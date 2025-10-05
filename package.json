@@ -21,7 +21,7 @@
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
 		"format": "echo 'Format: using editorconfig for consistent formatting'",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"test": "vitest",
+	"test": "vitest run",
 		"ci:debug": "bash scripts/ci-debug.sh",
 		"test:run": "vitest run"
 	},
