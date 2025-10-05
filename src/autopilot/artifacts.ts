@@ -49,14 +49,17 @@ export class ArtifactWriter {
 	private outputDir: string;
 	private profilePath: string;
 	private profileRole: string;
+	private timestamp?: string;
 
-	constructor(profilePath: string, profileRole: string, timestamp?: string) {
+	constructor(profilePath: string, profileRole: string, timestamp?: string, customDeliverablesDir?: string) {
 		this.profilePath = profilePath;
 		this.profileRole = profileRole;
+		this.timestamp = timestamp;
 
 		// Generate timestamp-based directory name
 		const ts = timestamp || new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
-		this.outputDir = path.join(profilePath, "deliverables", `weave-${ts}`);
+		const deliverablesRoot = customDeliverablesDir || path.join(profilePath, "deliverables");
+		this.outputDir = path.join(deliverablesRoot, `weave-${ts}`);
 	}
 
 	/**
@@ -74,6 +77,13 @@ export class ArtifactWriter {
 		if (!fs.existsSync(this.outputDir)) {
 			fs.mkdirSync(this.outputDir, { recursive: true });
 		}
+	}
+
+	/**
+	 * Get timestamp used for this artifact writer
+	 */
+	getTimestamp(): string | undefined {
+		return this.timestamp;
 	}
 
 	/**

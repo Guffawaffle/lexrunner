@@ -308,6 +308,7 @@ program
 	.argument("[file]", "Path to plan.json file (alternative to --plan)")
 	.option("--level <level>", "Autopilot level (0=report-only, 1=artifacts)", "1")
 	.option("--profile-dir <dir>", "Profile directory (default: .smartergpt)")
+	.option("--deliverables-dir <dir>", "Custom deliverables directory (overrides default profile/deliverables)")
 	.option("--json", "Output JSON format")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file;
@@ -349,7 +350,8 @@ program
 				process.exit(1);
 			}
 
-			const result = await autopilot.execute();
+			// Execute with optional custom deliverables directory
+			const result = await autopilot.execute(opts.deliverablesDir);
 
 			if (opts.json) {
 				console.log(canonicalJSONStringify(result));
@@ -1343,6 +1345,147 @@ program
 			}
 		} catch (error) {
 			console.error(`Error initializing local overlay: ${error instanceof Error ? error.message : String(error)}`);
+			process.exit(1);
+		}
+	});
+
+// Deliverables list command
+program
+	.command("deliverables:list")
+	.description("List all autopilot deliverables with metadata")
+	.option("--profile-dir <dir>", "Profile directory (default: .smartergpt)")
+	.option("--json", "Output JSON format")
+	.action(async (opts) => {
+		try {
+			const profile = resolveProfile(opts.profileDir);
+			const { DeliverablesManager } = await import("./autopilot/index.js");
+			const manager = new DeliverablesManager(profile.path);
+			const deliverables = await manager.listDeliverables();
+
+			if (opts.json) {
+				console.log(canonicalJSONStringify(deliverables));
+			} else {
+				if (deliverables.length === 0) {
+					console.log("No deliverables found");
+					return;
+				}
+
+				console.log(`\n📦 Deliverables in ${manager.getDeliverablesRoot()}\n`);
+				
+				deliverables.forEach((d, idx) => {
+					console.log(`${idx + 1}. ${d.timestamp}`);
+					console.log(`   Level: ${d.levelExecuted}`);
+					console.log(`   Plan Hash: ${d.planHash.substring(0, 12)}...`);
+					console.log(`   Artifacts: ${d.artifacts.length}`);
+					console.log(`   Environment: ${d.executionContext.environment}`);
+					if (d.executionContext.actor) {
+						console.log(`   Actor: ${d.executionContext.actor}`);
+					}
+					console.log("");
+				});
+
+				const latest = manager.getLatestPath();
+				if (latest) {
+					console.log(`📍 Latest: ${path.basename(latest)}`);
+				}
+			}
+		} catch (error) {
+			console.error(`Error listing deliverables: ${error instanceof Error ? error.message : String(error)}`);
+			process.exit(1);
+		}
+	});
+
+// Deliverables cleanup command
+program
+	.command("deliverables:cleanup")
+	.description("Clean up old deliverables based on retention policy")
+	.option("--profile-dir <dir>", "Profile directory (default: .smartergpt)")
+	.option("--max-age <days>", "Maximum age in days (deletes older deliverables)")
+	.option("--max-count <count>", "Maximum number of deliverables to keep")
+	.option("--keep-latest", "Always keep the latest deliverables (default: true)", true)
+	.option("--dry-run", "Preview cleanup without deleting")
+	.option("--json", "Output JSON format")
+	.action(async (opts) => {
+		try {
+			const profile = resolveProfile(opts.profileDir);
+			const { DeliverablesManager } = await import("./autopilot/index.js");
+			const manager = new DeliverablesManager(profile.path);
+
+			const policy = {
+				maxAge: opts.maxAge ? parseInt(opts.maxAge) : undefined,
+				maxCount: opts.maxCount ? parseInt(opts.maxCount) : undefined,
+				keepLatest: opts.keepLatest
+			};
+
+			if (opts.dryRun) {
+				// Preview mode - show what would be deleted
+				const deliverables = await manager.listDeliverables();
+				let toKeep = deliverables;
+
+				if (policy.maxCount !== undefined && policy.maxCount > 0) {
+					toKeep = toKeep.slice(0, policy.maxCount);
+				}
+
+				if (policy.maxAge !== undefined && policy.maxAge > 0) {
+					const cutoffDate = new Date();
+					cutoffDate.setDate(cutoffDate.getDate() - policy.maxAge);
+					toKeep = toKeep.filter(d => new Date(d.timestamp) > cutoffDate);
+				}
+
+				if (policy.keepLatest && deliverables.length > 0 && !toKeep.includes(deliverables[0])) {
+					toKeep = [deliverables[0], ...toKeep];
+				}
+
+				const keepSet = new Set(toKeep.map(d => d.timestamp));
+				const toRemove = deliverables.filter(d => !keepSet.has(d.timestamp));
+
+				if (opts.json) {
+					console.log(canonicalJSONStringify({
+						dryRun: true,
+						policy,
+						toKeep: toKeep.length,
+						toRemove: toRemove.length,
+						deliverables: toRemove
+					}));
+				} else {
+					console.log("\n🔍 Cleanup Preview (dry-run)\n");
+					console.log(`Policy: ${policy.maxAge ? `max-age=${policy.maxAge}d` : ''} ${policy.maxCount ? `max-count=${policy.maxCount}` : ''} keep-latest=${policy.keepLatest}`);
+					console.log("");
+					console.log(`Would keep: ${toKeep.length} deliverables`);
+					console.log(`Would remove: ${toRemove.length} deliverables`);
+					
+					if (toRemove.length > 0) {
+						console.log("\nTo be removed:");
+						toRemove.forEach(d => {
+							const dirName = `weave-${d.timestamp.replace(/[:.]/g, "-").replace("Z", "")}`;
+							console.log(`  - ${dirName} (${d.timestamp})`);
+						});
+					}
+					
+					console.log("\nRun without --dry-run to apply changes");
+				}
+			} else {
+				// Actual cleanup
+				const result = await manager.cleanup(policy);
+
+				if (opts.json) {
+					console.log(canonicalJSONStringify(result));
+				} else {
+					console.log("\n🧹 Cleanup Complete\n");
+					console.log(`Removed: ${result.removed.length} deliverables`);
+					console.log(`Kept: ${result.kept.length} deliverables`);
+					console.log(`Freed space: ${(result.freedSpace / 1024).toFixed(2)} KB`);
+					
+					if (result.removed.length > 0) {
+						console.log("\nRemoved:");
+						result.removed.forEach(path => {
+							console.log(`  - ${path}`);
+						});
+					}
+				}
+			}
+		} catch (error) {
+			console.error(`Error cleaning up deliverables: ${error instanceof Error ? error.message : String(error)}`);
 			process.exit(1);
 		}
 	});

@@ -10,6 +10,8 @@ import {
 	GatePrediction,
 	ConflictPrediction
 } from "./artifacts.js";
+import { DeliverablesManager } from "./deliverables.js";
+import * as path from "path";
 
 /**
  * Level 1 autopilot - Artifact generation
@@ -20,16 +22,38 @@ export class AutopilotLevel1 extends AutopilotLevel0 {
 		return 1;
 	}
 
-	async execute(): Promise<AutopilotResult> {
+	async execute(customDeliverablesDir?: string): Promise<AutopilotResult> {
 		try {
 			const plan = this.context.plan;
 			const mergeOrder = this.computeMergeOrder();
 			const recommendations = this.generateRecommendations();
 
-			// Create artifact writer with timestamp
+			// Get runner version
+			const runnerVersion = this.getRunnerVersion();
+
+			// Generate timestamp for this execution
+			const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
+
+			// Initialize deliverables manager
+			const deliverables = new DeliverablesManager(
+				this.context.profilePath,
+				customDeliverablesDir
+			);
+
+			// Create deliverables directory with manifest
+			const deliverableDir = await deliverables.createDeliverables(
+				plan,
+				this.getLevel(),
+				runnerVersion,
+				timestamp
+			);
+
+			// Create artifact writer with same timestamp
 			const writer = new ArtifactWriter(
 				this.context.profilePath,
-				this.context.profileRole
+				this.context.profileRole,
+				timestamp,
+				customDeliverablesDir
 			);
 
 			// Initialize output directory (validates write permissions)
@@ -51,13 +75,31 @@ export class AutopilotLevel1 extends AutopilotLevel0 {
 			// Generate gate predictions
 			const gatePredictions = this.generateGatePredictions();
 
-			// Write all artifacts
+			// Write all artifacts and register them
 			const artifacts: string[] = [];
-			artifacts.push(await writer.writeAnalysis(analysisData));
-			artifacts.push(await writer.writeWeaveReport(plan, mergeOrder, recommendations));
-			artifacts.push(await writer.writeGatePredictions(gatePredictions));
-			artifacts.push(await writer.writeExecutionLog(plan, mergeOrder));
-			artifacts.push(await writer.writeMetadata(this.getLevel()));
+			
+			const analysisPath = await writer.writeAnalysis(analysisData);
+			artifacts.push(analysisPath);
+			await deliverables.registerArtifact(deliverableDir, analysisPath, "json");
+
+			const reportPath = await writer.writeWeaveReport(plan, mergeOrder, recommendations);
+			artifacts.push(reportPath);
+			await deliverables.registerArtifact(deliverableDir, reportPath, "markdown");
+
+			const predictionsPath = await writer.writeGatePredictions(gatePredictions);
+			artifacts.push(predictionsPath);
+			await deliverables.registerArtifact(deliverableDir, predictionsPath, "json");
+
+			const logPath = await writer.writeExecutionLog(plan, mergeOrder);
+			artifacts.push(logPath);
+			await deliverables.registerArtifact(deliverableDir, logPath, "markdown");
+
+			const metadataPath = await writer.writeMetadata(this.getLevel());
+			artifacts.push(metadataPath);
+			await deliverables.registerArtifact(deliverableDir, metadataPath, "json");
+
+			// Update latest symlink
+			await deliverables.updateLatestSymlink(deliverableDir);
 
 			const message = [
 				"Level 1: Artifact generation complete",
@@ -65,6 +107,9 @@ export class AutopilotLevel1 extends AutopilotLevel0 {
 				"",
 				"Artifacts created:",
 				...artifacts.map(a => `  - ${a}`),
+				"",
+				"Deliverables manifest: " + path.join(deliverableDir, "manifest.json"),
+				"Latest symlink: " + path.join(deliverables.getDeliverablesRoot(), "latest"),
 				"",
 				"Next steps:",
 				"  - Review weave-report.md for execution recommendations",
@@ -85,6 +130,19 @@ export class AutopilotLevel1 extends AutopilotLevel0 {
 				success: false,
 				message: `Level 1 execution failed: ${errorMessage}`
 			};
+		}
+	}
+
+	/**
+	 * Get runner version from package.json
+	 */
+	private getRunnerVersion(): string {
+		try {
+			const packageJsonPath = path.resolve(process.cwd(), "package.json");
+			const packageJson = JSON.parse(require("fs").readFileSync(packageJsonPath, "utf8"));
+			return packageJson.version || "unknown";
+		} catch {
+			return "unknown";
 		}
 	}
 

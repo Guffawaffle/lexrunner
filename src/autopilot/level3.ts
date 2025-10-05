@@ -21,10 +21,10 @@ export class AutopilotLevel3 extends AutopilotLevel2 {
 		return 3;
 	}
 
-	async execute(): Promise<AutopilotResult> {
+	async execute(customDeliverablesDir?: string): Promise<AutopilotResult> {
 		try {
 			// Execute Level 2 first to generate artifacts and annotations
-			const level2Result = await super.execute();
+			const level2Result = await super.execute(customDeliverablesDir);
 			if (!level2Result.success) {
 				return level2Result; // Propagate Level 2 failure
 			}
