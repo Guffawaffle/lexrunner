@@ -2,20 +2,97 @@
 
 **Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.**
 
-## Features
+## MCP Multi-Repo Integration
 
-- **📋 Interactive Plan Review**: Human-in-the-loop validation and editing of merge plans
-- **🔗 Dependency Resolution**: Automatic computation of merge order with cycle detection
-- **✅ Quality Gates**: Execute tests, linters, and custom validation gates
-- **🔄 Autopilot Levels**: Graduated automation from dry-run to full merge
-- **📊 Plan Comparison**: Diff and compare plan versions
-- **📝 History Tracking**: Audit trail for plan changes and approvals
+The repository includes an optional **Model Context Protocol (MCP) server** (`src/mcp/server.ts`) that exposes deterministic tools for plan & gate workflows.
 
-## Components
+### Why
 
-- **Runner CLI**: TypeScript command-line app under `src/**`. Commands: `plan|run|merge|doctor|format|ci-replay` + `execute|merge-order|report|status|schema|plan-review|plan-diff`
-- **MCP server**: Optional read-only adapter at `src/mcp/server.ts`. Exposes tools (`plan.create`, `gates.run`, `merge.apply`) and resources under `.smartergpt/runner/`
-- **Workspace profile**: Portable example profile under `.smartergpt/**`. Configuration inputs the runner consumes
+Use a single built artifact to service multiple local repositories (each as an isolated endpoint) without adding persistent services to your compose stack. This keeps lex-serve minimal (nginx + tunnel) while enabling agent orchestration.
+
+### Generator Script
+
+Auto-generate `servers.json` describing per-repo MCP endpoints.
+
+Script location:
+
+`scripts/gen_mcp_servers.py`
+
+Key capabilities:
+
+- Recursive or shallow git repo discovery under provided roots
+- Include / exclude regex filters (`--include`, `--exclude`)
+- Mutation allow-list via repeated `--mutate <repo>` or structured `--policy-file`
+- Per-repo `.env.mcp` overlay (non-destructive; does not override explicit flags/policy)
+- Profile detection precedence: `.smartergpt.local` → `.smartergpt`
+- Dist autodetect: built `dist/mcp/server.js` → fallback `tsx src/mcp/server.ts`
+- Deterministic sorted keys + SHA-256 hash guard (skip rewrite if unchanged)
+- Optional read-only workspace variant (`--workspace-out`)
+- Prefix isolation (`--prefix`, default `lex-pr-runner`)
+
+### Quick Use
+
+```bash
+# Build once so dist/mcp/server.js is present
+npm run build
+
+# Generate primary + workspace variant (recursive scan)
+python3 scripts/gen_mcp_servers.py \
+  -r /srv -r /home/guff \
+  --recursive \
+  --include '^(smartergpt|lex-serve|lex-pr-runner)$' \
+  --mutate lex-pr-runner \
+  --workspace-out servers.workspace.json
+
+# Or use the convenience npm script (uses defaults)
+  }
+```
+
+### Output Shape (primary)
+
+```jsonc
+{
+  "mcpServers": {
+    "lex-pr-runner-smartergpt": {
+      "command": "node",
+      "args": ["/home/guff/lex-pr-runner/dist/mcp/server.js"],
+      "env": {
+        "ALLOW_MUTATIONS": "false",
+        "LEX_PR_PROFILE_DIR": "/srv/sites/smartergpt/.smartergpt"
+      },
+      "workingDirectory": "/srv/sites/smartergpt"
+    }
+  }
+}
+```
+
+Workspace variant (`servers.workspace.json`) mirrors entries but forces `ALLOW_MUTATIONS=false` for all.
+
+### Orchestrator Flow (Suggested)
+
+1. `profile.resolve` (confirm profile path & role)
+2. `local.init` (if runner artifacts missing)
+3. `plan.create`
+4. `gates.run`
+5. `merge.apply` (dry run) → eligibility summary
+6. `merge.apply` (real) only after explicit approval & env `ALLOW_MUTATIONS=true`
+
+See `orchestrator-prompt.md` for a supervisory prompt template.
+}
+```
+
+Workspace variant (`servers.workspace.json`) mirrors entries but forces `ALLOW_MUTATIONS=false` for all.
+
+### Orchestrator Flow (Suggested)
+1. `profile.resolve` (confirm profile path & role)
+2. `local.init` (if runner artifacts missing)
+3. `plan.create`
+4. `gates.run`
+5. `merge.apply` (dry run) → eligibility summary
+6. `merge.apply` (real) only after explicit approval & env `ALLOW_MUTATIONS=true`
+
+See `orchestrator-prompt.md` for a supervisory prompt template.
+
 
 ## Two-track separation (firm)
 
@@ -110,6 +187,7 @@ npm run cli -- plan --help
 ## CLI Commands
 
 ### Plan Generation
+
 ```bash
 # Generate plan artifacts (plan.json + snapshot.md)
 npm run cli -- plan [--out .smartergpt/runner]
@@ -122,6 +200,7 @@ npm run cli -- plan --out ./my-artifacts
 ```
 
 ### Other Commands
+
 ```bash
 # Environment and config sanity checks
 npm run cli -- doctor
@@ -148,6 +227,7 @@ npm run cli -- report ./gate-results --out md
 
 **Gate Result Format:**
 Each gate result file must follow the JSON schema with stable keys:
+
 ```json
 {
   "item": "item-name",
@@ -165,6 +245,7 @@ Each gate result file must follow the JSON schema with stable keys:
 ```
 
 **Features:**
+
 - Stable, deterministic output with sorted items and gates
 - Validation against JSON schema
 - Summary statistics (allGreen, pass/fail counts)
@@ -183,6 +264,7 @@ The runner uses a **precedence chain** to locate the profile directory:
 4. `.smartergpt/` - Tracked example profile (default)
 
 **Quick start:**
+
 ```bash
 # Initialize local overlay for development
 npm run cli -- init-local
@@ -206,6 +288,7 @@ The planner reads configuration from the resolved profile directory:
 - **`profile.yml`**: Profile metadata and role (`example`, `development`, `local`)
 
 ### Example stack.yml
+
 ```yaml
 version: 1
 target: main
@@ -237,6 +320,7 @@ npm run cli -- plan --json || echo "Plan validation failed with exit code $?"
 ```
 
 ## Project layout
+
 - `src/core`: planner, gates runner, weave strategies
 - `src/cli.ts`: human CLI (Commander)
 - `src/mcp/server.ts`: MCP tool/resource surface (adapter)
@@ -254,6 +338,7 @@ cmp .artifacts1/plan.json .artifacts2/plan.json  # Should be identical
 ```
 
 **Key guarantees:**
+
 - Canonical JSON with stable key ordering (no timestamps)
 - Raw-byte deterministic hashing for artifact verification
 - Cross-platform portability (Windows, macOS, Linux)
@@ -271,6 +356,33 @@ process.chdir(testDir);
 This keeps tests isolated and prevents intermittent failures when running the full test suite.
 
 ## Notes
+
 - Deterministic > clever. Outputs are sorted for stable diffs.
 - `schemas/plan.schema.json` is the source of truth for validation.
 - Dependencies resolve by `name` field (generator can default `name := id`)
+
+## MCP: Multi-Repo Integration
+
+Generate MCP server manifests for all local repos. The generator discovers git roots under `/srv` and `/home/guff`, detects `.smartergpt(.local)` profiles, and writes a deterministic `servers.json`.
+
+```bash
+# Build once (for dist), then generate
+npm run build
+npm run generate:mcp-servers
+
+# Customize (recursive, filters, policy-file, mutate allow-list)
+python3 scripts/gen_mcp_servers.py      -r /srv -r /home/guff --recursive      --include '^(smartergpt|lex-serve|lex-pr-runner)$'      --policy-file mutate-policy.json      --mutate lex-pr-runner      -o servers.json --workspace-out servers.workspace.json
+```
+
+### MCP Section Notes
+
+- Profile precedence: `.smartergpt.local` → `.smartergpt`.
+- Mutations are **off** by default; enable per-repo via `--mutate` or policy file.
+- If `dist/mcp/server.js` is missing, generator falls back to `npx tsx src/mcp/server.ts`.
+- `servers.workspace.json` is a read-only variant (all `ALLOW_MUTATIONS=false`).
+
+### MCP Section Exit Codes
+
+- `0`: success, no changes
+- `2`: dry-run indicates the output would change
+- `1`: error
