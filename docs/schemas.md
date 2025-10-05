@@ -76,19 +76,39 @@ export const Gate = z.object({
 
 ### Gate Report Schema
 
+The Gate Report schema has been enhanced with versioning and artifact support:
+
 ```typescript
 // Defined in src/schema/gateReport.ts
 export const GateReport = z.object({
+  schemaVersion: z.string().regex(/^1\.\d+\.\d+$/).optional(),
   item: z.string(),
   gate: z.string(), 
   status: z.enum(["pass", "fail"]),
-  duration_ms: z.number(),
+  duration_ms: z.number().min(0),
   started_at: z.string(), // ISO timestamp
   stderr_path: z.string().optional(),
   stdout_path: z.string().optional(),
-  meta: z.record(z.string()).optional()
+  meta: z.record(z.string()).optional(),
+  artifacts: z.array(ArtifactMetadata).optional()
+});
+
+export const ArtifactMetadata = z.object({
+  path: z.string(),
+  type: z.string().optional(),
+  size: z.number().min(0).optional(),
+  description: z.string().optional()
 });
 ```
+
+**Key Features:**
+
+- **Schema Versioning**: Optional `schemaVersion` field for backward compatibility (format: `1.x.y`)
+- **Artifact Metadata**: Track build outputs, reports, and logs with rich metadata
+- **Enhanced Validation**: Detailed error messages with fix suggestions
+- **Migration Support**: Utilities to migrate legacy report formats
+
+**See Also:** [Gate Report Examples](./gate-report-examples.md) for complete usage examples.
 
 ## Schema Versioning
 
@@ -99,6 +119,36 @@ Schemas follow semantic versioning principles:
 - **Patch (1.1.1 → 1.1.2)**: Additive optional fields or documentation only
 
 Current supported version: **1.x.y** (major version 1 only)
+
+### Gate Report Schema Evolution
+
+The gate report schema supports versioning and migration:
+
+- **Schema Version Field**: Optional `schemaVersion` field (format: `1.x.y`)
+- **Backward Compatibility**: Reports without schema version are treated as `1.0.0`
+- **Migration Utilities**: Automatic migration from legacy formats
+
+#### Legacy Field Mapping
+
+| Legacy Field | Current Field | Migration Rule |
+|--------------|---------------|----------------|
+| `result: "success"` | `status: "pass"` | Direct mapping |
+| `result: "failure"` | `status: "fail"` | Direct mapping |
+| `duration` | `duration_ms` | Field rename |
+| `start_time` | `started_at` | Field rename |
+
+#### Migration Commands
+
+```bash
+# Check if report needs migration
+lex-pr gate-report validate report.json
+
+# Migrate and show converted format
+lex-pr gate-report validate legacy-report.json --migrate
+
+# Migrate with JSON output
+lex-pr gate-report validate legacy-report.json --migrate --json
+```
 
 ## Validation and Error Handling
 
@@ -147,9 +197,18 @@ npm run cli -- schema validate plan.json
 
 # JSON output for CI integration
 npm run cli -- schema validate plan.json --json
+
+# Validate gate report
+npm run cli -- gate-report validate report.json
+
+# Validate with JSON output
+npm run cli -- gate-report validate report.json --json
+
+# Migrate and validate legacy gate report
+npm run cli -- gate-report validate legacy-report.json --migrate
 ```
 
-Expected JSON output format:
+Expected JSON output format for plan validation:
 ```json
 // Success
 { "valid": true }
@@ -164,6 +223,45 @@ Expected JSON output format:
       "code": "invalid_type"
     }
   ]
+}
+```
+
+Expected JSON output format for gate report validation:
+```json
+// Success
+{ "valid": true }
+
+// Failure with suggestions
+{
+  "valid": false,
+  "errors": [
+    {
+      "path": "status",
+      "message": "Invalid enum value. Expected 'pass' | 'fail', received 'invalid-status'",
+      "code": "invalid_enum_value",
+      "suggestion": "Valid values: \"pass\" or \"fail\""
+    },
+    {
+      "path": "started_at",
+      "message": "Required",
+      "code": "invalid_type",
+      "suggestion": "Use ISO 8601 format: \"2024-01-15T10:30:00Z\""
+    }
+  ]
+}
+
+// Migration success
+{
+  "valid": true,
+  "migrated": true,
+  "data": {
+    "schemaVersion": "1.0.0",
+    "item": "feature-payment",
+    "gate": "test",
+    "status": "pass",
+    "duration_ms": 3500,
+    "started_at": "2024-01-15T11:00:00Z"
+  }
 }
 ```
 

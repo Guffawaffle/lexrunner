@@ -2,12 +2,18 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://example.com/schemas/gate-report.schema.json",
   "title": "Gate Report Schema",
-  "description": "Schema for gate execution reports with stable keys and deterministic output",
+  "description": "Schema for gate execution reports with stable keys and deterministic output. Supports schema versioning and artifact metadata.",
+  "version": "1.0.0",
   "$ref": "#/definitions/GateReport",
   "definitions": {
     "GateReport": {
       "type": "object",
       "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "pattern": "^1\\.\\d+\\.\\d+$",
+          "default": "1.0.0"
+        },
         "item": {
           "type": "string"
         },
@@ -38,6 +44,31 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "size": {
+                "type": "number",
+                "minimum": 0
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
           }
         }
       },

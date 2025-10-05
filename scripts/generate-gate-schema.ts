@@ -17,7 +17,8 @@ const jsonSchema = {
 	$schema: "https://json-schema.org/draft/2020-12/schema",
 	$id: "https://example.com/schemas/gate-report.schema.json",
 	title: "Gate Report Schema",
-	description: "Schema for gate execution reports with stable keys and deterministic output",
+	description: "Schema for gate execution reports with stable keys and deterministic output. Supports schema versioning and artifact metadata.",
+	version: "1.0.0",
 	...schema
 };
 
