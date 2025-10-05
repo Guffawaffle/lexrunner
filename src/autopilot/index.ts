@@ -12,6 +12,7 @@ export { AutopilotLevel2 } from "./level2.js";
 export { AutopilotLevel3 } from "./level3.js";
 export { AutopilotLevel4 } from "./level4.js";
 export { ArtifactWriter } from "./artifacts.js";
+export { DeliverablesManager } from "./deliverables.js";
 export type {
         AutopilotContext,
         AutopilotResult
@@ -22,3 +23,10 @@ export type {
         ConflictPrediction,
         ArtifactMetadata
 } from "./artifacts.js";
+export type {
+        DeliverablesManifest,
+        ArtifactEntry,
+        ExecutionContext,
+        RetentionPolicy,
+        CleanupResult
+} from "./deliverables.js";

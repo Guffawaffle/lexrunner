@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "policy": {
+    "requiredGates": ["lint", "typecheck", "test"],
+    "optionalGates": ["e2e"],
+    "maxWorkers": 3,
+    "retries": {
+      "e2e": { "maxAttempts": 2, "backoffSeconds": 30 }
+    },
+    "mergeRule": {
+      "type": "strict-required"
+    }
+  },
+  "items": [
+    {
+      "name": "PR-116-A9-E2E-Testing",
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-117-C3-Documentation",
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-118-D2-Error-Recovery",
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-119-D3-Security",
+      "deps": ["PR-118-D2-Error-Recovery"],
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-120-D4-Performance",
+      "deps": ["PR-118-D2-Error-Recovery"],
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-121-C2-CLI-Features",
+      "deps": ["PR-117-C3-Documentation"],
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-122-A7-Level4",
+      "deps": ["PR-116-A9-E2E-Testing"],
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-123-B4-Interactive-Plan",
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    },
+    {
+      "name": "PR-124-B3-Plan-Generation",
+      "deps": ["PR-123-B4-Interactive-Plan"],
+      "gates": [
+        {"name": "lint", "run": "npm run lint"},
+        {"name": "typecheck", "run": "npm run typecheck"},
+        {"name": "test", "run": "npm test"}
+      ]
+    }
+  ]
+}
