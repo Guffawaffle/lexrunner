@@ -133,8 +133,12 @@ describe('AutopilotLevel1', () => {
 		expect(fs.existsSync(deliverables)).toBe(true);
 
 		const dirs = fs.readdirSync(deliverables);
-		expect(dirs.length).toBe(1);
-		expect(dirs[0]).toMatch(/^weave-/);
+		const weave_dirs = dirs.filter(d => d.startsWith('weave-'));
+		expect(weave_dirs.length).toBe(1);
+		expect(weave_dirs[0]).toMatch(/^weave-/);
+		
+		// Check that latest symlink exists
+		expect(dirs).toContain('latest');
 	});
 
 	it('should generate all required artifacts', async () => {
@@ -331,5 +335,122 @@ describe('AutopilotLevel1', () => {
 
 		expect(analysis.mergeOrder).toHaveLength(1);
 		expect(analysis.mergeOrder[0]).toHaveLength(2);
+	});
+
+	it('should create manifest.json with plan hash', async () => {
+		const autopilot = new AutopilotLevel1(context);
+		const result = await autopilot.execute();
+
+		expect(result.success).toBe(true);
+
+		const deliverables = path.join(testDir, 'deliverables');
+		const dirs = fs.readdirSync(deliverables).filter(d => d.startsWith('weave-'));
+		const weaveDir = path.join(deliverables, dirs[0]);
+		const manifestPath = path.join(weaveDir, 'manifest.json');
+
+		expect(fs.existsSync(manifestPath)).toBe(true);
+
+		const content = fs.readFileSync(manifestPath, 'utf-8');
+		const manifest = JSON.parse(content);
+
+		expect(manifest.schemaVersion).toBe("1.0.0");
+		expect(manifest.timestamp).toBeDefined();
+		expect(manifest.planHash).toBeDefined();
+		expect(manifest.planHash.length).toBeGreaterThan(0);
+		expect(manifest.runnerVersion).toBeDefined();
+		expect(manifest.levelExecuted).toBe(1);
+		expect(manifest.profilePath).toBe(testDir);
+		expect(manifest.artifacts).toBeDefined();
+		expect(manifest.artifacts.length).toBe(5);
+		expect(manifest.executionContext).toBeDefined();
+	});
+
+	it('should register all artifacts in manifest', async () => {
+		const autopilot = new AutopilotLevel1(context);
+		const result = await autopilot.execute();
+
+		expect(result.success).toBe(true);
+
+		const deliverables = path.join(testDir, 'deliverables');
+		const dirs = fs.readdirSync(deliverables).filter(d => d.startsWith('weave-'));
+		const weaveDir = path.join(deliverables, dirs[0]);
+		const manifestPath = path.join(weaveDir, 'manifest.json');
+
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+
+		// Check that all artifacts are registered
+		const artifactNames = manifest.artifacts.map((a: any) => a.name);
+		expect(artifactNames).toContain('analysis.json');
+		expect(artifactNames).toContain('weave-report.md');
+		expect(artifactNames).toContain('gate-predictions.json');
+		expect(artifactNames).toContain('execution-log.md');
+		expect(artifactNames).toContain('metadata.json');
+
+		// Check artifact metadata
+		for (const artifact of manifest.artifacts) {
+			expect(artifact.name).toBeDefined();
+			expect(artifact.path).toBeDefined();
+			expect(artifact.type).toMatch(/^(json|markdown|log)$/);
+			expect(artifact.size).toBeGreaterThan(0);
+			expect(artifact.hash).toBeDefined();
+		}
+	});
+
+	it('should create latest symlink', async () => {
+		const autopilot = new AutopilotLevel1(context);
+		const result = await autopilot.execute();
+
+		expect(result.success).toBe(true);
+
+		const deliverables = path.join(testDir, 'deliverables');
+		const latestPath = path.join(deliverables, 'latest');
+
+		expect(fs.existsSync(latestPath)).toBe(true);
+
+		const stats = fs.lstatSync(latestPath);
+		expect(stats.isSymbolicLink()).toBe(true);
+	});
+
+	it('should update latest symlink on multiple executions', async () => {
+		const autopilot1 = new AutopilotLevel1(context);
+		await autopilot1.execute();
+
+		// Wait a bit to ensure different timestamps
+		await new Promise(resolve => setTimeout(resolve, 10));
+
+		const autopilot2 = new AutopilotLevel1(context);
+		const result2 = await autopilot2.execute();
+
+		expect(result2.success).toBe(true);
+
+		const deliverables = path.join(testDir, 'deliverables');
+		const latestPath = path.join(deliverables, 'latest');
+		const target = fs.readlinkSync(latestPath);
+
+		// Latest should point to most recent execution
+		const dirs = fs.readdirSync(deliverables)
+			.filter(d => d.startsWith('weave-'))
+			.sort()
+			.reverse();
+		
+		expect(target).toBe(dirs[0]);
+	});
+
+	it('should support custom deliverables directory', async () => {
+		const customDir = path.join(testDir, 'custom-deliverables');
+		const autopilot = new AutopilotLevel1(context);
+		const result = await autopilot.execute(customDir);
+
+		expect(result.success).toBe(true);
+
+		expect(fs.existsSync(customDir)).toBe(true);
+		
+		const dirs = fs.readdirSync(customDir).filter(d => d.startsWith('weave-'));
+		expect(dirs.length).toBe(1);
+
+		// Verify artifacts exist in custom directory
+		const weaveDir = path.join(customDir, dirs[0]);
+		expect(fs.existsSync(path.join(weaveDir, 'manifest.json'))).toBe(true);
+		expect(fs.existsSync(path.join(weaveDir, 'analysis.json'))).toBe(true);
 	});
 });

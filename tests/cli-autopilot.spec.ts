@@ -102,15 +102,20 @@ describe('CLI autopilot command', () => {
 		expect(fs.existsSync(deliverables)).toBe(true);
 
 		const dirs = fs.readdirSync(deliverables);
-		expect(dirs.length).toBe(1);
-		expect(dirs[0]).toMatch(/^weave-/);
+		const weaveDirs = dirs.filter(d => d.startsWith('weave-'));
+		expect(weaveDirs.length).toBe(1);
+		expect(weaveDirs[0]).toMatch(/^weave-/);
 
-		const weaveDir = path.join(deliverables, dirs[0]);
+		const weaveDir = path.join(deliverables, weaveDirs[0]);
 		expect(fs.existsSync(path.join(weaveDir, 'analysis.json'))).toBe(true);
 		expect(fs.existsSync(path.join(weaveDir, 'weave-report.md'))).toBe(true);
 		expect(fs.existsSync(path.join(weaveDir, 'gate-predictions.json'))).toBe(true);
 		expect(fs.existsSync(path.join(weaveDir, 'execution-log.md'))).toBe(true);
 		expect(fs.existsSync(path.join(weaveDir, 'metadata.json'))).toBe(true);
+		expect(fs.existsSync(path.join(weaveDir, 'manifest.json'))).toBe(true);
+		
+		// Verify latest symlink exists
+		expect(fs.existsSync(path.join(deliverables, 'latest'))).toBe(true);
 	});
 
 	it('should fail when writing to role=example profile', () => {
