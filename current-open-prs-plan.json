@@ -1,5 +1,52 @@
 {
-  "items": [],
   "schemaVersion": "1.0.0",
-  "target": "main"
+  "target": "main",
+  "policy": {
+    "requiredGates": ["lint", "type", "test"],
+    "maxWorkers": 2
+  },
+  "items": [
+    {
+      "name": "PR-125-gate-schema-evolution",
+      "deps": [],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint",
+          "artifacts": []
+        },
+        {
+          "name": "type",
+          "run": "npm run typecheck",
+          "artifacts": []
+        },
+        {
+          "name": "test",
+          "run": "npm test",
+          "artifacts": []
+        }
+      ]
+    },
+    {
+      "name": "PR-126-autopilot-deliverables",
+      "deps": [],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint",
+          "artifacts": []
+        },
+        {
+          "name": "type",
+          "run": "npm run typecheck",
+          "artifacts": []
+        },
+        {
+          "name": "test",
+          "run": "npm test",
+          "artifacts": []
+        }
+      ]
+    }
+  ]
 }

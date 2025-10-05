@@ -3,13 +3,9 @@ import { Plan, Gate, PlanItem, Policy, GateResult, GateStatus, RetryConfig } fro
 import { ExecutionState } from "./executionState.js";
 import path from "path";
 import fs from "fs";
-<<<<<<< HEAD
 import { classifyError, formatErrorForUser, ErrorType } from "./core/errorRecovery.js";
-||||||| eb067ce
-=======
 import { MemoryMonitor, OperationCache } from "./performance.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
->>>>>>> origin/copilot/fix-e5c8d1fa-1689-4596-b747-e58071cfe83e
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -50,7 +46,7 @@ export async function executeGate(
 		if (result.stderr) {
 			const error = new Error(result.stderr);
 			const classified = classifyError(error, `Gate '${gate.name}' execution`);
-			
+
 			// Log error classification for diagnostics
 			if (classified.type === ErrorType.Permanent) {
 				console.error(`❌ Gate '${gate.name}' failed with permanent error - not retrying`);
@@ -374,7 +370,7 @@ export async function executeGatesWithPolicy(
 			const nodeIndex = pendingNodes.indexOf(node);
 			pendingNodes.splice(nodeIndex, 1);
 			executing.add(node);
-			
+
 			// Update active workers metric
 			metrics.setGauge(METRICS.ACTIVE_WORKERS, executing.size);
 
