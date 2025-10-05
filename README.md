@@ -61,25 +61,25 @@ lex-pr merge plan.json
 
 See [docs/quickstart.md](docs/quickstart.md) for a complete 5-minute onboarding guide.
 
-<<<<<<< HEAD
 ## 📚 Documentation
 
-**[Complete Documentation →](docs/README.md)**
+Complete documentation and interactive plan review guides
 
-### Quick Links
-- **[Getting Started](docs/quickstart.md)** - 5-minute onboarding
-- **[Architecture Overview](docs/architecture.md)** - System design & philosophy
-- **[CLI Reference](docs/cli.md)** - Complete command documentation
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues & solutions
-- **[Migration Guide](docs/migration-guide.md)** - From manual to automated
-- **[Video Tutorials](docs/tutorials/)** - Step-by-step video guides
-- **[Workflows](docs/workflows/)** - Examples for different team sizes
-- **[CI/CD Integrations](docs/integrations/)** - Platform-specific setup
-||||||| eb067ce
-=======
-### Interactive Plan Review
+See the full documentation index: [docs/README.md](docs/README.md)
 
-Review and edit plans before execution:
+Quick links:
+- **Getting Started**: docs/quickstart.md — 5-minute onboarding
+- **Architecture Overview**: docs/architecture.md — system design & philosophy
+- **CLI Reference**: docs/cli.md — complete command documentation
+- **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
+- **Migration Guide**: docs/migration-guide.md — migrating to lex-pr-runner
+- **Video Tutorials**: docs/tutorials/ — step-by-step video guides
+- **Workflows**: docs/workflows/ — examples for different team sizes
+- **CI/CD Integrations**: docs/integrations/ — platform-specific setup
+
+Interactive Plan Review
+
+Review and edit plans before execution. Example workflows:
 
 ```bash
 # Interactive review with validation
@@ -92,8 +92,7 @@ lex-pr plan-diff old-plan.json new-plan.json
 lex-pr plan-review plan.json --save-history --output approved-plan.json
 ```
 
-See [docs/interactive-plan-review.md](docs/interactive-plan-review.md) for complete interactive workflow guide.
->>>>>>> origin/copilot/fix-b3530d6f-af96-4c2a-b05f-eb74cc519d01
+See docs/interactive-plan-review.md for the full interactive workflow guide.
 
 ### For Development
 
