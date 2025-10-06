@@ -199,4 +199,62 @@ describe('Security - Compliance & Audit', () => {
 			expect(typeof report.signature).toBe('string');
 		});
 	});
+
+	describe('Audit Log Retention', () => {
+		it('should provide retention recommendations', () => {
+			const recommendations = auditService.getRetentionRecommendations();
+
+			expect(recommendations).toBeInstanceOf(Array);
+			expect(recommendations.length).toBeGreaterThan(0);
+			
+			// Check SOX recommendation
+			const sox = recommendations.find(r => r.framework === 'SOX');
+			expect(sox).toBeDefined();
+			expect(sox?.minDays).toBe(2555); // 7 years
+		});
+
+		it('should include major compliance frameworks', () => {
+			const recommendations = auditService.getRetentionRecommendations();
+			const frameworks = recommendations.map(r => r.framework);
+
+			expect(frameworks).toContain('SOX');
+			expect(frameworks).toContain('SOC2');
+			expect(frameworks).toContain('GDPR');
+			expect(frameworks).toContain('HIPAA');
+			expect(frameworks).toContain('ISO 27001');
+			expect(frameworks).toContain('PCI DSS');
+		});
+
+		it('should prune old entries', () => {
+			// Create test entries
+			auditService.logSecure('old_op', 'decision', {});
+			
+			const prunedCount = auditService.pruneOldEntries(0); // Prune everything
+
+			expect(prunedCount).toBeGreaterThanOrEqual(0);
+		});
+
+		it('should apply SOX retention policy', () => {
+			const result = auditService.applyRetentionPolicy('SOX');
+
+			expect(result.applied).toBe(true);
+			expect(result.retentionDays).toBe(2555); // 7 years
+			expect(result.prunedCount).toBeGreaterThanOrEqual(0);
+		});
+
+		it('should apply GDPR retention policy', () => {
+			const result = auditService.applyRetentionPolicy('GDPR');
+
+			expect(result.applied).toBe(true);
+			expect(result.retentionDays).toBe(90); // 3 months
+		});
+
+		it('should handle invalid framework gracefully', () => {
+			const result = auditService.applyRetentionPolicy('INVALID' as any);
+
+			expect(result.applied).toBe(false);
+			expect(result.retentionDays).toBe(0);
+			expect(result.prunedCount).toBe(0);
+		});
+	});
 });

@@ -43,6 +43,11 @@ export {
 	EnvironmentSecretProvider,
 	SecretsManager,
 	secretsManager,
+	// Secrets Scanning
+	SecretPattern,
+	DetectedSecret,
+	SECRET_PATTERNS,
+	PlanSecretsScanner,
 } from './secrets.js';
 
 export {

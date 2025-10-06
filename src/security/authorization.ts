@@ -185,4 +185,87 @@ export class AuthorizationService {
 			);
 		}
 	}
+
+	/**
+	 * Preflight check for operations before execution
+	 * Returns validation result with detailed permissions info
+	 */
+	preflightCheck(context: AuthContext, requiredPermissions: Permission[]): {
+		allowed: boolean;
+		missingPermissions: Permission[];
+		userPermissions: Permission[];
+		recommendations?: string;
+	} {
+		const userPermissions = this.getUserPermissions(context);
+		const missingPermissions = requiredPermissions.filter(
+			required => !userPermissions.includes(required)
+		);
+
+		let recommendations: string | undefined;
+		if (missingPermissions.length > 0) {
+			// Suggest roles that would grant missing permissions
+			const suggestedRoles: string[] = [];
+			for (const [roleName, role] of Object.entries(ROLES)) {
+				const wouldGrant = missingPermissions.some(p => role.permissions.includes(p));
+				if (wouldGrant && !context.roles.includes(roleName)) {
+					suggestedRoles.push(roleName);
+				}
+			}
+
+			if (suggestedRoles.length > 0) {
+				recommendations = `Consider adding role(s): ${suggestedRoles.join(', ')}`;
+			}
+		}
+
+		return {
+			allowed: missingPermissions.length === 0,
+			missingPermissions,
+			userPermissions,
+			recommendations,
+		};
+	}
+
+	/**
+	 * Batch preflight check for multiple operations
+	 */
+	batchPreflightCheck(context: AuthContext, operations: {
+		name: string;
+		permissions: Permission[];
+	}[]): {
+		operation: string;
+		allowed: boolean;
+		missingPermissions: Permission[];
+	}[] {
+		return operations.map(op => {
+			const check = this.preflightCheck(context, op.permissions);
+			return {
+				operation: op.name,
+				allowed: check.allowed,
+				missingPermissions: check.missingPermissions,
+			};
+		});
+	}
+
+	/**
+	 * Generate permission report for user
+	 */
+	generatePermissionReport(context: AuthContext): string {
+		const lines: string[] = [];
+		
+		lines.push(`Permission Report for: ${context.user}`);
+		lines.push(`Roles: ${context.roles.join(', ')}`);
+		lines.push('');
+
+		const permissions = this.getUserPermissions(context);
+		lines.push(`Granted Permissions (${permissions.length}):`);
+		for (const permission of permissions) {
+			lines.push(`  ✓ ${permission}`);
+		}
+
+		lines.push('');
+		lines.push(`Maximum Autopilot Level: ${this.getMaxAutopilotLevel(context)}`);
+
+		return lines.join('\n');
+	}
 }
+

@@ -191,4 +191,131 @@ describe('Security - Secrets Management', () => {
 			expect(value).toBe('value');
 		});
 	});
+
+	describe('Plan Secrets Scanner', () => {
+		let scanner: any; // PlanSecretsScanner - using any for dynamic import
+
+		beforeEach(async () => {
+			const { PlanSecretsScanner } = await import('../src/security/secrets.js');
+			scanner = new PlanSecretsScanner();
+		});
+
+		it('should detect GitHub tokens', () => {
+			const content = 'Using token ghp_1234567890abcdefghijklmnopqrstuvwxyz in config';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].pattern.name).toBe('github_token');
+			expect(detected[0].value).toContain('***');
+		});
+
+		it('should detect AWS access keys', () => {
+			const content = 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].pattern.name).toBe('aws_access_key');
+		});
+
+		it('should detect private keys', () => {
+			const content = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].pattern.name).toBe('private_key');
+		});
+
+		it('should detect Slack tokens', () => {
+			const content = 'SLACK_TOKEN=xoxb-1234567890-1234567890123-abcdefghijklmnopqrstuvwx';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].pattern.name).toBe('slack_token');
+		});
+
+		it('should detect JWT tokens', () => {
+			const content = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].pattern.name).toBe('jwt_token');
+		});
+
+		it('should provide line and column information', () => {
+			const content = 'line 1\nline 2 ghp_1234567890abcdefghijklmnopqrstuvwxyz\nline 3';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(1);
+			expect(detected[0].line).toBe(2);
+			expect(detected[0].column).toBeGreaterThan(0);
+		});
+
+		it('should redact detected secrets', () => {
+			const content = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+			const detected = scanner.scanText(content);
+
+			expect(detected[0].value).not.toContain('1234567890abcdefghijklmnopqrstuvwxyz');
+			expect(detected[0].value).toContain('***');
+		});
+
+		it('should scan JSON objects', () => {
+			const obj = {
+				config: {
+					token: 'ghp_1234567890abcdefghijklmnopqrstuvwxyz',
+					api_key: 'AKIAIOSFODNN7EXAMPLE'
+				}
+			};
+
+			const detected = scanner.scanObject(obj);
+
+			expect(detected.length).toBeGreaterThanOrEqual(2);
+		});
+
+		it('should handle clean content with no secrets', () => {
+			const content = 'This is clean content with no secrets';
+			const detected = scanner.scanText(content);
+
+			expect(detected).toHaveLength(0);
+		});
+
+		it('should generate report for detected secrets', () => {
+			const content = 'Token: ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+			const detected = scanner.scanText(content);
+			const report = scanner.generateReport(detected);
+
+			expect(report).toContain('Found 1 potential secret');
+			expect(report).toContain('github_token');
+			expect(report).toContain('GitHub Personal Access Token');
+		});
+
+		it('should generate clean report when no secrets', () => {
+			const detected: any[] = [];
+			const report = scanner.generateReport(detected);
+
+			expect(report).toContain('✅ No secrets detected');
+		});
+
+		it('should detect multiple different secret types', () => {
+			const content = `
+				token: ghp_1234567890abcdefghijklmnopqrstuvwxyz
+				aws_key: AKIAIOSFODNN7EXAMPLE
+				slack: xoxb-1234567890-1234567890123-abcdefghijklmnopqrstuvwx
+			`;
+			const detected = scanner.scanText(content);
+
+			expect(detected.length).toBeGreaterThanOrEqual(3);
+			const types = detected.map(d => d.pattern.name);
+			expect(types).toContain('github_token');
+			expect(types).toContain('aws_access_key');
+			expect(types).toContain('slack_token');
+		});
+
+		it('should provide context for detected secrets', () => {
+			const content = 'config.token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz";';
+			const detected = scanner.scanText(content);
+
+			expect(detected[0].context).toBeDefined();
+			expect(detected[0].context).toContain('***');
+		});
+	});
 });
