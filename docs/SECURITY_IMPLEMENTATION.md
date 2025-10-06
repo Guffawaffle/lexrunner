@@ -350,13 +350,29 @@ npm test          # Full test suite (664 tests)
    lex-pr autopilot --level 4 --audit-signed
    ```
 
+### Security CLI Commands
+
+The `lex-pr security` command provides security operations:
+
+```bash
+# Check if secrets need rotation
+lex-pr security check-rotation GITHUB_TOKEN API_KEY --max-age 90
+
+# Scan plan files for accidentally exposed secrets
+lex-pr security scan-plan plan.json
+
+# Validate required secrets are present
+lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL
+```
+
 ### Monitoring
 
 - Review audit logs regularly
 - Generate compliance reports monthly
-- Check for secret rotation needs
+- Check for secret rotation needs with `lex-pr security check-rotation`
 - Monitor security scan results
 - Track permission usage
+- Apply retention policies based on compliance framework (SOX, GDPR, etc.)
 
 ## Security Best Practices
 

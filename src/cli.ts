@@ -2005,6 +2005,39 @@ function formatQueryResult(result: any, format: string): string {
 	return output;
 }
 
+// Security operations command
+program
+	.command("security")
+	.description("Security operations: token rotation, secrets scanning, validation")
+	.addCommand(
+		new Command("check-rotation")
+			.description("Check if secrets need rotation based on age")
+			.argument("[secrets...]", "Secret IDs to check (without LEX_PR_ prefix)", ["GITHUB_TOKEN"])
+			.option("--max-age <days>", "Maximum age in days before rotation needed", "90")
+			.action(async (secretIds: string[], options: { maxAge: string }) => {
+				const { checkRotation } = await import("./commands/security.js");
+				await checkRotation(secretIds, parseInt(options.maxAge));
+			})
+	)
+	.addCommand(
+		new Command("scan-plan")
+			.description("Scan plan file for accidentally exposed secrets")
+			.argument("[plan-file]", "Path to plan file", "plan.json")
+			.action(async (planFile: string) => {
+				const { scanPlan } = await import("./commands/security.js");
+				await scanPlan(planFile);
+			})
+	)
+	.addCommand(
+		new Command("validate-secrets")
+			.description("Validate that required secrets are present")
+			.argument("<secrets...>", "Required secret IDs (without LEX_PR_ prefix)")
+			.action(async (secretIds: string[]) => {
+				const { validateSecrets } = await import("./commands/security.js");
+				await validateSecrets(secretIds);
+			})
+	);
+
 program.parseAsync(process.argv);
 
 /**
