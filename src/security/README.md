@@ -398,6 +398,54 @@ npm test -- tests/security-authorization.spec.ts
 npm test -- tests/security-compliance.spec.ts
 npm test -- tests/security-secrets.spec.ts
 npm test -- tests/security-policy.spec.ts
+npm test -- tests/security-scanning.spec.ts
+```
+
+## CLI Usage
+
+The security module provides CLI commands for common security operations:
+
+### Token Rotation Checks
+
+```bash
+# Check if secrets need rotation (default 90 days)
+lex-pr security check-rotation GITHUB_TOKEN
+
+# Check multiple secrets with custom age threshold
+lex-pr security check-rotation GITHUB_TOKEN API_KEY --max-age 60
+
+# Example output:
+# 🔐 Checking secret rotation status (max age: 90 days)...
+# ⚠️  GITHUB_TOKEN: Needs rotation (>90 days old)
+# ✓ API_KEY: Within rotation window
+```
+
+### Plan Secrets Scanning
+
+```bash
+# Scan plan file for accidentally exposed secrets
+lex-pr security scan-plan plan.json
+
+# Example output:
+# 🔍 Scanning plan for exposed secrets: plan.json
+# ⚠️  Found 1 potential secret(s):
+# - github_token: GitHub Personal Access Token
+#   Line 9, Column 18
+#   Context: "token": "ghp_****...****"
+# ⚠️  Please remove these secrets before committing!
+```
+
+### Secret Validation
+
+```bash
+# Validate that required secrets are present
+lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL
+
+# Example output:
+# 🔐 Validating required secrets...
+# ✅ All required secrets are present
+#   ✓ GITHUB_TOKEN
+#   ✓ DATABASE_URL
 ```
 
 ## API Reference
