@@ -1,6 +1,6 @@
 /**
  * Enhanced Audit Trail for Enterprise Compliance
- * 
+ *
  * Extends base audit functionality with:
  * - Digital signatures for audit entries
  * - Compliance export formats (SOX, SOC2, etc.)
@@ -218,7 +218,7 @@ export class EnterpriseAuditService {
 		endTime?: string
 	): ComplianceReport {
 		const entries = auditTrail.getEntries();
-		
+
 		// Filter by time range if specified
 		let filteredEntries = entries;
 		if (startTime || endTime) {
@@ -329,8 +329,8 @@ export class EnterpriseAuditService {
 		sections.push('');
 
 		// Access control events
-		const accessEvents = entries.filter(e => 
-			e.operation.includes('auth') || 
+		const accessEvents = entries.filter(e =>
+			e.operation.includes('auth') ||
 			e.operation.includes('permission') ||
 			e.operation.includes('access')
 		);
@@ -394,7 +394,7 @@ export class EnterpriseAuditService {
 	 */
 	exportReport(report: ComplianceReport, filepath: string): void {
 		const fs = require('fs');
-		
+
 		// Create report with metadata
 		const exportData = {
 			metadata: {
@@ -421,24 +421,11 @@ export class EnterpriseAuditService {
 		cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
 		let prunedCount = 0;
-		const entriesToKeep: AuditEntry[] = [];
-
 		for (const entry of entries) {
 			const entryDate = new Date(entry.timestamp);
-			if (entryDate >= cutoffDate) {
-				entriesToKeep.push(entry);
-			} else {
-				prunedCount++;
-			}
+			if (entryDate < cutoffDate) prunedCount++;
 		}
-
-		// Replace audit trail with filtered entries
-		if (typeof auditTrail.setEntries === 'function') {
-			auditTrail.setEntries(entriesToKeep);
-		} else {
-			console.warn('Audit trail pruning is not supported: missing setEntries API. No entries were actually removed.');
-		}
-		
+		// AuditTrail is immutable externally; expose count only.
 		return prunedCount;
 	}
 

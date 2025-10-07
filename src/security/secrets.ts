@@ -1,6 +1,6 @@
 /**
  * Secrets Management Integration
- * 
+ *
  * Provides secure credential handling with:
  * - Environment variable validation
  * - Secret rotation support
@@ -254,6 +254,8 @@ export interface DetectedSecret {
 	column?: number;
 	/** Context around the match */
 	context?: string;
+	/** Confidence score (0-1) */
+	confidence?: number;
 }
 
 /**
@@ -341,28 +343,44 @@ export class PlanSecretsScanner {
 		const lines = content.split('\n');
 
 		for (const pattern of this.patterns) {
-			// Reset regex
-			pattern.pattern.lastIndex = 0;
-
+			// Clone regex to avoid shared lastIndex state (B3 requirement)
+			const source = pattern.pattern.source;
+			const flags = pattern.pattern.flags.includes('g') ? pattern.pattern.flags : pattern.pattern.flags + 'g';
+			const regex = new RegExp(source, flags);
 			let match: RegExpExecArray | null;
-			while ((match = pattern.pattern.exec(content)) !== null) {
+			while ((match = regex.exec(content)) !== null) {
 				const matchValue = match[1] || match[0];
-				
-				// Find line and column
 				const position = this.findPosition(content, match.index);
-				
-				// Get context (line where match was found)
 				const context = position.line !== undefined ? lines[position.line - 1] : undefined;
-
+				// Simple confidence heuristic: longer tokens & specific pattern names rank higher
+				const baseLen = Math.min(matchValue.length, 64);
+				let confidence = baseLen / 64; // 0..1 scaled by length (cap 64)
+				// Pattern based weighting
+				if (/private|secret|token|key/i.test(pattern.name)) confidence = Math.min(1, confidence * 1.1 + 0.1);
+				if (/password/i.test(pattern.name)) confidence = Math.min(1, confidence * 0.9 + 0.05);
 				detected.push({
 					pattern,
 					value: this.redact(matchValue),
 					line: position.line,
 					column: position.column,
 					context: context ? this.redact(context) : undefined,
+					confidence: Number(confidence.toFixed(3)),
 				});
 			}
 		}
+
+		// Deterministic ordering: pattern name, line, column
+		detected.sort((a, b) => {
+			const pn = a.pattern.name.localeCompare(b.pattern.name);
+			if (pn !== 0) return pn;
+			const la = a.line || 0;
+			const lb = b.line || 0;
+			if (la !== lb) return la - lb;
+			const ca = a.column || 0;
+			const cb = b.column || 0;
+			if (ca !== cb) return ca - cb;
+			return 0;
+		});
 
 		return detected;
 	}
@@ -391,22 +409,19 @@ export class PlanSecretsScanner {
 		if (detected.length === 0) {
 			return '✅ No secrets detected';
 		}
-
 		const lines: string[] = [];
-		lines.push(`⚠️  Found ${detected.length} potential secret(s):\n`);
-
+		lines.push(`Found ${detected.length} potential secret(s):`);
 		for (const secret of detected) {
-			lines.push(`- ${secret.pattern.name}: ${secret.pattern.description}`);
+			const conf = secret.confidence !== undefined ? ` (confidence: ${secret.confidence})` : '';
+			lines.push(`- ${secret.pattern.name}${conf} — ${secret.pattern.description}`);
 			if (secret.line !== undefined) {
 				lines.push(`  Line ${secret.line}, Column ${secret.column}`);
 			}
 			if (secret.context) {
 				lines.push(`  Context: ${secret.context}`);
 			}
-			lines.push('');
 		}
-
-		lines.push('⚠️  Please remove these secrets before committing!');
+		lines.push('Remove or rotate these secrets before committing.');
 		return lines.join('\n');
 	}
 

@@ -385,6 +385,74 @@ program
 		}
 	});
 
+// Schema validation command (restored for JSON output tests)
+program
+	.command("schema")
+	.description("Schema utilities (validate plan.json)")
+	.addCommand(
+		new Command("validate")
+			.description("Validate a plan file against schema")
+			.argument("<file>", "Path to plan.json file")
+			.option("--json", "Output JSON result")
+			.action((file: string, opts) => {
+				try {
+					if (!fs.existsSync(file)) {
+						if (opts.json) {
+							console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: 'File not found' }] }));
+						} else {
+							console.error(`File not found: ${file}`);
+						}
+						process.exit(1);
+					}
+					const content = fs.readFileSync(file, 'utf-8');
+					let plan: Plan;
+					try {
+						plan = loadPlan(content);
+					} catch (error) {
+						if (opts.json) {
+							const err = error as any;
+							if (err instanceof SchemaValidationError && err.issues) {
+								console.log(JSON.stringify({ valid: false, errors: err.issues }, null, 2));
+							} else {
+								console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String(err?.message || error) }] }, null, 2));
+							}
+						} else {
+							console.error(`Validation failed: ${error instanceof Error ? error.message : String(error)}`);
+						}
+						process.exit(1);
+					}
+
+					// Additional semantic checks
+					try {
+						computeMergeOrder(plan); // ensure DAG
+					} catch (error) {
+						if (opts.json) {
+							console.log(JSON.stringify({ valid: false, errors: [{ path: 'dependencies', message: (error as Error).message }] }, null, 2));
+						} else {
+							console.error(`Dependency validation failed: ${(error as Error).message}`);
+						}
+						process.exit(1);
+					}
+
+					if (opts.json) {
+						console.log(JSON.stringify({ valid: true, items: plan.items.length, target: plan.target }, null, 2));
+					} else {
+						console.log(`✓ ${file} is valid`);
+						console.log(`  Items: ${plan.items.length}`);
+						console.log(`  Target: ${plan.target}`);
+					}
+					process.exit(0);
+				} catch (error) {
+					if (opts.json) {
+						console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String((error as Error).message) }] }));
+					} else {
+						console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
+					}
+					process.exit(1);
+				}
+			})
+	);
+
 // Plan review command - Interactive plan validation and editing
 program
 	.command("plan-review")
