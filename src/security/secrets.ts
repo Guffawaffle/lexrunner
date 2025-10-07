@@ -263,22 +263,22 @@ export const SECRET_PATTERNS: SecretPattern[] = [
 	{
 		name: 'github_token',
 		description: 'GitHub Personal Access Token',
-		pattern: /\b(ghp_[a-zA-Z0-9]{36})\b/g,
+		pattern: /\b(ghp_[A-Za-z0-9]{36})(?![A-Za-z0-9])/g,
 	},
 	{
 		name: 'github_oauth',
 		description: 'GitHub OAuth Access Token',
-		pattern: /\b(gho_[a-zA-Z0-9]{36})\b/g,
+		pattern: /\b(gho_[A-Za-z0-9]{36})(?![A-Za-z0-9])/g,
 	},
 	{
 		name: 'github_app_token',
 		description: 'GitHub App Token',
-		pattern: /\b(ghs_[a-zA-Z0-9]{36})\b/g,
+		pattern: /\b(ghs_[A-Za-z0-9]{36})(?![A-Za-z0-9])/g,
 	},
 	{
 		name: 'github_refresh_token',
 		description: 'GitHub Refresh Token',
-		pattern: /\b(ghr_[a-zA-Z0-9]{36})\b/g,
+		pattern: /\b(ghr_[A-Za-z0-9]{36})(?![A-Za-z0-9])/g,
 	},
 	{
 		name: 'aws_access_key',
@@ -318,7 +318,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
 	{
 		name: 'password',
 		description: 'Password in Code',
-		pattern: /(?:password|passwd|pwd).{0,20}["']([^"']{8,})["']/gi,
+		pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']([^"']{8,})["']/gi,
 	},
 ];
 

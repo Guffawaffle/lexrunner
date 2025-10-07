@@ -433,8 +433,11 @@ export class EnterpriseAuditService {
 		}
 
 		// Replace audit trail with filtered entries
-		// Note: This requires extending the audit trail API
-		// For now, this is a logical implementation
+		if (typeof auditTrail.setEntries === 'function') {
+			auditTrail.setEntries(entriesToKeep);
+		} else {
+			console.warn('Audit trail pruning is not supported: missing setEntries API. No entries were actually removed.');
+		}
 		
 		return prunedCount;
 	}
