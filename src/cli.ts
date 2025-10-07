@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import chalk from "chalk";
 import { Plan, loadPlan, SchemaValidationError } from "./schema.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "./mergeOrder.js";
 import { executeGatesWithPolicy } from "./gates.js";
@@ -21,6 +22,7 @@ import { WriteProtectionError, resolveProfile, validateWriteOperation } from "./
 import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescription, AutopilotLevel } from "./autopilot/index.js";
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
+import { registerSecurityCommands } from "./cli-security.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -68,99 +70,33 @@ program
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
 	.version("0.1.0")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
-	.addHelpText('after', `
+ 	.addHelpText('after', `
 Examples:
-  $ lex-pr init                          Initialize workspace with interactive setup
-  $ lex-pr doctor                        Validate environment and configuration
-  $ lex-pr discover                      Find open PRs matching scope
-  $ lex-pr plan --from-github            Generate merge plan from GitHub PRs
-  $ lex-pr plan-review plan.json         Interactively review and edit plan
-  $ lex-pr plan-diff plan1.json plan2.json  Compare two plans
-  $ lex-pr execute plan.json             Run quality gates on plan
-  $ lex-pr merge plan.json --dry-run     Preview merge operations
+	$ lex-pr init                           Initialize workspace with interactive setup
+	$ lex-pr doctor                         Validate environment and configuration
+	$ lex-pr discover                       Find open PRs matching scope
+	$ lex-pr plan --from-github             Generate merge plan from GitHub PRs
+	$ lex-pr plan-review plan.json          Interactively review and edit plan
+	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
+	$ lex-pr execute plan.json              Run quality gates on plan
+	$ lex-pr security check-rotation        Check token rotation status
+	$ lex-pr security scan-plan             Scan a plan file for secrets
+	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
 
 Power User Commands:
-  $ lex-pr view plan.json                Interactive plan viewer
-  $ lex-pr query plan.json --stats       Plan statistics and analysis
-  $ lex-pr query plan.json "level eq 1"  Query items by criteria
-  $ lex-pr retry --filter failed         Retry failed gates
-  $ lex-pr completion bash               Generate bash completion
+	$ lex-pr view plan.json                 Interactive plan viewer
+	$ lex-pr query plan.json --stats        Plan statistics and analysis
+	$ lex-pr query plan.json "level eq 1"   Query items by criteria
+	$ lex-pr retry --filter failed          Retry failed gates
+	$ lex-pr completion bash                Generate bash completion script
 
-Quick Start:
-  1. Initialize:  lex-pr init
-  2. Validate:    lex-pr doctor
-  3. Discover:    lex-pr discover
-  4. Plan:        lex-pr plan --from-github
-  5. Review:      lex-pr plan-review plan.json
-  6. Execute:     lex-pr execute plan.json
-  7. Merge:       lex-pr merge plan.json
-
-Documentation: https://github.com/Guffawaffle/lex-pr-runner/blob/main/docs/quickstart.md
+Workflow:
+	1. Discover:    lex-pr discover
+	2. Plan:        lex-pr plan --from-github --json > plan.json
+	3. Review:      lex-pr plan-review plan.json
+	4. Execute:     lex-pr execute plan.json
+	5. Report:      lex-pr report artifacts --out md
 `)
-	.hook('preAction', (thisCommand) => {
-		// Initialize logger based on global option
-		const opts = thisCommand.opts();
-		logger = createLogger({
-			format: opts.logFormat as 'json' | 'human',
-			correlationId: generateCorrelationId()
-		});
-	});
-
-// Schema validation command
-program
-	.command("schema")
-	.description("Schema operations")
-	.addCommand(
-		new Command("validate")
-			.description("Validate plan.json against schema")
-			.option("--plan <file>", "Path to plan.json file")
-			.argument("[file]", "Path to plan.json file (alternative to --plan)")
-			.option("--json", "Output machine-readable JSON errors")
-			.action((file: string | undefined, opts) => {
-				const planFile = opts.plan || file;
-				if (!planFile) {
-					console.error("\n❌ Error: Plan file is required\n");
-					console.error("Usage:");
-					console.error("  lex-pr schema validate plan.json");
-					console.error("  lex-pr schema validate --plan plan.json\n");
-					console.error("💡 Tip: Generate a plan first with 'lex-pr plan --from-github'\n");
-					process.exit(1);
-				}
-
-				try {
-					const planContent = fs.readFileSync(planFile, "utf-8");
-					const plan = loadPlan(planContent);
-
-					if (opts.json) {
-						console.log(JSON.stringify({ valid: true }));
-					} else {
-						console.log(`✓ ${planFile} is valid`);
-					}
-					process.exit(0);
-				} catch (error) {
-					if (error instanceof SchemaValidationError) {
-						if (opts.json) {
-							const errorJson = error.toJSON();
-							console.log(JSON.stringify({ valid: false, errors: errorJson.errors }, null, 2));
-						} else {
-							console.error(`✗ ${planFile} validation failed:`);
-							error.issues.forEach(issue => {
-								console.error(`  ${issue.path.join('.')}: ${issue.message}`);
-							});
-						}
-						process.exit(1);
-					} else {
-						const message = error instanceof Error ? error.message : String(error);
-						if (opts.json) {
-							console.log(JSON.stringify({ valid: false, errors: [message] }));
-						} else {
-							console.error(`Error validating ${planFile}: ${message}`);
-						}
-						process.exit(1);
-					}
-				}
-			})
-	);
 
 // Gate report validation command
 program
@@ -175,7 +111,7 @@ program
 			.action((file: string, opts) => {
 				try {
 					if (!fs.existsSync(file)) {
-						console.error(`\n❌ Error: File not found: ${file}\n`);
+						console.error(`\nError: File not found: ${file}\n`);
 						process.exit(1);
 					}
 
@@ -196,8 +132,8 @@ program
 								}]
 							}, null, 2));
 						} else {
-							console.error(`\n❌ Error: Invalid JSON format in ${file}`);
-							console.error(`💡 Tip: Check for syntax errors in the JSON file\n`);
+							console.error(`\nError: Invalid JSON format in ${file}`);
+							console.error(`Tip: Check for syntax errors in the JSON file\n`);
 						}
 						process.exit(1);
 					}
@@ -2006,37 +1942,8 @@ function formatQueryResult(result: any, format: string): string {
 }
 
 // Security operations command
-program
-	.command("security")
-	.description("Security operations: token rotation, secrets scanning, validation")
-	.addCommand(
-		new Command("check-rotation")
-			.description("Check if secrets need rotation based on age")
-			.argument("[secrets...]", "Secret IDs to check (without LEX_PR_ prefix)", ["GITHUB_TOKEN"])
-			.option("--max-age <days>", "Maximum age in days before rotation needed", "90")
-			.action(async (secretIds: string[], options: { maxAge: string }) => {
-				const { checkRotation } = await import("./commands/security.js");
-				await checkRotation(secretIds, parseInt(options.maxAge));
-			})
-	)
-	.addCommand(
-		new Command("scan-plan")
-			.description("Scan plan file for accidentally exposed secrets")
-			.argument("[plan-file]", "Path to plan file", "plan.json")
-			.action(async (planFile: string) => {
-				const { scanPlan } = await import("./commands/security.js");
-				await scanPlan(planFile);
-			})
-	)
-	.addCommand(
-		new Command("validate-secrets")
-			.description("Validate that required secrets are present")
-			.argument("<secrets...>", "Required secret IDs (without LEX_PR_ prefix)")
-			.action(async (secretIds: string[]) => {
-				const { validateSecrets } = await import("./commands/security.js");
-				await validateSecrets(secretIds);
-			})
-	);
+// Register security subcommands once (modular implementation)
+registerSecurityCommands(program);
 
 program.parseAsync(process.argv);
 

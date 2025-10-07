@@ -3,9 +3,30 @@
  * Provides security operations like token rotation checks, secrets scanning, etc.
  */
 
-import { SecretsManager } from '../security/secrets.js';
-import { PlanSecretsScanner } from '../security/secrets.js';
-import chalk from 'chalk';
+import { SecretsManager, PlanSecretsScanner } from '../security/secrets.js';
+
+/**
+ * Standardized security command result
+ */
+export interface SecurityCommandResult<TFindings = any> {
+	/** Exit code to be used by CLI */
+	exitCode: number;
+	/** Human‑readable report (no ANSI colors; CLI adds styling) */
+	report: string;
+	/** Machine‑readable findings payload (shape depends on command) */
+	findings?: TFindings;
+	/** Status classification */
+	status: 'ok' | 'findings' | 'error';
+}
+
+function createResult<TFindings>(command: string, status: 'ok' | 'findings' | 'error', report: string, findings?: TFindings): SecurityCommandResult<TFindings> {
+ 	let exitCode = 0;
+ 	if (status === 'findings') exitCode = 1;
+ 	else if (status === 'error') exitCode = 2; // Reserved internal error code (documented elsewhere)
+	// Prepend command name to report for clarity (without colors)
+	const fullReport = report.startsWith(command) ? report : `${command}: ${report}`;
+ 	return { exitCode, report: fullReport, findings, status };
+}
 
 /**
  * Check if secrets need rotation
@@ -13,81 +34,74 @@ import chalk from 'chalk';
 export async function checkRotation(
 	secretIds: string[],
 	maxAgeDays: number = 90
-): Promise<void> {
+): Promise<SecurityCommandResult<{ summary: { needsRotation: string[]; ok: string[]; maxAgeDays: number } }>> {
 	const secretsManager = new SecretsManager();
-
-	console.log(chalk.blue(`\n🔐 Checking secret rotation status (max age: ${maxAgeDays} days)...\n`));
-
-	let needsRotation = 0;
+	const needsRotation: string[] = [];
+	const ok: string[] = [];
 
 	for (const secretId of secretIds) {
-		const needs = await secretsManager.checkRotationNeeded(secretId, maxAgeDays);
-		
-		if (needs) {
-			console.log(chalk.yellow(`⚠️  ${secretId}: Needs rotation (>${maxAgeDays} days old)`));
-			needsRotation++;
-		} else {
-			console.log(chalk.green(`✓ ${secretId}: Within rotation window`));
+		try {
+			const needs = await secretsManager.checkRotationNeeded(secretId, maxAgeDays);
+			if (needs) needsRotation.push(secretId); else ok.push(secretId);
+		} catch (e) {
+			// Treat errors as findings for now (could differentiate later)
+			needsRotation.push(secretId);
 		}
 	}
 
-	console.log('');
-
-	if (needsRotation > 0) {
-		console.log(chalk.yellow(`⚠️  ${needsRotation} secret(s) need rotation`));
-		process.exit(1);
-	} else {
-		console.log(chalk.green('✅ All secrets are within rotation policy'));
+	let reportLines: string[] = [];
+	reportLines.push(`Checking secret rotation status (max age: ${maxAgeDays} days)`);
+	for (const id of ok) {
+		reportLines.push(`✓ ${id}: Within rotation window`);
 	}
+	for (const id of needsRotation) {
+		reportLines.push(`! ${id}: Needs rotation (>${maxAgeDays} days old)`);
+	}
+
+	if (needsRotation.length === 0) {
+		reportLines.push('All secrets are within rotation policy');
+		return createResult('check-rotation', 'ok', reportLines.join('\n'), { summary: { needsRotation, ok, maxAgeDays } });
+	}
+
+	reportLines.push(`${needsRotation.length} secret(s) need rotation`);
+	return createResult('check-rotation', 'findings', reportLines.join('\n'), { summary: { needsRotation, ok, maxAgeDays } });
 }
 
 /**
  * Scan plan file for accidentally exposed secrets
  */
-export async function scanPlan(planPath: string): Promise<void> {
+export async function scanPlan(planPath: string): Promise<SecurityCommandResult<{ detected: number; items: any[] }>> {
 	const scanner = new PlanSecretsScanner();
-
-	console.log(chalk.blue(`\n🔍 Scanning plan for exposed secrets: ${planPath}\n`));
-
 	try {
 		const detected = await scanner.scanPlanFile(planPath);
 		const report = scanner.generateReport(detected);
-
 		if (detected.length === 0) {
-			console.log(chalk.green(report));
-		} else {
-			console.log(chalk.red(report));
-			process.exit(1);
+			return createResult('scan-plan', 'ok', report, { detected: 0, items: [] });
 		}
+		return createResult('scan-plan', 'findings', report, { detected: detected.length, items: detected });
 	} catch (error) {
-		console.error(chalk.red(`❌ Scan failed: ${error instanceof Error ? error.message : String(error)}`));
-		process.exit(1);
+		const message = error instanceof Error ? error.message : String(error);
+		return createResult('scan-plan', 'error', `Scan failed: ${message}`, { detected: -1, items: [] });
 	}
 }
 
 /**
  * Validate required secrets exist
  */
-export async function validateSecrets(secretIds: string[]): Promise<void> {
+export async function validateSecrets(secretIds: string[]): Promise<SecurityCommandResult<{ missing: string[]; present: string[] }>> {
 	const secretsManager = new SecretsManager();
-
-	console.log(chalk.blue(`\n🔐 Validating required secrets...\n`));
-
 	const result = await secretsManager.validateSecrets(secretIds);
-
+	const present = secretIds.filter(id => !result.missing.includes(id));
+	let reportLines: string[] = [];
+	reportLines.push('Validating required secrets');
 	if (result.valid) {
-		console.log(chalk.green('✅ All required secrets are present'));
-		for (const id of secretIds) {
-			console.log(chalk.green(`  ✓ ${id}`));
-		}
-	} else {
-		console.log(chalk.red('❌ Missing required secrets:'));
-		for (const id of result.missing) {
-			console.log(chalk.red(`  ✗ ${id}`));
-		}
-		console.log('');
-		console.log(chalk.yellow('Set missing secrets with:'));
-		console.log(chalk.cyan(`  export LEX_PR_<SECRET_ID>="<value>"`));
-		process.exit(1);
+		reportLines.push('All required secrets are present');
+		for (const id of present) reportLines.push(`✓ ${id}`);
+		return createResult('validate-secrets', 'ok', reportLines.join('\n'), { missing: [], present });
 	}
+	reportLines.push('Missing required secrets:');
+	for (const id of result.missing) reportLines.push(`✗ ${id}`);
+	reportLines.push('Set missing secrets with:');
+	reportLines.push('export LEX_PR_<SECRET_ID>="<value>"');
+	return createResult('validate-secrets', 'findings', reportLines.join('\n'), { missing: result.missing, present });
 }
