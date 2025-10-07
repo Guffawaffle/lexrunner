@@ -1,6 +1,21 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
+/**
+ * Security CLI Registration (B5 Documentation Placeholder)
+ *
+ * Output Controls:
+ * --format text|json  (default text)
+ *   json: stable key ordering: {command,status,exitCode,findings,timestamp}
+ * --no-color disables ANSI styling (text mode only)
+ *
+ * Exit Codes:
+ * 0 success (no findings)
+ * 1 findings (policy or validation issues discovered)
+ * 2 internal error (unexpected failure path)
+ *
+ * Determinism: JSON output uses explicit property ordering & canonical sort of findings
+ */
 export interface SecurityCommandResult {
   exitCode: number;
   report: string;

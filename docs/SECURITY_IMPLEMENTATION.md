@@ -106,12 +106,12 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
   - Required reviewer roles
   - Code owner approval requirements
   - Stale approval dismissal
-  
+
 - **Branch Protection:**
   - Pattern-based branch rules
   - Status check requirements
   - Push restrictions by role
-  
+
 - **Merge Restrictions:**
   - Allowed merge strategies (merge/squash/rebase)
   - Linear history enforcement
@@ -142,6 +142,34 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 - Secrets management
 - Security scanning integration
 - Policy enforcement configuration
+
+### ✅ 9. Security CLI Exit Semantics (B5 Placeholder)
+
+| Exit Code | Meaning | Status Mapping | Retry Guidance |
+|-----------|---------|----------------|----------------|
+| 0 | Success / No findings | `ok` | Not required |
+| 1 | Findings detected (actionable issues, non-fatal) | `findings` | Address & re-run |
+| 2 | Internal error (unexpected failure) | `error` | Investigate infrastructure / stack trace |
+
+Stability: Codes 0–2 are reserved and will not change without a documented major version bump.
+
+### ✅ 10. Retention Trimming Contract (B4/B5)
+
+`EnterpriseAuditService.trimRetention(retentionDays?, framework?)` (non-destructive preview) returns:
+```jsonc
+{
+  "total": 150,          // total audit entries
+  "trimmed": 42,         // entries older than applied retention
+  "kept": 108,           // total - trimmed
+  "retentionDaysApplied": 365, // resolved from args or framework default
+  "framework": "ISO 27001",   // canonical display name if framework recognized
+  "supportedFrameworks": ["GDPR","HIPAA","ISO 27001","PCI DSS","SOC2","SOX"]
+}
+```
+
+Aliases: `iso27001`, `soc-2`, `sarbanesoxley`, `pci` map to their canonical forms via normalization.
+
+Determinism: `supportedFrameworks` is sorted and stable across runs.
 
 ## Architecture
 
@@ -249,10 +277,10 @@ const policy = new CompliancePolicyService({
 ### Basic Secure Execution
 
 ```typescript
-import { 
-  AuthenticationManager, 
+import {
+  AuthenticationManager,
   AuthorizationService,
-  EnterpriseAuditService 
+  EnterpriseAuditService
 } from './security';
 
 // Authenticate

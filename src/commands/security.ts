@@ -19,6 +19,14 @@ export interface SecurityCommandResult<TFindings = any> {
 	status: 'ok' | 'findings' | 'error';
 }
 
+/**
+ * Exit Code Semantics (B5 – documented for Gate 5 final docs)
+ * 0 = status 'ok' (no findings / success)
+ * 1 = status 'findings' (policy‑relevant issues discovered; actionable but not internal error)
+ * 2 = status 'error' (unexpected internal failure – parsing errors, I/O, unhandled exceptions)
+ * These codes are stable and consumed by CI to distinguish remediation vs infrastructure failures.
+ */
+
 function createResult<TFindings>(command: string, status: 'ok' | 'findings' | 'error', report: string, findings?: TFindings): SecurityCommandResult<TFindings> {
  	let exitCode = 0;
  	if (status === 'findings') exitCode = 1;
