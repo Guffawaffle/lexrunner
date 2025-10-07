@@ -192,7 +192,7 @@ describe('Security - Compliance & Audit', () => {
 		it('should sign report when signing key provided', () => {
 			const signedService = new EnterpriseAuditService('test-key');
 			signedService.logSecure('test', 'approved', {});
-			
+
 			const report = signedService.generateComplianceReport(ComplianceFormat.JSON);
 
 			expect(report.signature).toBeDefined();
@@ -206,7 +206,7 @@ describe('Security - Compliance & Audit', () => {
 
 			expect(recommendations).toBeInstanceOf(Array);
 			expect(recommendations.length).toBeGreaterThan(0);
-			
+
 			// Check SOX recommendation
 			const sox = recommendations.find(r => r.framework === 'SOX');
 			expect(sox).toBeDefined();
@@ -228,7 +228,7 @@ describe('Security - Compliance & Audit', () => {
 		it('should prune old entries', () => {
 			// Create test entries
 			auditService.logSecure('old_op', 'decision', {});
-			
+
 			const prunedCount = auditService.pruneOldEntries(0); // Prune everything
 
 			expect(prunedCount).toBeGreaterThanOrEqual(0);
@@ -255,6 +255,39 @@ describe('Security - Compliance & Audit', () => {
 			expect(result.applied).toBe(false);
 			expect(result.retentionDays).toBe(0);
 			expect(result.prunedCount).toBe(0);
+		});
+
+		it('should return trimRetention summary without inputs', () => {
+			const summary = auditService.trimRetention();
+			expect(summary.total).toBeGreaterThanOrEqual(0);
+			expect(summary.trimmed).toBe(0);
+			expect(summary.kept).toBe(summary.total);
+			expect(Array.isArray(summary.supportedFrameworks)).toBe(true);
+		});
+
+		it('should compute trimmed count for explicit days', () => {
+			// Add an old entry and mutate timestamp (audit trail stores reference we can modify for test)
+			const old = auditService.logSecure('old_event', 'ok', {});
+			const past = new Date();
+			past.setDate(past.getDate() - 400); // ~400 days ago
+			(old as any).timestamp = past.toISOString();
+			// Use retention 0 days so all entries qualify as trimmed (ensures deterministic >=1)
+			const summary = auditService.trimRetention(0);
+			expect(summary.retentionDaysApplied).toBe(0);
+			expect(summary.trimmed).toBeGreaterThanOrEqual(1);
+			expect(summary.kept + summary.trimmed).toBe(summary.total);
+		});
+
+		it('should normalize framework aliases (iso27001)', () => {
+			const summary = auditService.trimRetention(undefined, 'iso27001');
+			expect(summary.framework).toBe('ISO 27001');
+			expect(summary.retentionDaysApplied).toBeDefined();
+		});
+
+		it('should use framework default when days not provided', () => {
+			const summary = auditService.trimRetention(undefined, 'PCI');
+			expect(summary.framework).toBe('PCI DSS');
+			expect(summary.retentionDaysApplied).toBe(365);
 		});
 	});
 });

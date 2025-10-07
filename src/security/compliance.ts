@@ -83,6 +83,12 @@ export interface MergeAuditData {
 export class EnterpriseAuditService {
 	private signingKey?: string;
 
+	/**
+	 * Cached normalized framework lookup map (normalized token -> display name)
+	 * Built lazily the first time we need normalization.
+	 */
+	private _frameworkLookup?: Map<string, { display: string; minDays: number; original: string }>;
+
 	constructor(signingKey?: string) {
 		// Use provided key or environment variable
 		this.signingKey = signingKey || process.env.AUDIT_SIGNING_KEY;
@@ -475,24 +481,115 @@ export class EnterpriseAuditService {
 		retentionDays: number;
 		prunedCount: number;
 	} {
-		const policies = this.getRetentionRecommendations();
-		const policy = policies.find(p => p.framework.toUpperCase().replace(/\s+/g, '') === framework.toUpperCase().replace(/\s+/g, ''));
+		// Backwards compatible wrapper around new normalization logic.
+		const normalized = this.normalizeFramework(framework);
+		if (!normalized) {
+			return { applied: false, retentionDays: 0, prunedCount: 0 };
+		}
+		const prunedCount = this.pruneOldEntries(normalized.minDays);
+		return { applied: true, retentionDays: normalized.minDays, prunedCount };
+	}
 
-		if (!policy) {
+	/**
+	 * Result contract for retention trimming (B4)
+	 */
+	trimRetention(retentionDays?: number, framework?: string): {
+		total: number;
+		trimmed: number; // number of entries that would be removed (non‑destructive)
+		kept: number;    // number of entries retained
+		retentionDaysApplied?: number; // days used (explicit or derived from framework)
+		framework?: string; // canonical display name if framework provided/recognized
+		supportedFrameworks: string[]; // deterministic, sorted list of display names
+	} {
+		const entries = auditTrail.getEntries();
+		const total = entries.length;
+
+		// Build normalization map (lazy) so we can always return supported list
+		const lookup = this.ensureFrameworkLookup();
+		const supportedFrameworks = Array.from(new Set(Array.from(lookup.values()).map(v => v.display)));
+		supportedFrameworks.sort(); // deterministic ordering
+
+		let appliedDays: number | undefined;
+		let canonicalFramework: string | undefined;
+
+		if (framework) {
+			const normalized = this.normalizeFramework(framework);
+			if (normalized) {
+				appliedDays = retentionDays ?? normalized.minDays;
+				canonicalFramework = normalized.display;
+			} else if (retentionDays !== undefined) {
+				// Unknown framework but explicit retention provided
+				appliedDays = retentionDays;
+			}
+		} else if (retentionDays !== undefined) {
+			appliedDays = retentionDays;
+		}
+
+		// If neither provided, do not trim (report only)
+		if (appliedDays === undefined) {
 			return {
-				applied: false,
-				retentionDays: 0,
-				prunedCount: 0,
+				total,
+				trimmed: 0,
+				kept: total,
+				supportedFrameworks,
 			};
 		}
 
-		const prunedCount = this.pruneOldEntries(policy.minDays);
+		const cutoff = new Date();
+		cutoff.setDate(cutoff.getDate() - appliedDays);
+		let trimmed = 0;
+		for (const e of entries) {
+			if (new Date(e.timestamp) < cutoff) trimmed++;
+		}
 
 		return {
-			applied: true,
-			retentionDays: policy.minDays,
-			prunedCount,
+			total,
+			trimmed,
+			kept: total - trimmed,
+			retentionDaysApplied: appliedDays,
+			framework: canonicalFramework,
+			supportedFrameworks,
 		};
+	}
+
+	/**
+	 * Normalize a framework token to a recommendation entry
+	 * Accepts variants like 'iso27001', 'ISO 27001', 'pci', 'PCI DSS', etc.
+	 */
+	private normalizeFramework(input: string): { display: string; minDays: number; original: string } | null {
+		const lookup = this.ensureFrameworkLookup();
+		const token = this.frameworkToken(input);
+		return lookup.get(token) || null;
+	}
+
+	/** Build (or return cached) framework lookup */
+	private ensureFrameworkLookup(): Map<string, { display: string; minDays: number; original: string }> {
+		if (this._frameworkLookup) return this._frameworkLookup;
+		const map = new Map<string, { display: string; minDays: number; original: string }>();
+		for (const rec of this.getRetentionRecommendations()) {
+			// Primary token
+			map.set(this.frameworkToken(rec.framework), { display: rec.framework, minDays: rec.minDays, original: rec.framework });
+			// Known aliases
+			const aliases: Record<string, string[]> = {
+				'SOX': ['sarbanes', 'sarbanesoxley'],
+				'SOC2': ['soc2', 'soc-2', 'soc 2'],
+				'GDPR': [],
+				'HIPAA': [],
+				'ISO 27001': ['iso27001', 'iso-27001', 'iso 27001'],
+				'PCI DSS': ['pci', 'pcidss', 'pci-dss'],
+			};
+			const aliasList = aliases[rec.framework] || [];
+			for (const alias of aliasList) {
+				map.set(this.frameworkToken(alias), { display: rec.framework, minDays: rec.minDays, original: rec.framework });
+			}
+		}
+		this._frameworkLookup = map;
+		return map;
+	}
+
+	/** Convert arbitrary framework input to comparable token */
+	private frameworkToken(v: string): string {
+		return v.toLowerCase().replace(/[^a-z0-9]/g, '');
 	}
 }
 
