@@ -53,12 +53,8 @@ describe('rotate-secrets-example.ts', () => {
 			const output = JSON.parse(stdout.trim());
 			const keys = Object.keys(output);
 
-			// Expected canonical order
-			expect(keys[0]).toBe('command');
-			expect(keys[1]).toBe('exitCode');
-			expect(keys[2]).toBe('findings');
-			expect(keys[3]).toBe('status');
-			expect(keys[4]).toBe('timestamp');
+			// Expected canonical order (from canonicalJSONStringify)
+			expect(keys).toEqual(['command', 'exitCode', 'findings', 'status', 'timestamp']);
 		});
 
 		it('should output trailing newline', async () => {
@@ -71,7 +67,7 @@ describe('rotate-secrets-example.ts', () => {
 			
 			expect(stdout.endsWith('\n')).toBe(true);
 			// Ensure exactly one trailing newline (canonical JSON)
-			expect(stdout.match(/\n$/g)?.length).toBe(1);
+			expect((stdout.match(/\n$/g) || []).length).toBe(1);
 		});
 
 		it('should sort secret arrays alphabetically', async () => {
