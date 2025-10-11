@@ -108,11 +108,20 @@ export function resolveProfile(
 }
 
 /**
+ * Log profile-related message to stderr with consistent prefix
+ * 
+ * @param message - The message to log (without prefix)
+ */
+export function logProfileMessage(message: string): void {
+	// Use stderr to avoid interfering with JSON output to stdout
+	console.error(`lex-pr-runner profile: ${message}`);
+}
+
+/**
  * Emit telemetry breadcrumb on profile resolution
  */
 function emitTelemetry(profilePath: string, role: string): void {
-	// Use stderr to avoid interfering with JSON output to stdout
-	console.error(`lex-pr-runner using profile: ${profilePath} (role: ${role})`);
+	logProfileMessage(`using profile: ${profilePath} (role: ${role})`);
 }
 
 /**
