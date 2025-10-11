@@ -326,6 +326,11 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
 		};
 	}
 	
+	// scanResult is guaranteed to be non-null here due to the else return above
+	if (!scanResult) {
+		throw new Error('Unexpected null scan result');
+	}
+	
 	// Check against policy thresholds
 	const violations: string[] = [];
 	
