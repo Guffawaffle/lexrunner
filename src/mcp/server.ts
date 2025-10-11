@@ -496,7 +496,7 @@ async function handleProfileResolve(args: ProfileResolveArgs): Promise<{ content
  */
 async function handleHealth(args: { includeMetrics?: boolean }): Promise<{ content: [{ type: "text", text: string }] }> {
 	const health = healthChecker.getHealth(args.includeMetrics || false);
-	
+
 	return {
 		content: [
 			{
@@ -530,7 +530,7 @@ process.on("unhandledRejection", (reason, promise) => {
 	process.exit(1);
 });
 
-// Start the server
+// Start the server if run directly (ESM-only)
 if (import.meta.url === `file://${process.argv[1]}`) {
 	main().catch((error) => {
 		console.error("Failed to start MCP server:", error);

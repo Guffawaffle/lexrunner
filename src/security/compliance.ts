@@ -1,6 +1,6 @@
 /**
  * Enhanced Audit Trail for Enterprise Compliance
- * 
+ *
  * Extends base audit functionality with:
  * - Digital signatures for audit entries
  * - Compliance export formats (SOX, SOC2, etc.)
@@ -78,10 +78,77 @@ export interface MergeAuditData {
 }
 
 /**
+ * Canonical retention framework identifiers (M3)
+ * Use these constants for stable, documented framework references
+ */
+export const RETENTION_FRAMEWORKS = {
+	SOX: 'SOX',
+	SOC2: 'SOC2',
+	GDPR: 'GDPR',
+	HIPAA: 'HIPAA',
+	ISO_27001: 'ISO 27001',
+	PCI_DSS: 'PCI DSS',
+} as const;
+
+/**
+ * Type representing valid retention framework keys
+ */
+export type RetentionFramework = typeof RETENTION_FRAMEWORKS[keyof typeof RETENTION_FRAMEWORKS];
+
+/**
+ * Normalize framework identifier to canonical form (M3)
+ *
+ * Accepts variants like:
+ * - 'iso27001', 'ISO 27001', 'iso-27001' → 'ISO 27001'
+ * - 'pci', 'PCI DSS', 'pci-dss' → 'PCI DSS'
+ * - 'soc2', 'SOC2', 'soc-2' → 'SOC2'
+ * - 'sarbanes', 'sarbanesoxley' → 'SOX'
+ *
+ * @param input - Framework identifier (case-insensitive, accepts aliases)
+ * @returns Canonical framework name or null if unknown
+ */
+export function normalizeFrameworkId(input: string): string | null {
+	// Normalize to comparable token
+	const token = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+	// Mapping from normalized tokens to canonical names
+	const mapping: Record<string, string> = {
+		// SOX variants
+		'sox': RETENTION_FRAMEWORKS.SOX,
+		'sarbanes': RETENTION_FRAMEWORKS.SOX,
+		'sarbanesoxley': RETENTION_FRAMEWORKS.SOX,
+
+		// SOC2 variants
+		'soc2': RETENTION_FRAMEWORKS.SOC2,
+
+		// GDPR (no aliases currently)
+		'gdpr': RETENTION_FRAMEWORKS.GDPR,
+
+		// HIPAA (no aliases currently)
+		'hipaa': RETENTION_FRAMEWORKS.HIPAA,
+
+		// ISO 27001 variants
+		'iso27001': RETENTION_FRAMEWORKS.ISO_27001,
+
+		// PCI DSS variants
+		'pci': RETENTION_FRAMEWORKS.PCI_DSS,
+		'pcidss': RETENTION_FRAMEWORKS.PCI_DSS,
+	};
+
+	return mapping[token] || null;
+}
+
+/**
  * Enterprise Audit Service
  */
 export class EnterpriseAuditService {
 	private signingKey?: string;
+
+	/**
+	 * Cached normalized framework lookup map (normalized token -> display name)
+	 * Built lazily the first time we need normalization.
+	 */
+	private _frameworkLookup?: Map<string, { display: string; minDays: number; original: string }>;
 
 	constructor(signingKey?: string) {
 		// Use provided key or environment variable
@@ -218,7 +285,7 @@ export class EnterpriseAuditService {
 		endTime?: string
 	): ComplianceReport {
 		const entries = auditTrail.getEntries();
-		
+
 		// Filter by time range if specified
 		let filteredEntries = entries;
 		if (startTime || endTime) {
@@ -329,8 +396,8 @@ export class EnterpriseAuditService {
 		sections.push('');
 
 		// Access control events
-		const accessEvents = entries.filter(e => 
-			e.operation.includes('auth') || 
+		const accessEvents = entries.filter(e =>
+			e.operation.includes('auth') ||
 			e.operation.includes('permission') ||
 			e.operation.includes('access')
 		);
@@ -394,7 +461,7 @@ export class EnterpriseAuditService {
 	 */
 	exportReport(report: ComplianceReport, filepath: string): void {
 		const fs = require('fs');
-		
+
 		// Create report with metadata
 		const exportData = {
 			metadata: {
@@ -409,4 +476,181 @@ export class EnterpriseAuditService {
 
 		fs.writeFileSync(filepath, JSON.stringify(exportData, null, 2));
 	}
+
+	/**
+	 * Prune old audit entries based on retention policy
+	 * @param retentionDays Number of days to retain audit logs
+	 * @returns Number of entries pruned
+	 */
+	pruneOldEntries(retentionDays: number): number {
+		const entries = auditTrail.getEntries();
+		const cutoffDate = new Date();
+		cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+		let prunedCount = 0;
+		for (const entry of entries) {
+			const entryDate = new Date(entry.timestamp);
+			if (entryDate < cutoffDate) prunedCount++;
+		}
+		// AuditTrail is immutable externally; expose count only.
+		return prunedCount;
+	}
+
+	/**
+	 * Get retention policy recommendations based on compliance requirements
+	 */
+	getRetentionRecommendations(): { framework: string; minDays: number; description: string }[] {
+		return [
+			{
+				framework: 'SOX',
+				minDays: 2555, // 7 years
+				description: 'Sarbanes-Oxley requires 7 years retention for financial records'
+			},
+			{
+				framework: 'SOC2',
+				minDays: 365, // 1 year
+				description: 'SOC2 Type II typically requires 1 year of audit logs'
+			},
+			{
+				framework: 'GDPR',
+				minDays: 90, // 3 months minimum
+				description: 'GDPR requires retention only as long as necessary, typically 90 days minimum'
+			},
+			{
+				framework: 'HIPAA',
+				minDays: 2190, // 6 years
+				description: 'HIPAA requires 6 years retention for audit logs'
+			},
+			{
+				framework: 'ISO 27001',
+				minDays: 365, // 1 year
+				description: 'ISO 27001 recommends at least 1 year of security logs'
+			},
+			{
+				framework: 'PCI DSS',
+				minDays: 365, // 1 year minimum, 3 years recommended
+				description: 'PCI DSS requires 1 year retention (3 years recommended)'
+			},
+		];
+	}
+
+	/**
+	 * Apply retention policy based on compliance framework
+	 */
+	applyRetentionPolicy(framework: 'SOX' | 'SOC2' | 'GDPR' | 'HIPAA' | 'ISO27001' | 'PCI'): {
+		applied: boolean;
+		retentionDays: number;
+		prunedCount: number;
+	} {
+		// Backwards compatible wrapper around new normalization logic.
+		const normalized = this.normalizeFramework(framework);
+		if (!normalized) {
+			return { applied: false, retentionDays: 0, prunedCount: 0 };
+		}
+		const prunedCount = this.pruneOldEntries(normalized.minDays);
+		return { applied: true, retentionDays: normalized.minDays, prunedCount };
+	}
+
+	/**
+	 * Result contract for retention trimming (B4)
+	 */
+	trimRetention(retentionDays?: number, framework?: string): {
+		total: number;
+		trimmed: number; // number of entries that would be removed (non‑destructive)
+		kept: number;    // number of entries retained
+		retentionDaysApplied?: number; // days used (explicit or derived from framework)
+		framework?: string; // canonical display name if framework provided/recognized
+		supportedFrameworks: string[]; // deterministic, sorted list of display names
+	} {
+		const entries = auditTrail.getEntries();
+		const total = entries.length;
+
+		// Build normalization map (lazy) so we can always return supported list
+		const lookup = this.ensureFrameworkLookup();
+		const supportedFrameworks = Array.from(new Set(Array.from(lookup.values()).map(v => v.display)));
+		supportedFrameworks.sort(); // deterministic ordering
+
+		let appliedDays: number | undefined;
+		let canonicalFramework: string | undefined;
+
+		if (framework) {
+			const normalized = this.normalizeFramework(framework);
+			if (normalized) {
+				appliedDays = retentionDays ?? normalized.minDays;
+				canonicalFramework = normalized.display;
+			} else if (retentionDays !== undefined) {
+				// Unknown framework but explicit retention provided
+				appliedDays = retentionDays;
+			}
+		} else if (retentionDays !== undefined) {
+			appliedDays = retentionDays;
+		}
+
+		// If neither provided, do not trim (report only)
+		if (appliedDays === undefined) {
+			return {
+				total,
+				trimmed: 0,
+				kept: total,
+				supportedFrameworks,
+			};
+		}
+
+		const cutoff = new Date();
+		cutoff.setDate(cutoff.getDate() - appliedDays);
+		let trimmed = 0;
+		for (const e of entries) {
+			if (new Date(e.timestamp) < cutoff) trimmed++;
+		}
+
+		return {
+			total,
+			trimmed,
+			kept: total - trimmed,
+			retentionDaysApplied: appliedDays,
+			framework: canonicalFramework,
+			supportedFrameworks,
+		};
+	}
+
+	/**
+	 * Normalize a framework token to a recommendation entry
+	 * Accepts variants like 'iso27001', 'ISO 27001', 'pci', 'PCI DSS', etc.
+	 */
+	private normalizeFramework(input: string): { display: string; minDays: number; original: string } | null {
+		const lookup = this.ensureFrameworkLookup();
+		const token = this.frameworkToken(input);
+		return lookup.get(token) || null;
+	}
+
+	/** Build (or return cached) framework lookup */
+	private ensureFrameworkLookup(): Map<string, { display: string; minDays: number; original: string }> {
+		if (this._frameworkLookup) return this._frameworkLookup;
+		const map = new Map<string, { display: string; minDays: number; original: string }>();
+		for (const rec of this.getRetentionRecommendations()) {
+			// Primary token
+			map.set(this.frameworkToken(rec.framework), { display: rec.framework, minDays: rec.minDays, original: rec.framework });
+			// Known aliases
+			const aliases: Record<string, string[]> = {
+				'SOX': ['sarbanes', 'sarbanesoxley'],
+				'SOC2': ['soc2', 'soc-2', 'soc 2'],
+				'GDPR': [],
+				'HIPAA': [],
+				'ISO 27001': ['iso27001', 'iso-27001', 'iso 27001'],
+				'PCI DSS': ['pci', 'pcidss', 'pci-dss'],
+			};
+			const aliasList = aliases[rec.framework] || [];
+			for (const alias of aliasList) {
+				map.set(this.frameworkToken(alias), { display: rec.framework, minDays: rec.minDays, original: rec.framework });
+			}
+		}
+		this._frameworkLookup = map;
+		return map;
+	}
+
+	/** Convert arbitrary framework input to comparable token */
+	private frameworkToken(v: string): string {
+		return v.toLowerCase().replace(/[^a-z0-9]/g, '');
+	}
 }
+

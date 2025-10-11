@@ -314,6 +314,21 @@ The CLI follows standard Unix conventions for automation and CI integration:
 - **`2`**: Validation errors - invalid configuration, unknown dependencies, schema violations
 - **`1`**: Unexpected errors - system failures, network issues, crashes
 
+### Security Subcommand Exit Codes (Extended)
+
+For `security` subcommands (`check-rotation`, `scan-plan`, `validate-secrets`):
+
+| Code | Meaning | Notes |
+|------|---------|-------|
+| 0 | Success / No findings | Status = ok |
+| 1 | Findings detected | Status = findings (action required) |
+| 2 | Internal error | Status = error (investigate stack) |
+
+JSON output is deterministic with ordered keys: `command,status,exitCode,findings,timestamp`.
+
+Format flags:
+`--format text|json` (default text), `--no-color` disables ANSI styling in text mode.
+
 ```bash
 # CI-friendly validation
 npm run cli -- plan --json || echo "Plan validation failed with exit code $?"
