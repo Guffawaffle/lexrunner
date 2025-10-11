@@ -63,6 +63,13 @@ export class GitHubAPI {
 	}
 
 	/**
+	 * Get the underlying Octokit instance
+	 */
+	getOctokit(): Octokit {
+		return this.octokit;
+	}
+
+	/**
 	 * Discover open pull requests with stable ordering and error recovery
 	 */
 	async discoverPullRequests(state: "open" | "closed" | "all" = "open"): Promise<GitHubPullRequest[]> {

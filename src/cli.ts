@@ -92,7 +92,7 @@ Power User Commands:
 	$ lex-pr completion bash                Generate bash completion script
 
 Workflow:
-	1. Discover:    lex-pr discover --suggest
+	1. Discover:    lex-pr discover (optionally add --suggest for dependencies)
 	2. Plan:        lex-pr plan --from-github --json > plan.json
 	3. Review:      lex-pr plan-review plan.json
 	4. Execute:     lex-pr execute plan.json
@@ -953,11 +953,14 @@ program
 
 			if (opts.suggest) {
 				// Generate dependency suggestions using heuristics
-				const { Octokit } = await import("@octokit/rest");
 				const { createFileAnalyzer } = await import("./planner/fileAnalysis.js");
 				
-				const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-				const analyzer = createFileAnalyzer(octokit, githubAPI.config.owner, githubAPI.config.repo);
+				// Reuse the existing Octokit instance from githubAPI
+				const analyzer = createFileAnalyzer(
+					githubAPI.getOctokit(),
+					githubAPI.config.owner,
+					githubAPI.config.repo
+				);
 
 				const prs = pullRequests.map(pr => ({
 					number: pr.number,
