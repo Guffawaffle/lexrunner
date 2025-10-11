@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EnterpriseAuditService, ComplianceFormat, MergeAuditData } from '../src/security/compliance';
+import {
+	EnterpriseAuditService,
+	ComplianceFormat,
+	MergeAuditData,
+	RETENTION_FRAMEWORKS,
+	normalizeFrameworkId
+} from '../src/security/compliance';
 import { AuthContext } from '../src/security/authentication';
 
 describe('Security - Compliance & Audit', () => {
@@ -288,6 +294,66 @@ describe('Security - Compliance & Audit', () => {
 			const summary = auditService.trimRetention(undefined, 'PCI');
 			expect(summary.framework).toBe('PCI DSS');
 			expect(summary.retentionDaysApplied).toBe(365);
+		});
+	});
+
+	describe('Framework Normalization (M3)', () => {
+		it('should export canonical framework constants', () => {
+			expect(RETENTION_FRAMEWORKS.SOX).toBe('SOX');
+			expect(RETENTION_FRAMEWORKS.SOC2).toBe('SOC2');
+			expect(RETENTION_FRAMEWORKS.GDPR).toBe('GDPR');
+			expect(RETENTION_FRAMEWORKS.HIPAA).toBe('HIPAA');
+			expect(RETENTION_FRAMEWORKS.ISO_27001).toBe('ISO 27001');
+			expect(RETENTION_FRAMEWORKS.PCI_DSS).toBe('PCI DSS');
+		});
+
+		it('should normalize SOX variants', () => {
+			expect(normalizeFrameworkId('sox')).toBe('SOX');
+			expect(normalizeFrameworkId('SOX')).toBe('SOX');
+			expect(normalizeFrameworkId('sarbanes')).toBe('SOX');
+			expect(normalizeFrameworkId('sarbanesoxley')).toBe('SOX');
+			expect(normalizeFrameworkId('Sarbanes-Oxley')).toBe('SOX');
+		});
+
+		it('should normalize ISO 27001 variants', () => {
+			expect(normalizeFrameworkId('iso27001')).toBe('ISO 27001');
+			expect(normalizeFrameworkId('ISO 27001')).toBe('ISO 27001');
+			expect(normalizeFrameworkId('ISO-27001')).toBe('ISO 27001');
+			expect(normalizeFrameworkId('iso 27001')).toBe('ISO 27001');
+		});
+
+		it('should normalize PCI DSS variants', () => {
+			expect(normalizeFrameworkId('pci')).toBe('PCI DSS');
+			expect(normalizeFrameworkId('PCI')).toBe('PCI DSS');
+			expect(normalizeFrameworkId('pcidss')).toBe('PCI DSS');
+			expect(normalizeFrameworkId('PCI DSS')).toBe('PCI DSS');
+			expect(normalizeFrameworkId('pci-dss')).toBe('PCI DSS');
+		});
+
+		it('should normalize SOC2 variants', () => {
+			expect(normalizeFrameworkId('soc2')).toBe('SOC2');
+			expect(normalizeFrameworkId('SOC2')).toBe('SOC2');
+			expect(normalizeFrameworkId('SOC-2')).toBe('SOC2');
+			expect(normalizeFrameworkId('soc 2')).toBe('SOC2');
+		});
+
+		it('should return null for unknown frameworks', () => {
+			expect(normalizeFrameworkId('unknown')).toBeNull();
+			expect(normalizeFrameworkId('FOOBAR')).toBeNull();
+			expect(normalizeFrameworkId('')).toBeNull();
+		});
+
+		it('should be case-insensitive', () => {
+			expect(normalizeFrameworkId('GDPR')).toBe('GDPR');
+			expect(normalizeFrameworkId('gdpr')).toBe('GDPR');
+			expect(normalizeFrameworkId('GdPr')).toBe('GDPR');
+		});
+
+		it('should handle hyphenated and spaced variants', () => {
+			// All these should normalize the same way
+			expect(normalizeFrameworkId('ISO-27001')).toBe('ISO 27001');
+			expect(normalizeFrameworkId('ISO 27001')).toBe('ISO 27001');
+			expect(normalizeFrameworkId('ISO27001')).toBe('ISO 27001');
 		});
 	});
 });

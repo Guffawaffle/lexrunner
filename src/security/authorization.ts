@@ -1,6 +1,6 @@
 /**
  * Role-Based Access Control (RBAC) for Autopilot Levels
- * 
+ *
  * Implements permission checks and authorization for different autopilot operations
  */
 
@@ -104,7 +104,7 @@ export class AuthorizationService {
 	 */
 	canExecuteAutopilotLevel(context: AuthContext, level: number): boolean {
 		const requiredPermission = AUTOPILOT_LEVEL_PERMISSIONS[level];
-		
+
 		if (!requiredPermission) {
 			// Unknown level, deny access
 			return false;
@@ -247,11 +247,47 @@ export class AuthorizationService {
 	}
 
 	/**
+	 * Recommend minimal covering set of roles for given permissions
+	 * Returns roles in priority order: admin > release-manager > integrator > developer > viewer
+	 *
+	 * @param requiredPermissions - Permissions that need to be satisfied
+	 * @returns Minimal set of role names that cover all required permissions
+	 */
+	recommendMinimalRoles(requiredPermissions: Permission[]): string[] {
+		if (requiredPermissions.length === 0) {
+			return [];
+		}
+
+		// Try each role from lowest to highest privilege to find minimal covering set
+		const rolePriority: (keyof typeof ROLES)[] = [
+			'viewer',
+			'developer',
+			'integrator',
+			'releaseManager',
+			'admin',
+		];
+
+		// Find the single lowest-privilege role that covers all permissions
+		for (const roleKey of rolePriority) {
+			const role = ROLES[roleKey];
+			const coversAll = requiredPermissions.every(p => role.permissions.includes(p));
+
+			if (coversAll) {
+				return [role.name];
+			}
+		}
+
+		// If no single role covers all, this shouldn't happen with our current role hierarchy
+		// but return admin as fallback
+		return ['admin'];
+	}
+
+	/**
 	 * Generate permission report for user
 	 */
 	generatePermissionReport(context: AuthContext): string {
 		const lines: string[] = [];
-		
+
 		lines.push(`Permission Report for: ${context.user}`);
 		lines.push(`Roles: ${context.roles.join(', ')}`);
 		lines.push('');

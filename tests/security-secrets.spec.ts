@@ -17,7 +17,7 @@ describe('Security - Secrets Management', () => {
 	describe('Environment Secret Provider', () => {
 		it('should get secret from environment', async () => {
 			process.env.LEX_PR_TEST_SECRET = 'secret-value';
-			
+
 			const provider = new EnvironmentSecretProvider();
 			const secret = await provider.getSecret('TEST_SECRET');
 
@@ -50,7 +50,7 @@ describe('Security - Secrets Management', () => {
 			process.env.LEX_PR_EXISTS = 'value';
 
 			const provider = new EnvironmentSecretProvider();
-			
+
 			expect(await provider.hasSecret('EXISTS')).toBe(true);
 			expect(await provider.hasSecret('NOT_EXISTS')).toBe(false);
 		});
@@ -316,6 +316,90 @@ describe('Security - Secrets Management', () => {
 
 			expect(detected[0].context).toBeDefined();
 			expect(detected[0].context).toContain('***');
+		});
+
+		describe('Confidence Level Classification (M2)', () => {
+			it('should classify GitHub tokens as high confidence', () => {
+				const content = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+				const detected = scanner.scanText(content);
+
+				expect(detected).toHaveLength(1);
+				expect(detected[0].confidenceLevel).toBe('high');
+			});
+
+			it('should classify AWS access keys as high confidence', () => {
+				const content = 'AKIAIOSFODNN7EXAMPLE';
+				const detected = scanner.scanText(content);
+
+				expect(detected).toHaveLength(1);
+				expect(detected[0].confidenceLevel).toBe('high');
+			});
+
+			it('should classify private keys as high confidence', () => {
+				const content = '-----BEGIN RSA PRIVATE KEY-----';
+				const detected = scanner.scanText(content);
+
+				expect(detected).toHaveLength(1);
+				expect(detected[0].confidenceLevel).toBe('high');
+			});
+
+			it('should classify Slack webhooks as high confidence', () => {
+				const content = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
+				const detected = scanner.scanText(content);
+
+				expect(detected).toHaveLength(1);
+				expect(detected[0].confidenceLevel).toBe('high');
+			});
+
+			it('should classify JWT tokens as medium confidence', () => {
+				const content = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+				const detected = scanner.scanText(content);
+
+				expect(detected).toHaveLength(1);
+				expect(detected[0].confidenceLevel).toBe('medium');
+			});
+
+			it('should classify generic API keys as medium confidence', () => {
+				const content = 'api_key="sk_live_abcdefghijklmnopqrstuvwxyz"';
+				const detected = scanner.scanText(content);
+
+				expect(detected.length).toBeGreaterThan(0);
+				const apiKey = detected.find((d: any) => d.pattern.name === 'generic_api_key');
+				expect(apiKey?.confidenceLevel).toBe('medium');
+			});
+
+			it('should classify password patterns as low confidence', () => {
+				const content = 'password = "mysecretpassword123"';
+				const detected = scanner.scanText(content);
+
+				expect(detected.length).toBeGreaterThan(0);
+				const pwd = detected.find((d: any) => d.pattern.name === 'password');
+				expect(pwd?.confidenceLevel).toBe('low');
+			});
+
+			it('should include confidence level in JSON findings', () => {
+				const content = `
+					github: ghp_1234567890abcdefghijklmnopqrstuvwxyz
+					jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U
+					password: "weakpassword123"
+				`;
+				const detected = scanner.scanText(content);
+
+				// All detected secrets should have confidenceLevel
+				for (const secret of detected) {
+					expect(secret.confidenceLevel).toBeDefined();
+					expect(['high', 'medium', 'low']).toContain(secret.confidenceLevel);
+				}
+
+				// Verify expected levels
+				const github = detected.find((d: any) => d.pattern.name === 'github_token');
+				const jwt = detected.find((d: any) => d.pattern.name === 'jwt_token');
+				const pwd = detected.find((d: any) => d.pattern.name === 'password');
+
+				expect(github?.confidenceLevel).toBe('high');
+				expect(jwt?.confidenceLevel).toBe('medium');
+				expect(pwd?.confidenceLevel).toBe('low');
+			});
 		});
 	});
 });

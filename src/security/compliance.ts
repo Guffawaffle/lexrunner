@@ -78,6 +78,67 @@ export interface MergeAuditData {
 }
 
 /**
+ * Canonical retention framework identifiers (M3)
+ * Use these constants for stable, documented framework references
+ */
+export const RETENTION_FRAMEWORKS = {
+	SOX: 'SOX',
+	SOC2: 'SOC2',
+	GDPR: 'GDPR',
+	HIPAA: 'HIPAA',
+	ISO_27001: 'ISO 27001',
+	PCI_DSS: 'PCI DSS',
+} as const;
+
+/**
+ * Type representing valid retention framework keys
+ */
+export type RetentionFramework = typeof RETENTION_FRAMEWORKS[keyof typeof RETENTION_FRAMEWORKS];
+
+/**
+ * Normalize framework identifier to canonical form (M3)
+ *
+ * Accepts variants like:
+ * - 'iso27001', 'ISO 27001', 'iso-27001' → 'ISO 27001'
+ * - 'pci', 'PCI DSS', 'pci-dss' → 'PCI DSS'
+ * - 'soc2', 'SOC2', 'soc-2' → 'SOC2'
+ * - 'sarbanes', 'sarbanesoxley' → 'SOX'
+ *
+ * @param input - Framework identifier (case-insensitive, accepts aliases)
+ * @returns Canonical framework name or null if unknown
+ */
+export function normalizeFrameworkId(input: string): string | null {
+	// Normalize to comparable token
+	const token = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+	// Mapping from normalized tokens to canonical names
+	const mapping: Record<string, string> = {
+		// SOX variants
+		'sox': RETENTION_FRAMEWORKS.SOX,
+		'sarbanes': RETENTION_FRAMEWORKS.SOX,
+		'sarbanesoxley': RETENTION_FRAMEWORKS.SOX,
+
+		// SOC2 variants
+		'soc2': RETENTION_FRAMEWORKS.SOC2,
+
+		// GDPR (no aliases currently)
+		'gdpr': RETENTION_FRAMEWORKS.GDPR,
+
+		// HIPAA (no aliases currently)
+		'hipaa': RETENTION_FRAMEWORKS.HIPAA,
+
+		// ISO 27001 variants
+		'iso27001': RETENTION_FRAMEWORKS.ISO_27001,
+
+		// PCI DSS variants
+		'pci': RETENTION_FRAMEWORKS.PCI_DSS,
+		'pcidss': RETENTION_FRAMEWORKS.PCI_DSS,
+	};
+
+	return mapping[token] || null;
+}
+
+/**
  * Enterprise Audit Service
  */
 export class EnterpriseAuditService {

@@ -241,6 +241,11 @@ export interface SecretPattern {
 }
 
 /**
+ * Confidence level for detected secrets (M2)
+ */
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+/**
  * Detected secret in content
  */
 export interface DetectedSecret {
@@ -256,6 +261,8 @@ export interface DetectedSecret {
 	context?: string;
 	/** Confidence score (0-1) */
 	confidence?: number;
+	/** Categorical confidence level (M2) */
+	confidenceLevel?: ConfidenceLevel;
 }
 
 /**
@@ -336,6 +343,51 @@ export class PlanSecretsScanner {
 	}
 
 	/**
+	 * Classify confidence level based on pattern characteristics (M2)
+	 *
+	 * High: Specific prefixes (ghp_, gho_, ghs_, AKIA...), private key delimiters, Slack webhook
+	 * Medium: JWT, generic API key pattern (structured)
+	 * Low: Password assignments / loose heuristics
+	 */
+	private classifyConfidenceLevel(patternName: string, value: string): ConfidenceLevel {
+		// High confidence patterns (very specific signatures)
+		if (patternName.startsWith('github_') && /^gh[poas]_/.test(value)) {
+			return 'high';
+		}
+		if (patternName === 'aws_access_key' && /^AKIA/.test(value)) {
+			return 'high';
+		}
+		if (patternName === 'private_key' && value.includes('-----BEGIN')) {
+			return 'high';
+		}
+		if (patternName === 'slack_webhook' && value.includes('hooks.slack.com')) {
+			return 'high';
+		}
+
+		// Medium confidence patterns (structured but less specific)
+		if (patternName === 'jwt_token') {
+			return 'medium';
+		}
+		if (patternName === 'generic_api_key') {
+			return 'medium';
+		}
+		if (patternName === 'slack_token' && /^xox[baprs]-/.test(value)) {
+			return 'medium';
+		}
+
+		// Low confidence patterns (loose heuristics)
+		if (patternName === 'password') {
+			return 'low';
+		}
+		if (patternName === 'aws_secret_key') {
+			return 'low'; // Context-dependent pattern
+		}
+
+		// Default fallback
+		return 'medium';
+	}
+
+	/**
 	 * Scan text content for secrets
 	 */
 	scanText(content: string): DetectedSecret[] {
@@ -358,6 +410,10 @@ export class PlanSecretsScanner {
 				// Pattern based weighting
 				if (/private|secret|token|key/i.test(pattern.name)) confidence = Math.min(1, confidence * 1.1 + 0.1);
 				if (/password/i.test(pattern.name)) confidence = Math.min(1, confidence * 0.9 + 0.05);
+
+				// M2: Classify categorical confidence level
+				const confidenceLevel = this.classifyConfidenceLevel(pattern.name, matchValue);
+
 				detected.push({
 					pattern,
 					value: this.redact(matchValue),
@@ -365,6 +421,7 @@ export class PlanSecretsScanner {
 					column: position.column,
 					context: context ? this.redact(context) : undefined,
 					confidence: Number(confidence.toFixed(3)),
+					confidenceLevel,
 				});
 			}
 		}
