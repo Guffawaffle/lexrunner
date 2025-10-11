@@ -34,7 +34,8 @@ function outputSecurityResult(command: string, result: ResultLike, format: strin
       findings: normalizeFindings(result.findings),
       timestamp: new Date().toISOString()
     };
-    const ordered = { command: payload.command, status: payload.status, exitCode: payload.exitCode, findings: payload.findings, timestamp: payload.timestamp };
+    const keyOrder = ['command', 'status', 'exitCode', 'findings', 'timestamp'] as const;
+    const ordered = Object.fromEntries(keyOrder.map(k => [k, payload[k]]));
     process.stdout.write(JSON.stringify(ordered, null, 2) + '\n');
     process.exit(result.exitCode);
   }
