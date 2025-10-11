@@ -180,10 +180,8 @@ jobs:
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#v}
           
-          # Extract changelog section for this version
-          awk "/## \[${TAG_VERSION}\]/,/## \[/" CHANGELOG.md | 
-            sed '/## \[/d' | 
-            sed -e :a -e '/^\s*$/d;N;ba' > release_notes.md
+          # Extract changelog section for this version (exclude section headers)
+          awk "/## \[${TAG_VERSION}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
           
           if [ ! -s release_notes.md ]; then
             echo "No changelog entry found for version ${TAG_VERSION}" > release_notes.md

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 
 describe("release:prepare script", () => {
 	let testDir: string;
@@ -14,7 +15,7 @@ describe("release:prepare script", () => {
 	beforeEach(() => {
 		// Create a temporary test directory
 		originalCwd = process.cwd();
-		testDir = fs.mkdtempSync(path.join("/tmp", "release-test-"));
+		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-test-"));
 		process.chdir(testDir);
 
 		// Initialize git repo
