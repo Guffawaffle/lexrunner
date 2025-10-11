@@ -61,6 +61,10 @@ New to lex-pr-runner? Start here:
 
 ### Tutorials
 
+- **[Quick Merge Pyramid](./tutorials/quick-merge-pyramid.md)** - Complete workflow guide (10 min)
+  - Discover → Plan → Execute → Merge
+  - Dependency management
+  - Gate execution and verification
 - **[Video Tutorial Scripts](./tutorials/)** - Complete video guides
   - Getting Started (5 min)
   - Understanding Dependencies (8 min)

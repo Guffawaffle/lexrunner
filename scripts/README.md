@@ -1,8 +1,72 @@
-# Sample Repository Creation Script
+# lex-pr-runner Scripts
 
-This directory contains scripts for creating sample repositories to test lex-pr-runner functionality.
+This directory contains utility scripts for lex-pr-runner development and adoption tracking.
 
-## create-sample-repo.sh
+## Adoption Metrics
+
+### metrics-template.ts
+
+Generate adoption metrics template with deterministic output for tracking lex-pr-runner usage.
+
+**Usage:**
+
+```bash
+# Generate metrics template
+npx tsx scripts/metrics-template.ts
+
+# Save to file
+npx tsx scripts/metrics-template.ts > metrics.json
+```
+
+**Output:**
+
+```json
+{
+  "metrics": {
+    "schemaVersion": "1.0.0",
+    "period": { "start": "2024-01-08", "end": "2024-01-15" },
+    "prMetrics": { "totalMerged": 0, "averageTimeToMerge": 0, "successRate": 0 },
+    "gateMetrics": { "totalExecutions": 0, "passRate": 0, "averageExecutionTime": 0 },
+    "dependencyMetrics": { "totalResolved": 0, "cyclesDetected": 0, "accuracyRate": 0 },
+    "timeSavings": { "totalHoursSaved": 0, "automationRate": 0 },
+    "badges": { "status": "testing", "prsPerWeek": 0, "successRate": 0 }
+  },
+  "badges": {
+    "status": "https://img.shields.io/badge/status-testing-yellow",
+    "prsPerWeek": "https://img.shields.io/badge/PRs%2Fweek-0-blue",
+    "successRate": "https://img.shields.io/badge/success%20rate-0%25-red"
+  }
+}
+```
+
+**Features:**
+
+- Deterministic output with canonical JSON key ordering
+- Badge-ready URLs for README
+- Placeholder values for tracking adoption metrics
+- See [Issue #134](https://github.com/Guffawaffle/lex-pr-runner/issues/134) for adoption tracking initiative
+
+## Schema Generation
+
+### generate-plan-schema.ts
+
+Generate JSON schema from Zod plan schema definition.
+
+```bash
+npx tsx scripts/generate-plan-schema.ts
+```
+
+### generate-gate-schema.ts
+
+Generate JSON schema from Zod gate schema definition.
+
+```bash
+npx tsx scripts/generate-gate-schema.ts
+```
+
+## Sample Repository Creation
+
+### create-sample-repo.sh
 
 Creates a sample Git repository with multiple feature branches and dependencies for testing the merge pyramid workflow.
 
