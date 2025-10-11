@@ -284,9 +284,10 @@ Items at the same dependency level can run in parallel. Parallelism is controlle
 # Configure max parallel workers during plan generation
 lex-pr plan --from-github --max-workers 3
 
-# Gates execute in parallel according to:
+# Items execute in parallel according to:
 # 1. Dependency level (items at same level can run in parallel)
 # 2. Max workers limit from the plan
+# Note: Each item's gates run sequentially, but multiple items can run concurrently
 lex-pr execute plan.json
 ```
 
