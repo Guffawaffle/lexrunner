@@ -1,5 +1,9 @@
 # Security Implementation Verification Checklist
 
+> **📌 Master Documentation (M4):**
+> This is the authoritative reference for security implementation and acceptance criteria verification.
+> Related summaries: [ISSUE_106_SUMMARY.md](./ISSUE_106_SUMMARY.md), [VERIFICATION_GUIDE.md](./VERIFICATION_GUIDE.md)
+
 ## Acceptance Criteria Verification
 
 This document verifies that all acceptance criteria from issue #D3 have been met.

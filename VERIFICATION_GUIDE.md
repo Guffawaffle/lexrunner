@@ -1,5 +1,9 @@
 # How to Verify Issue #106 Implementation
 
+> **📌 Documentation Notice (M4):**
+> This document provides practical verification steps for issue #106.
+> For comprehensive acceptance criteria and detailed implementation status, see [SECURITY_VERIFICATION.md](./SECURITY_VERIFICATION.md).
+
 This guide shows how to verify all the enterprise security features implemented for issue #106.
 
 ## Prerequisites
@@ -21,7 +25,7 @@ npm test -- tests/security
 
 # Expected output:
 # ✓ tests/security-authentication.spec.ts (5 tests)
-# ✓ tests/security-authorization.spec.ts (25 tests) 
+# ✓ tests/security-authorization.spec.ts (25 tests)
 # ✓ tests/security-compliance.spec.ts (21 tests)
 # ✓ tests/security-secrets.spec.ts (32 tests)
 # ✓ tests/security-policy.spec.ts (18 tests)
