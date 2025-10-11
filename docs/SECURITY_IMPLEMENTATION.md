@@ -63,6 +63,7 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 
 **Files:**
 - `src/security/secrets.ts` - Secure credential handling
+- `scripts/rotate-secrets-example.ts` - Example rotation script
 
 **Features:**
 - Environment variable integration with prefix support
@@ -76,6 +77,14 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 - Secrets never logged in plaintext
 - Automatic redaction in error messages
 - Rotation warnings for aged credentials
+
+**Rotation Guide:**
+- See [docs/security/rotation-guide.md](security/rotation-guide.md) for:
+  - Recommended rotation cadences by secret type
+  - Compliance framework requirements (SOX, PCI-DSS, SOC 2, HIPAA)
+  - Step-by-step rotation workflows
+  - Automation patterns and CI/CD integration
+  - Emergency rotation procedures
 
 ### ✅ 5. Security Scanning Integration
 
@@ -398,6 +407,8 @@ lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL
 - Review audit logs regularly
 - Generate compliance reports monthly
 - Check for secret rotation needs with `lex-pr security check-rotation`
+- Use rotation example script: `tsx scripts/rotate-secrets-example.ts`
+- See [rotation guide](security/rotation-guide.md) for automation patterns
 - Monitor security scan results
 - Track permission usage
 - Apply retention policies based on compliance framework (SOX, GDPR, etc.)

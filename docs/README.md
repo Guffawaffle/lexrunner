@@ -108,6 +108,16 @@ New to lex-pr-runner? Start here:
 
 ## 🛠️ Operations
 
+### Security
+
+- **[Security Implementation](./SECURITY_IMPLEMENTATION.md)** - Enterprise security features
+- **[Secret Rotation Guide](./security/rotation-guide.md)** - Rotation patterns and best practices
+  - Recommended rotation cadences
+  - Compliance framework requirements
+  - Step-by-step rotation workflows
+  - Automation and CI/CD integration
+  - Emergency rotation procedures
+
 ### Monitoring
 
 - **[Monitoring Implementation](./monitoring-implementation.md)** - Setup guide
