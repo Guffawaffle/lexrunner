@@ -6,7 +6,7 @@
  * - Parse conventional commits since last tag
  * - Compute next semantic version (major.minor.patch)
  * - Update CHANGELOG.md with new version section
- * - Update package.json version via npm version command
+ * - Update package.json version (executes npm version command)
  * - Output instructions for signed tag creation
  * 
  * Does NOT:
