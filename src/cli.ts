@@ -453,6 +453,63 @@ program
 			})
 	);
 
+// Config inspect command
+program
+	.command("config:inspect")
+	.description("Display merged configuration with provenance map")
+	.option("--json", "Output canonical JSON format")
+	.action((opts) => {
+		try {
+			// Load configuration with provenance tracking
+			const config = loadInputs();
+
+			if (opts.json) {
+				// Output deterministic JSON with sorted keys
+				const output = {
+					config: {
+						items: config.items,
+						target: config.target,
+						version: config.version
+					},
+					provenance: config.provenance || {},
+					sources: config.sources.map(s => ({
+						exists: s.exists,
+						file: s.file
+					}))
+				};
+				console.log(canonicalJSONStringify(output));
+			} else {
+				// Human-readable output
+				console.log(chalk.bold('\n📋 Configuration Inspection\n'));
+				
+				console.log(chalk.cyan('Configuration:'));
+				console.log(`  Version: ${config.version}`);
+				console.log(`  Target: ${config.target}`);
+				console.log(`  Items: ${config.items.length}\n`);
+
+				if (config.provenance) {
+					console.log(chalk.cyan('Provenance Map:'));
+					const sortedKeys = Object.keys(config.provenance).sort();
+					for (const key of sortedKeys) {
+						console.log(`  ${key}: ${chalk.green(config.provenance[key])}`);
+					}
+					console.log('');
+				}
+
+				console.log(chalk.cyan('Configuration Sources:'));
+				for (const source of config.sources) {
+					const status = source.exists ? chalk.green('✓') : chalk.gray('✗');
+					console.log(`  ${status} ${source.file}`);
+				}
+				console.log('');
+			}
+
+			process.exit(0);
+		} catch (error) {
+			exitWith(error);
+		}
+	});
+
 // Plan review command - Interactive plan validation and editing
 program
 	.command("plan-review")

@@ -19,6 +19,13 @@ export interface ConfigSource {
 }
 
 /**
+ * Provenance map tracking source file for each configuration key
+ */
+export interface ProvenanceMap {
+	[key: string]: string; // key -> source file name
+}
+
+/**
  * Normalized input configuration
  */
 export interface InputConfig {
@@ -26,6 +33,7 @@ export interface InputConfig {
 	target: string;
 	items: InputItem[];
 	sources: ConfigSource[];
+	provenance?: ProvenanceMap;
 }
 
 export interface InputItem {
@@ -103,11 +111,13 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 	];
 
 	const sources: ConfigSource[] = [];
+	const provenance: ProvenanceMap = {};
 	let config: InputConfig = {
 		version: 1,
 		target: "main",
 		items: [],
-		sources: []
+		sources: [],
+		provenance
 	};
 
 	// Load stack.yml (highest precedence)
@@ -119,6 +129,8 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 		const stackConfig = StackConfig.parse(stackSource.content);
 		config.version = stackConfig.version;
 		config.target = stackConfig.target;
+		provenance.version = stackSource.file;
+		provenance.target = stackSource.file;
 		config.items = stackConfig.items.map((item, index) => {
 			const id = item.id ?? (index + 1);
 			// Normalize all IDs to strings internally to prevent comparison bugs
@@ -150,6 +162,8 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 			const scopeConfig = ScopeConfig.parse(scopeSource.content);
 			config.target = scopeConfig.target;
 			config.version = scopeConfig.version;
+			provenance.target = scopeSource.file;
+			provenance.version = scopeSource.file;
 		}
 
 		// deps.yml would be loaded here if it existed
