@@ -75,6 +75,7 @@ Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
 	$ lex-pr doctor                         Validate environment and configuration
 	$ lex-pr discover                       Find open PRs matching scope
+	$ lex-pr discover --suggest             Generate dependency suggestions with heuristics
 	$ lex-pr plan --from-github             Generate merge plan from GitHub PRs
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
@@ -91,7 +92,7 @@ Power User Commands:
 	$ lex-pr completion bash                Generate bash completion script
 
 Workflow:
-	1. Discover:    lex-pr discover
+	1. Discover:    lex-pr discover --suggest
 	2. Plan:        lex-pr plan --from-github --json > plan.json
 	3. Review:      lex-pr plan-review plan.json
 	4. Execute:     lex-pr execute plan.json
