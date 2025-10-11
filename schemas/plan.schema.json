@@ -138,6 +138,36 @@
               },
               "additionalProperties": false,
               "default": {}
+            },
+            "security": {
+              "type": "object",
+              "properties": {
+                "blockCritical": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "blockHigh": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "maxMedium": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 5
+                },
+                "maxLow": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 10
+                }
+              },
+              "additionalProperties": false,
+              "default": {
+                "blockCritical": true,
+                "blockHigh": true,
+                "maxMedium": 5,
+                "maxLow": 10
+              }
             }
           },
           "additionalProperties": false
