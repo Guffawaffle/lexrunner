@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/flake-report.schema.json",
+  "title": "Flake Report Schema",
+  "description": "Schema for tracking gate retry attempts and transient failures. Emitted when a gate requires multiple attempts to pass or ultimately fails after retries.",
+  "version": "1.0.0",
+  "$ref": "#/definitions/FlakeReport",
+  "definitions": {
+    "FlakeReport": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "pattern": "^1\\.\\d+\\.\\d+$",
+          "default": "1.0.0"
+        },
+        "item": {
+          "type": "string"
+        },
+        "gate": {
+          "type": "string"
+        },
+        "total_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "final_status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              },
+              "duration_ms": {
+                "type": "number",
+                "minimum": 0
+              },
+              "error_type": {
+                "type": "string",
+                "enum": [
+                  "transient",
+                  "permanent",
+                  "unknown"
+                ]
+              },
+              "error_message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "attempt",
+              "timestamp",
+              "status",
+              "duration_ms"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "total_duration_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "item",
+        "gate",
+        "total_attempts",
+        "final_status",
+        "attempts",
+        "total_duration_ms"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
