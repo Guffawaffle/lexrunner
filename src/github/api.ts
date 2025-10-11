@@ -51,7 +51,7 @@ export interface GitHubConfig {
  */
 export class GitHubAPI {
 	private octokit: Octokit;
-	private config: GitHubConfig;
+	public config: GitHubConfig;
 	private circuitBreaker: CircuitBreaker;
 
 	constructor(config: GitHubConfig) {

@@ -34,6 +34,14 @@ export interface FileIntersection {
 }
 
 /**
+ * Heuristic types for dependency detection
+ */
+export type HeuristicType = 
+	| "shared-files"
+	| "directory-proximity"
+	| "test-overlap";
+
+/**
  * Dependency suggestion based on file analysis
  */
 export interface DependencySuggestion {
@@ -42,6 +50,7 @@ export interface DependencySuggestion {
 	reason: string;
 	confidence: number; // 0.0 to 1.0
 	sharedFiles: string[];
+	heuristic?: HeuristicType; // Which heuristic generated this suggestion
 }
 
 /**
