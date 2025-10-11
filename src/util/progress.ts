@@ -28,7 +28,7 @@ export class ProgressReporter {
 		if (!this.enabled) return;
 		const key = `level-${level}`;
 		this.startTimes.set(key, Date.now());
-		console.log(`\n⏳ Level ${level}: Starting [${items.join(', ')}]...`);
+		console.log(`⏳ Level ${level}: Starting [${items.join(', ')}]...`);
 	}
 
 	/**
