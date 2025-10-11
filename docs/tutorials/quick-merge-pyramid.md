@@ -278,10 +278,13 @@ gates:
 
 ### Parallel Execution
 
-Items at the same dependency level run in parallel based on policy:
+Items at the same dependency level run in parallel based on plan configuration:
 ```bash
-# Configure in plan generation
+# Max workers is set in plan generation
 lex-pr plan --from-github --max-workers 3
+
+# Gates execute according to the plan's parallelism settings
+lex-pr execute plan.json
 ```
 
 ### Error Recovery
