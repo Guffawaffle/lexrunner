@@ -6,6 +6,8 @@ import fs from "fs";
 import { classifyError, formatErrorForUser, ErrorType } from "./core/errorRecovery.js";
 import { MemoryMonitor, OperationCache } from "./performance.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
+import { parseSarif } from "./security/sarif.js";
+import { SecurityScanResult, DEFAULT_SECURITY_POLICY, SecurityPolicy, NpmAuditScanner } from "./security/scanning.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -250,6 +252,129 @@ function collectArtifacts(gate: Gate, artifactDir: string): string[] {
 }
 
 /**
+ * Check vulnerability scan results against policy thresholds
+ */
+function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult {
+	const startTime = Date.now();
+	const startedAt = new Date().toISOString();
+	
+	// Use default policy if not provided
+	const vulnPolicy = policy || DEFAULT_SECURITY_POLICY;
+	
+	// Look for SARIF file first, then npm audit JSON
+	const sarifPath = path.join(artifactDir, 'scan-results.sarif');
+	const npmAuditPath = path.join(artifactDir, 'npm-audit.json');
+	
+	let scanResult: SecurityScanResult | null = null;
+	let artifactPath: string | null = null;
+	
+	// Try SARIF first
+	if (fs.existsSync(sarifPath)) {
+		try {
+			const sarifContent = fs.readFileSync(sarifPath, 'utf-8');
+			scanResult = parseSarif(sarifContent);
+			artifactPath = sarifPath;
+		} catch (error) {
+			return {
+				gate: 'vuln',
+				status: 'fail',
+				exitCode: 1,
+				duration: Date.now() - startTime,
+				stdout: '',
+				stderr: `Failed to parse SARIF: ${error instanceof Error ? error.message : String(error)}`,
+				artifacts: [],
+				attempts: 1,
+				lastAttempt: startedAt,
+			};
+		}
+	}
+	// Fall back to npm audit JSON
+	else if (fs.existsSync(npmAuditPath)) {
+		try {
+			const npmAuditContent = fs.readFileSync(npmAuditPath, 'utf-8');
+			const auditData = JSON.parse(npmAuditContent);
+			// Use NpmAuditScanner's parsing logic
+			const scanner = new NpmAuditScanner();
+			scanResult = (scanner as any).parseNpmAudit(auditData);
+			artifactPath = npmAuditPath;
+		} catch (error) {
+			return {
+				gate: 'vuln',
+				status: 'fail',
+				exitCode: 1,
+				duration: Date.now() - startTime,
+				stdout: '',
+				stderr: `Failed to parse npm audit: ${error instanceof Error ? error.message : String(error)}`,
+				artifacts: [],
+				attempts: 1,
+				lastAttempt: startedAt,
+			};
+		}
+	}
+	// No vulnerability scan artifacts found
+	else {
+		return {
+			gate: 'vuln',
+			status: 'fail',
+			exitCode: 1,
+			duration: Date.now() - startTime,
+			stdout: '',
+			stderr: `No vulnerability scan artifacts found. Expected SARIF at ${sarifPath} or npm audit JSON at ${npmAuditPath}`,
+			artifacts: [],
+			attempts: 1,
+			lastAttempt: startedAt,
+		};
+	}
+	
+	// Check against policy thresholds
+	const violations: string[] = [];
+	
+	if (vulnPolicy.blockCritical && scanResult.criticalCount > 0) {
+		violations.push(`${scanResult.criticalCount} critical vulnerabilities (threshold: 0)`);
+	}
+	
+	if (vulnPolicy.blockHigh && scanResult.highCount > 0) {
+		violations.push(`${scanResult.highCount} high vulnerabilities (threshold: 0)`);
+	}
+	
+	if (scanResult.mediumCount > vulnPolicy.maxMedium) {
+		violations.push(`${scanResult.mediumCount} medium vulnerabilities (threshold: ${vulnPolicy.maxMedium})`);
+	}
+	
+	if (scanResult.lowCount > vulnPolicy.maxLow) {
+		violations.push(`${scanResult.lowCount} low vulnerabilities (threshold: ${vulnPolicy.maxLow})`);
+	}
+	
+	const passed = violations.length === 0;
+	
+	// Build deterministic output message
+	const summary = [
+		`Vulnerability scan results (${scanResult.scanner}):`,
+		`  Critical: ${scanResult.criticalCount}`,
+		`  High: ${scanResult.highCount}`,
+		`  Medium: ${scanResult.mediumCount}`,
+		`  Low: ${scanResult.lowCount}`,
+		`  Total: ${scanResult.totalVulnerabilities}`,
+	].join('\n');
+	
+	const output = passed 
+		? `${summary}\n\n✅ All thresholds met`
+		: `${summary}\n\n❌ Policy violations:\n${violations.map(v => `  - ${v}`).join('\n')}`;
+	
+	return {
+		gate: 'vuln',
+		status: passed ? 'pass' : 'fail',
+		exitCode: passed ? 0 : 1,
+		duration: Date.now() - startTime,
+		stdout: output,
+		stderr: passed ? '' : violations.join('; '),
+		artifacts: artifactPath ? [artifactPath] : [],
+		attempts: 1,
+		lastAttempt: startedAt,
+	};
+}
+
+/**
  * Execute all gates for a specific item with policy-aware execution
  */
 export async function executeItemGates(
@@ -286,6 +411,16 @@ export async function executeItemGates(
 			};
 			results.push(blockedResult);
 			executionState.updateGateResult(item.name, blockedResult);
+			continue;
+		}
+
+		// Special handling for 'vuln' gate
+		if (gate.name === 'vuln') {
+			// Extract security policy from plan policy if available
+			const securityPolicy = (policy as any).security || DEFAULT_SECURITY_POLICY;
+			const result = checkVulnGate(itemArtifactDir, securityPolicy);
+			results.push(result);
+			executionState.updateGateResult(item.name, result);
 			continue;
 		}
 

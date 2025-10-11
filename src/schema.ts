@@ -108,6 +108,22 @@ export const PerformanceConfig = z.object({
 export type PerformanceConfig = z.infer<typeof PerformanceConfig>;
 
 /**
+ * Security policy for vulnerability thresholds in vuln gate
+ */
+export const VulnPolicy = z.object({
+	blockCritical: z.boolean().default(true),
+	blockHigh: z.boolean().default(true),
+	maxMedium: z.number().int().min(0).default(5),
+	maxLow: z.number().int().min(0).default(10),
+}).default({
+	blockCritical: true,
+	blockHigh: true,
+	maxMedium: 5,
+	maxLow: 10,
+});
+export type VulnPolicy = z.infer<typeof VulnPolicy>;
+
+/**
  * Policy configuration for the plan execution
  */
 export const Policy = z.object({
@@ -120,7 +136,8 @@ export const Policy = z.object({
 	}).default({}),
 	blockOn: z.array(z.string()).default([]),
 	mergeRule: MergeRule.default({ type: "strict-required" }),
-	performance: PerformanceConfig.optional() // Performance tuning options
+	performance: PerformanceConfig.optional(), // Performance tuning options
+	security: VulnPolicy.optional() // Security/vulnerability thresholds for vuln gate
 });
 export type Policy = z.infer<typeof Policy>;
 
