@@ -15,7 +15,7 @@
 		"cli": "tsx src/cli.ts",
 		"cli:built": "node dist/cli.js",
 		"mcp": "tsx src/mcp/server.ts",
-		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist && tsup src/mcp/server.ts --format esm,cjs --dts --out-dir dist",
+		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist && tsup src/mcp/server.ts --format esm --dts --out-dir dist",
 		"pretest": "npm run build",
 		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts",
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
