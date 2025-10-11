@@ -278,12 +278,15 @@ gates:
 
 ### Parallel Execution
 
-Items at the same dependency level run in parallel based on plan configuration:
+Items at the same dependency level can run in parallel. Parallelism is controlled by the `--max-workers` setting during plan generation:
+
 ```bash
-# Max workers is set in plan generation
+# Configure max parallel workers during plan generation
 lex-pr plan --from-github --max-workers 3
 
-# Gates execute according to the plan's parallelism settings
+# Gates execute in parallel according to:
+# 1. Dependency level (items at same level can run in parallel)
+# 2. Max workers limit from the plan
 lex-pr execute plan.json
 ```
 
