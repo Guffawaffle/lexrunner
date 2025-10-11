@@ -14,6 +14,102 @@ The parser supports multiple dependency formats:
 - **GitHub Keywords**: `Closes: #100`, `Fixes: #200`, `Resolves: #300`
 - **Cross-repo**: `owner/repo#123`, `repo#456`
 
+### Automatic Dependency Discovery (Heuristics)
+
+In addition to explicit dependencies in PR descriptions, the system can automatically suggest dependencies using multiple heuristics:
+
+#### 1. Shared File Modifications
+Detects when multiple PRs modify the same files.
+
+- **Confidence**: 0.6 - 1.0
+- **Logic**: Both PRs modify identical files
+- **Higher confidence** when both modify (vs. one adds, one modifies)
+- **Example**: PR-101 and PR-102 both modify `src/core.ts`
+
+#### 2. Directory Proximity  
+Identifies PRs working in the same area of the codebase.
+
+- **Confidence**: 0.3 - 0.8
+- **Logic**: Calculate overlap of directory paths
+- **Formula**: `min(commonDirs / totalDirs, 0.8)`
+- **Example**: PR-201 modifies `src/planner/core.ts`, PR-202 modifies `src/planner/utils.ts`
+
+#### 3. Test Overlap
+Finds PRs that test the same modules or share test files.
+
+- **Confidence**: 0.5 - 0.85
+- **Logic**: 
+  - Shared test files: 0.7 - 0.85 confidence
+  - Same module tested (different test files): 0.5 - 0.65 confidence
+- **Example**: PR-301 modifies `tests/core.spec.ts`, PR-302 modifies `tests/core.test.ts` (both test "core" module)
+
+#### Heuristic Output
+
+Use `discover --suggest` to generate suggestions:
+
+```bash
+lex-pr discover --suggest
+```
+
+**Table Output:**
+```
+📊 Dependency Suggestions (3 found):
+
+| From   | To     | Confidence | Heuristic          | Reason                              |
+|--------|--------|------------|--------------------|-------------------------------------|
+| PR-101 | PR-102 | 95%        | shared-files       | shared file modifications           |
+| PR-201 | PR-202 | 50%        | directory-proximity| both modify files in 1 common directory |
+| PR-301 | PR-302 | 65%        | test-overlap       | tests for same module               |
+```
+
+**JSON Output:**
+```bash
+lex-pr discover --suggest --json
+```
+
+```json
+{
+  "suggestions": [
+    {
+      "from": "PR-101",
+      "to": "PR-102",
+      "reason": "shared file modifications",
+      "confidence": 0.95,
+      "sharedFiles": ["src/core.ts"],
+      "heuristic": "shared-files"
+    },
+    {
+      "from": "PR-201",
+      "to": "PR-202",
+      "reason": "both modify files in 1 common directory",
+      "confidence": 0.50,
+      "sharedFiles": ["src/planner"],
+      "heuristic": "directory-proximity"
+    },
+    {
+      "from": "PR-301",
+      "to": "PR-302",
+      "reason": "tests for same module",
+      "confidence": 0.65,
+      "sharedFiles": ["core"],
+      "heuristic": "test-overlap"
+    }
+  ]
+}
+```
+
+#### Deterministic Ordering
+
+Suggestions are sorted with stable, deterministic ordering:
+
+1. **Primary**: Confidence (descending) - highest confidence first
+2. **Secondary**: From PR (ascending) - alphabetical order
+3. **Tertiary**: To PR (ascending) - alphabetical order
+
+#### Deduplication
+
+When multiple heuristics detect the same PR pair, only the highest confidence suggestion is kept.
+
 ### Gate Overrides
 
 Extract gate configuration from PR body:
