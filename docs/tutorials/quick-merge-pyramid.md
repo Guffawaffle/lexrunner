@@ -287,7 +287,7 @@ lex-pr plan --from-github --max-workers 3
 # Items execute in parallel according to:
 # 1. Dependency level (items at same level can run in parallel)
 # 2. Max workers limit from the plan
-# Note: Each item's gates run sequentially, but multiple items can run concurrently
+# Note: Gates within each item run sequentially, but multiple items can execute concurrently
 lex-pr execute plan.json
 ```
 
