@@ -74,7 +74,7 @@ program
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
 	$ lex-pr doctor                         Validate environment and configuration
-	$ lex-pr config:inspect                 Show merged config with provenance map
+	$ lex-pr config:inspect                 Display merged configuration with provenance map
 	$ lex-pr discover                       Find open PRs matching scope
 	$ lex-pr plan --from-github             Generate merge plan from GitHub PRs
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
