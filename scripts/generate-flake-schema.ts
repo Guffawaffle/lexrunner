@@ -14,7 +14,7 @@ const schema = zodToJsonSchema(FlakeReport, {
 
 // Add metadata
 const jsonSchema = {
-	$schema: "https://json-schema.org/draft/2020-12/schema",
+	$schema: "http://json-schema.org/draft-07/schema#",
 	$id: "https://example.com/schemas/flake-report.schema.json",
 	title: "Flake Report Schema",
 	description: "Schema for tracking gate retry attempts and transient failures. Emitted when a gate requires multiple attempts to pass or ultimately fails after retries.",
