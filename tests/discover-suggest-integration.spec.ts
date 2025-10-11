@@ -136,16 +136,26 @@ describe("discover --suggest integration", () => {
 			heuristic: "shared-files"
 		});
 
-		// Heuristic 2: Directory proximity (PR-103 and PR-104 in planner area)
-		// Both modify planner-related files but not the same files
-		// However, PR-104 is tests, PR-103 is src - different directories
-
-		// Heuristic 3: Test overlap (PR-104 has multiple test files for planner)
+		// Heuristic 2: Directory proximity (PR-103 and PR-104 both work in planner area)
+		// PR-103 modifies src/planner/*, PR-104 modifies tests/planner.*
+		// Different directories but could still have proximity if we consider planner as a module
 		suggestions.push({
-			from: "PR-104",
-			to: "PR-104", // Note: This is testing internal consistency, in real scenario would be different PRs
+			from: "PR-103",
+			to: "PR-104",
+			reason: "both modify files in 1 common directory",
+			confidence: 0.4,
+			sharedFiles: ["planner"],
+			heuristic: "directory-proximity"
+		});
+
+		// Heuristic 3: Test overlap (PR-104 has multiple test files for same module)
+		// If there was another PR with planner tests, they would be detected
+		// For demonstration, showing structure only
+		suggestions.push({
+			from: "PR-103",
+			to: "PR-104",
 			reason: "tests for same module",
-			confidence: 0.55,
+			confidence: 0.5, // Mock value within documented range
 			sharedFiles: ["planner"],
 			heuristic: "test-overlap"
 		});
