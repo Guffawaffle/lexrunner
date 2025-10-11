@@ -23,6 +23,7 @@ import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescriptio
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { ProgressReporter } from "./util/progress.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -766,8 +767,11 @@ program
 				console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
 			}
 
+			// Create progress reporter (disabled in JSON mode)
+			const progressReporter = new ProgressReporter({ enabled: !opts.json });
+
 			// Execute gates with policy
-			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs);
+			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter);
 
 			// Get final results
 			const results = executionState.getResults();
@@ -1106,8 +1110,11 @@ program
 					console.log("");
 				}
 
+				// Create progress reporter (disabled in JSON mode)
+				const progressReporter = new ProgressReporter({ enabled: !opts.json });
+
 				// Execute weave
-				const result = await gitOps.executeWeave(plan, levels);
+				const result = await gitOps.executeWeave(plan, levels, progressReporter);
 
 				if (opts.json) {
 					console.log(canonicalJSONStringify({
