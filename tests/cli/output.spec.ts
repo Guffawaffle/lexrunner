@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeJsonOutput, formatHumanOutput, writeOutput } from '../../src/cli/output';
-import { canonicalJSONStringify } from '../../src/util/canonicalJson';
+import { writeJsonOutput, formatHumanOutput, writeOutput } from '../../src/cli/output.js';
+import { canonicalJSONStringify } from '../../src/util/canonicalJson.js';
 
 describe('CLI Output Utilities', () => {
 	// Store original stdout.write and console.error
