@@ -1,52 +1,20 @@
 {
-  "schemaVersion": "1.0.0",
-  "target": "main",
+  "items": [],
   "policy": {
-    "requiredGates": ["lint", "type", "test"],
-    "maxWorkers": 2
-  },
-  "items": [
-    {
-      "name": "PR-125-gate-schema-evolution",
-      "deps": [],
-      "gates": [
-        {
-          "name": "lint",
-          "run": "npm run lint",
-          "artifacts": []
-        },
-        {
-          "name": "type",
-          "run": "npm run typecheck",
-          "artifacts": []
-        },
-        {
-          "name": "test",
-          "run": "npm test",
-          "artifacts": []
-        }
-      ]
+    "blockOn": [],
+    "maxWorkers": 2,
+    "mergeRule": {
+      "type": "strict-required"
     },
-    {
-      "name": "PR-126-autopilot-deliverables",
-      "deps": [],
-      "gates": [
-        {
-          "name": "lint",
-          "run": "npm run lint",
-          "artifacts": []
-        },
-        {
-          "name": "type",
-          "run": "npm run typecheck",
-          "artifacts": []
-        },
-        {
-          "name": "test",
-          "run": "npm test",
-          "artifacts": []
-        }
-      ]
-    }
-  ]
+    "optionalGates": [],
+    "overrides": {},
+    "requiredGates": [
+      "lint",
+      "typecheck",
+      "test"
+    ],
+    "retries": {}
+  },
+  "schemaVersion": "1.0.0",
+  "target": "main"
 }

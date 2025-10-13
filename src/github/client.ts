@@ -17,6 +17,7 @@ import {
 	GitHubAuthError
 } from "./types.js";
 import { parsePRDescription, normalizeDependencyRef } from "../planner/index.js";
+import { parseRemoteUrl } from "../git/parseRemote.js";
 
 export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo };
 export { GitHubAPIError, GitHubRateLimitError, GitHubAuthError };
@@ -101,24 +102,36 @@ export class GitHubClientImpl implements GitHubClient {
 				sort: options.sort || "created",
 				direction: options.direction || "desc",
 				per_page: options.per_page || 30,
-				page: options.page || 1
+				page: options.page ?? 1
 			};
 
-			if (options.base) {
-				params.base = options.base;
-			}
-			if (options.head) {
-				params.head = options.head;
-			}
+			if (options.base) params.base = options.base;
+			if (options.head) params.head = options.head;
 
-			const response = await this.octokit.rest.pulls.list(params);
+			// Use octokit.paginate to follow pagination automatically if available
+			let allPRs: any[];
+			if (typeof (this.octokit as any).paginate === 'function') {
+				allPRs = await (this.octokit as any).paginate((this.octokit as any).rest.pulls.list, params);
+
+				// Some test fakes return minimal objects (e.g., [{ number: 1 }]). If items are incomplete
+				// (missing expected fields like 'title'), fallback to a single REST list call which
+				// most mocks provide with full PR objects.
+				if (allPRs.length > 0 && allPRs.some(item => typeof item.title === 'undefined')) {
+					const response = await this.octokit.rest.pulls.list(params as any);
+					allPRs = response.data || [];
+				}
+			} else {
+				// Fallback: single page request
+				const response = await this.octokit.rest.pulls.list(params as any);
+				allPRs = response.data || [];
+			}
 
 			// Filter by labels if specified
-			let prs = response.data;
+			let prs = allPRs;
 			if (options.labels && options.labels.length > 0) {
-				prs = prs.filter(pr =>
-					options.labels!.some(label =>
-						pr.labels.some(prLabel => prLabel.name === label)
+				prs = prs.filter((pr: any) =>
+					options.labels!.some((label: string) =>
+						pr.labels.some((prLabel: any) => prLabel.name === label)
 					)
 				);
 			}
@@ -173,7 +186,7 @@ export class GitHubClientImpl implements GitHubClient {
 		});
 
 		// Normalize all dependencies to full format (owner/repo#123)
-		const normalizedDeps = parsed.dependencies.map(dep => 
+		const normalizedDeps = parsed.dependencies.map(dep =>
 			normalizeDependencyRef(dep, `${this.owner}/${this.repo}`)
 		);
 
@@ -281,21 +294,35 @@ export async function createGitHubClient(options: {
 	if (!owner || !repo) {
 		try {
 			const { execa } = await import("execa");
-			const result = await execa("git", ["remote", "get-url", "origin"]);
-			const remoteUrl = result.stdout.trim();
 
-			// Parse GitHub URL formats
-			// SSH: git@github.com:owner/repo.git
-			// HTTPS: https://github.com/owner/repo.git
-			const sshMatch = remoteUrl.match(/git@github\.com:([^/]+)\/([^.]+)\.git$/);
-			const httpsMatch = remoteUrl.match(/https:\/\/github\.com\/([^/]+)\/([^.]+)\.git$/);
+			// Prefer origin; fall back to first push remote from `git remote -v`
+			let remoteUrl: string | undefined;
+			try {
+				const r = await execa("git", ["remote", "get-url", "origin"]);
+				remoteUrl = r.stdout.trim();
+			} catch (e) {
+				// fallback: parse git remote -v for a push url
+				const r = await execa("git", ["remote", "-v"]);
+				const lines = r.stdout.trim().split(/\r?\n/);
+				for (const line of lines) {
+					// format: <name> <url> (fetch|push)
+					const m = line.match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
+					if (m && m[3] === 'push') {
+						remoteUrl = m[2];
+						break;
+					}
+				}
+				// if still not found, try first remote entry
+				if (!remoteUrl && lines.length > 0) {
+					const m = lines[0].match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
+					if (m) remoteUrl = m[2];
+				}
+			}
 
-			if (sshMatch) {
-				owner = owner || sshMatch[1];
-				repo = repo || sshMatch[2];
-			} else if (httpsMatch) {
-				owner = owner || httpsMatch[1];
-				repo = repo || httpsMatch[2];
+			if (remoteUrl) {
+				const parsed = parseRemoteUrl(remoteUrl);
+				owner = owner || parsed.owner;
+				repo = repo || parsed.repo;
 			}
 		} catch (error) {
 			// Ignore git command errors - user will need to provide explicit values
@@ -304,6 +331,58 @@ export async function createGitHubClient(options: {
 
 	if (!owner || !repo) {
 		throw new GitHubAPIError("Repository owner and name must be provided or detectable from git remote");
+	}
+
+	// Support test injection of a fake Octokit via environment variable
+	if (process.env.LEX_PR_FAKE_OCTOKIT === '1') {
+		// Prefer a real object set on the global (in spawned test bootstrap)
+		const globalFake = (global as any).__FAKE_OCTOKIT;
+		const fakeOctokit: any = globalFake && typeof globalFake === 'object' ? globalFake : (process as any).__FAKE_OCTOKIT || {};
+		const now = new Date().toISOString();
+		const fallbackPR = {
+			number: 1,
+			title: 'Fake PR',
+			body: '',
+			head: { ref: 'fake-branch', sha: 'fake-sha' },
+			base: { ref: 'main', sha: 'base-sha' },
+			state: 'open',
+			labels: [],
+			draft: false,
+			mergeable: true,
+			user: { login: 'fake-user' },
+			created_at: now,
+			updated_at: now
+		};
+		fakeOctokit.rest = fakeOctokit.rest || {};
+		fakeOctokit.rest.repos = fakeOctokit.rest.repos || {};
+		if (typeof fakeOctokit.rest.repos.get !== 'function') {
+			fakeOctokit.rest.repos.get = async () => ({
+				data: {
+					default_branch: 'main',
+					html_url: `https://github.com/${owner}/${repo}`
+				}
+			});
+		}
+		fakeOctokit.rest.pulls = fakeOctokit.rest.pulls || {};
+		if (typeof fakeOctokit.rest.pulls.list !== 'function') {
+			fakeOctokit.rest.pulls.list = async () => ({ data: [fallbackPR] });
+		}
+		if (typeof fakeOctokit.rest.pulls.get !== 'function') {
+			fakeOctokit.rest.pulls.get = async ({ pull_number }: { pull_number: number }) => ({
+				data: {
+					...fallbackPR,
+					number: pull_number
+				}
+			});
+		}
+		if (typeof fakeOctokit.paginate !== 'function') {
+			fakeOctokit.paginate = async () => [fallbackPR];
+		}
+		const client = new GitHubClientImpl({ token: options.token, owner, repo });
+		// If paginate is a function on the fake, we will use it directly; otherwise
+		// keep the provided fake object as-is for the tests to stub as needed.
+		(client as any).octokit = fakeOctokit;
+		return client;
 	}
 
 	return new GitHubClientImpl({

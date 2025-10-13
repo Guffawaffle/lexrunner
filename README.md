@@ -150,6 +150,7 @@ Quick links:
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
 - **Migration Guide**: docs/migration-guide.md — migrating to lex-pr-runner
+- **FAQ**: FAQ.md — quick answers to common questions
 - **Video Tutorials**: docs/tutorials/ — step-by-step video guides
 - **Workflows**: docs/workflows/ — examples for different team sizes
 - **CI/CD Integrations**: docs/integrations/ — platform-specific setup

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command } from "commander";
+import { Command, CommanderError } from "commander";
 import chalk from "chalk";
 import { Plan, loadPlan, SchemaValidationError } from "./schema.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "./mergeOrder.js";
@@ -26,15 +26,35 @@ import { registerSecurityCommands } from "./cli-security.js";
 import * as fs from "fs";
 import * as path from "path";
 
+class CLIExitSignal extends Error {
+	exitCode: number;
+
+	constructor(code: number, message?: string) {
+		super(message ?? `CLI exited with code ${code}`);
+		this.exitCode = code;
+	}
+}
+
+const throwExit = (code: number): never => {
+	throw new CLIExitSignal(code);
+};
+
+let jsonModeActive = false;
+
 /**
  * CLI exit discipline with proper error codes
  */
 function exitWith(e: unknown, schemaCode = "ESCHEMA") {
+  // Let CLIExitSignal propagate - don't treat it as an error
+  if (e instanceof CLIExitSignal) {
+    throw e;
+  }
+
   const err: any = e;
   if (err?.code === schemaCode && Array.isArray(err.issues)) {
     console.log(JSON.stringify({ errors: err.issues }, null, 2));
     console.error(err.message);
-    process.exit(2);
+		throwExit(2);
   }
   if (e instanceof SchemaValidationError || e instanceof CycleError || e instanceof UnknownDependencyError || e instanceof WriteProtectionError || e instanceof AutopilotConfigError) {
     console.error(`\n❌ Error: ${String(err?.message ?? e)}\n`);
@@ -54,17 +74,18 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
       console.error("   lex-pr schema validate plan.json\n");
     }
 
-    process.exit(2); // Validation errors
+		throwExit(2); // Validation errors
   }
   console.error(`\n❌ Unexpected error: ${String(err?.message ?? e)}\n`);
   console.error("💡 Tip: Run 'lex-pr doctor' to check your environment\n");
-  process.exit(1); // Unexpected failures
+	throwExit(1); // Unexpected failures
 }
 
 // Global logger instance
 let logger: Logger;
 
 const program = new Command();
+program.exitOverride();
 program
 	.name("lex-pr")
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
@@ -112,7 +133,7 @@ program
 				try {
 					if (!fs.existsSync(file)) {
 						console.error(`\nError: File not found: ${file}\n`);
-						process.exit(1);
+						throwExit(1);
 					}
 
 					const content = fs.readFileSync(file, "utf-8");
@@ -135,7 +156,7 @@ program
 							console.error(`\nError: Invalid JSON format in ${file}`);
 							console.error(`Tip: Check for syntax errors in the JSON file\n`);
 						}
-						process.exit(1);
+						throwExit(1);
 					}
 
 					// Check if migration is needed
@@ -153,7 +174,7 @@ program
 								console.log(`\n💡 Migrated report (consider updating the file):\n`);
 								console.log(JSON.stringify(migrated, null, 2));
 							}
-							process.exit(0);
+							return;
 						} catch (migrateError) {
 							if (opts.json) {
 								console.log(JSON.stringify({
@@ -169,7 +190,7 @@ program
 								console.error(`\n❌ Error: Migration failed for ${file}`);
 								console.error(`Details: ${migrateError instanceof Error ? migrateError.message : String(migrateError)}\n`);
 							}
-							process.exit(1);
+							throwExit(1);
 						}
 					}
 
@@ -196,7 +217,7 @@ program
 							}
 							console.log('');
 						}
-						process.exit(0);
+						return;
 					} else {
 						if (opts.json) {
 							console.log(JSON.stringify({
@@ -213,7 +234,7 @@ program
 							});
 							console.error('');
 						}
-						process.exit(1);
+							throwExit(1);
 					}
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
@@ -225,7 +246,7 @@ program
 					} else {
 						console.error(`\n❌ Unexpected error: ${message}\n`);
 					}
-					process.exit(1);
+						throwExit(1);
 				}
 			})
 	);
@@ -250,6 +271,8 @@ program
 	.option("--validate-cycles", "Enable dependency cycle detection (default: true)")
 	.option("--optimize", "Optimize plan for parallel execution")
 	.action(async (opts) => {
+		const previousJsonMode = jsonModeActive;
+		jsonModeActive = Boolean(opts.json);
 		try {
 			// Resolve profile first to determine default output directory
 			const resolved = resolveProfile(undefined, process.cwd());
@@ -290,7 +313,12 @@ program
 					}
 				});
 
-				if (!opts.json) {
+				// If JSON mode is requested, keep non-JSON logs on stderr and emit a brief diagnostic
+				if (opts.json) {
+					// diagnostics to stderr only
+					const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
+					console.error(`[from-github] repo=${repoDiag} discovered=${plan.items.length}`);
+				} else {
 					console.log(`✓ Auto-discovered ${plan.items.length} PRs from GitHub`);
 				}
 			} else {
@@ -312,10 +340,10 @@ program
 				} catch (error) {
 					if (error instanceof CycleError) {
 						console.error(`\n❌ Plan validation failed: ${error.message}`);
-						process.exit(1);
+						throwExit(1);
 					} else if (error instanceof UnknownDependencyError) {
 						console.error(`\n❌ Plan validation failed: ${error.message}`);
-						process.exit(1);
+						throwExit(1);
 					}
 					throw error;
 				}
@@ -335,8 +363,9 @@ program
 
 			if (opts.json) {
 				// JSON mode: output only canonical plan to stdout, write nothing else
+				// canonicalJSONStringify already includes trailing newline
 				process.stdout.write(canonicalJSONStringify(validatedPlan));
-				process.exit(0);
+				return;
 			}
 
 			// Generate artifacts
@@ -351,7 +380,7 @@ program
 				console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
 				console.log("");
 				console.log(generatePlanSummary(validatedPlan));
-				process.exit(0);
+				return;
 			}
 
 			// Write artifacts - validate write permissions first
@@ -379,9 +408,11 @@ program
 			console.log("");
 			console.log(generatePlanSummary(validatedPlan));
 
-			process.exit(0);
+			return;
 		} catch (error) {
 			exitWith(error);
+		} finally {
+			jsonModeActive = previousJsonMode;
 		}
 	});
 
@@ -402,10 +433,10 @@ program
 						} else {
 							console.error(`File not found: ${file}`);
 						}
-						process.exit(1);
+						throwExit(1);
 					}
 					const content = fs.readFileSync(file, 'utf-8');
-					let plan: Plan;
+					let plan: Plan | undefined;
 					try {
 						plan = loadPlan(content);
 					} catch (error) {
@@ -419,36 +450,44 @@ program
 						} else {
 							console.error(`Validation failed: ${error instanceof Error ? error.message : String(error)}`);
 						}
-						process.exit(1);
+						throwExit(1);
 					}
+					if (!plan) {
+						throw new Error("Plan parsing failed unexpectedly");
+					}
+					const validatedPlan = plan;
 
 					// Additional semantic checks
 					try {
-						computeMergeOrder(plan); // ensure DAG
+						computeMergeOrder(validatedPlan); // ensure DAG
 					} catch (error) {
 						if (opts.json) {
 							console.log(JSON.stringify({ valid: false, errors: [{ path: 'dependencies', message: (error as Error).message }] }, null, 2));
 						} else {
 							console.error(`Dependency validation failed: ${(error as Error).message}`);
 						}
-						process.exit(1);
+						throwExit(1);
 					}
 
 					if (opts.json) {
-						console.log(JSON.stringify({ valid: true, items: plan.items.length, target: plan.target }, null, 2));
+						console.log(JSON.stringify({ valid: true, items: validatedPlan.items.length, target: validatedPlan.target }, null, 2));
 					} else {
 						console.log(`✓ ${file} is valid`);
-						console.log(`  Items: ${plan.items.length}`);
-						console.log(`  Target: ${plan.target}`);
+						console.log(`  Items: ${validatedPlan.items.length}`);
+						console.log(`  Target: ${validatedPlan.target}`);
 					}
-					process.exit(0);
+					return;
 				} catch (error) {
+					// Let CLIExitSignal propagate - JSON already output
+					if (error instanceof CLIExitSignal) {
+						throw error;
+					}
 					if (opts.json) {
 						console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String((error as Error).message) }] }));
 					} else {
 						console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
 					}
-					process.exit(1);
+					throwExit(1);
 				}
 			})
 	);
@@ -467,7 +506,7 @@ program
 		const planFile = opts.plan || file;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			process.exit(1);
+			throwExit(1);
 		}
 
 		try {
@@ -509,13 +548,13 @@ program
 					console.log(`\n📝 Changes made:`);
 					result.changes?.forEach(change => console.log(`  - ${change}`));
 				}
-				process.exit(0);
+				throwExit(0);
 			} else {
 				console.log('\n❌ Plan rejected');
 				if (result.reason) {
 					console.log(`Reason: ${result.reason}`);
 				}
-				process.exit(1);
+				throwExit(1);
 			}
 		} catch (error) {
 			exitWith(error);
@@ -551,7 +590,7 @@ program
 				console.log(formatPlanDiff(diff));
 			}
 
-			process.exit(diff.hasChanges ? 1 : 0);
+			throwExit(diff.hasChanges ? 1 : 0);
 		} catch (error) {
 			exitWith(error);
 		}
@@ -568,7 +607,7 @@ program
 		const planFile = opts.plan || file;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			process.exit(1);
+			throwExit(1);
 		}
 
 		try {
@@ -584,7 +623,7 @@ program
 					console.log(`Level ${index + 1}: [${level.join(', ')}]`);
 				});
 			}
-			process.exit(0);
+			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (opts.json) {
@@ -610,7 +649,7 @@ program
 		const planFile = opts.plan || file;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			process.exit(1);
+			throwExit(1);
 		}
 
 		try {
@@ -633,18 +672,19 @@ program
 
 			// Select and execute autopilot level
 			const level = parseInt(opts.level);
-			let autopilot;
-
-			if (level === 0) {
-				autopilot = new AutopilotLevel0(context);
-			} else if (level === 1) {
-				autopilot = new AutopilotLevel1(context);
-			} else if (level === 2) {
-				autopilot = new AutopilotLevel2(context);
-			} else {
+			const autopilot = (() => {
+				if (level === 0) {
+					return new AutopilotLevel0(context);
+				}
+				if (level === 1) {
+					return new AutopilotLevel1(context);
+				}
+				if (level === 2) {
+					return new AutopilotLevel2(context);
+				}
 				console.error(`Error: unsupported autopilot level ${level} (supported: 0, 1, 2)`);
-				process.exit(1);
-			}
+				throwExit(1);
+			})() as { execute: (deliverablesDir?: string) => Promise<{ success: boolean; message: string }> };
 
 			// Execute with optional custom deliverables directory
 			const result = await autopilot.execute(opts.deliverablesDir);
@@ -655,7 +695,10 @@ program
 				console.log(result.message);
 			}
 
-			process.exit(result.success ? 0 : 1);
+			if (!result.success) {
+				throwExit(1);
+			}
+			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (opts.json) {
@@ -701,7 +744,7 @@ program
 			} catch (error) {
 				if (error instanceof AutopilotConfigError) {
 					console.error(`Configuration Error: ${error.message}`);
-					process.exit(2);
+					throwExit(2);
 				}
 				throw error;
 			}
@@ -759,7 +802,7 @@ program
 					}
 				}
 
-				process.exit(0);
+				return;
 			}
 
 			if (!opts.json) {
@@ -816,15 +859,18 @@ program
 
 			// Exit with appropriate code
 			const hasFailures = mergeSummary.failed.length > 0 || mergeSummary.blocked.length > 0;
-			process.exit(hasFailures ? 1 : 0);
+			if (hasFailures) {
+				throwExit(1);
+			}
+			return;
 
 		} catch (error) {
 			console.error(`Error executing plan: ${error instanceof Error ? error.message : String(error)}`);
 			// Use exit code 2 for validation errors, 1 for others
 			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
-				process.exit(2);
+				throwExit(2);
 			} else {
-				process.exit(1);
+				throwExit(1);
 			}
 		}
 	});
@@ -871,9 +917,9 @@ program
 			console.error(`Error getting status: ${error instanceof Error ? error.message : String(error)}`);
 			// Use exit code 2 for validation errors, 1 for others
 			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
-				process.exit(2);
+				throwExit(2);
 			} else {
-				process.exit(1);
+				throwExit(1);
 			}
 		}
 	});
@@ -895,15 +941,18 @@ program
 				console.log(canonicalJSONStringify(report));
 			} else {
 				console.error(`Invalid output format: ${opts.out}. Use 'json' or 'md'.`);
-				process.exit(1);
+				throwExit(1);
 			}
 
 			// Exit with error code if not all green
-			process.exit(report.allGreen ? 0 : 1);
+			if (!report.allGreen) {
+				throwExit(1);
+			}
+			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			console.error(`Error aggregating gate reports: ${message}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -937,17 +986,18 @@ program
 				console.error("     lex-pr discover --owner <owner> --repo <repo>\n");
 				console.error("💡 Tip: Initialize your workspace first:");
 				console.error("   lex-pr init\n");
-				process.exit(1);
+				throwExit(1);
 			}
+			const resolvedAPI = githubAPI!;
 
 			// Check authentication
-			const authStatus = await githubAPI.checkAuth();
+			const authStatus = await resolvedAPI.checkAuth();
 			if (!authStatus.authenticated) {
 				console.warn("Warning: GitHub API not authenticated. Set GITHUB_TOKEN environment variable for better rate limits.");
 			}
 
 			// Fetch pull requests
-			const pullRequests = await githubAPI.discoverPullRequests(opts.state as "open" | "closed" | "all");
+			const pullRequests = await resolvedAPI.discoverPullRequests(opts.state as "open" | "closed" | "all");
 
 			if (opts.json) {
 				console.log(canonicalJSONStringify({
@@ -979,10 +1029,10 @@ program
 		} catch (error) {
 			if (error instanceof GitHubAPIError) {
 				console.error(`GitHub API Error: ${error.message}`);
-				process.exit(1);
+				throwExit(1);
 			}
 			console.error(`Error discovering pull requests: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1020,7 +1070,7 @@ program
 			} catch (error) {
 				if (error instanceof AutopilotConfigError) {
 					console.error(`Configuration Error: ${error.message}`);
-					process.exit(2);
+					throwExit(2);
 				}
 				throw error;
 			}
@@ -1043,7 +1093,7 @@ program
 			// Load plan
 			if (!fs.existsSync(opts.plan)) {
 				console.error(`Error: Plan file ${opts.plan} not found`);
-				process.exit(1);
+				throwExit(1);
 			}
 
 			const planContent = fs.readFileSync(opts.plan, "utf-8");
@@ -1059,7 +1109,7 @@ program
 			const isClean = await gitOps.isClean();
 			if (!isClean && opts.execute) {
 				console.error("Error: Working directory is not clean. Please commit or stash changes.");
-				process.exit(1);
+				throwExit(1);
 			}
 
 			const currentBranch = await gitOps.getCurrentBranch();
@@ -1150,7 +1200,7 @@ program
 					if (result.failed > 0) {
 						console.log("");
 						console.log("❌ Merge pyramid execution completed with failures");
-						process.exit(1);
+						throwExit(1);
 					} else {
 						console.log("");
 						console.log("✅ Merge pyramid execution completed successfully");
@@ -1169,10 +1219,10 @@ program
 		} catch (error) {
 			if (error instanceof GitOperationError) {
 				console.error(`Git Operation Error: ${error.message}`);
-				process.exit(1);
+				throwExit(1);
 			}
 			console.error(`Error executing merge: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1192,7 +1242,7 @@ program
 			const result = await performDoctorChecks();
 			console.log(canonicalJSONStringify(result));
 			if (result.hasErrors) {
-				process.exit(1);
+				throwExit(1);
 			}
 			return;
 		}
@@ -1353,7 +1403,7 @@ program
 				} catch (error) {
 					if (error instanceof WriteProtectionError) {
 						console.error(`❌ ${error.message}`);
-						process.exit(2);
+						throwExit(2);
 					}
 					throw error;
 				}
@@ -1405,7 +1455,7 @@ program
 		console.log("");
 		if (hasErrors) {
 			console.log("❌ Doctor found issues that need attention");
-			process.exit(1);
+			throwExit(1);
 		} else {
 			console.log("✅ All checks passed - environment looks good!");
 
@@ -1417,7 +1467,7 @@ program
 				console.log("3. Run 'lex-pr discover' to find open PRs");
 			}
 
-			process.exit(0);
+			return;
 		}
 	});
 
@@ -1519,17 +1569,17 @@ program
 
 			if (!result.success) {
 				console.error(`\n❌ ${result.message}\n`);
-				process.exit(1);
+				throwExit(1);
 			}
 
-			process.exit(0);
+			return;
 		} catch (error) {
 			if (error instanceof WriteProtectionError) {
 				console.error(`\n❌ ${error.message}\n`);
-				process.exit(2);
+				throwExit(2);
 			}
 			console.error(`\n❌ Initialization failed: ${error instanceof Error ? error.message : String(error)}\n`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1589,10 +1639,10 @@ program
 		} catch (error) {
 			if (error instanceof WriteProtectionError) {
 				console.error(`Error bootstrapping workspace: ${error.message}`);
-				process.exit(2); // Validation/config error
+				throwExit(2); // Validation/config error
 			}
 			console.error(`Error bootstrapping workspace: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1645,7 +1695,7 @@ program
 			}
 		} catch (error) {
 			console.error(`Error initializing local overlay: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1662,7 +1712,7 @@ program
 		const planFile = opts.plan || file;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			process.exit(1);
+			throwExit(1);
 		}
 
 		try {
@@ -1677,7 +1727,7 @@ program
 			});
 
 			await viewer.start();
-			process.exit(0);
+			return;
 		} catch (error) {
 			exitWith(error);
 		}
@@ -1725,7 +1775,7 @@ program
 			}
 		} catch (error) {
 			console.error(`Error listing deliverables: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1820,7 +1870,7 @@ program
 			}
 		} catch (error) {
 			console.error(`Error cleaning up deliverables: ${error instanceof Error ? error.message : String(error)}`);
-			process.exit(1);
+			throwExit(1);
 		}
 	});
 
@@ -1840,7 +1890,7 @@ program
 
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			process.exit(1);
+			throwExit(1);
 		}
 
 		try {
@@ -1863,7 +1913,7 @@ program
 				result = engine.query(queryString);
 			} else {
 				console.error("Error: query string or option (--stats, --roots, --leaves, --level) required");
-				process.exit(1);
+				throwExit(1);
 			}
 
 			const output = opts.format === 'json'
@@ -1877,7 +1927,7 @@ program
 				console.log(output);
 			}
 
-			process.exit(0);
+			return;
 		} catch (error) {
 			exitWith(error);
 		}
@@ -1920,7 +1970,10 @@ program
 				}
 			}
 
-			process.exit(result.success ? 0 : 1);
+			if (!result.success) {
+				throwExit(1);
+			}
+			return;
 		} catch (error) {
 			exitWith(error);
 		}
@@ -1939,21 +1992,21 @@ program
 
 			if (opts.install) {
 				console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
-				process.exit(0);
+				return;
 			}
 
-			let script: string;
+			let script = "";
 			if (shell === "zsh") {
 				script = generator.generateZsh();
 			} else if (shell === "bash") {
 				script = generator.generateBash();
 			} else {
 				console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
-				process.exit(1);
+				throwExit(1);
 			}
 
 			console.log(script);
-			process.exit(0);
+			return;
 		} catch (error) {
 			exitWith(error);
 		}
@@ -2013,7 +2066,70 @@ function formatQueryResult(result: any, format: string): string {
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
 
-program.parseAsync(process.argv);
+export async function main(argv: string[] = process.argv): Promise<void> {
+	try {
+		await program.parseAsync(argv);
+		if (process.exitCode === undefined || process.exitCode === null) {
+			process.exitCode = 0;
+		}
+	} catch (error) {
+		if (error instanceof CLIExitSignal) {
+			process.exitCode = error.exitCode;
+			// Don't output error message for successful exits
+			if (error.exitCode !== 0) {
+				// Only output custom messages, not the default "CLI exited with code N"
+				if (error.message && !error.message.startsWith('CLI exited with code')) {
+					process.stderr.write(`${error.message}\n`);
+				}
+			}
+			return;
+		}
+		if (error instanceof CommanderError) {
+			const exitCode = typeof error.exitCode === "number" ? error.exitCode : 1;
+			// Commander help/version commands use exitCode 0 - don't treat as error
+			if (exitCode === 0) {
+				process.exitCode = 0;
+				return;
+			}
+			const message = error.message || "Command error";
+			// Don't output Commander's internal messages like "(outputHelp)"
+			if (message && message !== '(outputHelp)' && !message.startsWith('(')) {
+				process.stderr.write(`${message}\n`);
+			}
+			process.exitCode = exitCode;
+			return;
+		}
+		const message = error instanceof Error ? error.message : String(error);
+		const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+		process.stderr.write(`${prefix} ${message}\n`);
+		process.exitCode = 1;
+	}
+}
+
+// ============================================================================
+// Entry point detection (ESM/CJS compatible)
+// ============================================================================
+// CRITICAL: This must work in both ESM (.js) and CJS (.cjs) builds.
+//
+// - ESM build: import.meta is available and we check import.meta.url
+// - CJS build: import.meta.url will be undefined/empty (tsup warning is expected)
+//
+// The typeof check ensures we only run main() in ESM context when directly executed.
+// tsup will emit a warning about import.meta in CJS, but that's acceptable since:
+// 1. The check prevents execution in CJS context
+// 2. The warning is cosmetic and doesn't affect runtime behavior
+// 3. Alternative approaches (eval, indirect access) introduce worse issues
+//
+// DO NOT REFACTOR to eval() or indirect access - those create their own warnings.
+// Accept the tsup warning as documented expected behavior.
+// ============================================================================
+if (typeof import.meta !== 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
+	main().catch((error) => {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stderr.write(`[lex-pr] fatal: ${message}\n`);
+		process.exitCode = process.exitCode ?? 1;
+	});
+}
 
 /**
  * Helper functions for CLI output
