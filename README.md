@@ -330,6 +330,10 @@ JSON output is deterministic with ordered keys: `command,status,exitCode,finding
 Format flags:
 `--format text|json` (default text), `--no-color` disables ANSI styling in text mode.
 
+**Secret Rotation:**
+- See [docs/security/rotation-guide.md](docs/security/rotation-guide.md) for rotation patterns and cadences
+- Example script: `tsx scripts/rotate-secrets-example.ts` (deterministic JSON output)
+
 ```bash
 # CI-friendly validation
 npm run cli -- plan --json || echo "Plan validation failed with exit code $?"
