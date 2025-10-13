@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { CompletionGenerator } from "../src/commands/completion.js";
+import { CompletionGenerator, registerCompletionCommand } from "../src/commands/completion.js";
+import { Command } from "commander";
 
 describe("CompletionGenerator", () => {
 	describe("generateBash", () => {
@@ -109,6 +110,24 @@ describe("CompletionGenerator", () => {
 
 			// Bash function names can't have hyphens
 			expect(bashScript).toContain("_lex_pr_completions");
+		});
+	});
+
+	describe("registerCompletionCommand", () => {
+		it("should register completion command with program", () => {
+			const program = new Command();
+			const mockThrowExit = (code: number): never => {
+				throw new Error(`Exit ${code}`);
+			};
+			const mockExitWith = (error: unknown): void => {
+				throw error;
+			};
+
+			registerCompletionCommand(program, mockThrowExit, mockExitWith);
+
+			const completionCommand = program.commands.find(cmd => cmd.name() === "completion");
+			expect(completionCommand).toBeDefined();
+			expect(completionCommand?.description()).toBe("Generate shell completion scripts");
 		});
 	});
 });
