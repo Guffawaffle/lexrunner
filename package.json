@@ -17,7 +17,7 @@
 		"mcp": "tsx src/mcp/server.ts",
 		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist && tsup src/mcp/server.ts --format esm --dts --out-dir dist",
 		"pretest": "npm run build",
-		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts",
+		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts",
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
 		"format": "echo 'Format: using editorconfig for consistent formatting'",
 		"typecheck": "tsc -p tsconfig.json --noEmit",

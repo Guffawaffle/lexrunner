@@ -8,6 +8,8 @@ import { MemoryMonitor, OperationCache } from "./performance.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
 import { parseSarif } from "./security/sarif.js";
 import { SecurityScanResult, DEFAULT_SECURITY_POLICY, SecurityPolicy, NpmAuditScanner } from "./security/scanning.js";
+import { FlakeReport, AttemptRecord } from "./schema/flakeReport.js";
+import { canonicalJSONStringify } from "./util/canonicalJson.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -20,10 +22,13 @@ export async function executeGate(
 	gate: Gate,
 	policy: Policy,
 	artifactDir: string,
-	timeoutMs: number = 30000
+	timeoutMs: number = 30000,
+	itemName?: string
 ): Promise<GateResult> {
 	const retryConfig = policy.retries[gate.name] || { maxAttempts: 1, backoffSeconds: 0 };
 	let lastResult: GateResult | null = null;
+	const attemptRecords: AttemptRecord[] = [];
+	let totalDuration = 0;
 
 	for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
 		// Add backoff delay for retries
@@ -35,34 +40,67 @@ export async function executeGate(
 
 		const result = await executeGateAttempt(gate, artifactDir, attempt, timeoutMs);
 		lastResult = result;
+		totalDuration += result.duration || 0;
 
-		// If successful, return immediately
-		if (result.status === "pass") {
-			if (attempt > 1) {
-				console.log(`✅ Gate '${gate.name}' succeeded on attempt ${attempt}`);
-			}
-			return result;
-		}
+		// Track attempt metadata for flake report
+		const attemptRecord: AttemptRecord = {
+			attempt,
+			timestamp: result.lastAttempt || new Date().toISOString(),
+			status: result.status === "pass" ? "pass" : "fail",
+			duration_ms: result.duration || 0
+		};
 
-		// Classify the error to determine if we should retry
+		// Classify error if present
+		let errorType: ErrorType | undefined;
 		if (result.stderr) {
 			const error = new Error(result.stderr);
 			const classified = classifyError(error, `Gate '${gate.name}' execution`);
+			errorType = classified.type;
+
+			attemptRecord.error_type = errorType;
+			attemptRecord.error_message = result.stderr;
 
 			// Log error classification for diagnostics
 			if (classified.type === ErrorType.Permanent) {
 				console.error(`❌ Gate '${gate.name}' failed with permanent error - not retrying`);
 				console.error(formatErrorForUser(classified));
+				attemptRecords.push(attemptRecord);
+
+				// Write flake report if there were retries
+				if (itemName && attemptRecords.length > 1) {
+					await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+				}
+
 				return result;
 			} else if (classified.type === ErrorType.Transient && attempt < retryConfig.maxAttempts) {
 				console.warn(`⚠️  Gate '${gate.name}' failed with transient error - will retry`);
 			}
 		}
 
+		attemptRecords.push(attemptRecord);
+
+		// If successful, return immediately
+		if (result.status === "pass") {
+			if (attempt > 1) {
+				console.log(`✅ Gate '${gate.name}' succeeded on attempt ${attempt}`);
+
+				// Write flake report for successful retry
+				if (itemName) {
+					await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+				}
+			}
+			return result;
+		}
+
 		// If this is the last attempt, return the result
 		if (attempt === retryConfig.maxAttempts) {
 			if (attempt > 1) {
 				console.error(`❌ Gate '${gate.name}' failed after ${attempt} attempts`);
+
+				// Write flake report for failed retries
+				if (itemName) {
+					await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+				}
 			}
 			return result;
 		}
@@ -72,6 +110,45 @@ export async function executeGate(
 	}
 
 	return lastResult!;
+}
+
+/**
+ * Write flake report artifact when retries occur
+ */
+async function writeFlakeReport(
+	itemName: string,
+	gateName: string,
+	attempts: AttemptRecord[],
+	totalDuration: number,
+	artifactDir: string
+): Promise<void> {
+	// Only write flake report if there were multiple attempts
+	if (attempts.length <= 1) {
+		return;
+	}
+
+	const finalAttempt = attempts[attempts.length - 1];
+	const flakeReport: FlakeReport = {
+		schemaVersion: "1.0.0",
+		item: itemName,
+		gate: gateName,
+		total_attempts: attempts.length,
+		final_status: finalAttempt.status,
+		attempts: attempts.sort((a, b) => a.attempt - b.attempt), // Ensure chronological order
+		total_duration_ms: totalDuration
+	};
+
+	// Write flake report to artifact directory
+	const flakeReportDir = path.join(artifactDir, 'flake-reports');
+	if (!fs.existsSync(flakeReportDir)) {
+		fs.mkdirSync(flakeReportDir, { recursive: true });
+	}
+
+	const reportPath = path.join(flakeReportDir, `${itemName}-${gateName}.json`);
+	const reportContent = canonicalJSONStringify(flakeReport);
+	fs.writeFileSync(reportPath, reportContent, 'utf-8');
+
+	console.log(`📊 Flake report written: ${reportPath}`);
 }
 
 /**
@@ -257,17 +334,17 @@ function collectArtifacts(gate: Gate, artifactDir: string): string[] {
 function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult {
 	const startTime = Date.now();
 	const startedAt = new Date().toISOString();
-	
+
 	// Use default policy if not provided
 	const vulnPolicy = policy || DEFAULT_SECURITY_POLICY;
-	
+
 	// Look for SARIF file first, then npm audit JSON
 	const sarifPath = path.join(artifactDir, 'scan-results.sarif');
 	const npmAuditPath = path.join(artifactDir, 'npm-audit.json');
-	
+
 	let scanResult: SecurityScanResult | null = null;
 	let artifactPath: string | null = null;
-	
+
 	// Try SARIF first
 	if (fs.existsSync(sarifPath)) {
 		try {
@@ -325,33 +402,33 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
 			lastAttempt: startedAt,
 		};
 	}
-	
+
 	// scanResult is guaranteed to be non-null here due to the else return above
 	if (!scanResult) {
 		throw new Error('Unexpected null scan result');
 	}
-	
+
 	// Check against policy thresholds
 	const violations: string[] = [];
-	
+
 	if (vulnPolicy.blockCritical && scanResult.criticalCount > 0) {
 		violations.push(`${scanResult.criticalCount} critical vulnerabilities (threshold: 0)`);
 	}
-	
+
 	if (vulnPolicy.blockHigh && scanResult.highCount > 0) {
 		violations.push(`${scanResult.highCount} high vulnerabilities (threshold: 0)`);
 	}
-	
+
 	if (scanResult.mediumCount > vulnPolicy.maxMedium) {
 		violations.push(`${scanResult.mediumCount} medium vulnerabilities (threshold: ${vulnPolicy.maxMedium})`);
 	}
-	
+
 	if (scanResult.lowCount > vulnPolicy.maxLow) {
 		violations.push(`${scanResult.lowCount} low vulnerabilities (threshold: ${vulnPolicy.maxLow})`);
 	}
-	
+
 	const passed = violations.length === 0;
-	
+
 	// Build deterministic output message
 	const summary = [
 		`Vulnerability scan results (${scanResult.scanner}):`,
@@ -361,11 +438,11 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
 		`  Low: ${scanResult.lowCount}`,
 		`  Total: ${scanResult.totalVulnerabilities}`,
 	].join('\n');
-	
-	const output = passed 
+
+	const output = passed
 		? `${summary}\n\n✅ All thresholds met`
 		: `${summary}\n\n❌ Policy violations:\n${violations.map(v => `  - ${v}`).join('\n')}`;
-	
+
 	return {
 		gate: 'vuln',
 		status: passed ? 'pass' : 'fail',
@@ -415,28 +492,26 @@ export async function executeItemGates(
 				lastAttempt: new Date().toISOString()
 			};
 			results.push(blockedResult);
-			executionState.updateGateResult(item.name, blockedResult);
-			continue;
-		}
-
-		// Special handling for 'vuln' gate
-		if (gate.name === 'vuln') {
-			// Extract security policy from plan policy if available
-			const securityPolicy = (policy as any).security || DEFAULT_SECURITY_POLICY;
-			const result = checkVulnGate(itemArtifactDir, securityPolicy);
-			results.push(result);
-			executionState.updateGateResult(item.name, result);
-			continue;
-		}
-
-		const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs);
-		results.push(result);
-
-		// Update execution state
-		executionState.updateGateResult(item.name, result);
+		executionState.updateGateResult(item.name, blockedResult);
+		continue;
 	}
 
-	return results;
+	// Special handling for 'vuln' gate
+	if (gate.name === 'vuln') {
+		// Extract security policy from plan policy if available
+		const securityPolicy = (policy as any).security || DEFAULT_SECURITY_POLICY;
+		const result = checkVulnGate(itemArtifactDir, securityPolicy);
+		results.push(result);
+		executionState.updateGateResult(item.name, result);
+		continue;
+	}
+
+	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name);
+	results.push(result);
+
+	// Update execution state
+	executionState.updateGateResult(item.name, result);
+}	return results;
 }
 
 /**
