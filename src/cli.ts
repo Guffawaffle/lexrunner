@@ -26,6 +26,7 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { registerCompletionCommand } from "./commands/completion.js";
+import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -704,44 +705,8 @@ program
 		}
 	});
 
-// Merge order command
-program
-	.command("merge-order")
-	.description("Compute dependency levels and merge order")
-	.option("--plan <file>", "Path to plan.json file")
-	.argument("[file]", "Path to plan.json file (alternative to --plan)")
-	.option("--json", "Output JSON format")
-	.action((file: string | undefined, opts) => {
-		const planFile = opts.plan || file;
-		if (!planFile) {
-			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			throwExit(1);
-		}
-
-		try {
-			const planContent = fs.readFileSync(planFile, "utf-8");
-			const plan = loadPlan(planContent);
-			const levels = computeMergeOrder(plan);
-
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput({ levels });
-			} else {
-				console.log(`Merge order for ${plan.items.length} items:`);
-				levels.forEach((level: string[], index: number) => {
-					console.log(`Level ${index + 1}: [${level.join(', ')}]`);
-				});
-			}
-			return;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput({ error: message });
-			} else {
-				console.error(`Error computing merge order: ${message}`);
-			}
-			exitWith(error);
-		}
-	});
+// Merge order command - modular implementation
+registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
 
 // Autopilot command
 program
