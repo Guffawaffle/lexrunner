@@ -466,6 +466,142 @@ Total items: 4, Max parallelism: 2
 
 ---
 
+### `orchestrate:predict-conflicts`
+
+Predict merge conflicts using conflict graphs, Maximal Independent Set (MIS) computation, and git merge-tree simulation.
+
+```bash
+lex-pr orchestrate:predict-conflicts [options]
+
+Options:
+  --prs <numbers>       Comma-separated list of PR numbers (e.g., 166,167,168) [required]
+  --base <branch>       Base branch for conflict analysis (default: "main")
+  --skip-merge-tree     Skip git merge-tree simulation
+  -h, --help            Display help for command
+```
+
+#### Algorithm Overview
+
+1. **Conflict Graph**: Build undirected graph where nodes are PRs and edges represent shared files
+2. **MIS Computation**: Use greedy algorithm to find Maximal Independent Set (PRs with no conflicts)
+3. **Merge Simulation**: Run `git merge-tree` to validate predicted conflicts
+
+**Greedy MIS Algorithm:**
+- Sort nodes by degree (fewest conflicts first), then by PR number
+- Greedily select nodes that don't conflict with already selected nodes
+- Result: Maximum set of PRs that can merge in parallel
+
+#### Examples
+
+```bash
+# Predict conflicts for specific PRs (human-readable)
+lex-pr orchestrate:predict-conflicts --prs 166,167,168
+
+# JSON output for automation
+lex-pr --json orchestrate:predict-conflicts --prs 166,167,168
+
+# Skip merge-tree simulation (faster, file-based analysis only)
+lex-pr orchestrate:predict-conflicts --prs 166,167,168 --skip-merge-tree
+
+# Custom base branch
+lex-pr orchestrate:predict-conflicts --prs 100,101,102 --base develop
+```
+
+#### JSON Output Schema (`--json` flag)
+
+**Success Response:**
+```json
+{
+  "analyzedAt": "2025-10-13T02:00:00Z",
+  "baseBranch": "main",
+  "conflictGraph": {
+    "nodes": ["166", "167", "168"],
+    "edges": [
+      {
+        "from": "166",
+        "to": "167",
+        "sharedFiles": ["src/cli.ts"]
+      },
+      {
+        "from": "167",
+        "to": "168",
+        "sharedFiles": ["src/gates.ts"]
+      }
+    ]
+  },
+  "misBatches": [
+    {
+      "id": "mis-1",
+      "prs": ["166", "168"],
+      "reason": "No shared files"
+    },
+    {
+      "id": "mis-2",
+      "prs": ["167"],
+      "reason": "Conflicts with #166 and #168"
+    }
+  ],
+  "mergeTreeSimulation": {
+    "166-168": {
+      "status": "clean",
+      "conflicts": []
+    },
+    "166-167": {
+      "status": "conflict",
+      "conflicts": [
+        {
+          "file": "src/cli.ts",
+          "lines": "125-140",
+          "type": "both-modified"
+        }
+      ]
+    }
+  },
+  "recommendations": {
+    "safeBatch": ["166", "168"],
+    "sequential": ["167"]
+  }
+}
+```
+
+**Human-Readable Output:**
+```
+🔍 Conflict Analysis
+============================================================
+
+📊 Conflict Graph:
+  - #166 ↔ #167: src/cli.ts
+  - #167 ↔ #168: src/gates.ts
+
+🔀 MIS Batches (safe parallel groups):
+  - mis-1: [#166, #168]
+    No shared files
+  - mis-2: [#167]
+    Conflicts with #166 and #168
+
+🧪 git merge-tree Simulation:
+  - #166 + #168: ✅ Clean merge
+  - #166 + #167: ❌ Conflict
+    ↳ src/cli.ts (both-modified)
+
+💡 Recommendations:
+  ✓ Safe parallel batch: #166, #168
+  ⚠ Merge sequentially: #167
+```
+
+**Exit Codes:**
+- `0`: Conflict analysis completed successfully
+- `1`: Missing required parameters or system error
+
+#### Use Cases
+
+- **Batch Planning**: Determine which PRs can be merged in parallel
+- **Conflict Avoidance**: Identify potential conflicts before merging
+- **Optimization**: Maximize parallelism in merge pyramid execution
+- **CI/CD Integration**: Automate conflict detection in merge workflows
+
+---
+
 ### `plan-review`
 
 Interactively review and edit a plan with human-in-the-loop validation.
