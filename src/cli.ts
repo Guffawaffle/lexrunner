@@ -537,7 +537,7 @@ program
 			} else {
 				// Human-readable output
 				console.log(chalk.bold('\n📋 Configuration Inspection\n'));
-				
+
 				console.log(chalk.cyan('Configuration:'));
 				console.log(`  Version: ${config.version}`);
 				console.log(`  Target: ${config.target}`);
@@ -1077,18 +1077,16 @@ program
 			// Fetch pull requests
 			const pullRequests = await resolvedAPI.discoverPullRequests(opts.state as "open" | "closed" | "all");
 
-			if (opts.suggest) {
-				// Generate dependency suggestions using heuristics
-				const { createFileAnalyzer } = await import("./planner/fileAnalysis.js");
-				
-				// Reuse the existing Octokit instance from githubAPI
-				const analyzer = createFileAnalyzer(
-					githubAPI.getOctokit(),
-					githubAPI.config.owner,
-					githubAPI.config.repo
-				);
+		if (opts.suggest) {
+			// Generate dependency suggestions using heuristics
+			const { createFileAnalyzer } = await import("./planner/fileAnalysis.js");
 
-				const prs = pullRequests.map(pr => ({
+			// Reuse the existing Octokit instance from githubAPI
+			const analyzer = createFileAnalyzer(
+				resolvedAPI.getOctokit(),
+				resolvedAPI.config.owner,
+				resolvedAPI.config.repo
+			);				const prs = pullRequests.map(pr => ({
 					number: pr.number,
 					name: `PR-${pr.number}`,
 					sha: pr.sha
