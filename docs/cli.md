@@ -1146,6 +1146,8 @@ import { canonicalJSONStringify } from "./util/canonicalJson.js";
 process.stdout.write(canonicalJSONStringify(data));
 ```
 
+**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location.
+
 **Why**: Ensures deterministic output:
 - Keys sorted alphabetically at all levels
 - Consistent 2-space indentation
@@ -1185,11 +1187,21 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
 
   const err: any = e;
   
-  // Handle validation errors (exit 2)
+  // Schema-specific error handling
+  if (err?.code === schemaCode && Array.isArray(err.issues)) {
+    console.log(JSON.stringify({ errors: err.issues }, null, 2));
+    console.error(err.message);
+    throwExit(2);
+  }
+  
+  // Handle known validation errors (exit 2)
   if (e instanceof SchemaValidationError || 
       e instanceof CycleError || 
-      e instanceof UnknownDependencyError) {
+      e instanceof UnknownDependencyError ||
+      e instanceof WriteProtectionError ||
+      e instanceof AutopilotConfigError) {
     console.error(`\n❌ Error: ${err.message}\n`);
+    // ... contextual help messages
     throwExit(2);
   }
   
@@ -1198,6 +1210,8 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   throwExit(1);
 }
 ```
+
+**Note**: Simplified example. See `src/cli.ts` for the full implementation with contextual error messages.
 
 **Usage**:
 ```typescript
@@ -1228,22 +1242,24 @@ Write tests that verify exit behavior:
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import { main } from "../src/cli.js";
+import { CLIExitSignal } from "../src/cli.js";
 
 describe("CLI exit codes", () => {
-  it("exits 0 on success", async () => {
-    await expect(main(["node", "cli.js", "plan", "--json"]))
-      .resolves.toBeUndefined();
-    expect(process.exitCode).toBe(0);
+  it("should throw CLIExitSignal on validation error", () => {
+    // Test that validation errors throw CLIExitSignal with code 2
+    expect(() => {
+      throw new CLIExitSignal(2, "Validation failed");
+    }).toThrow(CLIExitSignal);
   });
 
-  it("exits 2 on validation error", async () => {
-    await expect(main(["node", "cli.js", "plan", "--json"]))
-      .resolves.toBeUndefined();
-    expect(process.exitCode).toBe(2);
+  it("should have correct exit code in signal", () => {
+    const signal = new CLIExitSignal(2, "Validation error");
+    expect(signal.exitCode).toBe(2);
   });
 });
 ```
+
+**Note**: Testing the full CLI requires mocking process.exit or using child processes. The above shows testing the CLIExitSignal class itself.
 
 ### Summary
 
