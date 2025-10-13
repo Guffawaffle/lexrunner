@@ -29,8 +29,8 @@ import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
-import { 
-	CLIExitSignal, 
+import {
+	CLIExitSignal,
 	throwExit,
 	installSignalHandlers,
 	installUnhandledRejectionHandler
@@ -38,19 +38,6 @@ import {
 import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/formatters.js";
 import * as fs from "fs";
 import * as path from "path";
-
-class CLIExitSignal extends Error {
-	exitCode: number;
-
-	constructor(code: number, message?: string) {
-		super(message ?? `CLI exited with code ${code}`);
-		this.exitCode = code;
-	}
-}
-
-const throwExit = (code: number): never => {
-	throw new CLIExitSignal(code);
-};
 
 let jsonModeActive = false;
 
@@ -131,10 +118,10 @@ program
 		const opts = thisCommand.optsWithGlobals();
 		const jsonMode = opts.json || false;
 		const noColor = opts.noColor || false;
-		
+
 		// Set global JSON mode
 		jsonModeActive = jsonMode;
-		
+
 		// Initialize color control (--json implies --no-color)
 		initColorControl({ noColor, jsonMode });
 	})
@@ -348,7 +335,7 @@ program
 				const labels = opts.labels ? opts.labels.split(',').map((l: string) => l.trim()) : undefined;
 
 				// Parse excluded PR numbers if provided
-				const excludePRs = opts.excludePrs 
+				const excludePRs = opts.excludePrs
 					? opts.excludePrs.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
 					: undefined;
 
