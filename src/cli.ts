@@ -26,21 +26,9 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { ProgressReporter } from "./util/progress.js";
+import { CLIExitSignal, throwExit } from "./util/exit.js";
 import * as fs from "fs";
 import * as path from "path";
-
-class CLIExitSignal extends Error {
-	exitCode: number;
-
-	constructor(code: number, message?: string) {
-		super(message ?? `CLI exited with code ${code}`);
-		this.exitCode = code;
-	}
-}
-
-const throwExit = (code: number): never => {
-	throw new CLIExitSignal(code);
-};
 
 let jsonModeActive = false;
 
@@ -560,7 +548,7 @@ program
 				console.log('');
 			}
 
-			process.exit(0);
+			throwExit(0);
 		} catch (error) {
 			exitWith(error);
 		}

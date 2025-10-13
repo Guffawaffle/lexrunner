@@ -75,6 +75,9 @@ If adding public behavior or fixing a bug, prefer tests first (happy path + 1-2 
 - TypeScript-first; strict types preferred
 - Keep modules small and pure where possible; isolate side-effects
 - Use Zod for schemas and validation in `src/schema.ts`
+- **Never use `process.exit()` directly** - use `throwExit()` from `src/util/exit.ts` instead for clean error handling (enforced via ESLint)
+  - Exception: Emergency handlers in MCP server, standalone scripts, and examples are allowed
+  - See PR #154 for context on exit discipline pattern
 
 ## Opening an issue
 
