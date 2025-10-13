@@ -9,6 +9,38 @@ The file-change analysis engine detects implicit dependencies between PRs by ana
 - **Conflict Prediction**: Detect potential merge conflicts before attempting to merge
 - **Dependency Scoring**: Confidence levels (0.0-1.0) for inferred relationships
 - **Smart Caching**: Cache file analysis results for performance
+- **Scope Validation**: Static analysis to validate agent edit scope (NEW)
+
+## Modules
+
+### File Analysis (`fileAnalysis.ts`)
+Analyzes file changes across PRs to detect dependencies and conflicts.
+
+### Scope Validation (`scopeValidator.ts`)
+**NEW**: Validates that agent edits match declared scope to prevent unintended modifications.
+
+See [Scope Validation Documentation](../../docs/scope-validation.md) for details.
+
+**Key capabilities:**
+- Detects global variable writes (`window.*`, `global.*`)
+- Validates function/class modifications match declarations
+- Identifies side effects (module-level vs. global)
+- Supports ESM, CommonJS, AMD, UMD module systems
+- AST-based analysis for JavaScript/TypeScript
+
+**Quick example:**
+```typescript
+import { validateEditScope } from "./planner/scopeValidator.js";
+
+const declaredPlan = {
+  functions_modified: ['processPayment'],
+  side_effects: 'none',
+  globals_written: []
+};
+
+await validateEditScope('/path/to/file.js', declaredPlan);
+// Throws ScopeValidationError if actual changes don't match
+```
 
 ## Usage
 
