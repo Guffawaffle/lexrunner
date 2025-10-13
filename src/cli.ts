@@ -27,6 +27,7 @@ import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
+import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/formatters.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -947,7 +948,7 @@ program
 				console.log(canonicalJSONStringify(output));
 			} else if (opts.statusTable) {
 				// Generate status table for PR comments
-				generateStatusTable(results, mergeSummary);
+				console.log(formatStatusTable(results, mergeSummary));
 			} else {
 				// Human-readable output
 				console.log("\n=== Execution Results ===");
@@ -2181,56 +2182,6 @@ program
 		}
 	});
 
-// Helper function to format query results
-function formatQueryResult(result: any, format: string): string {
-	if (format === 'json') {
-		return canonicalJSONStringify(result);
-	}
-
-	if (result.stats) {
-		const stats = result.stats;
-		return `Plan Statistics:
-  Total Items: ${stats.totalItems}
-  Total Levels: ${stats.totalLevels}
-  Avg Dependencies/Item: ${stats.avgDepsPerItem.toFixed(2)}
-  Avg Gates/Item: ${stats.avgGatesPerItem.toFixed(2)}
-  Root Nodes: ${stats.rootNodes}
-  Leaf Nodes: ${stats.leafNodes}`;
-	}
-
-	if (format === 'csv') {
-		const items = result.items || [];
-		if (items.length === 0) return "No results";
-
-		const headers = Object.keys(items[0]);
-		const rows = items.map((item: any) =>
-			headers.map((h) => JSON.stringify(item[h] || "")).join(",")
-		);
-		return [headers.join(","), ...rows].join("\n");
-	}
-
-	// Table format (default)
-	const items = result.items || [];
-	if (items.length === 0) return "No results";
-
-	let output = `Query: ${result.query}\nResults: ${result.count}\n\n`;
-
-	items.forEach((item: any) => {
-		output += `- ${item.name} [Level ${item.level}]\n`;
-		if (item.deps.length > 0) {
-			output += `  Deps: ${item.deps.join(", ")}\n`;
-		}
-		if (item.dependents && item.dependents.length > 0) {
-			output += `  Dependents: ${item.dependents.join(", ")}\n`;
-		}
-		if (item.gates.length > 0) {
-			output += `  Gates: ${item.gates.map((g: any) => g.name).join(", ")}\n`;
-		}
-	});
-
-	return output;
-}
-
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
@@ -2307,49 +2258,4 @@ if (isDirectExec) {
 		process.stderr.write(`[lex-pr] fatal: ${message}\n`);
 		process.exitCode = process.exitCode ?? 1;
 	});
-}
-
-/**
- * Helper functions for CLI output
- */
-
-function getStatusIcon(status: string): string {
-	switch (status) {
-		case "pass": return "✓";
-		case "fail": return "✗";
-		case "blocked": return "⛔";
-		case "skipped": return "⏭";
-		case "retrying": return "🔄";
-		default: return "?";
-	}
-}
-
-function generateStatusTable(results: Map<string, any>, mergeSummary: any): void {
-	console.log("\n## Execution Status Table");
-	console.log("");
-	console.log("| Node | Status | Gates | Eligible | Details |");
-	console.log("|------|--------|-------|----------|---------|");
-
-	for (const [name, result] of results) {
-		const statusIcon = getStatusIcon(result.status);
-		const gateCount = result.gates.length;
-		const eligible = result.eligibleForMerge ? "✓" : "✗";
-
-		let gateDetails = "";
-		if (gateCount > 0) {
-			const passed = result.gates.filter((g: any) => g.status === "pass").length;
-			const failed = result.gates.filter((g: any) => g.status === "fail").length;
-			gateDetails = `${passed}/${gateCount} passed`;
-			if (failed > 0) gateDetails += `, ${failed} failed`;
-		}
-
-		console.log(`| ${name} | ${statusIcon} ${result.status} | ${gateCount} | ${eligible} | ${gateDetails} |`);
-	}
-
-	console.log("");
-	console.log("### Summary");
-	console.log(`- **Eligible**: ${mergeSummary.eligible.length} nodes ready for merge`);
-	console.log(`- **Pending**: ${mergeSummary.pending.length} nodes waiting`);
-	console.log(`- **Failed**: ${mergeSummary.failed.length} nodes with failures`);
-	console.log(`- **Blocked**: ${mergeSummary.blocked.length} nodes blocked by dependencies`);
 }
