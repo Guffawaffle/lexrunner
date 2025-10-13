@@ -477,7 +477,7 @@ program
 			.action((file: string, opts) => {
 				try {
 					if (!fs.existsSync(file)) {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: 'File not found' }] }));
 						} else {
 							console.error(`File not found: ${file}`);
@@ -489,7 +489,7 @@ program
 					try {
 						plan = loadPlan(content);
 					} catch (error) {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							const err = error as any;
 							if (err instanceof SchemaValidationError && err.issues) {
 								console.log(JSON.stringify({ valid: false, errors: err.issues }, null, 2));
@@ -510,7 +510,7 @@ program
 					try {
 						computeMergeOrder(validatedPlan); // ensure DAG
 					} catch (error) {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							console.log(JSON.stringify({ valid: false, errors: [{ path: 'dependencies', message: (error as Error).message }] }, null, 2));
 						} else {
 							console.error(`Dependency validation failed: ${(error as Error).message}`);
@@ -518,7 +518,7 @@ program
 						throwExit(1);
 					}
 
-					if (opts.json) {
+					if (opts.json || jsonModeActive) {
 						console.log(JSON.stringify({ valid: true, items: validatedPlan.items.length, target: validatedPlan.target }, null, 2));
 					} else {
 						console.log(`✓ ${file} is valid`);
@@ -531,7 +531,7 @@ program
 					if (error instanceof CLIExitSignal) {
 						throw error;
 					}
-					if (opts.json) {
+					if (opts.json || jsonModeActive) {
 						console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String((error as Error).message) }] }));
 					} else {
 						console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
@@ -688,7 +688,7 @@ program
 
 			const diff = comparePlans(plan1, plan2);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				writeJsonOutput(diff);
 			} else {
 				console.log('\n📊 Plan Comparison\n');
@@ -796,7 +796,7 @@ program
 			// Execute with optional custom deliverables directory
 			const result = await autopilot.execute(opts.deliverablesDir);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				writeJsonOutput(result);
 			} else {
 				console.log(result.message);
@@ -808,7 +808,7 @@ program
 			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				writeJsonOutput({ success: false, error: message });
 			} else {
 				console.error(`Error running autopilot: ${message}`);
@@ -857,7 +857,7 @@ program
 			}
 
 			// Show autopilot configuration if not in JSON mode
-			if (!opts.json && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
+			if (!(opts.json || jsonModeActive) && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
 				console.log(`🤖 Autopilot Level ${autopilotConfig.maxLevel}: ${getAutopilotLevelDescription(autopilotConfig.maxLevel)}`);
 				if (autopilotConfig.dryRun) {
 					console.log("   Mode: Dry run (preview only)");
@@ -877,7 +877,7 @@ program
 			const levels = computeMergeOrder(plan);
 
 			if (opts.dryRun) {
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					const output = {
 						dryRun: true,
 						plan: {
@@ -912,7 +912,7 @@ program
 				return;
 			}
 
-			if (!opts.json) {
+			if (!(opts.json || jsonModeActive)) {
 				console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
 			}
 
@@ -926,7 +926,7 @@ program
 			const results = executionState.getResults();
 			const mergeSummary = evaluator.getMergeSummary();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				// Output JSON results
 				const output = {
 					plan: {
@@ -1005,7 +1005,7 @@ program
 			const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 			const mergeSummary = evaluator.getMergeSummary();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({
 					plan: {
 						schemaVersion: plan.schemaVersion,
@@ -1820,7 +1820,7 @@ program
 		try {
 			const result = initLocalOverlay(process.cwd(), opts.force);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({
 					created: result.created,
 					path: result.path,
@@ -2120,7 +2120,7 @@ program
 				dryRun: opts.dryRun,
 			});
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				writeJsonOutput(result);
 			} else {
 				if (opts.dryRun) {
