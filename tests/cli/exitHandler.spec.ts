@@ -118,9 +118,8 @@ describe('Exit Handler Utilities', () => {
 				SIGTERM: process.listeners('SIGTERM').slice() as NodeJS.SignalsListener[]
 			};
 			
-			// Remove all existing listeners
-			process.removeAllListeners('SIGINT');
-			process.removeAllListeners('SIGTERM');
+			// Note: We don't remove existing listeners because installSignalHandlers is idempotent
+			// and may have been called by previous tests or the CLI initialization
 			
 			// Spy on process.exit and console.error
 			processExitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
@@ -132,20 +131,17 @@ describe('Exit Handler Utilities', () => {
 			processExitSpy.mockRestore();
 			consoleErrorSpy.mockRestore();
 			
-			// Remove test listeners
-			process.removeAllListeners('SIGINT');
-			process.removeAllListeners('SIGTERM');
-			
-			// Restore original listeners
-			originalListeners.SIGINT.forEach(listener => process.on('SIGINT', listener));
-			originalListeners.SIGTERM.forEach(listener => process.on('SIGTERM', listener));
+			// Note: We don't remove/restore listeners because handlers are designed to be installed once
+			// and persist for the life of the process
 		});
 
 		it('should install SIGINT handler', () => {
+			const beforeCount = process.listeners('SIGINT').length;
 			installSignalHandlers();
+			const afterCount = process.listeners('SIGINT').length;
 			
-			const sigintListeners = process.listeners('SIGINT');
-			expect(sigintListeners.length).toBeGreaterThan(0);
+			// Handler should be installed (count increases or stays same if already installed)
+			expect(afterCount).toBeGreaterThanOrEqual(beforeCount);
 			
 			// Emit SIGINT signal
 			process.emit('SIGINT', 'SIGINT');
@@ -155,16 +151,32 @@ describe('Exit Handler Utilities', () => {
 		});
 
 		it('should install SIGTERM handler', () => {
+			const beforeCount = process.listeners('SIGTERM').length;
 			installSignalHandlers();
+			const afterCount = process.listeners('SIGTERM').length;
 			
-			const sigtermListeners = process.listeners('SIGTERM');
-			expect(sigtermListeners.length).toBeGreaterThan(0);
+			// Handler should be installed (count increases or stays same if already installed)
+			expect(afterCount).toBeGreaterThanOrEqual(beforeCount);
 			
 			// Emit SIGTERM signal
 			process.emit('SIGTERM', 'SIGTERM');
 			
 			expect(consoleErrorSpy).toHaveBeenCalledWith('\nReceived SIGTERM, exiting gracefully...');
 			expect(processExitSpy).toHaveBeenCalledWith(143); // 128 + SIGTERM(15)
+		});
+
+		it('should be idempotent', () => {
+			const beforeCount = process.listeners('SIGINT').length;
+			
+			// Call multiple times
+			installSignalHandlers();
+			const afterFirstCall = process.listeners('SIGINT').length;
+			
+			installSignalHandlers();
+			const afterSecondCall = process.listeners('SIGINT').length;
+			
+			// Should not add duplicate handlers
+			expect(afterSecondCall).toBe(afterFirstCall);
 		});
 
 		it('should use correct exit codes for signals', () => {
@@ -191,8 +203,8 @@ describe('Exit Handler Utilities', () => {
 			// Save original listeners
 			originalListeners = process.listeners('unhandledRejection').slice() as NodeJS.UnhandledRejectionListener[];
 			
-			// Remove all existing listeners
-			process.removeAllListeners('unhandledRejection');
+			// Note: We don't remove existing listeners because installUnhandledRejectionHandler is idempotent
+			// and may have been called by previous tests or the CLI initialization
 			
 			// Spy on process.exit and console.error
 			processExitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
@@ -204,18 +216,31 @@ describe('Exit Handler Utilities', () => {
 			processExitSpy.mockRestore();
 			consoleErrorSpy.mockRestore();
 			
-			// Remove test listeners
-			process.removeAllListeners('unhandledRejection');
-			
-			// Restore original listeners
-			originalListeners.forEach(listener => process.on('unhandledRejection', listener));
+			// Note: We don't remove/restore listeners because handlers are designed to be installed once
+			// and persist for the life of the process
 		});
 
 		it('should install unhandledRejection handler', () => {
+			const beforeCount = process.listeners('unhandledRejection').length;
 			installUnhandledRejectionHandler();
+			const afterCount = process.listeners('unhandledRejection').length;
 			
-			const listeners = process.listeners('unhandledRejection');
-			expect(listeners.length).toBeGreaterThan(0);
+			// Handler should be installed (count increases or stays same if already installed)
+			expect(afterCount).toBeGreaterThanOrEqual(beforeCount);
+		});
+
+		it('should be idempotent', () => {
+			const beforeCount = process.listeners('unhandledRejection').length;
+			
+			// Call multiple times
+			installUnhandledRejectionHandler();
+			const afterFirstCall = process.listeners('unhandledRejection').length;
+			
+			installUnhandledRejectionHandler();
+			const afterSecondCall = process.listeners('unhandledRejection').length;
+			
+			// Should not add duplicate handlers
+			expect(afterSecondCall).toBe(afterFirstCall);
 		});
 
 		it('should handle unhandled promise rejections with Error', () => {

@@ -48,12 +48,22 @@ export function formatError(error: unknown): string {
 	return String(error);
 }
 
+// Track if handlers are already installed to prevent duplicates
+let signalHandlersInstalled = false;
+let unhandledRejectionHandlerInstalled = false;
+
 /**
  * Install global signal handlers for clean exits.
  * Handles SIGINT (Ctrl+C) and SIGTERM (termination signal).
  * Exits with standard codes: 130 for SIGINT, 143 for SIGTERM.
+ * 
+ * Note: This is idempotent - calling multiple times has no effect.
  */
 export function installSignalHandlers(): void {
+	if (signalHandlersInstalled) {
+		return;
+	}
+	
 	process.on('SIGINT', () => {
 		console.error('\nReceived SIGINT, exiting gracefully...');
 		process.exit(130); // 128 + SIGINT(2)
@@ -63,17 +73,28 @@ export function installSignalHandlers(): void {
 		console.error('\nReceived SIGTERM, exiting gracefully...');
 		process.exit(143); // 128 + SIGTERM(15)
 	});
+	
+	signalHandlersInstalled = true;
 }
 
 /**
  * Install global unhandledRejection handler.
  * Catches async errors that are not properly handled.
  * Addresses Issue #158.
+ * 
+ * Note: This is idempotent - calling multiple times has no effect.
  */
 export function installUnhandledRejectionHandler(): void {
+	if (unhandledRejectionHandlerInstalled) {
+		return;
+	}
+	
 	process.on('unhandledRejection', (reason: unknown) => {
 		console.error('Unhandled async error:', formatError(reason));
 		process.exit(1);
 	});
+	
+	unhandledRejectionHandlerInstalled = true;
 }
+
 
