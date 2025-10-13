@@ -128,7 +128,7 @@ Invalid input for gate "lint":
   - input/files must NOT have fewer than 1 items
   - input/linter must be equal to one of the allowed values
 
-Suggestion: Check your gate input against the schema at schemas/gates/lint.schema.json
+Suggestion: Check the gate input schema documentation for the correct format
 ```
 
 ## Creating Custom Gate Schemas
