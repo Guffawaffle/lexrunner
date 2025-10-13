@@ -67,6 +67,7 @@ async function runLinter() {
 
 /**
  * Parse lint output to extract violations
+ * Note: This parser is specific to TypeScript compiler (tsc) output format
  */
 function parseLintErrors(output: string): Array<{ file: string; line: number; message: string }> {
 	const violations: Array<{ file: string; line: number; message: string }> = [];

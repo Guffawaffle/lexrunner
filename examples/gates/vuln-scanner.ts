@@ -37,7 +37,8 @@ async function scanVulnerabilities(packageJsonPath: string = 'package.json') {
 
 		// Emit each vulnerability finding
 		if (auditData.vulnerabilities) {
-			for (const [id, vuln] of Object.entries(auditData.vulnerabilities) as any) {
+			const vulnEntries = Object.entries(auditData.vulnerabilities) as Array<[string, any]>;
+			for (const [id, vuln] of vulnEntries) {
 				const cve = vuln.via?.[0]?.url?.match(/CVE-\d{4}-\d+/)?.[0] || id;
 				
 				await audit.emitVuln(cve, vuln.severity, {
@@ -50,6 +51,7 @@ async function scanVulnerabilities(packageJsonPath: string = 'package.json') {
 
 		// Emit scan summary
 		const totalVulns = auditData.metadata?.vulnerabilities?.total || 0;
+		const vulnerabilitiesCount = Object.keys(auditData.vulnerabilities || {}).length;
 		const severityBreakdown = auditData.metadata?.vulnerabilities || {
 			critical: 0,
 			high: 0,
@@ -58,7 +60,7 @@ async function scanVulnerabilities(packageJsonPath: string = 'package.json') {
 		};
 
 		await audit.emit('scan_complete', {
-			total: Object.keys(auditData.vulnerabilities || {}).length,
+			total: vulnerabilitiesCount,
 			vulnerable: totalVulns,
 			severity_breakdown: severityBreakdown
 		});

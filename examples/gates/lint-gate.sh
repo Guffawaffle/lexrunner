@@ -4,7 +4,7 @@
 # Usage: ./lint-gate.sh
 
 GATE_NAME="lint"
-SIDECAR_FILE="${LEX_AUDIT_DROP_DIR}/${GATE_NAME}.$.ndjson"
+SIDECAR_FILE="${LEX_AUDIT_DROP_DIR}/${GATE_NAME}.$$.ndjson"
 
 # Emit an audit event
 emit_event() {
