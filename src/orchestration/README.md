@@ -37,7 +37,7 @@ Options:
 lex-pr orchestrate:assign-batch --issues 156,157,160 --repo owner/repo
 
 # Output:
-# Agent Assignment (batch-1760355715525)
+# Agent Assignment (batch-1729000000000)
 # ========================================
 # ✅ owner/repo#156: assigned at 2025-10-13T02:00:00Z
 # ✅ owner/repo#157: assigned at 2025-10-13T02:00:05Z
@@ -81,7 +81,7 @@ lex-pr orchestrate:assign-batch --issues 156,157 --repo owner/repo --json
 # Output:
 {
   "assignedAt": "2025-10-13T02:00:00Z",
-  "batchId": "batch-1760355715525",
+  "batchId": "batch-1729000000000",
   "results": [
     {
       "agentUrl": "https://github.com/owner/repo/issues/156",
@@ -174,7 +174,7 @@ import { formatAssignmentLog } from './orchestration';
 
 const humanReadable = formatAssignmentLog(log, 'owner/repo');
 console.log(humanReadable);
-// Agent Assignment (batch-123)
+// Agent Assignment (batch-1729000000000)
 // ========================================
 // ✅ owner/repo#156: assigned at 2025-10-13T02:00:00Z
 // ...
