@@ -107,12 +107,18 @@ export function resolveProfile(
 	};
 }
 
+import { isJsonMode } from '../util/colorControl.js';
+
 /**
  * Log profile-related message to stderr with consistent prefix
  * 
  * @param message - The message to log (without prefix)
  */
 export function logProfileMessage(message: string): void {
+	// Suppress in JSON mode to keep stderr clean
+	if (isJsonMode()) {
+		return;
+	}
 	// Use stderr to avoid interfering with JSON output to stdout
 	console.error(`lex-pr-runner profile: ${message}`);
 }

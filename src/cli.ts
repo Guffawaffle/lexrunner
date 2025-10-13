@@ -358,7 +358,7 @@ program
 				});
 
 				// If JSON mode is requested, keep non-JSON logs on stderr and emit a brief diagnostic
-				if (opts.json) {
+				if (jsonModeActive) {
 					// diagnostics to stderr only
 					const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
 					console.error(`[from-github] repo=${repoDiag} discovered=${plan.items.length}`);
@@ -398,7 +398,7 @@ program
 			if (opts.optimize && validatedPlan.items.length > 0) {
 				// Plan is already optimized by computeMergeOrder - just show info
 				const levels = computeMergeOrder(validatedPlan);
-				if (!opts.json) {
+				if (!jsonModeActive) {
 					console.log(`✓ Plan optimized for parallel execution: ${levels.length} levels`);
 					levels.forEach((level, idx) => {
 						console.log(`  Level ${idx + 1}: ${level.join(', ')}`);
@@ -406,7 +406,7 @@ program
 				}
 			}
 
-			if (opts.json) {
+			if (jsonModeActive) {
 				// JSON mode: output only canonical plan to stdout, write nothing else
 				// canonicalJSONStringify already includes trailing newline
 				process.stdout.write(canonicalJSONStringify(validatedPlan));
