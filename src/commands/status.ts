@@ -22,6 +22,15 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
 		.option("--plan <file>", "Path to plan.json file", "plan.json")
 		.argument("[file]", "Path to plan.json file (alternative to --plan)")
 		.option("--json", "Output JSON format")
+		.addHelpText('after', `
+Examples:
+  $ lex-pr status plan.json                     # Show plan status
+  $ lex-pr status --json                        # JSON output for dashboards
+  $ lex-pr status --json | jq '.mergeSummary'   # Extract merge summary
+
+Common Issues:
+  • "Plan file not found": Verify path to plan.json
+  • Missing execution state: Run 'lex-pr execute' first to populate status`)
 		.action((file: string | undefined, opts) => {
 			const planFile = opts.plan || file || "plan.json";
 
