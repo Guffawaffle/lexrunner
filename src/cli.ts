@@ -14,6 +14,7 @@ import { generateSnapshot, generatePlanSummary, generateGitHubSnapshot } from ".
 import { generatePlanFromGitHub } from "./core/githubPlan.js";
 import { createGitHubClient } from "./github/index.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
+import { writeJsonOutput } from "./cli/output.js";
 import { readGateDir, generateMarkdownSummary } from "./report/aggregate.js";
 import { validateGateReportWithErrors, migrateGateReport, needsMigration } from "./schema/gateReport.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "./github/api.js";
@@ -416,8 +417,7 @@ program
 
 			if (jsonModeActive) {
 				// JSON mode: output only canonical plan to stdout, write nothing else
-				// canonicalJSONStringify already includes trailing newline
-				process.stdout.write(canonicalJSONStringify(validatedPlan));
+				writeJsonOutput(validatedPlan);
 				return;
 			}
 
@@ -570,7 +570,7 @@ program
 						file: s.file
 					}))
 				};
-				console.log(canonicalJSONStringify(output));
+				writeJsonOutput(output);
 			} else {
 				// Human-readable output
 				console.log(chalk.bold('\n📋 Configuration Inspection\n'));
@@ -693,7 +693,7 @@ program
 			const diff = comparePlans(plan1, plan2);
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify(diff));
+				writeJsonOutput(diff);
 			} else {
 				console.log('\n📊 Plan Comparison\n');
 				console.log(`Plan 1: ${plan1Path}`);
@@ -727,7 +727,7 @@ program
 			const levels = computeMergeOrder(plan);
 
 			if (opts.json || jsonModeActive) {
-				console.log(canonicalJSONStringify({ levels }));
+				writeJsonOutput({ levels });
 			} else {
 				console.log(`Merge order for ${plan.items.length} items:`);
 				levels.forEach((level: string[], index: number) => {
@@ -738,7 +738,7 @@ program
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (opts.json || jsonModeActive) {
-				console.log(canonicalJSONStringify({ error: message }));
+				writeJsonOutput({ error: message });
 			} else {
 				console.error(`Error computing merge order: ${message}`);
 			}
@@ -801,7 +801,7 @@ program
 			const result = await autopilot.execute(opts.deliverablesDir);
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify(result));
+				writeJsonOutput(result);
 			} else {
 				console.log(result.message);
 			}
@@ -813,7 +813,7 @@ program
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (opts.json) {
-				console.log(canonicalJSONStringify({ success: false, error: message }));
+				writeJsonOutput({ success: false, error: message });
 			} else {
 				console.error(`Error running autopilot: ${message}`);
 			}
@@ -900,7 +900,7 @@ program
 							} : undefined
 						}
 					};
-					console.log(canonicalJSONStringify(output));
+					writeJsonOutput(output);
 				} else {
 					console.log("Dry run - Plan validation successful");
 					console.log(`Plan contains ${plan.items.length} items in ${levels.length} levels:`);
@@ -944,7 +944,7 @@ program
 						artifactDir: opts.artifactDir
 					}
 				};
-				console.log(canonicalJSONStringify(output));
+				writeJsonOutput(output);
 			} else if (opts.statusTable) {
 				// Generate status table for PR comments
 				generateStatusTable(results, mergeSummary);
@@ -1010,7 +1010,7 @@ program
 			const mergeSummary = evaluator.getMergeSummary();
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify({
+				writeJsonOutput({
 					plan: {
 						schemaVersion: plan.schemaVersion,
 						target: plan.target,
@@ -1018,7 +1018,7 @@ program
 						policy: plan.policy
 					},
 					mergeSummary
-				}));
+				});
 			} else {
 				console.log(`Plan: ${plan.items.length} items targeting ${plan.target}`);
 				console.log(`Schema version: ${plan.schemaVersion}`);
@@ -1052,7 +1052,7 @@ program
 				const markdown = generateMarkdownSummary(report);
 				console.log(markdown);
 			} else if (opts.out === 'json') {
-				console.log(canonicalJSONStringify(report));
+				writeJsonOutput(report);
 			} else {
 				console.error(`Invalid output format: ${opts.out}. Use 'json' or 'md'.`);
 				throwExit(1);
@@ -1132,14 +1132,14 @@ program
 				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
 
 				if (opts.json) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						pullRequests,
 						suggestions,
 						total: pullRequests.length,
 						suggestionsCount: suggestions.length,
 						authenticated: authStatus.authenticated,
 						user: authStatus.user
-					}));
+					});
 				} else {
 					console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
 					if (authStatus.authenticated) {
@@ -1165,12 +1165,12 @@ program
 			} else {
 				// Original discover output
 				if (opts.json) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						pullRequests,
 						total: pullRequests.length,
 						authenticated: authStatus.authenticated,
 						user: authStatus.user
-					}));
+					});
 				} else {
 					console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
 					if (authStatus.authenticated) {
@@ -1283,7 +1283,7 @@ program
 			if (opts.dryRun && !opts.execute) {
 				// Dry run mode (default)
 				if (opts.json || jsonModeActive) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						mode: "dry-run",
 						plan: {
 							target: plan.target,
@@ -1296,7 +1296,7 @@ program
 						})),
 						currentBranch,
 						isClean,
-					}));
+					});
 				} else {
 					console.log(`🔍 DRY RUN MODE - Merge plan for ${plan.items.length} items → ${plan.target}`);
 					console.log(`Current branch: ${currentBranch}`);
@@ -1313,7 +1313,7 @@ program
 			} else if (opts.execute) {
 				// Execute mode
 				if (opts.json || jsonModeActive) {
-					console.log(canonicalJSONStringify({ mode: "execute", status: "starting" }));
+					writeJsonOutput({ mode: "execute", status: "starting" });
 				} else {
 					console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
 					console.log(`Target: ${plan.target}`);
@@ -1329,7 +1329,7 @@ program
 				const result = await gitOps.executeWeave(plan, levels, progressReporter);
 
 				if (opts.json || jsonModeActive) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						mode: "execute",
 						status: "completed",
 						result: {
@@ -1345,7 +1345,7 @@ program
 							message: op.message,
 							sha: op.sha,
 						})),
-					}));
+					});
 				} else {
 					console.log("");
 					console.log("## Execution Results");
@@ -1409,7 +1409,7 @@ program
 		if (opts.json) {
 			// JSON mode for programmatic use
 			const result = await performDoctorChecks();
-			console.log(canonicalJSONStringify(result));
+			writeJsonOutput(result);
 			if (result.hasErrors) {
 				throwExit(1);
 			}
@@ -1765,20 +1765,20 @@ program
 
 			if (opts.json) {
 				if (bootstrap.hasConfiguration && !opts.force) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						status: "exists",
 						message: "Configuration already exists",
 						bootstrap,
 						projectType,
-					}));
+					});
 				} else {
 					createMinimalWorkspace();
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						status: "created",
 						message: "Minimal configuration created",
 						projectType,
 						filesCreated: bootstrap.missingFiles,
-					}));
+					});
 				}
 			} else {
 				console.log("🚀 Bootstrapping workspace configuration");
@@ -1825,12 +1825,12 @@ program
 			const result = initLocalOverlay(process.cwd(), opts.force);
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify({
+				writeJsonOutput({
 					created: result.created,
 					path: result.path,
 					config: result.config,
 					copiedFiles: result.copiedFiles
-				}));
+				});
 			} else {
 				if (result.created) {
 					console.log("🎉 Local overlay initialized successfully");
@@ -1916,7 +1916,7 @@ program
 			const deliverables = await manager.listDeliverables();
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify(deliverables));
+				writeJsonOutput(deliverables);
 			} else {
 				if (deliverables.length === 0) {
 					console.log("No deliverables found");
@@ -1993,13 +1993,13 @@ program
 				const toRemove = deliverables.filter(d => !keepSet.has(d.timestamp));
 
 				if (opts.json) {
-					console.log(canonicalJSONStringify({
+					writeJsonOutput({
 						dryRun: true,
 						policy,
 						toKeep: toKeep.length,
 						toRemove: toRemove.length,
 						deliverables: toRemove
-					}));
+					});
 				} else {
 					console.log("\n🔍 Cleanup Preview (dry-run)\n");
 					console.log(`Policy: ${policy.maxAge ? `max-age=${policy.maxAge}d` : ''} ${policy.maxCount ? `max-count=${policy.maxCount}` : ''} keep-latest=${policy.keepLatest}`);
@@ -2022,7 +2022,7 @@ program
 				const result = await manager.cleanup(policy);
 
 				if (opts.json) {
-					console.log(canonicalJSONStringify(result));
+					writeJsonOutput(result);
 				} else {
 					console.log("\n🧹 Cleanup Complete\n");
 					console.log(`Removed: ${result.removed.length} deliverables`);
@@ -2125,7 +2125,7 @@ program
 			});
 
 			if (opts.json) {
-				console.log(canonicalJSONStringify(result));
+				writeJsonOutput(result);
 			} else {
 				if (opts.dryRun) {
 					console.log(`Would retry ${result.processedItems.length} gate(s):`);
