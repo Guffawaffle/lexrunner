@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -10,6 +10,21 @@ import * as os from 'os';
  */
 describe('CLI UX Enhancements E2E', () => {
 	const cliPath = path.resolve(__dirname, '..', 'dist', 'cli.js');
+	const tempFiles: string[] = [];
+
+	// Clean up temporary files after all tests
+	afterEach(() => {
+		for (const file of tempFiles) {
+			try {
+				if (fs.existsSync(file)) {
+					fs.unlinkSync(file);
+				}
+			} catch (err) {
+				// Ignore cleanup errors
+			}
+		}
+		tempFiles.length = 0;
+	});
 
 	describe('Help text with examples', () => {
 		it('execute command should include usage examples', () => {
@@ -68,6 +83,7 @@ describe('CLI UX Enhancements E2E', () => {
 		it('should return exit code 2 for validation errors', () => {
 			let exitCode = 0;
 			const tmpFile = path.join(os.tmpdir(), 'invalid-schema-test.json');
+			tempFiles.push(tmpFile);
 			
 			try {
 				execSync(`node ${cliPath} execute --plan ${tmpFile}`, { 
@@ -96,6 +112,7 @@ describe('CLI UX Enhancements E2E', () => {
 
 		it('should return exit code 0 for successful operations', () => {
 			const tmpFile = path.join(os.tmpdir(), 'valid-plan-test.json');
+			tempFiles.push(tmpFile);
 			const validPlan = {
 				schemaVersion: '1.0.0',
 				target: 'main',
@@ -130,6 +147,7 @@ describe('CLI UX Enhancements E2E', () => {
 	describe('JSON mode consistency', () => {
 		it('should produce clean JSON output without progress indicators', () => {
 			const tmpFile = path.join(os.tmpdir(), 'json-test-plan.json');
+			tempFiles.push(tmpFile);
 			const validPlan = {
 				schemaVersion: '1.0.0',
 				target: 'main',
@@ -165,6 +183,7 @@ describe('CLI UX Enhancements E2E', () => {
 	describe('Error message consistency', () => {
 		it('should have consistent error format for validation errors', () => {
 			const tmpFile = path.join(os.tmpdir(), 'invalid-error-test.json');
+			tempFiles.push(tmpFile);
 			fs.writeFileSync(tmpFile, JSON.stringify({ invalid: 'data' }));
 			
 			let stderr = '';
