@@ -17,7 +17,7 @@ const __dirname = dirname(__filename);
 
 async function main() {
 	console.log('Phase 2 Verification: CI Context Blocks & Gate Matrix\n');
-	console.log('=' .repeat(60));
+	console.log('='.repeat(60));
 
 	// Create temp directory for output
 	const tmpDir = await fs.promises.mkdtemp(join(os.tmpdir(), 'audit-verify-'));
@@ -29,9 +29,9 @@ async function main() {
 	// Test git context
 	console.log('  📦 Git Context:');
 	const gitContext = await collectContext(['git']);
-	console.log(`    - commit: ${gitContext.git?.commit.substring(0, 8)}`);
-	console.log(`    - branch: ${gitContext.git?.branch}`);
-	console.log(`    - dirty: ${gitContext.git?.dirty}`);
+	console.log(`    - commit: ${gitContext.git?.commit?.substring(0, 8) || 'N/A'}`);
+	console.log(`    - branch: ${gitContext.git?.branch || 'N/A'}`);
+	console.log(`    - dirty: ${gitContext.git?.dirty ?? 'N/A'}`);
 
 	// Test CI context
 	console.log('\n  🔧 CI Context:');
@@ -123,7 +123,7 @@ async function main() {
 	console.log(`    - session_id: ${firstEvent.session_id}`);
 	console.log(`    - context.git: ${firstEvent.context.git ? '✓' : '✗'}`);
 	console.log(`    - context.ci: ${firstEvent.context.ci ? '✓' : '✗'}`);
-	console.log(`    - context.os: ${firstEvent.context.os ? '✗ (excluded by soc2)' : '✗'}`);
+	console.log(`    - context.os: ${firstEvent.context.os ? '✓' : '✗ (excluded by soc2)'}`);
 
 	// ========== Acceptance Criteria 4: Profile Defaults ==========
 	console.log('\n\n✅ AC4: Profile Defaults\n');
@@ -139,7 +139,7 @@ async function main() {
 	}
 
 	// ========== Summary ==========
-	console.log('\n\n' + '=' .repeat(60));
+	console.log('\n\n' + '='.repeat(60));
 	console.log('✅ All Acceptance Criteria Verified\n');
 
 	console.log('Output files:');
