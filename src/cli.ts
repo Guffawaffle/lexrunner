@@ -26,6 +26,7 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { ProgressReporter } from "./util/progress.js";
+import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -56,31 +57,39 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   const err: any = e;
   if (err?.code === schemaCode && Array.isArray(err.issues)) {
     console.log(JSON.stringify({ errors: err.issues }, null, 2));
-    console.error(err.message);
+    if (!jsonModeActive) {
+      console.error(err.message);
+    }
 		throwExit(2);
   }
   if (e instanceof SchemaValidationError || e instanceof CycleError || e instanceof UnknownDependencyError || e instanceof WriteProtectionError || e instanceof AutopilotConfigError) {
-    console.error(`\n❌ Error: ${String(err?.message ?? e)}\n`);
+    const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+    console.error(`\n${prefix} Error: ${String(err?.message ?? e)}\n`);
 
-    // Add helpful suggestions based on error type
-    if (e instanceof WriteProtectionError) {
-      console.error("💡 Tip: Use a local profile directory for development:");
-      console.error("   lex-pr init --profile-dir .smartergpt.local\n");
-    } else if (e instanceof CycleError) {
-      console.error("💡 Tip: Check your dependency declarations in PR descriptions");
-      console.error("   Look for circular dependencies like: A→B→C→A\n");
-    } else if (e instanceof UnknownDependencyError) {
-      console.error("💡 Tip: Ensure all referenced PRs exist and are included in your plan");
-      console.error("   Run 'lex-pr discover' to find available PRs\n");
-    } else if (e instanceof SchemaValidationError) {
-      console.error("💡 Tip: Validate your configuration files:");
-      console.error("   lex-pr schema validate plan.json\n");
+    // Add helpful suggestions based on error type (suppress in JSON mode)
+    if (!jsonModeActive) {
+      if (e instanceof WriteProtectionError) {
+        console.error("💡 Tip: Use a local profile directory for development:");
+        console.error("   lex-pr init --profile-dir .smartergpt.local\n");
+      } else if (e instanceof CycleError) {
+        console.error("💡 Tip: Check your dependency declarations in PR descriptions");
+        console.error("   Look for circular dependencies like: A→B→C→A\n");
+      } else if (e instanceof UnknownDependencyError) {
+        console.error("💡 Tip: Ensure all referenced PRs exist and are included in your plan");
+        console.error("   Run 'lex-pr discover' to find available PRs\n");
+      } else if (e instanceof SchemaValidationError) {
+        console.error("💡 Tip: Validate your configuration files:");
+        console.error("   lex-pr schema validate plan.json\n");
+      }
     }
 
 		throwExit(2); // Validation errors
   }
-  console.error(`\n❌ Unexpected error: ${String(err?.message ?? e)}\n`);
-  console.error("💡 Tip: Run 'lex-pr doctor' to check your environment\n");
+  const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+  console.error(`\n${prefix} Unexpected error: ${String(err?.message ?? e)}\n`);
+  if (!jsonModeActive) {
+    console.error("💡 Tip: Run 'lex-pr doctor' to check your environment\n");
+  }
 	throwExit(1); // Unexpected failures
 }
 
@@ -105,7 +114,21 @@ program
 	.name("lex-pr")
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
 	.version("0.1.0")
+	.option("--no-color", "Disable ANSI color codes in output")
+	.option("--json", "Enable JSON output mode (implies --no-color)")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
+	.hook('preAction', (thisCommand) => {
+		// Initialize color control based on global flags
+		const opts = thisCommand.optsWithGlobals();
+		const jsonMode = opts.json || false;
+		const noColor = opts.noColor || false;
+		
+		// Set global JSON mode
+		jsonModeActive = jsonMode;
+		
+		// Initialize color control (--json implies --no-color)
+		initColorControl({ noColor, jsonMode });
+	})
  	.addHelpText('after', `
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
@@ -289,7 +312,11 @@ program
 	.option("--optimize", "Optimize plan for parallel execution")
 	.action(async (opts) => {
 		const previousJsonMode = jsonModeActive;
-		jsonModeActive = Boolean(opts.json);
+		// jsonModeActive is already set by preAction hook from global --json
+		// Command-level --json flag also sets it for backwards compatibility
+		if (opts.json) {
+			jsonModeActive = true;
+		}
 		try {
 			// Resolve profile first to determine default output directory
 			const resolved = resolveProfile(undefined, process.cwd());
@@ -351,12 +378,13 @@ program
 			if (opts.validateCycles !== false && validatedPlan.items.length > 0) {
 				try {
 					computeMergeOrder(validatedPlan);
-					if (!opts.json) {
+					if (!jsonModeActive) {
 						console.log(`✓ Dependency validation passed (no cycles detected)`);
 					}
 				} catch (error) {
 					if (error instanceof CycleError) {
-						console.error(`\n❌ Plan validation failed: ${error.message}`);
+						const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+						console.error(`\n${prefix} Plan validation failed: ${error.message}`);
 						throwExit(1);
 					} else if (error instanceof UnknownDependencyError) {
 						console.error(`\n❌ Plan validation failed: ${error.message}`);

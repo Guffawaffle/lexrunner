@@ -2,6 +2,8 @@
  * Structured logging with correlation IDs for production observability
  */
 
+import { isColorDisabled } from '../util/colorControl.js';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LogEntry {
@@ -118,6 +120,16 @@ export class Logger {
 	 * Get icon for log level
 	 */
 	private getLevelIcon(level: LogLevel): string {
+		// Don't use emoji icons when color is disabled (JSON mode, --no-color, etc.)
+		if (isColorDisabled()) {
+			switch (level) {
+				case 'debug': return '[DEBUG]';
+				case 'info': return '[INFO]';
+				case 'warn': return '[WARN]';
+				case 'error': return '[ERROR]';
+			}
+		}
+		
 		switch (level) {
 			case 'debug': return '🔍';
 			case 'info': return 'ℹ️';
