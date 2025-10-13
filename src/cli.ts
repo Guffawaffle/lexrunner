@@ -29,6 +29,7 @@ import { registerSecurityCommands } from "./cli-security.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
+import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -680,6 +681,9 @@ registerPlanDiffCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith
 });
+
+// Orchestrate: Pin Toolchain command
+registerPinToolchainCommand(program);
 
 // Autopilot command
 program
