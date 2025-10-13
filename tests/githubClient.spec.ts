@@ -64,4 +64,38 @@ describe('GitHubClientImpl (pagination & discovery)', () => {
     const prs = await client.listOpenPRs({});
     expect(prs).toEqual([]);
   });
+
+  it('uses injected Octokit instead of creating new instance', async () => {
+    const fakeOctokit = {
+      rest: {
+        pulls: { 
+          list: () => ({ data: [makeFakePR(1)] }) 
+        },
+        repos: {
+          get: () => ({
+            data: {
+              default_branch: 'main',
+              html_url: 'https://github.com/test/test'
+            }
+          })
+        }
+      }
+    };
+
+    // Inject via constructor
+    const client = new GitHubClientImpl({ 
+      owner: 'Test', 
+      repo: 'Repo',
+      octokit: fakeOctokit as any
+    });
+
+    // Verify it uses the injected instance
+    expect(client.getOctokit()).toBe(fakeOctokit);
+    
+    // Verify it works
+    const repo = await client.validateRepository();
+    expect(repo.owner).toBe('Test');
+    expect(repo.repo).toBe('Repo');
+    expect(repo.defaultBranch).toBe('main');
+  });
 });
