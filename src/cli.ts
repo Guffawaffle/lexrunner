@@ -29,6 +29,7 @@ import { registerSecurityCommands } from "./cli-security.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
+import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -2043,6 +2044,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
+
+// Orchestration commands
+registerGenerateDeliverablesCommand(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
