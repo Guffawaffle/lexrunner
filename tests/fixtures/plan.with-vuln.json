@@ -1,0 +1,25 @@
+{
+	"schemaVersion": "1.0.0",
+	"target": "main",
+	"policy": {
+		"requiredGates": ["vuln"],
+		"security": {
+			"blockCritical": true,
+			"blockHigh": true,
+			"maxMedium": 5,
+			"maxLow": 10
+		}
+	},
+	"items": [
+		{
+			"name": "feature-with-vuln-gate",
+			"deps": [],
+			"gates": [
+				{
+					"name": "vuln",
+					"run": "echo 'Vuln gate - artifact based'"
+				}
+			]
+		}
+	]
+}

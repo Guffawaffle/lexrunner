@@ -90,19 +90,55 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 
 **Files:**
 - `src/security/scanning.ts` - Vulnerability detection
+- `src/security/sarif.ts` - SARIF format parser
 
 **Features:**
 - NPM audit integration for dependency scanning
+- SARIF (Static Analysis Results Interchange Format) 2.1.0 support
 - CVE and CVSS tracking
 - Severity-based policy enforcement (CRITICAL, HIGH, MEDIUM, LOW)
 - Configurable vulnerability thresholds
 - Detailed vulnerability reporting with fix recommendations
 
+**Vuln Gate:**
+The `vuln` gate provides artifact-based vulnerability scanning:
+- Automatically detects and parses SARIF files (`scan-results.sarif`)
+- Falls back to npm audit JSON (`npm-audit.json`) when SARIF not available
+- Enforces security policy thresholds configured in `plan.policy.security`
+- Provides deterministic, structured output with severity counts
+
 **Policy Controls:**
-- Block critical vulnerabilities
-- Block high vulnerabilities
-- Maximum allowed medium/low vulnerabilities
+- Block critical vulnerabilities (`blockCritical: true`)
+- Block high vulnerabilities (`blockHigh: true`)
+- Maximum allowed medium vulnerabilities (`maxMedium: 5`)
+- Maximum allowed low vulnerabilities (`maxLow: 10`)
 - Custom scanner integration support
+
+**Example Configuration:**
+```json
+{
+  "policy": {
+    "requiredGates": ["vuln"],
+    "security": {
+      "blockCritical": true,
+      "blockHigh": true,
+      "maxMedium": 5,
+      "maxLow": 10
+    }
+  },
+  "items": [
+    {
+      "name": "feature-branch",
+      "gates": [
+        {
+          "name": "vuln",
+          "run": "trivy fs --format sarif --output scan-results.sarif ."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ### ✅ 6. Compliance Policy Enforcement
 
