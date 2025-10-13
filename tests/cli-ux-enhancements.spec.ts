@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 /**
  * Test suite validating CLI UX enhancements from issue #78
@@ -65,8 +67,10 @@ describe('CLI UX Enhancements E2E', () => {
 	describe('Exit code consistency', () => {
 		it('should return exit code 2 for validation errors', () => {
 			let exitCode = 0;
+			const tmpFile = path.join(os.tmpdir(), 'invalid-schema-test.json');
+			
 			try {
-				execSync(`node ${cliPath} execute --plan /tmp/nonexistent-plan.json`, { 
+				execSync(`node ${cliPath} execute --plan ${tmpFile}`, { 
 					encoding: 'utf-8',
 					stdio: 'pipe'
 				});
@@ -76,8 +80,6 @@ describe('CLI UX Enhancements E2E', () => {
 			
 			// File not found might be code 1, but invalid schema should be 2
 			// Let's test with an actual invalid schema
-			const fs = require('fs');
-			const tmpFile = '/tmp/invalid-schema-test.json';
 			fs.writeFileSync(tmpFile, JSON.stringify({ invalid: 'schema' }));
 			
 			try {
@@ -93,8 +95,7 @@ describe('CLI UX Enhancements E2E', () => {
 		});
 
 		it('should return exit code 0 for successful operations', () => {
-			const fs = require('fs');
-			const tmpFile = '/tmp/valid-plan-test.json';
+			const tmpFile = path.join(os.tmpdir(), 'valid-plan-test.json');
 			const validPlan = {
 				schemaVersion: '1.0.0',
 				target: 'main',
@@ -128,8 +129,7 @@ describe('CLI UX Enhancements E2E', () => {
 
 	describe('JSON mode consistency', () => {
 		it('should produce clean JSON output without progress indicators', () => {
-			const fs = require('fs');
-			const tmpFile = '/tmp/json-test-plan.json';
+			const tmpFile = path.join(os.tmpdir(), 'json-test-plan.json');
 			const validPlan = {
 				schemaVersion: '1.0.0',
 				target: 'main',
@@ -164,8 +164,7 @@ describe('CLI UX Enhancements E2E', () => {
 
 	describe('Error message consistency', () => {
 		it('should have consistent error format for validation errors', () => {
-			const fs = require('fs');
-			const tmpFile = '/tmp/invalid-error-test.json';
+			const tmpFile = path.join(os.tmpdir(), 'invalid-error-test.json');
 			fs.writeFileSync(tmpFile, JSON.stringify({ invalid: 'data' }));
 			
 			let stderr = '';
