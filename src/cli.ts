@@ -141,6 +141,8 @@ Examples:
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
 	$ lex-pr execute plan.json              Run quality gates on plan
+	$ lex-pr orchestrate analyze            Analyze issues for parallel work planning
+	$ lex-pr orchestrate analyze --labels priority:P1 --json
 	$ lex-pr security check-rotation        Check token rotation status
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
