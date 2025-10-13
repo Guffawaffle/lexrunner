@@ -117,6 +117,8 @@ program
 	.version("0.1.0")
 	.option("--no-color", "Disable ANSI color codes in output")
 	.option("--json", "Enable JSON output mode (implies --no-color)")
+	.option("--verbose", "Enable verbose logging")
+	.option("--quiet", "Suppress non-essential output")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
 	.hook('preAction', (thisCommand) => {
 		// Parse and validate global flags
