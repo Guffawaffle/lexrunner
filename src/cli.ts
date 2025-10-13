@@ -279,6 +279,7 @@ program
 	.option("--query <query>", "GitHub search query (e.g., 'is:open label:stack:*')")
 	.option("--labels <labels>", "Filter PRs by comma-separated labels")
 	.option("--include-drafts", "Include draft PRs in the plan")
+	.option("--exclude-prs <numbers>", "Exclude specific PRs by comma-separated PR numbers")
 	.option("--github-token <token>", "GitHub API token (or use GITHUB_TOKEN env var)")
 	.option("--owner <owner>", "GitHub repository owner (auto-detected from git remote)")
 	.option("--repo <repo>", "GitHub repository name (auto-detected from git remote)")
@@ -310,6 +311,11 @@ program
 				// Parse labels if provided
 				const labels = opts.labels ? opts.labels.split(',').map((l: string) => l.trim()) : undefined;
 
+				// Parse excluded PR numbers if provided
+				const excludePRs = opts.excludePrs 
+					? opts.excludePrs.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
+					: undefined;
+
 				// Parse required gates if provided
 				const requiredGates = opts.requiredGates
 					? opts.requiredGates.split(',').map((g: string) => g.trim())
@@ -322,6 +328,7 @@ program
 				plan = await generatePlanFromGitHub(client, {
 					query: opts.query,
 					labels,
+					excludePRs,
 					includeDrafts: opts.includeDrafts,
 					target: opts.target,
 					policy: {
