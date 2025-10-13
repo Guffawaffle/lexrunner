@@ -997,6 +997,339 @@ cmp output1.json output2.json     # Should be identical
 
 ---
 
+## CLI Conventions
+
+This section documents internal patterns for CLI development. Follow these conventions to ensure consistent behavior across all commands.
+
+### Exit Handling
+
+**Core Principle**: Never call `process.exit()` directly. Use `throwExit()` or throw `CLIExitSignal` instead.
+
+#### The CLIExitSignal Pattern
+
+The CLI uses a custom error class for all exits:
+
+```typescript
+class CLIExitSignal extends Error {
+  exitCode: number;
+  
+  constructor(code: number, message?: string) {
+    super(message ?? `CLI exited with code ${code}`);
+    this.exitCode = code;
+  }
+}
+
+const throwExit = (code: number): never => {
+  throw new CLIExitSignal(code);
+};
+```
+
+**Why**: This approach allows:
+- Centralized exit handling in the main error handler
+- Proper cleanup of resources before exit
+- Testability (errors can be caught in tests)
+- Consistent error formatting
+
+#### Commander Exit Override
+
+All Commander exits are intercepted centrally:
+
+```typescript
+program.exitOverride((err: CommanderError) => {
+  // Help/version often exit with code 0; normalize through CLIExitSignal
+  throw new CLIExitSignal(err.exitCode ?? 1, err.message);
+});
+```
+
+**Why**: Commander's default exit behavior calls `process.exit()` directly. Overriding ensures:
+- All exits go through the same path
+- Help/version commands work correctly with exit code 0
+- No bypassing of error handlers
+
+#### Exit Code Discipline
+
+Use the standard exit codes consistently:
+
+```typescript
+throwExit(0);  // Success
+throwExit(1);  // System/infrastructure errors  
+throwExit(2);  // User/validation errors
+```
+
+**Examples**:
+
+✅ **Correct**:
+```typescript
+try {
+  const plan = loadPlan(planPath);
+  // ... process plan
+  throwExit(0);
+} catch (e) {
+  if (e instanceof SchemaValidationError) {
+    console.error(`Validation failed: ${e.message}`);
+    throwExit(2);  // User can fix this
+  }
+  console.error(`Unexpected error: ${e.message}`);
+  throwExit(1);  // System error
+}
+```
+
+❌ **Incorrect**:
+```typescript
+// DON'T: Direct process.exit
+process.exit(1);
+
+// DON'T: Throw generic errors for exit
+throw new Error("exit");
+
+// DON'T: Return exit codes
+return 1;
+```
+
+### JSON Purity
+
+**Core Principle**: Keep stdout clean for JSON output. All diagnostics, progress messages, and errors go to stderr.
+
+#### Output Stream Configuration
+
+Configure Commander to use explicit streams:
+
+```typescript
+program.configureOutput({
+  writeOut: (str) => process.stdout.write(str),
+  writeErr: (str) => process.stderr.write(str),
+});
+```
+
+**Why**: This ensures:
+- Help/version output goes to stderr (Commander default)
+- stdout remains pure for JSON or data output
+- Pipeable commands work correctly
+
+#### JSON Mode Discipline
+
+Commands with `--json` flag must follow strict rules:
+
+```typescript
+let jsonModeActive = false;
+
+command.action(async (opts) => {
+  const previousJsonMode = jsonModeActive;
+  jsonModeActive = !!opts.json;
+  
+  try {
+    if (opts.json) {
+      // ONLY write JSON to stdout, nothing else
+      process.stdout.write(canonicalJSONStringify(result));
+      return;
+    }
+    
+    // Human-readable output
+    console.log("✓ Success!");
+    console.log(summary);
+  } finally {
+    jsonModeActive = previousJsonMode;
+  }
+});
+```
+
+**Rules for JSON mode**:
+1. **No console.log** in JSON mode - use `process.stdout.write()` directly
+2. **No progress messages** - suppress all diagnostics in JSON mode
+3. **No emojis or formatting** - JSON only
+4. **Always use canonicalJSONStringify** - ensures deterministic output
+
+**Examples**:
+
+✅ **Correct**:
+```typescript
+if (opts.json) {
+  // Pure JSON to stdout
+  process.stdout.write(canonicalJSONStringify({ status: "ok", data }));
+  return;
+}
+
+// Human mode: rich output to stdout/stderr
+console.log("✓ Operation complete");
+console.error("ℹ️ Note: Some items were skipped");
+```
+
+❌ **Incorrect**:
+```typescript
+if (opts.json) {
+  console.log("Processing...");  // DON'T: breaks JSON purity
+  console.log(JSON.stringify(data));  // DON'T: use canonicalJSONStringify
+  console.error(JSON.stringify(error));  // DON'T: errors to stderr, not JSON mixed in
+}
+```
+
+#### Diagnostic Output
+
+Even in normal mode, separate data from diagnostics:
+
+```typescript
+// Diagnostics and progress → stderr
+console.error("🔍 Analyzing plan...");
+console.error(`Found ${items.length} items`);
+
+// Final output → stdout
+console.log(canonicalJSONStringify(result));
+```
+
+**Why**: Allows users to pipe output while still seeing progress:
+```bash
+lex-pr plan --json > plan.json  # Progress visible, JSON piped
+```
+
+### Output Modes
+
+#### Canonical JSON Output
+
+Always use `canonicalJSONStringify()` for JSON output:
+
+```typescript
+import { canonicalJSONStringify } from "./util/canonicalJson.js";
+
+// Automatically includes trailing newline
+process.stdout.write(canonicalJSONStringify(data));
+```
+
+**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location. Use `.js` extension in imports even for TypeScript source files (required for ES modules - TypeScript doesn't rewrite extensions).
+
+**Why**: Ensures deterministic output:
+- Keys sorted alphabetically at all levels
+- Consistent 2-space indentation
+- Always includes trailing newline
+- Same output every time (no timestamps, no random ordering)
+
+#### Human-Readable Output
+
+For human output, use rich formatting:
+
+```typescript
+console.log("\n✓ Plan generated successfully\n");
+console.log(`📁 Output: ${planPath}`);
+console.log(`📊 Items: ${items.length}`);
+console.log("");
+console.log(generatePlanSummary(plan));
+```
+
+**Guidelines**:
+- Use emojis for visual clarity
+- Include spacing for readability
+- Provide actionable next steps
+- Use colors (via chalk) sparingly
+
+### Error Handling Patterns
+
+#### The exitWith() Helper
+
+Use the `exitWith()` helper for consistent error handling:
+
+```typescript
+function exitWith(e: unknown, schemaCode = "ESCHEMA") {
+  // Let CLIExitSignal propagate - don't treat it as an error
+  if (e instanceof CLIExitSignal) {
+    throw e;
+  }
+
+  const err: any = e;
+  
+  // Schema-specific error handling
+  if (err?.code === schemaCode && Array.isArray(err.issues)) {
+    console.log(JSON.stringify({ errors: err.issues }, null, 2));
+    console.error(err.message);
+    throwExit(2);
+  }
+  
+  // Handle known validation errors (exit 2)
+  if (e instanceof SchemaValidationError || 
+      e instanceof CycleError || 
+      e instanceof UnknownDependencyError ||
+      e instanceof WriteProtectionError ||
+      e instanceof AutopilotConfigError) {
+    console.error(`\n❌ Error: ${err.message}\n`);
+    
+    // Add contextual help based on error type
+    // e.g., for WriteProtectionError: suggest using local profile
+    // e.g., for CycleError: suggest checking dependency declarations
+    
+    throwExit(2);
+  }
+  
+  // Handle system errors (exit 1)
+  console.error(`\n❌ Unexpected error: ${err.message}\n`);
+  throwExit(1);
+}
+```
+
+**Note**: Simplified example. See `src/cli.ts` for the full implementation with contextual error messages.
+
+**Usage**:
+```typescript
+try {
+  const plan = await generatePlan();
+  process.stdout.write(canonicalJSONStringify(plan));
+} catch (error) {
+  exitWith(error);
+}
+```
+
+#### Error Context
+
+Provide helpful context in error messages:
+
+```typescript
+if (e instanceof WriteProtectionError) {
+  console.error(`\n❌ Error: ${e.message}\n`);
+  console.error("💡 Tip: Use a local profile directory for development:");
+  console.error("   lex-pr init --profile-dir .smartergpt.local\n");
+  throwExit(2);
+}
+```
+
+### Testing CLI Commands
+
+Write tests that verify exit behavior:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { CLIExitSignal } from "../src/cli.js";
+
+describe("CLI exit codes", () => {
+  it("should throw CLIExitSignal on validation error", () => {
+    // Test that validation errors throw CLIExitSignal with code 2
+    expect(() => {
+      throw new CLIExitSignal(2, "Validation failed");
+    }).toThrow(CLIExitSignal);
+  });
+
+  it("should have correct exit code in signal", () => {
+    const signal = new CLIExitSignal(2, "Validation error");
+    expect(signal.exitCode).toBe(2);
+  });
+});
+```
+
+**Note**: Testing the full CLI requires mocking process.exit or using child processes. The above shows testing the CLIExitSignal class itself.
+
+### Summary
+
+**Key Takeaways**:
+
+1. **Exit Discipline**: Always use `throwExit()` or throw `CLIExitSignal`, never `process.exit()`
+2. **JSON Purity**: stdout for data, stderr for diagnostics - configure Commander explicitly
+3. **Deterministic Output**: Use `canonicalJSONStringify()` for all JSON output
+4. **Error Codes**: 0 = success, 1 = system error, 2 = user error
+5. **Stream Separation**: Commander's `configureOutput()` ensures help/errors don't pollute stdout
+
+**Related Documentation**:
+- [Error Taxonomy](./errors.md) - Complete error code reference
+- [Deterministic Output](#deterministic-output-requirements) - JSON output guarantees
+- Source: `src/cli.ts` - See `CLIExitSignal`, `throwExit()`, `exitWith()`
+
+---
+
 ## Advanced Commands
 
 ### `view`
