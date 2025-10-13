@@ -112,6 +112,7 @@ Examples:
 	$ lex-pr doctor                         Validate environment and configuration
 	$ lex-pr config:inspect                 Display merged configuration with provenance map
 	$ lex-pr discover                       Find open PRs matching scope
+	$ lex-pr discover --suggest             Generate dependency suggestions with heuristics
 	$ lex-pr plan --from-github             Generate merge plan from GitHub PRs
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
@@ -128,7 +129,7 @@ Power User Commands:
 	$ lex-pr completion bash                Generate bash completion script
 
 Workflow:
-	1. Discover:    lex-pr discover
+	1. Discover:    lex-pr discover (optionally add --suggest for dependencies)
 	2. Plan:        lex-pr plan --from-github --json > plan.json
 	3. Review:      lex-pr plan-review plan.json
 	4. Execute:     lex-pr execute plan.json
@@ -1039,6 +1040,7 @@ program
 	.option("--owner <owner>", "GitHub repository owner")
 	.option("--repo <repo>", "GitHub repository name")
 	.option("--state <state>", "PR state filter", "open")
+	.option("--suggest", "Generate dependency/grouping suggestions using heuristics")
 	.option("--json", "Output JSON format")
 	.action(async (opts) => {
 		try {
@@ -1075,30 +1077,83 @@ program
 			// Fetch pull requests
 			const pullRequests = await resolvedAPI.discoverPullRequests(opts.state as "open" | "closed" | "all");
 
-			if (opts.json) {
-				console.log(canonicalJSONStringify({
-					pullRequests,
-					total: pullRequests.length,
-					authenticated: authStatus.authenticated,
-					user: authStatus.user
+			if (opts.suggest) {
+				// Generate dependency suggestions using heuristics
+				const { createFileAnalyzer } = await import("./planner/fileAnalysis.js");
+				
+				// Reuse the existing Octokit instance from githubAPI
+				const analyzer = createFileAnalyzer(
+					githubAPI.getOctokit(),
+					githubAPI.config.owner,
+					githubAPI.config.repo
+				);
+
+				const prs = pullRequests.map(pr => ({
+					number: pr.number,
+					name: `PR-${pr.number}`,
+					sha: pr.sha
 				}));
-			} else {
-				console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
-				if (authStatus.authenticated) {
-					console.log(`✓ Authenticated as: ${authStatus.user}`);
-				}
-				console.log("");
 
-				if (pullRequests.length === 0) {
-					console.log("No pull requests found.");
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				if (opts.json) {
+					console.log(canonicalJSONStringify({
+						pullRequests,
+						suggestions,
+						total: pullRequests.length,
+						suggestionsCount: suggestions.length,
+						authenticated: authStatus.authenticated,
+						user: authStatus.user
+					}));
 				} else {
-					console.log("| PR# | Title | Branch | Author | Labels |");
-					console.log("|-----|-------|--------|--------|--------|");
+					console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
+					if (authStatus.authenticated) {
+						console.log(`✓ Authenticated as: ${authStatus.user}`);
+					}
+					console.log("");
 
-					for (const pr of pullRequests) {
-						const labels = pr.labels.length > 0 ? pr.labels.join(", ") : "none";
-						const title = pr.title.length > 50 ? pr.title.substring(0, 47) + "..." : pr.title;
-						console.log(`| #${pr.number} | ${title} | ${pr.branch} | ${pr.author} | ${labels} |`);
+					if (suggestions.length === 0) {
+						console.log("No dependency suggestions found.");
+					} else {
+						console.log(`\n📊 Dependency Suggestions (${suggestions.length} found):\n`);
+						console.log("| From | To | Confidence | Heuristic | Reason |");
+						console.log("|------|------|------------|-----------|--------|");
+
+						for (const suggestion of suggestions) {
+							const confidence = (suggestion.confidence * 100).toFixed(0) + "%";
+							const heuristic = suggestion.heuristic || "unknown";
+							const reason = suggestion.reason.length > 50 ? suggestion.reason.substring(0, 47) + "..." : suggestion.reason;
+							console.log(`| ${suggestion.from} | ${suggestion.to} | ${confidence} | ${heuristic} | ${reason} |`);
+						}
+					}
+				}
+			} else {
+				// Original discover output
+				if (opts.json) {
+					console.log(canonicalJSONStringify({
+						pullRequests,
+						total: pullRequests.length,
+						authenticated: authStatus.authenticated,
+						user: authStatus.user
+					}));
+				} else {
+					console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
+					if (authStatus.authenticated) {
+						console.log(`✓ Authenticated as: ${authStatus.user}`);
+					}
+					console.log("");
+
+					if (pullRequests.length === 0) {
+						console.log("No pull requests found.");
+					} else {
+						console.log("| PR# | Title | Branch | Author | Labels |");
+						console.log("|-----|-------|--------|--------|--------|");
+
+						for (const pr of pullRequests) {
+							const labels = pr.labels.length > 0 ? pr.labels.join(", ") : "none";
+							const title = pr.title.length > 50 ? pr.title.substring(0, 47) + "..." : pr.title;
+							console.log(`| #${pr.number} | ${title} | ${pr.branch} | ${pr.author} | ${labels} |`);
+						}
 					}
 				}
 			}

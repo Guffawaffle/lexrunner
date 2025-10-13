@@ -51,7 +51,7 @@ export interface GitHubConfig {
  */
 export class GitHubAPI {
 	private octokit: Octokit;
-	private config: GitHubConfig;
+	public config: GitHubConfig;
 	private circuitBreaker: CircuitBreaker;
 
 	constructor(config: GitHubConfig) {
@@ -60,6 +60,13 @@ export class GitHubAPI {
 			auth: config.token || process.env.GITHUB_TOKEN,
 		});
 		this.circuitBreaker = createGitHubCircuitBreaker();
+	}
+
+	/**
+	 * Get the underlying Octokit instance
+	 */
+	getOctokit(): Octokit {
+		return this.octokit;
 	}
 
 	/**
