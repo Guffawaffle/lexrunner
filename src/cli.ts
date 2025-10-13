@@ -28,21 +28,14 @@ import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
+import { 
+	CLIExitSignal, 
+	throwExit,
+	installSignalHandlers,
+	installUnhandledRejectionHandler
+} from "./cli/exitHandler.js";
 import * as fs from "fs";
 import * as path from "path";
-
-class CLIExitSignal extends Error {
-	exitCode: number;
-
-	constructor(code: number, message?: string) {
-		super(message ?? `CLI exited with code ${code}`);
-		this.exitCode = code;
-	}
-}
-
-const throwExit = (code: number): never => {
-	throw new CLIExitSignal(code);
-};
 
 let jsonModeActive = false;
 
@@ -2236,6 +2229,12 @@ function formatQueryResult(result: any, format: string): string {
 registerSecurityCommands(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
+	// Install signal handlers for clean exits (SIGINT, SIGTERM)
+	installSignalHandlers();
+	
+	// Install unhandled rejection handler for async errors (Issue #158)
+	installUnhandledRejectionHandler();
+	
 	try {
 		await program.parseAsync(argv);
 		if (process.exitCode === undefined || process.exitCode === null) {
