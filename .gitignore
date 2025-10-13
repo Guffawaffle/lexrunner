@@ -26,6 +26,9 @@ gate-results/
 deliverables/
 out*.json
 
+# Keep test fixtures
+!tests/fixtures/deliverables/
+
 # .smartergpt runtime directories
 .smartergpt/runner/
 .smartergpt/gate-results/
