@@ -27,6 +27,7 @@ import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
+import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -118,16 +119,23 @@ program
 	.option("--json", "Enable JSON output mode (implies --no-color)")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
 	.hook('preAction', (thisCommand) => {
-		// Initialize color control based on global flags
+		// Parse and validate global flags
 		const opts = thisCommand.optsWithGlobals();
-		const jsonMode = opts.json || false;
-		const noColor = opts.noColor || false;
+		const globalFlags = parseGlobalFlags(opts);
+		
+		// Validate flag combinations
+		try {
+			validateFlagCombinations(globalFlags);
+		} catch (error) {
+			console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+			throwExit(2);
+		}
 		
 		// Set global JSON mode
-		jsonModeActive = jsonMode;
+		jsonModeActive = globalFlags.json || false;
 		
 		// Initialize color control (--json implies --no-color)
-		initColorControl({ noColor, jsonMode });
+		initColorControl({ noColor: globalFlags.noColor, jsonMode: globalFlags.json });
 	})
  	.addHelpText('after', `
 Examples:
@@ -182,7 +190,7 @@ program
 					try {
 						data = JSON.parse(content);
 					} catch (parseError) {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							console.log(JSON.stringify({
 								valid: false,
 								errors: [{
@@ -203,7 +211,7 @@ program
 					if (opts.migrate && needsMigration(data)) {
 						try {
 							const migrated = migrateGateReport(data);
-							if (opts.json) {
+							if (opts.json || jsonModeActive) {
 								console.log(JSON.stringify({
 									valid: true,
 									migrated: true,
@@ -216,7 +224,7 @@ program
 							}
 							return;
 						} catch (migrateError) {
-							if (opts.json) {
+							if (opts.json || jsonModeActive) {
 								console.log(JSON.stringify({
 									valid: false,
 									migrated: false,
@@ -238,7 +246,7 @@ program
 					const validation = validateGateReportWithErrors(data);
 
 					if (validation.valid) {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							console.log(JSON.stringify({ valid: true }));
 						} else {
 							console.log(`✓ ${file} is valid`);
@@ -259,7 +267,7 @@ program
 						}
 						return;
 					} else {
-						if (opts.json) {
+						if (opts.json || jsonModeActive) {
 							console.log(JSON.stringify({
 								valid: false,
 								errors: validation.errors
@@ -278,7 +286,7 @@ program
 					}
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
-					if (opts.json) {
+					if (opts.json || jsonModeActive) {
 						console.log(JSON.stringify({
 							valid: false,
 							errors: [{ path: 'root', message, code: 'unexpected_error' }]
@@ -315,7 +323,7 @@ program
 		const previousJsonMode = jsonModeActive;
 		// jsonModeActive is already set by preAction hook from global --json
 		// Command-level --json flag also sets it for backwards compatibility
-		if (opts.json) {
+		if (opts.json || jsonModeActive) {
 			jsonModeActive = true;
 		}
 		try {
@@ -479,9 +487,12 @@ program
 			.argument("<file>", "Path to plan.json file")
 			.option("--json", "Output JSON result")
 			.action((file: string, opts) => {
+				// Check both command-level and global --json flags
+				const useJson = opts.json || jsonModeActive;
+				
 				try {
 					if (!fs.existsSync(file)) {
-						if (opts.json) {
+						if (useJson) {
 							console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: 'File not found' }] }));
 						} else {
 							console.error(`File not found: ${file}`);
@@ -493,7 +504,7 @@ program
 					try {
 						plan = loadPlan(content);
 					} catch (error) {
-						if (opts.json) {
+						if (useJson) {
 							const err = error as any;
 							if (err instanceof SchemaValidationError && err.issues) {
 								console.log(JSON.stringify({ valid: false, errors: err.issues }, null, 2));
@@ -514,7 +525,7 @@ program
 					try {
 						computeMergeOrder(validatedPlan); // ensure DAG
 					} catch (error) {
-						if (opts.json) {
+						if (useJson) {
 							console.log(JSON.stringify({ valid: false, errors: [{ path: 'dependencies', message: (error as Error).message }] }, null, 2));
 						} else {
 							console.error(`Dependency validation failed: ${(error as Error).message}`);
@@ -522,7 +533,7 @@ program
 						throwExit(1);
 					}
 
-					if (opts.json) {
+					if (useJson) {
 						console.log(JSON.stringify({ valid: true, items: validatedPlan.items.length, target: validatedPlan.target }, null, 2));
 					} else {
 						console.log(`✓ ${file} is valid`);
@@ -535,7 +546,7 @@ program
 					if (error instanceof CLIExitSignal) {
 						throw error;
 					}
-					if (opts.json) {
+					if (useJson) {
 						console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String((error as Error).message) }] }));
 					} else {
 						console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
@@ -692,7 +703,7 @@ program
 
 			const diff = comparePlans(plan1, plan2);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify(diff));
 			} else {
 				console.log('\n📊 Plan Comparison\n');
@@ -800,7 +811,7 @@ program
 			// Execute with optional custom deliverables directory
 			const result = await autopilot.execute(opts.deliverablesDir);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify(result));
 			} else {
 				console.log(result.message);
@@ -812,7 +823,7 @@ program
 			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({ success: false, error: message }));
 			} else {
 				console.error(`Error running autopilot: ${message}`);
@@ -861,7 +872,7 @@ program
 			}
 
 			// Show autopilot configuration if not in JSON mode
-			if (!opts.json && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
+			if (!(opts.json || jsonModeActive) && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
 				console.log(`🤖 Autopilot Level ${autopilotConfig.maxLevel}: ${getAutopilotLevelDescription(autopilotConfig.maxLevel)}`);
 				if (autopilotConfig.dryRun) {
 					console.log("   Mode: Dry run (preview only)");
@@ -881,7 +892,7 @@ program
 			const levels = computeMergeOrder(plan);
 
 			if (opts.dryRun) {
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					const output = {
 						dryRun: true,
 						plan: {
@@ -916,7 +927,7 @@ program
 				return;
 			}
 
-			if (!opts.json) {
+			if (!(opts.json || jsonModeActive)) {
 				console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
 			}
 
@@ -930,7 +941,7 @@ program
 			const results = executionState.getResults();
 			const mergeSummary = evaluator.getMergeSummary();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				// Output JSON results
 				const output = {
 					plan: {
@@ -1009,7 +1020,7 @@ program
 			const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 			const mergeSummary = evaluator.getMergeSummary();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({
 					plan: {
 						schemaVersion: plan.schemaVersion,
@@ -1131,7 +1142,7 @@ program
 
 				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
 
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({
 						pullRequests,
 						suggestions,
@@ -1164,7 +1175,7 @@ program
 				}
 			} else {
 				// Original discover output
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({
 						pullRequests,
 						total: pullRequests.length,
@@ -1379,7 +1390,7 @@ program
 				// Cleanup if requested
 				if (opts.cleanup) {
 					await gitOps.cleanup();
-					if (!opts.json || jsonModeActive) {
+					if (!(opts.json || jsonModeActive)) {
 						console.log("🧹 Cleaned up integration branches");
 					}
 				}
@@ -1406,7 +1417,7 @@ program
 		const issues: string[] = [];
 		const suggestions: string[] = [];
 
-		if (opts.json) {
+		if (opts.json || jsonModeActive) {
 			// JSON mode for programmatic use
 			const result = await performDoctorChecks();
 			console.log(canonicalJSONStringify(result));
@@ -1763,7 +1774,7 @@ program
 			const bootstrap = bootstrapWorkspace();
 			const projectType = detectProjectType();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				if (bootstrap.hasConfiguration && !opts.force) {
 					console.log(canonicalJSONStringify({
 						status: "exists",
@@ -1824,7 +1835,7 @@ program
 		try {
 			const result = initLocalOverlay(process.cwd(), opts.force);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({
 					created: result.created,
 					path: result.path,
@@ -1915,7 +1926,7 @@ program
 			const manager = new DeliverablesManager(profile.path);
 			const deliverables = await manager.listDeliverables();
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify(deliverables));
 			} else {
 				if (deliverables.length === 0) {
@@ -1992,7 +2003,7 @@ program
 				const keepSet = new Set(toKeep.map(d => d.timestamp));
 				const toRemove = deliverables.filter(d => !keepSet.has(d.timestamp));
 
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({
 						dryRun: true,
 						policy,
@@ -2021,7 +2032,7 @@ program
 				// Actual cleanup
 				const result = await manager.cleanup(policy);
 
-				if (opts.json) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify(result));
 				} else {
 					console.log("\n🧹 Cleanup Complete\n");
@@ -2124,7 +2135,7 @@ program
 				dryRun: opts.dryRun,
 			});
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify(result));
 			} else {
 				if (opts.dryRun) {
