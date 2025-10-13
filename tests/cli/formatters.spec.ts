@@ -175,8 +175,8 @@ describe('CLI Formatters', () => {
 			expect(result).toContain('✓ pass');
 			expect(result).toContain('✗ fail');
 			expect(result).toContain('Summary');
-			expect(result).toContain('**Eligible**: 1 nodes');
-			expect(result).toContain('**Failed**: 1 nodes');
+			expect(result).toContain('**Eligible**: 1 node');
+			expect(result).toContain('**Failed**: 1 node');
 		});
 
 		it('should show gate pass/fail counts', () => {
@@ -202,6 +202,23 @@ describe('CLI Formatters', () => {
 			
 			expect(result).toContain('2/3 passed');
 			expect(result).toContain('1 failed');
+		});
+
+		it('should use correct pluralization', () => {
+			const results = new Map();
+			const mergeSummary = {
+				eligible: ['node1'],
+				pending: ['node2', 'node3'],
+				failed: [],
+				blocked: []
+			};
+
+			const result = formatStatusTable(results, mergeSummary);
+			
+			// Singular
+			expect(result).toContain('1 node ready for merge');
+			// Plural
+			expect(result).toContain('2 nodes waiting');
 		});
 	});
 

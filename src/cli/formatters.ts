@@ -177,10 +177,10 @@ export function formatStatusTable(
 	
 	lines.push("");
 	lines.push("### Summary");
-	lines.push(`- **Eligible**: ${mergeSummary.eligible.length} nodes ready for merge`);
-	lines.push(`- **Pending**: ${mergeSummary.pending.length} nodes waiting`);
-	lines.push(`- **Failed**: ${mergeSummary.failed.length} nodes with failures`);
-	lines.push(`- **Blocked**: ${mergeSummary.blocked.length} nodes blocked by dependencies`);
+	lines.push(`- **Eligible**: ${mergeSummary.eligible.length} ${mergeSummary.eligible.length === 1 ? 'node' : 'nodes'} ready for merge`);
+	lines.push(`- **Pending**: ${mergeSummary.pending.length} ${mergeSummary.pending.length === 1 ? 'node' : 'nodes'} waiting`);
+	lines.push(`- **Failed**: ${mergeSummary.failed.length} ${mergeSummary.failed.length === 1 ? 'node' : 'nodes'} with failures`);
+	lines.push(`- **Blocked**: ${mergeSummary.blocked.length} ${mergeSummary.blocked.length === 1 ? 'node' : 'nodes'} blocked by dependencies`);
 	
 	return lines.join('\n');
 }
@@ -233,8 +233,9 @@ export function formatCSV(data: Record<string, any>[]): string {
  * Format query results in various formats
  */
 export function formatQueryResult(result: any, format: string): string {
+	// Note: For JSON format, the caller should use canonicalJSONStringify
+	// This function returns a JSON string but doesn't guarantee canonical ordering
 	if (format === 'json') {
-		// Note: JSON formatting should use canonicalJSONStringify from the caller
 		return JSON.stringify(result);
 	}
 	
