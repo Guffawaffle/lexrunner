@@ -48,15 +48,13 @@ All notable changes to this project will be documented in this file.
 
 Initial release.
 `;
-		fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
+	fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
 
-		// Initial commit
-		execSync("git add .", { cwd: testDir });
-		execSync('git commit -m "Initial commit"', { cwd: testDir });
-		execSync("git tag v1.0.0", { cwd: testDir });
-	});
-
-	afterEach(() => {
+	// Initial commit
+	execSync("git add .", { cwd: testDir });
+	execSync('git commit -m "Initial commit"', { cwd: testDir });
+	execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
+});	afterEach(() => {
 		process.chdir(originalCwd);
 		// Clean up test directory
 		fs.rmSync(testDir, { recursive: true, force: true });
