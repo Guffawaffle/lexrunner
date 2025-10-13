@@ -767,6 +767,7 @@ program
 	.option("--dry-run", "Validate plan and show execution order without running gates")
 	.option("--json", "Output results in JSON format")
 	.option("--status-table", "Generate status table for PR comments")
+	.option("--skip-input-validation", "Skip gate input schema validation (not recommended)")
 	.option("--max-level <level>", "Maximum autopilot level (0-4)", "0")
 	.option("--open-pr", "Open pull requests for integration branches (Level 3+)")
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
@@ -855,11 +856,17 @@ program
 				console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
 			}
 
+			// Check for input validation skip flag
+			const skipValidation = opts.skipInputValidation ?? false;
+			if (skipValidation && !(opts.json || jsonModeActive)) {
+				console.warn('⚠️  Gate input validation disabled - use at your own risk');
+			}
+
 			// Create progress reporter (disabled in JSON mode)
 			const progressReporter = new ProgressReporter({ enabled: !jsonModeActive });
 
 			// Execute gates with policy
-			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter);
+			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter, skipValidation);
 
 			// Get final results
 			const results = executionState.getResults();

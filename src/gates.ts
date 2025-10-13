@@ -11,6 +11,7 @@ import { SecurityScanResult, DEFAULT_SECURITY_POLICY, SecurityPolicy, NpmAuditSc
 import { FlakeReport, AttemptRecord } from "./schema/flakeReport.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
 import { ProgressReporter } from "./util/progress.js";
+import { validateGateInput } from "./gates/validator.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -24,8 +25,29 @@ export async function executeGate(
 	policy: Policy,
 	artifactDir: string,
 	timeoutMs: number = 30000,
-	itemName?: string
+	itemName?: string,
+	skipValidation: boolean = false
 ): Promise<GateResult> {
+	// Validate gate input before execution (unless explicitly skipped)
+	if (!skipValidation && gate.input) {
+		try {
+			validateGateInput(gate.name, gate.input);
+		} catch (error) {
+			// Return validation error as a failed gate result
+			return {
+				gate: gate.name,
+				status: "fail",
+				exitCode: 1,
+				duration: 0,
+				stdout: "",
+				stderr: error instanceof Error ? error.message : String(error),
+				artifacts: [],
+				attempts: 0,
+				lastAttempt: new Date().toISOString()
+			};
+		}
+	}
+
 	const retryConfig = policy.retries[gate.name] || { maxAttempts: 1, backoffSeconds: 0 };
 	let lastResult: GateResult | null = null;
 	const attemptRecords: AttemptRecord[] = [];
@@ -465,7 +487,8 @@ export async function executeItemGates(
 	policy: Policy,
 	executionState: ExecutionState,
 	artifactDir: string,
-	timeoutMs: number = 30000
+	timeoutMs: number = 30000,
+	skipValidation: boolean = false
 ): Promise<GateResult[]> {
 	if (!item.gates || item.gates.length === 0) {
 		return [];
@@ -507,7 +530,7 @@ export async function executeItemGates(
 		continue;
 	}
 
-	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name);
+	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation);
 	results.push(result);
 
 	// Update execution state
@@ -536,7 +559,8 @@ export async function executeGatesWithPolicy(
 	executionState: ExecutionState,
 	artifactDir: string,
 	timeoutMs: number = 30000,
-	progressReporter?: ProgressReporter
+	progressReporter?: ProgressReporter,
+	skipValidation: boolean = false
 ): Promise<void> {
 	const policy = plan.policy || {
 		requiredGates: [],
@@ -597,7 +621,7 @@ export async function executeGatesWithPolicy(
 			}
 
 			const item = plan.items.find(i => i.name === node)!;
-			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs)
+			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation)
 				.then(() => {
 					executing.delete(node);
 					completedNodes.add(node);

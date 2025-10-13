@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/test.schema.json",
+  "title": "Test Gate Input Schema",
+  "description": "Input contract for test gate execution",
+  "type": "object",
+  "required": ["framework", "files"],
+  "properties": {
+    "framework": {
+      "type": "string",
+      "enum": ["vitest", "jest", "mocha", "pytest", "junit"],
+      "description": "Test framework to use"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "List of test file paths or patterns"
+    },
+    "coverage": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable coverage collection"
+    },
+    "timeout": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Test timeout in milliseconds"
+    }
+  },
+  "additionalProperties": false
+}

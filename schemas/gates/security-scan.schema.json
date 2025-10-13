@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/security-scan.schema.json",
+  "title": "Security Scan Gate Input Schema",
+  "description": "Input contract for security scan gate execution",
+  "type": "object",
+  "required": ["scanner"],
+  "properties": {
+    "scanner": {
+      "type": "string",
+      "enum": ["npm-audit", "snyk", "trivy", "codeql"],
+      "description": "Security scanner to use"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"],
+      "description": "Minimum severity level to report"
+    },
+    "failOn": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "none"],
+      "default": "high",
+      "description": "Severity level to fail the gate"
+    },
+    "outputFormat": {
+      "type": "string",
+      "enum": ["sarif", "json", "text"],
+      "default": "sarif",
+      "description": "Output format for scan results"
+    }
+  },
+  "additionalProperties": false
+}
