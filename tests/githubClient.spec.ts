@@ -66,18 +66,23 @@ describe('GitHubClientImpl (pagination & discovery)', () => {
   });
 
   it('uses injected Octokit instead of creating new instance', async () => {
+    // Create a fake with a spy to track calls
+    let reposGetCalled = false;
     const fakeOctokit = {
       rest: {
         pulls: { 
           list: () => ({ data: [makeFakePR(1)] }) 
         },
         repos: {
-          get: () => ({
-            data: {
-              default_branch: 'main',
-              html_url: 'https://github.com/test/test'
-            }
-          })
+          get: () => {
+            reposGetCalled = true;
+            return {
+              data: {
+                default_branch: 'main',
+                html_url: 'https://github.com/test/test'
+              }
+            };
+          }
         }
       }
     };
@@ -92,8 +97,9 @@ describe('GitHubClientImpl (pagination & discovery)', () => {
     // Verify it uses the injected instance
     expect(client.getOctokit()).toBe(fakeOctokit);
     
-    // Verify it works
+    // Verify it actually uses the fake for API calls
     const repo = await client.validateRepository();
+    expect(reposGetCalled).toBe(true);
     expect(repo.owner).toBe('Test');
     expect(repo.repo).toBe('Repo');
     expect(repo.defaultBranch).toBe('main');
