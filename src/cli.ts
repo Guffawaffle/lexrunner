@@ -387,7 +387,8 @@ program
 						console.error(`\n${prefix} Plan validation failed: ${error.message}`);
 						throwExit(1);
 					} else if (error instanceof UnknownDependencyError) {
-						console.error(`\n❌ Plan validation failed: ${error.message}`);
+						const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+						console.error(`\n${prefix} Plan validation failed: ${error.message}`);
 						throwExit(1);
 					}
 					throw error;
@@ -1274,7 +1275,7 @@ program
 
 			if (opts.dryRun && !opts.execute) {
 				// Dry run mode (default)
-				if ((opts.json || jsonModeActive)) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({
 						mode: "dry-run",
 						plan: {
@@ -1304,7 +1305,7 @@ program
 				}
 			} else if (opts.execute) {
 				// Execute mode
-				if ((opts.json || jsonModeActive)) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({ mode: "execute", status: "starting" }));
 				} else {
 					console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
@@ -1320,7 +1321,7 @@ program
 				// Execute weave
 				const result = await gitOps.executeWeave(plan, levels, progressReporter);
 
-				if ((opts.json || jsonModeActive)) {
+				if (opts.json || jsonModeActive) {
 					console.log(canonicalJSONStringify({
 						mode: "execute",
 						status: "completed",
@@ -1371,7 +1372,7 @@ program
 				// Cleanup if requested
 				if (opts.cleanup) {
 					await gitOps.cleanup();
-					if (!(opts.json || jsonModeActive)) {
+					if (!opts.json || jsonModeActive) {
 						console.log("🧹 Cleaned up integration branches");
 					}
 				}
