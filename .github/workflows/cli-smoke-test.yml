@@ -34,8 +34,12 @@ jobs:
         run: |
           echo "Testing JSON mode with plan command..."
           
+          # Use GitHub Actions temp directory for security
+          STDOUT_FILE="${RUNNER_TEMP}/stdout.json"
+          STDERR_FILE="${RUNNER_TEMP}/stderr.txt"
+          
           # Run CLI in JSON mode and capture stdout/stderr separately
-          node dist/cli.js --json plan tests/fixtures/plan.tiny.json > /tmp/stdout.json 2> /tmp/stderr.txt
+          node dist/cli.js --json plan tests/fixtures/plan.tiny.json > "$STDOUT_FILE" 2> "$STDERR_FILE"
           EXIT_CODE=$?
           
           # Verify exit code is 0
@@ -46,31 +50,23 @@ jobs:
           echo "✅ Exit code: $EXIT_CODE"
           
           # Verify stdout is valid JSON
-          if ! cat /tmp/stdout.json | node -e "const data = require('fs').readFileSync(0, 'utf-8'); JSON.parse(data);"; then
+          if ! node -p "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" > /dev/null 2>&1; then
             echo "❌ stdout is not valid JSON:"
-            cat /tmp/stdout.json
+            cat "$STDOUT_FILE"
             exit 1
           fi
           echo "✅ stdout is valid JSON"
           
           # Verify JSON has expected structure
-          if ! node -e "const data = JSON.parse(require('fs').readFileSync('/tmp/stdout.json', 'utf-8')); if (!data.items || !data.schemaVersion) { console.error('Missing expected fields'); process.exit(1); }"; then
+          if ! node -e "const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8')); if (!data.items || !data.schemaVersion) { console.error('Missing expected fields'); process.exit(1); }"; then
             echo "❌ JSON output missing expected fields"
-            cat /tmp/stdout.json
+            cat "$STDOUT_FILE"
             exit 1
           fi
           echo "✅ JSON output has expected structure (items, schemaVersion)"
           
           # Display stderr for diagnostics (should be empty or contain only diagnostics, not JSON)
           echo "Stderr output (should not contain JSON):"
-          cat /tmp/stderr.txt || echo "(empty)"
-          
-          # Verify stderr doesn't contain JSON structures (basic check)
-          if grep -q '^\s*{' /tmp/stderr.txt || grep -q '^\s*\[' /tmp/stderr.txt; then
-            echo "⚠️  Warning: stderr may contain JSON-like structures"
-            echo "Stderr content:"
-            cat /tmp/stderr.txt
-            # Don't fail on this - stderr can have diagnostic JSON in some cases
-          fi
+          cat "$STDERR_FILE" || echo "(empty)"
           
           echo "✅ JSON purity smoke test passed"
