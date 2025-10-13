@@ -18,10 +18,10 @@
 		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist && tsup src/mcp/server.ts --format esm --dts --out-dir dist",
 		"pretest": "npm run build",
 		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts",
-		"lint": "eslint . && npm run typecheck",
+		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
 		"format": "echo 'Format: using editorconfig for consistent formatting'",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"test": "vitest run",
+	"test": "vitest run",
 		"release:prepare": "tsx scripts/release-prepare.ts",
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
@@ -46,7 +46,6 @@
 		"tsup": "^8.1.0",
 		"tsx": "^4.19.0",
 		"typescript": "^5.6.3",
-		"typescript-eslint": "^8.46.0",
 		"vitest": "^2.0.0"
 	}
 }

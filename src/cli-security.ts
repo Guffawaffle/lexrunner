@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { throwExit } from './util/exit.js';
 
 /**
  * Security CLI Registration (B5 Documentation Placeholder)
@@ -38,7 +37,7 @@ function outputSecurityResult(command: string, result: ResultLike, format: strin
     const keyOrder = ['command', 'status', 'exitCode', 'findings', 'timestamp'] as const;
     const ordered = Object.fromEntries(keyOrder.map(k => [k, payload[k]]));
     process.stdout.write(JSON.stringify(ordered, null, 2) + '\n');
-    throwExit(result.exitCode);
+    process.exit(result.exitCode);
   }
   const useColor = color && process.stdout.isTTY;
   if (useColor) {
@@ -48,7 +47,7 @@ function outputSecurityResult(command: string, result: ResultLike, format: strin
   } else {
     console.log(result.report);
   }
-  throwExit(result.exitCode);
+  process.exit(result.exitCode);
 }
 
 function normalizeFindings(findings: any) {
