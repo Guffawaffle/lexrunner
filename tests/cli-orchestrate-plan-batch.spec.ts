@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'child_process';
+import { tmpdir } from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -22,7 +23,7 @@ describe('CLI - orchestrate:plan-batch', () => {
 	let inputFile: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync('/tmp/batch-planner-test-');
+		tmpDir = fs.mkdtempSync(path.join(tmpdir(), 'batch-planner-test-'));
 		inputFile = path.join(tmpDir, 'issues.json');
 	});
 
