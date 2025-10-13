@@ -40,6 +40,8 @@ import {
 	installUnhandledRejectionHandler
 } from "./cli/exitHandler.js";
 import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/formatters.js";
+import { initAuditEmitter, emitEvent, finalizeAudit, AuditEmitter, AuditOptions, EVENT_TYPES } from "./audit/index.js";
+import { sha256 } from "./util/hash.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -772,8 +774,19 @@ program
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
 	.option("--comment-template <path>", "Path to PR comment template (Level 2+)")
 	.option("--branch-prefix <prefix>", "Prefix for integration branch names", "integration/")
+	.option("--audit <profile>", "Audit profile: off|basic|soc2|hipaa-strict", "off")
+	.option("--audit-dir <path>", "Audit output directory (default: <deliverables>/audit)")
+	.option("--audit-format <format>", "Audit format (reserved for future)", "jsonl")
+	.option("--audit-include-env <keys>", "Comma-separated env keys to include")
+	.option("--audit-redact <regex>", "Custom redaction regex pattern")
+	.option("--audit-hash-paths", "Hash file paths in audit events")
+	.option("--audit-signer <signer>", "Signature method (stub for Phase 2)")
+	.option("--audit-retain-days <days>", "Retention hint in days")
+	.option("--audit-context <types>", "Context blocks: git,ci,os")
+	.option("--audit-sample <percent>", "Sampling percentage for noisy gates", "100")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file || "plan.json";
+		let auditEmitter: AuditEmitter | null = null;
 
 		try {
 			// Parse and validate autopilot configuration
@@ -808,12 +821,60 @@ program
 			const plan = loadPlan(planContent);
 			const timeoutMs = parseInt(opts.timeout);
 
+			// Initialize audit emitter if profile is not 'off'
+			if (opts.audit && opts.audit !== 'off') {
+				const auditDir = opts.auditDir || path.join(opts.artifactDir, 'audit');
+				const auditOptions: AuditOptions = {
+					profile: opts.audit as 'basic' | 'soc2' | 'hipaa-strict',
+					dir: auditDir,
+					format: opts.auditFormat,
+					includeEnv: opts.auditIncludeEnv ? opts.auditIncludeEnv.split(',') : undefined,
+					redactRegex: opts.auditRedact,
+					hashPaths: opts.auditHashPaths,
+					context: opts.auditContext ? opts.auditContext.split(',') as ('git' | 'ci' | 'os')[] : undefined,
+					signer: opts.auditSigner,
+					retainDays: opts.auditRetainDays ? parseInt(opts.auditRetainDays) : undefined,
+					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined
+				};
+
+				auditEmitter = await initAuditEmitter(auditOptions);
+
+				// Emit command invocation event
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, {
+					argv: process.argv.slice(2),
+					cwd: process.cwd()
+				});
+
+				// Emit plan discovered event
+				const planHash = sha256(planContent);
+				await emitEvent(auditEmitter, EVENT_TYPES.PLAN_DISCOVERED, {
+					pr_ids: plan.items.map(item => item.name),
+					base: 'main',
+					head: plan.target,
+					plan_hash: planHash
+				});
+
+				// Emit plan validated event
+				await emitEvent(auditEmitter, EVENT_TYPES.PLAN_VALIDATED, {
+					schema_version: plan.schemaVersion,
+					warnings: []
+				});
+			}
+
 			// Create execution state
 			const executionState = new ExecutionState(plan);
 			const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 
 			// Validate and show execution order
 			const levels = computeMergeOrder(plan);
+
+			// Emit merge order computed event
+			if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.MERGE_ORDER_COMPUTED, {
+					levels: levels.length,
+					items_per_level: levels.map(level => level.length)
+				});
+			}
 
 			if (opts.dryRun) {
 				if (opts.json || jsonModeActive) {
@@ -908,12 +969,59 @@ program
 
 			// Exit with appropriate code
 			const hasFailures = mergeSummary.failed.length > 0 || mergeSummary.blocked.length > 0;
+
+			// Emit run summary if audit is enabled
+			if (auditEmitter) {
+				const totalGates = Array.from(results.values()).reduce((sum, r) => sum + r.gates.length, 0);
+				const passedGates = Array.from(results.values()).reduce(
+					(sum, r) => sum + r.gates.filter(g => g.status === 'pass').length,
+					0
+				);
+				const failedGates = Array.from(results.values()).reduce(
+					(sum, r) => sum + r.gates.filter(g => g.status === 'fail').length,
+					0
+				);
+
+				// Build pass/fail matrix
+				const passFailMatrix: Record<string, Record<string, string>> = {};
+				for (const [name, result] of results) {
+					passFailMatrix[name] = {};
+					for (const gate of result.gates) {
+						passFailMatrix[name][gate.gate] = gate.status;
+					}
+				}
+
+				await emitEvent(auditEmitter, EVENT_TYPES.RUN_SUMMARY, {
+					totals: {
+						items: plan.items.length,
+						gates: totalGates,
+						passed: passedGates,
+						failed: failedGates
+					},
+					pass_fail_matrix: passFailMatrix,
+					final_status: hasFailures ? 'failed' : 'success'
+				});
+
+				// Finalize audit
+				await finalizeAudit(auditEmitter, hasFailures ? 'failed' : 'success');
+			}
+
 			if (hasFailures) {
 				throwExit(1);
 			}
 			return;
 
 		} catch (error) {
+			// Finalize audit on error
+			if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.ERROR, {
+					code: 'EXECUTION_ERROR',
+					message: error instanceof Error ? error.message : String(error),
+					where: 'execute_command'
+				}, 'error');
+				await finalizeAudit(auditEmitter, 'error');
+			}
+
 			console.error(`Error executing plan: ${error instanceof Error ? error.message : String(error)}`);
 			// Use exit code 2 for validation errors, 1 for others
 			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
