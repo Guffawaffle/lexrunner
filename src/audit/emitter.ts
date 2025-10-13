@@ -133,7 +133,7 @@ export class AuditEmitter {
 				return {
 					valid: false,
 					errors: validateWithSchema.errors.map(err => ({
-						path: err.instancePath || err.dataPath,
+						path: (err as any).instancePath || (err as any).dataPath || '',
 						message: err.message,
 						params: err.params
 					}))
