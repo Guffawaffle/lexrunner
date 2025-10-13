@@ -29,6 +29,7 @@ import { registerSecurityCommands } from "./cli-security.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
+import { registerOrchestrateCommands } from "./commands/orchestrate.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -926,6 +927,9 @@ program
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
+
+// Orchestrate commands
+registerOrchestrateCommands(program, () => jsonModeActive);
 
 // Report command
 program
