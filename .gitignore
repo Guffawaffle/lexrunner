@@ -40,6 +40,9 @@ out*.json
 snapshot.md
 plan-*.json
 
+# Test files (temporary)
+test-plan.json
+
 # Keep only live deliverable in VCS
 !.smartergpt/deliverables/.live.md
 
