@@ -4,12 +4,12 @@
  */
 
 import { parse } from '@babel/parser';
-// @ts-ignore - babel/traverse doesn't have proper ESM types
-import babelTraverse from '@babel/traverse';
+import babelTraverse, { type NodePath } from '@babel/traverse';
+import type * as t from '@babel/types';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Handle default export from babel/traverse
+// Handle both ESM and CommonJS imports of babel/traverse
 const traverse = (babelTraverse as any).default || babelTraverse;
 
 export interface EditPlan {
@@ -148,7 +148,7 @@ async function validateJavaScriptFile(
     ExportDefaultDeclaration() {
       if (moduleSystem === 'unknown') moduleSystem = 'esm';
     },
-    CallExpression(path: any) {
+    CallExpression(path: NodePath<t.CallExpression>) {
       const callee = path.node.callee;
       if (callee.type === 'Identifier') {
         if (callee.name === 'require' && moduleSystem === 'unknown') {
@@ -161,21 +161,21 @@ async function validateJavaScriptFile(
     },
 
     // Detect function declarations/modifications
-    FunctionDeclaration(path: any) {
+    FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
       if (path.node.id?.name) {
         functionsModified.push(path.node.id.name);
       }
     },
 
     // Detect class declarations
-    ClassDeclaration(path: any) {
+    ClassDeclaration(path: NodePath<t.ClassDeclaration>) {
       if (path.node.id?.name) {
         classesModified.push(path.node.id.name);
       }
     },
 
     // Detect global writes (window.*, global.*)
-    MemberExpression(path: any) {
+    MemberExpression(path: NodePath<t.MemberExpression>) {
       const obj = path.node.object;
       if (obj.type === 'Identifier' && (obj.name === 'window' || obj.name === 'global')) {
         const parent = path.parent;
@@ -229,7 +229,7 @@ async function validateTypeScriptFile(
     ExportDefaultDeclaration() {
       if (moduleSystem === 'unknown') moduleSystem = 'esm';
     },
-    CallExpression(path: any) {
+    CallExpression(path: NodePath<t.CallExpression>) {
       const callee = path.node.callee;
       if (callee.type === 'Identifier') {
         if (callee.name === 'require' && moduleSystem === 'unknown') {
@@ -242,21 +242,21 @@ async function validateTypeScriptFile(
     },
 
     // Detect function declarations/modifications
-    FunctionDeclaration(path: any) {
+    FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
       if (path.node.id?.name) {
         functionsModified.push(path.node.id.name);
       }
     },
 
     // Detect class declarations
-    ClassDeclaration(path: any) {
+    ClassDeclaration(path: NodePath<t.ClassDeclaration>) {
       if (path.node.id?.name) {
         classesModified.push(path.node.id.name);
       }
     },
 
     // Detect global writes (window.*, global.*)
-    MemberExpression(path: any) {
+    MemberExpression(path: NodePath<t.MemberExpression>) {
       const obj = path.node.object;
       if (obj.type === 'Identifier' && (obj.name === 'window' || obj.name === 'global')) {
         const parent = path.parent;
