@@ -76,6 +76,17 @@ If adding public behavior or fixing a bug, prefer tests first (happy path + 1-2 
 - Keep modules small and pure where possible; isolate side-effects
 - Use Zod for schemas and validation in `src/schema.ts`
 
+### CLI Development Conventions
+
+When adding or modifying CLI commands, follow these critical patterns:
+
+- **Exit handling**: Use `throwExit()` or throw `CLIExitSignal` - never call `process.exit()` directly
+- **JSON purity**: Keep stdout clean - all diagnostics to stderr, use `canonicalJSONStringify()` for JSON output
+- **Stream configuration**: Use Commander's `configureOutput()` to separate data from diagnostics
+- **Exit codes**: 0 = success, 1 = system error, 2 = user/validation error
+
+See [CLI Conventions](./docs/cli.md#cli-conventions) for detailed patterns and examples.
+
 ## Opening an issue
 
 Use the issue templates (Bug report / Feature request). Include acceptance criteria and reproduce steps. Link related docs/PRs.
