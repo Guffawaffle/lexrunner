@@ -63,7 +63,7 @@ export function generateGateMatrix(events: EventEnvelope[]): GateMatrix {
 			const key = `${item}:${gate}`;
 			gateStartTimes[key] = new Date(event.ts).getTime();
 		} else if (event.event === 'gate_finished') {
-			const { item, gate, status, error, reason } = event.payload;
+			const { item, gate, status, error, reason, duration_ms } = event.payload;
 			const key = `${item}:${gate}`;
 			const startTime = gateStartTimes[key];
 			const endTime = new Date(event.ts).getTime();
@@ -73,8 +73,10 @@ export function generateGateMatrix(events: EventEnvelope[]): GateMatrix {
 				matrix[item] = {};
 			}
 
-			// Calculate duration if we have start time
-			const duration_ms = startTime ? endTime - startTime : undefined;
+			// Use duration from payload if available, otherwise calculate
+			const finalDuration = duration_ms !== undefined 
+				? duration_ms 
+				: (startTime ? endTime - startTime : undefined);
 
 			// Map status to GateStatus type
 			const gateStatus: GateStatus = ['pass', 'fail', 'skip', 'blocked'].includes(status) 
@@ -83,7 +85,7 @@ export function generateGateMatrix(events: EventEnvelope[]): GateMatrix {
 
 			matrix[item][gate] = {
 				status: gateStatus,
-				duration_ms,
+				duration_ms: finalDuration,
 				error,
 				reason,
 			};
