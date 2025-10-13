@@ -25,6 +25,7 @@ import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescriptio
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -663,41 +664,6 @@ program
 				}
 				throwExit(1);
 			}
-		} catch (error) {
-			exitWith(error);
-		}
-	});
-
-// Plan diff command - Compare two plans
-program
-	.command("plan-diff")
-	.description("Compare two plans and show differences")
-	.argument("<plan1>", "First plan file")
-	.argument("<plan2>", "Second plan file")
-	.option("--json", "Output JSON format")
-	.action(async (plan1Path: string, plan2Path: string, opts) => {
-		try {
-			const plan1Content = fs.readFileSync(plan1Path, "utf-8");
-			const plan2Content = fs.readFileSync(plan2Path, "utf-8");
-
-			const plan1 = loadPlan(plan1Content);
-			const plan2 = loadPlan(plan2Content);
-
-			// Import diff utilities
-			const { comparePlans, formatPlanDiff } = await import("./interactive/planDiff.js");
-
-			const diff = comparePlans(plan1, plan2);
-
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput(diff);
-			} else {
-				console.log('\n📊 Plan Comparison\n');
-				console.log(`Plan 1: ${plan1Path}`);
-				console.log(`Plan 2: ${plan2Path}\n`);
-				console.log(formatPlanDiff(diff));
-			}
-
-			throwExit(diff.hasChanges ? 1 : 0);
 		} catch (error) {
 			exitWith(error);
 		}
@@ -2176,6 +2142,13 @@ program
 			exitWith(error);
 		}
 	});
+
+// Plan diff command
+// Register plan-diff command (modular implementation)
+registerPlanDiffCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith
+});
 
 // Security operations command
 // Register security subcommands once (modular implementation)
