@@ -29,6 +29,10 @@
 		"test:run": "vitest run"
 	},
 	"dependencies": {
+		"@aws-sdk/client-kms": "^3.0.0",
+		"@azure/identity": "^4.0.0",
+		"@azure/keyvault-keys": "^4.0.0",
+		"@google-cloud/kms": "^4.0.0",
 		"@modelcontextprotocol/sdk": "^1.18.2",
 		"@octokit/auth-token": "^6.0.0",
 		"@octokit/rest": "^22.0.0",

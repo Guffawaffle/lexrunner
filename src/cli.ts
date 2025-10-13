@@ -26,6 +26,7 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
@@ -772,6 +773,8 @@ program
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
 	.option("--comment-template <path>", "Path to PR comment template (Level 2+)")
 	.option("--branch-prefix <prefix>", "Prefix for integration branch names", "integration/")
+	.option("--audit <level>", "Audit level (none, basic, soc2, hipaa)", "none")
+	.option("--audit-signer <provider:keyref>", "Sign audit manifest (kms:<ARN> or gpg:<FINGERPRINT>)")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file || "plan.json";
 
@@ -2043,6 +2046,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
+
+// Audit operations command
+registerAuditCommands(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
