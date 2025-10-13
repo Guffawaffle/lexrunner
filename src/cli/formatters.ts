@@ -69,6 +69,13 @@ export function getStatusIcon(status: string): string {
 }
 
 /**
+ * Helper for pluralization
+ */
+function pluralize(count: number, singular: string, plural?: string): string {
+	return count === 1 ? singular : (plural || singular + 's');
+}
+
+/**
  * Format data as ASCII table
  */
 export function formatTable(
@@ -177,10 +184,10 @@ export function formatStatusTable(
 	
 	lines.push("");
 	lines.push("### Summary");
-	lines.push(`- **Eligible**: ${mergeSummary.eligible.length} ${mergeSummary.eligible.length === 1 ? 'node' : 'nodes'} ready for merge`);
-	lines.push(`- **Pending**: ${mergeSummary.pending.length} ${mergeSummary.pending.length === 1 ? 'node' : 'nodes'} waiting`);
-	lines.push(`- **Failed**: ${mergeSummary.failed.length} ${mergeSummary.failed.length === 1 ? 'node' : 'nodes'} with failures`);
-	lines.push(`- **Blocked**: ${mergeSummary.blocked.length} ${mergeSummary.blocked.length === 1 ? 'node' : 'nodes'} blocked by dependencies`);
+	lines.push(`- **Eligible**: ${mergeSummary.eligible.length} ${pluralize(mergeSummary.eligible.length, 'node')} ready for merge`);
+	lines.push(`- **Pending**: ${mergeSummary.pending.length} ${pluralize(mergeSummary.pending.length, 'node')} waiting`);
+	lines.push(`- **Failed**: ${mergeSummary.failed.length} ${pluralize(mergeSummary.failed.length, 'node')} with failures`);
+	lines.push(`- **Blocked**: ${mergeSummary.blocked.length} ${pluralize(mergeSummary.blocked.length, 'node')} blocked by dependencies`);
 	
 	return lines.join('\n');
 }
