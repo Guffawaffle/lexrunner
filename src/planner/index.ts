@@ -15,3 +15,6 @@ export {
 // File analysis and intersection detection (PR #111)
 export * from "./types.js";
 export * from "./fileAnalysis.js";
+
+// Scope validation for agent edits
+export * from "./scopeValidator.js";
