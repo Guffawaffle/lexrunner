@@ -1146,7 +1146,7 @@ import { canonicalJSONStringify } from "./util/canonicalJson.js";
 process.stdout.write(canonicalJSONStringify(data));
 ```
 
-**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location.
+**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location. Use `.js` extension in imports even for TypeScript source files.
 
 **Why**: Ensures deterministic output:
 - Keys sorted alphabetically at all levels
@@ -1201,7 +1201,11 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
       e instanceof WriteProtectionError ||
       e instanceof AutopilotConfigError) {
     console.error(`\n❌ Error: ${err.message}\n`);
-    // ... contextual help messages
+    
+    // Add contextual help based on error type
+    // e.g., for WriteProtectionError: suggest using local profile
+    // e.g., for CycleError: suggest checking dependency declarations
+    
     throwExit(2);
   }
   
