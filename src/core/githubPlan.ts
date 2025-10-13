@@ -44,8 +44,9 @@ export async function generatePlanFromGitHub(
 	const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
 
 	// Exclude specific PRs if requested
-	const finalPRs = options.excludePRs && options.excludePRs.length > 0
-		? filteredPRs.filter(pr => !options.excludePRs!.includes(pr.number))
+	const excludePRs = options.excludePRs || [];
+	const finalPRs = excludePRs.length > 0
+		? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
 		: filteredPRs;
 
 	if (finalPRs.length === 0) {
