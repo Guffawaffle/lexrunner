@@ -162,6 +162,82 @@ Example for a security scanning gate:
 }
 ```
 
+## Vulnerability Gate (vuln)
+
+The `vuln` gate is a special built-in gate that automatically scans for vulnerability artifacts and enforces security policy thresholds.
+
+### How It Works
+
+1. The gate looks for vulnerability scan artifacts in the item's artifact directory
+2. First checks for SARIF format (`scan-results.sarif`)
+3. Falls back to npm audit JSON (`npm-audit.json`) if SARIF not found
+4. Parses findings and counts by severity
+5. Applies policy thresholds and fails if violations found
+
+### Example Configuration
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "policy": {
+    "requiredGates": ["vuln"],
+    "security": {
+      "blockCritical": true,
+      "blockHigh": true,
+      "maxMedium": 5,
+      "maxLow": 10
+    }
+  },
+  "items": [
+    {
+      "name": "feature-auth",
+      "gates": [
+        {
+          "name": "vuln",
+          "run": "trivy fs --format sarif --output scan-results.sarif ."
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Supported Scanners
+
+Any tool that outputs **SARIF 2.1.0** format or **npm audit JSON**:
+- Trivy (`trivy fs --format sarif`)
+- Snyk (`snyk test --sarif`)
+- CodeQL (`codeql database analyze --format=sarif-latest`)
+- npm audit (`npm audit --json`)
+
+### Example Output (Pass)
+
+```json
+{
+  "gate": "vuln",
+  "status": "pass",
+  "exitCode": 0,
+  "stdout": "Vulnerability scan results (trivy):\n  Critical: 0\n  High: 0\n  Medium: 2\n  Low: 5\n  Total: 7\n\n✅ All thresholds met",
+  "stderr": "",
+  "artifacts": ["scan-results.sarif"],
+  "duration": 120
+}
+```
+
+### Example Output (Fail)
+
+```json
+{
+  "gate": "vuln",
+  "status": "fail",
+  "exitCode": 1,
+  "stdout": "Vulnerability scan results (trivy):\n  Critical: 1\n  High: 2\n  Medium: 3\n  Low: 4\n  Total: 10\n\n❌ Policy violations:\n  - 1 critical vulnerabilities (threshold: 0)\n  - 2 high vulnerabilities (threshold: 0)",
+  "stderr": "1 critical vulnerabilities (threshold: 0); 2 high vulnerabilities (threshold: 0)",
+  "artifacts": ["scan-results.sarif"],
+  "duration": 150
+}
+```
+
 ## Performance Benchmark Report
 
 Example for a performance testing gate:

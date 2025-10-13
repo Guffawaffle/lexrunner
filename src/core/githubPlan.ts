@@ -38,10 +38,9 @@ export async function generatePlanFromGitHub(
 		...(options.query ? { query: options.query } : {})
 	});
 
-	// Filter out drafts if not included
-	const filteredPRs = options.includeDrafts 
-		? prs 
-		: prs.filter(pr => !pr.draft);
+	// Default behavior: include drafts (align with `gh pr list`) unless explicitly disabled
+	const includeDrafts = options.includeDrafts === undefined ? true : Boolean(options.includeDrafts);
+	const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
 
 	if (filteredPRs.length === 0) {
 		// Return empty plan if no PRs found
@@ -50,7 +49,7 @@ export async function generatePlanFromGitHub(
 			target,
 			items: []
 		};
-		
+
 		// Add policy if specified
 		if (options.policy) {
 			emptyPlan.policy = {
@@ -63,7 +62,7 @@ export async function generatePlanFromGitHub(
 				mergeRule: { type: "strict-required" }
 			};
 		}
-		
+
 		return emptyPlan;
 	}
 
@@ -116,7 +115,7 @@ function transformPRToPlanItem(pr: PullRequestDetails, options: GitHubPlanOption
 	const deps = pr.dependencies
 		.filter((dep: string) => {
 			// Only include same-repo dependencies for now
-			// Dependencies like "testowner/testrepo#123" or just "#123" 
+			// Dependencies like "testowner/testrepo#123" or just "#123"
 			return dep.includes('#');
 		})
 		.map((dep: string) => {
@@ -142,8 +141,8 @@ function generateGatesFromPR(pr: PullRequestDetails, options: GitHubPlanOptions)
 	const gates: Gate[] = [];
 
 	// Use required gates from PR if specified, otherwise use policy defaults
-	const requiredGates = pr.requiredGates.length > 0 
-		? pr.requiredGates 
+	const requiredGates = pr.requiredGates.length > 0
+		? pr.requiredGates
 		: options.policy?.requiredGates || ["lint", "test"];
 
 	// Generate standard gates

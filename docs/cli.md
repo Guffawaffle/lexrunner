@@ -618,7 +618,55 @@ lex-pr execute --only-item item-a plan.json
 
 # JSON output for monitoring
 lex-pr execute --json plan.json
+
+# Execute plan with vulnerability scanning
+lex-pr execute plan-with-vuln.json
 ```
+
+#### Built-in Gates
+
+##### Vulnerability Gate (`vuln`)
+
+The `vuln` gate is a special built-in gate that scans for security vulnerabilities using artifact-based detection:
+
+- **Artifact Detection**: Automatically looks for `scan-results.sarif` (SARIF 2.1.0 format) or `npm-audit.json` in the item's artifact directory
+- **Policy Enforcement**: Applies thresholds from `plan.policy.security`
+- **Deterministic Output**: Provides consistent, structured vulnerability counts
+
+**Policy Configuration:**
+```json
+{
+  "policy": {
+    "requiredGates": ["vuln"],
+    "security": {
+      "blockCritical": true,
+      "blockHigh": true,
+      "maxMedium": 5,
+      "maxLow": 10
+    }
+  }
+}
+```
+
+**Example Gate:**
+```json
+{
+  "gates": [
+    {
+      "name": "vuln",
+      "run": "trivy fs --format sarif --output scan-results.sarif ."
+    }
+  ]
+}
+```
+
+**Supported Scanners:**
+- Trivy: `trivy fs --format sarif`
+- Snyk: `snyk test --sarif`  
+- CodeQL: `codeql database analyze --format=sarif-latest`
+- npm audit: `npm audit --json > npm-audit.json`
+
+See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) for detailed output examples.
 
 #### JSON Output Schema (`--json` flag)
 

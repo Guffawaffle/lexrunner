@@ -63,6 +63,7 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 
 **Files:**
 - `src/security/secrets.ts` - Secure credential handling
+- `scripts/rotate-secrets-example.ts` - Example rotation script
 
 **Features:**
 - Environment variable integration with prefix support
@@ -77,23 +78,67 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 - Automatic redaction in error messages
 - Rotation warnings for aged credentials
 
+**Rotation Guide:**
+- See [docs/security/rotation-guide.md](security/rotation-guide.md) for:
+  - Recommended rotation cadences by secret type
+  - Compliance framework requirements (SOX, PCI-DSS, SOC 2, HIPAA)
+  - Step-by-step rotation workflows
+  - Automation patterns and CI/CD integration
+  - Emergency rotation procedures
+
 ### ✅ 5. Security Scanning Integration
 
 **Files:**
 - `src/security/scanning.ts` - Vulnerability detection
+- `src/security/sarif.ts` - SARIF format parser
 
 **Features:**
 - NPM audit integration for dependency scanning
+- SARIF (Static Analysis Results Interchange Format) 2.1.0 support
 - CVE and CVSS tracking
 - Severity-based policy enforcement (CRITICAL, HIGH, MEDIUM, LOW)
 - Configurable vulnerability thresholds
 - Detailed vulnerability reporting with fix recommendations
 
+**Vuln Gate:**
+The `vuln` gate provides artifact-based vulnerability scanning:
+- Automatically detects and parses SARIF files (`scan-results.sarif`)
+- Falls back to npm audit JSON (`npm-audit.json`) when SARIF not available
+- Enforces security policy thresholds configured in `plan.policy.security`
+- Provides deterministic, structured output with severity counts
+
 **Policy Controls:**
-- Block critical vulnerabilities
-- Block high vulnerabilities
-- Maximum allowed medium/low vulnerabilities
+- Block critical vulnerabilities (`blockCritical: true`)
+- Block high vulnerabilities (`blockHigh: true`)
+- Maximum allowed medium vulnerabilities (`maxMedium: 5`)
+- Maximum allowed low vulnerabilities (`maxLow: 10`)
 - Custom scanner integration support
+
+**Example Configuration:**
+```json
+{
+  "policy": {
+    "requiredGates": ["vuln"],
+    "security": {
+      "blockCritical": true,
+      "blockHigh": true,
+      "maxMedium": 5,
+      "maxLow": 10
+    }
+  },
+  "items": [
+    {
+      "name": "feature-branch",
+      "gates": [
+        {
+          "name": "vuln",
+          "run": "trivy fs --format sarif --output scan-results.sarif ."
+        }
+      ]
+    }
+  ]
+}
+```
 
 ### ✅ 6. Compliance Policy Enforcement
 
@@ -398,6 +443,8 @@ lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL
 - Review audit logs regularly
 - Generate compliance reports monthly
 - Check for secret rotation needs with `lex-pr security check-rotation`
+- Use rotation example script: `tsx scripts/rotate-secrets-example.ts`
+- See [rotation guide](security/rotation-guide.md) for automation patterns
 - Monitor security scan results
 - Track permission usage
 - Apply retention policies based on compliance framework (SOX, GDPR, etc.)

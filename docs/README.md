@@ -61,6 +61,10 @@ New to lex-pr-runner? Start here:
 
 ### Tutorials
 
+- **[Quick Merge Pyramid](./tutorials/quick-merge-pyramid.md)** - Complete workflow guide (10 min)
+  - Discover → Plan → Execute → Merge
+  - Dependency management
+  - Gate execution and verification
 - **[Video Tutorial Scripts](./tutorials/)** - Complete video guides
   - Getting Started (5 min)
   - Understanding Dependencies (8 min)
@@ -107,6 +111,16 @@ New to lex-pr-runner? Start here:
 - **Email Reports** - Automated summaries
 
 ## 🛠️ Operations
+
+### Security
+
+- **[Security Implementation](./SECURITY_IMPLEMENTATION.md)** - Enterprise security features
+- **[Secret Rotation Guide](./security/rotation-guide.md)** - Rotation patterns and best practices
+  - Recommended rotation cadences
+  - Compliance framework requirements
+  - Step-by-step rotation workflows
+  - Automation and CI/CD integration
+  - Emergency rotation procedures
 
 ### Monitoring
 

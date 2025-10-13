@@ -443,6 +443,7 @@ describe("FileAnalyzer", () => {
 			expect(suggestions[0].reason).toBe("shared file modifications");
 			expect(suggestions[0].confidence).toBeGreaterThan(0.6);
 			expect(suggestions[0].sharedFiles).toEqual(["src/core.ts"]);
+			expect(suggestions[0].heuristic).toBe("shared-files");
 		});
 
 		it("should not suggest dependencies for low confidence intersections", async () => {
@@ -479,6 +480,375 @@ describe("FileAnalyzer", () => {
 
 			// Low confidence (both adding same file) - should not suggest
 			expect(suggestions).toHaveLength(0);
+		});
+	});
+
+	describe("suggestDependenciesWithHeuristics", () => {
+		describe("shared-files heuristic", () => {
+			it("should detect shared file modifications", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/core.ts",
+								status: "modified",
+								additions: 20,
+								deletions: 10,
+								changes: 30
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/core.ts",
+								status: "modified",
+								additions: 15,
+								deletions: 8,
+								changes: 23
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 1, name: "PR-1" },
+					{ number: 2, name: "PR-2" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				expect(suggestions.length).toBeGreaterThan(0);
+				const sharedFileSuggestion = suggestions.find(s => s.heuristic === "shared-files");
+				expect(sharedFileSuggestion).toBeDefined();
+				expect(sharedFileSuggestion?.confidence).toBeGreaterThan(0.6);
+			});
+		});
+
+		describe("directory-proximity heuristic", () => {
+			it("should detect PRs modifying files in same directory", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/utils.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 10, name: "PR-10" },
+					{ number: 11, name: "PR-11" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				const proximitySuggestion = suggestions.find(s => s.heuristic === "directory-proximity");
+				expect(proximitySuggestion).toBeDefined();
+				expect(proximitySuggestion?.reason).toContain("common director");
+				expect(proximitySuggestion?.sharedFiles).toContain("src/planner");
+			});
+
+			it("should not suggest for unrelated directories", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "tests/integration/test.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 20, name: "PR-20" },
+					{ number: 21, name: "PR-21" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				const proximitySuggestion = suggestions.find(s => s.heuristic === "directory-proximity");
+				expect(proximitySuggestion).toBeUndefined();
+			});
+		});
+
+		describe("test-overlap heuristic", () => {
+			it("should detect shared test file modifications with high confidence", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "tests/core.spec.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "tests/core.spec.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 30, name: "PR-30" },
+					{ number: 31, name: "PR-31" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				// Shared test file should be detected (may be by shared-files or test-overlap heuristic)
+				expect(suggestions.length).toBeGreaterThan(0);
+				const suggestion = suggestions.find(s => 
+					s.from === "PR-30" && s.to === "PR-31"
+				);
+				expect(suggestion).toBeDefined();
+				expect(suggestion?.confidence).toBeGreaterThan(0.7);
+			});
+
+			it("should detect tests for same module in different directories", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/__tests__/core.test.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "tests/unit/core.spec.ts",
+								status: "added",
+								additions: 8,
+								deletions: 0,
+								changes: 8
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 40, name: "PR-40" },
+					{ number: 41, name: "PR-41" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				// Should detect same module being tested (different directories, so no directory-proximity)
+				const testSuggestion = suggestions.find(s => s.heuristic === "test-overlap");
+				expect(testSuggestion).toBeDefined();
+				expect(testSuggestion?.reason).toContain("tests for same module");
+			});
+
+			it("should not detect test overlap when no test files present", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/core.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/utils.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 50, name: "PR-50" },
+					{ number: 51, name: "PR-51" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				const testSuggestion = suggestions.find(s => s.heuristic === "test-overlap");
+				expect(testSuggestion).toBeUndefined();
+			});
+		});
+
+		describe("deterministic ordering", () => {
+			it("should sort by confidence descending, then by PR name ascending", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 50,
+								deletions: 20,
+								changes: 70
+							},
+							{
+								filename: "tests/core.spec.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/utils.ts",
+								status: "modified",
+								additions: 5,
+								deletions: 2,
+								changes: 7
+							},
+							{
+								filename: "tests/core.spec.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 30,
+								deletions: 15,
+								changes: 45
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 1, name: "PR-1" },
+					{ number: 2, name: "PR-2" },
+					{ number: 3, name: "PR-3" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				// Should be sorted by confidence descending
+				for (let i = 0; i < suggestions.length - 1; i++) {
+					if (Math.abs(suggestions[i].confidence - suggestions[i + 1].confidence) > 0.001) {
+						expect(suggestions[i].confidence).toBeGreaterThanOrEqual(suggestions[i + 1].confidence);
+					}
+				}
+
+				// For same confidence, should be sorted by PR name
+				const sameConfidence = suggestions.filter(s => 
+					Math.abs(s.confidence - suggestions[0].confidence) < 0.001
+				);
+				if (sameConfidence.length > 1) {
+					for (let i = 0; i < sameConfidence.length - 1; i++) {
+						expect(sameConfidence[i].from.localeCompare(sameConfidence[i + 1].from)).toBeLessThanOrEqual(0);
+					}
+				}
+			});
+		});
+
+		describe("deduplication", () => {
+			it("should keep highest confidence suggestion for each PR pair", async () => {
+				mockOctokit.rest.pulls.listFiles
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 50,
+								deletions: 20,
+								changes: 70
+							},
+							{
+								filename: "tests/planner.spec.ts",
+								status: "modified",
+								additions: 10,
+								deletions: 5,
+								changes: 15
+							}
+						]
+					})
+					.mockResolvedValueOnce({
+						data: [
+							{
+								filename: "src/planner/core.ts",
+								status: "modified",
+								additions: 30,
+								deletions: 15,
+								changes: 45
+							},
+							{
+								filename: "tests/planner.spec.ts",
+								status: "modified",
+								additions: 8,
+								deletions: 3,
+								changes: 11
+							}
+						]
+					});
+
+				const prs = [
+					{ number: 100, name: "PR-100" },
+					{ number: 101, name: "PR-101" }
+				];
+
+				const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+				// Should have only one suggestion for this PR pair (highest confidence)
+				const pr100to101 = suggestions.filter(s => s.from === "PR-100" && s.to === "PR-101");
+				expect(pr100to101).toHaveLength(1);
+				
+				// Should be the highest confidence (likely shared-files or test-overlap)
+				expect(pr100to101[0].confidence).toBeGreaterThan(0.6);
+			});
 		});
 	});
 

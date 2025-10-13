@@ -146,10 +146,12 @@ See the full documentation index: [docs/README.md](docs/README.md)
 
 Quick links:
 - **Getting Started**: docs/quickstart.md — 5-minute onboarding
+- **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
 - **Migration Guide**: docs/migration-guide.md — migrating to lex-pr-runner
+- **FAQ**: FAQ.md — quick answers to common questions
 - **Video Tutorials**: docs/tutorials/ — step-by-step video guides
 - **Workflows**: docs/workflows/ — examples for different team sizes
 - **CI/CD Integrations**: docs/integrations/ — platform-specific setup
@@ -328,6 +330,10 @@ JSON output is deterministic with ordered keys: `command,status,exitCode,finding
 
 Format flags:
 `--format text|json` (default text), `--no-color` disables ANSI styling in text mode.
+
+**Secret Rotation:**
+- See [docs/security/rotation-guide.md](docs/security/rotation-guide.md) for rotation patterns and cadences
+- Example script: `tsx scripts/rotate-secrets-example.ts` (deterministic JSON output)
 
 ```bash
 # CI-friendly validation

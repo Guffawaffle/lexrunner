@@ -13,8 +13,10 @@ const schema = zodToJsonSchema(Plan, {
 });
 
 // Add metadata
+// Note: zodToJsonSchema generates draft-07 schemas, so we specify that here
+// for consistency with the generated output
 const jsonSchema = {
-	$schema: "https://json-schema.org/draft/2020-12/schema",
+	$schema: "http://json-schema.org/draft-07/schema#",
 	$id: "https://example.com/schemas/plan.schema.json",
 	title: "lex-pr plan schema v1",
 	description: "Schema for plan.json files - generated from Zod schema in src/schema.ts",
