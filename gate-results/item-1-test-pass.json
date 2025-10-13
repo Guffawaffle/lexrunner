@@ -1,8 +1,0 @@
-{
-  "name": "test-pass",
-  "exitCode": 0,
-  "duration": 8,
-  "stdout": "test passed",
-  "stderr": "",
-  "timedOut": false
-}

@@ -1,8 +1,0 @@
-{
-  "name": "test-fail",
-  "exitCode": 1,
-  "duration": 4,
-  "stdout": "",
-  "stderr": "test failed",
-  "timedOut": false
-}

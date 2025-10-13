@@ -1,8 +1,0 @@
-{
-  "name": "lint",
-  "exitCode": 0,
-  "duration": 1005,
-  "stdout": "linting...\nlint passed",
-  "stderr": "",
-  "timedOut": false
-}
