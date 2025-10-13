@@ -263,7 +263,7 @@ export function registerCompletionCommand(
 		.option("--install", "Show installation instructions")
 		.action(async (shell: string, opts) => {
 			try {
-				const generator = new CompletionGenerator("lex-pr");
+				const generator = new CompletionGenerator(program.name());
 
 				if (opts.install) {
 					console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
