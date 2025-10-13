@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from "commander";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import chalk from "chalk";
 import { Plan, loadPlan, SchemaValidationError } from "./schema.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "./mergeOrder.js";
@@ -85,7 +87,19 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
 let logger: Logger;
 
 const program = new Command();
-program.exitOverride();
+
+// Intercept all Commander exits centrally - no brittle message filtering needed
+program.exitOverride((err: CommanderError) => {
+	// Help/version often exit with code 0; normalize through CLIExitSignal
+	throw new CLIExitSignal(err.exitCode ?? 1, err.message);
+});
+
+// Configure output streams explicitly for JSON purity
+program.configureOutput({
+	writeOut: (str) => process.stdout.write(str),
+	writeErr: (str) => process.stderr.write(str),
+});
+
 program
 	.name("lex-pr")
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
@@ -2085,18 +2099,13 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 			return;
 		}
 		if (error instanceof CommanderError) {
+			// Already intercepted by exitOverride and converted to CLIExitSignal
+			// This branch should never execute, but handle defensively
 			const exitCode = typeof error.exitCode === "number" ? error.exitCode : 1;
-			// Commander help/version commands use exitCode 0 - don't treat as error
-			if (exitCode === 0) {
-				process.exitCode = 0;
-				return;
-			}
-			const message = error.message || "Command error";
-			// Don't output Commander's internal messages like "(outputHelp)"
-			if (message && message !== '(outputHelp)' && !message.startsWith('(')) {
-				process.stderr.write(`${message}\n`);
-			}
 			process.exitCode = exitCode;
+			if (exitCode !== 0 && error.message) {
+				process.stderr.write(`${error.message}\n`);
+			}
 			return;
 		}
 		const message = error instanceof Error ? error.message : String(error);
@@ -2107,24 +2116,38 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 }
 
 // ============================================================================
-// Entry point detection (ESM/CJS compatible)
+// Entry point detection (ESM/CJS compatible, cross-platform)
 // ============================================================================
-// CRITICAL: This must work in both ESM (.js) and CJS (.cjs) builds.
+// CRITICAL: This must work in both ESM (.js) and CJS (.cjs) builds, and handle
+// Windows paths, symlinks, and URL encoding correctly.
 //
 // - ESM build: import.meta is available and we check import.meta.url
 // - CJS build: import.meta.url will be undefined/empty (tsup warning is expected)
 //
-// The typeof check ensures we only run main() in ESM context when directly executed.
+// Using Node's pathToFileURL and resolve ensures:
+// 1. Windows paths are normalized correctly (C:\... → file:///C:/...)
+// 2. Symlinks are resolved consistently
+// 3. URL encoding is handled (spaces, special chars)
+//
 // tsup will emit a warning about import.meta in CJS, but that's acceptable since:
 // 1. The check prevents execution in CJS context
 // 2. The warning is cosmetic and doesn't affect runtime behavior
-// 3. Alternative approaches (eval, indirect access) introduce worse issues
+// 3. Config-based suppression (tsup.config.ts) silences the noise
 //
-// DO NOT REFACTOR to eval() or indirect access - those create their own warnings.
-// Accept the tsup warning as documented expected behavior.
+// DO NOT REFACTOR to simple string comparison - it breaks on Windows/symlinks.
 // ============================================================================
-if (typeof import.meta !== 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
-	main().catch((error) => {
+const isDirectExec = (() => {
+	try {
+		if (typeof import.meta === 'undefined') return false;
+		const argHref = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "";
+		return import.meta.url === argHref;
+	} catch {
+		return false;
+	}
+})();
+
+if (isDirectExec) {
+	void main().catch((error) => {
 		const message = error instanceof Error ? error.message : String(error);
 		process.stderr.write(`[lex-pr] fatal: ${message}\n`);
 		process.exitCode = process.exitCode ?? 1;
