@@ -8,9 +8,9 @@
             "lint-results.txt"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-f0876d3d-fb39-4fbd-858b-fa3e155adb35",
-            "PR_NUMBER": "70",
-            "PR_SHA": "94cdfe9545073f448b0036074deb5f2d884287e1"
+            "PR_BRANCH": "copilot/extract-json-output-utilities",
+            "PR_NUMBER": "185",
+            "PR_SHA": "a4563bcbd26f88a90c7613f09c155e2b6cd386ce"
           },
           "name": "lint",
           "run": "npm run lint",
@@ -22,9 +22,9 @@
             "coverage/"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-f0876d3d-fb39-4fbd-858b-fa3e155adb35",
-            "PR_NUMBER": "70",
-            "PR_SHA": "94cdfe9545073f448b0036074deb5f2d884287e1"
+            "PR_BRANCH": "copilot/extract-json-output-utilities",
+            "PR_NUMBER": "185",
+            "PR_SHA": "a4563bcbd26f88a90c7613f09c155e2b6cd386ce"
           },
           "name": "test",
           "run": "npm test",
@@ -35,16 +35,16 @@
             "typecheck-results.txt"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-f0876d3d-fb39-4fbd-858b-fa3e155adb35",
-            "PR_NUMBER": "70",
-            "PR_SHA": "94cdfe9545073f448b0036074deb5f2d884287e1"
+            "PR_BRANCH": "copilot/extract-json-output-utilities",
+            "PR_NUMBER": "185",
+            "PR_SHA": "a4563bcbd26f88a90c7613f09c155e2b6cd386ce"
           },
           "name": "typecheck",
           "run": "npm run typecheck",
           "runtime": "local"
         }
       ],
-      "name": "PR-70"
+      "name": "PR-185"
     },
     {
       "deps": [],
@@ -54,9 +54,9 @@
             "lint-results.txt"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-42d54ddd-66dc-463e-a057-92b1497464bc",
-            "PR_NUMBER": "71",
-            "PR_SHA": "b0c3a9e91f4cecb1c34530c3fd2bbaa5eb30a01c"
+            "PR_BRANCH": "copilot/extract-exit-handler-utilities",
+            "PR_NUMBER": "186",
+            "PR_SHA": "29f0d7f7a3ad98dd082515dc48f664ebb8605264"
           },
           "name": "lint",
           "run": "npm run lint",
@@ -68,9 +68,9 @@
             "coverage/"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-42d54ddd-66dc-463e-a057-92b1497464bc",
-            "PR_NUMBER": "71",
-            "PR_SHA": "b0c3a9e91f4cecb1c34530c3fd2bbaa5eb30a01c"
+            "PR_BRANCH": "copilot/extract-exit-handler-utilities",
+            "PR_NUMBER": "186",
+            "PR_SHA": "29f0d7f7a3ad98dd082515dc48f664ebb8605264"
           },
           "name": "test",
           "run": "npm test",
@@ -81,16 +81,108 @@
             "typecheck-results.txt"
           ],
           "env": {
-            "PR_BRANCH": "copilot/fix-42d54ddd-66dc-463e-a057-92b1497464bc",
-            "PR_NUMBER": "71",
-            "PR_SHA": "b0c3a9e91f4cecb1c34530c3fd2bbaa5eb30a01c"
+            "PR_BRANCH": "copilot/extract-exit-handler-utilities",
+            "PR_NUMBER": "186",
+            "PR_SHA": "29f0d7f7a3ad98dd082515dc48f664ebb8605264"
           },
           "name": "typecheck",
           "run": "npm run typecheck",
           "runtime": "local"
         }
       ],
-      "name": "PR-71"
+      "name": "PR-186"
+    },
+    {
+      "deps": [],
+      "gates": [
+        {
+          "artifacts": [
+            "lint-results.txt"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-global-flag-handling",
+            "PR_NUMBER": "187",
+            "PR_SHA": "2a097e44747e2e46723c9b09600ca74df1e6be1e"
+          },
+          "name": "lint",
+          "run": "npm run lint",
+          "runtime": "local"
+        },
+        {
+          "artifacts": [
+            "test-results.xml",
+            "coverage/"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-global-flag-handling",
+            "PR_NUMBER": "187",
+            "PR_SHA": "2a097e44747e2e46723c9b09600ca74df1e6be1e"
+          },
+          "name": "test",
+          "run": "npm test",
+          "runtime": "local"
+        },
+        {
+          "artifacts": [
+            "typecheck-results.txt"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-global-flag-handling",
+            "PR_NUMBER": "187",
+            "PR_SHA": "2a097e44747e2e46723c9b09600ca74df1e6be1e"
+          },
+          "name": "typecheck",
+          "run": "npm run typecheck",
+          "runtime": "local"
+        }
+      ],
+      "name": "PR-187"
+    },
+    {
+      "deps": [],
+      "gates": [
+        {
+          "artifacts": [
+            "lint-results.txt"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-output-formatters",
+            "PR_NUMBER": "188",
+            "PR_SHA": "031bad131f0f5337a604980b9428bd97ecf3ab02"
+          },
+          "name": "lint",
+          "run": "npm run lint",
+          "runtime": "local"
+        },
+        {
+          "artifacts": [
+            "test-results.xml",
+            "coverage/"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-output-formatters",
+            "PR_NUMBER": "188",
+            "PR_SHA": "031bad131f0f5337a604980b9428bd97ecf3ab02"
+          },
+          "name": "test",
+          "run": "npm test",
+          "runtime": "local"
+        },
+        {
+          "artifacts": [
+            "typecheck-results.txt"
+          ],
+          "env": {
+            "PR_BRANCH": "copilot/extract-output-formatters",
+            "PR_NUMBER": "188",
+            "PR_SHA": "031bad131f0f5337a604980b9428bd97ecf3ab02"
+          },
+          "name": "typecheck",
+          "run": "npm run typecheck",
+          "runtime": "local"
+        }
+      ],
+      "name": "PR-188"
     }
   ],
   "policy": {

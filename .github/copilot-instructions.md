@@ -58,6 +58,289 @@ When user requests merge-weave on "all open PRs":
 5. Push changes to remote
 6. **NEVER** stop to ask questions - complete the full workflow
 
+## File Editing Rules (MANDATORY)
+
+> **⚠️ SELF-CHECK BEFORE EVERY FILE EDIT:**
+> - [ ] Am I about to use `sed`, `awk`, `perl`, or shell redirection?
+> - [ ] If YES → STOP. Use `replace_string_in_file` instead.
+> - [ ] If NO → Verify I'm using the correct editing tool.
+
+**Core Principle: ALWAYS use the provided editing tools. NEVER use shell commands to edit files unless explicitly requested.**
+
+### Available Editing Tools (USE THESE)
+
+1. **`replace_string_in_file`** - Primary editing tool
+   - Use for ALL file modifications
+   - Include 3-5 lines of context before/after the change
+   - MUST provide exact literal strings (no placeholders, no `...existing code...`)
+
+2. **`read_file`** - Context gathering
+   - Use BEFORE editing to understand the file
+   - Read large meaningful chunks (50-100 lines)
+   - Prefer one large read over many small reads
+
+3. **`create_file`** - New file creation
+   - Use for new files only
+   - Never use for editing existing files
+
+4. **`get_errors`** - Validation
+   - Use AFTER editing to verify correctness
+   - Check TypeScript, lint, and syntax errors
+
+### FORBIDDEN Editing Approaches
+
+❌ **NEVER use these for file editing:**
+- `sed -i` or any sed command
+- `awk` for in-place modification
+- `perl -pi -e`
+- `echo "..." > file` or `cat > file`
+- `git checkout --ours/--theirs` followed by manual edits
+- Heredocs (`cat << EOF`) to write code
+- `vim`, `nano`, or editor commands in terminal
+
+### Conflict Resolution Protocol
+
+When encountering git merge conflicts:
+
+**❌ WRONG Approach:**
+```bash
+git checkout --theirs src/file.ts
+sed -i 's/pattern/replacement/g' src/file.ts
+git add src/file.ts
+```
+
+**✅ CORRECT Approach:**
+```typescript
+// Step 1: Read the conflict
+read_file({ filePath: "/path/to/file.ts", startLine: 1, endLine: 200 })
+
+// Step 2: Resolve with replace_string_in_file
+replace_string_in_file({
+  filePath: "/path/to/file.ts",
+  oldString: `import { initColorControl } from "./util/colorControl.js";
+<<<<<<< HEAD
+import { writeJsonOutput } from "./cli/output.js";
+import { exitHandler } from "./cli/exitHandler.js";
+||||||| parent
+=======
+import { parseGlobalFlags } from "./cli/flags.js";
+>>>>>>> branch
+import * as fs from "fs";`,
+  newString: `import { initColorControl } from "./util/colorControl.js";
+import { parseGlobalFlags } from "./cli/flags.js";
+import { writeJsonOutput } from "./cli/output.js";
+import { exitHandler } from "./cli/exitHandler.js";
+import * as fs from "fs";`
+})
+
+// Step 3: Verify
+get_errors({ filePaths: ["/path/to/file.ts"] })
+```
+
+### When Shell Commands ARE Appropriate
+
+✅ **Allowed shell command usage:**
+- Git operations: `git fetch`, `git merge`, `git commit`, `git push`
+- Build commands: `npm run build`, `npm test`, `npm run lint`
+- File inspection: `cat`, `head`, `tail`, `wc`, `ls`, `find`
+- Search: `grep`, `git diff`, `git log`
+- Directory operations: `mkdir`, `cp`, `mv`, `rm` (files/dirs, not editing)
+
+❌ **NOT allowed:**
+- Any command that modifies file CONTENTS
+- Text processing that results in file changes
+
+### Compliance Checklist
+
+Before using a terminal command to modify a file, ask:
+1. ❓ Is this editing file contents? → Use `replace_string_in_file`
+2. ❓ Am I creating a new file? → Use `create_file`
+3. ❓ Am I reading a file? → Use `read_file`
+4. ❓ Did the user EXPLICITLY ask for a shell command? → Only then proceed
+
+**Violation of these rules is considered a critical error and may result in:**
+- Rejected changes requiring complete rework
+- Loss of Copilot context/trust
+- Need to manually verify all edits
+- Potential file corruption requiring git reset
+
+**When in doubt:** Always choose editing tools over shell commands.
+
+### Common lex-pr-runner Editing Scenarios
+
+**Scenario 1: Merge conflict in src/cli.ts (imports)**
+```typescript
+// ❌ WRONG
+git checkout --theirs src/cli.ts
+sed -i '/import { initColorControl/a import { newModule } from "./new.js";' src/cli.ts
+
+// ✅ CORRECT
+read_file({ filePath: "src/cli.ts", startLine: 1, endLine: 50 })
+replace_string_in_file({
+  filePath: "src/cli.ts",
+  oldString: `import { initColorControl } from "./util/colorControl.js";
+<<<<<<< HEAD
+import { writeJsonOutput } from "./cli/output.js";
+=======
+import { parseGlobalFlags } from "./cli/flags.js";
+>>>>>>> branch`,
+  newString: `import { initColorControl } from "./util/colorControl.js";
+import { parseGlobalFlags } from "./cli/flags.js";
+import { writeJsonOutput } from "./cli/output.js";`
+})
+get_errors({ filePaths: ["src/cli.ts"] })
+```
+
+**Scenario 2: Update schema version in plan.json**
+```typescript
+// ❌ WRONG
+sed -i 's/"schemaVersion": "1.0.0"/"schemaVersion": "1.1.0"/' plan.json
+
+// ✅ CORRECT
+read_file({ filePath: "plan.json", startLine: 1, endLine: 20 })
+replace_string_in_file({
+  filePath: "plan.json",
+  oldString: `{
+  "schemaVersion": "1.0.0",
+  "items": [`,
+  newString: `{
+  "schemaVersion": "1.1.0",
+  "items": [`
+})
+```
+
+**Scenario 3: Add gate to existing plan item**
+```typescript
+// ❌ WRONG
+echo '{"name": "e2e", "run": "npm run e2e"}' >> temp &&
+cat temp | jq '.items[0].gates += [input]' plan.json
+
+// ✅ CORRECT
+read_file({ filePath: "plan.json", startLine: 1, endLine: 100 })
+replace_string_in_file({
+  filePath: "plan.json",
+  oldString: `      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        }
+      ]`,
+  newString: `      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "e2e",
+          "run": "npm run e2e"
+        }
+      ]`
+})
+```
+
+### Post-Conflict Validation (Required)
+
+After resolving any merge conflict with `replace_string_in_file`:
+
+1. **Check syntax:** `get_errors({ filePaths: ["<resolved-file>"] })`
+2. **Verify imports:** Ensure all modules are properly imported
+3. **Test build:** Run `npm run build` to catch integration issues
+4. **Type check:** Run `npm run typecheck` for TypeScript files
+5. **Document resolution:** Note which files had conflicts in commit message
+
+**Example commit message:**
+```
+Merge PR-XXX: Feature description
+
+Resolved conflicts:
+- src/cli.ts: Combined imports from output, exitHandler, and flags modules
+- Used writeJsonOutput with jsonModeActive flag
+
+Files touched: src/cli.ts
+```
+
+### Known Anti-Patterns (Learn from Past Violations)
+
+**Case Study: Merge-Weave Conflict Resolution (2025-10-13)**
+
+**Context:** Merging 4 CLI modularization PRs with overlapping changes in `src/cli.ts`
+
+❌ **What was done WRONG:**
+```bash
+# Violation 1: Used git checkout to blindly accept one side
+git checkout --theirs src/cli.ts
+
+# Violation 2: Used sed to add imports
+sed -i '/import { parseGlobalFlags/a import { \n\tCLIExitSignal...' src/cli.ts
+
+# Violation 3: Used sed with regex for bulk replacements
+sed -i 's/console\.log(canonicalJSONStringify(\(.*\)));/writeJsonOutput(\1);/g' src/cli.ts
+
+# Violation 4: Created shell script with heredocs
+cat > /tmp/resolve.sh << 'EOF'
+git checkout --theirs src/cli.ts
+sed -i '...'
+EOF
+```
+
+**Problems:**
+- Non-deterministic: sed regex could match unintended code
+- No validation: No immediate feedback if edits succeeded
+- Hard to debug: Shell escaping and quoting made errors opaque
+- Not auditable: Changes not visible in tool logs
+
+✅ **What SHOULD have been done:**
+```typescript
+// Step 1: Read the full conflict context
+read_file({ filePath: "src/cli.ts", startLine: 1, endLine: 100 })
+
+// Step 2: Resolve EACH conflict block precisely
+replace_string_in_file({
+  filePath: "src/cli.ts",
+  oldString: `import { initColorControl } from "./util/colorControl.js";
+<<<<<<< HEAD
+import { writeJsonOutput } from "./cli/output.js";
+import {
+      CLIExitSignal,
+      throwExit,
+      installSignalHandlers,
+      installUnhandledRejectionHandler
+} from "./cli/exitHandler.js";
+||||||| parent
+=======
+import { parseGlobalFlags } from "./cli/flags.js";
+>>>>>>> branch
+import * as fs from "fs";`,
+  newString: `import { initColorControl } from "./util/colorControl.js";
+import { parseGlobalFlags } from "./cli/flags.js";
+import { writeJsonOutput } from "./cli/output.js";
+import {
+      CLIExitSignal,
+      throwExit,
+      installSignalHandlers,
+      installUnhandledRejectionHandler
+} from "./cli/exitHandler.js";
+import * as fs from "fs";`
+})
+
+// Step 3: Verify TypeScript validity
+get_errors({ filePaths: ["src/cli.ts"] })
+
+// Step 4: Repeat for each remaining conflict block
+```
+
+**Impact of violations:** 2 hours debugging, non-deterministic results, violated documented guidelines
+
+**Lesson:** Shell commands feel faster but create technical debt. Tool-based edits are deterministic and auditable.
+
+### Related Documentation
+
+These file editing rules align with and extend the principles in:
+- [`AGENTS.md`](../AGENTS.md) - Overall agent operating principles
+- [`docs/TERMS.md`](../docs/TERMS.md) - Canonical terminology
+
+**Violation of these rules is considered a critical error.**
+
 ## Directory quick map
 - `src/` – core library & CLI.
 - `schema/` – generated schemas kept in sync with source (CI verifies).
