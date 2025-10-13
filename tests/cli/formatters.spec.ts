@@ -9,6 +9,7 @@ import {
 	formatFileSize,
 	formatCSV,
 	formatQueryResult,
+	pluralize,
 	type TreeNode,
 	type MarkdownSection
 } from '../../src/cli/formatters.js';
@@ -37,6 +38,30 @@ describe('CLI Formatters', () => {
 
 		it('should return ? for unknown status', () => {
 			expect(getStatusIcon('unknown')).toBe('?');
+		});
+	});
+
+	describe('pluralize', () => {
+		it('should return singular for count of 1', () => {
+			expect(pluralize(1, 'node')).toBe('node');
+			expect(pluralize(1, 'item')).toBe('item');
+		});
+
+		it('should return plural for count > 1', () => {
+			expect(pluralize(2, 'node')).toBe('nodes');
+			expect(pluralize(5, 'item')).toBe('items');
+			expect(pluralize(0, 'node')).toBe('nodes'); // 0 is plural
+		});
+
+		it('should use custom plural form if provided', () => {
+			expect(pluralize(1, 'child', 'children')).toBe('child');
+			expect(pluralize(2, 'child', 'children')).toBe('children');
+			expect(pluralize(3, 'person', 'people')).toBe('people');
+		});
+
+		it('should handle edge cases', () => {
+			expect(pluralize(0, 'node')).toBe('nodes');
+			expect(pluralize(-1, 'node')).toBe('nodes');
 		});
 	});
 
