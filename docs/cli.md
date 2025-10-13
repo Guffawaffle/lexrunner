@@ -247,6 +247,7 @@ Options:
   --query <query>           GitHub search query (e.g., 'is:open label:stack:*')
   --labels <labels>         Filter PRs by comma-separated labels
   --include-drafts          Include draft PRs in the plan
+  --exclude-prs <numbers>   Exclude specific PRs by comma-separated PR numbers
   --github-token <token>    GitHub API token (or use GITHUB_TOKEN env var)
   --owner <owner>           GitHub repository owner (auto-detected from git remote)
   --repo <repo>             GitHub repository name (auto-detected from git remote)
@@ -276,6 +277,9 @@ lex-pr plan --from-github --query "is:open label:stack:feature"
 
 # Filter by specific labels
 lex-pr plan --from-github --labels "enhancement,feature"
+
+# Exclude specific PRs from the plan
+lex-pr plan --from-github --exclude-prs 154,155
 
 # Include draft PRs
 lex-pr plan --from-github --include-drafts
