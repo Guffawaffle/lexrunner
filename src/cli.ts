@@ -24,7 +24,11 @@ import { WriteProtectionError, resolveProfile, validateWriteOperation } from "./
 import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescription, AutopilotLevel } from "./autopilot/index.js";
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
+import { registerStatusCommand } from "./commands/status.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerCompletionCommand } from "./commands/completion.js";
+import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
+import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -668,79 +672,14 @@ program
 		}
 	});
 
-// Plan diff command - Compare two plans
-program
-	.command("plan-diff")
-	.description("Compare two plans and show differences")
-	.argument("<plan1>", "First plan file")
-	.argument("<plan2>", "Second plan file")
-	.option("--json", "Output JSON format")
-	.action(async (plan1Path: string, plan2Path: string, opts) => {
-		try {
-			const plan1Content = fs.readFileSync(plan1Path, "utf-8");
-			const plan2Content = fs.readFileSync(plan2Path, "utf-8");
+// Merge order command - modular implementation
+registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
 
-			const plan1 = loadPlan(plan1Content);
-			const plan2 = loadPlan(plan2Content);
-
-			// Import diff utilities
-			const { comparePlans, formatPlanDiff } = await import("./interactive/planDiff.js");
-
-			const diff = comparePlans(plan1, plan2);
-
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput(diff);
-			} else {
-				console.log('\n📊 Plan Comparison\n');
-				console.log(`Plan 1: ${plan1Path}`);
-				console.log(`Plan 2: ${plan2Path}\n`);
-				console.log(formatPlanDiff(diff));
-			}
-
-			throwExit(diff.hasChanges ? 1 : 0);
-		} catch (error) {
-			exitWith(error);
-		}
-	});
-
-// Merge order command
-program
-	.command("merge-order")
-	.description("Compute dependency levels and merge order")
-	.option("--plan <file>", "Path to plan.json file")
-	.argument("[file]", "Path to plan.json file (alternative to --plan)")
-	.option("--json", "Output JSON format")
-	.action((file: string | undefined, opts) => {
-		const planFile = opts.plan || file;
-		if (!planFile) {
-			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			throwExit(1);
-		}
-
-		try {
-			const planContent = fs.readFileSync(planFile, "utf-8");
-			const plan = loadPlan(planContent);
-			const levels = computeMergeOrder(plan);
-
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput({ levels });
-			} else {
-				console.log(`Merge order for ${plan.items.length} items:`);
-				levels.forEach((level: string[], index: number) => {
-					console.log(`Level ${index + 1}: [${level.join(', ')}]`);
-				});
-			}
-			return;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput({ error: message });
-			} else {
-				console.error(`Error computing merge order: ${message}`);
-			}
-			exitWith(error);
-		}
-	});
+// Plan diff command - modular implementation
+registerPlanDiffCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith
+});
 
 // Autopilot command
 program
@@ -985,54 +924,8 @@ program
 		}
 	});
 
-// Status command
-program
-	.command("status")
-	.description("Show current execution status and merge eligibility")
-	.option("--plan <file>", "Path to plan.json file", "plan.json")
-	.argument("[file]", "Path to plan.json file (alternative to --plan)")
-	.option("--json", "Output JSON format")
-	.action((file: string | undefined, opts) => {
-		const planFile = opts.plan || file || "plan.json";
-
-		try {
-			const planContent = fs.readFileSync(planFile, "utf-8");
-			const plan = loadPlan(planContent);
-
-			// For now, show plan structure and policy
-			// In a full implementation, this would load execution state from artifacts
-			const executionState = new ExecutionState(plan);
-			const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-			const mergeSummary = evaluator.getMergeSummary();
-
-			if (opts.json || jsonModeActive) {
-				console.log(canonicalJSONStringify({
-					plan: {
-						schemaVersion: plan.schemaVersion,
-						target: plan.target,
-						itemCount: plan.items.length,
-						policy: plan.policy
-					},
-					mergeSummary
-				}));
-			} else {
-				console.log(`Plan: ${plan.items.length} items targeting ${plan.target}`);
-				console.log(`Schema version: ${plan.schemaVersion}`);
-				if (plan.policy) {
-					console.log(`Policy: ${plan.policy.maxWorkers} max workers, merge rule: ${plan.policy.mergeRule.type}`);
-				}
-				console.log(`Status: ${mergeSummary.eligible.length} eligible, ${mergeSummary.pending.length} pending, ${mergeSummary.failed.length} failed`);
-			}
-		} catch (error) {
-			console.error(`Error getting status: ${error instanceof Error ? error.message : String(error)}`);
-			// Use exit code 2 for validation errors, 1 for others
-			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
-				throwExit(2);
-			} else {
-				throwExit(1);
-			}
-		}
-	});
+// Status command - modularized in Phase 2.5
+registerStatusCommand(program, () => jsonModeActive);
 
 // Report command
 program
@@ -2145,37 +2038,7 @@ program
 	});
 
 // Completion command
-program
-	.command("completion")
-	.description("Generate shell completion scripts")
-	.argument("[shell]", "Shell type: bash, zsh", "bash")
-	.option("--install", "Show installation instructions")
-	.action(async (shell: string, opts) => {
-		try {
-			const { CompletionGenerator } = await import("./commands/completion.js");
-			const generator = new CompletionGenerator("lex-pr");
-
-			if (opts.install) {
-				console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
-				return;
-			}
-
-			let script = "";
-			if (shell === "zsh") {
-				script = generator.generateZsh();
-			} else if (shell === "bash") {
-				script = generator.generateBash();
-			} else {
-				console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
-				throwExit(1);
-			}
-
-			console.log(script);
-			return;
-		} catch (error) {
-			exitWith(error);
-		}
-	});
+registerCompletionCommand(program, throwExit, exitWith);
 
 // Security operations command
 // Register security subcommands once (modular implementation)
