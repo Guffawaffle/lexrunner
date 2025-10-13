@@ -11,6 +11,7 @@ import { createFileAnalyzer, FileAnalysisResult } from "../planner/index.js";
 export interface GitHubPlanOptions {
 	query?: string; // GitHub search query
 	labels?: string[]; // Filter by specific labels
+	excludePRs?: number[]; // Exclude specific PR numbers
 	includeDrafts?: boolean; // Include draft PRs
 	target?: string; // Target branch (defaults to repo default)
 	policy?: {
@@ -42,7 +43,13 @@ export async function generatePlanFromGitHub(
 	const includeDrafts = options.includeDrafts === undefined ? true : Boolean(options.includeDrafts);
 	const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
 
-	if (filteredPRs.length === 0) {
+	// Exclude specific PRs if requested
+	const excludePRs = options.excludePRs || [];
+	const finalPRs = excludePRs.length > 0
+		? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
+		: filteredPRs;
+
+	if (finalPRs.length === 0) {
 		// Return empty plan if no PRs found
 		const emptyPlan: Plan = {
 			schemaVersion: "1.0.0",
@@ -68,7 +75,7 @@ export async function generatePlanFromGitHub(
 
 	// Get detailed information for each PR
 	const prDetails = await Promise.all(
-		filteredPRs.map(pr => client.getPRDetails(pr.number))
+		finalPRs.map(pr => client.getPRDetails(pr.number))
 	);
 
 	// Transform PRs to plan items

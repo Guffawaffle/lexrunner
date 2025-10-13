@@ -350,6 +350,281 @@ describe("GitHub Integration", () => {
 
 			expect(plan.items).toHaveLength(0);
 		});
+
+		it("should exclude specific PRs when excludePRs is provided", async () => {
+			const mockClient = {
+				validateRepository: vi.fn().mockResolvedValue({
+					owner: "testowner",
+					repo: "testrepo",
+					defaultBranch: "main",
+					url: "https://github.com/testowner/testrepo"
+				}),
+				listOpenPRs: vi.fn().mockResolvedValue([
+					{
+						number: 123,
+						title: "Feature A",
+						body: "Base feature",
+						head: { ref: "feature-a", sha: "abc123" },
+						base: { ref: "main", sha: "def456" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev1" },
+						createdAt: "2023-01-01T00:00:00Z",
+						updatedAt: "2023-01-02T00:00:00Z"
+					},
+					{
+						number: 154,
+						title: "Integration PR",
+						body: "Integration branch",
+						head: { ref: "integration", sha: "int123" },
+						base: { ref: "main", sha: "def456" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev2" },
+						createdAt: "2023-01-02T00:00:00Z",
+						updatedAt: "2023-01-03T00:00:00Z"
+					},
+					{
+						number: 456,
+						title: "Feature B",
+						body: "Another feature",
+						head: { ref: "feature-b", sha: "def789" },
+						base: { ref: "main", sha: "def456" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev3" },
+						createdAt: "2023-01-04T00:00:00Z",
+						updatedAt: "2023-01-05T00:00:00Z"
+					}
+				]),
+				getPRDetails: vi.fn()
+			};
+
+			// Mock PR details for non-excluded PRs only
+			mockClient.getPRDetails
+				.mockResolvedValueOnce({
+					number: 123,
+					title: "Feature A",
+					body: "Base feature",
+					head: { ref: "feature-a", sha: "abc123" },
+					base: { ref: "main", sha: "def456" },
+					state: "open",
+					labels: [],
+					draft: false,
+					mergeable: true,
+					user: { login: "dev1" },
+					createdAt: "2023-01-01T00:00:00Z",
+					updatedAt: "2023-01-02T00:00:00Z",
+					dependencies: [],
+					tags: [],
+					requiredGates: []
+				})
+				.mockResolvedValueOnce({
+					number: 456,
+					title: "Feature B",
+					body: "Another feature",
+					head: { ref: "feature-b", sha: "def789" },
+					base: { ref: "main", sha: "def456" },
+					state: "open",
+					labels: [],
+					draft: false,
+					mergeable: true,
+					user: { login: "dev3" },
+					createdAt: "2023-01-04T00:00:00Z",
+					updatedAt: "2023-01-05T00:00:00Z",
+					dependencies: [],
+					tags: [],
+					requiredGates: []
+				});
+
+			const plan = await generatePlanFromGitHub(mockClient as any, {
+				excludePRs: [154],
+				policy: {
+					requiredGates: ["lint", "test"],
+					maxWorkers: 2
+				}
+			});
+
+			expect(plan.items).toHaveLength(2);
+			expect(plan.items[0].name).toBe("PR-123");
+			expect(plan.items[1].name).toBe("PR-456");
+			// Verify PR-154 is not in the plan
+			expect(plan.items.find(item => item.name === "PR-154")).toBeUndefined();
+		});
+
+		it("should exclude multiple PRs when excludePRs contains multiple numbers", async () => {
+			const mockClient = {
+				validateRepository: vi.fn().mockResolvedValue({
+					owner: "testowner",
+					repo: "testrepo",
+					defaultBranch: "main",
+					url: "https://github.com/testowner/testrepo"
+				}),
+				listOpenPRs: vi.fn().mockResolvedValue([
+					{
+						number: 100,
+						title: "PR 100",
+						body: "Feature",
+						head: { ref: "pr-100", sha: "sha100" },
+						base: { ref: "main", sha: "mainsha" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev1" },
+						createdAt: "2023-01-01T00:00:00Z",
+						updatedAt: "2023-01-02T00:00:00Z"
+					},
+					{
+						number: 101,
+						title: "PR 101",
+						body: "Feature",
+						head: { ref: "pr-101", sha: "sha101" },
+						base: { ref: "main", sha: "mainsha" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev2" },
+						createdAt: "2023-01-02T00:00:00Z",
+						updatedAt: "2023-01-03T00:00:00Z"
+					},
+					{
+						number: 102,
+						title: "PR 102",
+						body: "Feature",
+						head: { ref: "pr-102", sha: "sha102" },
+						base: { ref: "main", sha: "mainsha" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev3" },
+						createdAt: "2023-01-03T00:00:00Z",
+						updatedAt: "2023-01-04T00:00:00Z"
+					},
+					{
+						number: 103,
+						title: "PR 103",
+						body: "Feature",
+						head: { ref: "pr-103", sha: "sha103" },
+						base: { ref: "main", sha: "mainsha" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev4" },
+						createdAt: "2023-01-04T00:00:00Z",
+						updatedAt: "2023-01-05T00:00:00Z"
+					}
+				]),
+				getPRDetails: vi.fn()
+			};
+
+			// Mock PR details for non-excluded PRs only (100 and 102)
+			mockClient.getPRDetails
+				.mockResolvedValueOnce({
+					number: 100,
+					title: "PR 100",
+					body: "Feature",
+					head: { ref: "pr-100", sha: "sha100" },
+					base: { ref: "main", sha: "mainsha" },
+					state: "open",
+					labels: [],
+					draft: false,
+					mergeable: true,
+					user: { login: "dev1" },
+					createdAt: "2023-01-01T00:00:00Z",
+					updatedAt: "2023-01-02T00:00:00Z",
+					dependencies: [],
+					tags: [],
+					requiredGates: []
+				})
+				.mockResolvedValueOnce({
+					number: 102,
+					title: "PR 102",
+					body: "Feature",
+					head: { ref: "pr-102", sha: "sha102" },
+					base: { ref: "main", sha: "mainsha" },
+					state: "open",
+					labels: [],
+					draft: false,
+					mergeable: true,
+					user: { login: "dev3" },
+					createdAt: "2023-01-03T00:00:00Z",
+					updatedAt: "2023-01-04T00:00:00Z",
+					dependencies: [],
+					tags: [],
+					requiredGates: []
+				});
+
+			const plan = await generatePlanFromGitHub(mockClient as any, {
+				excludePRs: [101, 103]
+			});
+
+			expect(plan.items).toHaveLength(2);
+			expect(plan.items[0].name).toBe("PR-100");
+			expect(plan.items[1].name).toBe("PR-102");
+			expect(plan.items.find(item => item.name === "PR-101")).toBeUndefined();
+			expect(plan.items.find(item => item.name === "PR-103")).toBeUndefined();
+		});
+
+		it("should handle excludePRs with empty array", async () => {
+			const mockClient = {
+				validateRepository: vi.fn().mockResolvedValue({
+					owner: "testowner",
+					repo: "testrepo",
+					defaultBranch: "main",
+					url: "https://github.com/testowner/testrepo"
+				}),
+				listOpenPRs: vi.fn().mockResolvedValue([
+					{
+						number: 123,
+						title: "Feature A",
+						body: "Base feature",
+						head: { ref: "feature-a", sha: "abc123" },
+						base: { ref: "main", sha: "def456" },
+						state: "open",
+						labels: [],
+						draft: false,
+						mergeable: true,
+						user: { login: "dev1" },
+						createdAt: "2023-01-01T00:00:00Z",
+						updatedAt: "2023-01-02T00:00:00Z"
+					}
+				]),
+				getPRDetails: vi.fn().mockResolvedValue({
+					number: 123,
+					title: "Feature A",
+					body: "Base feature",
+					head: { ref: "feature-a", sha: "abc123" },
+					base: { ref: "main", sha: "def456" },
+					state: "open",
+					labels: [],
+					draft: false,
+					mergeable: true,
+					user: { login: "dev1" },
+					createdAt: "2023-01-01T00:00:00Z",
+					updatedAt: "2023-01-02T00:00:00Z",
+					dependencies: [],
+					tags: [],
+					requiredGates: []
+				})
+			};
+
+			const plan = await generatePlanFromGitHub(mockClient as any, {
+				excludePRs: []
+			});
+
+			expect(plan.items).toHaveLength(1);
+			expect(plan.items[0].name).toBe("PR-123");
+		});
 	});
 
 	describe("GitHub Plan with File Analysis", () => {
