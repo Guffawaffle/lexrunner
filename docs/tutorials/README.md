@@ -2,6 +2,15 @@
 
 This directory contains scripts and resources for creating video tutorials about lex-pr-runner.
 
+## Quick Start Tutorial
+
+**[Quick Merge Pyramid](./quick-merge-pyramid.md)** (10 minutes) - Complete hands-on tutorial
+- Discover → Plan → Execute → Merge workflow
+- Dependency management and merge order
+- Gate execution and verification
+- Common patterns and best practices
+- **Start here** for a practical introduction to lex-pr-runner!
+
 ## Available Scripts
 
 1. **[Getting Started](./01-getting-started.md)** (5 minutes)

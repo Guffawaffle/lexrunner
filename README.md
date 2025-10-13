@@ -146,6 +146,7 @@ See the full documentation index: [docs/README.md](docs/README.md)
 
 Quick links:
 - **Getting Started**: docs/quickstart.md — 5-minute onboarding
+- **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
