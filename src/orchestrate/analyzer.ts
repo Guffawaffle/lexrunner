@@ -112,6 +112,8 @@ export class IssueAnalyzer {
 		// Depends-on: #123, #456
 		// Depends: #123
 		// Requires: #123
+		// Blocks: #789
+		// Blocked by: #456
 		const patterns = [
 			/(?:Depends-on|Depends|Requires):\s*#(\d+)/gi,
 			/(?:Blocks|Blocked by):\s*#(\d+)/gi
