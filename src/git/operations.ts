@@ -7,6 +7,7 @@ import { simpleGit, SimpleGit, MergeResult as GitMergeResult } from "simple-git"
 import { Plan, PlanItem } from "../schema.js";
 import { metrics, METRICS } from "../monitoring/metrics.js";
 import { profiler } from "../monitoring/profiler.js";
+import { ProgressReporter } from "../util/progress.js";
 
 export interface MergeOperation {
 	item: PlanItem;
@@ -197,7 +198,7 @@ export class GitOperations {
 	/**
 	 * Execute merge pyramid with dependency ordering
 	 */
-	async executeWeave(plan: Plan, levels: string[][]): Promise<WeaveExecutionResult> {
+	async executeWeave(plan: Plan, levels: string[][], progressReporter?: ProgressReporter): Promise<WeaveExecutionResult> {
 		const results: WeaveResult[] = [];
 		let successful = 0;
 		let failed = 0;
@@ -210,7 +211,14 @@ export class GitOperations {
 
 			// Process each level in dependency order
 			for (const [levelIndex, level] of levels.entries()) {
-				console.log(`Processing level ${levelIndex + 1}: [${level.join(', ')}]`);
+				const levelNum = levelIndex + 1;
+				
+				// Report level start
+				if (progressReporter) {
+					progressReporter.levelStart(levelNum, level);
+				} else {
+					console.log(`Processing level ${levelNum}: [${level.join(', ')}]`);
+				}
 
 				// Process items in parallel within each level
 				const levelPromises = level.map(async (itemName) => {
@@ -248,10 +256,15 @@ export class GitOperations {
 					}
 				}
 
+				// Report level completion
+				if (progressReporter) {
+					progressReporter.levelComplete(levelNum);
+				}
+
 				// Stop if any item in this level failed (dependency-aware execution)
 				const levelFailed = levelResults.some(result => !result.success);
 				if (levelFailed) {
-					console.log(`Level ${levelIndex + 1} failed, stopping execution`);
+					console.log(`Level ${levelNum} failed, stopping execution`);
 					break;
 				}
 			}

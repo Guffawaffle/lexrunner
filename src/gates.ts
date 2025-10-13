@@ -10,6 +10,7 @@ import { parseSarif } from "./security/sarif.js";
 import { SecurityScanResult, DEFAULT_SECURITY_POLICY, SecurityPolicy, NpmAuditScanner } from "./security/scanning.js";
 import { FlakeReport, AttemptRecord } from "./schema/flakeReport.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
+import { ProgressReporter } from "./util/progress.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -534,7 +535,8 @@ export async function executeGatesWithPolicy(
 	plan: Plan,
 	executionState: ExecutionState,
 	artifactDir: string,
-	timeoutMs: number = 30000
+	timeoutMs: number = 30000,
+	progressReporter?: ProgressReporter
 ): Promise<void> {
 	const policy = plan.policy || {
 		requiredGates: [],
@@ -589,6 +591,11 @@ export async function executeGatesWithPolicy(
 			// Update active workers metric
 			metrics.setGauge(METRICS.ACTIVE_WORKERS, executing.size);
 
+			// Report node start progress
+			if (progressReporter) {
+				progressReporter.nodeStart(node);
+			}
+
 			const item = plan.items.find(i => i.name === node)!;
 			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs)
 				.then(() => {
@@ -596,12 +603,22 @@ export async function executeGatesWithPolicy(
 					completedNodes.add(node);
 					metrics.setGauge(METRICS.ACTIVE_WORKERS, executing.size);
 					executionState.propagateBlockedStatus();
+
+					// Report node completion progress
+					if (progressReporter) {
+						progressReporter.nodeComplete(node, true);
+					}
 				})
 				.catch((error) => {
 					console.error(`Error executing gates for ${node}:`, error);
 					executing.delete(node);
 					completedNodes.add(node);
 					metrics.setGauge(METRICS.ACTIVE_WORKERS, executing.size);
+
+					// Report node completion progress
+					if (progressReporter) {
+						progressReporter.nodeComplete(node, false);
+					}
 				});
 
 			promises.push(promise);
