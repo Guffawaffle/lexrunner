@@ -1146,7 +1146,7 @@ import { canonicalJSONStringify } from "./util/canonicalJson.js";
 process.stdout.write(canonicalJSONStringify(data));
 ```
 
-**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location. Use `.js` extension in imports even for TypeScript source files.
+**Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location. Use `.js` extension in imports even for TypeScript source files (required for ES modules - TypeScript doesn't rewrite extensions).
 
 **Why**: Ensures deterministic output:
 - Keys sorted alphabetically at all levels
