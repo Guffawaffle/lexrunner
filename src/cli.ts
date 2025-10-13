@@ -2040,13 +2040,6 @@ program
 // Completion command
 registerCompletionCommand(program, throwExit, exitWith);
 
-// Plan diff command
-// Register plan-diff command (modular implementation)
-registerPlanDiffCommand(program, {
-	jsonModeActive: () => jsonModeActive,
-	exitWith
-});
-
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
