@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createMinimalWorkspace, detectProjectType, bootstrapWorkspace } from '../core/bootstrap.js';
-import { WriteProtectionError, resolveProfile } from '../config/profileResolver.js';
+import { WriteProtectionError, resolveProfile, logProfileMessage } from '../config/profileResolver.js';
 import { createGitHubClient, GitHubAuthError } from '../github/client.js';
 
 interface InitOptions {
@@ -47,7 +47,7 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 		if (fs.existsSync(trackedExample)) {
 			// Use .smartergpt.local for local development
 			profileDir = path.join(baseDir, '.smartergpt.local');
-			console.log(`📁 Found tracked example profile, using .smartergpt.local for your workspace`);
+			logProfileMessage('Found tracked example profile, using .smartergpt.local for your workspace');
 		} else {
 			// Use .smartergpt.local by default for new setups
 			profileDir = path.join(baseDir, '.smartergpt.local');

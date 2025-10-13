@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { resolveProfile, ProfileResolverError } from '../src/config/profileResolver.js';
+import { resolveProfile, ProfileResolverError, logProfileMessage } from '../src/config/profileResolver.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -255,7 +255,7 @@ describe('Profile Resolver', () => {
 			resolveProfile(profileDir, tempDir);
 
 			expect(consoleSpy).toHaveBeenCalledWith(
-				`lex-pr-runner using profile: ${profileDir} (role: test-role)`
+				`lex-pr-runner profile: using profile: ${profileDir} (role: test-role)`
 			);
 		});
 
@@ -266,7 +266,7 @@ describe('Profile Resolver', () => {
 			resolveProfile(undefined, tempDir);
 
 			expect(consoleSpy).toHaveBeenCalledWith(
-				`lex-pr-runner using profile: ${trackedDir} (role: example)`
+				`lex-pr-runner profile: using profile: ${trackedDir} (role: example)`
 			);
 		});
 
@@ -281,6 +281,22 @@ describe('Profile Resolver', () => {
 			resolveProfile(profileDir, tempDir);
 
 			expect(consoleSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it('should use consistent stderr prefix format', () => {
+			const profileDir = path.join(tempDir, 'profile');
+			fs.mkdirSync(profileDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(profileDir, 'profile.yml'),
+				'role: test-prefix'
+			);
+
+			resolveProfile(profileDir, tempDir);
+
+			// Verify the message starts with the expected prefix
+			const calls = consoleSpy.mock.calls;
+			expect(calls.length).toBe(1);
+			expect(calls[0][0]).toMatch(/^lex-pr-runner profile: /);
 		});
 	});
 
@@ -306,6 +322,25 @@ describe('Profile Resolver', () => {
 			expect(() => resolveProfile(customDir, tempDir)).toThrow(
 				/from --profile-dir/
 			);
+		});
+	});
+
+	describe('Profile Message Helper', () => {
+		it('should log messages with consistent prefix to stderr', () => {
+			logProfileMessage('test message');
+
+			expect(consoleSpy).toHaveBeenCalledWith('lex-pr-runner profile: test message');
+		});
+
+		it('should write to stderr not stdout', () => {
+			const stdoutSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			
+			logProfileMessage('stderr test');
+
+			expect(consoleSpy).toHaveBeenCalled();
+			expect(stdoutSpy).not.toHaveBeenCalled();
+			
+			stdoutSpy.mockRestore();
 		});
 	});
 });
