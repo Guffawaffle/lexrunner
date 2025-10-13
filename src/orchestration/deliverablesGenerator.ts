@@ -56,11 +56,13 @@ function generateGate0Preflight(plan: Plan, batchId: string): string {
 	lines.push("");
 	for (const [index, item] of plan.items.entries()) {
 		lines.push(`${index + 1}. **${item.name}**`);
-		if (item.issue) {
-			lines.push(`   - Issue: ${item.issue}`);
+		// Optional fields with type-safe access
+		const itemAny = item as any;
+		if (itemAny.issue) {
+			lines.push(`   - Issue: ${itemAny.issue}`);
 		}
-		if (item.branch) {
-			lines.push(`   - Branch: \`${item.branch}\``);
+		if (itemAny.branch) {
+			lines.push(`   - Branch: \`${itemAny.branch}\``);
 		}
 	}
 	lines.push("");
@@ -95,8 +97,10 @@ function generateGate1Assignment(plan: Plan, batchId: string): string {
 	for (const [index, item] of plan.items.entries()) {
 		lines.push(`${index + 1}. **${item.name}**`);
 		lines.push(`   - Status: Pending`);
-		if (item.assignee) {
-			lines.push(`   - Assignee: @${item.assignee}`);
+		// Optional field with type-safe access
+		const itemAny = item as any;
+		if (itemAny.assignee) {
+			lines.push(`   - Assignee: @${itemAny.assignee}`);
 		}
 		lines.push("");
 	}
@@ -214,8 +218,10 @@ function generateGate5Cleanup(plan: Plan, batchId: string): string {
 	lines.push("");
 	
 	for (const item of plan.items) {
-		if (item.branch) {
-			lines.push(`- [ ] Delete branch: \`${item.branch}\``);
+		// Optional field with type-safe access
+		const itemAny = item as any;
+		if (itemAny.branch) {
+			lines.push(`- [ ] Delete branch: \`${itemAny.branch}\``);
 		}
 	}
 	lines.push("");
@@ -223,8 +229,10 @@ function generateGate5Cleanup(plan: Plan, batchId: string): string {
 	lines.push("## PR Closure");
 	lines.push("");
 	for (const item of plan.items) {
-		if (item.issue) {
-			lines.push(`- [ ] Close PR: ${item.issue}`);
+		// Optional field with type-safe access
+		const itemAny = item as any;
+		if (itemAny.issue) {
+			lines.push(`- [ ] Close PR: ${itemAny.issue}`);
 		}
 	}
 	lines.push("");
@@ -263,11 +271,13 @@ function generateSummary(plan: Plan, batchId: string, planHash: string, toolchai
 	lines.push("");
 	for (const [index, item] of plan.items.entries()) {
 		lines.push(`${index + 1}. **${item.name}**`);
-		if (item.issue) {
-			lines.push(`   - Issue: ${item.issue}`);
+		// Optional fields with type-safe access
+		const itemAny = item as any;
+		if (itemAny.issue) {
+			lines.push(`   - Issue: ${itemAny.issue}`);
 		}
-		if (item.branch) {
-			lines.push(`   - Branch: \`${item.branch}\``);
+		if (itemAny.branch) {
+			lines.push(`   - Branch: \`${itemAny.branch}\``);
 		}
 		if (item.gates.length > 0) {
 			lines.push(`   - Gates: ${item.gates.map(g => g.name).join(", ")}`);
