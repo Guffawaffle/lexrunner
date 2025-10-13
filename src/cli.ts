@@ -25,6 +25,7 @@ import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescriptio
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerCompletionCommand } from "./commands/completion.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -2145,37 +2146,7 @@ program
 	});
 
 // Completion command
-program
-	.command("completion")
-	.description("Generate shell completion scripts")
-	.argument("[shell]", "Shell type: bash, zsh", "bash")
-	.option("--install", "Show installation instructions")
-	.action(async (shell: string, opts) => {
-		try {
-			const { CompletionGenerator } = await import("./commands/completion.js");
-			const generator = new CompletionGenerator("lex-pr");
-
-			if (opts.install) {
-				console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
-				return;
-			}
-
-			let script = "";
-			if (shell === "zsh") {
-				script = generator.generateZsh();
-			} else if (shell === "bash") {
-				script = generator.generateBash();
-			} else {
-				console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
-				throwExit(1);
-			}
-
-			console.log(script);
-			return;
-		} catch (error) {
-			exitWith(error);
-		}
-	});
+registerCompletionCommand(program, throwExit, exitWith);
 
 // Security operations command
 // Register security subcommands once (modular implementation)

@@ -2,6 +2,8 @@
  * Shell completion generation for bash and zsh
  */
 
+import { Command } from "commander";
+
 export interface CompletionScript {
 	shell: "bash" | "zsh";
 	script: string;
@@ -244,4 +246,44 @@ To install ${shell} completion:
    source ${rcFile}
 `;
 	}
+}
+
+/**
+ * Register the completion command with Commander program
+ */
+export function registerCompletionCommand(
+	program: Command,
+	throwExit: (code: number) => never,
+	exitWith: (error: unknown) => void
+): void {
+	program
+		.command("completion")
+		.description("Generate shell completion scripts")
+		.argument("[shell]", "Shell type: bash, zsh", "bash")
+		.option("--install", "Show installation instructions")
+		.action(async (shell: string, opts) => {
+			try {
+				const generator = new CompletionGenerator("lex-pr");
+
+				if (opts.install) {
+					console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
+					return;
+				}
+
+				let script = "";
+				if (shell === "zsh") {
+					script = generator.generateZsh();
+				} else if (shell === "bash") {
+					script = generator.generateBash();
+				} else {
+					console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
+					throwExit(1);
+				}
+
+				console.log(script);
+				return;
+			} catch (error) {
+				exitWith(error);
+			}
+		});
 }
