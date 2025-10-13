@@ -187,6 +187,29 @@ async function executeLocalGate(
 	startTime: number,
 	timeoutMs: number
 ): Promise<GateResult> {
+	// Validate command before execution (security check)
+	try {
+		const { getCommandValidator } = await import('./security/commandValidator.js');
+		const validator = getCommandValidator();
+		validator.validate(gate.run);
+	} catch (validationError) {
+		// Return failed gate result if validation fails
+		const duration = Date.now() - startTime;
+		const errorMessage = validationError instanceof Error ? validationError.message : String(validationError);
+		
+		return {
+			gate: gate.name,
+			status: "fail",
+			exitCode: 1,
+			duration,
+			stdout: "",
+			stderr: `Command validation failed: ${errorMessage}`,
+			artifacts: [],
+			attempts: attempt,
+			lastAttempt: startedAt
+		};
+	}
+
 	return new Promise((resolve) => {
 		let timedOut = false;
 

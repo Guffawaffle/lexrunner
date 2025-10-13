@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { executeGate, executeItemGates, executeGatesWithPolicy } from '../src/gates.js';
 import { loadPlan, Policy, Gate } from '../src/schema.js';
 import { ExecutionState } from '../src/executionState.js';
+import { resetCommandValidator } from '../src/security/commandValidator.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -21,12 +22,14 @@ describe('Gate Execution', () => {
 
 	beforeEach(() => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-'));
+		resetCommandValidator(); // Reset validator to avoid state pollution
 	});
 
 	afterEach(() => {
 		if (fs.existsSync(tempDir)) {
 			fs.rmSync(tempDir, { recursive: true });
 		}
+		resetCommandValidator(); // Clean up after test
 	});
 
 	it('executes a passing gate', async () => {
