@@ -26,6 +26,16 @@ const ajv = new Ajv({ allErrors: true });
 const validateWithSchema = auditSchema ? ajv.compile(auditSchema) : null;
 
 /**
+ * AJV error object interface (compatible with both v6 and v8)
+ */
+interface AjvErrorObject {
+	instancePath?: string;  // v8
+	dataPath?: string;      // v6
+	message?: string;
+	params?: any;
+}
+
+/**
  * Audit event envelope structure
  */
 export interface AuditEventEnvelope {
@@ -132,8 +142,8 @@ export class AuditEmitter {
 			if (!valid && validateWithSchema.errors) {
 				return {
 					valid: false,
-					errors: validateWithSchema.errors.map(err => ({
-						path: (err as any).instancePath || (err as any).dataPath || '',
+					errors: validateWithSchema.errors.map((err: AjvErrorObject) => ({
+						path: err.instancePath || err.dataPath || '',
 						message: err.message,
 						params: err.params
 					}))
