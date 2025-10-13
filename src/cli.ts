@@ -547,7 +547,8 @@ program
 			// Load configuration with provenance tracking
 			const config = loadInputs();
 
-			if (opts.json) {
+			// Check both command-level and global JSON mode
+			if (opts.json || jsonModeActive) {
 				// Output deterministic JSON with sorted keys
 				const output = {
 					config: {
@@ -717,7 +718,7 @@ program
 			const plan = loadPlan(planContent);
 			const levels = computeMergeOrder(plan);
 
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({ levels }));
 			} else {
 				console.log(`Merge order for ${plan.items.length} items:`);
@@ -728,7 +729,7 @@ program
 			return;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			if (opts.json) {
+			if (opts.json || jsonModeActive) {
 				console.log(canonicalJSONStringify({ error: message }));
 			} else {
 				console.error(`Error computing merge order: ${message}`);
@@ -912,7 +913,7 @@ program
 			}
 
 			// Create progress reporter (disabled in JSON mode)
-			const progressReporter = new ProgressReporter({ enabled: !opts.json });
+			const progressReporter = new ProgressReporter({ enabled: !jsonModeActive });
 
 			// Execute gates with policy
 			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter);
@@ -1233,7 +1234,7 @@ program
 			}
 
 			// Show autopilot configuration if not in JSON mode
-			if (!opts.json && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
+			if (!(opts.json || jsonModeActive) && autopilotConfig.maxLevel > AutopilotLevel.ReportOnly) {
 				console.log(`🤖 Autopilot Level ${autopilotConfig.maxLevel}: ${getAutopilotLevelDescription(autopilotConfig.maxLevel)}`);
 				if (autopilotConfig.dryRun) {
 					console.log("   Mode: Dry run (preview only)");
@@ -1273,7 +1274,7 @@ program
 
 			if (opts.dryRun && !opts.execute) {
 				// Dry run mode (default)
-				if (opts.json) {
+				if ((opts.json || jsonModeActive)) {
 					console.log(canonicalJSONStringify({
 						mode: "dry-run",
 						plan: {
@@ -1303,7 +1304,7 @@ program
 				}
 			} else if (opts.execute) {
 				// Execute mode
-				if (opts.json) {
+				if ((opts.json || jsonModeActive)) {
 					console.log(canonicalJSONStringify({ mode: "execute", status: "starting" }));
 				} else {
 					console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
@@ -1314,12 +1315,12 @@ program
 				}
 
 				// Create progress reporter (disabled in JSON mode)
-				const progressReporter = new ProgressReporter({ enabled: !opts.json });
+				const progressReporter = new ProgressReporter({ enabled: !jsonModeActive });
 
 				// Execute weave
 				const result = await gitOps.executeWeave(plan, levels, progressReporter);
 
-				if (opts.json) {
+				if ((opts.json || jsonModeActive)) {
 					console.log(canonicalJSONStringify({
 						mode: "execute",
 						status: "completed",
@@ -1370,7 +1371,7 @@ program
 				// Cleanup if requested
 				if (opts.cleanup) {
 					await gitOps.cleanup();
-					if (!opts.json) {
+					if (!(opts.json || jsonModeActive)) {
 						console.log("🧹 Cleaned up integration branches");
 					}
 				}

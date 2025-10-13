@@ -12,8 +12,54 @@ Complete reference for the lex-pr-runner command-line interface, including all s
 lex-pr [options] [command]
 
 Options:
-  -V, --version     Output the version number
-  -h, --help        Display help for command
+  -V, --version        Output the version number
+  --no-color           Disable ANSI color codes in output
+  --json               Enable JSON output mode (implies --no-color)
+  --log-format <fmt>   Log output format: 'json' or 'human' (default: 'human')
+  -h, --help           Display help for command
+```
+
+### Output Control Flags
+
+#### `--no-color`
+
+Unconditionally disables ANSI escape codes in output, regardless of TTY detection.
+
+**Use cases:**
+- Force plain text output when piping to tools that don't handle ANSI codes
+- Debugging in environments where color codes interfere with output
+- CI/CD pipelines where color codes are not needed
+
+**Example:**
+```bash
+lex-pr --no-color config:inspect
+```
+
+#### `--json`
+
+Enables JSON output mode and automatically disables colors. This flag:
+- Forces JSON output to stdout for supported commands
+- Disables ANSI color codes (implies `--no-color`)
+- Suppresses human-friendly decorations (emojis, tips, progress indicators)
+- Uses plain text prefixes in error messages (e.g., `[lex-pr]` instead of ❌)
+
+**Use cases:**
+- Machine-readable output for automation and scripting
+- Clean JSON output for piping to `jq` or other JSON processors
+- CI/CD pipelines and automated testing
+
+**Example:**
+```bash
+lex-pr --json plan > plan.json
+```
+
+**Note:** The `--json` flag can be used either globally or at the command level:
+```bash
+# Global flag (affects all output)
+lex-pr --json plan
+
+# Command-level flag (some commands support this)
+lex-pr plan --json
 ```
 
 ## Configuration Precedence
@@ -32,6 +78,8 @@ Configuration values are resolved in the following order (highest to lowest prio
 | `LEX_PR_OUT_DIR` | Default output directory for artifacts | `.smartergpt/runner` |
 | `LEX_PR_MAX_WORKERS` | Maximum parallel gate execution | `1` |
 | `LEX_PR_TIMEOUT` | Default gate timeout in seconds | `300` |
+| `NO_COLOR` | Disable ANSI color codes when set (any value) | unset |
+| `LOG_FORMAT` | Log output format: 'json' or 'human' | `human` |
 
 ## Commands
 
