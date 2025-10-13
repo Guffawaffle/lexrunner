@@ -63,7 +63,7 @@ Initial release.
 	it("should detect no commits since last release", () => {
 		// No new commits, so script should exit cleanly
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
-		
+
 		try {
 			const output = execSync(`tsx ${scriptPath}`, {
 				cwd: testDir,
