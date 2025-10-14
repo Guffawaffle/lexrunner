@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/lint.schema.json",
+  "title": "Lint Gate Input Schema",
+  "description": "Input contract for lint gate execution",
+  "type": "object",
+  "required": ["files", "linter"],
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "List of file paths or glob patterns to lint"
+    },
+    "linter": {
+      "type": "string",
+      "enum": ["eslint", "tslint", "pylint", "ruff"],
+      "description": "Linter tool to use"
+    },
+    "fix": {
+      "type": "boolean",
+      "default": false,
+      "description": "Auto-fix violations when possible"
+    },
+    "config": {
+      "type": "string",
+      "description": "Path to custom linter config file"
+    }
+  },
+  "additionalProperties": false
+}

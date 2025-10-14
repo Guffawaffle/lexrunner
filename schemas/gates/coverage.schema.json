@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/coverage.schema.json",
+  "title": "Coverage Gate Input Schema",
+  "description": "Input contract for coverage gate execution",
+  "type": "object",
+  "required": ["tool", "threshold"],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": ["istanbul", "nyc", "jest", "vitest", "pytest-cov"],
+      "description": "Coverage tool to use"
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Minimum coverage percentage required"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Files or patterns to include in coverage"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Files or patterns to exclude from coverage"
+    },
+    "reportFormat": {
+      "type": "string",
+      "enum": ["lcov", "html", "text", "cobertura"],
+      "default": "lcov",
+      "description": "Coverage report format"
+    }
+  },
+  "additionalProperties": false
+}

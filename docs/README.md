@@ -27,6 +27,7 @@ New to lex-pr-runner? Start here:
 
 - **[Dependency Parser](./dependency-parser.md)** - Understanding PR dependencies
 - **[Schemas](./schemas.md)** - Plan and configuration schemas
+- **[Gates](./gates.md)** - Quality gates and input validation
 - **[Error Taxonomy](./errors.md)** - Error codes and handling
 
 ### Merge Strategies
