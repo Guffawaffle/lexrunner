@@ -1,7 +1,12 @@
 /**
- * Orchestration module - Conflict prediction and batch optimization
+ * Orchestration module - Tools for pyramid orchestration
+ *
+ * Includes:
+ * - Conflict prediction and batch optimization
+ * - Agent assignment for batch operations
  */
 
+// Conflict prediction exports
 export {
 	predictConflicts,
 	buildConflictGraph,
@@ -19,3 +24,6 @@ export type {
 	ConflictDetail,
 	MergeSimulationResult
 } from "./types.js";
+
+// Agent assignment exports
+export * from './agentAssigner.js';

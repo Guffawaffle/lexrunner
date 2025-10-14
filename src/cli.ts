@@ -33,6 +33,7 @@ import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
 import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
 import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
+import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -2057,6 +2058,7 @@ registerSecurityCommands(program);
 // Orchestration commands
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
+registerAssignBatchCommand(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {

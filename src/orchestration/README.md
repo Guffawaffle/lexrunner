@@ -377,3 +377,71 @@ Planned features (from Epic #171):
 2. **Agent Assigner** (Feature 3) - Assign agents to batches
 3. **Integration** - Connect with GitHub API for live data
 ```
+
+---
+
+## Agent Assigner
+
+**Bulk-assign GitHub Copilot agents to batched issues**
+
+### Overview
+
+The Agent Assigner implements bulk assignment of GitHub Copilot agents to issues with robust error handling and rate limiting.
+
+**Key Features:**
+- Rate limiting with exponential backoff (10s, 20s, 40s, 80s max, 4 retries)
+- Graceful handling of already-assigned issues
+- Configurable stagger delay between assignments (default: 5s)
+- Dry-run mode for previewing assignments
+- JSON output for automation
+
+### CLI Command
+
+```bash
+lex-pr orchestrate:assign-batch [options]
+
+Options:
+  --batch <file>       Batch plan JSON file
+  --issues <numbers>   Comma-separated issue numbers (e.g., 156,157,160)
+  --repo <owner/repo>  GitHub repository (default: auto-detect)
+  --dry-run            Show what would be assigned without actually doing it
+  --stagger <seconds>  Wait N seconds between assignments (default: 5)
+  --json               Output results as JSON (global flag)
+```
+
+### Examples
+
+**Basic Assignment:**
+```bash
+lex-pr orchestrate:assign-batch --issues 156,157,160 --repo owner/repo
+```
+
+**Dry Run:**
+```bash
+lex-pr orchestrate:assign-batch --issues 156,157,160 --repo owner/repo --dry-run
+```
+
+**JSON Output:**
+```bash
+lex-pr orchestrate:assign-batch --issues 156,157,160 --json
+```
+
+### Implementation
+
+See `src/orchestration/agentAssigner.ts` for the core implementation.
+
+**Main Function:**
+```typescript
+export async function assignAgentsToBatch(
+  options: AssignAgentsOptions
+): Promise<AssignmentResult>
+```
+
+**Error Handling:**
+- `AlreadyAssignedError` - Issue already has an agent
+- `RateLimitError` - GitHub API rate limit hit (auto-retry)
+- `UnexpectedError` - Other failures (logged and skipped)
+
+### Testing
+
+See `tests/agent-assigner.spec.ts` and `tests/cli-agent-assigner.spec.ts` for comprehensive test coverage.
