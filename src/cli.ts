@@ -31,6 +31,7 @@ import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
 import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
+import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -2051,6 +2052,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
+
+// Orchestrate commands
+registerPredictConflictsCommand(program, () => jsonModeActive);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
