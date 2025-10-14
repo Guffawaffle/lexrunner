@@ -1,0 +1,72 @@
+name: CLI Smoke Test
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  json-purity-smoke-test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build distribution
+        run: npm run build
+      
+      - name: Test JSON purity on built artifacts
+        run: |
+          echo "Testing JSON mode with plan command..."
+          
+          # Use GitHub Actions temp directory for security
+          STDOUT_FILE="${RUNNER_TEMP}/stdout.json"
+          STDERR_FILE="${RUNNER_TEMP}/stderr.txt"
+          
+          # Run CLI in JSON mode and capture stdout/stderr separately
+          node dist/cli.js --json plan tests/fixtures/plan.tiny.json > "$STDOUT_FILE" 2> "$STDERR_FILE"
+          EXIT_CODE=$?
+          
+          # Verify exit code is 0
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ CLI exited with non-zero code: $EXIT_CODE"
+            exit 1
+          fi
+          echo "✅ Exit code: $EXIT_CODE"
+          
+          # Verify stdout is valid JSON
+          if ! node -e "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" 2>&1; then
+            echo "❌ stdout is not valid JSON:"
+            cat "$STDOUT_FILE"
+            exit 1
+          fi
+          echo "✅ stdout is valid JSON"
+          
+          # Verify JSON has expected structure
+          if ! node -e "const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8')); if (!data.items || !data.schemaVersion) { console.error('Missing expected fields'); process.exit(1); }"; then
+            echo "❌ JSON output missing expected fields"
+            cat "$STDOUT_FILE"
+            exit 1
+          fi
+          echo "✅ JSON output has expected structure (items, schemaVersion)"
+          
+          # Display stderr for diagnostics (should be empty or contain only diagnostics, not JSON)
+          echo "Stderr output (should not contain JSON):"
+          cat "$STDERR_FILE" || echo "(empty)"
+          
+          echo "✅ JSON purity smoke test passed"
