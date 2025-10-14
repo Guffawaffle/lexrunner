@@ -210,10 +210,35 @@ npm run cli -- doctor
 # Gate report aggregation
 npm run cli -- report <directory> [--out json|md]
 
+# Orchestration: Batch planning with Kahn's algorithm
+npm run cli -- orchestrate:plan-batch --issues 156,157,160
+npm run cli -- orchestrate:plan-batch --input analysis.json --json
+
 # Python CLI (legacy)
 lex-pr schema validate plan.json
 lex-pr merge-order plan.json --json
 ```
+
+### Orchestration Commands
+
+The `orchestrate:plan-batch` command generates deterministic batch plans using Kahn's algorithm:
+
+```bash
+# From explicit issue list
+lex-pr orchestrate:plan-batch --issues 156,157,160,161,164
+
+# From issue analyzer output
+lex-pr orchestrate:plan-batch --input analysis.json --json > batch-plan.json
+```
+
+**Features:**
+- Deterministic topological sorting (same input → same output)
+- Stable priority queue (score → createdAt → number)
+- Layer-based batching for parallel execution
+- Cycle detection with helpful error messages
+- SHA256 hash for plan reproducibility
+
+See [`docs/orchestration.md`](docs/orchestration.md) for detailed documentation.
 
 ### Gate Report Aggregation
 

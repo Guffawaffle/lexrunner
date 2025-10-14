@@ -29,6 +29,7 @@ import { registerSecurityCommands } from "./cli-security.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
+import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -680,6 +681,9 @@ registerPlanDiffCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith
 });
+
+// Orchestrate: plan-batch command - batch planner with Kahn's algorithm
+registerPlanBatchCommand(program, () => jsonModeActive);
 
 // Autopilot command
 program
