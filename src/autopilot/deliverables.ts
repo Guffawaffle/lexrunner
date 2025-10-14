@@ -8,6 +8,7 @@ import * as path from "path";
 import { Plan } from "../schema.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { sha256 } from "../util/hash.js";
+import { generateToolchainManifest } from "../orchestration/determinism.js";
 
 /**
  * Deliverables manifest schema
@@ -133,6 +134,11 @@ export class DeliverablesManager {
 		// Write manifest
 		const manifestPath = path.join(deliverableDir, "manifest.json");
 		fs.writeFileSync(manifestPath, canonicalJSONStringify(manifest) + "\n", "utf-8");
+
+		// Generate and write toolchain manifest
+		const toolchainManifest = await generateToolchainManifest();
+		const toolchainPath = path.join(deliverableDir, "toolchain-manifest.json");
+		fs.writeFileSync(toolchainPath, canonicalJSONStringify(toolchainManifest) + "\n", "utf-8");
 
 		return deliverableDir;
 	}

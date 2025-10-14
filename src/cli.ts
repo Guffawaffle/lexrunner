@@ -26,9 +26,16 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
+import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
+import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
+import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
+import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
+import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
+import { registerOrchestrateCommands } from "./commands/orchestrate.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -40,6 +47,8 @@ import {
 	installUnhandledRejectionHandler
 } from "./cli/exitHandler.js";
 import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/formatters.js";
+import { initAuditEmitter, emitEvent, finalizeAudit, AuditEmitter, AuditOptions, EVENT_TYPES } from "./audit/index.js";
+import { sha256 } from "./util/hash.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -140,6 +149,8 @@ Examples:
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
 	$ lex-pr execute plan.json              Run quality gates on plan
+	$ lex-pr orchestrate analyze            Analyze issues for parallel work planning
+	$ lex-pr orchestrate analyze --labels priority:P1 --json
 	$ lex-pr security check-rotation        Check token rotation status
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
@@ -311,6 +322,19 @@ program
 	.option("--target <branch>", "Target branch for merging PRs (default: repo default branch)")
 	.option("--validate-cycles", "Enable dependency cycle detection (default: true)")
 	.option("--optimize", "Optimize plan for parallel execution")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr plan --from-github --json > plan.json    # Generate plan from GitHub PRs
+  $ lex-pr plan --dry-run                           # Preview plan without writing
+  $ lex-pr plan --labels "feature,bugfix"           # Filter by labels
+  $ lex-pr plan --exclude-prs 123,456               # Exclude specific PRs
+  $ lex-pr plan --target staging                    # Target different branch
+  $ lex-pr plan --required-gates lint,test,e2e      # Custom gate requirements
+
+Common Issues:
+  • GitHub API errors: Set GITHUB_TOKEN environment variable
+  • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
+  • Missing configuration: Run 'lex-pr init' to set up workspace`)
 	.action(async (opts) => {
 		const previousJsonMode = jsonModeActive;
 		// jsonModeActive is already set by preAction hook from global --json
@@ -681,6 +705,12 @@ registerPlanDiffCommand(program, {
 	exitWith
 });
 
+// Orchestrate: plan-batch command - batch planner with Kahn's algorithm
+registerPlanBatchCommand(program, () => jsonModeActive);
+
+// Orchestrate: Pin Toolchain command
+registerPinToolchainCommand(program);
+
 // Autopilot command
 program
 	.command("autopilot")
@@ -767,13 +797,38 @@ program
 	.option("--dry-run", "Validate plan and show execution order without running gates")
 	.option("--json", "Output results in JSON format")
 	.option("--status-table", "Generate status table for PR comments")
+	.option("--skip-input-validation", "Skip gate input schema validation (not recommended)")
 	.option("--max-level <level>", "Maximum autopilot level (0-4)", "0")
 	.option("--open-pr", "Open pull requests for integration branches (Level 3+)")
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
 	.option("--comment-template <path>", "Path to PR comment template (Level 2+)")
 	.option("--branch-prefix <prefix>", "Prefix for integration branch names", "integration/")
+	.option("--audit <profile>", "Audit profile: off|basic|soc2|hipaa-strict", "off")
+	.option("--audit-dir <path>", "Audit output directory (default: <deliverables>/audit)")
+	.option("--audit-format <format>", "Audit format (reserved for future)", "jsonl")
+	.option("--audit-include-env <keys>", "Comma-separated env keys to include")
+	.option("--audit-redact <regex>", "Custom redaction regex pattern")
+	.option("--audit-hash-paths", "Hash file paths in audit events")
+	.option("--audit-signer <provider:keyref>", "Signature method: kms:<ARN> or gpg:<FINGERPRINT>")
+	.option("--audit-retain-days <days>", "Retention hint in days")
+	.option("--audit-context <types>", "Context blocks: git,ci,os")
+	.option("--audit-sample <percent>", "Sampling percentage for noisy gates", "100")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr execute plan.json                    # Run all gates in plan
+  $ lex-pr execute --dry-run                    # Validate plan without running gates
+  $ lex-pr execute --json > results.json        # JSON output for CI/CD integration
+  $ lex-pr execute --status-table               # Generate PR comment-ready status table
+  $ lex-pr execute --timeout 60000              # Increase timeout to 60 seconds
+  $ lex-pr execute --artifact-dir ./build       # Custom artifact location
+
+Common Issues:
+  • Gates timing out: Increase --timeout or check gate commands
+  • Missing dependencies: Run 'lex-pr merge-order' to verify plan structure
+  • Permission errors: Ensure artifact directory is writable`)
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file || "plan.json";
+		let auditEmitter: AuditEmitter | null = null;
 
 		try {
 			// Parse and validate autopilot configuration
@@ -808,12 +863,60 @@ program
 			const plan = loadPlan(planContent);
 			const timeoutMs = parseInt(opts.timeout);
 
+			// Initialize audit emitter if profile is not 'off'
+			if (opts.audit && opts.audit !== 'off') {
+				const auditDir = opts.auditDir || path.join(opts.artifactDir, 'audit');
+				const auditOptions: AuditOptions = {
+					profile: opts.audit as 'basic' | 'soc2' | 'hipaa-strict',
+					dir: auditDir,
+					format: opts.auditFormat,
+					includeEnv: opts.auditIncludeEnv ? opts.auditIncludeEnv.split(',') : undefined,
+					redactRegex: opts.auditRedact,
+					hashPaths: opts.auditHashPaths,
+					context: opts.auditContext ? opts.auditContext.split(',') as ('git' | 'ci' | 'os')[] : undefined,
+					signer: opts.auditSigner,
+					retainDays: opts.auditRetainDays ? parseInt(opts.auditRetainDays) : undefined,
+					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined
+				};
+
+				auditEmitter = await initAuditEmitter(auditOptions);
+
+				// Emit command invocation event
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, {
+					argv: process.argv.slice(2),
+					cwd: process.cwd()
+				});
+
+				// Emit plan discovered event
+				const planHash = sha256(planContent);
+				await emitEvent(auditEmitter, EVENT_TYPES.PLAN_DISCOVERED, {
+					pr_ids: plan.items.map(item => item.name),
+					base: 'main',
+					head: plan.target,
+					plan_hash: planHash
+				});
+
+				// Emit plan validated event
+				await emitEvent(auditEmitter, EVENT_TYPES.PLAN_VALIDATED, {
+					schema_version: plan.schemaVersion,
+					warnings: []
+				});
+			}
+
 			// Create execution state
 			const executionState = new ExecutionState(plan);
 			const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 
 			// Validate and show execution order
 			const levels = computeMergeOrder(plan);
+
+			// Emit merge order computed event
+			if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.MERGE_ORDER_COMPUTED, {
+					levels: levels.length,
+					items_per_level: levels.map(level => level.length)
+				});
+			}
 
 			if (opts.dryRun) {
 				if (opts.json || jsonModeActive) {
@@ -855,11 +958,17 @@ program
 				console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
 			}
 
+			// Check for input validation skip flag
+			const skipValidation = opts.skipInputValidation ?? false;
+			if (skipValidation && !(opts.json || jsonModeActive)) {
+				console.warn('⚠️  Gate input validation disabled - use at your own risk');
+			}
+
 			// Create progress reporter (disabled in JSON mode)
 			const progressReporter = new ProgressReporter({ enabled: !jsonModeActive });
 
 			// Execute gates with policy
-			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter);
+			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter, skipValidation);
 
 			// Get final results
 			const results = executionState.getResults();
@@ -908,12 +1017,59 @@ program
 
 			// Exit with appropriate code
 			const hasFailures = mergeSummary.failed.length > 0 || mergeSummary.blocked.length > 0;
+
+			// Emit run summary if audit is enabled
+			if (auditEmitter) {
+				const totalGates = Array.from(results.values()).reduce((sum, r) => sum + r.gates.length, 0);
+				const passedGates = Array.from(results.values()).reduce(
+					(sum, r) => sum + r.gates.filter(g => g.status === 'pass').length,
+					0
+				);
+				const failedGates = Array.from(results.values()).reduce(
+					(sum, r) => sum + r.gates.filter(g => g.status === 'fail').length,
+					0
+				);
+
+				// Build pass/fail matrix
+				const passFailMatrix: Record<string, Record<string, string>> = {};
+				for (const [name, result] of results) {
+					passFailMatrix[name] = {};
+					for (const gate of result.gates) {
+						passFailMatrix[name][gate.gate] = gate.status;
+					}
+				}
+
+				await emitEvent(auditEmitter, EVENT_TYPES.RUN_SUMMARY, {
+					totals: {
+						items: plan.items.length,
+						gates: totalGates,
+						passed: passedGates,
+						failed: failedGates
+					},
+					pass_fail_matrix: passFailMatrix,
+					final_status: hasFailures ? 'failed' : 'success'
+				});
+
+				// Finalize audit
+				await finalizeAudit(auditEmitter, hasFailures ? 'failed' : 'success');
+			}
+
 			if (hasFailures) {
 				throwExit(1);
 			}
 			return;
 
 		} catch (error) {
+			// Finalize audit on error
+			if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.ERROR, {
+					code: 'EXECUTION_ERROR',
+					message: error instanceof Error ? error.message : String(error),
+					where: 'execute_command'
+				}, 'error');
+				await finalizeAudit(auditEmitter, 'error');
+			}
+
 			console.error(`Error executing plan: ${error instanceof Error ? error.message : String(error)}`);
 			// Use exit code 2 for validation errors, 1 for others
 			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
@@ -926,6 +1082,9 @@ program
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
+
+// Orchestrate commands
+registerOrchestrateCommands(program, () => jsonModeActive);
 
 // Report command
 program
@@ -968,6 +1127,18 @@ program
 	.option("--state <state>", "PR state filter", "open")
 	.option("--suggest", "Generate dependency/grouping suggestions using heuristics")
 	.option("--json", "Output JSON format")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr discover                             # Discover PRs from current repo
+  $ lex-pr discover --suggest                   # Discover with dependency suggestions
+  $ lex-pr discover --json > prs.json           # JSON output for processing
+  $ lex-pr discover --owner org --repo project  # Specify repository explicitly
+  $ lex-pr discover --state all                 # Include closed PRs
+
+Common Issues:
+  • "Could not detect repository": Set GITHUB_TOKEN or run from git repository
+  • Rate limit errors: Wait or use authenticated token with higher limits
+  • No PRs found: Check --state filter and repository permissions`)
 	.action(async (opts) => {
 		try {
 			let githubAPI = await createGitHubAPI();
@@ -1109,6 +1280,19 @@ program
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
 	.option("--comment-template <path>", "Path to PR comment template (Level 2+)")
 	.option("--branch-prefix <prefix>", "Prefix for integration branch names", "integration/")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr merge                                # Dry-run: preview merge operations
+  $ lex-pr merge --execute                      # Execute merge pyramid
+  $ lex-pr merge --execute --cleanup            # Execute and clean up integration branches
+  $ lex-pr merge --json > merge-results.json    # JSON output for automation
+  $ lex-pr merge --levels 1,2 --execute         # Merge only specific levels
+  $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
+
+Common Issues:
+  • Merge conflicts: Review conflicts and resolve manually, then re-run
+  • Dirty working directory: Commit or stash changes before merging
+  • Permission denied: Ensure you have push access to the repository`)
 	.action(async (opts) => {
 		try {
 			// Parse and validate autopilot configuration
@@ -2043,6 +2227,14 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
+
+// Orchestration commands
+registerPredictConflictsCommand(program, () => jsonModeActive);
+registerGenerateDeliverablesCommand(program);
+registerAssignBatchCommand(program);
+
+// Audit operations command
+registerAuditCommands(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {

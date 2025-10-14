@@ -171,7 +171,9 @@ export const Gate = z.object({
 	// Container spec (only used when runtime is "container")
 	container: ContainerSpec.optional(),
 	// Expected artifact paths (for output collection)
-	artifacts: z.array(z.string()).default([])
+	artifacts: z.array(z.string()).default([]),
+	// Optional input data for gates that require structured inputs (validated against gate-specific schemas)
+	input: z.record(z.unknown()).optional()
 }).strict();
 export type Gate = z.infer<typeof Gate>;
 

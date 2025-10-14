@@ -9,7 +9,9 @@ import type {
 	PullRequest,
 	PullRequestDetails,
 	PRQueryOptions,
-	RepositoryInfo
+	RepositoryInfo,
+	GitHubIssue,
+	IssueQueryOptions
 } from "./types.js";
 import {
 	GitHubAPIError,
@@ -19,7 +21,7 @@ import {
 import { parsePRDescription, normalizeDependencyRef } from "../planner/index.js";
 import { parseRemoteUrl } from "../git/parseRemote.js";
 
-export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo };
+export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo, GitHubIssue, IssueQueryOptions };
 export { GitHubAPIError, GitHubRateLimitError, GitHubAuthError };
 
 export interface GitHubClient {
@@ -27,6 +29,8 @@ export interface GitHubClient {
 	getPRDetails(number: number): Promise<PullRequestDetails>;
 	getPRDependencies(pr: PullRequest): Promise<string[]>;
 	validateRepository(): Promise<RepositoryInfo>;
+	// Issue operations
+	listIssues(options?: IssueQueryOptions): Promise<GitHubIssue[]>;
 	// File analysis support
 	getOctokit(): any; // Returns Octokit instance for advanced operations
 	getOwner(): string;
@@ -42,12 +46,16 @@ export class GitHubClientImpl implements GitHubClient {
 		token?: string;
 		owner: string;
 		repo: string;
+		octokit?: Octokit;
 	}) {
 		this.owner = options.owner;
 		this.repo = options.repo;
 
-		// Initialize Octokit with authentication if token provided
-		if (options.token) {
+		// Use injected Octokit if provided (for testing)
+		if (options.octokit) {
+			this.octokit = options.octokit;
+		} else if (options.token) {
+			// Initialize Octokit with authentication if token provided
 			this.octokit = new Octokit({
 				auth: options.token
 			});
@@ -194,6 +202,62 @@ export class GitHubClientImpl implements GitHubClient {
 		return [...new Set(normalizedDeps)].sort();
 	}
 
+	async listIssues(options: IssueQueryOptions = {}): Promise<GitHubIssue[]> {
+		try {
+			const params: any = {
+				owner: this.owner,
+				repo: this.repo,
+				state: options.state || "open",
+				per_page: options.per_page || 100,
+				page: options.page || 1,
+				sort: options.sort || "created",
+				direction: options.direction || "desc"
+			};
+
+			if (options.labels && options.labels.length > 0) {
+				params.labels = options.labels.join(",");
+			}
+
+			if (options.assignee) {
+				params.assignee = options.assignee;
+			}
+
+			if (options.creator) {
+				params.creator = options.creator;
+			}
+
+			if (options.mentioned) {
+				params.mentioned = options.mentioned;
+			}
+
+			const response = await this.octokit.rest.issues.listForRepo(params);
+
+			// Filter out pull requests (GitHub API includes PRs in issues endpoint)
+			const issues = response.data.filter((item: any) => !item.pull_request);
+
+			return issues.map((issue: any) => ({
+				number: issue.number,
+				title: issue.title,
+				body: issue.body,
+				state: issue.state,
+				labels: issue.labels.map((label: any) => ({
+					name: label.name,
+					color: label.color
+				})),
+				user: {
+					login: issue.user.login
+				},
+				assignees: issue.assignees.map((assignee: any) => ({
+					login: assignee.login
+				})),
+				createdAt: issue.created_at,
+				updatedAt: issue.updated_at
+			}));
+		} catch (error: any) {
+			return this.handleAPIError(error);
+		}
+	}
+
 	private transformPR(prData: any): PullRequest {
 		return {
 			number: prData.number,
@@ -286,6 +350,7 @@ export async function createGitHubClient(options: {
 	token?: string;
 	owner?: string;
 	repo?: string;
+	octokit?: Octokit;
 } = {}): Promise<GitHubClient> {
 	let owner = options.owner;
 	let repo = options.repo;
@@ -333,61 +398,19 @@ export async function createGitHubClient(options: {
 		throw new GitHubAPIError("Repository owner and name must be provided or detectable from git remote");
 	}
 
-	// Support test injection of a fake Octokit via environment variable
-	if (process.env.LEX_PR_FAKE_OCTOKIT === '1') {
-		// Prefer a real object set on the global (in spawned test bootstrap)
+	// Support test injection via global fake Octokit (for CLI subprocess testing)
+	let octokitToInject = options.octokit;
+	if (!octokitToInject && process.env.LEX_PR_FAKE_OCTOKIT === '1') {
 		const globalFake = (global as any).__FAKE_OCTOKIT;
-		const fakeOctokit: any = globalFake && typeof globalFake === 'object' ? globalFake : (process as any).__FAKE_OCTOKIT || {};
-		const now = new Date().toISOString();
-		const fallbackPR = {
-			number: 1,
-			title: 'Fake PR',
-			body: '',
-			head: { ref: 'fake-branch', sha: 'fake-sha' },
-			base: { ref: 'main', sha: 'base-sha' },
-			state: 'open',
-			labels: [],
-			draft: false,
-			mergeable: true,
-			user: { login: 'fake-user' },
-			created_at: now,
-			updated_at: now
-		};
-		fakeOctokit.rest = fakeOctokit.rest || {};
-		fakeOctokit.rest.repos = fakeOctokit.rest.repos || {};
-		if (typeof fakeOctokit.rest.repos.get !== 'function') {
-			fakeOctokit.rest.repos.get = async () => ({
-				data: {
-					default_branch: 'main',
-					html_url: `https://github.com/${owner}/${repo}`
-				}
-			});
+		if (globalFake && typeof globalFake === 'object') {
+			octokitToInject = globalFake;
 		}
-		fakeOctokit.rest.pulls = fakeOctokit.rest.pulls || {};
-		if (typeof fakeOctokit.rest.pulls.list !== 'function') {
-			fakeOctokit.rest.pulls.list = async () => ({ data: [fallbackPR] });
-		}
-		if (typeof fakeOctokit.rest.pulls.get !== 'function') {
-			fakeOctokit.rest.pulls.get = async ({ pull_number }: { pull_number: number }) => ({
-				data: {
-					...fallbackPR,
-					number: pull_number
-				}
-			});
-		}
-		if (typeof fakeOctokit.paginate !== 'function') {
-			fakeOctokit.paginate = async () => [fallbackPR];
-		}
-		const client = new GitHubClientImpl({ token: options.token, owner, repo });
-		// If paginate is a function on the fake, we will use it directly; otherwise
-		// keep the provided fake object as-is for the tests to stub as needed.
-		(client as any).octokit = fakeOctokit;
-		return client;
 	}
 
 	return new GitHubClientImpl({
 		token: options.token,
 		owner,
-		repo
+		repo,
+		octokit: octokitToInject
 	});
 }

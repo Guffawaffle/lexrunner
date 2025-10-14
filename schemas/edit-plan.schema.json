@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/edit-plan.schema.json",
+  "title": "Edit Plan Schema",
+  "description": "Declares intended scope of code edits for validation",
+  "type": "object",
+  "required": ["file", "module_system", "scope_validated"],
+  "properties": {
+    "file": {
+      "type": "string",
+      "description": "Absolute or relative path to file being edited"
+    },
+    "module_system": {
+      "type": "string",
+      "enum": ["esm", "commonjs", "amd", "umd", "iife", "unknown"],
+      "description": "Module system detected in file"
+    },
+    "functions_modified": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "List of function names being modified"
+    },
+    "classes_modified": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "List of class names being modified"
+    },
+    "variables_modified": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "List of module-level variables being modified"
+    },
+    "side_effects": {
+      "type": "string",
+      "enum": ["none", "module", "global"],
+      "default": "none",
+      "description": "Level of side effects: none (pure), module (module-scoped), global (window/global)"
+    },
+    "globals_written": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "List of global variables being written (window.*, global.*)"
+    },
+    "scope_validated": {
+      "type": "boolean",
+      "description": "Whether scope validation passed"
+    },
+    "validation_method": {
+      "type": "string",
+      "enum": ["babel-ast", "typescript-ast", "python-ast", "regex-fallback"],
+      "description": "AST parser used for validation"
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "message", "location"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["undeclared_function", "undeclared_class", "global_write", "side_effect"]
+          },
+          "message": {"type": "string"},
+          "location": {
+            "type": "object",
+            "properties": {
+              "line": {"type": "number"},
+              "column": {"type": "number"}
+            }
+          }
+        }
+      },
+      "description": "List of scope violations detected"
+    }
+  }
+}

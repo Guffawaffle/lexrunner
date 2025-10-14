@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "feature-authentication",
+      "issue": "#301",
+      "branch": "feature/auth",
+      "deps": [],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        },
+        {
+          "name": "test",
+          "run": "npm test"
+        }
+      ]
+    },
+    {
+      "name": "feature-user-profile",
+      "issue": "#302",
+      "branch": "feature/user-profile",
+      "deps": ["feature-authentication"],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        }
+      ]
+    },
+    {
+      "name": "feature-dashboard",
+      "issue": "#303",
+      "branch": "feature/dashboard",
+      "deps": ["feature-user-profile"],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "test",
+          "run": "npm test"
+        },
+        {
+          "name": "e2e",
+          "run": "npm run test:e2e"
+        }
+      ]
+    }
+  ]
+}

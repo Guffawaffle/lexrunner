@@ -21,7 +21,7 @@
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
 		"format": "echo 'Format: using editorconfig for consistent formatting'",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-	"test": "vitest run",
+		"test": "vitest run",
 		"release:prepare": "tsx scripts/release-prepare.ts",
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
@@ -29,14 +29,18 @@
 		"test:run": "vitest run"
 	},
 	"dependencies": {
+		"@babel/parser": "^7.28.4",
+		"@babel/traverse": "^7.28.4",
 		"@modelcontextprotocol/sdk": "^1.18.2",
 		"@octokit/auth-token": "^6.0.0",
 		"@octokit/rest": "^22.0.0",
+		"@types/babel__traverse": "^7.28.0",
 		"chalk": "^5.3.0",
 		"commander": "^12.0.0",
 		"execa": "^9.2.0",
 		"fs-extra": "^11.2.0",
 		"simple-git": "^3.24.0",
+		"ulid": "^3.0.1",
 		"yaml": "^2.6.0",
 		"zod": "^3.23.8"
 	},

@@ -1,0 +1,108 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/allowed-commands.schema.json",
+	"title": "Command Whitelist",
+	"description": "Whitelist configuration for allowed commands in gate execution",
+	"type": "object",
+	"required": ["version", "mode", "defaults", "custom", "policy"],
+	"properties": {
+		"$schema": {
+			"type": "string",
+			"description": "JSON Schema reference"
+		},
+		"version": {
+			"type": "string",
+			"pattern": "^\\d+\\.\\d+\\.\\d+$",
+			"description": "Semantic version of the whitelist schema"
+		},
+		"mode": {
+			"type": "string",
+			"enum": ["strict", "permissive"],
+			"description": "Validation mode: 'strict' enforces whitelist, 'permissive' allows all commands"
+		},
+		"defaults": {
+			"type": "object",
+			"description": "Default command configurations for standard binaries",
+			"additionalProperties": {
+				"type": "object",
+				"required": ["commands", "allow_args", "deny_args"],
+				"properties": {
+					"commands": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Allowed command variations"
+					},
+					"allow_args": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Explicitly allowed arguments"
+					},
+					"deny_args": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Explicitly denied arguments"
+					}
+				}
+			}
+		},
+		"custom": {
+			"type": "object",
+			"description": "Custom command configurations",
+			"additionalProperties": {
+				"type": "object",
+				"required": ["binary", "allow_args", "deny_args"],
+				"properties": {
+					"binary": {
+						"type": "string",
+						"description": "Path to the binary"
+					},
+					"allow_args": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Explicitly allowed arguments"
+					},
+					"deny_args": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Explicitly denied arguments"
+					}
+				}
+			}
+		},
+		"policy": {
+			"type": "object",
+			"required": [
+				"allow_shell_operators",
+				"allow_env_vars",
+				"max_command_length",
+				"hallucination_threshold",
+				"dry_run_mode"
+			],
+			"properties": {
+				"allow_shell_operators": {
+					"type": "boolean",
+					"description": "Whether to allow shell operators like |, >, &&, etc."
+				},
+				"allow_env_vars": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "List of allowed environment variables"
+				},
+				"max_command_length": {
+					"type": "integer",
+					"minimum": 1,
+					"description": "Maximum allowed command length in characters"
+				},
+				"hallucination_threshold": {
+					"type": "integer",
+					"minimum": 1,
+					"description": "Number of hallucinated commands before escalation"
+				},
+				"dry_run_mode": {
+					"type": "boolean",
+					"description": "If true, log violations but don't block commands"
+				}
+			}
+		}
+	}
+}

@@ -93,3 +93,40 @@ export class GitHubAuthError extends GitHubAPIError {
 		this.name = "GitHubAuthError";
 	}
 }
+
+/**
+ * GitHub Issue representation
+ */
+export interface GitHubIssue {
+	number: number;
+	title: string;
+	body: string | null;
+	state: "open" | "closed";
+	labels: Array<{
+		name: string;
+		color: string;
+	}>;
+	user: {
+		login: string;
+	};
+	assignees: Array<{
+		login: string;
+	}>;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
+ * Query options for listing issues
+ */
+export interface IssueQueryOptions {
+	state?: "open" | "closed" | "all";
+	labels?: string[];
+	assignee?: string;
+	creator?: string;
+	mentioned?: string;
+	sort?: "created" | "updated" | "comments";
+	direction?: "asc" | "desc";
+	per_page?: number;
+	page?: number;
+}

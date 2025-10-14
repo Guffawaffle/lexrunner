@@ -330,4 +330,38 @@ describe('DeliverablesManager', () => {
 			expect(fs.existsSync(deliverableDir)).toBe(true);
 		});
 	});
+
+	describe('toolchain manifest integration', () => {
+		it('should create toolchain manifest alongside deliverables manifest', async () => {
+			const plan: Plan = {
+				schemaVersion: "1.0.0",
+				target: "main",
+				items: [
+					{
+						name: "test-item",
+						deps: [],
+						gates: []
+					}
+				]
+			};
+
+			const deliverableDir = await manager.createDeliverables(plan, 1, "0.1.0");
+
+			// Check toolchain manifest exists
+			const toolchainPath = path.join(deliverableDir, "toolchain-manifest.json");
+			expect(fs.existsSync(toolchainPath)).toBe(true);
+
+			// Parse and validate toolchain manifest
+			const toolchainManifest = JSON.parse(fs.readFileSync(toolchainPath, "utf-8"));
+			expect(toolchainManifest.recordedAt).toBeDefined();
+			expect(toolchainManifest.tools).toBeDefined();
+			expect(toolchainManifest.tools.git).toBeDefined();
+			expect(toolchainManifest.tools.node).toBeDefined();
+			expect(toolchainManifest.tools.npm).toBeDefined();
+			expect(toolchainManifest.environment).toBeDefined();
+			expect(toolchainManifest.os).toBeDefined();
+			expect(toolchainManifest.os.platform).toBeDefined();
+			expect(toolchainManifest.os.arch).toBeDefined();
+		});
+	});
 });

@@ -26,6 +26,9 @@ gate-results/
 deliverables/
 out*.json
 
+# Keep test fixtures
+!tests/fixtures/deliverables/
+
 # .smartergpt runtime directories
 .smartergpt/runner/
 .smartergpt/gate-results/
@@ -39,6 +42,9 @@ out*.json
 # Generated plan artifacts (runtime)
 snapshot.md
 plan-*.json
+
+# Test files (temporary)
+test-plan.json
 
 # Keep only live deliverable in VCS
 !.smartergpt/deliverables/.live.md
