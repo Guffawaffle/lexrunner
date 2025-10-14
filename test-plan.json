@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "item-1",
+      "issue": "#101",
+      "branch": "feature/item-1",
+      "deps": [],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "test",
+          "run": "npm test"
+        }
+      ]
+    },
+    {
+      "name": "item-2",
+      "issue": "#102",
+      "branch": "feature/item-2",
+      "deps": ["item-1"],
+      "gates": [
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        }
+      ]
+    },
+    {
+      "name": "item-3",
+      "issue": "#103",
+      "branch": "feature/item-3",
+      "deps": ["item-2"],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        },
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        },
+        {
+          "name": "test",
+          "run": "npm test"
+        }
+      ]
+    }
+  ]
+}
