@@ -26,6 +26,7 @@ import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.
 import { runInit } from "./commands/init.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerSecurityCommands } from "./cli-security.js";
+import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
@@ -795,7 +796,7 @@ program
 	.option("--audit-include-env <keys>", "Comma-separated env keys to include")
 	.option("--audit-redact <regex>", "Custom redaction regex pattern")
 	.option("--audit-hash-paths", "Hash file paths in audit events")
-	.option("--audit-signer <signer>", "Signature method (stub for Phase 2)")
+	.option("--audit-signer <provider:keyref>", "Signature method: kms:<ARN> or gpg:<FINGERPRINT>")
 	.option("--audit-retain-days <days>", "Retention hint in days")
 	.option("--audit-context <types>", "Context blocks: git,ci,os")
 	.option("--audit-sample <percent>", "Sampling percentage for noisy gates", "100")
@@ -2180,6 +2181,9 @@ registerSecurityCommands(program);
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
 registerAssignBatchCommand(program);
+
+// Audit operations command
+registerAuditCommands(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
