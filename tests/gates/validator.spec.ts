@@ -89,7 +89,7 @@ describe('Gate Input Validation', () => {
 		it('fails on invalid framework', () => {
 			const input = { framework: 'unknown', files: ['test.ts'] };
 			expect(() => validateGateInput('test', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 	});
 
@@ -132,13 +132,13 @@ describe('Gate Input Validation', () => {
 		it('fails on invalid scanner', () => {
 			const input = { scanner: 'invalid-scanner' };
 			expect(() => validateGateInput('security-scan', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 
 		it('fails on invalid severity', () => {
 			const input = { scanner: 'npm-audit', severity: 'invalid' };
 			expect(() => validateGateInput('security-scan', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 	});
 
@@ -156,13 +156,13 @@ describe('Gate Input Validation', () => {
 		it('fails on threshold out of range', () => {
 			const input = { tool: 'vitest', threshold: 150 };
 			expect(() => validateGateInput('coverage', input))
-				.toThrow(/must be <= 100/i);
+				.toThrow(/should be <= 100/i);
 		});
 
 		it('fails on negative threshold', () => {
 			const input = { tool: 'vitest', threshold: -10 };
 			expect(() => validateGateInput('coverage', input))
-				.toThrow(/must be >= 0/i);
+				.toThrow(/should be >= 0/i);
 		});
 	});
 
