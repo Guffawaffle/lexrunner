@@ -74,3 +74,12 @@ export {
 	PRApprovalStatus,
 	CompliancePolicyService,
 } from './policy.js';
+
+export {
+	// Command Validation
+	CommandWhitelist,
+	CommandValidationError,
+	CommandValidator,
+	getCommandValidator,
+	resetCommandValidator,
+} from './commandValidator.js';

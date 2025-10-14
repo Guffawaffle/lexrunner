@@ -48,6 +48,24 @@ The security module provides comprehensive security controls that integrate with
 ### 4. Security Scanning
 
 **Vulnerability Detection:**
+- npm audit integration
+- SARIF format support
+- Severity-based policy enforcement
+- Automated gate failure on threshold violations
+
+### 5. Command Whitelist & Hallucination Detection
+
+**Command Validation:**
+- Whitelist enforcement for gate commands
+- Shell operator blocking
+- Argument validation (allow/deny lists)
+- Command length restrictions
+- Hallucination tracking and escalation
+- Dry-run mode for testing
+
+See [Command Whitelist Documentation](../../docs/command-whitelist.md) for details.
+
+## Usage
 - NPM audit integration
 - CVE tracking
 - CVSS scoring
