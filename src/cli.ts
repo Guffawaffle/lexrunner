@@ -322,6 +322,19 @@ program
 	.option("--target <branch>", "Target branch for merging PRs (default: repo default branch)")
 	.option("--validate-cycles", "Enable dependency cycle detection (default: true)")
 	.option("--optimize", "Optimize plan for parallel execution")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr plan --from-github --json > plan.json    # Generate plan from GitHub PRs
+  $ lex-pr plan --dry-run                           # Preview plan without writing
+  $ lex-pr plan --labels "feature,bugfix"           # Filter by labels
+  $ lex-pr plan --exclude-prs 123,456               # Exclude specific PRs
+  $ lex-pr plan --target staging                    # Target different branch
+  $ lex-pr plan --required-gates lint,test,e2e      # Custom gate requirements
+
+Common Issues:
+  • GitHub API errors: Set GITHUB_TOKEN environment variable
+  • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
+  • Missing configuration: Run 'lex-pr init' to set up workspace`)
 	.action(async (opts) => {
 		const previousJsonMode = jsonModeActive;
 		// jsonModeActive is already set by preAction hook from global --json
@@ -800,6 +813,19 @@ program
 	.option("--audit-retain-days <days>", "Retention hint in days")
 	.option("--audit-context <types>", "Context blocks: git,ci,os")
 	.option("--audit-sample <percent>", "Sampling percentage for noisy gates", "100")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr execute plan.json                    # Run all gates in plan
+  $ lex-pr execute --dry-run                    # Validate plan without running gates
+  $ lex-pr execute --json > results.json        # JSON output for CI/CD integration
+  $ lex-pr execute --status-table               # Generate PR comment-ready status table
+  $ lex-pr execute --timeout 60000              # Increase timeout to 60 seconds
+  $ lex-pr execute --artifact-dir ./build       # Custom artifact location
+
+Common Issues:
+  • Gates timing out: Increase --timeout or check gate commands
+  • Missing dependencies: Run 'lex-pr merge-order' to verify plan structure
+  • Permission errors: Ensure artifact directory is writable`)
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file || "plan.json";
 		let auditEmitter: AuditEmitter | null = null;
@@ -1101,6 +1127,18 @@ program
 	.option("--state <state>", "PR state filter", "open")
 	.option("--suggest", "Generate dependency/grouping suggestions using heuristics")
 	.option("--json", "Output JSON format")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr discover                             # Discover PRs from current repo
+  $ lex-pr discover --suggest                   # Discover with dependency suggestions
+  $ lex-pr discover --json > prs.json           # JSON output for processing
+  $ lex-pr discover --owner org --repo project  # Specify repository explicitly
+  $ lex-pr discover --state all                 # Include closed PRs
+
+Common Issues:
+  • "Could not detect repository": Set GITHUB_TOKEN or run from git repository
+  • Rate limit errors: Wait or use authenticated token with higher limits
+  • No PRs found: Check --state filter and repository permissions`)
 	.action(async (opts) => {
 		try {
 			let githubAPI = await createGitHubAPI();
@@ -1242,6 +1280,19 @@ program
 	.option("--close-superseded", "Close superseded PRs after integration (Level 4)")
 	.option("--comment-template <path>", "Path to PR comment template (Level 2+)")
 	.option("--branch-prefix <prefix>", "Prefix for integration branch names", "integration/")
+	.addHelpText('after', `
+Examples:
+  $ lex-pr merge                                # Dry-run: preview merge operations
+  $ lex-pr merge --execute                      # Execute merge pyramid
+  $ lex-pr merge --execute --cleanup            # Execute and clean up integration branches
+  $ lex-pr merge --json > merge-results.json    # JSON output for automation
+  $ lex-pr merge --levels 1,2 --execute         # Merge only specific levels
+  $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
+
+Common Issues:
+  • Merge conflicts: Review conflicts and resolve manually, then re-run
+  • Dirty working directory: Commit or stash changes before merging
+  • Permission denied: Ensure you have push access to the repository`)
 	.action(async (opts) => {
 		try {
 			// Parse and validate autopilot configuration
