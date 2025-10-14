@@ -19,9 +19,13 @@ export interface AuditOptions {
 	redactRegex?: string;
 	hashPaths?: boolean;
 	context?: ('git' | 'ci' | 'os')[];
+	contextTypes?: ('git' | 'ci' | 'os')[]; // Alias for context
 	signer?: string;
 	retainDays?: number;
 	sample?: number;
+	sessionId?: string; // Optional override for testing
+	runId?: string; // Optional override for testing
+	tool?: { name: string; version: string }; // Optional override for testing
 }
 
 export interface AuditSummary {
@@ -59,12 +63,12 @@ export class AuditEmitter {
 		this.config = getProfileConfig(options.profile);
 		this.auditDir = options.dir;
 		this.ndjsonPath = path.join(this.auditDir, 'audit.ndjson');
-		this.sessionId = ulid();
-		this.runId = ulid();
+		this.sessionId = options.sessionId || ulid();
+		this.runId = options.runId || ulid();
 		this.startTime = Date.now();
 
-		// Tool info
-		this.tool = {
+		// Tool info (with optional override for testing)
+		this.tool = options.tool || {
 			name: 'lex-pr-runner',
 			version: process.env.npm_package_version || '0.1.0'
 		};
@@ -77,12 +81,8 @@ export class AuditEmitter {
 		// Repo info
 		this.repo = {};
 
-		// Build context if profile requires it
-		if (this.config) {
-			const contextTypes = options.context || this.config.includeContext;
-			const includeEnv = options.includeEnv || this.config.includeEnv;
-			this.context = buildContext(contextTypes, undefined, includeEnv);
-		}
+		// Context will be built during init()
+		this.context = {};
 
 		// Sidecar drop directory
 		this.dropDir = `/tmp/lex-audit-session-${this.sessionId}`;
@@ -95,6 +95,30 @@ export class AuditEmitter {
 		// If profile is 'off', skip all initialization
 		if (!this.config || this.options.profile === 'off') {
 			return;
+		}
+
+		// Build context if profile requires it
+		if (this.config) {
+			const contextTypes = this.options.contextTypes || this.options.context || this.config.includeContext;
+
+			// Try to collect git context if requested
+			let gitInfo: { branch?: string; commit?: string; remote?: string } | undefined;
+			if (contextTypes.includes('git')) {
+				try {
+					const { execa } = await import('execa');
+					const commit = await execa('git', ['rev-parse', 'HEAD']).then(r => r.stdout).catch(() => undefined);
+					const branch = await execa('git', ['rev-parse', '--abbrev-ref', 'HEAD']).then(r => r.stdout).catch(() => undefined);
+					const remote = await execa('git', ['remote', 'get-url', 'origin']).then(r => r.stdout).catch(() => undefined);
+					if (commit || branch || remote) {
+						gitInfo = { commit, branch, remote };
+					}
+				} catch {
+					// Git not available, context will be empty
+				}
+			}
+
+			const includeEnv = this.options.includeEnv || this.config.includeEnv;
+			this.context = buildContext(contextTypes, gitInfo, includeEnv);
 		}
 
 		// Create audit directory
@@ -299,11 +323,79 @@ export class AuditEmitter {
 		const manifest = await generateManifest(this.auditDir);
 		await writeManifest(this.auditDir, manifest);
 
+		// Generate gate matrix if profile requires it (e.g., soc2)
+		if (this.config.includeContext?.length > 0) {
+			await this.generateGateMatrix();
+		}
+
 		// Create signature stub (Phase 2)
 		if (this.config.requireSignature) {
 			const sigPath = path.join(this.auditDir, 'audit.sig');
 			fs.writeFileSync(sigPath, '# Signature stub - Phase 2 implementation pending\n');
 		}
+	}
+
+	/**
+	 * Generate gate matrix from audit events
+	 */
+	private async generateGateMatrix(): Promise<void> {
+		// Read audit log
+		const auditPath = path.join(this.auditDir, 'audit.ndjson');
+		if (!fs.existsSync(auditPath)) {
+			return;
+		}
+
+		const content = fs.readFileSync(auditPath, 'utf-8');
+		const lines = content.trim().split('\n').filter(l => l);
+
+		const matrix: Record<string, Record<string, any>> = {};
+		let totalPassed = 0;
+		let totalFailed = 0;
+		let totalSkipped = 0;
+		let totalBlocked = 0;
+		let totalGates = 0;
+
+		// Process gate_finished events
+		for (const line of lines) {
+			const event = JSON.parse(line);
+			if (event.event === 'gate_finished') {
+				const { item, gate, status, duration_ms, error, reason } = event.payload;
+
+				if (!matrix[item]) {
+					matrix[item] = {};
+				}
+
+				matrix[item][gate] = {
+					status,
+					...(duration_ms !== undefined && { duration_ms }),
+					...(error && { error }),
+					...(reason && { reason })
+				};
+
+				totalGates++;
+				if (status === 'pass') totalPassed++;
+				else if (status === 'fail') totalFailed++;
+				else if (status === 'skip') totalSkipped++;
+				else if (status === 'blocked') totalBlocked++;
+			}
+		}
+
+		const gateMatrix = {
+			generated_at: new Date().toISOString(),
+			session_id: this.sessionId,
+			matrix,
+			summary: {
+				total_prs: Object.keys(matrix).length,
+				total_gates: totalGates,
+				passed: totalPassed,
+				failed: totalFailed,
+				skipped: totalSkipped,
+				blocked: totalBlocked
+			}
+		};
+
+		const matrixPath = path.join(this.auditDir, 'audit-gate-matrix.json');
+		fs.writeFileSync(matrixPath, JSON.stringify(gateMatrix, null, 2));
 	}
 
 	/**

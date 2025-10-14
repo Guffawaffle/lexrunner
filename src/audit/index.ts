@@ -2,35 +2,29 @@
  * Audit subsystem - Public API
  */
 
-export {
-	AuditEmitter,
-	AuditOptions,
-	AuditSummary,
-	initAuditEmitter,
-	emitEvent,
-	finalizeAudit
-} from './emitter.js';
+export { AuditEmitter, initAuditEmitter, emitEvent, finalizeAudit } from './emitter.js';
+export type { AuditOptions, AuditSummary } from './emitter.js';
 
-export {
+export type {
 	EventEnvelope,
 	EventLevel,
 	Tool,
 	Actor,
 	Repo,
 	Context,
-	EventType,
-	EVENT_TYPES
+	EventType
 } from './events.js';
 
+export { EVENT_TYPES } from './events.js';
+
 export {
-	AuditProfile,
-	AuditProfileConfig,
 	AUDIT_PROFILES,
 	getProfileConfig,
 	mergeProfileConfig,
 	DEFAULT_REDACT_REGEX,
 	STRICT_REDACT_REGEX
 } from './profiles.js';
+export type { AuditProfile, AuditProfileConfig } from './profiles.js';
 
 export {
 	redactSecrets,
@@ -42,18 +36,14 @@ export {
 	buildContext
 } from './redaction.js';
 
-export {
-	AuditManifest,
-	AuditManifestEntry,
-	generateManifest,
-	writeManifest
-} from './manifest.js';
+export { generateManifest, writeManifest } from './manifest.js';
+export type { AuditManifest, AuditManifestEntry } from './manifest.js';
 
 export {
-	SidecarEvent,
 	discoverSidecarFiles,
 	readSidecarFile,
 	markSidecarProcessed,
 	enrichSidecarEvent,
 	ingestSidecarFiles
 } from './sidecar.js';
+export type { SidecarEvent } from './sidecar.js';
