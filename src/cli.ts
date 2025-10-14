@@ -35,7 +35,7 @@ import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
 import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
-import { registerOrchestrateCommands } from "./commands/orchestrate.js";
+import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -705,12 +705,6 @@ registerPlanDiffCommand(program, {
 	exitWith
 });
 
-// Orchestrate: plan-batch command - batch planner with Kahn's algorithm
-registerPlanBatchCommand(program, () => jsonModeActive);
-
-// Orchestrate: Pin Toolchain command
-registerPinToolchainCommand(program);
-
 // Autopilot command
 program
 	.command("autopilot")
@@ -1082,9 +1076,6 @@ Common Issues:
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
-
-// Orchestrate commands
-registerOrchestrateCommands(program, () => jsonModeActive);
 
 // Report command
 program
@@ -2229,6 +2220,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 registerSecurityCommands(program);
 
 // Orchestration commands
+registerAnalyzeIssuesCommand(program, () => jsonModeActive);
+registerPlanBatchCommand(program, () => jsonModeActive);
+registerPinToolchainCommand(program);
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
 registerAssignBatchCommand(program);

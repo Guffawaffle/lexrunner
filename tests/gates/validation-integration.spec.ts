@@ -39,12 +39,12 @@ describe('Gate Input Validation Integration', () => {
 			}
 		};
 
-		const result = await executeGate(gate, defaultPolicy, tempDir, 5000);
+	const result = await executeGate(gate, defaultPolicy, tempDir, 5000);
 
-		expect(result.status).toBe('fail');
-		expect(result.stderr).toContain('Invalid input for gate "lint"');
-		expect(result.stderr).toContain('must NOT have fewer than 1 items');
-		expect(result.attempts).toBe(0);  // Validation failure, no execution attempts
+	expect(result.status).toBe('fail');
+	expect(result.stderr).toContain('Invalid input for gate "lint"');
+	expect(result.stderr).toContain('should NOT have fewer than 1 items');
+	expect(result.attempts).toBe(0);  // Validation failure, no execution attempts
 	});
 
 	it('executes gate when input is valid', async () => {

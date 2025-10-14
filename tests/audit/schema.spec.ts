@@ -222,23 +222,16 @@ describe('Audit Emitter', () => {
 	describe('AuditEmitter', () => {
 		it('should create emitter with required options', () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'lex-pr-runner',
-				toolVersion: '0.1.0',
-				actorType: 'cli'
+				profile: 'basic',
+				dir: tempDir
 			});
 			expect(emitter).toBeDefined();
 		});
 
 		it('should emit valid audit events', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'lex-pr-runner',
-				toolVersion: '0.1.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('gate_started', { data: 'test' });
@@ -259,12 +252,8 @@ describe('Audit Emitter', () => {
 
 		it('should include tool information in events', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'lex-pr-runner',
-				toolVersion: '0.1.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('gate_finished', {});
@@ -278,12 +267,8 @@ describe('Audit Emitter', () => {
 
 		it('should include actor information', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'mcp',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('command_invocation', {});
@@ -296,12 +281,8 @@ describe('Audit Emitter', () => {
 
 		it('should support different severity levels', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('plan_discovered', {}, 'info');
@@ -319,12 +300,8 @@ describe('Audit Emitter', () => {
 
 		it('should append multiple events to NDJSON', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('gate_started', { num: 1 });
@@ -342,13 +319,8 @@ describe('Audit Emitter', () => {
 
 		it('should throw error for invalid event when validation enabled', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath,
-				validateBeforeWrite: true
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			// This should work fine since emitter builds valid envelopes
@@ -357,13 +329,8 @@ describe('Audit Emitter', () => {
 
 		it('should allow disabling validation', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath,
-				validateBeforeWrite: false
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await expect(emitter.emit('gate_started', {})).resolves.not.toThrow();
@@ -373,12 +340,8 @@ describe('Audit Emitter', () => {
 	describe('emitEvent helper', () => {
 		it('should emit event using helper function', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitEvent(emitter, 'artifact_written', { data: 'value' });
@@ -394,12 +357,8 @@ describe('Audit Emitter', () => {
 	describe('Event Types', () => {
 		it('should support all documented event types', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			const eventTypes = [
@@ -433,12 +392,8 @@ describe('Audit Emitter', () => {
 	describe('Timestamp and ID Generation', () => {
 		it('should include ISO 8601 timestamps', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'session-123',
-				runId: 'run-456',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('run_summary', {});
@@ -453,12 +408,8 @@ describe('Audit Emitter', () => {
 
 		it('should preserve session and run IDs', async () => {
 			const emitter = new AuditEmitter({
-				sessionId: 'unique-session-789',
-				runId: 'unique-run-012',
-				toolName: 'test',
-				toolVersion: '1.0.0',
-				actorType: 'cli',
-				outputPath
+				profile: 'basic',
+				dir: tempDir
 			});
 
 			await emitter.emit('run_summary', {});
