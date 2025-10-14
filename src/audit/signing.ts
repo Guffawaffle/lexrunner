@@ -1,6 +1,6 @@
 /**
  * Audit Manifest Signing
- * 
+ *
  * Supports KMS (AWS, GCP, Azure) and GPG signing for tamper-evident audit trails.
  */
 
@@ -100,8 +100,9 @@ async function signWithAWSKMS(
 ): Promise<{ signature: Buffer; metadata: SignatureMetadata }> {
 	try {
 		// Dynamic import to avoid loading SDK if not needed
+		// @ts-expect-error - Optional peer dependency, only loaded if installed
 		const { KMSClient, SignCommand } = await import('@aws-sdk/client-kms');
-		
+
 		const client = new KMSClient({});
 		const command = new SignCommand({
 			KeyId: keyArn,
@@ -109,13 +110,13 @@ async function signWithAWSKMS(
 			MessageType: 'DIGEST',
 			SigningAlgorithm: 'RSASSA_PSS_SHA_256'
 		});
-		
+
 		const response = await client.send(command);
-		
+
 		if (!response.Signature) {
 			throw new Error('KMS signing failed: no signature returned');
 		}
-		
+
 		const metadata: SignatureMetadata = {
 			provider: 'kms',
 			algorithm: 'RSASSA_PSS_SHA_256',
@@ -123,7 +124,7 @@ async function signWithAWSKMS(
 			signed_at: new Date().toISOString(),
 			manifest_sha256: manifestHash
 		};
-		
+
 		return { signature: Buffer.from(response.Signature), metadata };
 	} catch (error: any) {
 		throw new Error(`AWS KMS signing failed: ${error.message}`);
@@ -139,8 +140,9 @@ async function signWithGCPKMS(
 ): Promise<{ signature: Buffer; metadata: SignatureMetadata }> {
 	try {
 		// Dynamic import to avoid loading SDK if not needed
+		// @ts-expect-error - Optional peer dependency, only loaded if installed
 		const { KeyManagementServiceClient } = await import('@google-cloud/kms');
-		
+
 		const client = new KeyManagementServiceClient();
 		const [response] = await client.asymmetricSign({
 			name: keyPath,
@@ -148,11 +150,11 @@ async function signWithGCPKMS(
 				sha256: Buffer.from(manifestHash, 'hex')
 			}
 		});
-		
+
 		if (!response.signature) {
 			throw new Error('GCP KMS signing failed: no signature returned');
 		}
-		
+
 		const metadata: SignatureMetadata = {
 			provider: 'kms',
 			algorithm: 'RSA_SIGN_PSS_2048_SHA256',
@@ -160,7 +162,7 @@ async function signWithGCPKMS(
 			signed_at: new Date().toISOString(),
 			manifest_sha256: manifestHash
 		};
-		
+
 		return { signature: Buffer.from(response.signature), metadata };
 	} catch (error: any) {
 		throw new Error(`GCP KMS signing failed: ${error.message}`);
@@ -176,18 +178,20 @@ async function signWithAzureKV(
 ): Promise<{ signature: Buffer; metadata: SignatureMetadata }> {
 	try {
 		// Dynamic import to avoid loading SDK if not needed
+		// @ts-expect-error - Optional peer dependency, only loaded if installed
 		const { CryptographyClient } = await import('@azure/keyvault-keys');
+		// @ts-expect-error - Optional peer dependency, only loaded if installed
 		const { DefaultAzureCredential } = await import('@azure/identity');
-		
+
 		const credential = new DefaultAzureCredential();
 		const client = new CryptographyClient(keyUrl, credential);
-		
+
 		const result = await client.sign('PS256', Buffer.from(manifestHash, 'hex'));
-		
+
 		if (!result.result) {
 			throw new Error('Azure Key Vault signing failed: no signature returned');
 		}
-		
+
 		const metadata: SignatureMetadata = {
 			provider: 'kms',
 			algorithm: 'PS256',
@@ -195,7 +199,7 @@ async function signWithAzureKV(
 			signed_at: new Date().toISOString(),
 			manifest_sha256: manifestHash
 		};
-		
+
 		return { signature: Buffer.from(result.result), metadata };
 	} catch (error: any) {
 		throw new Error(`Azure Key Vault signing failed: ${error.message}`);
@@ -210,7 +214,7 @@ async function signWithKMS(
 	keyRef: string
 ): Promise<{ signature: Buffer; metadata: SignatureMetadata }> {
 	const provider = detectKMSProvider(keyRef);
-	
+
 	switch (provider) {
 		case 'aws':
 			return signWithAWSKMS(manifestHash, keyRef);
@@ -233,7 +237,7 @@ async function signWithGPG(
 	const manifestHash = computeManifestHash(manifestPath);
 	const sigPath = manifestPath.replace(/\.json$/, '.sig');
 	const pubkeyPath = manifestPath.replace(/\.json$/, '.pubkey.asc');
-	
+
 	try {
 		// Check if GPG is available
 		try {
@@ -241,7 +245,7 @@ async function signWithGPG(
 		} catch {
 			throw new Error('GPG binary not found in PATH');
 		}
-		
+
 		// Create detached signature
 		const passphrase = process.env.GPG_PASSPHRASE || '';
 		const gpgArgs = [
@@ -250,17 +254,17 @@ async function signWithGPG(
 			'--local-user', fingerprint,
 			'--output', sigPath
 		];
-		
+
 		if (passphrase) {
 			gpgArgs.unshift('--batch', '--yes', '--pinentry-mode', 'loopback', '--passphrase', passphrase);
 		} else {
 			gpgArgs.unshift('--batch', '--yes', '--pinentry-mode', 'loopback');
 		}
-		
+
 		gpgArgs.push(manifestPath);
-		
+
 		await execFileAsync('gpg', gpgArgs);
-		
+
 		// Export public key
 		await execFileAsync('gpg', [
 			'--armor',
@@ -272,10 +276,10 @@ async function signWithGPG(
 		}).then(({ stdout }) => {
 			writeFileSync(pubkeyPath, stdout);
 		});
-		
+
 		const signature = readFileSync(sigPath, 'utf-8');
 		const pubkey = readFileSync(pubkeyPath, 'utf-8');
-		
+
 		const metadata: SignatureMetadata = {
 			provider: 'gpg',
 			algorithm: 'RSA',
@@ -284,7 +288,7 @@ async function signWithGPG(
 			manifest_sha256: manifestHash,
 			pubkey_file: 'audit.pubkey.asc'
 		};
-		
+
 		return { signature, pubkey, metadata };
 	} catch (error: any) {
 		throw new Error(`GPG signing failed: ${error.message}`);
@@ -301,23 +305,23 @@ export async function signManifest(
 	if (options.provider === 'none') {
 		return;
 	}
-	
+
 	if (!options.keyRef) {
 		throw new Error('Key reference is required for signing');
 	}
-	
+
 	const manifestHash = computeManifestHash(manifestPath);
 	const sigPath = manifestPath.replace(/\.json$/, '.sig');
 	const metaPath = manifestPath.replace(/\.json$/, '.sig.meta');
-	
+
 	let signatureMetadata: SignatureMetadata;
 	let manifestSigningMetadata: ManifestSigningMetadata;
-	
+
 	if (options.provider === 'kms') {
 		const { signature, metadata } = await signWithKMS(manifestHash, options.keyRef);
 		writeFileSync(sigPath, signature);
 		signatureMetadata = metadata;
-		
+
 		manifestSigningMetadata = {
 			provider: 'kms',
 			key_ref: options.keyRef,
@@ -329,7 +333,7 @@ export async function signManifest(
 		const { signature, pubkey, metadata } = await signWithGPG(manifestPath, options.keyRef);
 		// Signature and pubkey files are already written by signWithGPG
 		signatureMetadata = metadata;
-		
+
 		manifestSigningMetadata = {
 			provider: 'gpg',
 			key_ref: options.keyRef,
@@ -340,10 +344,10 @@ export async function signManifest(
 	} else {
 		throw new Error(`Unsupported signing provider: ${options.provider}`);
 	}
-	
+
 	// Write signature metadata
 	writeFileSync(metaPath, JSON.stringify(signatureMetadata, null, 2));
-	
+
 	// Update manifest with signing metadata
 	const manifestContent = readFileSync(manifestPath, 'utf-8');
 	const manifest = JSON.parse(manifestContent);
@@ -362,14 +366,15 @@ async function verifyKMSSignature(
 	if (!metadata.key_ref) {
 		throw new Error('KMS key reference not found in metadata');
 	}
-	
+
 	const provider = detectKMSProvider(metadata.key_ref);
 	const manifestHash = computeManifestHash(manifestPath);
 	const signature = readFileSync(sigPath);
-	
+
 	try {
 		switch (provider) {
 			case 'aws': {
+				// @ts-expect-error - Optional peer dependency, only loaded if installed
 				const { KMSClient, VerifyCommand } = await import('@aws-sdk/client-kms');
 				const client = new KMSClient({});
 				const command = new VerifyCommand({
@@ -383,6 +388,7 @@ async function verifyKMSSignature(
 				return response.SignatureValid === true;
 			}
 			case 'gcp': {
+				// @ts-expect-error - Optional peer dependency, only loaded if installed
 				const { KeyManagementServiceClient } = await import('@google-cloud/kms');
 				const client = new KeyManagementServiceClient();
 				const [response] = await client.asymmetricDecrypt({
@@ -394,7 +400,9 @@ async function verifyKMSSignature(
 				return true;
 			}
 			case 'azure': {
+				// @ts-expect-error - Optional peer dependency, only loaded if installed
 				const { CryptographyClient } = await import('@azure/keyvault-keys');
+				// @ts-expect-error - Optional peer dependency, only loaded if installed
 				const { DefaultAzureCredential } = await import('@azure/identity');
 				const credential = new DefaultAzureCredential();
 				const client = new CryptographyClient(metadata.key_ref, credential);
@@ -447,7 +455,7 @@ export async function verifyManifestSignature(
 		// Read manifest
 		const manifestContent = readFileSync(manifestPath, 'utf-8');
 		const manifest = JSON.parse(manifestContent);
-		
+
 		if (!manifest.signing) {
 			return {
 				valid: false,
@@ -455,18 +463,18 @@ export async function verifyManifestSignature(
 				error: 'No signing metadata found in manifest'
 			};
 		}
-		
+
 		const signing = manifest.signing;
 		const basePath = manifestPath.replace(/\.json$/, '');
 		const sigPath = basePath + '.sig';
 		const metaPath = basePath + '.sig.meta';
-		
+
 		// Read signature metadata
 		const metaContent = readFileSync(metaPath, 'utf-8');
 		const metadata: SignatureMetadata = JSON.parse(metaContent);
-		
+
 		let valid = false;
-		
+
 		if (signing.provider === 'kms') {
 			valid = await verifyKMSSignature(manifestPath, sigPath, metadata);
 		} else if (signing.provider === 'gpg') {
@@ -478,7 +486,7 @@ export async function verifyManifestSignature(
 				error: `Unsupported signing provider: ${signing.provider}`
 			};
 		}
-		
+
 		return {
 			valid,
 			provider: signing.provider,

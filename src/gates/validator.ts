@@ -6,7 +6,6 @@ import type { ErrorObject } from 'ajv';
 // Create a single shared AJV instance
 const ajv = new Ajv({
 	allErrors: true,
-	strict: true,
 	verbose: true
 });
 
@@ -67,7 +66,7 @@ function loadGateSchema(gateName: string): object | null {
  */
 export function validateGateInput(gateName: string, input: unknown): void {
 	const schema = loadGateSchema(gateName);
-	
+
 	if (!schema) {
 		// No schema = no validation (backward compatibility)
 		return;
