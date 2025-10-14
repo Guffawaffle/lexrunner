@@ -9,7 +9,9 @@ import type {
 	PullRequest,
 	PullRequestDetails,
 	PRQueryOptions,
-	RepositoryInfo
+	RepositoryInfo,
+	GitHubIssue,
+	IssueQueryOptions
 } from "./types.js";
 import {
 	GitHubAPIError,
@@ -19,7 +21,7 @@ import {
 import { parsePRDescription, normalizeDependencyRef } from "../planner/index.js";
 import { parseRemoteUrl } from "../git/parseRemote.js";
 
-export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo };
+export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo, GitHubIssue, IssueQueryOptions };
 export { GitHubAPIError, GitHubRateLimitError, GitHubAuthError };
 
 export interface GitHubClient {
@@ -27,6 +29,8 @@ export interface GitHubClient {
 	getPRDetails(number: number): Promise<PullRequestDetails>;
 	getPRDependencies(pr: PullRequest): Promise<string[]>;
 	validateRepository(): Promise<RepositoryInfo>;
+	// Issue operations
+	listIssues(options?: IssueQueryOptions): Promise<GitHubIssue[]>;
 	// File analysis support
 	getOctokit(): any; // Returns Octokit instance for advanced operations
 	getOwner(): string;
@@ -192,6 +196,62 @@ export class GitHubClientImpl implements GitHubClient {
 
 		// Remove duplicates and sort for deterministic output
 		return [...new Set(normalizedDeps)].sort();
+	}
+
+	async listIssues(options: IssueQueryOptions = {}): Promise<GitHubIssue[]> {
+		try {
+			const params: any = {
+				owner: this.owner,
+				repo: this.repo,
+				state: options.state || "open",
+				per_page: options.per_page || 100,
+				page: options.page || 1,
+				sort: options.sort || "created",
+				direction: options.direction || "desc"
+			};
+
+			if (options.labels && options.labels.length > 0) {
+				params.labels = options.labels.join(",");
+			}
+
+			if (options.assignee) {
+				params.assignee = options.assignee;
+			}
+
+			if (options.creator) {
+				params.creator = options.creator;
+			}
+
+			if (options.mentioned) {
+				params.mentioned = options.mentioned;
+			}
+
+			const response = await this.octokit.rest.issues.listForRepo(params);
+
+			// Filter out pull requests (GitHub API includes PRs in issues endpoint)
+			const issues = response.data.filter((item: any) => !item.pull_request);
+
+			return issues.map((issue: any) => ({
+				number: issue.number,
+				title: issue.title,
+				body: issue.body,
+				state: issue.state,
+				labels: issue.labels.map((label: any) => ({
+					name: label.name,
+					color: label.color
+				})),
+				user: {
+					login: issue.user.login
+				},
+				assignees: issue.assignees.map((assignee: any) => ({
+					login: assignee.login
+				})),
+				createdAt: issue.created_at,
+				updatedAt: issue.updated_at
+			}));
+		} catch (error: any) {
+			return this.handleAPIError(error);
+		}
 	}
 
 	private transformPR(prData: any): PullRequest {

@@ -34,6 +34,7 @@ import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
 import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
+import { registerOrchestrateCommands } from "./commands/orchestrate.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -145,6 +146,8 @@ Examples:
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
 	$ lex-pr execute plan.json              Run quality gates on plan
+	$ lex-pr orchestrate analyze            Analyze issues for parallel work planning
+	$ lex-pr orchestrate analyze --labels priority:P1 --json
 	$ lex-pr security check-rotation        Check token rotation status
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
@@ -944,6 +947,9 @@ program
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
+
+// Orchestrate commands
+registerOrchestrateCommands(program, () => jsonModeActive);
 
 // Report command
 program
