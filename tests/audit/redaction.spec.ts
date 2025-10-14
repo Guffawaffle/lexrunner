@@ -16,7 +16,7 @@ describe('Audit Redaction', () => {
 	describe('redactSecrets', () => {
 		it('should redact secrets matching pattern', () => {
 			const text = 'My password is secret123 and token is abc456';
-			const redacted = redactSecrets(text, '(?i)password|token');
+			const redacted = redactSecrets(text, 'password|token');
 
 			expect(redacted).toContain('***REDACTED***');
 			expect(redacted).not.toContain('secret123');
@@ -25,7 +25,7 @@ describe('Audit Redaction', () => {
 
 		it('should handle case-insensitive patterns', () => {
 			const text = 'TOKEN=xyz PASSWORD=123 Secret=abc';
-			const redacted = redactSecrets(text, '(?i)token|password|secret');
+			const redacted = redactSecrets(text, 'token|password|secret');
 
 			expect(redacted).toBe('***REDACTED***=xyz ***REDACTED***=123 ***REDACTED***=abc');
 		});
@@ -46,7 +46,7 @@ describe('Audit Redaction', () => {
 				'AUTH_TOKEN=abc'
 			];
 
-			const pattern = '(?i)token|secret|key|auth';
+			const pattern = 'token|secret|key|auth';
 
 			for (const text of patterns) {
 				const redacted = redactSecrets(text, pattern);
@@ -63,7 +63,7 @@ describe('Audit Redaction', () => {
 				token: 'ghp_abc123'
 			};
 
-			const redacted = redactObject(obj, '(?i)password|token');
+			const redacted = redactObject(obj, 'password|token');
 
 			expect(redacted.username).toBe('alice');
 			expect(redacted.password).toContain('***REDACTED***');
@@ -81,7 +81,7 @@ describe('Audit Redaction', () => {
 				}
 			};
 
-			const redacted = redactObject(obj, '(?i)password|key');
+			const redacted = redactObject(obj, 'password|key');
 
 			expect(redacted.user.name).toBe('alice');
 			expect(redacted.user.credentials.password).toContain('***REDACTED***');
@@ -94,7 +94,7 @@ describe('Audit Redaction', () => {
 				names: ['alice', 'bob']
 			};
 
-			const redacted = redactObject(obj, '(?i)token');
+			const redacted = redactObject(obj, 'token');
 
 			expect(redacted.tokens[0]).toContain('***REDACTED***');
 			expect(redacted.tokens[1]).toContain('***REDACTED***');
@@ -108,7 +108,7 @@ describe('Audit Redaction', () => {
 				api_token: 'abc'
 			};
 
-			const redacted = redactObject(obj, '(?i)secret|token');
+			const redacted = redactObject(obj, 'secret|token');
 
 			expect(redacted.username).toBe('alice');
 			expect(redacted.secret_key).toBe('***REDACTED***');
@@ -124,7 +124,7 @@ describe('Audit Redaction', () => {
 	describe('redactArgv', () => {
 		it('should redact arguments with secrets', () => {
 			const argv = ['lex-pr', 'execute', '--token', 'ghp_abc123', '--file', 'plan.json'];
-			const redacted = redactArgv(argv, '(?i)token');
+			const redacted = redactArgv(argv, 'token');
 
 			expect(redacted).toContain('lex-pr');
 			expect(redacted).toContain('--file');
@@ -134,7 +134,7 @@ describe('Audit Redaction', () => {
 
 		it('should redact key=value format', () => {
 			const argv = ['--token=ghp_abc123', '--file=plan.json'];
-			const redacted = redactArgv(argv, '(?i)token');
+			const redacted = redactArgv(argv, 'token');
 
 			expect(redacted).toContain('--token=***REDACTED***');
 			expect(redacted).toContain('--file=plan.json');
@@ -142,7 +142,7 @@ describe('Audit Redaction', () => {
 
 		it('should redact values in key=value when value matches', () => {
 			const argv = ['--key=secret123', '--name=alice'];
-			const redacted = redactArgv(argv, '(?i)secret');
+			const redacted = redactArgv(argv, 'secret');
 
 			expect(redacted).toContain('--key=***REDACTED***');
 			expect(redacted).toContain('--name=alice');

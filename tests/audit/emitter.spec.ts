@@ -106,7 +106,7 @@ describe('Audit Emitter', () => {
 			const emitter = await initAuditEmitter({
 				profile: 'basic',
 				dir: auditDir,
-				redactRegex: '(?i)token|secret'
+				redactRegex: 'token|secret'
 			});
 
 			await emitEvent(emitter, EVENT_TYPES.COMMAND_INVOCATION, {
