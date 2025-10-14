@@ -6,19 +6,24 @@ import { createHash } from 'node:crypto';
 
 /**
  * Redact secrets from text using regex pattern
+ * Matches patterns like "password=value", "password: value", "password is value", "bearer value"
+ * and redacts the value part
  */
 export function redactSecrets(text: string, pattern: string): string {
 	try {
-		const regex = new RegExp(pattern, 'gi');
-		return text.replace(regex, '***REDACTED***');
+		// First, validate the pattern by trying to create a regex with it
+		new RegExp(pattern, 'gi');
+
+		// Match keyword followed by optional separator (=, :, is) and optional spaces, then capture the value
+		// Value is captured as: non-whitespace characters or quoted strings
+		const regex = new RegExp(`(${pattern})\\s*(?:=|:|is|:=)?\\s*([^\\s"']+|"[^"]*"|'[^']*')`, 'gi');
+		return text.replace(regex, '$1 ***REDACTED***');
 	} catch (error) {
 		// If regex is invalid, return text unchanged
 		console.warn(`Invalid redaction pattern: ${pattern}`, error);
 		return text;
 	}
-}
-
-/**
+}/**
  * Redact secrets from object values
  */
 export function redactObject(obj: any, pattern: string): any {
@@ -63,13 +68,13 @@ export function hashPath(filePath: string): string {
  */
 export function sanitizeEnv(env: NodeJS.ProcessEnv, allowlist: string[]): Record<string, string> {
 	const sanitized: Record<string, string> = {};
-	
+
 	for (const key of allowlist) {
 		if (env[key]) {
 			sanitized[key] = env[key] as string;
 		}
 	}
-	
+
 	return sanitized;
 }
 
@@ -88,12 +93,12 @@ export function redactArgv(argv: string[], pattern: string): string[] {
 				return `${key}=***REDACTED***`;
 			}
 		}
-		
+
 		// Redact if the arg itself matches pattern
 		if (new RegExp(pattern, 'gi').test(arg)) {
 			return '***REDACTED***';
 		}
-		
+
 		return arg;
 	});
 }

@@ -23,14 +23,12 @@ describe('Audit Redaction', () => {
 			expect(redacted).not.toContain('abc456');
 		});
 
-		it('should handle case-insensitive patterns', () => {
-			const text = 'TOKEN=xyz PASSWORD=123 Secret=abc';
-			const redacted = redactSecrets(text, 'token|password|secret');
+	it('should handle case-insensitive patterns', () => {
+		const text = 'TOKEN=xyz PASSWORD=123 Secret=abc';
+		const redacted = redactSecrets(text, 'token|password|secret');
 
-			expect(redacted).toBe('***REDACTED***=xyz ***REDACTED***=123 ***REDACTED***=abc');
-		});
-
-		it('should handle invalid regex gracefully', () => {
+		expect(redacted).toBe('TOKEN ***REDACTED*** PASSWORD ***REDACTED*** Secret ***REDACTED***');
+	});		it('should handle invalid regex gracefully', () => {
 			const text = 'test content';
 			const redacted = redactSecrets(text, '[invalid(regex');
 
@@ -88,20 +86,18 @@ describe('Audit Redaction', () => {
 			expect(redacted.user.credentials.apiKey).toContain('***REDACTED***');
 		});
 
-		it('should redact arrays', () => {
-			const obj = {
-				tokens: ['token1', 'token2'],
-				names: ['alice', 'bob']
-			};
+	it('should redact arrays', () => {
+		const obj = {
+			tokens: ['token1', 'token2'],
+			names: ['alice', 'bob']
+		};
 
-			const redacted = redactObject(obj, 'token');
+		const redacted = redactObject(obj, 'token');
 
-			expect(redacted.tokens[0]).toContain('***REDACTED***');
-			expect(redacted.tokens[1]).toContain('***REDACTED***');
-			expect(redacted.names).toEqual(['alice', 'bob']);
-		});
-
-		it('should redact keys matching pattern', () => {
+		// When key matches pattern, entire value is redacted
+		expect(redacted.tokens).toBe('***REDACTED***');
+		expect(redacted.names).toEqual(['alice', 'bob']);
+	});		it('should redact keys matching pattern', () => {
 			const obj = {
 				username: 'alice',
 				secret_key: 'value123',

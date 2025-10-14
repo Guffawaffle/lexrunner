@@ -92,6 +92,11 @@ export class AuditEmitter {
 	 * Initialize emitter - create directory and files
 	 */
 	async init(): Promise<void> {
+		// If profile is 'off', skip all initialization
+		if (!this.config || this.options.profile === 'off') {
+			return;
+		}
+
 		// Create audit directory
 		if (!fs.existsSync(this.auditDir)) {
 			fs.mkdirSync(this.auditDir, { recursive: true });
@@ -105,6 +110,11 @@ export class AuditEmitter {
 		// Set environment variables for gates
 		process.env.LEX_AUDIT_DROP_DIR = this.dropDir;
 		process.env.LEX_AUDIT_SESSION_ID = this.sessionId;
+
+		// Create empty NDJSON file if it doesn't exist
+		if (!fs.existsSync(this.ndjsonPath)) {
+			fs.writeFileSync(this.ndjsonPath, '');
+		}
 
 		// Open NDJSON stream
 		this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: 'a' });
@@ -146,7 +156,7 @@ export class AuditEmitter {
 		}
 
 		// Apply sampling if configured
-		if (this.options.sample && this.options.sample < 100) {
+		if (this.options.sample !== undefined && this.options.sample < 100) {
 			if (Math.random() * 100 > this.options.sample) {
 				return; // Skip this event
 			}
@@ -253,9 +263,15 @@ export class AuditEmitter {
 		// Final sidecar ingestion
 		await this.ingestSidecar();
 
-		// Close NDJSON stream
+		// Close NDJSON stream and wait for it to finish
 		if (this.ndjsonStream) {
-			this.ndjsonStream.end();
+			const stream = this.ndjsonStream;
+			await new Promise<void>((resolve, reject) => {
+				stream.end((err?: Error) => {
+					if (err) reject(err);
+					else resolve();
+				});
+			});
 			this.ndjsonStream = null;
 		}
 
