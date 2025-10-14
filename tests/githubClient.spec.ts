@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { GitHubClientImpl } from '../src/github/client.js';
 
 function makeFakePR(n: number) {
@@ -19,13 +19,6 @@ function makeFakePR(n: number) {
 }
 
 describe('GitHubClientImpl (pagination & discovery)', () => {
-  const realEnv = { ...process.env };
-
-  afterEach(() => {
-    process.env = { ...realEnv };
-    (process as any).__FAKE_OCTOKIT = undefined;
-  });
-
   it('aggregates paginated PRs via paginate', async () => {
     // Create fake octokit with paginate that returns two pages
     const prsPage1 = Array.from({ length: 100 }, (_, i) => makeFakePR(i + 1));
@@ -42,12 +35,11 @@ describe('GitHubClientImpl (pagination & discovery)', () => {
       }
     };
 
-    (process as any).__FAKE_OCTOKIT = fakeOctokit;
-    process.env.LEX_PR_FAKE_OCTOKIT = '1';
-
-    const client = await new GitHubClientImpl({ owner: 'Owner', repo: 'Repo' } as any);
-    // override octokit via fake
-    (client as any).octokit = fakeOctokit;
+    const client = new GitHubClientImpl({ 
+      owner: 'Owner', 
+      repo: 'Repo',
+      octokit: fakeOctokit as any
+    });
 
     const prs = await client.listOpenPRs({});
     expect(prs.length).toBe(102);
@@ -62,13 +54,54 @@ describe('GitHubClientImpl (pagination & discovery)', () => {
       },
       paginate: async () => []
     };
-    (process as any).__FAKE_OCTOKIT = fakeOctokit;
-    process.env.LEX_PR_FAKE_OCTOKIT = '1';
 
-    const client = await new GitHubClientImpl({ owner: 'Owner', repo: 'Repo' } as any);
-    (client as any).octokit = fakeOctokit;
+    const client = new GitHubClientImpl({ 
+      owner: 'Owner', 
+      repo: 'Repo',
+      octokit: fakeOctokit as any
+    });
 
     const prs = await client.listOpenPRs({});
     expect(prs).toEqual([]);
+  });
+
+  it('uses injected Octokit instead of creating new instance', async () => {
+    // Create a fake with a spy to track calls
+    let reposGetCalled = false;
+    const fakeOctokit = {
+      rest: {
+        pulls: { 
+          list: () => ({ data: [makeFakePR(1)] }) 
+        },
+        repos: {
+          get: () => {
+            reposGetCalled = true;
+            return {
+              data: {
+                default_branch: 'main',
+                html_url: 'https://github.com/test/test'
+              }
+            };
+          }
+        }
+      }
+    };
+
+    // Inject via constructor
+    const client = new GitHubClientImpl({ 
+      owner: 'Test', 
+      repo: 'Repo',
+      octokit: fakeOctokit as any
+    });
+
+    // Verify it uses the injected instance
+    expect(client.getOctokit()).toBe(fakeOctokit);
+    
+    // Verify it actually uses the fake for API calls
+    const repo = await client.validateRepository();
+    expect(reposGetCalled).toBe(true);
+    expect(repo.owner).toBe('Test');
+    expect(repo.repo).toBe('Repo');
+    expect(repo.defaultBranch).toBe('main');
   });
 });
