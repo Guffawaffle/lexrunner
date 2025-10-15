@@ -124,6 +124,7 @@ program
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
 	.version("0.1.0")
 	.option("--no-color", "Disable ANSI color codes in output")
+	.option('--audit-profile <profile>', 'Audit logging profile: off|basic|soc2|hipaa-strict', 'off')
 	.option("--json", "Enable JSON output mode (implies --no-color)")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
 	.hook('preAction', (thisCommand) => {
@@ -336,6 +337,7 @@ Common Issues:
   • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
   • Missing configuration: Run 'lex-pr init' to set up workspace`)
 	.action(async (opts) => {
+		let auditEmitter: AuditEmitter | null = null;
 		const previousJsonMode = jsonModeActive;
 		// jsonModeActive is already set by preAction hook from global --json
 		// Command-level --json flag also sets it for backwards compatibility
@@ -457,6 +459,25 @@ Common Issues:
 				console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
 				console.log("");
 				console.log(generatePlanSummary(validatedPlan));
+				// Ensure audit emitter is finalized for dry-run paths so background
+				// timers (sidecar ingestion) are stopped and the process can exit.
+				if (auditEmitter) {
+					try {
+						await finalizeAudit(auditEmitter, 'success');
+					} catch (e) {
+						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
+					}
+				}
+
+				// Ensure audit emitter is finalized on dry-run to close streams/timers
+				if (auditEmitter) {
+					try {
+						await finalizeAudit(auditEmitter, 'dry-run');
+					} catch (e) {
+						// Best-effort; do not fail dry-run on finalize errors
+						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
+					}
+				}
 				return;
 			}
 
@@ -625,6 +646,9 @@ program
 		} catch (error) {
 			exitWith(error);
 		}
+		finally {
+			// no audit finalization here
+		}
 	});
 
 // Plan review command - Interactive plan validation and editing
@@ -639,12 +663,22 @@ program
 	.option("--output <file>", "Output file for approved/modified plan")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file;
+		let auditEmitter: AuditEmitter | null = null;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
 			throwExit(1);
 		}
 
 		try {
+			// Initialize audit emitter from global audit-profile flag if set
+			const globalAudit = program.opts().auditProfile as string | undefined;
+				if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(resolveProfile(opts.profileDir).path, 'deliverables', 'audit');
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: envKey });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'autopilot', argv: process.argv.slice(2) });
+			}
 			const planContent = fs.readFileSync(planFile, "utf-8");
 			const plan = loadPlan(planContent);
 
@@ -717,6 +751,7 @@ program
 	.option("--json", "Output JSON format")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file;
+		let auditEmitter: AuditEmitter | null = null;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
 			throwExit(1);
@@ -729,6 +764,16 @@ program
 
 			// Resolve profile
 			const profile = resolveProfile(opts.profileDir);
+
+			// Initialize audit emitter from global flag if present
+			const globalAudit = program.opts().auditProfile as string | undefined;
+			if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(profile.path, 'deliverables', 'audit');
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: envKey });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'autopilot', argv: process.argv.slice(2) });
+			}
 
 			// Import autopilot modules
 			const { AutopilotLevel0, AutopilotLevel1, AutopilotLevel2 } = await import("./autopilot/index.js");
@@ -777,6 +822,10 @@ program
 				console.error(`Error running autopilot: ${message}`);
 			}
 			exitWith(error);
+		} finally {
+			if (auditEmitter) {
+				await finalizeAudit(auditEmitter);
+			}
 		}
 	});
 
@@ -860,6 +909,8 @@ Common Issues:
 			// Initialize audit emitter if profile is not 'off'
 			if (opts.audit && opts.audit !== 'off') {
 				const auditDir = opts.auditDir || path.join(opts.artifactDir, 'audit');
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const phiFlag = (opts.audit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
 				const auditOptions: AuditOptions = {
 					profile: opts.audit as 'basic' | 'soc2' | 'hipaa-strict',
 					dir: auditDir,
@@ -870,7 +921,9 @@ Common Issues:
 					context: opts.auditContext ? opts.auditContext.split(',') as ('git' | 'ci' | 'os')[] : undefined,
 					signer: opts.auditSigner,
 					retainDays: opts.auditRetainDays ? parseInt(opts.auditRetainDays) : undefined,
-					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined
+					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined,
+					phiRedaction: phiFlag,
+					encryptionKeyHex: envKey
 				};
 
 				auditEmitter = await initAuditEmitter(auditOptions);
@@ -942,6 +995,16 @@ Common Issues:
 
 					if (plan.policy) {
 						console.log(`Policy: ${plan.policy.maxWorkers} max workers, ${Object.keys(plan.policy.retries).length} retry configs`);
+					}
+				}
+
+				// Finalize audit emitter on dry-run so background tasks run and optional
+				// at-rest encryption can occur when an encryption key is provided.
+				if (auditEmitter) {
+					try {
+						await finalizeAudit(auditEmitter, 'dry-run');
+					} catch (e) {
+						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
 					}
 				}
 
@@ -1131,6 +1194,7 @@ Common Issues:
   • Rate limit errors: Wait or use authenticated token with higher limits
   • No PRs found: Check --state filter and repository permissions`)
 	.action(async (opts) => {
+		let auditEmitter: AuditEmitter | null = null;
 		try {
 			let githubAPI = await createGitHubAPI();
 
@@ -1285,6 +1349,7 @@ Common Issues:
   • Dirty working directory: Commit or stash changes before merging
   • Permission denied: Ensure you have push access to the repository`)
 	.action(async (opts) => {
+		let auditEmitter: AuditEmitter | null = null;
 		try {
 			// Parse and validate autopilot configuration
 			let autopilotConfig;
@@ -1328,6 +1393,16 @@ Common Issues:
 
 			const planContent = fs.readFileSync(opts.plan, "utf-8");
 			const plan = loadPlan(planContent);
+
+			// Initialize audit emitter from global flag if present
+			const globalAudit = program.opts().auditProfile as string | undefined;
+			if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(path.dirname(opts.plan || '.'), 'audit');
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: envKey });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'merge', argv: process.argv.slice(2) });
+			}
 
 			// Compute merge order
 			const levels = computeMergeOrder(plan);
@@ -1450,12 +1525,20 @@ Common Issues:
 			}
 
 		} catch (error) {
+			if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.ERROR, { code: 'MERGE_ERROR', message: error instanceof Error ? error.message : String(error), where: 'merge_command' }, 'error');
+				await finalizeAudit(auditEmitter, 'error');
+			}
 			if (error instanceof GitOperationError) {
 				console.error(`Git Operation Error: ${error.message}`);
 				throwExit(1);
 			}
 			console.error(`Error executing merge: ${error instanceof Error ? error.message : String(error)}`);
 			throwExit(1);
+		} finally {
+			if (auditEmitter) {
+				await finalizeAudit(auditEmitter, 'success');
+			}
 		}
 	});
 

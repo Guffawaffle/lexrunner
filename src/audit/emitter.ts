@@ -7,9 +7,10 @@ import * as path from 'path';
 import { ulid } from 'ulid';
 import { EventEnvelope, EventLevel, Tool, Actor, Repo, Context } from './events.js';
 import { AuditProfile, getProfileConfig, AuditProfileConfig } from './profiles.js';
-import { redactObject, redactArgv, buildContext, hashPath } from './redaction.js';
+import { redactObject, redactArgv, buildContext, hashPath, redactPHI } from './redaction.js';
 import { generateManifest, writeManifest } from './manifest.js';
 import { ingestSidecarFiles } from './sidecar.js';
+import * as crypto from 'crypto';
 
 export interface AuditOptions {
 	profile: AuditProfile;
@@ -26,6 +27,9 @@ export interface AuditOptions {
 	sessionId?: string; // Optional override for testing
 	runId?: string; // Optional override for testing
 	tool?: { name: string; version: string }; // Optional override for testing
+	// Optional HIPAA-related toggles
+	phiRedaction?: boolean; // redact PHI patterns when true
+	encryptionKeyHex?: string; // optional AES-256-GCM key (hex) to encrypt ndjson at finalize
 }
 
 export interface AuditSummary {
@@ -141,7 +145,11 @@ export class AuditEmitter {
 		}
 
 		// Open NDJSON stream
-		this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: 'a' });
+		this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: 'a', autoClose: true });
+		// Guard against stream errors (e.g., directory removed concurrently in tests)
+		this.ndjsonStream.on('error', (err) => {
+			console.warn('[lex-pr] audit: ndjson stream error (ignored)', String(err));
+		});
 
 		// Write schema file
 		const schemaPath = path.join(this.auditDir, 'audit.schema.json');
@@ -193,6 +201,29 @@ export class AuditEmitter {
 			redactedPayload = redactObject(payload, redactRegex);
 		}
 
+		// PHI redaction (opt-in)
+		if (this.options.phiRedaction) {
+			try {
+				const line = JSON.stringify(redactedPayload);
+				const { text, flagged } = redactPHI(line, true);
+				if (flagged) {
+					// Mark payload to indicate PHI was detected and redacted
+					if (typeof redactedPayload === 'object' && redactedPayload !== null) {
+						(redactedPayload as any)._phi_redacted = true;
+					}
+					// Replace payload with parsed redacted text when possible
+					try {
+						redactedPayload = JSON.parse(text);
+					} catch {
+						// Keep as original redacted string in worst case
+						redactedPayload = text;
+					}
+				}
+			} catch {
+				// ignore PHI redaction failures
+			}
+		}
+
 		// Hash paths if needed
 		if (this.options.hashPaths || this.config.hashPaths) {
 			if (redactedPayload.path) {
@@ -218,8 +249,15 @@ export class AuditEmitter {
 			payload: redactedPayload
 		};
 
-		// Write to NDJSON stream
-		this.ndjsonStream.write(JSON.stringify(envelope) + '\n');
+		// Prepare line
+		let line = JSON.stringify(envelope) + '\n';
+		try {
+			if (this.ndjsonStream && !this.ndjsonStream.destroyed) {
+				this.ndjsonStream.write(line);
+			}
+		} catch (e) {
+			console.warn('[lex-pr] audit: ndjson write failed (ignored)', String(e));
+		}
 
 		// Track event
 		this.eventCount++;
@@ -238,8 +276,23 @@ export class AuditEmitter {
 	 */
 	private startSidecarIngestion(): void {
 		this.sidecarIngestInterval = setInterval(async () => {
-			await this.ingestSidecar();
+			try {
+				await this.ingestSidecar();
+			} catch (e) {
+				// Don't let sidecar ingestion errors bubble and kill the test runner
+				console.warn('[lex-pr] audit: sidecar ingestion error (ignored)', String(e));
+			}
 		}, 5000); // Every 5 seconds
+
+		// Ensure the interval does not keep the Node event loop alive if finalize() is not called
+		try {
+			// Some Node timers have unref() to allow process to exit
+			if (this.sidecarIngestInterval && typeof (this.sidecarIngestInterval as any).unref === 'function') {
+				(this.sidecarIngestInterval as any).unref();
+			}
+		} catch (e) {
+			// Swallow any errors here - defensive
+		}
 	}
 
 	/**
@@ -258,20 +311,29 @@ export class AuditEmitter {
 			context: this.context
 		};
 
-		await ingestSidecarFiles(this.dropDir, envelope, async (event) => {
-			// Apply redaction to ingested events
-			const redactRegex = this.options.redactRegex || this.config!.redactRegex;
-			if (redactRegex) {
-				event.payload = redactObject(event.payload, redactRegex);
-			}
+		try {
+			await ingestSidecarFiles(this.dropDir, envelope, async (event) => {
+				try {
+					// Apply redaction to ingested events
+					const redactRegex = this.options.redactRegex || this.config!.redactRegex;
+					if (redactRegex) {
+						event.payload = redactObject(event.payload, redactRegex);
+					}
 
-			// Write to stream
-			if (this.ndjsonStream) {
-				this.ndjsonStream.write(JSON.stringify(event) + '\n');
-				this.eventCount++;
-				this.eventsByType[event.event] = (this.eventsByType[event.event] || 0) + 1;
-			}
-		});
+					// Write to stream
+					if (this.ndjsonStream) {
+						this.ndjsonStream.write(JSON.stringify(event) + '\n');
+						this.eventCount++;
+						this.eventsByType[event.event] = (this.eventsByType[event.event] || 0) + 1;
+					}
+				} catch (innerErr) {
+					console.warn('[lex-pr] audit: error ingesting sidecar event (ignored)', String(innerErr));
+				}
+			});
+		} catch (err) {
+			// If dropDir doesn't exist or files raced away, ignore the ingestion error
+			console.warn('[lex-pr] audit: ingestSidecarFiles failed (ignored)', String(err));
+		}
 	}
 
 	/**
@@ -333,6 +395,31 @@ export class AuditEmitter {
 			const sigPath = path.join(this.auditDir, 'audit.sig');
 			fs.writeFileSync(sigPath, '# Signature stub - Phase 2 implementation pending\n');
 		}
+
+		// Optional at-rest encryption (opt-in via options.encryptionKeyHex)
+		if (this.options.encryptionKeyHex) {
+			// Debug: surface whether encryption key is present (non-sensitive length only)
+			// (debug removed) do not log encryption key length or any sensitive material
+			try {
+				const key = Buffer.from(this.options.encryptionKeyHex, 'hex');
+				if (key.length !== 32) {
+					console.warn('[lex-pr] audit: encryptionKeyHex must be 64 hex chars (32 bytes) - skipping encryption');
+				} else {
+					const ndjsonPath = this.ndjsonPath;
+					const src = fs.readFileSync(ndjsonPath);
+					const iv = crypto.randomBytes(12);
+					const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+					const enc = Buffer.concat([cipher.update(src), cipher.final()]);
+					const tag = cipher.getAuthTag();
+					const outPath = ndjsonPath + '.enc';
+					fs.writeFileSync(outPath, Buffer.concat([iv, tag, enc]));
+					// remove plaintext
+					fs.unlinkSync(ndjsonPath);
+				}
+			} catch (e) {
+				console.warn('[lex-pr] audit: encryption failed', e);
+			}
+		}
 	}
 
 	/**
@@ -345,7 +432,14 @@ export class AuditEmitter {
 			return;
 		}
 
-		const content = fs.readFileSync(auditPath, 'utf-8');
+		let content: string;
+		try {
+			content = fs.readFileSync(auditPath, 'utf-8');
+		} catch (e) {
+			// File may have been removed between exists check and read; bail out
+			console.warn('[lex-pr] audit: failed to read audit.ndjson (ignored)', String(e));
+			return;
+		}
 		const lines = content.trim().split('\n').filter(l => l);
 
 		const matrix: Record<string, Record<string, any>> = {};

@@ -160,3 +160,23 @@ export function buildContext(
 
 	return context;
 }
+
+// Conservative PHI pattern set; disabled by default unless profile enables it.
+export const PHI_PATTERNS: RegExp[] = [
+	/\b\d{3}-\d{2}-\d{4}\b/g,                           // SSN
+	/\b\d{2}-\d{7}\b/g,                                 // EIN
+	/\b(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g // DOB (ISO)
+];
+
+export function redactPHI(text: string, enable = false): { text: string; flagged: boolean } {
+	if (!enable) return { text, flagged: false };
+	let flagged = false;
+	let result = text;
+	for (const re of PHI_PATTERNS) {
+		if (re.test(result)) {
+			flagged = true;
+			result = result.replace(re, '***REDACTED***');
+		}
+	}
+	return { text: result, flagged };
+}
