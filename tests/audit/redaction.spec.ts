@@ -28,8 +28,10 @@ describe('Audit Redaction', () => {
 		const redacted = redactSecrets(text, 'token|password|secret');
 
 		expect(redacted).toBe('TOKEN ***REDACTED*** PASSWORD ***REDACTED*** Secret ***REDACTED***');
-	});		it('should handle invalid regex gracefully', () => {
-			const text = 'test content';
+	});
+
+	it('should handle invalid regex gracefully', () => {
+		const text = 'test content';
 			const redacted = redactSecrets(text, '[invalid(regex');
 
 			// Should return original text if regex is invalid
@@ -97,8 +99,10 @@ describe('Audit Redaction', () => {
 		// When key matches pattern, entire value is redacted
 		expect(redacted.tokens).toBe('***REDACTED***');
 		expect(redacted.names).toEqual(['alice', 'bob']);
-	});		it('should redact keys matching pattern', () => {
-			const obj = {
+	});
+
+	it('should redact keys matching pattern', () => {
+		const obj = {
 				username: 'alice',
 				secret_key: 'value123',
 				api_token: 'abc'

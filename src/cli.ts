@@ -494,7 +494,9 @@ Common Issues:
 				}
 			}
 			return;
-		}			// Write artifacts - validate write permissions first
+		}
+
+	// Write artifacts - validate write permissions first
 
 			// Check if output directory is within a profile and validate write permissions
 			const absOutDir = path.resolve(outDir);

@@ -370,7 +370,9 @@ export class AuditEmitter {
 				}
 			} catch (e) {
 				console.error('[HIPAA] Failed to scrub sensitive audit files:', e);
-			}				const errObj = {
+			}
+
+		const errObj = {
 					profile: 'hipaa-strict',
 					status: 'aborted',
 					reason: 'missing_or_invalid_key'

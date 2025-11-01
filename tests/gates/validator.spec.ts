@@ -37,8 +37,10 @@ describe('Gate Input Validation', () => {
 		const input = { files: ['src/index.ts'], linter: 'eslint', unknownProp: 'value' };
 		expect(() => validateGateInput('lint', input))
 			.toThrow(/should NOT have additional properties/i);
-	});		it('provides actionable error messages', () => {
-			const input = { files: [], linter: 'eslint' };
+	});
+
+	it('provides actionable error messages', () => {
+		const input = { files: [], linter: 'eslint' };
 			try {
 				validateGateInput('lint', input);
 				expect.fail('Should have thrown');

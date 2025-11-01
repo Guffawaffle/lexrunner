@@ -23,7 +23,9 @@ export function redactSecrets(text: string, pattern: string): string {
 		console.warn(`Invalid redaction pattern: ${pattern}`, error);
 		return text;
 	}
-}/**
+}
+
+/**
  * Redact secrets from object values
  */
 export function redactObject(obj: any, pattern: string): any {
