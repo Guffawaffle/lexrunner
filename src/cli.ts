@@ -49,6 +49,7 @@ import {
 import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/formatters.js";
 import { initAuditEmitter, emitEvent, finalizeAudit, AuditEmitter, AuditOptions, EVENT_TYPES } from "./audit/index.js";
 import { sha256 } from "./util/hash.js";
+import { validatePlan as validatePlanDeps, formatValidationResult } from "./planner/validation.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -572,7 +573,6 @@ program
 					const validatedPlan = plan;
 
 					// Enhanced semantic validation with detailed error reporting
-					const { validatePlan: validatePlanDeps, formatValidationResult } = require("./planner/validation.js");
 					const validationResult = validatePlanDeps(validatedPlan, { verbose: opts.verbose });
 
 					if (opts.json || jsonModeActive) {

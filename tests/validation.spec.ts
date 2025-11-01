@@ -25,7 +25,7 @@ describe("Plan Validation", () => {
 			expect(result.errors[0].message).toContain("Dependency cycle detected");
 			expect(result.errors[0].message).toContain("feat-a");
 			expect(result.errors[0].message).toContain("feat-b");
-			expect(result.errors[0].suggestion).toMatch(/[Rr]emov/);
+			expect(result.errors[0].suggestion.toLowerCase()).toContain("remov");
 		});
 
 		it("detects complex cycle (A→B→C→D→B)", () => {
@@ -52,7 +52,7 @@ describe("Plan Validation", () => {
 			const cyclePath = cycleError!.details.cyclePath!;
 			expect(cyclePath.length).toBeGreaterThan(2);
 			expect(cycleError!.message).toContain("Dependency cycle detected");
-			expect(cycleError!.suggestion).toMatch(/[Rr]emov/);
+			expect(cycleError!.suggestion.toLowerCase()).toContain("remov");
 		});
 
 		it("detects self-dependency", () => {
@@ -73,7 +73,7 @@ describe("Plan Validation", () => {
 			expect(selfDepError).toBeDefined();
 			expect(selfDepError!.details.itemName).toBe("feat-a");
 			expect(selfDepError!.message).toContain("depends on itself");
-			expect(selfDepError!.suggestion).toMatch(/[Rr]emov/);
+			expect(selfDepError!.suggestion.toLowerCase()).toContain("remov");
 		});
 
 		it("handles multiple cycles", () => {

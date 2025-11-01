@@ -179,8 +179,9 @@ function detectCycles(graph: Map<string, string[]>): string[][] | null {
 	const visited = new Set<string>();
 	const recursionStack = new Set<string>();
 	const cycles: string[][] = [];
+	const path: string[] = [];
 
-	function dfs(node: string, path: string[]): void {
+	function dfs(node: string): void {
 		visited.add(node);
 		recursionStack.add(node);
 		path.push(node);
@@ -188,7 +189,7 @@ function detectCycles(graph: Map<string, string[]>): string[][] | null {
 		const neighbors = graph.get(node) || [];
 		for (const neighbor of neighbors) {
 			if (!visited.has(neighbor)) {
-				dfs(neighbor, [...path]);
+				dfs(neighbor);
 			} else if (recursionStack.has(neighbor)) {
 				// Back edge = cycle found
 				const cycleStart = path.indexOf(neighbor);
@@ -201,11 +202,12 @@ function detectCycles(graph: Map<string, string[]>): string[][] | null {
 		}
 
 		recursionStack.delete(node);
+		path.pop();
 	}
 
 	for (const node of graph.keys()) {
 		if (!visited.has(node)) {
-			dfs(node, []);
+			dfs(node);
 		}
 	}
 
