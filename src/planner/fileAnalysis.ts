@@ -687,8 +687,7 @@ export class FileAnalyzer {
  * });
  * ```
  * 
- * @see {@link docs/diffgraph-planner.md#file-change-heuristics} for heuristic details
- * @see {@link src/planner/README.md} for module documentation
+ * @see {@link ../../../docs/diffgraph-planner.md#file-change-heuristics} for heuristic details
  */
 export function createFileAnalyzer(
 	octokit: Octokit,

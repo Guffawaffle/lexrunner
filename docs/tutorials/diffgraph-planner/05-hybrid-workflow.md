@@ -181,7 +181,8 @@ gh pr diff 102 | grep -A5 "validation.ts"
 
 **Output:**
 ```diff
-+++ src/validation.ts
+--- a/src/validation.ts
++++ b/src/validation.ts
 @@ -1,5 +1,8 @@
 +import { Schema } from './schema.js';  // ← From PR-100!
 +

@@ -554,7 +554,7 @@ diff plan1.json plan2.json
 # Pin specific commit SHAs in plan (not yet supported - file a feature request)
 ```
 
-**Report:** This is a critical bug - please [file an issue](https://github.com/Guffawaffle/lex-pr-runner/issues/new) with:
+**Report:** This is a critical bug - please [file an issue](https://github.com/Guffawaffle/lex-pr-runner/issues/new/choose) with:
 - Commands run
 - Diff of the two plans
 - Environment details (OS, Node version, lex-pr version)
