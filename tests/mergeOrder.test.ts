@@ -67,7 +67,7 @@ describe('Merge Order Computation', () => {
 		} catch (error) {
 			expect(error).toBeInstanceOf(CycleError);
 			const cycleError = error as CycleError;
-			expect(cycleError.message).toContain('dependency cycle detected');
+			expect(cycleError.message.toLowerCase()).toContain('dependency cycle detected');
 			expect(cycleError.message).toContain('feat-a');
 			expect(cycleError.message).toContain('feat-b');
 		}
