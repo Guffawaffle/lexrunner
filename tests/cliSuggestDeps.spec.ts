@@ -55,7 +55,7 @@ describe("CLI --suggest-deps", () => {
 			expect(output).toContain("PR-102 → PR-101");
 			expect(output).toContain("[score: 0.85]");
 			expect(output).toContain("shared-files");
-			expect(output).toContain("Total: 2 suggestion");
+			expect(output).toContain("Total: 2 suggestions");
 		});
 
 		it("should show confidence levels in table format", async () => {
