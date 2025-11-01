@@ -153,13 +153,83 @@ This will show you PRs that can be merged based on your configuration.
 
 ## Step 6: Generate a Merge Plan
 
-Create a merge plan from discovered PRs:
+Create a merge plan from discovered PRs. You have several options:
+
+### Option 1: Auto-Discovery with Diffgraph Planner (Recommended)
+
+Automatically discover dependencies from PR descriptions and file changes:
 
 ```bash
+# Generate plan with dependency auto-discovery
 lex-pr plan --from-github
 ```
 
-This generates a `plan.json` file with:
+**What this does:**
+1. Fetches all open PRs matching your scope filters
+2. Parses explicit dependencies from PR descriptions (e.g., `Depends-on: #42`)
+3. Analyzes file changes to suggest implicit dependencies
+4. Validates the dependency graph (detects cycles)
+5. Computes merge layers using topological sort
+6. Generates `plan.json`
+
+**Example PR description with explicit dependency:**
+```markdown
+# Add Authentication UI
+
+UI components for the auth system.
+
+## Dependencies
+Depends-on: #42
+
+## Changes
+- Add LoginForm component
+- Add LogoutButton component
+```
+
+**Review dependency suggestions before generating final plan:**
+```bash
+# See file-based dependency suggestions
+lex-pr plan --suggest-deps --threshold=0.7 > suggestions.md
+
+# Review suggestions, add to PR descriptions, then regenerate plan
+lex-pr plan --from-github
+```
+
+See the **[Diffgraph Planner Guide](./diffgraph-planner.md)** for complete documentation on:
+- Dependency syntax reference
+- File-change heuristics
+- Validation & troubleshooting
+- Best practices and workflows
+
+### Option 2: Basic Planning from GitHub
+
+Generate a simple plan without file analysis:
+
+```bash
+lex-pr plan --from-github --no-suggestions
+```
+
+### Option 3: Manual Planning
+
+Create `plan.json` manually for full control:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "id": "pr-42",
+      "name": "auth-system",
+      "branch": "feature/auth",
+      "deps": [],
+      "strategy": "merge-weave"
+    }
+  ]
+}
+```
+
+**Generated plan structure:**
 - Dependency graph
 - Merge order (topologically sorted)
 - Policy configuration

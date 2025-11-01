@@ -603,7 +603,92 @@ export class FileAnalyzer {
 }
 
 /**
- * Factory function to create FileAnalyzer instance
+ * Create a file analyzer for detecting implicit dependencies between PRs
+ * 
+ * Factory function that creates a FileAnalyzer instance with caching,
+ * heuristic analysis, and conflict prediction capabilities. The analyzer
+ * uses multiple heuristics to suggest dependencies based on file changes.
+ * 
+ * @param octokit - Authenticated Octokit instance for GitHub API access
+ * @param owner - Repository owner (username or organization)
+ * @param repo - Repository name
+ * @returns FileAnalyzer instance with methods for analyzing file changes
+ * 
+ * @example Basic usage
+ * ```typescript
+ * import { createFileAnalyzer } from "./planner/fileAnalysis.js";
+ * import { Octokit } from "@octokit/rest";
+ * 
+ * const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+ * const analyzer = createFileAnalyzer(octokit, "owner", "repo");
+ * 
+ * const analysis = await analyzer.analyzeFiles([
+ *   { number: 101, name: "PR-101", sha: "abc123" },
+ *   { number: 102, name: "PR-102", sha: "def456" }
+ * ]);
+ * 
+ * console.log("File intersections:", analysis.fileIntersections);
+ * console.log("Suggestions:", analysis.suggestions);
+ * console.log("Conflicts:", analysis.conflicts);
+ * ```
+ * 
+ * @example With caching
+ * ```typescript
+ * const analyzer = createFileAnalyzer(octokit, "owner", "repo");
+ * 
+ * // First call fetches from GitHub API
+ * const analysis1 = await analyzer.analyzeFiles(prs);
+ * 
+ * // Second call uses cache
+ * const analysis2 = await analyzer.analyzeFiles(prs);
+ * 
+ * // Check cache statistics
+ * const stats = analyzer.getCacheStats();
+ * console.log(`Cache size: ${stats.size} entries`);
+ * 
+ * // Clear cache if needed
+ * analyzer.clearCache();
+ * ```
+ * 
+ * @example Dependency suggestions with heuristics
+ * ```typescript
+ * const analyzer = createFileAnalyzer(octokit, "owner", "repo");
+ * 
+ * const prs = [
+ *   { number: 100, name: "PR-100", body: "", sha: "abc" },
+ *   { number: 101, name: "PR-101", body: "", sha: "def" },
+ *   { number: 102, name: "PR-102", body: "", sha: "ghi" }
+ * ];
+ * 
+ * const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+ * 
+ * // Suggestions are sorted by confidence (high to low)
+ * suggestions.forEach(s => {
+ *   console.log(`${s.from} → ${s.to}`);
+ *   console.log(`  Confidence: ${(s.confidence * 100).toFixed(0)}%`);
+ *   console.log(`  Heuristic: ${s.heuristic}`);
+ *   console.log(`  Reason: ${s.reason}`);
+ *   console.log(`  Shared files: ${s.sharedFiles.join(", ")}`);
+ * });
+ * ```
+ * 
+ * @example Conflict prediction
+ * ```typescript
+ * const analyzer = createFileAnalyzer(octokit, "owner", "repo");
+ * const analysis = await analyzer.analyzeFiles(prs);
+ * 
+ * const highSeverityConflicts = analysis.conflicts.filter(c => c.severity === "high");
+ * 
+ * highSeverityConflicts.forEach(conflict => {
+ *   console.error(`Conflict: ${conflict.prs.join(" vs ")}`);
+ *   console.error(`  Files: ${conflict.files.join(", ")}`);
+ *   console.error(`  Severity: ${conflict.severity}`);
+ *   console.error(`  Reason: ${conflict.reason}`);
+ * });
+ * ```
+ * 
+ * @see {@link docs/diffgraph-planner.md#file-change-heuristics} for heuristic details
+ * @see {@link src/planner/README.md} for module documentation
  */
 export function createFileAnalyzer(
 	octokit: Octokit,
