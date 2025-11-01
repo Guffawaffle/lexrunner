@@ -168,6 +168,9 @@ export const PHI_PATTERNS: RegExp[] = [
 	/\b(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g // DOB (ISO)
 ];
 
+/**
+ * Redact PHI patterns from a string
+ */
 export function redactPHI(text: string, enable = false): { text: string; flagged: boolean } {
 	if (!enable) return { text, flagged: false };
 	let flagged = false;
@@ -179,4 +182,33 @@ export function redactPHI(text: string, enable = false): { text: string; flagged
 		}
 	}
 	return { text: result, flagged };
+}
+
+/**
+ * Redact PHI patterns from an object (recursively applies to string values)
+ * More efficient than stringify + parse roundtrip
+ */
+export function redactPHIFromObject(obj: any): { obj: any; flagged: boolean } {
+	let flagged = false;
+
+	function redactValue(value: any): any {
+		if (typeof value === 'string') {
+			const { text, flagged: wasRedacted } = redactPHI(value, true);
+			if (wasRedacted) {
+				flagged = true;
+			}
+			return text;
+		} else if (Array.isArray(value)) {
+			return value.map(redactValue);
+		} else if (value !== null && typeof value === 'object') {
+			const redacted: any = {};
+			for (const key in value) {
+				redacted[key] = redactValue(value[key]);
+			}
+			return redacted;
+		}
+		return value;
+	}
+
+	return { obj: redactValue(obj), flagged };
 }

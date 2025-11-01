@@ -4,10 +4,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 import { ulid } from 'ulid';
 import { EventEnvelope, EventLevel, Tool, Actor, Repo, Context } from './events.js';
 import { AuditProfile, getProfileConfig, AuditProfileConfig } from './profiles.js';
-import { redactObject, buildContext, hashPath, redactPHI } from './redaction.js';
+import { redactObject, buildContext, hashPath, redactPHIFromObject } from './redaction.js';
 import { generateManifest, writeManifest } from './manifest.js';
 import { ingestSidecarFiles } from './sidecar.js';
 import * as crypto from 'crypto';
@@ -201,26 +202,15 @@ export class AuditEmitter {
 			redactedPayload = redactObject(payload, redactRegex);
 		}
 
-		// PHI redaction (opt-in)
+		// PHI redaction (opt-in) - apply directly to object structure for efficiency
 		if (this.options.phiRedaction) {
-			try {
-				const line = JSON.stringify(redactedPayload);
-				const { text, flagged } = redactPHI(line, true);
-				if (flagged) {
-					// Mark payload to indicate PHI was detected and redacted
-					if (typeof redactedPayload === 'object' && redactedPayload !== null) {
-						(redactedPayload as any)._phi_redacted = true;
-					}
-					// Replace payload with parsed redacted text when possible
-					try {
-						redactedPayload = JSON.parse(text);
-					} catch {
-						// Keep as original redacted string in worst case
-						redactedPayload = text;
-					}
+			const { obj, flagged } = redactPHIFromObject(redactedPayload);
+			if (flagged) {
+				redactedPayload = obj;
+				// Mark payload to indicate PHI was detected and redacted
+				if (typeof redactedPayload === 'object' && redactedPayload !== null) {
+					(redactedPayload as any)._phi_redacted = true;
 				}
-			} catch {
-				// ignore PHI redaction failures
 			}
 		}
 
@@ -467,6 +457,7 @@ export class AuditEmitter {
 
 	/**
 	 * Generate gate matrix from audit events
+	 * Uses streaming to handle large audit logs efficiently
 	 */
 	private async generateGateMatrix(): Promise<void> {
 		// Read audit log
@@ -475,16 +466,6 @@ export class AuditEmitter {
 			return;
 		}
 
-		let content: string;
-		try {
-			content = fs.readFileSync(auditPath, 'utf-8');
-		} catch (e) {
-			// File may have been removed between exists check and read; bail out
-			console.warn('[lex-pr] audit: failed to read audit.ndjson (ignored)', String(e));
-			return;
-		}
-		const lines = content.trim().split('\n').filter(l => l);
-
 		const matrix: Record<string, Record<string, any>> = {};
 		let totalPassed = 0;
 		let totalFailed = 0;
@@ -492,29 +473,47 @@ export class AuditEmitter {
 		let totalBlocked = 0;
 		let totalGates = 0;
 
-		// Process gate_finished events
-		for (const line of lines) {
-			const event = JSON.parse(line);
-			if (event.event === 'gate_finished') {
-				const { item, gate, status, duration_ms, error, reason } = event.payload;
+		try {
+			// Use readline for memory-efficient line-by-line processing
+			const fileStream = fs.createReadStream(auditPath);
+			const rl = readline.createInterface({
+				input: fileStream,
+				crlfDelay: Infinity
+			});
 
-				if (!matrix[item]) {
-					matrix[item] = {};
+			for await (const line of rl) {
+				if (!line.trim()) continue;
+
+				try {
+					const event = JSON.parse(line);
+					if (event.event === 'gate_finished') {
+						const { item, gate, status, duration_ms, error, reason } = event.payload;
+
+						if (!matrix[item]) {
+							matrix[item] = {};
+						}
+
+						matrix[item][gate] = {
+							status,
+							...(duration_ms !== undefined && { duration_ms }),
+							...(error && { error }),
+							...(reason && { reason })
+						};
+
+						totalGates++;
+						if (status === 'pass') totalPassed++;
+						else if (status === 'fail') totalFailed++;
+						else if (status === 'skip') totalSkipped++;
+						else if (status === 'blocked') totalBlocked++;
+					}
+				} catch (parseError) {
+					// Skip malformed lines
+					console.warn('[lex-pr] audit: skipping malformed line in audit.ndjson');
 				}
-
-				matrix[item][gate] = {
-					status,
-					...(duration_ms !== undefined && { duration_ms }),
-					...(error && { error }),
-					...(reason && { reason })
-				};
-
-				totalGates++;
-				if (status === 'pass') totalPassed++;
-				else if (status === 'fail') totalFailed++;
-				else if (status === 'skip') totalSkipped++;
-				else if (status === 'blocked') totalBlocked++;
 			}
+		} catch (e) {
+			console.warn('[lex-pr] audit: failed to read audit.ndjson (ignored)', String(e));
+			return;
 		}
 
 		const gateMatrix = {
