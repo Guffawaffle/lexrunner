@@ -61,9 +61,76 @@ export interface ValidationResult {
 /**
  * Validate a plan's dependency graph
  * 
- * @param plan - The plan to validate
+ * Performs comprehensive validation including cycle detection, orphan warnings,
+ * invalid reference checks, and topological analysis. Returns detailed error
+ * and warning information with actionable suggestions.
+ * 
+ * @param plan - The plan to validate (from generatePlan() or loaded from JSON)
  * @param options - Optional validation options
  * @returns Validation result with errors, warnings, and diagnostics
+ * 
+ * @example Basic validation
+ * ```typescript
+ * import { validatePlan } from "./planner/validation.js";
+ * import { loadPlan } from "./core/plan.js";
+ * 
+ * const plan = await loadPlan("plan.json");
+ * const result = validatePlan(plan);
+ * 
+ * if (!result.valid) {
+ *   console.error("Validation errors:");
+ *   result.errors.forEach(err => {
+ *     console.error(`  - ${err.message}`);
+ *     console.error(`    Suggestion: ${err.suggestion}`);
+ *   });
+ *   process.exit(1);
+ * }
+ * 
+ * if (result.warnings.length > 0) {
+ *   console.warn("Validation warnings:");
+ *   result.warnings.forEach(warn => {
+ *     console.warn(`  - ${warn.message}`);
+ *     console.warn(`    Affected PRs: ${warn.affectedPRs.join(", ")}`);
+ *   });
+ * }
+ * 
+ * console.log(`✓ Plan is valid: ${result.diagnostics.nodes} nodes, ${result.diagnostics.edges} edges`);
+ * ```
+ * 
+ * @example Handle cycle errors
+ * ```typescript
+ * const result = validatePlan(plan);
+ * 
+ * const cycleErrors = result.errors.filter(e => e.type === "cycle");
+ * if (cycleErrors.length > 0) {
+ *   cycleErrors.forEach(err => {
+ *     console.error(`Cycle detected: ${err.message}`);
+ *     console.error(`Path: ${err.details.cyclePath?.join(" → ")}`);
+ *     console.error(`Suggestion: ${err.suggestion}`);
+ *   });
+ * }
+ * ```
+ * 
+ * @example Verbose mode with diagnostics
+ * ```typescript
+ * const result = validatePlan(plan, { verbose: true });
+ * 
+ * console.log("Plan diagnostics:");
+ * console.log(`  Nodes: ${result.diagnostics.nodes}`);
+ * console.log(`  Edges: ${result.diagnostics.edges}`);
+ * console.log(`  Layers: ${result.diagnostics.layers.length}`);
+ * 
+ * result.diagnostics.layers.forEach(layer => {
+ *   console.log(`  Layer ${layer.level}: ${layer.prs.join(", ")}`);
+ * });
+ * 
+ * if (result.diagnostics.orphans.length > 0) {
+ *   console.log(`  Orphans: ${result.diagnostics.orphans.join(", ")}`);
+ * }
+ * ```
+ * 
+ * @see {@link docs/diffgraph-planner.md#validation--troubleshooting} for validation details
+ * @see {@link docs/troubleshooting-planner.md} for troubleshooting guide
  */
 export function validatePlan(
 	plan: Plan,

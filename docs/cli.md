@@ -335,7 +335,7 @@ Suggestion: Consider if these items should have dependencies or dependents.
 
 ### `plan`
 
-Generate plan from configuration sources or GitHub PRs.
+Generate merge plan from workspace configuration or GitHub PRs with automatic dependency discovery.
 
 ```bash
 lex-pr plan [options]
@@ -344,9 +344,13 @@ Options:
   --out <dir>               Output directory for artifacts (default: ".smartergpt/runner")
   --json                    Output canonical plan JSON to stdout only
   --dry-run                 Validate inputs and show what would be written
-  --from-github             Auto-discover PRs from GitHub API
+  --from-github             Auto-discover PRs from GitHub API with dependency detection
+  --suggest-deps            Generate dependency suggestions from file analysis
+  --threshold <float>       Confidence threshold for suggestions (0.0-1.0, default: 0.3)
+  --no-suggestions          Disable file-based dependency suggestions
   --query <query>           GitHub search query (e.g., 'is:open label:stack:*')
   --labels <labels>         Filter PRs by comma-separated labels
+  --exclude-labels <l>      Exclude PRs with labels (comma-separated)
   --include-drafts          Include draft PRs in the plan
   --exclude-prs <numbers>   Exclude specific PRs by comma-separated PR numbers
   --github-token <token>    GitHub API token (or use GITHUB_TOKEN env var)
@@ -355,36 +359,100 @@ Options:
   --required-gates <gates>  Comma-separated list of required gates (default: lint,typecheck,test)
   --max-workers <n>         Maximum parallel workers for execution (default: 2)
   --target <branch>         Target branch for merging PRs (default: repo default branch)
+  --validate                Validate plan after generation (cycles, orphans, refs)
   --validate-cycles         Enable dependency cycle detection (default: true)
   --optimize                Optimize plan for parallel execution
+  --format <type>           Output format: json|markdown|dot (default: json)
+  --output <file>           Output file path (alternative to --out, for single file)
   -h, --help                Display help for command
 ```
 
 #### Plan Generation Modes
 
-**1. Configuration Files Mode (Default)**
+**1. GitHub Auto-Discovery Mode (Recommended)**
+
+Generate plan from GitHub PRs with automatic dependency detection:
+
+```bash
+# Basic auto-discovery with dependency parsing
+lex-pr plan --from-github
+
+# With file-based dependency suggestions
+lex-pr plan --from-github --suggest-deps --threshold=0.7
+
+# Filter by labels
+lex-pr plan --from-github --labels "ready-to-merge,stack:feature"
+
+# Exclude certain labels
+lex-pr plan --from-github --exclude-labels "wip,draft"
+```
+
+**What auto-discovery does:**
+1. Fetches open PRs from GitHub
+2. Parses `Depends-on:` footers from PR descriptions
+3. Analyzes file changes to suggest implicit dependencies (if `--suggest-deps`)
+4. Validates dependency graph (detects cycles, orphans)
+5. Computes merge layers using topological sort
+6. Generates deterministic `plan.json`
+
+**2. Dependency Suggestions Only**
+
+Generate file-based dependency suggestions without creating a plan:
+
+```bash
+# High-confidence suggestions (≥0.7)
+lex-pr plan --suggest-deps --threshold=0.7
+
+# Output as markdown for review
+lex-pr plan --suggest-deps --format=markdown > suggestions.md
+
+# JSON format for automation
+lex-pr plan --suggest-deps --format=json | jq '.suggestions'
+```
+
+**3. Configuration Files Mode (Default)**
+
 ```bash
 # Generate from .smartergpt/ configuration files
 lex-pr plan
 ```
 
-**2. GitHub Auto-Discovery Mode**
-```bash
-# Auto-discover PRs from GitHub repository
-lex-pr plan --from-github
+#### Dependency Syntax
 
-# With custom GitHub search query
-lex-pr plan --from-github --query "is:open label:stack:feature"
+The planner recognizes these dependency formats in PR descriptions:
 
-# Filter by specific labels
-lex-pr plan --from-github --labels "enhancement,feature"
+```markdown
+# Single dependency
+Depends-on: #123
 
-# Exclude specific PRs from the plan
-lex-pr plan --from-github --exclude-prs 154,155
+# Multiple dependencies
+Depends-on: #123, #456, #789
 
-# Include draft PRs
-lex-pr plan --from-github --include-drafts
+# Cross-repo references
+Depends-on: owner/repo#123
+
+# Alternative keywords (aliases)
+Depends: #123
+Requires: #456
 ```
+
+**Note:** `Closes`, `Fixes`, and `Resolves` are GitHub keywords for closing issues and are **not** treated as dependencies.
+
+#### File-Based Heuristics
+
+When `--suggest-deps` is used, the planner analyzes file changes to suggest dependencies:
+
+| Heuristic | Confidence Range | Description |
+|-----------|-----------------|-------------|
+| **Shared files** | 0.6 - 1.0 | Both PRs modify the same files |
+| **Directory proximity** | 0.3 - 0.8 | PRs work in the same directories |
+| **Test overlap** | 0.5 - 0.85 | PRs test the same modules |
+
+**Threshold guidelines:**
+- `≥0.8`: Very high confidence, almost always valid
+- `≥0.7`: High confidence, recommended for hybrid workflow
+- `≥0.5`: Medium confidence, requires manual review
+- `<0.5`: Low confidence, likely false positive
 
 #### Examples
 
@@ -419,31 +487,53 @@ lex-pr plan --from-github \
   --labels "priority-high"
 ```
 
-#### Dependency Validation
+#### Dependency Validation and Optimization
 
-The plan command automatically validates dependencies:
+The plan command automatically validates dependencies when using `--from-github`:
 
-- **Cycle Detection**: Detects circular dependencies between PRs (enabled by default with `--validate-cycles`)
-- **Unknown Dependencies**: Validates all dependencies exist in the plan
+- **Cycle Detection**: Detects circular dependencies between PRs (enabled by default with `--validate-cycles` or `--validate`)
+- **Orphan Detection**: Warns about PRs with no dependencies/dependents
+- **Reference Validation**: Ensures all dependencies exist in the plan
 - **Optimization**: Shows parallelization levels with `--optimize` flag
 
 ```bash
-# Enable cycle detection (default)
-lex-pr plan --from-github --validate-cycles
+# Full validation (recommended)
+lex-pr plan --from-github --validate
 
-# Show optimization levels
+# Show optimization levels and merge layers
 lex-pr plan --from-github --optimize
+
+# Disable cycle detection (not recommended)
+lex-pr plan --from-github --validate-cycles=false
 ```
 
 Example output with `--optimize`:
 ```
 ✓ Auto-discovered 5 PRs from GitHub
+✓ Parsed dependencies: 3 explicit, 1 implicit
 ✓ Dependency validation passed (no cycles detected)
-✓ Plan optimized for parallel execution: 3 levels
-  Level 1: PR-100
-  Level 2: PR-101, PR-102
-  Level 3: PR-103, PR-104
+✓ Plan optimized for parallel execution: 3 layers
+  Layer 0: PR-100 (ready to merge)
+  Layer 1: PR-101, PR-102 (after PR-100, parallel)
+  Layer 2: PR-103, PR-104 (after Layer 1, parallel)
 ```
+
+#### Exit Codes
+
+- `0`: Plan generated successfully
+- `1`: Plan generation failed (general error)
+- `2`: Validation failed (cycles, invalid refs, orphans)
+
+#### See Also
+
+- **[Diffgraph Planner Guide](./diffgraph-planner.md)** - Complete feature documentation
+- **[Troubleshooting](./troubleshooting-planner.md)** - Common errors and solutions
+- **[Dependency Parser](./dependency-parser.md)** - Parser documentation
+- **[Tutorials](./tutorials/diffgraph-planner/)** - Step-by-step guides
+- `lex-pr schema validate` - Validate existing plan
+- `lex-pr merge-order` - Review merge layers
+
+---
 
 #### JSON Output Schema (`--json` flag)
 

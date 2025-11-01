@@ -70,6 +70,69 @@ See `docs/cli.md` for the full command reference.
 
 If adding public behavior or fixing a bug, prefer tests first (happy path + 1-2 edge cases). Ensure outputs are deterministic.
 
+### Testing Planner Features
+
+When working on diffgraph planner features (`src/planner/`), follow these guidelines:
+
+**Test Coverage Requirements:**
+- Dependency parser: Test all supported syntax variations
+- File analysis: Test intersection detection, confidence scoring
+- Dependency scoring: Test weight combinations, threshold filtering
+- Validation: Test cycle detection, orphan warnings, invalid refs
+
+**E2E Test Fixtures:**
+Located in `tests/fixtures/` - use realistic PR structures:
+- Simple stacks (linear dependencies)
+- Diamond patterns (fan-out/fan-in)
+- Complex graphs (10+ PRs with mixed dependencies)
+- Edge cases (cycles, orphans, self-dependencies)
+
+**Example test structure:**
+```typescript
+import { parsePRDescription } from "../src/planner/dependencyParser.js";
+
+describe("Dependency Parser", () => {
+  it("should parse single dependency", () => {
+    const result = parsePRDescription(101, "Depends-on: #100");
+    expect(result.dependencies).toEqual(["#100"]);
+  });
+  
+  it("should parse multiple dependencies", () => {
+    const result = parsePRDescription(101, "Depends-on: #100, #102");
+    expect(result.dependencies).toEqual(["#100", "#102"]);
+  });
+  
+  // Test determinism
+  it("should produce stable sorted output", () => {
+    const result1 = parsePRDescription(101, "Depends-on: #103, #100, #102");
+    const result2 = parsePRDescription(101, "Depends-on: #102, #103, #100");
+    expect(result1.dependencies).toEqual(result2.dependencies);
+  });
+});
+```
+
+**Run planner-specific tests:**
+```bash
+# All planner tests
+npm test -- tests/batch-planner.spec.ts
+
+# Dependency parser tests
+npm test -- tests/dependencyParser.spec.ts
+
+# File analysis tests
+npm test -- tests/fileAnalysis.spec.ts
+```
+
+**Documentation Tests:**
+Ensure examples in documentation work:
+```bash
+# Test examples from tutorials
+cd docs/tutorials/diffgraph-planner/
+# Run commands from 01-simple-stack.md, etc.
+```
+
+See [Diffgraph Planner Guide](./docs/diffgraph-planner.md) for feature documentation.
+
 ## Code style & types
 
 - TypeScript-first; strict types preferred
