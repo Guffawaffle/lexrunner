@@ -50,6 +50,9 @@ import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/forma
 import { initAuditEmitter, emitEvent, finalizeAudit, AuditEmitter, AuditOptions, EVENT_TYPES } from "./audit/index.js";
 import { sha256 } from "./util/hash.js";
 import { validatePlan as validatePlanDeps, formatValidationResult } from "./planner/validation.js";
+import { scoreDependencies } from "./planner/dependencyScoring.js";
+import { FileAnalyzer } from "./planner/fileAnalysis.js";
+import { formatSuggestions, type SuggestionFormat } from "./cli/formatSuggestions.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -347,6 +350,10 @@ program
 	.option("--target <branch>", "Target branch for merging PRs (default: repo default branch)")
 	.option("--validate-cycles", "Enable dependency cycle detection (default: true)")
 	.option("--optimize", "Optimize plan for parallel execution")
+	.option("--suggest-deps", "Output dependency suggestions for review (does not generate plan.json)")
+	.option("--threshold <number>", "Filter suggestions below this score (default: 0.3)", parseFloat)
+	.option("--format <format>", "Output format: table|json|markdown (default: table)")
+	.option("--output <file>", "Write suggestions to file instead of stdout")
 	.addHelpText('after', `
 Examples:
   $ lex-pr plan --from-github --json > plan.json    # Generate plan from GitHub PRs
@@ -355,6 +362,9 @@ Examples:
   $ lex-pr plan --exclude-prs 123,456               # Exclude specific PRs
   $ lex-pr plan --target staging                    # Target different branch
   $ lex-pr plan --required-gates lint,test,e2e      # Custom gate requirements
+  $ lex-pr plan --from-github --suggest-deps        # Review dependency suggestions
+  $ lex-pr plan --from-github --suggest-deps --format=json  # JSON suggestions for tooling
+  $ lex-pr plan --from-github --suggest-deps --threshold=0.7  # High-confidence only
 
 Common Issues:
   • GitHub API errors: Set GITHUB_TOKEN environment variable
@@ -392,6 +402,72 @@ Common Issues:
 				const excludePRs = opts.excludePrs
 					? opts.excludePrs.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
 					: undefined;
+
+				// Handle --suggest-deps mode
+				if (opts.suggestDeps) {
+					// Discover PRs based on query/filters
+					const prs = await client.listOpenPRs({
+						state: "open",
+						labels,
+						...(opts.query ? { query: opts.query } : {})
+					});
+
+					// Default behavior: include drafts unless explicitly disabled
+					const includeDrafts = opts.includeDrafts === undefined ? true : Boolean(opts.includeDrafts);
+					const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
+
+					// Exclude specific PRs if requested
+					const finalPRs = excludePRs && excludePRs.length > 0
+						? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
+						: filteredPRs;
+
+					if (finalPRs.length === 0) {
+						console.log("No PRs found matching the criteria.");
+						return;
+					}
+
+					// Get detailed information for each PR
+					const prDetails = await Promise.all(
+						finalPRs.map(pr => client.getPRDetails(pr.number))
+					);
+
+					// Create file analyzer
+					const fileAnalyzer = new FileAnalyzer(
+						client.getOctokit(),
+						client.getOwner(),
+						client.getRepo()
+					);
+
+					// Score dependencies
+					const threshold = opts.threshold ?? 0.3;
+					const scores = await scoreDependencies(
+						prDetails.map(pr => ({
+							number: pr.number,
+							name: `PR-${pr.number}`,
+							body: pr.body,
+							sha: pr.head.sha
+						})),
+						fileAnalyzer,
+						{ threshold }
+					);
+
+					// Format output
+					const format = (opts.format as SuggestionFormat) || "table";
+					const output = formatSuggestions(scores, format, threshold);
+
+					// Write to stdout or file
+					if (opts.output) {
+						fs.writeFileSync(opts.output, output, "utf-8");
+						if (!jsonModeActive) {
+							console.log(`✓ Suggestions written to ${opts.output}`);
+						}
+					} else {
+						console.log(output);
+					}
+
+					// Exit without generating plan.json
+					return;
+				}
 
 				// Parse required gates if provided
 				const requiredGates = opts.requiredGates
