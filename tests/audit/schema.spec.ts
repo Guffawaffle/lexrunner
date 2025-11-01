@@ -7,7 +7,7 @@ import {
 	migrateEvent,
 	parseSchemaVersion
 } from '../../src/audit/schema.js';
-import { AuditEmitter, emitEvent, initAuditEmitter, finalizeAudit } from '../../src/audit/emitter.js';
+import { emitEvent, initAuditEmitter, finalizeAudit } from '../../src/audit/emitter.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

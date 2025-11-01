@@ -67,12 +67,6 @@ async function finalizeAuditGuard(emitter: AuditEmitter, status?: string): Promi
 	}
 }
 
-function rethrowHipaa(e: unknown): void {
-	if (e && typeof (e as any).message === 'string' && (e as any).message.startsWith('HIPAA:')) {
-		throw e as Error;
-	}
-}
-
 /**
  * CLI exit discipline with proper error codes
  */
@@ -83,13 +77,13 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   }
 
   const err: any = e;
-		if (err?.code === schemaCode && Array.isArray(err.issues)) {
+  if (err?.code === schemaCode && Array.isArray(err.issues)) {
     console.log(JSON.stringify({ errors: err.issues }, null, 2));
     if (!jsonModeActive) {
       console.error(err.message);
     }
-		process.exitCode = 2;
-		throwExit(2);
+    process.exitCode = 2;
+    throwExit(2);
   }
   if (e instanceof SchemaValidationError || e instanceof CycleError || e instanceof UnknownDependencyError || e instanceof WriteProtectionError || e instanceof AutopilotConfigError) {
     const prefix = jsonModeActive ? "[lex-pr]" : "❌";
@@ -485,36 +479,22 @@ Common Issues:
 			if (opts.dryRun) {
 				console.log("Dry run - would generate:");
 				console.log(`📁 ${path.join(outDir, "plan.json")} (${planJSON.length} bytes)`);
-				console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
-				console.log("");
-				console.log(generatePlanSummary(validatedPlan));
-				// Ensure audit emitter is finalized for dry-run paths so background
-				// timers (sidecar ingestion) are stopped and the process can exit.
-				if (auditEmitter) {
-					try {
-						await finalizeAuditGuard(auditEmitter, 'success');
-					} catch (e) {
-						if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
-							exitWith(e as Error);
-						}
-						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
+			console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
+			console.log("");
+			console.log(generatePlanSummary(validatedPlan));
+			// Ensure audit emitter is finalized on dry-run to close streams/timers
+			if (auditEmitter) {
+				try {
+					await finalizeAuditGuard(auditEmitter, 'dry-run');
+				} catch (e) {
+					if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
+						exitWith(e as Error);
 					}
+					console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
 				}
-				// Ensure audit emitter is finalized on dry-run to close streams/timers
-				if (auditEmitter) {
-					try {
-						await finalizeAuditGuard(auditEmitter, 'dry-run');
-					} catch (e) {
-						if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
-							exitWith(e as Error);
-						}
-						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
-					}
-				}
-				return;
 			}
-
-			// Write artifacts - validate write permissions first
+			return;
+		}			// Write artifacts - validate write permissions first
 
 			// Check if output directory is within a profile and validate write permissions
 			const absOutDir = path.resolve(outDir);
@@ -1232,7 +1212,6 @@ Common Issues:
   • Rate limit errors: Wait or use authenticated token with higher limits
   • No PRs found: Check --state filter and repository permissions`)
 	.action(async (opts) => {
-		let auditEmitter: AuditEmitter | null = null;
 		try {
 			let githubAPI = await createGitHubAPI();
 

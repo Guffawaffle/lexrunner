@@ -7,7 +7,7 @@ import * as path from 'path';
 import { ulid } from 'ulid';
 import { EventEnvelope, EventLevel, Tool, Actor, Repo, Context } from './events.js';
 import { AuditProfile, getProfileConfig, AuditProfileConfig } from './profiles.js';
-import { redactObject, redactArgv, buildContext, hashPath, redactPHI } from './redaction.js';
+import { redactObject, buildContext, hashPath, redactPHI } from './redaction.js';
 import { generateManifest, writeManifest } from './manifest.js';
 import { ingestSidecarFiles } from './sidecar.js';
 import * as crypto from 'crypto';
@@ -374,15 +374,13 @@ export class AuditEmitter {
 					if (fs.existsSync(nd)) {
 						fs.unlinkSync(nd);
 					}
-					const enc = nd + '.enc';
-					if (fs.existsSync(enc)) {
-						fs.unlinkSync(enc);
-					}
-				} catch (e) {
-					// ignore scrub errors
+				const enc = nd + '.enc';
+				if (fs.existsSync(enc)) {
+					fs.unlinkSync(enc);
 				}
-
-				const errObj = {
+			} catch (e) {
+				console.error('[HIPAA] Failed to scrub sensitive audit files:', e);
+			}				const errObj = {
 					profile: 'hipaa-strict',
 					status: 'aborted',
 					reason: 'missing_or_invalid_key'

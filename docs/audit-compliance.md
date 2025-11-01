@@ -38,9 +38,9 @@ export LEX_AUDIT_KEY_HEX=0123456789abcdef0123456789abcdef0123456789abcdef0123456
 
 - For `hipaa-strict`, PHI redaction is enabled before any payload is written to disk. Redaction uses opt-in regular expressions and structured redaction helpers; when redaction detects content, the event payload will include `_phi_redacted=true` to indicate the redaction occurred.
 
-## Fail-closed semantics (recommended)
+## Fail-closed semantics
 
-- Current behavior: encryption is best-effort when a valid key is present. If encryption fails during finalize, the emitter logs a safe error and (where possible) removes plaintext and writes a summary/manifest. For stricter requirements (mandatory for `hipaa-strict`), you may opt to treat encryption errors as fatal and exit non-zero — we can enable this behavior if desired.
+- For `hipaa-strict`, fail-closed behavior is **mandatory**: if encryption fails during finalize, the emitter throws a fatal error, exits non-zero, and removes any plaintext artifacts. This ensures that no unencrypted PHI is ever written to disk. For other profiles, encryption is best-effort when a valid key is present; if encryption fails, the emitter logs a safe error and (where possible) removes plaintext and writes a summary/manifest.
 
 ## Decryption helper (node)
 
