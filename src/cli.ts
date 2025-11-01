@@ -538,6 +538,7 @@ program
 			.description("Validate a plan file against schema")
 			.argument("<file>", "Path to plan.json file")
 			.option("--json", "Output JSON result")
+			.option("--verbose", "Show detailed diagnostics including layers and warnings")
 			.action((file: string, opts) => {
 				try {
 					if (!fs.existsSync(file)) {
@@ -570,25 +571,28 @@ program
 					}
 					const validatedPlan = plan;
 
-					// Additional semantic checks
-					try {
-						computeMergeOrder(validatedPlan); // ensure DAG
-					} catch (error) {
-						if (opts.json || jsonModeActive) {
-							console.log(JSON.stringify({ valid: false, errors: [{ path: 'dependencies', message: (error as Error).message }] }, null, 2));
-						} else {
-							console.error(`Dependency validation failed: ${(error as Error).message}`);
-						}
+					// Enhanced semantic validation with detailed error reporting
+					const { validatePlan: validatePlanDeps, formatValidationResult } = require("./planner/validation.js");
+					const validationResult = validatePlanDeps(validatedPlan, { verbose: opts.verbose });
+
+					if (opts.json || jsonModeActive) {
+						// Output machine-readable JSON
+						console.log(JSON.stringify({
+							valid: validationResult.valid,
+							errors: validationResult.errors,
+							warnings: validationResult.warnings,
+							diagnostics: validationResult.diagnostics
+						}, null, 2));
+					} else {
+						// Human-readable output
+						const formattedResult = formatValidationResult(validationResult, opts.verbose);
+						console.log(formattedResult);
+					}
+
+					if (!validationResult.valid) {
 						throwExit(1);
 					}
 
-					if (opts.json || jsonModeActive) {
-						console.log(JSON.stringify({ valid: true, items: validatedPlan.items.length, target: validatedPlan.target }, null, 2));
-					} else {
-						console.log(`✓ ${file} is valid`);
-						console.log(`  Items: ${validatedPlan.items.length}`);
-						console.log(`  Target: ${validatedPlan.target}`);
-					}
 					return;
 				} catch (error) {
 					// Let CLIExitSignal propagate - JSON already output
