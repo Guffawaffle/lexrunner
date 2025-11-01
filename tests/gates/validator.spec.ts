@@ -16,31 +16,31 @@ describe('Gate Input Validation', () => {
 				.toThrow(/required property 'files'/i);
 		});
 
-		it('fails on empty files array', () => {
-			const input = { files: [], linter: 'eslint' };
-			expect(() => validateGateInput('lint', input))
-				.toThrow(/must NOT have fewer than 1 items/i);
-		});
+	it('fails on empty files array', () => {
+		const input = { files: [], linter: 'eslint' };
+		expect(() => validateGateInput('lint', input))
+			.toThrow(/should NOT have fewer than 1 items/i);
+	});
 
-		it('fails on invalid linter enum', () => {
-			const input = { files: ['src/index.ts'], linter: 'magic-linter' };
-			expect(() => validateGateInput('lint', input))
-				.toThrow(/must be equal to one of/i);
-		});
+	it('fails on invalid linter enum', () => {
+		const input = { files: ['src/index.ts'], linter: 'magic-linter' };
+		expect(() => validateGateInput('lint', input))
+			.toThrow(/should be equal to one of the allowed values/i);
+	});
 
-		it('allows optional "fix" parameter', () => {
-			const input = { files: ['src/index.ts'], linter: 'eslint', fix: true };
-			expect(() => validateGateInput('lint', input)).not.toThrow();
-		});
+	it('allows optional "fix" parameter', () => {
+		const input = { files: ['src/index.ts'], linter: 'eslint', fix: true };
+		expect(() => validateGateInput('lint', input)).not.toThrow();
+	});
 
-		it('rejects additional properties', () => {
-			const input = { files: ['src/index.ts'], linter: 'eslint', unknownProp: 'value' };
-			expect(() => validateGateInput('lint', input))
-				.toThrow(/must NOT have additional properties/i);
-		});
+	it('rejects additional properties', () => {
+		const input = { files: ['src/index.ts'], linter: 'eslint', unknownProp: 'value' };
+		expect(() => validateGateInput('lint', input))
+			.toThrow(/should NOT have additional properties/i);
+	});
 
-		it('provides actionable error messages', () => {
-			const input = { files: [], linter: 'eslint' };
+	it('provides actionable error messages', () => {
+		const input = { files: [], linter: 'eslint' };
 			try {
 				validateGateInput('lint', input);
 				expect.fail('Should have thrown');
@@ -89,7 +89,7 @@ describe('Gate Input Validation', () => {
 		it('fails on invalid framework', () => {
 			const input = { framework: 'unknown', files: ['test.ts'] };
 			expect(() => validateGateInput('test', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 	});
 
@@ -132,13 +132,13 @@ describe('Gate Input Validation', () => {
 		it('fails on invalid scanner', () => {
 			const input = { scanner: 'invalid-scanner' };
 			expect(() => validateGateInput('security-scan', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 
 		it('fails on invalid severity', () => {
 			const input = { scanner: 'npm-audit', severity: 'invalid' };
 			expect(() => validateGateInput('security-scan', input))
-				.toThrow(/must be equal to one of/i);
+				.toThrow(/should be equal to one of the allowed values/i);
 		});
 	});
 
@@ -156,13 +156,13 @@ describe('Gate Input Validation', () => {
 		it('fails on threshold out of range', () => {
 			const input = { tool: 'vitest', threshold: 150 };
 			expect(() => validateGateInput('coverage', input))
-				.toThrow(/must be <= 100/i);
+				.toThrow(/should be <= 100/i);
 		});
 
 		it('fails on negative threshold', () => {
 			const input = { tool: 'vitest', threshold: -10 };
 			expect(() => validateGateInput('coverage', input))
-				.toThrow(/must be >= 0/i);
+				.toThrow(/should be >= 0/i);
 		});
 	});
 

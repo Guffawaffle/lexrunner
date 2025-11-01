@@ -24,7 +24,7 @@ export const ArtifactMetadata = z.object({
  * Based on issue requirement: stable keys, no timestamps
  */
 export const GateReport = z.object({
-	/** Schema version for backward compatibility */
+	/** Schema version for gate reports */
 	schemaVersion: GateReportSchemaVersion.optional(),
 	/** Item identifier this gate was run for */
 	item: z.string(),
@@ -121,32 +121,32 @@ export function safeValidateGateReport(data: unknown): { success: true; data: Ga
 /**
  * Validate with enhanced error messages
  */
-export function validateGateReportWithErrors(data: unknown): { 
-	valid: true; 
-	data: GateReport 
-} | { 
-	valid: false; 
-	errors: GateReportValidationError[] 
+export function validateGateReportWithErrors(data: unknown): {
+	valid: true;
+	data: GateReport
+} | {
+	valid: false;
+	errors: GateReportValidationError[]
 } {
 	const result = GateReport.safeParse(data);
 	if (result.success) {
 		return { valid: true, data: result.data };
 	}
-	return { 
-		valid: false, 
-		errors: formatValidationErrors(result.error) 
+	return {
+		valid: false,
+		errors: formatValidationErrors(result.error)
 	};
 }
 
 /**
- * Migration utilities for gate report schema evolution
+ * Normalization utilities for gate report schema evolution
  */
 
 /**
- * Migrate legacy gate report to current schema version
- * Handles backward compatibility for older report formats
+ * Normalizes legacy gate report formats to the current schema version.
+ * Notes: internal normalization, not a public backward-compatibility policy.
  */
-export function migrateGateReport(data: unknown): GateReport {
+export function normalizeGateReport(data: unknown): GateReport {
 	// If data is already valid, return it (ensuring schema version is set)
 	const validation = GateReport.safeParse(data);
 	if (validation.success) {
@@ -203,6 +203,11 @@ export function migrateGateReport(data: unknown): GateReport {
 }
 
 /**
+ * @deprecated Use normalizeGateReport() instead. Will be removed at v1.0.0.
+ */
+export const migrateGateReport = normalizeGateReport;
+
+/**
  * Check if a gate report needs migration
  */
 export function needsMigration(data: unknown): boolean {
@@ -211,9 +216,9 @@ export function needsMigration(data: unknown): boolean {
 	}
 
 	const legacy = data as any;
-	
+
 	// Check for legacy field names
-	const hasLegacyFields = 
+	const hasLegacyFields =
 		legacy.result !== undefined ||
 		(legacy.duration !== undefined && legacy.duration_ms === undefined) ||
 		(legacy.start_time !== undefined && legacy.started_at === undefined);

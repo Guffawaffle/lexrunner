@@ -18,13 +18,15 @@ export interface AuditProfileConfig {
 
 /**
  * Default redaction regex - matches common secret patterns
+ * Note: Case insensitivity is handled by the 'gi' flags when creating the RegExp
  */
-export const DEFAULT_REDACT_REGEX = '(?i)token|secret|pass|key|auth';
+export const DEFAULT_REDACT_REGEX = 'token|secret|pass|key|auth';
 
 /**
  * Strict redaction regex - more comprehensive for HIPAA
+ * Note: Case insensitivity is handled by the 'gi' flags when creating the RegExp
  */
-export const STRICT_REDACT_REGEX = '(?i)token|secret|pass|key|auth|api[_-]?key|bearer|credential|pwd|ssn|ein|dob';
+export const STRICT_REDACT_REGEX = 'token|secret|pass|key|auth|api[_-]?key|bearer|credential|pwd|ssn|ein|dob';
 
 /**
  * Profile configurations

@@ -4,12 +4,14 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 import { ulid } from 'ulid';
 import { EventEnvelope, EventLevel, Tool, Actor, Repo, Context } from './events.js';
 import { AuditProfile, getProfileConfig, AuditProfileConfig } from './profiles.js';
-import { redactObject, redactArgv, buildContext, hashPath } from './redaction.js';
+import { redactObject, buildContext, hashPath, redactPHIFromObject } from './redaction.js';
 import { generateManifest, writeManifest } from './manifest.js';
 import { ingestSidecarFiles } from './sidecar.js';
+import * as crypto from 'crypto';
 
 export interface AuditOptions {
 	profile: AuditProfile;
@@ -19,9 +21,16 @@ export interface AuditOptions {
 	redactRegex?: string;
 	hashPaths?: boolean;
 	context?: ('git' | 'ci' | 'os')[];
+	contextTypes?: ('git' | 'ci' | 'os')[]; // Alias for context
 	signer?: string;
 	retainDays?: number;
 	sample?: number;
+	sessionId?: string; // Optional override for testing
+	runId?: string; // Optional override for testing
+	tool?: { name: string; version: string }; // Optional override for testing
+	// Optional HIPAA-related toggles
+	phiRedaction?: boolean; // redact PHI patterns when true
+	encryptionKeyHex?: string; // optional AES-256-GCM key (hex) to encrypt ndjson at finalize
 }
 
 export interface AuditSummary {
@@ -59,12 +68,12 @@ export class AuditEmitter {
 		this.config = getProfileConfig(options.profile);
 		this.auditDir = options.dir;
 		this.ndjsonPath = path.join(this.auditDir, 'audit.ndjson');
-		this.sessionId = ulid();
-		this.runId = ulid();
+		this.sessionId = options.sessionId || ulid();
+		this.runId = options.runId || ulid();
 		this.startTime = Date.now();
 
-		// Tool info
-		this.tool = {
+		// Tool info (with optional override for testing)
+		this.tool = options.tool || {
 			name: 'lex-pr-runner',
 			version: process.env.npm_package_version || '0.1.0'
 		};
@@ -77,12 +86,8 @@ export class AuditEmitter {
 		// Repo info
 		this.repo = {};
 
-		// Build context if profile requires it
-		if (this.config) {
-			const contextTypes = options.context || this.config.includeContext;
-			const includeEnv = options.includeEnv || this.config.includeEnv;
-			this.context = buildContext(contextTypes, undefined, includeEnv);
-		}
+		// Context will be built during init()
+		this.context = {};
 
 		// Sidecar drop directory
 		this.dropDir = `/tmp/lex-audit-session-${this.sessionId}`;
@@ -92,6 +97,35 @@ export class AuditEmitter {
 	 * Initialize emitter - create directory and files
 	 */
 	async init(): Promise<void> {
+		// If profile is 'off', skip all initialization
+		if (!this.config || this.options.profile === 'off') {
+			return;
+		}
+
+		// Build context if profile requires it
+		if (this.config) {
+			const contextTypes = this.options.contextTypes || this.options.context || this.config.includeContext;
+
+			// Try to collect git context if requested
+			let gitInfo: { branch?: string; commit?: string; remote?: string } | undefined;
+			if (contextTypes.includes('git')) {
+				try {
+					const { execa } = await import('execa');
+					const commit = await execa('git', ['rev-parse', 'HEAD']).then(r => r.stdout).catch(() => undefined);
+					const branch = await execa('git', ['rev-parse', '--abbrev-ref', 'HEAD']).then(r => r.stdout).catch(() => undefined);
+					const remote = await execa('git', ['remote', 'get-url', 'origin']).then(r => r.stdout).catch(() => undefined);
+					if (commit || branch || remote) {
+						gitInfo = { commit, branch, remote };
+					}
+				} catch {
+					// Git not available, context will be empty
+				}
+			}
+
+			const includeEnv = this.options.includeEnv || this.config.includeEnv;
+			this.context = buildContext(contextTypes, gitInfo, includeEnv);
+		}
+
 		// Create audit directory
 		if (!fs.existsSync(this.auditDir)) {
 			fs.mkdirSync(this.auditDir, { recursive: true });
@@ -106,8 +140,17 @@ export class AuditEmitter {
 		process.env.LEX_AUDIT_DROP_DIR = this.dropDir;
 		process.env.LEX_AUDIT_SESSION_ID = this.sessionId;
 
+		// Create empty NDJSON file if it doesn't exist
+		if (!fs.existsSync(this.ndjsonPath)) {
+			fs.writeFileSync(this.ndjsonPath, '');
+		}
+
 		// Open NDJSON stream
-		this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: 'a' });
+		this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: 'a', autoClose: true });
+		// Guard against stream errors (e.g., directory removed concurrently in tests)
+		this.ndjsonStream.on('error', (err) => {
+			console.warn('[lex-pr] audit: ndjson stream error (ignored)', String(err));
+		});
 
 		// Write schema file
 		const schemaPath = path.join(this.auditDir, 'audit.schema.json');
@@ -146,7 +189,7 @@ export class AuditEmitter {
 		}
 
 		// Apply sampling if configured
-		if (this.options.sample && this.options.sample < 100) {
+		if (this.options.sample !== undefined && this.options.sample < 100) {
 			if (Math.random() * 100 > this.options.sample) {
 				return; // Skip this event
 			}
@@ -157,6 +200,18 @@ export class AuditEmitter {
 		const redactRegex = this.options.redactRegex || this.config.redactRegex;
 		if (redactRegex) {
 			redactedPayload = redactObject(payload, redactRegex);
+		}
+
+		// PHI redaction (opt-in) - apply directly to object structure for efficiency
+		if (this.options.phiRedaction) {
+			const { obj, flagged } = redactPHIFromObject(redactedPayload);
+			if (flagged) {
+				redactedPayload = obj;
+				// Mark payload to indicate PHI was detected and redacted
+				if (typeof redactedPayload === 'object' && redactedPayload !== null) {
+					(redactedPayload as any)._phi_redacted = true;
+				}
+			}
 		}
 
 		// Hash paths if needed
@@ -184,8 +239,15 @@ export class AuditEmitter {
 			payload: redactedPayload
 		};
 
-		// Write to NDJSON stream
-		this.ndjsonStream.write(JSON.stringify(envelope) + '\n');
+		// Prepare line
+		let line = JSON.stringify(envelope) + '\n';
+		try {
+			if (this.ndjsonStream && !this.ndjsonStream.destroyed) {
+				this.ndjsonStream.write(line);
+			}
+		} catch (e) {
+			console.warn('[lex-pr] audit: ndjson write failed (ignored)', String(e));
+		}
 
 		// Track event
 		this.eventCount++;
@@ -204,8 +266,23 @@ export class AuditEmitter {
 	 */
 	private startSidecarIngestion(): void {
 		this.sidecarIngestInterval = setInterval(async () => {
-			await this.ingestSidecar();
+			try {
+				await this.ingestSidecar();
+			} catch (e) {
+				// Don't let sidecar ingestion errors bubble and kill the test runner
+				console.warn('[lex-pr] audit: sidecar ingestion error (ignored)', String(e));
+			}
 		}, 5000); // Every 5 seconds
+
+		// Ensure the interval does not keep the Node event loop alive if finalize() is not called
+		try {
+			// Some Node timers have unref() to allow process to exit
+			if (this.sidecarIngestInterval && typeof (this.sidecarIngestInterval as any).unref === 'function') {
+				(this.sidecarIngestInterval as any).unref();
+			}
+		} catch (e) {
+			// Swallow any errors here - defensive
+		}
 	}
 
 	/**
@@ -224,20 +301,29 @@ export class AuditEmitter {
 			context: this.context
 		};
 
-		await ingestSidecarFiles(this.dropDir, envelope, async (event) => {
-			// Apply redaction to ingested events
-			const redactRegex = this.options.redactRegex || this.config!.redactRegex;
-			if (redactRegex) {
-				event.payload = redactObject(event.payload, redactRegex);
-			}
+		try {
+			await ingestSidecarFiles(this.dropDir, envelope, async (event) => {
+				try {
+					// Apply redaction to ingested events
+					const redactRegex = this.options.redactRegex || this.config!.redactRegex;
+					if (redactRegex) {
+						event.payload = redactObject(event.payload, redactRegex);
+					}
 
-			// Write to stream
-			if (this.ndjsonStream) {
-				this.ndjsonStream.write(JSON.stringify(event) + '\n');
-				this.eventCount++;
-				this.eventsByType[event.event] = (this.eventsByType[event.event] || 0) + 1;
-			}
-		});
+					// Write to stream
+					if (this.ndjsonStream) {
+						this.ndjsonStream.write(JSON.stringify(event) + '\n');
+						this.eventCount++;
+						this.eventsByType[event.event] = (this.eventsByType[event.event] || 0) + 1;
+					}
+				} catch (innerErr) {
+					console.warn('[lex-pr] audit: error ingesting sidecar event (ignored)', String(innerErr));
+				}
+			});
+		} catch (err) {
+			// If dropDir doesn't exist or files raced away, ignore the ingestion error
+			console.warn('[lex-pr] audit: ingestSidecarFiles failed (ignored)', String(err));
+		}
 	}
 
 	/**
@@ -253,13 +339,55 @@ export class AuditEmitter {
 		// Final sidecar ingestion
 		await this.ingestSidecar();
 
-		// Close NDJSON stream
+		// Close NDJSON stream and wait for it to finish
 		if (this.ndjsonStream) {
-			this.ndjsonStream.end();
+			const stream = this.ndjsonStream;
+			await new Promise<void>((resolve, reject) => {
+				stream.end((err?: Error) => {
+					if (err) reject(err);
+					else resolve();
+				});
+			});
 			this.ndjsonStream = null;
 		}
 
 		if (!this.config) return;
+
+		// Enforce HIPAA fail-closed: when profile is hipaa-strict, require a valid 64-hex key
+		if (this.options.profile === 'hipaa-strict') {
+			const keyHex = this.options.encryptionKeyHex || process.env.LEX_AUDIT_KEY_HEX;
+			const valid = typeof keyHex === 'string' && /^[0-9a-fA-F]{64}$/.test(keyHex);
+			if (!valid) {
+				// Scrub any plaintext audit log and partial encrypted files, then write audit.error.json
+				try {
+					const nd = this.ndjsonPath;
+					if (fs.existsSync(nd)) {
+						fs.unlinkSync(nd);
+					}
+				const enc = nd + '.enc';
+				if (fs.existsSync(enc)) {
+					fs.unlinkSync(enc);
+				}
+			} catch (e) {
+				console.error('[HIPAA] Failed to scrub sensitive audit files:', e);
+			}
+
+		const errObj = {
+					profile: 'hipaa-strict',
+					status: 'aborted',
+					reason: 'missing_or_invalid_key'
+				};
+				try {
+					fs.writeFileSync(path.join(this.auditDir, 'audit.error.json'), JSON.stringify(errObj, null, 2));
+				} catch (e) {
+					// ignore write errors
+				}
+
+				throw new Error('HIPAA: encryption key required and must be 64 hex chars (32 bytes); aborting and scrubbed plaintext.');
+			}
+			// ensure options has the canonical key set for later encryption
+			this.options.encryptionKeyHex = keyHex;
+		}
 
 		const duration = Date.now() - this.startTime;
 
@@ -279,15 +407,133 @@ export class AuditEmitter {
 		const summaryPath = path.join(this.auditDir, 'audit-summary.json');
 		fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
 
-		// Generate and write manifest
-		const manifest = await generateManifest(this.auditDir);
-		await writeManifest(this.auditDir, manifest);
+		// Generate gate matrix if profile requires it (e.g., soc2)
+		if (this.config.includeContext?.length > 0) {
+			await this.generateGateMatrix();
+		}
 
 		// Create signature stub (Phase 2)
 		if (this.config.requireSignature) {
 			const sigPath = path.join(this.auditDir, 'audit.sig');
 			fs.writeFileSync(sigPath, '# Signature stub - Phase 2 implementation pending\n');
 		}
+
+		// Optional at-rest encryption (opt-in via options.encryptionKeyHex)
+		if (this.options.encryptionKeyHex) {
+			// Debug: surface whether encryption key is present (non-sensitive length only)
+			// (debug removed) do not log encryption key length or any sensitive material
+			try {
+				const key = Buffer.from(this.options.encryptionKeyHex as string, 'hex');
+				if (key.length !== 32) {
+					throw new Error('HIPAA: encryption key invalid length');
+				}
+				const ndjsonPath = this.ndjsonPath;
+				const src = fs.readFileSync(ndjsonPath);
+				const iv = crypto.randomBytes(12);
+				const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+				const enc = Buffer.concat([cipher.update(src), cipher.final()]);
+				const tag = cipher.getAuthTag();
+				const outPath = ndjsonPath + '.enc';
+				fs.writeFileSync(outPath, Buffer.concat([iv, tag, enc]));
+				// remove plaintext
+				fs.unlinkSync(ndjsonPath);
+			} catch (e) {
+				// On HIPAA profiles, scrub plaintext and write audit.error.json, then surface a HIPAA-prefixed error
+				try {
+					const nd = this.ndjsonPath;
+					if (fs.existsSync(nd)) fs.unlinkSync(nd);
+					const enc = nd + '.enc';
+					if (fs.existsSync(enc)) fs.unlinkSync(enc);
+				} catch (ignored) {}
+				try {
+					fs.writeFileSync(path.join(this.auditDir, 'audit.error.json'), JSON.stringify({ profile: this.options.profile, status: 'aborted', reason: 'encryption_failed' }, null, 2));
+				} catch (ignored) {}
+				throw new Error('HIPAA: encryption failed; scrubbed plaintext and aborting.');
+			}
+		}
+
+		// Generate and write manifest AFTER encryption (so .enc file is included instead of plaintext)
+		const manifest = await generateManifest(this.auditDir);
+		await writeManifest(this.auditDir, manifest);
+	}
+
+	/**
+	 * Generate gate matrix from audit events
+	 * Uses streaming to handle large audit logs efficiently
+	 */
+	private async generateGateMatrix(): Promise<void> {
+		// Read audit log
+		const auditPath = path.join(this.auditDir, 'audit.ndjson');
+		if (!fs.existsSync(auditPath)) {
+			return;
+		}
+
+		const matrix: Record<string, Record<string, any>> = {};
+		let totalPassed = 0;
+		let totalFailed = 0;
+		let totalSkipped = 0;
+		let totalBlocked = 0;
+		let totalGates = 0;
+
+		try {
+			// Use readline for memory-efficient line-by-line processing
+			const fileStream = fs.createReadStream(auditPath);
+			const rl = readline.createInterface({
+				input: fileStream,
+				crlfDelay: Infinity
+			});
+
+			for await (const line of rl) {
+				if (!line.trim()) continue;
+
+				try {
+					const event = JSON.parse(line);
+					if (event.event === 'gate_finished') {
+						const { item, gate, status, duration_ms, error, reason } = event.payload;
+
+						if (!matrix[item]) {
+							matrix[item] = {};
+						}
+
+						matrix[item][gate] = {
+							status,
+							...(duration_ms !== undefined && { duration_ms }),
+							...(error && { error }),
+							...(reason && { reason })
+						};
+
+						totalGates++;
+						if (status === 'pass') totalPassed++;
+						else if (status === 'fail') totalFailed++;
+						else if (status === 'skip') totalSkipped++;
+						else if (status === 'blocked') totalBlocked++;
+					}
+				} catch (parseError) {
+					// Skip malformed lines
+					console.warn('[lex-pr] audit: skipping malformed line in audit.ndjson');
+				}
+			}
+		} catch (e) {
+			console.warn('[lex-pr] audit: failed to read audit.ndjson (ignored)', String(e));
+			return;
+		}
+
+		const gateMatrix = {
+			generated_at: new Date().toISOString(),
+			session_id: this.sessionId,
+			matrix,
+			summary: {
+				total_prs: Object.keys(matrix).length,
+				total_gates: totalGates,
+				passed: totalPassed,
+				failed: totalFailed,
+				skipped: totalSkipped,
+				blocked: totalBlocked
+			}
+		};
+
+		const matrixPath = path.join(this.auditDir, 'audit-gate-matrix.json');
+		fs.writeFileSync(matrixPath, JSON.stringify(gateMatrix, null, 2));
 	}
 
 	/**

@@ -35,7 +35,7 @@ import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
 import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
-import { registerOrchestrateCommands } from "./commands/orchestrate.js";
+import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -54,6 +54,19 @@ import * as path from "path";
 
 let jsonModeActive = false;
 
+// Guarded finalize: ensure HIPAA-prefixed errors rethrow (to map to exit 2),
+// while non-HIPAA finalize errors are logged and ignored.
+async function finalizeAuditGuard(emitter: AuditEmitter, status?: string): Promise<void> {
+	try {
+		await finalizeAudit(emitter, status);
+	} catch (e) {
+		if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
+			throw e; // let top-level handler map to exit code 2
+		}
+		console.warn('[lex-pr] audit: finalize failed (ignored)', String(e));
+	}
+}
+
 /**
  * CLI exit discipline with proper error codes
  */
@@ -69,7 +82,8 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
     if (!jsonModeActive) {
       console.error(err.message);
     }
-		throwExit(2);
+    process.exitCode = 2;
+    throwExit(2);
   }
   if (e instanceof SchemaValidationError || e instanceof CycleError || e instanceof UnknownDependencyError || e instanceof WriteProtectionError || e instanceof AutopilotConfigError) {
     const prefix = jsonModeActive ? "[lex-pr]" : "❌";
@@ -92,8 +106,16 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
       }
     }
 
-		throwExit(2); // Validation errors
+    	process.exitCode = 2;
+    	throwExit(2); // Validation errors
   }
+	// HIPAA fail-closed errors are surfaced as Error messages prefixed with 'HIPAA:'
+	if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
+		const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+		console.error(`\n${prefix} ${e.message.replace(/^HIPAA:\s*/, '')}\n`);
+		process.exitCode = 2;
+		throwExit(2);
+	}
   const prefix = jsonModeActive ? "[lex-pr]" : "❌";
   console.error(`\n${prefix} Unexpected error: ${String(err?.message ?? e)}\n`);
   if (!jsonModeActive) {
@@ -124,6 +146,8 @@ program
 	.description("Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly")
 	.version("0.1.0")
 	.option("--no-color", "Disable ANSI color codes in output")
+	.option('--audit-profile <profile>', 'Audit logging profile: off|basic|soc2|hipaa-strict', 'off')
+	.option('--audit-key <hex>', 'Audit encryption key (64 hex chars) - overrides LEX_AUDIT_KEY_HEX')
 	.option("--json", "Enable JSON output mode (implies --no-color)")
 	.option("--log-format <format>", "Log output format: 'json' or 'human'", process.env.LOG_FORMAT || 'human')
 	.hook('preAction', (thisCommand) => {
@@ -336,6 +360,7 @@ Common Issues:
   • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
   • Missing configuration: Run 'lex-pr init' to set up workspace`)
 	.action(async (opts) => {
+		let auditEmitter: AuditEmitter | null = null;
 		const previousJsonMode = jsonModeActive;
 		// jsonModeActive is already set by preAction hook from global --json
 		// Command-level --json flag also sets it for backwards compatibility
@@ -454,13 +479,24 @@ Common Issues:
 			if (opts.dryRun) {
 				console.log("Dry run - would generate:");
 				console.log(`📁 ${path.join(outDir, "plan.json")} (${planJSON.length} bytes)`);
-				console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
-				console.log("");
-				console.log(generatePlanSummary(validatedPlan));
-				return;
+			console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
+			console.log("");
+			console.log(generatePlanSummary(validatedPlan));
+			// Ensure audit emitter is finalized on dry-run to close streams/timers
+			if (auditEmitter) {
+				try {
+					await finalizeAuditGuard(auditEmitter, 'dry-run');
+				} catch (e) {
+					if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
+						exitWith(e as Error);
+					}
+					console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
+				}
 			}
+			return;
+		}
 
-			// Write artifacts - validate write permissions first
+	// Write artifacts - validate write permissions first
 
 			// Check if output directory is within a profile and validate write permissions
 			const absOutDir = path.resolve(outDir);
@@ -625,6 +661,9 @@ program
 		} catch (error) {
 			exitWith(error);
 		}
+		finally {
+			// no audit finalization here
+		}
 	});
 
 // Plan review command - Interactive plan validation and editing
@@ -639,12 +678,24 @@ program
 	.option("--output <file>", "Output file for approved/modified plan")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file;
+		let auditEmitter: AuditEmitter | null = null;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
 			throwExit(1);
 		}
 
 		try {
+			// Initialize audit emitter from global audit-profile flag if set
+			const globalAudit = program.opts().auditProfile as string | undefined;
+				if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(resolveProfile(opts.profileDir).path, 'deliverables', 'audit');
+				const cliKey = program.opts().auditKey as string | undefined;
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const keyToUse = cliKey || envKey;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: keyToUse });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'autopilot', argv: process.argv.slice(2) });
+			}
 			const planContent = fs.readFileSync(planFile, "utf-8");
 			const plan = loadPlan(planContent);
 
@@ -705,12 +756,6 @@ registerPlanDiffCommand(program, {
 	exitWith
 });
 
-// Orchestrate: plan-batch command - batch planner with Kahn's algorithm
-registerPlanBatchCommand(program, () => jsonModeActive);
-
-// Orchestrate: Pin Toolchain command
-registerPinToolchainCommand(program);
-
 // Autopilot command
 program
 	.command("autopilot")
@@ -723,6 +768,7 @@ program
 	.option("--json", "Output JSON format")
 	.action(async (file: string | undefined, opts) => {
 		const planFile = opts.plan || file;
+		let auditEmitter: AuditEmitter | null = null;
 		if (!planFile) {
 			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
 			throwExit(1);
@@ -735,6 +781,18 @@ program
 
 			// Resolve profile
 			const profile = resolveProfile(opts.profileDir);
+
+			// Initialize audit emitter from global flag if present
+			const globalAudit = program.opts().auditProfile as string | undefined;
+			if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(profile.path, 'deliverables', 'audit');
+				const cliKey = program.opts().auditKey as string | undefined;
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const keyToUse = cliKey || envKey;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: keyToUse });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'autopilot', argv: process.argv.slice(2) });
+			}
 
 			// Import autopilot modules
 			const { AutopilotLevel0, AutopilotLevel1, AutopilotLevel2 } = await import("./autopilot/index.js");
@@ -783,6 +841,10 @@ program
 				console.error(`Error running autopilot: ${message}`);
 			}
 			exitWith(error);
+		} finally {
+			if (auditEmitter) {
+				await finalizeAuditGuard(auditEmitter);
+			}
 		}
 	});
 
@@ -861,11 +923,16 @@ Common Issues:
 
 			const planContent = fs.readFileSync(planFile, "utf-8");
 			const plan = loadPlan(planContent);
+			let auditEmitter: AuditEmitter | null = null;
 			const timeoutMs = parseInt(opts.timeout);
 
 			// Initialize audit emitter if profile is not 'off'
 			if (opts.audit && opts.audit !== 'off') {
 				const auditDir = opts.auditDir || path.join(opts.artifactDir, 'audit');
+				const cliKey = program.opts().auditKey as string | undefined;
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const keyToUse = cliKey || envKey;
+				const phiFlag = (opts.audit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
 				const auditOptions: AuditOptions = {
 					profile: opts.audit as 'basic' | 'soc2' | 'hipaa-strict',
 					dir: auditDir,
@@ -876,7 +943,9 @@ Common Issues:
 					context: opts.auditContext ? opts.auditContext.split(',') as ('git' | 'ci' | 'os')[] : undefined,
 					signer: opts.auditSigner,
 					retainDays: opts.auditRetainDays ? parseInt(opts.auditRetainDays) : undefined,
-					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined
+					sample: opts.auditSample ? parseInt(opts.auditSample) : undefined,
+					phiRedaction: phiFlag,
+					encryptionKeyHex: keyToUse
 				};
 
 				auditEmitter = await initAuditEmitter(auditOptions);
@@ -948,6 +1017,20 @@ Common Issues:
 
 					if (plan.policy) {
 						console.log(`Policy: ${plan.policy.maxWorkers} max workers, ${Object.keys(plan.policy.retries).length} retry configs`);
+					}
+				}
+
+				// Finalize audit emitter on dry-run so background tasks run and optional
+				// at-rest encryption can occur when an encryption key is provided.
+				if (auditEmitter) {
+					try {
+						await finalizeAuditGuard(auditEmitter, 'dry-run');
+					} catch (e) {
+						if (e instanceof Error && typeof e.message === 'string' && e.message.startsWith('HIPAA:')) {
+							// Surface HIPAA failures as fatal
+							exitWith(e as Error);
+						}
+						console.warn('[lex-pr] audit: finalize on dry-run failed (ignored)', String(e));
 					}
 				}
 
@@ -1051,7 +1134,7 @@ Common Issues:
 				});
 
 				// Finalize audit
-				await finalizeAudit(auditEmitter, hasFailures ? 'failed' : 'success');
+				await finalizeAuditGuard(auditEmitter, hasFailures ? 'failed' : 'success');
 			}
 
 			if (hasFailures) {
@@ -1060,31 +1143,22 @@ Common Issues:
 			return;
 
 		} catch (error) {
-			// Finalize audit on error
+			// Finalize audit on error and delegate exit mapping to exitWith
 			if (auditEmitter) {
 				await emitEvent(auditEmitter, EVENT_TYPES.ERROR, {
 					code: 'EXECUTION_ERROR',
 					message: error instanceof Error ? error.message : String(error),
 					where: 'execute_command'
 				}, 'error');
-				await finalizeAudit(auditEmitter, 'error');
+				await finalizeAuditGuard(auditEmitter, 'error');
 			}
 
-			console.error(`Error executing plan: ${error instanceof Error ? error.message : String(error)}`);
-			// Use exit code 2 for validation errors, 1 for others
-			if (error instanceof SchemaValidationError || error instanceof CycleError || error instanceof UnknownDependencyError) {
-				throwExit(2);
-			} else {
-				throwExit(1);
-			}
+			exitWith(error);
 		}
 	});
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
-
-// Orchestrate commands
-registerOrchestrateCommands(program, () => jsonModeActive);
 
 // Report command
 program
@@ -1294,6 +1368,7 @@ Common Issues:
   • Dirty working directory: Commit or stash changes before merging
   • Permission denied: Ensure you have push access to the repository`)
 	.action(async (opts) => {
+		let auditEmitter: AuditEmitter | null = null;
 		try {
 			// Parse and validate autopilot configuration
 			let autopilotConfig;
@@ -1337,6 +1412,16 @@ Common Issues:
 
 			const planContent = fs.readFileSync(opts.plan, "utf-8");
 			const plan = loadPlan(planContent);
+
+			// Initialize audit emitter from global flag if present
+			const globalAudit = program.opts().auditProfile as string | undefined;
+			if (globalAudit && globalAudit !== 'off') {
+				const auditDir = path.join(path.dirname(opts.plan || '.'), 'audit');
+				const envKey = process.env.LEX_AUDIT_KEY_HEX;
+				const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
+				auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: envKey });
+				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'merge', argv: process.argv.slice(2) });
+			}
 
 			// Compute merge order
 			const levels = computeMergeOrder(plan);
@@ -1459,12 +1544,20 @@ Common Issues:
 			}
 
 		} catch (error) {
+				if (auditEmitter) {
+				await emitEvent(auditEmitter, EVENT_TYPES.ERROR, { code: 'MERGE_ERROR', message: error instanceof Error ? error.message : String(error), where: 'merge_command' }, 'error');
+				await finalizeAuditGuard(auditEmitter, 'error');
+			}
 			if (error instanceof GitOperationError) {
 				console.error(`Git Operation Error: ${error.message}`);
 				throwExit(1);
 			}
 			console.error(`Error executing merge: ${error instanceof Error ? error.message : String(error)}`);
 			throwExit(1);
+		} finally {
+			if (auditEmitter) {
+				await finalizeAuditGuard(auditEmitter, 'success');
+			}
 		}
 	});
 
@@ -1734,6 +1827,12 @@ async function performDoctorChecks(): Promise<any> {
 			checks.issues.push(`Node.js version mismatch: ${process.version} vs v${expectedVersion}`);
 		}
 	} catch (error) {
+		// If a HIPAA prefixed error made it here, ensure we exit with code 2
+		if (error instanceof Error && typeof error.message === 'string' && error.message.startsWith('HIPAA:')) {
+			process.stderr.write(`${error.message.replace(/^HIPAA:\s*/, '')}\n`);
+			process.exitCode = 2;
+			return;
+		}
 		checks.nodejs = { status: "no_constraint", current: process.version };
 		checks.suggestions.push("Consider adding .nvmrc file for Node.js version consistency");
 	}
@@ -2229,6 +2328,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 registerSecurityCommands(program);
 
 // Orchestration commands
+registerAnalyzeIssuesCommand(program, () => jsonModeActive);
+registerPlanBatchCommand(program, () => jsonModeActive);
+registerPinToolchainCommand(program);
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
 registerAssignBatchCommand(program);

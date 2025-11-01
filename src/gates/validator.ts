@@ -26,7 +26,6 @@ export class GateInputValidationError extends Error {
 		this.gate = gate;
 		this.errors = errors;
 	}
-
 	/**
 	 * Get machine-readable error format
 	 */
@@ -68,7 +67,12 @@ export function validateGateInput(gateName: string, input: unknown): void {
 	const schema = loadGateSchema(gateName);
 
 	if (!schema) {
-		// No schema = no validation (backward compatibility)
+		// No schema: emit warning and skip validation (temporary; required at v1.0.0)
+		// Rationale: before v1.0.0 we allow missing schemas but make the pressure explicit.
+		console.warn(
+			'[lex-pr] validator: missing schema for gate; validation skipped (will be required in v1.0.0)'
+		);
+		// tests and callers expect void; surface a light warning but keep behavior
 		return;
 	}
 
