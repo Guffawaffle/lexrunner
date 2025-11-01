@@ -1,0 +1,101 @@
+{
+  "description": "Cross-Module: 4 PRs in different modules with no overlap",
+  "prs": [
+    {
+      "number": 400,
+      "title": "Module A: Authentication",
+      "body": "Implements authentication module",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/auth/login.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        },
+        {
+          "filename": "src/auth/session.ts",
+          "status": "added",
+          "additions": 80,
+          "deletions": 0,
+          "changes": 80
+        }
+      ]
+    },
+    {
+      "number": 401,
+      "title": "Module B: Payment processing",
+      "body": "Implements payment module",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/payment/stripe.ts",
+          "status": "added",
+          "additions": 150,
+          "deletions": 0,
+          "changes": 150
+        },
+        {
+          "filename": "src/payment/validation.ts",
+          "status": "added",
+          "additions": 60,
+          "deletions": 0,
+          "changes": 60
+        }
+      ]
+    },
+    {
+      "number": 402,
+      "title": "Module C: Notifications",
+      "body": "Implements notification system",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/notifications/email.ts",
+          "status": "added",
+          "additions": 120,
+          "deletions": 0,
+          "changes": 120
+        },
+        {
+          "filename": "src/notifications/sms.ts",
+          "status": "added",
+          "additions": 90,
+          "deletions": 0,
+          "changes": 90
+        }
+      ]
+    },
+    {
+      "number": 403,
+      "title": "Module D: Analytics",
+      "body": "Implements analytics tracking",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/analytics/tracker.ts",
+          "status": "added",
+          "additions": 110,
+          "deletions": 0,
+          "changes": 110
+        },
+        {
+          "filename": "src/analytics/events.ts",
+          "status": "added",
+          "additions": 70,
+          "deletions": 0,
+          "changes": 70
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "orphans": ["PR-400", "PR-401", "PR-402", "PR-403"],
+    "warnings": 1
+  }
+}

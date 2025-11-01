@@ -1,0 +1,110 @@
+{
+  "description": "File Overlap Heavy: 5 PRs modifying same codebase, no explicit deps",
+  "prs": [
+    {
+      "number": 300,
+      "title": "Refactor: Update core utilities",
+      "body": "Refactors core utilities",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/utils/helpers.ts",
+          "status": "modified",
+          "additions": 40,
+          "deletions": 20,
+          "changes": 60
+        },
+        {
+          "filename": "src/utils/validators.ts",
+          "status": "modified",
+          "additions": 25,
+          "deletions": 10,
+          "changes": 35
+        }
+      ]
+    },
+    {
+      "number": 301,
+      "title": "Feature: Add logging",
+      "body": "Adds logging to utilities",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/utils/helpers.ts",
+          "status": "modified",
+          "additions": 30,
+          "deletions": 5,
+          "changes": 35
+        },
+        {
+          "filename": "src/utils/logger.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    },
+    {
+      "number": 302,
+      "title": "Fix: Validator bug fixes",
+      "body": "Fixes bugs in validators",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/utils/validators.ts",
+          "status": "modified",
+          "additions": 15,
+          "deletions": 8,
+          "changes": 23
+        }
+      ]
+    },
+    {
+      "number": 303,
+      "title": "Tests: Utility tests",
+      "body": "Adds tests for utilities",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "tests/utils/helpers.spec.ts",
+          "status": "added",
+          "additions": 200,
+          "deletions": 0,
+          "changes": 200
+        },
+        {
+          "filename": "tests/utils/validators.spec.ts",
+          "status": "added",
+          "additions": 150,
+          "deletions": 0,
+          "changes": 150
+        }
+      ]
+    },
+    {
+      "number": 304,
+      "title": "Docs: Update utility docs",
+      "body": "Updates documentation",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "docs/utils/README.md",
+          "status": "modified",
+          "additions": 50,
+          "deletions": 10,
+          "changes": 60
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "orphans": [],
+    "suggestions": 2
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "description": "Single PR: Only one open PR",
+  "prs": [
+    {
+      "number": 900,
+      "title": "Single PR",
+      "body": "The only open PR in the repository",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/feature.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "layers": [["PR-900"]],
+    "orphans": ["PR-900"],
+    "warnings": 1
+  }
+}

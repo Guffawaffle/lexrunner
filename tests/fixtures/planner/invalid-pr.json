@@ -1,0 +1,25 @@
+{
+  "description": "Invalid PR Reference: PR depends on non-existent PR",
+  "prs": [
+    {
+      "number": 700,
+      "title": "PR with invalid dependency",
+      "body": "Depends on non-existent PR\n\nDepends-on: #999",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/feature.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "errors": ["invalid reference"],
+    "warnings": 1
+  }
+}
