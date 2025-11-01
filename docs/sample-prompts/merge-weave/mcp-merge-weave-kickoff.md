@@ -12,14 +12,13 @@ You will plan and execute a **merge-weave** into a single umbrella branch and PR
 - After all levels pass gates, **merge the umbrella PR** to default.
 
 **Agent session dir (fixed):** `.smartergpt.local/deliverables/_session` — for plans, merge logs, orchestration metadata
-**lex-pr artifacts (configurable):** `lex-pr execute` writes gate artifacts to `--artifact-dir` (default: `./artifacts`)
-  - **Recommended:** Use `--artifact-dir .smartergpt.local/deliverables/_session/gate-artifacts` to keep everything together
+**lex-pr gate artifacts (default):** `.smartergpt.local/artifacts/` — lex-pr writes detailed gate logs here automatically
 **Schema path (fixed):** `schema/plan.schema.json` — `lex-pr schema validate` uses this
 **Safety:** No force-push, no history rewrites. Use `git revert` for safe undos.
 
 > **MCP Preference:** Use MCP tools for git/GitHub ops (`mcp:git.*`, `mcp:github.*`). For lex-pr-runner commands, wrap via `mcp:tool.run name="lex-pr" args=[...]`. Fallback to `gh` CLI, then shell, then REST.
 >
-> **Key insight:** `lex-pr` CLI is responsible for discovering PRs, generating plans, computing order, and running gates (it manages its own artifact collection internally). **You orchestrate the flow and capture lex-pr's JSON outputs to your session dir.** The two artifact spaces don't conflict—lex-pr writes gate logs/coverage to its `--artifact-dir`, you capture MCP tool outputs (JSON) to `.smartergpt.local/deliverables/_session/`.
+> **Key insight:** `lex-pr` CLI is responsible for discovering PRs, generating plans, computing order, and running gates (it manages its own artifact collection internally). **You orchestrate the flow and capture lex-pr's JSON outputs to your session dir.** The two artifact spaces don't conflict—lex-pr writes gate logs/coverage to `.smartergpt.local/artifacts/`, you capture MCP tool outputs (JSON) to `.smartergpt.local/deliverables/_session/`.
 
 ---
 
@@ -232,7 +231,7 @@ Fold PR branches into umbrella, run gates, manage umbrella PR body, close folded
 - `mcp:github.pr.update` — update umbrella PR body (github outputs status)
 - `mcp:github.pr.comment` — comment on PRs (github outputs status)
 - `mcp:github.pr.close` — close folded PRs (github outputs status)
-- `mcp:tool.run name="lex-pr" args=["execute", "--plan", "...", "--artifact-dir", "...", "--json"]` — run gates (lex-pr outputs gate results JSON + logs)
+- `mcp:tool.run name="lex-pr" args=["execute", "--plan", "...", "--json"]` — run gates (lex-pr outputs gate results JSON + logs)
 - `filesystem/read`, `filesystem/write` — capture and organize outputs
 - **You (agent) responsibility:** Run MCP tools, capture outputs (gate results, merge logs), save to fixed paths
 - **Forbidden:** force-push, rebase, history rewrite
@@ -253,9 +252,8 @@ for PR in level_items; do
   fi
 
   # Run gates on umbrella + PR_BRANCH (lex-pr outputs gate results as JSON to stdout)
-  # Agent captures JSON output; lex-pr writes detailed gate artifacts to --artifact-dir
+  # Agent captures JSON output; lex-pr writes detailed gate artifacts to .smartergpt.local/artifacts/
   mcp:tool.run name="lex-pr" args=["execute", "--plan", "plan.json", \
-    "--artifact-dir", ".smartergpt.local/deliverables/_session/gate-artifacts", \
     "--json"] \
     | tee gate-result-${PR}.json
 
@@ -287,8 +285,8 @@ done
 - `.smartergpt.local/deliverables/_session/umbrella-body.md` — umbrella PR body with checklist (you update)
 - `.smartergpt.local/deliverables/_session/fold-summary.json` — fold statistics (you compute from logs)
 
-**lex-pr internal artifacts (lex-pr creates via `--artifact-dir`):**
-- `.smartergpt.local/deliverables/_session/gate-artifacts/{gate-name}/` — detailed gate logs, coverage, test results, build artifacts (created by `lex-pr execute --artifact-dir ...`)
+**lex-pr internal artifacts (default location):**
+- `.smartergpt.local/artifacts/{gate-name}/` — detailed gate logs, coverage, test results, build artifacts (created automatically by `lex-pr execute`)
 
 ### Success Criteria
 - All eligible PRs folded into umbrella
