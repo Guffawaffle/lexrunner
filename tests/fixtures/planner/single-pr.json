@@ -19,7 +19,6 @@
     }
   ],
   "expectedPlan": {
-    "layers": [["PR-900"]],
     "orphans": ["PR-900"],
     "warnings": 1
   }

@@ -134,8 +134,9 @@ export async function loadFixture(name: string): Promise<PlanFixture> {
 	try {
 		const content = await fs.readFile(fixturePath, "utf-8");
 		return JSON.parse(content) as PlanFixture;
-	} catch (error: any) {
-		throw new Error(`Failed to load fixture "${name}": ${error.message}`);
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Failed to load fixture "${name}": ${message}`);
 	}
 }
 

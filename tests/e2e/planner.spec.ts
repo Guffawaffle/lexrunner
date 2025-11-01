@@ -617,7 +617,7 @@ describe("E2E: Diffgraph Planner", () => {
 				parsePRDescription(pr.number, pr.body)
 			);
 
-			const runs: any[] = [];
+			const runs: ReturnType<typeof generatePlanFromParsedPRs>[] = [];
 			for (let i = 0; i < 5; i++) {
 				runs.push(generatePlanFromParsedPRs(parsedPRs));
 			}
