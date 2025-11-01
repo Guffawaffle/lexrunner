@@ -95,7 +95,8 @@ describe('End-to-End Integration Tests', () => {
 
       const { stdout } = await runCLI(`schema validate ${planPath}`);
 
-      expect(stdout).toContain('✓');
+      // Updated: validation now uses ✅ instead of ✓
+      expect(stdout).toMatch(/[✓✅]/);
       expect(stdout).toContain('is valid');
     });
 
