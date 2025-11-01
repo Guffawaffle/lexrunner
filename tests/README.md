@@ -77,3 +77,71 @@ npm test -- autopilot-e2e-level3-4.spec.ts -t "Complex Dependency Graphs"
 - All tests are deterministic and avoid timing dependencies
 - Level 4 tests are stubs documenting expected behavior for when the implementation is complete
 - Fixtures provide realistic PR graph patterns for validation
+
+Diffgraph Planner E2E Tests
+============================
+
+The `e2e/planner.spec.ts` file contains comprehensive end-to-end tests for the diffgraph planner with dependency auto-discovery:
+
+**Real Repository Scenarios:**
+- **Scenario A: Simple Stack** - Linear dependencies (foundation → feature → tests)
+- **Scenario B: Diamond Pattern** - Core splits into parallel features, then integrates
+- **Scenario C: Mixed Dependencies** - Explicit dependencies (Depends-on:) + implicit via file overlaps
+- **Scenario D: File-Overlap Heavy** - Multiple PRs modifying same codebase with no explicit deps
+- **Scenario E: Cross-Module** - Independent PRs in different modules with low overlap
+
+**Edge Cases Covered:**
+1. **Cycle Detection** - 3 PRs forming circular dependency
+2. **Self-Dependency** - PR declaring dependency on itself
+3. **Invalid PR Reference** - Dependency on non-existent PR
+4. **Stale PR** - Plan includes closed/merged PR
+5. **Large Batch** - Stress test with 100+ PRs
+6. **Merge Conflicts** - Predicted conflicts from file analysis
+7. **Empty Repository** - No open PRs scenario
+8. **Single PR** - Single orphan PR handling
+
+**Test Infrastructure:**
+- **Fixtures**: `tests/fixtures/planner/*.json` - 11 realistic PR scenarios
+- **Helpers**: `tests/helpers/plannerTestHelpers.ts` - Mock creation, fixture loading, assertions
+- **Performance Benchmarks**: 10 PRs <1s, 100 PRs <10s
+- **Determinism Tests**: Verify identical outputs for same inputs
+- **Regression Tests**: Track historical bugs and ensure fixes remain stable
+
+**Test Fixtures:**
+- `simple-stack.json` - Linear 3-PR dependency chain
+- `diamond-pattern.json` - 4-PR diamond (fan-out/fan-in)
+- `mixed-deps.json` - Explicit + implicit dependencies
+- `file-overlap-heavy.json` - 5 PRs with file conflicts
+- `cross-module.json` - 4 independent module PRs
+- `cycle-error.json` - Circular dependency (3 PRs)
+- `self-dependency.json` - PR depending on itself
+- `invalid-pr.json` - Invalid dependency reference
+- `stale-pr.json` - Closed/merged PR in plan
+- `empty-repo.json` - No PRs scenario
+- `single-pr.json` - Single orphan PR
+- `merge-conflicts.json` - High-severity conflict prediction
+
+**Running the tests:**
+```bash
+# Run all planner E2E tests
+npm test -- e2e/planner.spec.ts
+
+# Run specific scenario
+npm test -- e2e/planner.spec.ts -t "Simple Stack"
+npm test -- e2e/planner.spec.ts -t "Diamond Pattern"
+npm test -- e2e/planner.spec.ts -t "Cycle Detection"
+
+# Run performance benchmarks only
+npm test -- e2e/planner.spec.ts -t "Performance Benchmarks"
+
+# Run determinism tests only
+npm test -- e2e/planner.spec.ts -t "Determinism"
+```
+
+**Key Testing Approach:**
+- Tests use existing `dependencyParser` and `FileAnalyzer` modules
+- Mock GitHub API via `createMockGitHub` helper
+- Fixtures contain realistic PR data including file changes
+- All tests validate deterministic behavior (same inputs → same outputs)
+- File analysis tests verify conflict prediction and dependency suggestions
+- Performance tests ensure scalability (100 PRs in <10s)

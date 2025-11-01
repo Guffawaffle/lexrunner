@@ -16,5 +16,26 @@ export {
 export * from "./types.js";
 export * from "./fileAnalysis.js";
 
+// Dependency scoring and weighting (Issue #196)
+export {
+	scoreDependencies,
+	mergeDuplicateScores,
+	sortScores,
+	type DependencyScore,
+	type ScoringOptions
+} from "./dependencyScoring.js";
+
 // Scope validation for agent edits
 export * from "./scopeValidator.js";
+
+// Plan validation with cycle detection and diagnostics
+export {
+        validatePlan,
+        formatValidationResult,
+        type ValidationResult,
+        type ValidationError,
+        type ValidationWarning,
+        type ValidationDiagnostics,
+        type ValidationErrorType,
+        type ValidationWarningType
+} from "./validation.js";

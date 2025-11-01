@@ -1,0 +1,40 @@
+{
+  "description": "Stale PR: Plan includes closed/merged PR",
+  "prs": [
+    {
+      "number": 800,
+      "title": "Active PR",
+      "body": "Depends on merged PR\n\nDepends-on: #801",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/feature.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    },
+    {
+      "number": 801,
+      "title": "Merged PR",
+      "body": "This PR was already merged",
+      "state": "closed",
+      "merged": true,
+      "files": [
+        {
+          "filename": "src/base.ts",
+          "status": "added",
+          "additions": 80,
+          "deletions": 0,
+          "changes": 80
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "warnings": 1
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "description": "Mixed Dependencies: Some explicit, some implicit via file overlaps",
+  "prs": [
+    {
+      "number": 200,
+      "title": "Core: Database layer",
+      "body": "Database infrastructure",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/db/connection.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        },
+        {
+          "filename": "src/db/models.ts",
+          "status": "added",
+          "additions": 150,
+          "deletions": 0,
+          "changes": 150
+        }
+      ]
+    },
+    {
+      "number": 201,
+      "title": "API: REST endpoints",
+      "body": "REST API implementation\n\nDepends-on: #200",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/api/routes.ts",
+          "status": "added",
+          "additions": 200,
+          "deletions": 0,
+          "changes": 200
+        },
+        {
+          "filename": "src/api/handlers.ts",
+          "status": "added",
+          "additions": 180,
+          "deletions": 0,
+          "changes": 180
+        }
+      ]
+    },
+    {
+      "number": 202,
+      "title": "Validation: Request validation",
+      "body": "Adds input validation (no explicit dependency, but modifies same files as API)",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/api/handlers.ts",
+          "status": "modified",
+          "additions": 50,
+          "deletions": 10,
+          "changes": 60
+        },
+        {
+          "filename": "src/validation/schemas.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    },
+    {
+      "number": 203,
+      "title": "Caching: Add caching layer",
+      "body": "Caching for database queries (no explicit dep, modifies db files)",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/db/connection.ts",
+          "status": "modified",
+          "additions": 30,
+          "deletions": 5,
+          "changes": 35
+        },
+        {
+          "filename": "src/cache/redis.ts",
+          "status": "added",
+          "additions": 80,
+          "deletions": 0,
+          "changes": 80
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "layers": [
+      ["PR-200"],
+      ["PR-201", "PR-203"],
+      ["PR-202"]
+    ],
+    "suggestions": 2
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "description": "Self-Dependency: PR declares dependency on itself",
+  "prs": [
+    {
+      "number": 600,
+      "title": "Self-referencing PR",
+      "body": "This PR mistakenly depends on itself\n\nDepends-on: #600",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/feature.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "errors": ["self-dependency"]
+  }
+}

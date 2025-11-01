@@ -175,31 +175,77 @@ This ensures local development work doesn't overwrite tracked example configurat
 
 ### `schema validate`
 
-Validate plan.json files against the schema.
+Validate plan.json files against the schema with enhanced cycle detection and diagnostics.
 
 ```bash
 lex-pr schema validate [options] [file]
 
 Arguments:
-  file              Path to plan.json file (alternative to --plan)
+  file              Path to plan.json file
 
 Options:
-  --plan <file>     Path to plan.json file  
   --json            Output machine-readable JSON errors
+  --verbose         Show detailed diagnostics (layers, warnings, full dependency graph)
   -h, --help        Display help for command
 ```
+
+#### Validation Checks
+
+The validator performs comprehensive checks:
+1. **Schema validation** - Ensures plan follows correct structure
+2. **Cycle detection** - Identifies circular dependencies with full path details
+3. **Orphan detection** - Warns about items with no dependencies/dependents
+4. **Reference validation** - Ensures all dependencies exist
+5. **Self-dependency detection** - Catches items depending on themselves
+6. **Topology analysis** - Computes merge layers and identifies bottlenecks
 
 #### Examples
 
 ```bash
-# Validate with human-readable output
+# Basic validation with human-readable output
 lex-pr schema validate plan.json
+
+# Detailed validation with layer information
+lex-pr schema validate plan.json --verbose
 
 # Validate with JSON output for CI
 lex-pr schema validate --json plan.json
 
-# Using --plan flag
-lex-pr schema validate --plan ./configs/plan.json --json
+# Example output (human-readable):
+=== Plan Validation Report ===
+
+❌ Errors:
+
+Dependency cycle detected in plan
+
+Cycle path: feat-a → feat-b → feat-c → feat-a
+
+Dependency chain:
+  feat-a               depends on feat-b
+  feat-b               depends on feat-c
+  feat-c               depends on feat-a
+
+Suggestion: Consider removing the dependency from 'feat-c' to 'feat-a' to break the cycle
+
+❌ Plan has 1 error(s) that must be fixed
+
+# Example verbose output:
+=== Plan Validation Report ===
+
+Nodes: 6 items
+Edges: 4 dependencies
+
+Layers (topological sort):
+  Layer 0: feat-a, feat-b, feat-f
+  Layer 1: feat-c, feat-d
+  Layer 2: feat-e
+
+⚠️  Warnings:
+
+Item 'feat-f' has no dependencies and no dependents (orphan)
+Suggestion: Consider if these items should have dependencies or dependents.
+
+✅ Plan is valid and ready for execution
 ```
 
 #### JSON Output Schema
@@ -207,27 +253,82 @@ lex-pr schema validate --plan ./configs/plan.json --json
 **Success Response:**
 ```json
 {
-  "valid": true
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "diagnostics": {
+    "nodes": 5,
+    "edges": 4,
+    "layers": [
+      { "level": 0, "prs": ["feat-a", "feat-b"] },
+      { "level": 1, "prs": ["feat-c"] }
+    ],
+    "orphans": []
+  }
 }
 ```
 
-**Error Response:**
+**Error Response (Cycle):**
 ```json
 {
   "valid": false,
   "errors": [
     {
-      "path": "string",     // Dot-notation path to invalid field
-      "message": "string",  // Human-readable error message
-      "code": "string"      // Zod validation error code
+      "type": "cycle",
+      "message": "Dependency cycle detected in plan\n\nCycle path: feat-a → feat-b → feat-a\n\nDependency chain:\n  feat-a depends on feat-b\n  feat-b depends on feat-a",
+      "details": {
+        "cyclePath": ["feat-a", "feat-b", "feat-a"]
+      },
+      "suggestion": "Consider removing the dependency from 'feat-b' to 'feat-a' to break the cycle"
     }
-  ]
+  ],
+  "warnings": [],
+  "diagnostics": {
+    "nodes": 2,
+    "edges": 2,
+    "layers": [],
+    "orphans": []
+  }
 }
 ```
 
+**Warning Response (Orphans):**
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "type": "orphan",
+      "message": "2 items have no dependencies and no dependents (orphans): orphan-1, orphan-2",
+      "affectedPRs": ["orphan-1", "orphan-2"],
+      "suggestion": "Consider if these items should have dependencies or dependents. Use labels to mark intentional orphans."
+    }
+  ],
+  "diagnostics": {
+    "nodes": 4,
+    "edges": 1,
+    "layers": [
+      { "level": 0, "prs": ["feat-a", "orphan-1", "orphan-2"] },
+      { "level": 1, "prs": ["feat-b"] }
+    ],
+    "orphans": ["orphan-1", "orphan-2"]
+  }
+}
+```
+
+**Error Types:**
+- `cycle` - Circular dependency detected
+- `invalid-ref` - Reference to non-existent item
+- `self-dependency` - Item depends on itself
+
+**Warning Types:**
+- `orphan` - Item has no dependencies and no dependents
+- `large-layer` - Layer has too many items (potential merge conflicts)
+
 **Exit Codes:**
-- `0`: Validation successful
-- `1`: System error (file not readable, etc.)
+- `0`: Validation successful (may have warnings)
+- `1`: Validation failed with errors or system error
 - `2`: Validation failed
 
 ---

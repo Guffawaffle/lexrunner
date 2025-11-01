@@ -1,0 +1,9 @@
+{
+  "description": "Empty Repository: No open PRs",
+  "prs": [],
+  "expectedPlan": {
+    "layers": [],
+    "orphans": [],
+    "warnings": 0
+  }
+}
