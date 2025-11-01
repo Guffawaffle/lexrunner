@@ -1,0 +1,22 @@
+{
+	"schemaVersion": "1.0.0",
+	"target": "main",
+	"items": [
+		{
+			"name": "feat-a",
+			"deps": ["feat-b"]
+		},
+		{
+			"name": "feat-b",
+			"deps": []
+		},
+		{
+			"name": "orphan-1",
+			"deps": []
+		},
+		{
+			"name": "orphan-2",
+			"deps": []
+		}
+	]
+}

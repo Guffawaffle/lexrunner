@@ -1,6 +1,7 @@
 import { Plan, PlanItem } from "./schema.js";
 import { OperationCache } from "./performance.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
+import { validatePlan, ValidationError as PlanValidationError } from "./planner/validation.js";
 
 /**
  * Merge order computation using Kahn's algorithm with deterministic tie-breaking
@@ -47,6 +48,28 @@ export function computeMergeOrder(plan: Plan): string[][] {
 	const cached = dependencyCache.get(cacheKey);
 	if (cached) {
 		return cached;
+	}
+
+	// Validate the plan first to provide better error messages
+	const validationResult = validatePlan(plan);
+	
+	// Check for validation errors and throw appropriate exceptions
+	if (!validationResult.valid) {
+		for (const error of validationResult.errors) {
+			if (error.type === "cycle") {
+				// Throw enhanced cycle error with full details
+				const message = `${error.message}\n\n${error.suggestion}`;
+				throw new CycleError(message);
+			} else if (error.type === "invalid-ref") {
+				// Throw enhanced unknown dependency error
+				const message = `${error.message}\n\nSuggestion: ${error.suggestion}`;
+				throw new UnknownDependencyError(message);
+			} else if (error.type === "self-dependency") {
+				// Throw as cycle error (self-dependency is a special case of cycle)
+				const message = `${error.message}\n\nSuggestion: ${error.suggestion}`;
+				throw new CycleError(message);
+			}
+		}
 	}
 
 	const items = plan.items;
@@ -103,7 +126,7 @@ export function computeMergeOrder(plan: Plan): string[][] {
 		}
 	}
 
-	// Check for cycles
+	// Check for cycles (this should not happen if validation passed, but keep as safety check)
 	if (inDegree.size > 0 && Array.from(inDegree.values()).some(degree => degree > 0)) {
 		const cycleNodes = Array.from(inDegree.entries())
 			.filter(([, degree]) => degree > 0)

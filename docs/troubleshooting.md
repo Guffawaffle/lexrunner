@@ -224,15 +224,172 @@ items:
 
 **Cause:** Circular dependencies (A → B → A).
 
-**Solution:**
+**Enhanced Error Message (v0.1.0+):**
+
+```
+❌ Errors:
+
+Dependency cycle detected in plan
+
+Cycle path: feat-a → feat-b → feat-c → feat-a
+
+Dependency chain:
+  feat-a               depends on feat-b
+  feat-b               depends on feat-c
+  feat-c               depends on feat-a
+
+Suggestion: Consider removing the dependency from 'feat-c' to 'feat-a' to break the cycle
+```
+
+**Solutions:**
 
 ```bash
-# Visualize dependencies to find cycle
-lex-pr plan --json | jq '.items[] | {name, deps}'
+# 1. Validate plan to see detailed cycle information
+lex-pr schema validate plan.json
 
-# Fix by removing circular reference
-# Example cycle: auth → api → auth
-# Break by removing one dependency
+# 2. Visualize dependencies to understand the cycle
+lex-pr schema validate plan.json --verbose
+
+# Output includes layers showing dependency order:
+# Layers (topological sort):
+#   Layer 0: base-feature
+#   Layer 1: feature-a, feature-b
+#   Layer 2: feature-c
+
+# 3. Fix by identifying and removing the circular reference
+# Example cycle: auth → api → database → auth
+# Solution: Remove one dependency, e.g., database should not depend on auth
+
+# 4. Common cycle patterns and fixes:
+
+# Pattern 1: Simple cycle (A ↔ B)
+# Before:
+# - feature-a: deps: [feature-b]
+# - feature-b: deps: [feature-a]
+# Fix: Remove dependency from B to A
+
+# Pattern 2: Longer cycle (A → B → C → A)
+# Before:
+# - feature-a: deps: [feature-b]
+# - feature-b: deps: [feature-c]
+# - feature-c: deps: [feature-a]
+# Fix: Remove the "weakest" dependency (usually the last one)
+
+# Pattern 3: Self-dependency (A → A)
+# Before:
+# - feature-a: deps: [feature-a]
+# Fix: Remove self-reference
+
+# 5. Verify fix with validation
+lex-pr schema validate plan.json --verbose
+```
+
+**Prevention:**
+
+```bash
+# Always validate plans before execution
+lex-pr schema validate plan.json
+
+# Use --validate-cycles flag when generating plans (default: enabled)
+lex-pr plan --from-github --validate-cycles
+
+# Enable validation in CI/CD
+lex-pr schema validate plan.json || exit 1
+```
+
+#### Issue: `Orphan PRs detected` (Warning)
+
+**Cause:** Plan items with no dependencies and no dependents - execute in isolation.
+
+**Warning Message:**
+
+```
+⚠️  Warnings:
+
+Item 'orphan-feature' has no dependencies and no dependents (orphan)
+Suggestion: Consider if these items should have dependencies or dependents.
+```
+
+**Why This Matters:**
+
+Orphan items may indicate:
+- Forgotten dependency declarations
+- Features that should be grouped with others
+- Independent work that doesn't need the merge pyramid
+
+**Solutions:**
+
+```bash
+# 1. Review orphan items
+lex-pr schema validate plan.json --verbose
+
+# 2. Decide if orphan is intentional:
+
+# Option A: Add dependencies if the item should be part of the merge flow
+# In deps.yml or stack.yml:
+items:
+  - name: orphan-feature
+    deps: [base-feature]  # Link to dependency chain
+
+# Option B: Add label to mark as intentionally orphan (future)
+# In PR description:
+# Labels: orphan
+# This signals the item is meant to be independent
+
+# Option C: Merge orphans separately
+# Extract orphans to separate plan:
+lex-pr plan --from-github | jq '.items[] | select(.deps | length == 0)' > orphans.json
+
+# 3. Verify fix
+lex-pr schema validate plan.json
+```
+
+**When Orphans Are OK:**
+
+- Hotfixes that need immediate merge
+- Documentation updates
+- Independent features with no shared code
+- Experimental branches
+
+#### Issue: `Invalid dependency reference`
+
+**Cause:** Dependency name doesn't match any item in the plan.
+
+**Enhanced Error Message:**
+
+```
+❌ Errors:
+
+Item 'feature-a' references unknown dependency 'feature-missing'
+
+Suggestion: Ensure 'feature-missing' exists in the plan or remove it from 'feature-a' dependencies
+```
+
+**Solutions:**
+
+```bash
+# 1. Validate to see all invalid references
+lex-pr schema validate plan.json
+
+# 2. Check item names vs dependency names
+cat plan.json | jq '.items[] | {name, deps}'
+
+# 3. Common causes:
+
+# Typo in dependency name
+# Before: deps: ["feat-a"]
+# After:  deps: ["feature-a"]
+
+# Case mismatch
+# Before: deps: ["Feature-A"]
+# After:  deps: ["feature-a"]
+
+# Reference to deleted/renamed item
+# Before: deps: ["old-name"]
+# After:  deps: ["new-name"]
+
+# 4. Fix and revalidate
+lex-pr schema validate plan.json
 ```
 
 #### Issue: `No PRs found matching scope`
