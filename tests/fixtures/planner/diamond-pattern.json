@@ -1,0 +1,78 @@
+{
+  "description": "Diamond Pattern: Core splits into parallel features, then integrates",
+  "prs": [
+    {
+      "number": 100,
+      "title": "Core: Base infrastructure",
+      "body": "Core infrastructure that will be extended by two features",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/core/base.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    },
+    {
+      "number": 101,
+      "title": "Feature A: First feature",
+      "body": "First feature building on core\n\nDepends-on: #100",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/features/feature-a.ts",
+          "status": "added",
+          "additions": 80,
+          "deletions": 0,
+          "changes": 80
+        }
+      ]
+    },
+    {
+      "number": 102,
+      "title": "Feature B: Second feature",
+      "body": "Second feature building on core\n\nDepends-on: #100",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/features/feature-b.ts",
+          "status": "added",
+          "additions": 90,
+          "deletions": 0,
+          "changes": 90
+        }
+      ]
+    },
+    {
+      "number": 103,
+      "title": "Integration: Combine features",
+      "body": "Integrates both features\n\nDepends-on: #101, #102",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/integration/combined.ts",
+          "status": "added",
+          "additions": 120,
+          "deletions": 0,
+          "changes": 120
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "layers": [
+      ["PR-100"],
+      ["PR-101", "PR-102"],
+      ["PR-103"]
+    ],
+    "orphans": [],
+    "warnings": 0
+  }
+}

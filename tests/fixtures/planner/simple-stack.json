@@ -1,0 +1,83 @@
+{
+  "description": "Simple Stack: Linear dependencies (foundation → feature → tests)",
+  "prs": [
+    {
+      "number": 100,
+      "title": "Foundation: Core infrastructure",
+      "body": "Implements core infrastructure for the feature",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/core/foundation.ts",
+          "status": "added",
+          "additions": 150,
+          "deletions": 0,
+          "changes": 150
+        },
+        {
+          "filename": "src/core/types.ts",
+          "status": "added",
+          "additions": 50,
+          "deletions": 0,
+          "changes": 50
+        }
+      ]
+    },
+    {
+      "number": 101,
+      "title": "Feature: Main feature implementation",
+      "body": "Implements main feature\n\nDepends-on: #100",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/features/main-feature.ts",
+          "status": "added",
+          "additions": 200,
+          "deletions": 0,
+          "changes": 200
+        },
+        {
+          "filename": "src/core/foundation.ts",
+          "status": "modified",
+          "additions": 20,
+          "deletions": 5,
+          "changes": 25
+        }
+      ]
+    },
+    {
+      "number": 102,
+      "title": "Tests: Feature tests",
+      "body": "Adds comprehensive tests for the feature\n\nDepends-on: #101",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "tests/features/main-feature.spec.ts",
+          "status": "added",
+          "additions": 300,
+          "deletions": 0,
+          "changes": 300
+        },
+        {
+          "filename": "tests/core/foundation.spec.ts",
+          "status": "added",
+          "additions": 100,
+          "deletions": 0,
+          "changes": 100
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "layers": [
+      ["PR-100"],
+      ["PR-101"],
+      ["PR-102"]
+    ],
+    "orphans": [],
+    "warnings": 0
+  }
+}

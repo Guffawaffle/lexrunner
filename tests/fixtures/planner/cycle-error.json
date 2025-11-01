@@ -1,0 +1,56 @@
+{
+  "description": "Cycle Detection: 3 PRs forming a circular dependency",
+  "prs": [
+    {
+      "number": 500,
+      "title": "PR A",
+      "body": "Depends on PR C\n\nDepends-on: #502",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/a.ts",
+          "status": "added",
+          "additions": 50,
+          "deletions": 0,
+          "changes": 50
+        }
+      ]
+    },
+    {
+      "number": 501,
+      "title": "PR B",
+      "body": "Depends on PR A\n\nDepends-on: #500",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/b.ts",
+          "status": "added",
+          "additions": 60,
+          "deletions": 0,
+          "changes": 60
+        }
+      ]
+    },
+    {
+      "number": 502,
+      "title": "PR C",
+      "body": "Depends on PR B\n\nDepends-on: #501",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/c.ts",
+          "status": "added",
+          "additions": 70,
+          "deletions": 0,
+          "changes": 70
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "errors": ["Circular dependency"]
+  }
+}

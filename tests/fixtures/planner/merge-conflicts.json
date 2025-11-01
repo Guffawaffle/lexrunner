@@ -1,0 +1,42 @@
+{
+  "description": "Merge Conflicts: 2 PRs modifying same file, same lines (predicted conflict)",
+  "prs": [
+    {
+      "number": 1000,
+      "title": "PR A: Major refactor",
+      "body": "Major refactoring of core module",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/core/processor.ts",
+          "status": "modified",
+          "additions": 150,
+          "deletions": 100,
+          "changes": 250
+        }
+      ]
+    },
+    {
+      "number": 1001,
+      "title": "PR B: Major enhancement",
+      "body": "Major enhancement to core module",
+      "state": "open",
+      "merged": false,
+      "files": [
+        {
+          "filename": "src/core/processor.ts",
+          "status": "modified",
+          "additions": 180,
+          "deletions": 120,
+          "changes": 300
+        }
+      ]
+    }
+  ],
+  "expectedPlan": {
+    "orphans": ["PR-1000", "PR-1001"],
+    "warnings": 1,
+    "suggestions": 1
+  }
+}
