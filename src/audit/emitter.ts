@@ -363,6 +363,42 @@ export class AuditEmitter {
 
 		if (!this.config) return;
 
+		// Enforce HIPAA fail-closed: when profile is hipaa-strict, require a valid 64-hex key
+		if (this.options.profile === 'hipaa-strict') {
+			const keyHex = this.options.encryptionKeyHex || process.env.LEX_AUDIT_KEY_HEX;
+			const valid = typeof keyHex === 'string' && /^[0-9a-fA-F]{64}$/.test(keyHex);
+			if (!valid) {
+				// Scrub any plaintext audit log and partial encrypted files, then write audit.error.json
+				try {
+					const nd = this.ndjsonPath;
+					if (fs.existsSync(nd)) {
+						fs.unlinkSync(nd);
+					}
+					const enc = nd + '.enc';
+					if (fs.existsSync(enc)) {
+						fs.unlinkSync(enc);
+					}
+				} catch (e) {
+					// ignore scrub errors
+				}
+
+				const errObj = {
+					profile: 'hipaa-strict',
+					status: 'aborted',
+					reason: 'missing_or_invalid_key'
+				};
+				try {
+					fs.writeFileSync(path.join(this.auditDir, 'audit.error.json'), JSON.stringify(errObj, null, 2));
+				} catch (e) {
+					// ignore write errors
+				}
+
+				throw new Error('HIPAA: encryption key required and must be 64 hex chars (32 bytes); aborting and scrubbed plaintext.');
+			}
+			// ensure options has the canonical key set for later encryption
+			this.options.encryptionKeyHex = keyHex;
+		}
+
 		const duration = Date.now() - this.startTime;
 
 		// Write summary
@@ -401,23 +437,32 @@ export class AuditEmitter {
 			// Debug: surface whether encryption key is present (non-sensitive length only)
 			// (debug removed) do not log encryption key length or any sensitive material
 			try {
-				const key = Buffer.from(this.options.encryptionKeyHex, 'hex');
+				const key = Buffer.from(this.options.encryptionKeyHex as string, 'hex');
 				if (key.length !== 32) {
-					console.warn('[lex-pr] audit: encryptionKeyHex must be 64 hex chars (32 bytes) - skipping encryption');
-				} else {
-					const ndjsonPath = this.ndjsonPath;
-					const src = fs.readFileSync(ndjsonPath);
-					const iv = crypto.randomBytes(12);
-					const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-					const enc = Buffer.concat([cipher.update(src), cipher.final()]);
-					const tag = cipher.getAuthTag();
-					const outPath = ndjsonPath + '.enc';
-					fs.writeFileSync(outPath, Buffer.concat([iv, tag, enc]));
-					// remove plaintext
-					fs.unlinkSync(ndjsonPath);
+					throw new Error('HIPAA: encryption key invalid length');
 				}
+				const ndjsonPath = this.ndjsonPath;
+				const src = fs.readFileSync(ndjsonPath);
+				const iv = crypto.randomBytes(12);
+				const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+				const enc = Buffer.concat([cipher.update(src), cipher.final()]);
+				const tag = cipher.getAuthTag();
+				const outPath = ndjsonPath + '.enc';
+				fs.writeFileSync(outPath, Buffer.concat([iv, tag, enc]));
+				// remove plaintext
+				fs.unlinkSync(ndjsonPath);
 			} catch (e) {
-				console.warn('[lex-pr] audit: encryption failed', e);
+				// On HIPAA profiles, scrub plaintext and write audit.error.json, then surface a HIPAA-prefixed error
+				try {
+					const nd = this.ndjsonPath;
+					if (fs.existsSync(nd)) fs.unlinkSync(nd);
+					const enc = nd + '.enc';
+					if (fs.existsSync(enc)) fs.unlinkSync(enc);
+				} catch (ignored) {}
+				try {
+					fs.writeFileSync(path.join(this.auditDir, 'audit.error.json'), JSON.stringify({ profile: this.options.profile, status: 'aborted', reason: 'encryption_failed' }, null, 2));
+				} catch (ignored) {}
+				throw new Error('HIPAA: encryption failed; scrubbed plaintext and aborting.');
 			}
 		}
 	}

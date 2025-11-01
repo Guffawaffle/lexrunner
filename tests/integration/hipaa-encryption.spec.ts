@@ -62,31 +62,25 @@ describe('HIPAA encryption finalize (integration)', () => {
 
     const r = spawnSync('node', [DIST_CLI, 'execute', '--audit', 'hipaa-strict', '--audit-dir', tmpBad, '--dry-run', '--plan', 'examples/sample-plan.json'], { cwd: ROOT, env, encoding: 'utf8' });
 
-    // If behavior is fail-closed it may be non-zero; otherwise current policy allows plaintext
-    if (r.status !== 0) {
-      // Non-zero exit - ensure no plaintext remains
-      const ndjsonPath = path.join(tmpBad, 'audit.ndjson');
-      expect(fs.existsSync(ndjsonPath)).toBe(false);
-    } else {
-      // Zero exit - current policy: plaintext exists, .enc does not
-      const ndjsonPath = path.join(tmpBad, 'audit.ndjson');
-      const encPath = path.join(tmpBad, 'audit.ndjson.enc');
-      expect(fs.existsSync(ndjsonPath)).toBe(true);
-      expect(fs.existsSync(encPath)).toBe(false);
-    }
+    // Fail-closed: expect exit code 2 and audit.error.json present, no plaintext
+    expect(r.status).toBe(2);
+    const ndjsonPath = path.join(tmpBad, 'audit.ndjson');
+    const errPath = path.join(tmpBad, 'audit.error.json');
+    expect(fs.existsSync(ndjsonPath)).toBe(false);
+    expect(fs.existsSync(errPath)).toBe(true);
   });
 
-  test('without key leaves plaintext and no .enc', () => {
+  test('without key should fail-closed (exit 2) and write audit.error.json', () => {
     const env = { ...process.env };
     delete env.LEX_AUDIT_KEY_HEX;
 
     const r = spawnSync('node', [DIST_CLI, 'execute', '--audit', 'hipaa-strict', '--audit-dir', tmpNoKey, '--dry-run', '--plan', 'examples/sample-plan.json'], { cwd: ROOT, env, encoding: 'utf8' });
-    expect(r.status).toBe(0);
+    expect(r.status).toBe(2);
 
     const ndjsonPath = path.join(tmpNoKey, 'audit.ndjson');
-    const encPath = path.join(tmpNoKey, 'audit.ndjson.enc');
+    const errPath = path.join(tmpNoKey, 'audit.error.json');
 
-    expect(fs.existsSync(ndjsonPath)).toBe(true);
-    expect(fs.existsSync(encPath)).toBe(false);
+    expect(fs.existsSync(ndjsonPath)).toBe(false);
+    expect(fs.existsSync(errPath)).toBe(true);
   });
 });
