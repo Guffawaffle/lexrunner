@@ -264,7 +264,7 @@ export function sortScores(scores: DependencyScore[]): DependencyScore[] {
 
 		// Tertiary: to PR number ascending
 		const toNumA = extractPRNumber(a.to);
-		const toNumB = extractPRNumber(a.to);
+		const toNumB = extractPRNumber(b.to);
 		if (toNumA !== toNumB) {
 			return toNumA - toNumB;
 		}
