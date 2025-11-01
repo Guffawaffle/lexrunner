@@ -44,6 +44,42 @@ export interface ParserOptions {
 
 /**
  * Parse PR description to extract dependencies and metadata
+ * 
+ * Extracts structured information from PR descriptions including:
+ * - Explicit dependencies (Depends-on:, Depends:, Requires:)
+ * - Gate overrides (Skip:, Required:)
+ * - Metadata (Priority:, Labels:, YAML front-matter)
+ * 
+ * @param prNumber - PR number (e.g., 123)
+ * @param description - PR body text (can be null)
+ * @param options - Parsing options
+ * @returns Parsed dependency information with deterministic sorted arrays
+ * 
+ * @example
+ * ```typescript
+ * import { parsePRDescription } from "./planner/dependencyParser.js";
+ * 
+ * const description = `
+ * Add authentication API.
+ * 
+ * Depends-on: #100, #101
+ * Required: security-scan
+ * `;
+ * 
+ * const result = parsePRDescription(123, description, {
+ *   repository: "owner/repo"
+ * });
+ * 
+ * console.log(result);
+ * // {
+ * //   prId: "PR-123",
+ * //   dependencies: ["#100", "#101"],
+ * //   gates: { required: ["security-scan"] }
+ * // }
+ * ```
+ * 
+ * @see {@link docs/diffgraph-planner.md#dependency-syntax-reference} for supported syntax
+ * @see {@link docs/dependency-parser.md} for detailed parser documentation
  */
 export function parsePRDescription(
 	prNumber: number,

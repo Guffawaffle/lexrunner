@@ -147,6 +147,7 @@ See the full documentation index: [docs/README.md](docs/README.md)
 Quick links:
 - **Getting Started**: docs/quickstart.md — 5-minute onboarding
 - **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
+- **Diffgraph Planner**: docs/diffgraph-planner.md — automatic dependency discovery & merge ordering
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
@@ -172,6 +173,47 @@ lex-pr plan-review plan.json --save-history --output approved-plan.json
 ```
 
 See docs/interactive-plan-review.md for the full interactive workflow guide.
+
+## Diffgraph Planning
+
+The diffgraph planner automatically discovers dependencies between PRs and computes optimal merge order. It combines:
+
+1. **Explicit dependencies** from PR descriptions (e.g., `Depends-on: #123`)
+2. **Implicit dependencies** from file-change analysis
+3. **Validation** for cycles, orphans, and invalid references
+4. **Topological sorting** for deterministic merge layers
+
+### Quick Example
+
+```bash
+# Generate plan from GitHub PRs with auto-discovery
+lex-pr plan --from-github --output plan.json
+
+# Review suggested dependencies
+lex-pr plan --suggest-deps --threshold=0.7
+
+# Execute in dependency order
+lex-pr execute --plan plan.json
+```
+
+### Key Features
+
+- **Automatic dependency discovery** - detects implicit dependencies via file overlap
+- **Cycle detection** - prevents circular dependencies
+- **Confidence scoring** - ranks suggestions by reliability (0.0-1.0)
+- **Multiple heuristics** - shared files, directory proximity, test overlap
+- **Hybrid workflow** - combine explicit + implicit dependencies
+
+### Documentation
+
+- **[Complete Guide](docs/diffgraph-planner.md)** - full feature documentation
+- **[Troubleshooting](docs/troubleshooting-planner.md)** - common errors and solutions
+- **[Tutorials](docs/tutorials/diffgraph-planner/)** - step-by-step guides
+  - [01-simple-stack.md](docs/tutorials/diffgraph-planner/01-simple-stack.md) - linear dependencies
+  - [02-diamond-pattern.md](docs/tutorials/diffgraph-planner/02-diamond-pattern.md) - fan-out/fan-in
+  - [03-large-batch.md](docs/tutorials/diffgraph-planner/03-large-batch.md) - 20+ PRs
+  - [04-fixing-cycles.md](docs/tutorials/diffgraph-planner/04-fixing-cycles.md) - cycle resolution
+  - [05-hybrid-workflow.md](docs/tutorials/diffgraph-planner/05-hybrid-workflow.md) - explicit + implicit
 
 ### For Development
 
