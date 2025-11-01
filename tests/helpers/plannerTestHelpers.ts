@@ -5,7 +5,6 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import type { FileChange } from "../../src/planner/types.js";
 
 /**
  * Mock PR structure matching GitHub API response
@@ -74,9 +73,22 @@ export function createMockPR(params: {
 }
 
 /**
+ * Mock Octokit client interface
+ */
+export interface MockOctokit {
+	rest: {
+		pulls: {
+			list: () => Promise<{ data: MockPR[] }>;
+			get: (params: { pull_number: number }) => Promise<{ data: MockPR }>;
+			listFiles: (params: { pull_number: number }) => Promise<{ data: MockPR["files"] }>;
+		};
+	};
+}
+
+/**
  * Create a mock Octokit client with fixture PRs
  */
-export function createMockGitHub(prs: MockPR[]): any {
+export function createMockGitHub(prs: MockPR[]): MockOctokit {
 	const prMap = new Map(prs.map(pr => [pr.number, pr]));
 
 	return {
@@ -141,16 +153,33 @@ export async function loadFixture(name: string): Promise<PlanFixture> {
 }
 
 /**
+ * Expected plan structure for assertions
+ */
+export interface ExpectedPlanStructure {
+	layers?: string[][];
+	orphans?: string[];
+	warnings?: number;
+	errors?: string[];
+}
+
+/**
+ * Plan structure returned by generatePlanFromParsedPRs
+ */
+export interface PlanStructure {
+	layers: string[][];
+	orphans: string[];
+	nodes: string[];
+	edges: Array<{ from: string; to: string }>;
+	warnings?: any[];
+	errors?: any[];
+}
+
+/**
  * Assert plan structure matches expected
  */
 export function assertPlanStructure(
-	plan: any,
-	expected: {
-		layers?: string[][];
-		orphans?: string[];
-		warnings?: number;
-		errors?: string[];
-	}
+	plan: PlanStructure,
+	expected: ExpectedPlanStructure
 ): void {
 	if (expected.layers) {
 		// Verify layer count
@@ -268,7 +297,7 @@ export function createMockPRBatch(count: number): MockPR[] {
 /**
  * Assert that two objects are deeply equal (for determinism tests)
  */
-export function assertDeepEqual(actual: any, expected: any, path: string = "root"): void {
+export function assertDeepEqual<T>(actual: T, expected: T, path: string = "root"): void {
 	if (actual === expected) return;
 
 	if (actual == null || expected == null) {

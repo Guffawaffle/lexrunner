@@ -10,7 +10,8 @@ import {
 	assertPlanStructure,
 	createMockPRBatch,
 	assertDeepEqual,
-	type PlanFixture
+	type PlanFixture,
+	type PlanStructure
 } from "../helpers/plannerTestHelpers.js";
 import {
 	parsePRDescription,
@@ -23,7 +24,7 @@ import { FileAnalyzer } from "../../src/planner/fileAnalysis.js";
  * Helper: Generate plan structure from parsed PRs
  * This simulates a minimal plan generator using dependency and file analysis
  */
-function generatePlanFromParsedPRs(parsedPRs: ParsedDependency[]): any {
+function generatePlanFromParsedPRs(parsedPRs: ParsedDependency[]): PlanStructure {
 	// Build dependency graph
 	const graph = new Map<string, Set<string>>();
 	const allPRs = new Set<string>();
