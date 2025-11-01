@@ -417,10 +417,6 @@ export class AuditEmitter {
 		const summaryPath = path.join(this.auditDir, 'audit-summary.json');
 		fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
 
-		// Generate and write manifest
-		const manifest = await generateManifest(this.auditDir);
-		await writeManifest(this.auditDir, manifest);
-
 		// Generate gate matrix if profile requires it (e.g., soc2)
 		if (this.config.includeContext?.length > 0) {
 			await this.generateGateMatrix();
@@ -465,6 +461,10 @@ export class AuditEmitter {
 				throw new Error('HIPAA: encryption failed; scrubbed plaintext and aborting.');
 			}
 		}
+
+		// Generate and write manifest AFTER encryption (so .enc file is included instead of plaintext)
+		const manifest = await generateManifest(this.auditDir);
+		await writeManifest(this.auditDir, manifest);
 	}
 
 	/**
