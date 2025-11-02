@@ -238,7 +238,7 @@ Common Issues:
 					// Cleanup if requested
 					if (opts.cleanup) {
 						await gitOps.cleanup();
-						if (!(opts.json || jsonModeActive())) {
+						if (!opts.json && !jsonModeActive()) {
 							console.log("🧹 Cleaned up integration branches");
 						}
 					}
