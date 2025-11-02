@@ -64,7 +64,7 @@ export function registerPlanReviewCommand(program: Command, deps: PlanReviewComm
 						encryptionKeyHex: keyToUse,
 					});
 					await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, {
-						command: "autopilot",
+						command: "plan-review",
 						argv: process.argv.slice(2),
 					});
 				}
