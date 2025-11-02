@@ -25,11 +25,11 @@ export function registerRetryCommand(
 		.option("--json", "Output JSON format")
 		.action(async (opts) => {
 			try {
-				const retry = new RetryOperation(opts.stateDir);
+				const retryOperation = new RetryOperation(opts.stateDir);
 
 				const items = opts.items ? opts.items.split(",").map((s: string) => s.trim()) : undefined;
 
-				const result = await retry.retryFailed({
+				const result = await retryOperation.retryFailed({
 					filter: opts.filter,
 					items,
 					dryRun: opts.dryRun,
@@ -53,7 +53,6 @@ export function registerRetryCommand(
 				if (!result.success) {
 					throwExit(1);
 				}
-				return;
 			} catch (error) {
 				exitWith(error);
 			}
