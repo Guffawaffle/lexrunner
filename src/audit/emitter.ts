@@ -458,8 +458,7 @@ export class AuditEmitter {
 
 		// Sign manifest if signer is configured
 		if (this.options.signer) {
-			const { signManifest } = await import('./signing.js');
-			const { parseSignerOption } = await import('./signing.js');
+			const { signManifest, parseSignerOption } = await import('./signing.js');
 			const signingOptions = parseSignerOption(this.options.signer);
 			await signManifest(manifestPath, signingOptions);
 		}
