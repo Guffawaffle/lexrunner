@@ -2014,6 +2014,10 @@ const isDirectExec = (() => {
 })();
 
 if (isDirectExec) {
+	// Install global handlers before running main
+	installSignalHandlers();
+	installUnhandledRejectionHandler();
+	
 	void main().catch((error) => {
 		const message = error instanceof Error ? error.message : String(error);
 		process.stderr.write(`[lex-pr] fatal: ${message}\n`);
