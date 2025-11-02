@@ -779,8 +779,11 @@ Common Issues:
 			// Create progress reporter (disabled in JSON mode)
 			const progressReporter = new ProgressReporter({ enabled: !jsonModeActive });
 
+			// Capture repository root at the start for stable gate execution
+			const repoRoot = process.cwd();
+
 			// Execute gates with policy
-			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter, skipValidation);
+			await executeGatesWithPolicy(plan, executionState, opts.artifactDir, timeoutMs, progressReporter, skipValidation, repoRoot);
 
 			// Get final results
 			const results = executionState.getResults();

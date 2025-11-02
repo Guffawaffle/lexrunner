@@ -26,7 +26,8 @@ export async function executeGate(
 	artifactDir: string,
 	timeoutMs: number = 30000,
 	itemName?: string,
-	skipValidation: boolean = false
+	skipValidation: boolean = false,
+	repoRoot?: string
 ): Promise<GateResult> {
 	// Validate gate input before execution (unless explicitly skipped)
 	if (!skipValidation && gate.input) {
@@ -61,7 +62,7 @@ export async function executeGate(
 			await new Promise(resolve => setTimeout(resolve, delayMs));
 		}
 
-		const result = await executeGateAttempt(gate, artifactDir, attempt, timeoutMs);
+		const result = await executeGateAttempt(gate, artifactDir, attempt, timeoutMs, repoRoot);
 		lastResult = result;
 		totalDuration += result.duration || 0;
 
@@ -181,7 +182,8 @@ async function executeGateAttempt(
 	gate: Gate,
 	artifactDir: string,
 	attempt: number,
-	timeoutMs: number
+	timeoutMs: number,
+	repoRoot?: string
 ): Promise<GateResult> {
 	const startedAt = new Date().toISOString();
 	const startTime = Date.now();
@@ -189,12 +191,12 @@ async function executeGateAttempt(
 	// Handle different runtime modes
 	switch (gate.runtime) {
 		case "container":
-			return executeContainerGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs);
+			return executeContainerGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs, repoRoot);
 		case "ci-service":
 			return executeCiServiceGate(gate, artifactDir, attempt, startedAt, startTime);
 		case "local":
 		default:
-			return executeLocalGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs);
+			return executeLocalGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs, repoRoot);
 	}
 }
 
@@ -207,7 +209,8 @@ async function executeLocalGate(
 	attempt: number,
 	startedAt: string,
 	startTime: number,
-	timeoutMs: number
+	timeoutMs: number,
+	repoRoot?: string
 ): Promise<GateResult> {
 	// Validate command before execution (security check)
 	try {
@@ -235,8 +238,13 @@ async function executeLocalGate(
 	return new Promise((resolve) => {
 		let timedOut = false;
 
+		// Use gate.cwd if specified, otherwise fall back to repoRoot (captured at execution start)
+		// If neither is available, use process.cwd() as a last resort fallback
+		// This ensures gates always run in a valid, stable working directory
+		const workingDirectory = gate.cwd || repoRoot || process.cwd();
+
 		const childProcess = spawn('bash', ['-c', gate.run], {
-			cwd: gate.cwd || process.cwd(),
+			cwd: workingDirectory,
 			env: { ...process.env, ...gate.env },
 			stdio: ['pipe', 'pipe', 'pipe']
 		});
@@ -310,12 +318,13 @@ async function executeContainerGate(
 	attempt: number,
 	startedAt: string,
 	startTime: number,
-	timeoutMs: number
+	timeoutMs: number,
+	repoRoot?: string
 ): Promise<GateResult> {
 	// TODO: Implement container execution using Docker/Podman
 	// For now, fall back to local execution with warning
 	console.warn(`⚠️  Container runtime for gate '${gate.name}' not yet implemented, falling back to local execution`);
-	return executeLocalGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs);
+	return executeLocalGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs, repoRoot);
 }
 
 /**
@@ -511,7 +520,8 @@ export async function executeItemGates(
 	executionState: ExecutionState,
 	artifactDir: string,
 	timeoutMs: number = 30000,
-	skipValidation: boolean = false
+	skipValidation: boolean = false,
+	repoRoot?: string
 ): Promise<GateResult[]> {
 	if (!item.gates || item.gates.length === 0) {
 		return [];
@@ -553,7 +563,7 @@ export async function executeItemGates(
 		continue;
 	}
 
-	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation);
+	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation, repoRoot);
 	results.push(result);
 
 	// Update execution state
@@ -583,8 +593,11 @@ export async function executeGatesWithPolicy(
 	artifactDir: string,
 	timeoutMs: number = 30000,
 	progressReporter?: ProgressReporter,
-	skipValidation: boolean = false
+	skipValidation: boolean = false,
+	repoRoot?: string
 ): Promise<void> {
+	// Capture repository root once at the start of execution
+	const workingDir = repoRoot || process.cwd();
 	const policy = plan.policy || {
 		requiredGates: [],
 		optionalGates: [],
@@ -644,7 +657,7 @@ export async function executeGatesWithPolicy(
 			}
 
 			const item = plan.items.find(i => i.name === node)!;
-			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation)
+			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation, workingDir)
 				.then(() => {
 					executing.delete(node);
 					completedNodes.add(node);
