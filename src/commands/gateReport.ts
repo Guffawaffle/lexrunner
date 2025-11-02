@@ -126,7 +126,7 @@ export function registerGateReportCommand(program: Command): void {
 								});
 								console.error('');
 							}
-								throwExit(1);
+							throwExit(1);
 						}
 					} catch (error) {
 						const message = error instanceof Error ? error.message : String(error);
@@ -138,7 +138,7 @@ export function registerGateReportCommand(program: Command): void {
 						} else {
 							console.error(`\n❌ Unexpected error: ${message}\n`);
 						}
-							throwExit(1);
+						throwExit(1);
 					}
 				})
 		);
