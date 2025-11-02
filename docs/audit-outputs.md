@@ -580,18 +580,15 @@ lex-pr execute plan.json --audit hipaa-strict
 
 ## Next Steps
 
-- **Phase 2**: Manifest signatures (KMS, GPG) - See [Phase 2 documentation](#phase-2-signatures) below
+- **Phase 2**: Manifest signatures (KMS, GPG) - See [Phase 2 documentation](#phase-2-signatures-and-verification) below
 - **Phase 3**: Schema versioning, Node SDK, SARIF export
 - **Integration**: CI/CD pipelines, monitoring systems, compliance dashboards
 
 ---
 
+# Phase 2: Signatures and Verification
 
-# Phase 2: Signatures
-
-# Audit Outputs - Signing and Verification
-
-This document covers Phase 2 of the audit outputs system: **Manifest Signatures** for tamper-evident audit trails using KMS and GPG.
+This section covers Phase 2 of the audit outputs system: **Manifest Signatures** for tamper-evident audit trails using KMS and GPG.
 
 ## Overview
 
