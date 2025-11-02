@@ -7,9 +7,21 @@
 		"node": ">=20"
 	},
 	"packageManager": "npm@10.0.0",
+	"auditSchemaVersion": "1.0.0",
 	"bin": {
 		"lex-pr": "dist/cli.js",
 		"lex-pr-runner-mcp": "./mcp-server.mjs"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/cli.d.ts",
+			"import": "./dist/cli.js",
+			"require": "./dist/cli.cjs"
+		},
+		"./audit-sdk": {
+			"types": "./dist/sdk/index.d.ts",
+			"import": "./dist/sdk/index.js"
+		}
 	},
 	"scripts": {
 		"dev": "tsx watch src/cli.ts",
