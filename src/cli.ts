@@ -60,6 +60,7 @@ import { registerQueryCommand } from "./commands/query.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { registerPlanCommand } from "./commands/plan.js";
 import { registerSchemaCommand } from "./commands/schema.js";
+import { registerAutopilotCommand } from "./commands/autopilot.js";
 import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
 import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
@@ -683,130 +684,14 @@ registerPlanDiffCommand(program, {
 	exitWith,
 });
 
-// Autopilot command
-program
-	.command("autopilot")
-	.description("Run autopilot analysis and artifact generation")
-	.option("--plan <file>", "Path to plan.json file")
-	.argument("[file]", "Path to plan.json file (alternative to --plan)")
-	.option(
-		"--level <level>",
-		"Autopilot level (0=report-only, 1=artifacts)",
-		"1"
-	)
-	.option("--profile-dir <dir>", "Profile directory (default: .smartergpt)")
-	.option(
-		"--deliverables-dir <dir>",
-		"Custom deliverables directory (overrides default profile/deliverables)"
-	)
-	.option("--json", "Output JSON format")
-	.action(async (file: string | undefined, opts) => {
-		const planFile = opts.plan || file;
-		let auditEmitter: AuditEmitter | null = null;
-		if (!planFile) {
-			console.error(
-				"Error: plan file is required (use --plan <file> or provide as argument)"
-			);
-			throwExit(1);
-		}
-
-		try {
-			// Load plan
-			const planContent = fs.readFileSync(planFile, "utf-8");
-			const plan = loadPlan(planContent);
-
-			// Resolve profile
-			const profile = resolveProfile(opts.profileDir);
-
-			// Initialize audit emitter from global flag if present
-			const globalAudit = program.opts().auditProfile as
-				| string
-				| undefined;
-			if (globalAudit && globalAudit !== "off") {
-				const auditDir = path.join(
-					profile.path,
-					"deliverables",
-					"audit"
-				);
-				const cliKey = program.opts().auditKey as string | undefined;
-				const envKey = process.env.LEX_AUDIT_KEY_HEX;
-				const keyToUse = cliKey || envKey;
-				const phiFlag =
-					globalAudit === "hipaa-strict" ||
-					process.env.LEX_AUDIT_PHI === "1";
-				auditEmitter = await initAuditEmitter({
-					profile: globalAudit as any,
-					dir: auditDir,
-					phiRedaction: phiFlag,
-					encryptionKeyHex: keyToUse,
-				});
-				await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, {
-					command: "autopilot",
-					argv: process.argv.slice(2),
-				});
-			}
-
-			// Import autopilot modules
-			const { AutopilotLevel0, AutopilotLevel1, AutopilotLevel2 } =
-				await import("./autopilot/index.js");
-
-			// Create autopilot context
-			const context = {
-				plan,
-				profilePath: profile.path,
-				profileRole: profile.manifest.role,
-			};
-
-			// Select and execute autopilot level
-			const level = parseInt(opts.level);
-			const autopilot = (() => {
-				if (level === 0) {
-					return new AutopilotLevel0(context);
-				}
-				if (level === 1) {
-					return new AutopilotLevel1(context);
-				}
-				if (level === 2) {
-					return new AutopilotLevel2(context);
-				}
-				console.error(
-					`Error: unsupported autopilot level ${level} (supported: 0, 1, 2)`
-				);
-				throwExit(1);
-			})() as {
-				execute: (
-					deliverablesDir?: string
-				) => Promise<{ success: boolean; message: string }>;
-			};
-
-			// Execute with optional custom deliverables directory
-			const result = await autopilot.execute(opts.deliverablesDir);
-
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput(result);
-			} else {
-				console.log(result.message);
-			}
-
-			if (!result.success) {
-				throwExit(1);
-			}
-			return;
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
-			if (opts.json || jsonModeActive) {
-				writeJsonOutput({ success: false, error: message });
-			} else {
-				console.error(`Error running autopilot: ${message}`);
-			}
-			exitWith(error);
-		} finally {
-			if (auditEmitter) {
-				await finalizeAuditGuard(auditEmitter);
-			}
-		}
-	});
+// Autopilot command - modular implementation
+registerAutopilotCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith,
+	getAuditProfile: () => program.opts().auditProfile as string | undefined,
+	getAuditKey: () => program.opts().auditKey as string | undefined,
+	finalizeAuditGuard
+});
 
 // Execute plan command (replaces gate command)
 program
