@@ -202,3 +202,82 @@ jobs:
           "
           
           echo "✅ Execute dogfood test passed"
+  
+  execute-failure-handling-test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build distribution
+        run: npm run build
+      
+      - name: Test execute command failure detection
+        run: |
+          echo "Testing execute command failure handling..."
+          
+          # Use GitHub Actions temp directory
+          ARTIFACT_DIR="${RUNNER_TEMP}/fail-artifacts"
+          STDOUT_FILE="${RUNNER_TEMP}/fail-stdout.json"
+          STDERR_FILE="${RUNNER_TEMP}/fail-stderr.txt"
+          
+          # Run execute command with a plan that has failures (expect exit code 1)
+          set +e
+          node dist/cli.js execute \
+            --plan tests/fixtures/plan.with-failures.json \
+            --artifact-dir "$ARTIFACT_DIR" \
+            --timeout 10000 \
+            --json > "$STDOUT_FILE" 2> "$STDERR_FILE"
+          EXIT_CODE=$?
+          set -e
+          
+          # Verify exit code is 1 (failures detected)
+          if [ $EXIT_CODE -ne 1 ]; then
+            echo "❌ Execute command should exit with code 1 when gates fail, got: $EXIT_CODE"
+            exit 1
+          fi
+          echo "✅ Exit code: $EXIT_CODE (expected failure)"
+          
+          # Verify stdout is valid JSON
+          if ! node -e "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" 2>&1; then
+            echo "❌ stdout is not valid JSON:"
+            cat "$STDOUT_FILE"
+            exit 1
+          fi
+          echo "✅ stdout is valid JSON"
+          
+          # Verify failure is properly reported
+          node -e "
+            const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'));
+            
+            // Check that mergeSummary has failures
+            if (!data.execution.mergeSummary.failed || data.execution.mergeSummary.failed.length === 0) {
+              console.error('❌ No failures detected in mergeSummary');
+              process.exit(1);
+            }
+            
+            // Check that failed item has correct status
+            const failedItem = data.execution.results['always-fail'];
+            if (!failedItem || failedItem.status !== 'fail') {
+              console.error('❌ Failed item does not have fail status');
+              process.exit(1);
+            }
+            
+            // Check that passed item still passed
+            const passedItem = data.execution.results['always-pass'];
+            if (!passedItem || passedItem.status !== 'pass') {
+              console.error('❌ Passed item does not have pass status');
+              process.exit(1);
+            }
+            
+            console.log('✅ Failures properly detected and reported');
+            console.log('  Failed items:', data.execution.mergeSummary.failed.join(', '));
+            console.log('  Passed items:', data.execution.mergeSummary.eligible.join(', '));
+          "
+          
+          echo "✅ Execute failure handling test passed"
