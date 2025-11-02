@@ -26,6 +26,7 @@ import { registerSecurityCommands } from "./cli-security.js";
 import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
+import { registerQueryCommand } from "./commands/query.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { registerPlanCommand } from "./commands/plan.js";
 import { registerSchemaCommand } from "./commands/schema.js";
@@ -1919,64 +1920,8 @@ program
 		}
 	});
 
-// Query command
-program
-	.command("query [file] [query]")
-	.description("Advanced query and analysis of plan")
-	.option("--plan <file>", "Path to plan.json file")
-	.option("--format <format>", "Output format: json, table, csv", "table")
-	.option("--output <file>", "Output file (default: stdout)")
-	.option("--stats", "Show plan statistics")
-	.option("--roots", "Show root nodes (no dependencies)")
-	.option("--leaves", "Show leaf nodes (no dependents)")
-	.option("--level <level>", "Filter by merge level", parseInt)
-	.action(async (file: string | undefined, queryString: string | undefined, opts: any) => {
-		const planFile = opts.plan || file;
-
-		if (!planFile) {
-			console.error("Error: plan file is required (use --plan <file> or provide as argument)");
-			throwExit(1);
-		}
-
-		try {
-			const { PlanQueryEngine } = await import("./commands/query.js");
-			const planContent = fs.readFileSync(planFile, "utf-8");
-			const plan = loadPlan(planContent);
-
-			const engine = new PlanQueryEngine(plan);
-			let result;
-
-			if (opts.stats) {
-				result = { stats: engine.stats() };
-			} else if (opts.roots) {
-				result = engine.roots();
-			} else if (opts.leaves) {
-				result = engine.leaves();
-			} else if (opts.level) {
-				result = engine.byLevel(opts.level);
-			} else if (queryString) {
-				result = engine.query(queryString);
-			} else {
-				console.error("Error: query string or option (--stats, --roots, --leaves, --level) required");
-				throwExit(1);
-			}
-
-			const output = opts.format === 'json'
-				? canonicalJSONStringify(result)
-				: formatQueryResult(result, opts.format);
-
-			if (opts.output) {
-				fs.writeFileSync(opts.output, output);
-				console.log(`✓ Results written to ${opts.output}`);
-			} else {
-				console.log(output);
-			}
-
-			return;
-		} catch (error) {
-			exitWith(error);
-		}
-	});
+// Query command - modular implementation
+registerQueryCommand(program, exitWith);
 
 // Retry command
 registerRetryCommand(program, () => jsonModeActive, exitWith);
