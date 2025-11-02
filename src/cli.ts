@@ -27,6 +27,7 @@ import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { registerPlanCommand } from "./commands/plan.js";
+import { registerSchemaCommand } from "./commands/schema.js";
 import { registerPlanBatchCommand } from "./commands/orchestrate/plan-batch.js";
 import { registerPinToolchainCommand } from "./commands/orchestrate/pinToolchain.js";
 import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-conflicts.js";
@@ -330,85 +331,6 @@ registerPlanCommand(program, {
 	setJsonMode: (active: boolean) => { jsonModeActive = active; },
 	exitWith
 });
-
-// Schema validation command (restored for JSON output tests)
-program
-	.command("schema")
-	.description("Schema utilities (validate plan.json)")
-	.addCommand(
-		new Command("validate")
-			.description("Validate a plan file against schema")
-			.argument("<file>", "Path to plan.json file")
-			.option("--json", "Output JSON result")
-			.option("--verbose", "Show detailed diagnostics including layers and warnings")
-			.action((file: string, opts) => {
-				try {
-					if (!fs.existsSync(file)) {
-						if (opts.json || jsonModeActive) {
-							console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: 'File not found' }] }));
-						} else {
-							console.error(`File not found: ${file}`);
-						}
-						throwExit(1);
-					}
-					const content = fs.readFileSync(file, 'utf-8');
-					let plan: Plan | undefined;
-					try {
-						plan = loadPlan(content);
-					} catch (error) {
-						if (opts.json || jsonModeActive) {
-							const err = error as any;
-							if (err instanceof SchemaValidationError && err.issues) {
-								console.log(JSON.stringify({ valid: false, errors: err.issues }, null, 2));
-							} else {
-								console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String(err?.message || error) }] }, null, 2));
-							}
-						} else {
-							console.error(`Validation failed: ${error instanceof Error ? error.message : String(error)}`);
-						}
-						throwExit(1);
-					}
-					if (!plan) {
-						throw new Error("Plan parsing failed unexpectedly");
-					}
-					const validatedPlan = plan;
-
-					// Enhanced semantic validation with detailed error reporting
-					const validationResult = validatePlanDeps(validatedPlan, { verbose: opts.verbose });
-
-					if (opts.json || jsonModeActive) {
-						// Output machine-readable JSON
-						console.log(JSON.stringify({
-							valid: validationResult.valid,
-							errors: validationResult.errors,
-							warnings: validationResult.warnings,
-							diagnostics: validationResult.diagnostics
-						}, null, 2));
-					} else {
-						// Human-readable output
-						const formattedResult = formatValidationResult(validationResult, opts.verbose);
-						console.log(formattedResult);
-					}
-
-					if (!validationResult.valid) {
-						throwExit(1);
-					}
-
-					return;
-				} catch (error) {
-					// Let CLIExitSignal propagate - JSON already output
-					if (error instanceof CLIExitSignal) {
-						throw error;
-					}
-					if (opts.json || jsonModeActive) {
-						console.log(JSON.stringify({ valid: false, errors: [{ path: 'root', message: String((error as Error).message) }] }));
-					} else {
-						console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
-					}
-					throwExit(1);
-				}
-			})
-	);
 
 // Config inspect command
 program
@@ -964,6 +886,11 @@ Common Issues:
 
 // Status command - modularized in Phase 2.5
 registerStatusCommand(program, () => jsonModeActive);
+
+// Schema command - modularized in Phase 3.3
+registerSchemaCommand(program, {
+	jsonModeActive: () => jsonModeActive
+});
 
 // Report command
 program
