@@ -49,35 +49,18 @@ async function performDoctorChecks(): Promise<any> {
 	}
 
 	// Configuration check
-	try {
-		const bootstrap = bootstrapWorkspace();
-		checks.configuration = {
-			hasConfiguration: bootstrap.hasConfiguration,
-			missingFiles: bootstrap.missingFiles,
-			suggestions: bootstrap.suggestions,
-		};
-	} catch (error) {
-		checks.configuration = {
-			status: "error",
-			error: error instanceof Error ? error.message : String(error)
-		};
-		checks.hasErrors = true;
-		checks.issues.push(`Configuration check failed: ${error instanceof Error ? error.message : String(error)}`);
-	}
+	const bootstrap = bootstrapWorkspace();
+	checks.configuration = {
+		hasConfiguration: bootstrap.hasConfiguration,
+		missingFiles: bootstrap.missingFiles,
+		suggestions: bootstrap.suggestions,
+	};
 
 	// Project type detection
-	try {
-		checks.projectType = detectProjectType();
-	} catch (error) {
-		checks.projectType = "unknown";
-	}
+	checks.projectType = detectProjectType();
 
 	// Environment suggestions
-	try {
-		checks.environmentSuggestions = getEnvironmentSuggestions();
-	} catch (error) {
-		checks.environmentSuggestions = [];
-	}
+	checks.environmentSuggestions = getEnvironmentSuggestions();
 
 	// GitHub integration
 	try {
@@ -167,9 +150,8 @@ export function registerDoctorCommand(program: Command, jsonModeActive?: () => b
 					hasErrors = true;
 				}
 			} catch (error) {
-				console.log("✗ .nvmrc file not found or unreadable");
+				console.log("ℹ .nvmrc file not found");
 				console.log("✓ Node.js version:", process.version, "(no .nvmrc constraint)");
-				hasErrors = true;
 			}
 
 			// Check npm version against packageManager field
