@@ -34,7 +34,6 @@ export function registerReportCommand(program: Command): void {
 				if (!report.allGreen) {
 					throwExit(1);
 				}
-				return;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				console.error(`Error aggregating gate reports: ${message}`);
