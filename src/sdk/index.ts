@@ -1,26 +1,26 @@
 /**
  * Audit SDK for third-party consumption (Phase 3A)
- * 
+ *
  * @packageDocumentation
  * This SDK enables third-party tools to consume lex-pr-runner audit outputs.
- * 
+ *
  * ## Features
  * - Parse and validate audit events (NDJSON format)
  * - Query and filter events
  * - Validate audit manifests
  * - Type-safe TypeScript interfaces
- * 
+ *
  * ## Quick Start
  * ```typescript
  * import { readAuditNDJSON, filterEvents } from '@lex-pr/audit';
- * 
+ *
  * // Read all events
  * for await (const event of readAuditNDJSON('./audit.ndjson')) {
  *   if (event.event === 'gate_finished' && event.payload.status === 'fail') {
  *     console.log(`Failed gate: ${event.payload.gate}`);
  *   }
  * }
- * 
+ *
  * // Or load into memory and filter
  * import { readAuditNDJSONSync } from '@lex-pr/audit';
  * const events = await readAuditNDJSONSync('./audit.ndjson');

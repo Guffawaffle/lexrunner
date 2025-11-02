@@ -9,7 +9,7 @@ import type { AuditEvent } from '../audit/schema/events.js';
 
 /**
  * Parse a single line of NDJSON into an audit event
- * 
+ *
  * @param line - NDJSON line to parse
  * @returns Parsed and validated audit event
  * @throws Error if line is invalid JSON or fails validation
@@ -18,7 +18,7 @@ export function parseAuditEventLine(line: string): AuditEvent {
 	if (!line.trim()) {
 		throw new Error('Empty line cannot be parsed as audit event');
 	}
-	
+
 	try {
 		const data = JSON.parse(line);
 		return parseAuditEvent(data);
@@ -32,10 +32,10 @@ export function parseAuditEventLine(line: string): AuditEvent {
 
 /**
  * Read audit events from an NDJSON file (async iterable)
- * 
+ *
  * @param filePath - Path to NDJSON file
  * @yields Validated audit events
- * 
+ *
  * @example
  * ```typescript
  * for await (const event of readAuditNDJSON('./audit.ndjson')) {
@@ -61,14 +61,14 @@ export async function* readAuditNDJSON(filePath: string): AsyncIterable<AuditEve
 
 /**
  * Read all audit events from an NDJSON file into an array
- * 
+ *
  * @param filePath - Path to NDJSON file
  * @returns Array of validated audit events
- * 
+ *
  * @example
  * ```typescript
  * const events = await readAuditNDJSONSync('./audit.ndjson');
- * const failedGates = events.filter(e => 
+ * const failedGates = events.filter(e =>
  *   e.event === 'gate_finished' && e.payload.status === 'fail'
  * );
  * ```
@@ -83,19 +83,19 @@ export async function readAuditNDJSONSync(filePath: string): Promise<AuditEvent[
 
 /**
  * Parse audit events from a string containing NDJSON
- * 
+ *
  * @param content - NDJSON content as string
  * @returns Array of validated audit events
  */
 export function parseAuditNDJSONString(content: string): AuditEvent[] {
 	const lines = content.split('\n');
 	const events: AuditEvent[] = [];
-	
+
 	for (const line of lines) {
 		if (line.trim()) {
 			events.push(parseAuditEventLine(line));
 		}
 	}
-	
+
 	return events;
 }

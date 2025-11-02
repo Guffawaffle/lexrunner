@@ -9,11 +9,11 @@ import type { AuditEvent } from '../audit/schema/events.js';
 
 /**
  * Validate an audit manifest
- * 
+ *
  * @param manifest - Manifest object to validate
  * @returns Validated audit manifest
  * @throws ZodError if validation fails
- * 
+ *
  * @example
  * ```typescript
  * const manifest = JSON.parse(fs.readFileSync('./audit-manifest.json', 'utf8'));
@@ -27,10 +27,10 @@ export function validateAuditManifest(manifest: unknown): AuditManifest {
 
 /**
  * Validate an audit manifest (safe version that returns result object)
- * 
+ *
  * @param manifest - Manifest object to validate
  * @returns Validation result with success flag
- * 
+ *
  * @example
  * ```typescript
  * const result = validateAuditManifestSafe(manifest);
@@ -47,7 +47,7 @@ export function validateAuditManifestSafe(manifest: unknown) {
 
 /**
  * Validate a single audit event
- * 
+ *
  * @param event - Event object to validate
  * @returns Validated audit event
  * @throws ZodError if validation fails
@@ -58,7 +58,7 @@ export function validateAuditEvent(event: unknown): AuditEvent {
 
 /**
  * Validate a single audit event (safe version that returns result object)
- * 
+ *
  * @param event - Event object to validate
  * @returns Validation result with success flag
  */
@@ -68,11 +68,11 @@ export function validateAuditEventSafe(event: unknown) {
 
 /**
  * Check if a schema version is compatible with a given major version
- * 
+ *
  * @param schemaVersion - Version string (e.g., "1.2.3")
  * @param majorVersion - Major version to check compatibility (default: 1)
  * @returns true if compatible, false otherwise
- * 
+ *
  * @example
  * ```typescript
  * if (!isSchemaCompatible(event.schema_version, 1)) {
@@ -91,7 +91,7 @@ export function isSchemaCompatible(schemaVersion: string, majorVersion: number =
 
 /**
  * Validate multiple audit events
- * 
+ *
  * @param events - Array of event objects to validate
  * @returns Array of validated audit events
  * @throws ZodError if any validation fails
@@ -102,7 +102,7 @@ export function validateAuditEvents(events: unknown[]): AuditEvent[] {
 
 /**
  * Validate multiple audit events (safe version)
- * 
+ *
  * @param events - Array of event objects to validate
  * @returns Validation results with success/failure for each event
  */

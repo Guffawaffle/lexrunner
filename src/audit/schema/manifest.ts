@@ -27,7 +27,7 @@ export type AuditManifest = z.infer<typeof AuditManifestSchema>;
 
 /**
  * Parse and validate an audit manifest from unknown data
- * 
+ *
  * @param data - Unknown data to validate
  * @returns Validated audit manifest
  * @throws ZodError if validation fails
@@ -38,7 +38,7 @@ export function parseAuditManifest(data: unknown): AuditManifest {
 
 /**
  * Validate an audit manifest (returns success/error instead of throwing)
- * 
+ *
  * @param data - Unknown data to validate
  * @returns SafeParseReturnType with success flag and data or error
  */

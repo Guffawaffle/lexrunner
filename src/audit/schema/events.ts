@@ -344,7 +344,7 @@ export type AuditEvent =
 
 /**
  * Parse and validate an audit event from unknown data
- * 
+ *
  * @param data - Unknown data to validate
  * @returns Validated audit event
  * @throws ZodError if validation fails
@@ -355,7 +355,7 @@ export function parseAuditEvent(data: unknown): AuditEvent {
 
 /**
  * Validate an audit event (returns success/error instead of throwing)
- * 
+ *
  * @param data - Unknown data to validate
  * @returns SafeParseReturnType with success flag and data or error
  */

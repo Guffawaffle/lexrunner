@@ -33,11 +33,11 @@ export interface EventFilter {
 
 /**
  * Filter audit events by criteria
- * 
+ *
  * @param events - Array of audit events to filter
  * @param filter - Filter criteria
  * @returns Filtered array of audit events
- * 
+ *
  * @example
  * ```typescript
  * const failedGates = filterEvents(events, {
@@ -123,7 +123,7 @@ export function filterEvents(events: AuditEvent[], filter: EventFilter): AuditEv
 
 /**
  * Query builder for fluent filtering
- * 
+ *
  * @example
  * ```typescript
  * const failedGates = new EventQuery(events)
@@ -236,10 +236,10 @@ export class EventQuery {
 
 /**
  * Compute statistics from audit events
- * 
+ *
  * @param events - Array of audit events
  * @returns Statistics object
- * 
+ *
  * @example
  * ```typescript
  * const stats = computeStatistics(events);
