@@ -10,7 +10,6 @@ import { ExecutionState } from "./executionState.js";
 import { MergeEligibilityEvaluator } from "./mergeEligibility.js";
 import { loadInputs } from "./core/inputs.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
-import { readGateDir, generateMarkdownSummary } from "./report/aggregate.js";
 import { validateGateReportWithErrors, migrateGateReport, needsMigration } from "./schema/gateReport.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "./github/api.js";
 import { createGitOperations, GitOperationError } from "./git/operations.js";
@@ -21,6 +20,7 @@ import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescriptio
 import { createLogger, Logger, generateCorrelationId } from "./monitoring/index.js";
 import { runInit } from "./commands/init.js";
 import { registerStatusCommand } from "./commands/status.js";
+import { registerReportCommand } from "./commands/report.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
@@ -892,37 +892,8 @@ registerSchemaCommand(program, {
 	jsonModeActive: () => jsonModeActive
 });
 
-// Report command
-program
-	.command("report")
-	.description("Aggregate gate reports from directory")
-	.argument("<dir>", "Directory containing *.json gate result files")
-	.option("--out <format>", "Output format: 'json' or 'md'", "json")
-	.action((dir: string, opts) => {
-		try {
-			const report = readGateDir(dir);
-
-			if (opts.out === 'md') {
-				const markdown = generateMarkdownSummary(report);
-				console.log(markdown);
-			} else if (opts.out === 'json') {
-				writeJsonOutput(report);
-			} else {
-				console.error(`Invalid output format: ${opts.out}. Use 'json' or 'md'.`);
-				throwExit(1);
-			}
-
-			// Exit with error code if not all green
-			if (!report.allGreen) {
-				throwExit(1);
-			}
-			return;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			console.error(`Error aggregating gate reports: ${message}`);
-			throwExit(1);
-		}
-	});
+// Report command - modularized in Phase 3.4
+registerReportCommand(program);
 
 // Discover command - GitHub PR discovery
 program
