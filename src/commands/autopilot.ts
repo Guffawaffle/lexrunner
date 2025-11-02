@@ -19,6 +19,10 @@ interface AutopilotCommandDeps {
 	finalizeAuditGuard?: (emitter: AuditEmitter, status?: string) => Promise<void>;
 }
 
+interface AutopilotExecutor {
+	execute: (deliverablesDir?: string) => Promise<{ success: boolean; message: string }>;
+}
+
 /**
  * Register the autopilot command
  */
@@ -84,7 +88,7 @@ export function registerAutopilotCommand(program: Command, deps: AutopilotComman
 					}
 					console.error(`Error: unsupported autopilot level ${level} (supported: 0, 1, 2)`);
 					throwExit(1);
-				})() as { execute: (deliverablesDir?: string) => Promise<{ success: boolean; message: string }> };
+			})() as AutopilotExecutor;
 
 				// Execute with optional custom deliverables directory
 				const result = await autopilot.execute(opts.deliverablesDir);
@@ -98,7 +102,6 @@ export function registerAutopilotCommand(program: Command, deps: AutopilotComman
 				if (!result.success) {
 					throwExit(1);
 				}
-				return;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				if (opts.json || deps.jsonModeActive()) {
