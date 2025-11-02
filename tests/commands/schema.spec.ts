@@ -11,6 +11,7 @@ import * as os from 'os';
 describe('Schema Command Module', () => {
 	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-schema-test');
 	const cliPath = path.resolve(__dirname, '../..', 'dist', 'cli.js');
+	const originalCwd = process.cwd();
 
 	beforeEach(() => {
 		// Clean test directory
@@ -23,7 +24,7 @@ describe('Schema Command Module', () => {
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
+		process.chdir(originalCwd);
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}
