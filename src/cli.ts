@@ -16,7 +16,6 @@ import { loadInputs } from "./core/inputs.js";
 import { generatePlan } from "./core/plan.js";
 import { generateSnapshot } from "./core/snapshot.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
-import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "./github/api.js";
 import { createGitOperations, GitOperationError } from "./git/operations.js";
 import {
 	bootstrapWorkspace,
@@ -64,6 +63,7 @@ import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/gene
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
+import { registerDiscoverCommand } from "./commands/discover.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -959,205 +959,8 @@ registerSchemaCommand(program, {
 // Report command - modularized in Phase 3.4
 registerReportCommand(program);
 
-// Discover command - GitHub PR discovery
-program
-	.command("discover")
-	.description("Discover open pull requests from GitHub")
-	.option("--owner <owner>", "GitHub repository owner")
-	.option("--repo <repo>", "GitHub repository name")
-	.option("--state <state>", "PR state filter", "open")
-	.option(
-		"--suggest",
-		"Generate dependency/grouping suggestions using heuristics"
-	)
-	.option("--json", "Output JSON format")
-	.addHelpText(
-		"after",
-		`
-Examples:
-  $ lex-pr discover                             # Discover PRs from current repo
-  $ lex-pr discover --suggest                   # Discover with dependency suggestions
-  $ lex-pr discover --json > prs.json           # JSON output for processing
-  $ lex-pr discover --owner org --repo project  # Specify repository explicitly
-  $ lex-pr discover --state all                 # Include closed PRs
-
-Common Issues:
-  • "Could not detect repository": Set GITHUB_TOKEN or run from git repository
-  • Rate limit errors: Wait or use authenticated token with higher limits
-  • No PRs found: Check --state filter and repository permissions`
-	)
-	.action(async (opts) => {
-		try {
-			let githubAPI = await createGitHubAPI();
-
-			// Override with command line options if provided
-			if (opts.owner && opts.repo) {
-				githubAPI = new GitHubAPI({
-					owner: opts.owner,
-					repo: opts.repo,
-					token: process.env.GITHUB_TOKEN,
-				});
-			}
-
-			if (!githubAPI) {
-				console.error(
-					"\n❌ Error: Could not detect GitHub repository\n"
-				);
-				console.error("Solutions:");
-				console.error(
-					"  1. Run from a Git repository with GitHub remote:"
-				);
-				console.error("     git remote -v");
-				console.error("\n  2. Specify repository explicitly:");
-				console.error(
-					"     lex-pr discover --owner <owner> --repo <repo>\n"
-				);
-				console.error("💡 Tip: Initialize your workspace first:");
-				console.error("   lex-pr init\n");
-				throwExit(1);
-			}
-			const resolvedAPI = githubAPI!;
-
-			// Check authentication
-			const authStatus = await resolvedAPI.checkAuth();
-			if (!authStatus.authenticated) {
-				console.warn(
-					"Warning: GitHub API not authenticated. Set GITHUB_TOKEN environment variable for better rate limits."
-				);
-			}
-
-			// Fetch pull requests
-			const pullRequests = await resolvedAPI.discoverPullRequests(
-				opts.state as "open" | "closed" | "all"
-			);
-
-			if (opts.suggest) {
-				// Generate dependency suggestions using heuristics
-				const { createFileAnalyzer } = await import(
-					"./planner/fileAnalysis.js"
-				);
-
-				// Reuse the existing Octokit instance from githubAPI
-				const analyzer = createFileAnalyzer(
-					resolvedAPI.getOctokit(),
-					resolvedAPI.config.owner,
-					resolvedAPI.config.repo
-				);
-				const prs = pullRequests.map((pr) => ({
-					number: pr.number,
-					name: `PR-${pr.number}`,
-					sha: pr.sha,
-				}));
-
-				const suggestions =
-					await analyzer.suggestDependenciesWithHeuristics(prs);
-
-				if (opts.json) {
-					console.log(
-						canonicalJSONStringify({
-							pullRequests,
-							suggestions,
-							total: pullRequests.length,
-							suggestionsCount: suggestions.length,
-							authenticated: authStatus.authenticated,
-							user: authStatus.user,
-						})
-					);
-				} else {
-					console.log(
-						`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`
-					);
-					if (authStatus.authenticated) {
-						console.log(`✓ Authenticated as: ${authStatus.user}`);
-					}
-					console.log("");
-
-					if (suggestions.length === 0) {
-						console.log("No dependency suggestions found.");
-					} else {
-						console.log(
-							`\n📊 Dependency Suggestions (${suggestions.length} found):\n`
-						);
-						console.log(
-							"| From | To | Confidence | Heuristic | Reason |"
-						);
-						console.log(
-							"|------|------|------------|-----------|--------|"
-						);
-
-						for (const suggestion of suggestions) {
-							const confidence =
-								(suggestion.confidence * 100).toFixed(0) + "%";
-							const heuristic = suggestion.heuristic || "unknown";
-							const reason =
-								suggestion.reason.length > 50
-									? suggestion.reason.substring(0, 47) + "..."
-									: suggestion.reason;
-							console.log(
-								`| ${suggestion.from} | ${suggestion.to} | ${confidence} | ${heuristic} | ${reason} |`
-							);
-						}
-					}
-				}
-			} else {
-				// Original discover output
-				if (opts.json) {
-					console.log(
-						canonicalJSONStringify({
-							pullRequests,
-							total: pullRequests.length,
-							authenticated: authStatus.authenticated,
-							user: authStatus.user,
-						})
-					);
-				} else {
-					console.log(
-						`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`
-					);
-					if (authStatus.authenticated) {
-						console.log(`✓ Authenticated as: ${authStatus.user}`);
-					}
-					console.log("");
-
-					if (pullRequests.length === 0) {
-						console.log("No pull requests found.");
-					} else {
-						console.log(
-							"| PR# | Title | Branch | Author | Labels |"
-						);
-						console.log(
-							"|-----|-------|--------|--------|--------|"
-						);
-
-						for (const pr of pullRequests) {
-							const labels =
-								pr.labels.length > 0
-									? pr.labels.join(", ")
-									: "none";
-							const title =
-								pr.title.length > 50
-									? pr.title.substring(0, 47) + "..."
-									: pr.title;
-							console.log(
-								`| #${pr.number} | ${title} | ${pr.branch} | ${pr.author} | ${labels} |`
-							);
-						}
-					}
-				}
-			}
-		} catch (error) {
-			if (error instanceof GitHubAPIError) {
-				console.error(`GitHub API Error: ${error.message}`);
-				throwExit(1);
-			}
-			console.error(
-				`Error discovering pull requests: ${
-					error instanceof Error ? error.message : String(error)
-				}`
-			);
-			throwExit(1);
-		}
-	});
+// Discover command - modularized in Phase 3
+registerDiscoverCommand(program);
 
 // Merge command - Execute merge pyramid with git operations
 registerMergeCommand(program, () => jsonModeActive, () => program.opts());
