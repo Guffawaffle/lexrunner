@@ -1,0 +1,26 @@
+{
+	"schemaVersion": "1.0.0",
+	"target": "main",
+	"items": [
+		{
+			"name": "always-pass",
+			"deps": [],
+			"gates": [
+				{
+					"name": "pass-gate",
+					"run": "echo 'This gate passes'; exit 0"
+				}
+			]
+		},
+		{
+			"name": "always-fail",
+			"deps": [],
+			"gates": [
+				{
+					"name": "fail-gate",
+					"run": "echo 'This gate fails' >&2; exit 1"
+				}
+			]
+		}
+	]
+}

@@ -37,7 +37,11 @@ import {
 	InitLocalResult,
 	ProfileResolveResult,
 } from "./types.js";
-import { resolveProfile, validateWriteOperation, WriteProtectionError } from "../config/profileResolver.js";
+import {
+	resolveProfile,
+	validateWriteOperation,
+	WriteProtectionError,
+} from "../config/profileResolver.js";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -75,7 +79,8 @@ function createServer(): Server {
 							},
 							outDir: {
 								type: "string",
-								description: "Output directory for plan artifacts",
+								description:
+									"Output directory for plan artifacts",
 							},
 						},
 					},
@@ -96,20 +101,23 @@ function createServer(): Server {
 							},
 							outDir: {
 								type: "string",
-								description: "Output directory for gate results",
+								description:
+									"Output directory for gate results",
 							},
 						},
 					},
 				},
 				{
 					name: "merge.apply",
-					description: "Apply merge operations (requires ALLOW_MUTATIONS=true)",
+					description:
+						"Apply merge operations (requires ALLOW_MUTATIONS=true)",
 					inputSchema: {
 						type: "object",
 						properties: {
 							dryRun: {
 								type: "boolean",
-								description: "Simulate merge without making changes",
+								description:
+									"Simulate merge without making changes",
 								default: true,
 							},
 						},
@@ -117,13 +125,15 @@ function createServer(): Server {
 				},
 				{
 					name: "local.init",
-					description: "Initialize local overlay directory with auto-detected project configuration",
+					description:
+						"Initialize local overlay directory with auto-detected project configuration",
 					inputSchema: {
 						type: "object",
 						properties: {
 							force: {
 								type: "boolean",
-								description: "Force recreation even if local overlay exists",
+								description:
+									"Force recreation even if local overlay exists",
 								default: false,
 							},
 						},
@@ -131,26 +141,30 @@ function createServer(): Server {
 				},
 				{
 					name: "profile.resolve",
-					description: "Resolve profile directory using precedence chain (--profile-dir → LEX_PR_PROFILE_DIR → .smartergpt.local/ → .smartergpt/)",
+					description:
+						"Resolve profile directory using precedence chain (--profile-dir → LEX_PR_PROFILE_DIR → .smartergpt.local/ → .smartergpt/)",
 					inputSchema: {
 						type: "object",
 						properties: {
 							profileDir: {
 								type: "string",
-								description: "Optional profile directory override",
+								description:
+									"Optional profile directory override",
 							},
 						},
 					},
 				},
 				{
 					name: "health",
-					description: "Get health status of the system with optional metrics",
+					description:
+						"Get health status of the system with optional metrics",
 					inputSchema: {
 						type: "object",
 						properties: {
 							includeMetrics: {
 								type: "boolean",
-								description: "Include detailed metrics in response",
+								description:
+									"Include detailed metrics in response",
 								default: false,
 							},
 						},
@@ -197,7 +211,9 @@ function createServer(): Server {
 /**
  * Handle plan.create tool
  */
-async function handlePlanCreate(args: PlanCreateArgs): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handlePlanCreate(
+	args: PlanCreateArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const env = getMCPEnvironment();
 
@@ -235,28 +251,26 @@ async function handlePlanCreate(args: PlanCreateArgs): Promise<{ content: [{ typ
 
 		const result: PlanCreateResult = {
 			plan: plan,
-			outDir: outDir
+			outDir: outDir,
 		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(result, null, 2)
-				}
-			]
+					text: JSON.stringify(result, null, 2),
+				},
+			],
 		};
-
 	} catch (error) {
 		if (error instanceof WriteProtectionError) {
-			throw new McpError(
-				ErrorCode.InvalidRequest,
-				error.message
-			);
+			throw new McpError(ErrorCode.InvalidRequest, error.message);
 		}
 		throw new McpError(
 			ErrorCode.InternalError,
-			`Failed to create plan: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to create plan: ${
+				error instanceof Error ? error.message : String(error)
+			}`
 		);
 	}
 }
@@ -264,7 +278,9 @@ async function handlePlanCreate(args: PlanCreateArgs): Promise<{ content: [{ typ
 /**
  * Handle gates.run tool
  */
-async function handleGatesRun(args: GatesRunArgs): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handleGatesRun(
+	args: GatesRunArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const env = getMCPEnvironment();
 
@@ -284,14 +300,11 @@ async function handleGatesRun(args: GatesRunArgs): Promise<{ content: [{ type: "
 		const executionState = new ExecutionState(plan);
 
 		// Determine output directory
-		const outDir = args.outDir || path.join(resolved.path, "runner", "gates");
+		const outDir =
+			args.outDir || path.join(resolved.path, "runner", "gates");
 
 		// Execute gates (this modifies executionState in place)
-		await executeGatesWithPolicy(
-			plan,
-			executionState,
-			outDir
-		);
+		await executeGatesWithPolicy(plan, executionState, outDir);
 
 		// Get results from execution state
 		const results = executionState.getResults();
@@ -307,17 +320,20 @@ async function handleGatesRun(args: GatesRunArgs): Promise<{ content: [{ type: "
 			}
 
 			// Filter gates by onlyGate if specified
-			const gates = nodeResult.gates?.filter(gate =>
-				!args.onlyGate || gate.gate === args.onlyGate
-			).map((gate: any) => ({
-				name: gate.gate,
-				status: gate.status
-			})) || [];
+			const gates =
+				nodeResult.gates
+					?.filter(
+						(gate) => !args.onlyGate || gate.gate === args.onlyGate
+					)
+					.map((gate: any) => ({
+						name: gate.gate,
+						status: gate.status,
+					})) || [];
 
 			const itemResult = {
 				name: itemName,
 				status: nodeResult.status || "unknown",
-				gates: gates
+				gates: gates,
 			};
 
 			items.push(itemResult);
@@ -329,22 +345,23 @@ async function handleGatesRun(args: GatesRunArgs): Promise<{ content: [{ type: "
 
 		const result: GatesRunResult = {
 			items,
-			allGreen
+			allGreen,
 		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(result, null, 2)
-				}
-			]
+					text: JSON.stringify(result, null, 2),
+				},
+			],
 		};
-
 	} catch (error) {
 		throw new McpError(
 			ErrorCode.InternalError,
-			`Failed to run gates: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to run gates: ${
+				error instanceof Error ? error.message : String(error)
+			}`
 		);
 	}
 }
@@ -352,7 +369,9 @@ async function handleGatesRun(args: GatesRunArgs): Promise<{ content: [{ type: "
 /**
  * Handle merge.apply tool
  */
-async function handleMergeApply(args: MergeApplyArgs): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handleMergeApply(
+	args: MergeApplyArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const env = getMCPEnvironment();
 
@@ -360,16 +379,17 @@ async function handleMergeApply(args: MergeApplyArgs): Promise<{ content: [{ typ
 		if (!env.ALLOW_MUTATIONS && !args.dryRun) {
 			const result: MergeApplyResult = {
 				allowed: false,
-				message: "Mutations not allowed. Set ALLOW_MUTATIONS=true or use dryRun=true."
+				message:
+					"Mutations not allowed. Set ALLOW_MUTATIONS=true or use dryRun=true.",
 			};
 
 			return {
 				content: [
 					{
 						type: "text",
-						text: JSON.stringify(result, null, 2)
-					}
-				]
+						text: JSON.stringify(result, null, 2),
+					},
+				],
 			};
 		}
 
@@ -400,23 +420,24 @@ async function handleMergeApply(args: MergeApplyArgs): Promise<{ content: [{ typ
 			message: args.dryRun
 				? `Dry run: ${summary.eligible.length} items eligible, ${summary.failed.length} failed`
 				: env.ALLOW_MUTATIONS
-					? `Ready to merge ${summary.eligible.length} eligible items`
-					: "Mutations disabled. Set ALLOW_MUTATIONS=true to enable merging."
+				? `Ready to merge ${summary.eligible.length} eligible items`
+				: "Mutations disabled. Set ALLOW_MUTATIONS=true to enable merging.",
 		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(result, null, 2)
-				}
-			]
+					text: JSON.stringify(result, null, 2),
+				},
+			],
 		};
-
 	} catch (error) {
 		throw new McpError(
 			ErrorCode.InternalError,
-			`Failed to apply merge: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to apply merge: ${
+				error instanceof Error ? error.message : String(error)
+			}`
 		);
 	}
 }
@@ -424,7 +445,9 @@ async function handleMergeApply(args: MergeApplyArgs): Promise<{ content: [{ typ
 /**
  * Handle local.init tool
  */
-async function handleLocalInit(args: InitLocalArgs): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handleLocalInit(
+	args: InitLocalArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const force = args.force ?? false;
 		const result = initLocalOverlay(process.cwd(), force);
@@ -433,22 +456,23 @@ async function handleLocalInit(args: InitLocalArgs): Promise<{ content: [{ type:
 			created: result.created,
 			path: result.path,
 			config: result.config,
-			copiedFiles: result.copiedFiles
+			copiedFiles: result.copiedFiles,
 		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(output, null, 2)
-				}
-			]
+					text: JSON.stringify(output, null, 2),
+				},
+			],
 		};
-
 	} catch (error) {
 		throw new McpError(
 			ErrorCode.InternalError,
-			`Failed to initialize local overlay: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to initialize local overlay: ${
+				error instanceof Error ? error.message : String(error)
+			}`
 		);
 	}
 }
@@ -456,7 +480,9 @@ async function handleLocalInit(args: InitLocalArgs): Promise<{ content: [{ type:
 /**
  * Handle profile.resolve tool
  */
-async function handleProfileResolve(args: ProfileResolveArgs): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handleProfileResolve(
+	args: ProfileResolveArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const env = getMCPEnvironment();
 
@@ -470,23 +496,24 @@ async function handleProfileResolve(args: ProfileResolveArgs): Promise<{ content
 			manifest: {
 				role: resolved.manifest.role,
 				name: resolved.manifest.name,
-				version: resolved.manifest.version
-			}
+				version: resolved.manifest.version,
+			},
 		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(output, null, 2)
-				}
-			]
+					text: JSON.stringify(output, null, 2),
+				},
+			],
 		};
-
 	} catch (error) {
 		throw new McpError(
 			ErrorCode.InternalError,
-			`Failed to resolve profile: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to resolve profile: ${
+				error instanceof Error ? error.message : String(error)
+			}`
 		);
 	}
 }
@@ -494,16 +521,18 @@ async function handleProfileResolve(args: ProfileResolveArgs): Promise<{ content
 /**
  * Handle health check
  */
-async function handleHealth(args: { includeMetrics?: boolean }): Promise<{ content: [{ type: "text", text: string }] }> {
+async function handleHealth(args: {
+	includeMetrics?: boolean;
+}): Promise<{ content: [{ type: "text"; text: string }] }> {
 	const health = healthChecker.getHealth(args.includeMetrics || false);
 
 	return {
 		content: [
 			{
 				type: "text",
-				text: JSON.stringify(health, null, 2)
-			}
-		]
+				text: JSON.stringify(health, null, 2),
+			},
+		],
 	};
 }
 
@@ -513,10 +542,27 @@ async function handleHealth(args: { includeMetrics?: boolean }): Promise<{ conte
 async function main() {
 	const server = createServer();
 	const transport = new StdioServerTransport();
+
+	// Connect the server to stdio transport
 	await server.connect(transport);
 
 	// Log to stderr so it doesn't interfere with MCP protocol
 	console.error("MCP server started for lex-pr-runner");
+
+	// Keep the process alive by setting up event handlers
+	// The event loop will keep running while the stdio transport is active
+	process.stdin.resume();
+
+	// Handle graceful shutdown when stdin closes
+	process.stdin.on("end", () => {
+		console.error("MCP server shutting down");
+		process.exit(0);
+	});
+
+	// Never return - let the event loop handle everything
+	await new Promise<void>(() => {
+		// This promise never resolves, keeping the process alive
+	});
 }
 
 // Handle uncaught errors
@@ -538,4 +584,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	});
 }
 
-export { createServer };
+export { createServer, main };

@@ -8,14 +8,15 @@
 	},
 	"packageManager": "npm@10.0.0",
 	"bin": {
-		"lex-pr": "dist/cli.js"
+		"lex-pr": "dist/cli.js",
+		"lex-pr-runner-mcp": "./mcp-server.mjs"
 	},
 	"scripts": {
 		"dev": "tsx watch src/cli.ts",
 		"cli": "tsx src/cli.ts",
 		"cli:built": "node dist/cli.js",
-		"mcp": "tsx src/mcp/server.ts",
-		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist && tsup src/mcp/server.ts --format esm --dts --out-dir dist",
+		"mcp": "node mcp-server.mjs",
+		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist",
 		"pretest": "npm run build",
 		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts",
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",

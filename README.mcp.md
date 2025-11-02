@@ -2,28 +2,65 @@
 
 The Model Context Protocol (MCP) server for lex-pr-runner provides read-only tools for plan creation, gate execution, and merge operations.
 
+**Architecture:** This server is aligned with LexBrain and LexMap MCP implementations, using direct stdio JSON-RPC 2.0 protocol handling for consistency and maintainability across the Lex ecosystem.
+
 ## Quick Start
+
+### Configuration
+
+See [MCP-CONFIG.md](./MCP-CONFIG.md) for complete configuration details and alignment with lex-brain and lex-map.
+
+**Quick MCP Config Entry:**
+```json
+{
+  "mcpServers": {
+    "lex-pr-runner": {
+      "command": "node",
+      "args": ["/srv/lex-mcp/lex-pr-runner/mcp-server.mjs"],
+      "env": {
+        "LEX_PR_PROFILE_DIR": "/path/to/.smartergpt"
+      }
+    }
+  }
+}
+```
 
 ### Starting the Server
 
 ```bash
-# Start the MCP server
+# Production mode (recommended)
 npm run mcp
+
+# Or directly
+node mcp-server.mjs
+
+# Via launcher script (for specific environments)
+bash lex-pr-runner-launcher.sh
 ```
 
-The server listens on stdio and communicates using the MCP protocol.
+The server communicates via stdio using the MCP JSON-RPC 2.0 protocol, aligned with LexBrain and LexMap.
 
 ### Environment Configuration
 
 The MCP server respects these environment variables:
 
-- `LEX_PROFILE_DIR`: Directory containing configuration files (default: `.smartergpt`)
+- `LEX_PR_PROFILE_DIR`: Directory containing configuration files (default: auto-resolved via precedence chain)
 - `ALLOW_MUTATIONS`: Enable destructive operations like merging (default: `false`)
 
 ```bash
 # Example with custom configuration
-LEX_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
+LEX_PR_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
 ```
+
+## Architecture Alignment
+
+This MCP server follows the same architectural pattern as LexBrain and LexMap:
+
+1. **Direct stdio JSON-RPC 2.0**: No SDK abstraction, simple line-delimited protocol
+2. **Single entry point**: `mcp-server.mjs` handles protocol and imports built core functions
+3. **Core separation**: Business logic in TypeScript (`src/**`), protocol adapter in JavaScript
+4. **Consistent error handling**: JSON-RPC error codes (-32700, -32601, -32603)
+5. **Graceful shutdown**: SIGINT/SIGTERM handlers
 
 ## Available Tools
 
