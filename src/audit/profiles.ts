@@ -60,7 +60,7 @@ export const AUDIT_PROFILES: Record<AuditProfile, AuditProfileConfig | null> = {
 		includeEnv: [], // Must be explicitly allowed
 		redactRegex: STRICT_REDACT_REGEX,
 		hashPaths: true,
-		retainDays: 2555, // 7 years
+		retainDays: 2190, // 6 years per HIPAA 45 CFR 164.316(b)(2)(i)
 		requireSignature: true, // Stub for Phase 2
 		includeArtifactRefs: true,
 		includeJobIds: true,
