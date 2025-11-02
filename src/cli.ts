@@ -9,10 +9,6 @@ import { executeGatesWithPolicy } from "./gates.js";
 import { ExecutionState } from "./executionState.js";
 import { MergeEligibilityEvaluator } from "./mergeEligibility.js";
 import { loadInputs } from "./core/inputs.js";
-import { generatePlan, generateEmptyPlan } from "./core/plan.js";
-import { generateSnapshot, generatePlanSummary, generateGitHubSnapshot } from "./core/snapshot.js";
-import { generatePlanFromGitHub } from "./core/githubPlan.js";
-import { createGitHubClient } from "./github/index.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
 import { readGateDir, generateMarkdownSummary } from "./report/aggregate.js";
 import { validateGateReportWithErrors, migrateGateReport, needsMigration } from "./schema/gateReport.js";
@@ -51,9 +47,6 @@ import { getStatusIcon, formatStatusTable, formatQueryResult } from "./cli/forma
 import { initAuditEmitter, emitEvent, finalizeAudit, AuditEmitter, AuditOptions, EVENT_TYPES } from "./audit/index.js";
 import { sha256 } from "./util/hash.js";
 import { validatePlan as validatePlanDeps, formatValidationResult } from "./planner/validation.js";
-import { scoreDependencies } from "./planner/dependencyScoring.js";
-import { FileAnalyzer } from "./planner/fileAnalysis.js";
-import { formatSuggestions, type SuggestionFormat } from "./cli/formatSuggestions.js";
 import * as fs from "fs";
 import * as path from "path";
 
