@@ -65,7 +65,7 @@ lex-pr execute plan.json --audit hipaa-strict
 | PHI redaction | ❌ | ❌ | ❌ | ✅ |
 | Encryption | ❌ | Optional | Optional | **Required** |
 | Signature | ❌ | ❌ | Stub | Stub |
-| Retention | N/A | 365 days | 730 days | 2555 days (7 years) |
+| Retention | N/A | 365 days | 730 days | 2190 days (6 years, per HIPAA 45 CFR 164.316) |
 
 ### Profile Details
 
@@ -109,13 +109,13 @@ Comprehensive audit logging for SOC 2 Type II compliance:
 
 Maximum protection for HIPAA 164.312(b) compliance:
 
-- All soc2 profile features
+- All SOC 2 profile features
 - Path hashing: All file paths are SHA-256 hashed
 - PHI redaction: Automatic detection and redaction of PHI patterns (SSN, DOB, medical terms)
 - Strict redaction: Extended patterns including `ssn|ein|dob`
 - **Encryption required**: AES-256-GCM with 32-byte key
 - Fail-closed: Invalid key causes immediate abort and plaintext scrubbing
-- Retention: 2555 days (7 years)
+- Retention: 2190 days (6 years, per HIPAA 45 CFR 164.316)
 
 **Use cases:**
 - HIPAA-regulated environments
