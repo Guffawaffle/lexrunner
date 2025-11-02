@@ -8,13 +8,5 @@ if [ -f "$HOME/.nvm/nvm.sh" ]; then
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
-# Determine the installation path
-# Try production location first, fall back to development
-if [ -f "/srv/lex-mcp/lex-pr-runner/mcp-server.mjs" ]; then
-    SCRIPT_PATH="/srv/lex-mcp/lex-pr-runner/mcp-server.mjs"
-else
-    SCRIPT_PATH="/home/guff/lex-pr-runner/mcp-server.mjs"
-fi
-
-# Execute the MCP server
-exec node "$SCRIPT_PATH"
+# Execute the MCP server from the production location
+exec node /srv/lex-mcp/lex-pr-runner/mcp-server.mjs

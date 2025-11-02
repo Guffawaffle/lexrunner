@@ -1,7 +1,74 @@
 # MCP Alignment Summary
 
+**Date:** November 2, 2025
+**Status:** ✅ Complete and Tested
+
 ## Objective
-Align lex-pr-runner's MCP serving structure with lex-brain and lex-map to enable consistent configuration in mcp.json.
+
+Align lex-pr-runner's MCP server implementation with LexBrain and LexMap's architecture to ensure consistency across the Lex ecosystem and make bug fixes easier to apply uniformly.
+
+## What Was Done
+
+### 1. Rewrote MCP Server (`mcp-server.mjs`)
+
+**Before:**
+- SDK-based implementation using `@modelcontextprotocol/sdk`
+- Launcher script importing `dist/server.js`
+- Different pattern from LexBrain/LexMap
+
+**After:**
+- Direct stdio JSON-RPC 2.0 implementation
+- Single-file protocol handler importing `dist/cli.js`
+- Identical pattern to LexBrain/LexMap
+
+**Key Changes:**
+- Line-delimited JSON protocol handling
+- Simple buffer management for partial messages
+- Inline tool definitions with async handlers
+- Direct imports of core functions from built CLI
+- Consistent error handling with JSON-RPC codes
+
+### 2. Updated CLI Exports (`src/cli.ts`)
+
+Added exports for MCP server use:
+```typescript
+export {
+  // Core functionality
+  loadInputs,
+  generatePlan,
+  generateSnapshot,
+  loadPlan,
+
+  // Execution
+  executeGatesWithPolicy,
+  ExecutionState,
+  MergeEligibilityEvaluator,
+
+  // Configuration
+  initLocalOverlay,
+  resolveProfile,
+
+  // Utilities
+  canonicalJSONStringify,
+
+  // Monitoring
+  healthChecker,
+};
+```
+
+### 3. Simplified Build Process (`package.json`)
+
+**Before:**
+```json
+"mcp": "tsx src/mcp/server.ts",
+"build": "tsup src/cli.ts ... && tsup src/mcp/server.ts ..."
+```
+
+**After:**
+```json
+"mcp": "node mcp-server.mjs",
+"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist"
+```
 
 ## Changes Made
 
@@ -141,3 +208,38 @@ Then update mcp.json launcher path to `/srv/lex-mcp/lex-pr-runner/lex-pr-runner-
 ✅ Matches canonical terms from docs/TERMS.md
 ✅ TypeScript-first with proper build pipeline
 ✅ No workspace artifacts in core runner path
+
+## Summary of November 2, 2025 Updates
+
+### Architecture Migration Complete ✅
+
+**What Changed:**
+- Migrated from SDK-based MCP implementation to direct stdio JSON-RPC 2.0
+- Now fully aligned with LexBrain and LexMap architecture patterns
+- All 6 tools preserved with identical interfaces
+
+**Files Modified:**
+- `mcp-server.mjs` - Complete rewrite using stdio protocol
+- `src/cli.ts` - Added function exports for MCP server
+- `package.json` - Simplified build and mcp scripts
+- `README.mcp.md` - Updated with alignment documentation
+
+**New Files:**
+- `docs/MCP-MIGRATION.md` - Comprehensive migration guide
+- `src/mcp/DEPRECATED.md` - Deprecation notice
+- `test-mcp.mjs` - Integration test script
+
+**Testing:**
+- ✅ TypeScript compilation passes
+- ✅ Build succeeds
+- ✅ MCP server starts correctly
+- ✅ All 6 tools functional
+- ✅ Protocol alignment verified
+
+**Benefits:**
+- Same architecture as LexBrain and LexMap
+- Easier cross-project bug fixes
+- Simpler maintenance
+- No breaking changes
+
+**See:** `docs/MCP-MIGRATION.md` for detailed migration documentation.
