@@ -68,6 +68,34 @@ export interface VerificationResult {
 }
 
 /**
+ * Parse signer option string into SigningOptions
+ * Format: "kms:arn:aws:kms:..." or "gpg:FINGERPRINT"
+ */
+export function parseSignerOption(signerOption: string): SigningOptions {
+	if (!signerOption || signerOption === 'none') {
+		return { provider: 'none' };
+	}
+
+	const colonIndex = signerOption.indexOf(':');
+	if (colonIndex === -1) {
+		throw new Error(`Invalid signer option format: ${signerOption}. Expected "kms:<keyRef>" or "gpg:<fingerprint>"`);
+	}
+
+	const provider = signerOption.substring(0, colonIndex) as SigningProvider;
+	const keyRef = signerOption.substring(colonIndex + 1);
+
+	if (provider !== 'kms' && provider !== 'gpg') {
+		throw new Error(`Unsupported signing provider: ${provider}. Use "kms" or "gpg"`);
+	}
+
+	if (!keyRef) {
+		throw new Error(`Key reference is required for ${provider} signing`);
+	}
+
+	return { provider, keyRef };
+}
+
+/**
  * Compute SHA-256 hash of a file using canonical JSON
  */
 export function computeManifestHash(manifestPath: string): string {

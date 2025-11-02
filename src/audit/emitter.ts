@@ -454,7 +454,14 @@ export class AuditEmitter {
 
 		// Generate and write manifest AFTER encryption (so .enc file is included instead of plaintext)
 		const manifest = await generateManifest(this.auditDir);
-		await writeManifest(this.auditDir, manifest);
+		const manifestPath = await writeManifest(this.auditDir, manifest);
+
+		// Sign manifest if signer is configured
+		if (this.options.signer) {
+			const { signManifest, parseSignerOption } = await import('./signing.js');
+			const signingOptions = parseSignerOption(this.options.signer);
+			await signManifest(manifestPath, signingOptions);
+		}
 	}
 
 	/**
