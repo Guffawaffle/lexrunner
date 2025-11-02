@@ -4,11 +4,37 @@ The Model Context Protocol (MCP) server for lex-pr-runner provides read-only too
 
 ## Quick Start
 
+### Configuration
+
+See [MCP-CONFIG.md](./MCP-CONFIG.md) for complete configuration details and alignment with lex-brain and lex-map.
+
+**Quick MCP Config Entry:**
+```json
+{
+  "mcpServers": {
+    "lex-pr-runner": {
+      "command": "wsl",
+      "args": ["--", "/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh"],
+      "env": {
+        "LEX_PR_PROFILE_DIR": "/home/guff/lex-pr-runner/.smartergpt",
+        "LEX_PR_WORKSPACE": "/home/guff/lex-pr-runner"
+      }
+    }
+  }
+}
+```
+
 ### Starting the Server
 
 ```bash
-# Start the MCP server
+# Development mode (via tsx)
 npm run mcp
+
+# Production mode (via built files)
+node mcp-server.mjs
+
+# Via launcher script (recommended for MCP clients)
+bash lex-pr-runner-launcher.sh
 ```
 
 The server listens on stdio and communicates using the MCP protocol.
@@ -17,12 +43,14 @@ The server listens on stdio and communicates using the MCP protocol.
 
 The MCP server respects these environment variables:
 
-- `LEX_PROFILE_DIR`: Directory containing configuration files (default: `.smartergpt`)
+- `LEX_PR_PROFILE_DIR`: Directory containing configuration files (default: `.smartergpt`)
+- `LEX_PR_WORKSPACE`: Workspace root directory (default: current directory)
+- `LEX_PR_PLAN`: Optional path to a specific plan.json file
 - `ALLOW_MUTATIONS`: Enable destructive operations like merging (default: `false`)
 
 ```bash
 # Example with custom configuration
-LEX_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
+LEX_PR_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
 ```
 
 ## Available Tools

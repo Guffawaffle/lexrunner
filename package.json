@@ -8,7 +8,8 @@
 	},
 	"packageManager": "npm@10.0.0",
 	"bin": {
-		"lex-pr": "dist/cli.js"
+		"lex-pr": "dist/cli.js",
+		"lex-pr-runner-mcp": "./mcp-server.mjs"
 	},
 	"scripts": {
 		"dev": "tsx watch src/cli.ts",
