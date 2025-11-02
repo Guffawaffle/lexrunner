@@ -239,6 +239,7 @@ async function executeLocalGate(
 		let timedOut = false;
 
 		// Use gate.cwd if specified, otherwise fall back to repoRoot (captured at execution start)
+		// If neither is available, use process.cwd() as a last resort fallback
 		// This ensures gates always run in a valid, stable working directory
 		const workingDirectory = gate.cwd || repoRoot || process.cwd();
 
