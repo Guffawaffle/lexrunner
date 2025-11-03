@@ -90,6 +90,7 @@ import {
 	AuditOptions,
 	EVENT_TYPES,
 } from "./audit/index.js";
+import { AUDIT_SCHEMA_VERSION } from "./audit/schema/events.js";
 import { sha256 } from "./util/hash.js";
 import {
 	validatePlan as validatePlanDeps,
@@ -225,7 +226,7 @@ program
 	.description(
 		"Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly"
 	)
-	.version("0.1.0")
+	.version(`0.1.0 (audit-schema-version: ${AUDIT_SCHEMA_VERSION})`)
 	.option("--no-color", "Disable ANSI color codes in output")
 	.option(
 		"--audit-profile <profile>",
