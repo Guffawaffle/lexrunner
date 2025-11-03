@@ -282,28 +282,77 @@ High-level execution summary.
 
 ### `audit-manifest.json`
 
-File inventory with SHA-256 integrity hashes.
+File inventory with SHA-256 integrity hashes. For SOC 2 and HIPAA profiles, also includes CI context (git, CI environment, and OS details).
 
-**Example:**
+**Example (basic profile):**
 ```json
 {
   "schemaVersion": "1.0.0",
-  "generatedAt": "2025-11-02T14:35:00Z",
-  "sessionId": "01JB123456789",
+  "timestamp": "2025-11-02T14:35:00Z",
   "files": [
     {
-      "name": "audit.ndjson",
+      "file": "audit.ndjson",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 524288
     },
     {
-      "name": "audit-summary.json",
+      "file": "audit-summary.json",
       "sha256": "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
       "bytes": 1024
     }
   ],
-  "totalBytes": 525312,
-  "totalFiles": 2
+  "totalBytes": 525312
+}
+```
+
+**Example (soc2/hipaa-strict profile with CI context):**
+```json
+{
+  "schemaVersion": "1.0.0",
+  "timestamp": "2025-11-02T14:35:00Z",
+  "files": [
+    {
+      "file": "audit.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 524288
+    },
+    {
+      "file": "audit-gate-matrix.json",
+      "sha256": "a1b2c3d4e5f6...",
+      "bytes": 4096
+    }
+  ],
+  "totalBytes": 528384,
+  "ciContext": {
+    "git": {
+      "commit": "abc123def456",
+      "branch": "main",
+      "remote": "git@github.com:owner/repo.git",
+      "author": "dev@example.com",
+      "committer": "dev@example.com",
+      "message": "Fix: Update audit context",
+      "dirty": false,
+      "tags": ["v1.0.0"]
+    },
+    "ci": {
+      "provider": "github-actions",
+      "run_id": "12345678",
+      "run_number": "42",
+      "workflow": "Merge & Deploy",
+      "job": "audit-compliance",
+      "actor": "Guffawaffle",
+      "event_name": "push",
+      "ref": "refs/heads/main",
+      "sha": "abc123def456"
+    },
+    "os": {
+      "platform": "linux",
+      "release": "5.15.0-1020-azure",
+      "arch": "x64",
+      "hostname": "runner-001",
+      "user": "runner"
+    }
+  }
 }
 ```
 

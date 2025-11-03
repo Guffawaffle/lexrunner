@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { sha256FileRaw } from '../util/hash.js';
+import { AuditContext } from './context.js';
 
 export interface AuditManifestEntry {
 	file: string;
@@ -17,12 +18,16 @@ export interface AuditManifest {
 	timestamp: string;
 	files: AuditManifestEntry[];
 	totalBytes: number;
+	ciContext?: AuditContext;
 }
 
 /**
  * Generate manifest for audit directory
  */
-export async function generateManifest(auditDir: string): Promise<AuditManifest> {
+export async function generateManifest(
+	auditDir: string,
+	ciContext?: AuditContext
+): Promise<AuditManifest> {
 	const files: AuditManifestEntry[] = [];
 	let totalBytes = 0;
 
@@ -48,12 +53,19 @@ export async function generateManifest(auditDir: string): Promise<AuditManifest>
 	// Sort files for deterministic output
 	files.sort((a, b) => a.file.localeCompare(b.file));
 
-	return {
+	const manifest: AuditManifest = {
 		schemaVersion: '1.0.0',
 		timestamp: new Date().toISOString(),
 		files,
 		totalBytes
 	};
+
+	// Include CI context if provided
+	if (ciContext) {
+		manifest.ciContext = ciContext;
+	}
+
+	return manifest;
 }
 
 /**
