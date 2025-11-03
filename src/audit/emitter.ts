@@ -11,6 +11,7 @@ import { AuditProfile, getProfileConfig, AuditProfileConfig } from './profiles.j
 import { redactObject, buildContext, hashPath, redactPHIFromObject } from './redaction.js';
 import { generateManifest, writeManifest } from './manifest.js';
 import { ingestSidecarFiles } from './sidecar.js';
+import { collectContext, AuditContext } from './context.js';
 import * as crypto from 'crypto';
 
 export interface AuditOptions {
@@ -106,24 +107,19 @@ export class AuditEmitter {
 		if (this.config) {
 			const contextTypes = this.options.contextTypes || this.options.context || this.config.includeContext;
 
-			// Try to collect git context if requested
-			let gitInfo: { branch?: string; commit?: string; remote?: string } | undefined;
-			if (contextTypes.includes('git')) {
+			// Collect comprehensive context (git, CI, OS)
+			if (contextTypes && contextTypes.length > 0) {
 				try {
-					const { execa } = await import('execa');
-					const commit = await execa('git', ['rev-parse', 'HEAD']).then(r => r.stdout).catch(() => undefined);
-					const branch = await execa('git', ['rev-parse', '--abbrev-ref', 'HEAD']).then(r => r.stdout).catch(() => undefined);
-					const remote = await execa('git', ['remote', 'get-url', 'origin']).then(r => r.stdout).catch(() => undefined);
-					if (commit || branch || remote) {
-						gitInfo = { commit, branch, remote };
-					}
-				} catch {
-					// Git not available, context will be empty
+					const auditContext = await collectContext(contextTypes);
+					this.context = auditContext as Context;
+				} catch (err) {
+					// Context collection failed, log warning and continue with empty context
+					console.warn('[lex-pr] audit: context collection failed', err);
+					this.context = {};
 				}
+			} else {
+				this.context = {};
 			}
-
-			const includeEnv = this.options.includeEnv || this.config.includeEnv;
-			this.context = buildContext(contextTypes, gitInfo, includeEnv);
 		}
 
 		// Create audit directory
@@ -453,7 +449,7 @@ export class AuditEmitter {
 		}
 
 		// Generate and write manifest AFTER encryption (so .enc file is included instead of plaintext)
-		const manifest = await generateManifest(this.auditDir);
+		const manifest = await generateManifest(this.auditDir, this.context as AuditContext);
 		const manifestPath = await writeManifest(this.auditDir, manifest);
 
 		// Sign manifest if signer is configured
