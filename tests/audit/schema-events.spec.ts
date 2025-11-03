@@ -12,8 +12,6 @@ import {
 	MergeStatus,
 	parseAuditEvent,
 	validateAuditEvent,
-	EventEnvelopeSchema,
-	CommandInvocationPayload,
 	GateFinishedPayload,
 	type AuditEvent,
 	type CommandInvocationEvent,

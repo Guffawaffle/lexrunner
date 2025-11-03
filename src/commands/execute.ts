@@ -10,7 +10,6 @@ import { ExecutionState } from '../executionState.js';
 import { MergeEligibilityEvaluator } from '../mergeEligibility.js';
 import { parseAutopilotConfig, AutopilotConfigError, getAutopilotLevelDescription, AutopilotLevel } from '../autopilot/index.js';
 import { ProgressReporter } from '../util/progress.js';
-import { canonicalJSONStringify } from '../util/canonicalJson.js';
 import { writeJsonOutput } from '../cli/output.js';
 import { throwExit, CLIExitSignal } from '../cli/exitHandler.js';
 import { initAuditEmitter, emitEvent, AuditEmitter, AuditOptions, EVENT_TYPES } from '../audit/index.js';

@@ -13,13 +13,13 @@ import {
 	parseAuditNDJSONString,
 	validateAuditManifest,
 	validateAuditManifestSafe,
-	validateAuditEvent,
 	isSchemaCompatible,
 	filterEvents,
 	computeStatistics,
 	EventQuery,
 	type AuditEvent
 } from '../../src/sdk/index.js';
+import type { GateFinishedEvent } from '../../src/audit/schema/events.js';
 
 describe('Audit SDK (Phase 3A)', () => {
 	let tmpDir: string;
@@ -51,7 +51,7 @@ describe('Audit SDK (Phase 3A)', () => {
 		it('should parse valid NDJSON line', () => {
 			const event = parseAuditEventLine(validLine);
 			expect(event.event).toBe('gate_finished');
-			expect(event.payload.status).toBe('pass');
+			expect((event as GateFinishedEvent).payload.status).toBe('pass');
 		});
 
 		it('should throw on empty line', () => {
@@ -338,7 +338,7 @@ describe('Audit SDK (Phase 3A)', () => {
 		it('should filter by gate status', () => {
 			const filtered = filterEvents(events, { gateStatus: 'fail' });
 			expect(filtered).toHaveLength(1);
-			expect(filtered[0].payload.status).toBe('fail');
+			expect((filtered[0] as GateFinishedEvent).payload.status).toBe('fail');
 		});
 
 		it('should filter by gate name', () => {
@@ -357,7 +357,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				gateStatus: 'pass'
 			});
 			expect(filtered).toHaveLength(1);
-			expect(filtered[0].payload.gate).toBe('lint');
+			expect((filtered[0] as GateFinishedEvent).payload.gate).toBe('lint');
 		});
 	});
 
@@ -396,7 +396,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				.execute();
 
 			expect(results).toHaveLength(1);
-			expect(results[0].payload.gate).toBe('test');
+			expect((results[0] as GateFinishedEvent).payload.gate).toBe('test');
 		});
 
 		it('should count matching events', () => {
@@ -413,7 +413,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				.first();
 
 			expect(first).toBeDefined();
-			expect(first!.payload.gate).toBe('lint');
+			expect((first as GateFinishedEvent).payload.gate).toBe('lint');
 		});
 
 		it('should check if events exist', () => {
