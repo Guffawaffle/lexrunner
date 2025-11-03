@@ -1163,6 +1163,7 @@ Common Issues:
 registerMergeCommand(program, () => jsonModeActive, () => program.opts());
 
 
+
 // Doctor command - modularized in Phase 4.4
 registerDoctorCommand(program, () => jsonModeActive);
 
@@ -1695,7 +1696,7 @@ if (isDirectExec) {
 	// Install global handlers before running main
 	installSignalHandlers();
 	installUnhandledRejectionHandler();
-	
+
 	void main().catch((error) => {
 		const message = error instanceof Error ? error.message : String(error);
 		process.stderr.write(`[lex-pr] fatal: ${message}\n`);
