@@ -2,16 +2,516 @@
 
 ## Overview
 
-The Audit SDK provides a **simple Node.js interface** for gates to emit structured audit events using the sidecar pattern. This enables rich observability, compliance tracking, and debugging without modifying the runner's core architecture.
+The Audit SDK provides **two distinct APIs**:
+
+1. **Gate SDK** - For gates to emit audit events (sidecar pattern)
+2. **Consumer SDK** - For third-party tools to consume audit outputs (Phase 3A)
 
 **Key Features:**
-- 🎯 **Simple API** - Initialize, emit events, close
+- 🎯 **Simple API** - Initialize, emit events, close (Gate SDK)
+- 📖 **Parser & Query** - Read, validate, and filter audit events (Consumer SDK)
 - 📝 **NDJSON Format** - Newline-delimited JSON for easy parsing
 - 🔌 **Sidecar Pattern** - Decoupled from runner execution
 - 🚫 **No-op Mode** - Gates work standalone without runner
 - 🔒 **Type-safe** - Full TypeScript support with typed payloads
+- ✅ **Schema Validation** - Zod schemas for all 14 event types
+- 🔍 **Query Builder** - Fluent API for filtering events
+- 📊 **Statistics** - Built-in event aggregation and analysis
 
 ---
+
+## Table of Contents
+
+- [Consumer SDK (Phase 3A)](#consumer-sdk-phase-3a) - **NEW: Parse and query audit outputs**
+  - [Installation](#installation-consumer-sdk)
+  - [Quick Start](#quick-start-consumer-sdk)
+  - [API Reference](#consumer-sdk-api-reference)
+  - [Examples](#consumer-sdk-examples)
+- [Gate SDK](#gate-sdk) - Emit audit events from gates
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+  - [API Reference](#api-reference)
+  - [Examples](#examples)
+
+---
+
+# Consumer SDK (Phase 3A)
+
+> **New in Phase 3A:** Third-party tools can now consume lex-pr-runner audit outputs with full TypeScript support, schema validation, and query capabilities.
+
+## Installation (Consumer SDK)
+
+```bash
+npm install lex-pr-runner
+```
+
+Then import the consumer SDK from the source (until published as separate package):
+
+```typescript
+import {
+  readAuditNDJSON,
+  filterEvents,
+  computeStatistics,
+  validateAuditManifest,
+  EventQuery,
+  type AuditEvent
+} from 'lex-pr-runner/src/sdk/index.js';
+```
+
+Or use the types and parsers directly:
+
+```typescript
+import { parseAuditEvent, type AuditEvent } from 'lex-pr-runner/src/audit/schema/events.js';
+import { parseAuditManifest } from 'lex-pr-runner/src/audit/schema/manifest.js';
+```
+
+## Quick Start (Consumer SDK)
+
+### Example 1: Read and Filter Events
+
+```typescript
+import { readAuditNDJSON, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+
+// Read all events from audit output
+for await (const event of readAuditNDJSON('./audit.ndjson')) {
+  if (event.event === 'gate_finished' && event.payload.status === 'fail') {
+    console.log(`Failed gate: ${event.payload.gate} (item: ${event.payload.item})`);
+  }
+}
+```
+
+### Example 2: Load into Memory and Query
+
+```typescript
+import { readAuditNDJSONSync, EventQuery } from 'lex-pr-runner/src/sdk/index.js';
+
+// Load all events into memory
+const events = await readAuditNDJSONSync('./audit.ndjson');
+
+// Use fluent query API
+const failedGates = new EventQuery(events)
+  .byEventType('gate_finished')
+  .byGateStatus('fail')
+  .byLevel('error')
+  .execute();
+
+console.log(`Found ${failedGates.length} failed gates`);
+```
+
+### Example 3: Compute Statistics
+
+```typescript
+import { readAuditNDJSONSync, computeStatistics } from 'lex-pr-runner/src/sdk/index.js';
+
+const events = await readAuditNDJSONSync('./audit.ndjson');
+const stats = computeStatistics(events);
+
+console.log(`Total events: ${stats.totalEvents}`);
+console.log(`Failed gates: ${stats.gateStats.failed}`);
+console.log(`Successful merges: ${stats.mergeStats.success}`);
+console.log(`Time range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
+```
+
+### Example 4: Validate Manifest
+
+```typescript
+import { validateAuditManifest } from 'lex-pr-runner/src/sdk/index.js';
+import * as fs from 'fs';
+
+const manifestData = JSON.parse(fs.readFileSync('./audit-manifest.json', 'utf8'));
+
+try {
+  const manifest = validateAuditManifest(manifestData);
+  console.log(`Valid manifest: ${manifest.files.length} files, ${manifest.totalBytes} bytes`);
+} catch (error) {
+  console.error('Invalid manifest:', error);
+}
+```
+
+## Consumer SDK API Reference
+
+### Parsing Functions
+
+#### `readAuditNDJSON(filePath: string): AsyncIterable<AuditEvent>`
+
+Read audit events from an NDJSON file (async iterable).
+
+**Example:**
+```typescript
+for await (const event of readAuditNDJSON('./audit.ndjson')) {
+  console.log(event.event, event.ts);
+}
+```
+
+#### `readAuditNDJSONSync(filePath: string): Promise<AuditEvent[]>`
+
+Read all audit events from an NDJSON file into an array.
+
+**Example:**
+```typescript
+const events = await readAuditNDJSONSync('./audit.ndjson');
+console.log(`Loaded ${events.length} events`);
+```
+
+#### `parseAuditEventLine(line: string): AuditEvent`
+
+Parse a single NDJSON line into a validated audit event.
+
+**Example:**
+```typescript
+const event = parseAuditEventLine('{"schema_version":"1.0.0",...}');
+```
+
+#### `parseAuditNDJSONString(content: string): AuditEvent[]`
+
+Parse NDJSON content from a string.
+
+**Example:**
+```typescript
+const events = parseAuditNDJSONString(ndjsonContent);
+```
+
+### Validation Functions
+
+#### `validateAuditManifest(manifest: unknown): AuditManifest`
+
+Validate an audit manifest. Throws on validation error.
+
+**Example:**
+```typescript
+const manifest = validateAuditManifest(manifestData);
+console.log(`Total bytes: ${manifest.totalBytes}`);
+```
+
+#### `validateAuditManifestSafe(manifest: unknown)`
+
+Validate an audit manifest (safe version that returns result object).
+
+**Example:**
+```typescript
+const result = validateAuditManifestSafe(manifestData);
+if (result.success) {
+  console.log('Valid manifest:', result.data);
+} else {
+  console.error('Validation errors:', result.error);
+}
+```
+
+#### `validateAuditEvent(event: unknown): AuditEvent`
+
+Validate a single audit event. Throws on validation error.
+
+#### `isSchemaCompatible(schemaVersion: string, majorVersion?: number): boolean`
+
+Check if a schema version is compatible with a given major version.
+
+**Example:**
+```typescript
+if (!isSchemaCompatible(event.schema_version, 1)) {
+  console.warn(`Incompatible schema version: ${event.schema_version}`);
+}
+```
+
+### Query Functions
+
+#### `filterEvents(events: AuditEvent[], filter: EventFilter): AuditEvent[]`
+
+Filter audit events by criteria.
+
+**Filter Options:**
+- `eventType` - Filter by event type(s)
+- `level` - Filter by level(s)
+- `sessionId` - Filter by session ID
+- `runId` - Filter by run ID
+- `item` - Filter by item (for gate/merge events)
+- `gate` - Filter by gate name
+- `gateStatus` - Filter by gate status(es)
+- `timeRange` - Filter by timestamp range
+
+**Example:**
+```typescript
+const failedGates = filterEvents(events, {
+  eventType: 'gate_finished',
+  gateStatus: 'fail',
+  level: 'error'
+});
+```
+
+#### `EventQuery`
+
+Fluent query builder for filtering events.
+
+**Methods:**
+- `byEventType(type)` - Filter by event type
+- `byLevel(level)` - Filter by level
+- `bySessionId(sessionId)` - Filter by session ID
+- `byRunId(runId)` - Filter by run ID
+- `byItem(item)` - Filter by item
+- `byGate(gate)` - Filter by gate name
+- `byGateStatus(status)` - Filter by gate status
+- `byTimeRange(start, end)` - Filter by time range
+- `execute()` - Execute query and return results
+- `count()` - Count matching events
+- `first()` - Get first matching event
+- `exists()` - Check if any events match
+
+**Example:**
+```typescript
+const query = new EventQuery(events)
+  .byEventType('gate_finished')
+  .byGateStatus(['fail', 'error'])
+  .byTimeRange('2024-11-01T00:00:00Z', '2024-11-02T23:59:59Z');
+
+console.log(`Count: ${query.count()}`);
+console.log(`First: ${query.first()?.payload.gate}`);
+console.log(`Exists: ${query.exists()}`);
+
+const results = query.execute();
+```
+
+#### `computeStatistics(events: AuditEvent[])`
+
+Compute statistics from audit events.
+
+**Returns:**
+```typescript
+{
+  totalEvents: number;
+  eventTypes: Record<string, number>;
+  levels: { info: number; warn: number; error: number };
+  gateStats: {
+    total: number;
+    passed: number;
+    failed: number;
+    skipped: number;
+    errored: number;
+  };
+  mergeStats: {
+    total: number;
+    success: number;
+    conflict: number;
+    errored: number;
+  };
+  timeRange: {
+    start: string;
+    end: string;
+  };
+}
+```
+
+**Example:**
+```typescript
+const stats = computeStatistics(events);
+console.log(`Total events: ${stats.totalEvents}`);
+console.log(`Gate pass rate: ${stats.gateStats.passed / stats.gateStats.total * 100}%`);
+```
+
+## Consumer SDK Examples
+
+### Example 1: CI/CD Integration - Report Failed Gates
+
+```typescript
+import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+
+async function reportFailedGates() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  
+  const failedGates = filterEvents(events, {
+    eventType: 'gate_finished',
+    gateStatus: ['fail', 'error']
+  });
+
+  if (failedGates.length > 0) {
+    console.error(`❌ ${failedGates.length} gate(s) failed:`);
+    for (const event of failedGates) {
+      console.error(`  - ${event.payload.gate} (item ${event.payload.item})`);
+    }
+    process.exit(1);
+  } else {
+    console.log('✅ All gates passed');
+  }
+}
+
+reportFailedGates();
+```
+
+### Example 2: Generate HTML Report
+
+```typescript
+import { readAuditNDJSONSync, computeStatistics, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import * as fs from 'fs';
+
+async function generateReport() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  const stats = computeStatistics(events);
+
+  const failedGates = filterEvents(events, {
+    eventType: 'gate_finished',
+    gateStatus: 'fail'
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><title>Audit Report</title></head>
+<body>
+  <h1>Audit Report</h1>
+  <h2>Summary</h2>
+  <ul>
+    <li>Total Events: ${stats.totalEvents}</li>
+    <li>Gates Passed: ${stats.gateStats.passed}</li>
+    <li>Gates Failed: ${stats.gateStats.failed}</li>
+    <li>Merge Success: ${stats.mergeStats.success}</li>
+  </ul>
+  <h2>Failed Gates</h2>
+  <ul>
+    ${failedGates.map(e => `<li>${e.payload.gate} (item ${e.payload.item})</li>`).join('\n')}
+  </ul>
+</body>
+</html>
+  `;
+
+  fs.writeFileSync('audit-report.html', html);
+  console.log('Report generated: audit-report.html');
+}
+
+generateReport();
+```
+
+### Example 3: SIEM Integration - Export to JSON
+
+```typescript
+import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import * as fs from 'fs';
+
+async function exportToSIEM() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  
+  // Filter high-priority events
+  const criticalEvents = filterEvents(events, {
+    level: ['warn', 'error']
+  });
+
+  // Transform to SIEM format
+  const siemEvents = criticalEvents.map(event => ({
+    timestamp: event.ts,
+    severity: event.level,
+    source: 'lex-pr-runner',
+    event_type: event.event,
+    session_id: event.session_id,
+    details: event.payload
+  }));
+
+  fs.writeFileSync('siem-export.json', JSON.stringify(siemEvents, null, 2));
+  console.log(`Exported ${siemEvents.length} events to SIEM`);
+}
+
+exportToSIEM();
+```
+
+### Example 4: Compliance Dashboard - Aggregate Metrics
+
+```typescript
+import { readAuditNDJSONSync, EventQuery, computeStatistics } from 'lex-pr-runner/src/sdk/index.js';
+
+async function complianceDashboard() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  const stats = computeStatistics(events);
+
+  // Compute metrics
+  const totalGates = stats.gateStats.total;
+  const passRate = totalGates > 0 ? (stats.gateStats.passed / totalGates * 100).toFixed(2) : 'N/A';
+  
+  const mergeConflicts = new EventQuery(events)
+    .byEventType('merge_conflict_detected')
+    .count();
+
+  const errors = new EventQuery(events)
+    .byLevel('error')
+    .count();
+
+  // Generate dashboard
+  console.log('=== Compliance Dashboard ===');
+  console.log(`Session ID: ${events[0]?.session_id || 'N/A'}`);
+  console.log(`Time Range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
+  console.log('');
+  console.log('Gate Execution:');
+  console.log(`  Total: ${totalGates}`);
+  console.log(`  Passed: ${stats.gateStats.passed}`);
+  console.log(`  Failed: ${stats.gateStats.failed}`);
+  console.log(`  Pass Rate: ${passRate}%`);
+  console.log('');
+  console.log('Merge Operations:');
+  console.log(`  Total: ${stats.mergeStats.total}`);
+  console.log(`  Success: ${stats.mergeStats.success}`);
+  console.log(`  Conflicts: ${mergeConflicts}`);
+  console.log('');
+  console.log(`Total Errors: ${errors}`);
+}
+
+complianceDashboard();
+```
+
+### Example 5: Filter by Time Range
+
+```typescript
+import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+
+async function eventsInTimeRange() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  
+  const filtered = filterEvents(events, {
+    timeRange: {
+      start: '2024-11-02T00:00:00Z',
+      end: '2024-11-02T23:59:59Z'
+    }
+  });
+
+  console.log(`Events in date range: ${filtered.length}`);
+}
+
+eventsInTimeRange();
+```
+
+### Example 6: Type-Safe Event Handling
+
+```typescript
+import { readAuditNDJSONSync, type GateFinishedEvent } from 'lex-pr-runner/src/sdk/index.js';
+
+async function analyzeGatePerformance() {
+  const events = await readAuditNDJSONSync('./audit.ndjson');
+  
+  // Type-safe filtering
+  const gateEvents = events.filter(
+    (e): e is GateFinishedEvent => e.event === 'gate_finished'
+  );
+
+  // Calculate average duration per gate
+  const durationsByGate: Record<string, number[]> = {};
+  
+  for (const event of gateEvents) {
+    const gate = event.payload.gate;
+    const duration = event.payload.duration_ms;
+    
+    if (!durationsByGate[gate]) {
+      durationsByGate[gate] = [];
+    }
+    durationsByGate[gate].push(duration);
+  }
+
+  console.log('Average gate durations:');
+  for (const [gate, durations] of Object.entries(durationsByGate)) {
+    const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+    console.log(`  ${gate}: ${avg.toFixed(0)}ms`);
+  }
+}
+
+analyzeGatePerformance();
+```
+
+---
+
+# Gate SDK
 
 ## Installation
 
