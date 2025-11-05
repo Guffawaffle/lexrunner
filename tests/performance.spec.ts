@@ -7,7 +7,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should track memory usage', () => {
 			const monitor = new MemoryMonitor();
 			const usage = monitor.getMemoryUsage();
-			
+
 			expect(usage.heapUsed).toBeGreaterThan(0);
 			expect(usage.heapTotal).toBeGreaterThan(0);
 		});
@@ -18,7 +18,7 @@ describe('Performance - High-Throughput Execution', () => {
 				memoryThresholdPercent: 50
 			};
 			const monitor = new MemoryMonitor(config);
-			
+
 			// Current usage should exceed 10MB at 50% threshold
 			const isHigh = monitor.isMemoryHigh();
 			expect(typeof isHigh).toBe('boolean');
@@ -27,7 +27,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should calculate memory stats', () => {
 			const monitor = new MemoryMonitor({ maxMemoryMB: 1024 });
 			const stats = monitor.getMemoryStats();
-			
+
 			expect(stats.usedMB).toBeGreaterThan(0);
 			expect(stats.maxMB).toBe(1024);
 			expect(stats.usagePercent).toBeGreaterThanOrEqual(0);
@@ -39,12 +39,12 @@ describe('Performance - High-Throughput Execution', () => {
 				maxMemoryMB: 1
 			};
 			const monitor = new MemoryMonitor(config);
-			
+
 			// Should return immediately without waiting
 			const start = Date.now();
 			await monitor.throttleIfNeeded();
 			const elapsed = Date.now() - start;
-			
+
 			expect(elapsed).toBeLessThan(50); // Should be very fast
 		});
 	});
@@ -59,7 +59,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should cache and retrieve values', () => {
 			cache.set('key1', 'value1');
 			const result = cache.get('key1');
-			
+
 			expect(result).toBe('value1');
 		});
 
@@ -70,10 +70,10 @@ describe('Performance - High-Throughput Execution', () => {
 
 		it('should expire entries after TTL', async () => {
 			cache.set('key1', 'value1');
-			
-			// Wait for TTL to expire
-			await new Promise(resolve => setTimeout(resolve, 1100));
-			
+
+			// Wait for TTL to expire (add buffer to account for system variance)
+			await new Promise(resolve => setTimeout(resolve, 1500));
+
 			const result = cache.get('key1');
 			expect(result).toBeNull();
 		});
@@ -81,7 +81,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should not cache when disabled', () => {
 			const disabledCache = new OperationCache<string>(1, false);
 			disabledCache.set('key1', 'value1');
-			
+
 			const result = disabledCache.get('key1');
 			expect(result).toBeNull();
 		});
@@ -89,9 +89,9 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should clear all entries', () => {
 			cache.set('key1', 'value1');
 			cache.set('key2', 'value2');
-			
+
 			cache.clear();
-			
+
 			expect(cache.get('key1')).toBeNull();
 			expect(cache.get('key2')).toBeNull();
 		});
@@ -105,7 +105,7 @@ describe('Performance - High-Throughput Execution', () => {
 
 			const result1 = await cache.execute('test-key', operation);
 			const result2 = await cache.execute('test-key', operation);
-			
+
 			expect(result1).toBe('result');
 			expect(result2).toBe('result');
 			expect(executionCount).toBe(1); // Should only execute once
@@ -114,7 +114,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should provide cache statistics', () => {
 			cache.set('key1', 'value1');
 			cache.set('key2', 'value2');
-			
+
 			const stats = cache.getStats();
 			expect(stats.size).toBe(2);
 			expect(stats.entries).toContain('key1');
@@ -132,7 +132,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should process items in batches', async () => {
 			const items = [1, 2, 3, 4, 5, 6, 7];
 			const batchSizes: number[] = [];
-			
+
 			const results = await processor.processBatches(
 				items,
 				async (batch) => {
@@ -140,7 +140,7 @@ describe('Performance - High-Throughput Execution', () => {
 					return batch.map(n => n * 2);
 				}
 			);
-			
+
 			expect(results).toEqual([2, 4, 6, 8, 10, 12, 14]);
 			expect(batchSizes).toEqual([3, 3, 1]); // Three batches: 3, 3, 1
 		});
@@ -148,7 +148,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should call onBatchComplete callback', async () => {
 			const items = [1, 2, 3, 4, 5];
 			const completedBatches: number[] = [];
-			
+
 			await processor.processBatches(
 				items,
 				async (batch) => batch.map(n => n * 2),
@@ -156,7 +156,7 @@ describe('Performance - High-Throughput Execution', () => {
 					completedBatches.push(batchIndex);
 				}
 			);
-			
+
 			expect(completedBatches).toEqual([0, 1]); // Two batches
 		});
 
@@ -171,7 +171,7 @@ describe('Performance - High-Throughput Execution', () => {
 				[],
 				async (batch) => batch
 			);
-			
+
 			expect(results).toEqual([]);
 		});
 	});
@@ -185,11 +185,11 @@ describe('Performance - High-Throughput Execution', () => {
 
 		it('should manage worker capacity', () => {
 			expect(pool.hasCapacity()).toBe(true);
-			
+
 			pool.acquire();
 			pool.acquire();
 			pool.acquire();
-			
+
 			expect(pool.hasCapacity()).toBe(false);
 			expect(pool.getActiveCount()).toBe(3);
 		});
@@ -198,7 +198,7 @@ describe('Performance - High-Throughput Execution', () => {
 			pool.acquire();
 			pool.acquire();
 			expect(pool.getActiveCount()).toBe(2);
-			
+
 			pool.release();
 			expect(pool.getActiveCount()).toBe(1);
 			expect(pool.hasCapacity()).toBe(true);
@@ -215,13 +215,13 @@ describe('Performance - High-Throughput Execution', () => {
 			pool.acquire();
 			pool.acquire();
 			pool.acquire();
-			
+
 			// No capacity, should wait
 			const waitPromise = pool.waitForCapacity(50);
-			
+
 			// Release a worker after a short delay
 			setTimeout(() => pool.release(), 100);
-			
+
 			await waitPromise;
 			expect(pool.hasCapacity()).toBe(true);
 		});
@@ -230,7 +230,7 @@ describe('Performance - High-Throughput Execution', () => {
 			pool.acquire();
 			pool.release();
 			pool.release(); // Should not go negative
-			
+
 			expect(pool.getActiveCount()).toBe(0);
 		});
 	});
@@ -240,7 +240,7 @@ describe('Performance - High-Throughput Execution', () => {
 			// Create a large batch of items
 			const items = Array.from({ length: 100 }, (_, i) => i);
 			const processor = new BatchProcessor<number>(20);
-			
+
 			const startTime = Date.now();
 			const results = await processor.processBatches(
 				items,
@@ -251,7 +251,7 @@ describe('Performance - High-Throughput Execution', () => {
 				}
 			);
 			const duration = Date.now() - startTime;
-			
+
 			expect(results.length).toBe(100);
 			// With 5 batches of 20 items each, at 10ms per batch, should be ~50-100ms
 			expect(duration).toBeLessThan(200);
@@ -260,7 +260,7 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should demonstrate cache performance improvement', async () => {
 			const cache = new OperationCache<number>(60, true);
 			let executionCount = 0;
-			
+
 			const expensiveOperation = async () => {
 				executionCount++;
 				await new Promise(resolve => setTimeout(resolve, 50));
@@ -271,12 +271,12 @@ describe('Performance - High-Throughput Execution', () => {
 			const start1 = Date.now();
 			await cache.execute('expensive', expensiveOperation);
 			const time1 = Date.now() - start1;
-			
+
 			// Second execution (cache hit)
 			const start2 = Date.now();
 			await cache.execute('expensive', expensiveOperation);
 			const time2 = Date.now() - start2;
-			
+
 			expect(executionCount).toBe(1);
 			expect(time1).toBeGreaterThan(40); // Should take at least 50ms
 			expect(time2).toBeLessThan(10); // Should be much faster from cache
@@ -285,25 +285,25 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should handle concurrent worker pool operations', async () => {
 			const pool = new WorkerPool(5);
 			const results: number[] = [];
-			
+
 			// Simulate 20 concurrent operations
-			const operations = Array.from({ length: 20 }, (_, i) => 
+			const operations = Array.from({ length: 20 }, (_, i) =>
 				(async () => {
 					// Wait for capacity
 					while (!pool.acquire()) {
 						await new Promise(resolve => setTimeout(resolve, 10));
 					}
-					
+
 					// Simulate work
 					await new Promise(resolve => setTimeout(resolve, 20));
 					results.push(i);
-					
+
 					pool.release();
 				})()
 			);
-			
+
 			await Promise.all(operations);
-			
+
 			expect(results.length).toBe(20);
 			expect(pool.getActiveCount()).toBe(0);
 		});

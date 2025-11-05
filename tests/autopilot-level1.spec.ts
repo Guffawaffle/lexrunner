@@ -136,7 +136,7 @@ describe('AutopilotLevel1', () => {
 		const weave_dirs = dirs.filter(d => d.startsWith('weave-'));
 		expect(weave_dirs.length).toBe(1);
 		expect(weave_dirs[0]).toMatch(/^weave-/);
-		
+
 		// Check that latest symlink exists
 		expect(dirs).toContain('latest');
 	});
@@ -415,8 +415,8 @@ describe('AutopilotLevel1', () => {
 		const autopilot1 = new AutopilotLevel1(context);
 		await autopilot1.execute();
 
-		// Wait a bit to ensure different timestamps
-		await new Promise(resolve => setTimeout(resolve, 10));
+		// Wait to ensure different timestamps (weave dirs use millisecond precision)
+		await new Promise(resolve => setTimeout(resolve, 1500));
 
 		const autopilot2 = new AutopilotLevel1(context);
 		const result2 = await autopilot2.execute();
@@ -432,7 +432,7 @@ describe('AutopilotLevel1', () => {
 			.filter(d => d.startsWith('weave-'))
 			.sort()
 			.reverse();
-		
+
 		expect(target).toBe(dirs[0]);
 	});
 
@@ -444,7 +444,7 @@ describe('AutopilotLevel1', () => {
 		expect(result.success).toBe(true);
 
 		expect(fs.existsSync(customDir)).toBe(true);
-		
+
 		const dirs = fs.readdirSync(customDir).filter(d => d.startsWith('weave-'));
 		expect(dirs.length).toBe(1);
 
