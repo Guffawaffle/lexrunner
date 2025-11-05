@@ -34,6 +34,7 @@ export const PlanCreateArgs = z.object({
 export type PlanCreateArgs = z.infer<typeof PlanCreateArgs>;
 
 export const GatesRunArgs = z.object({
+	planFile: z.string().optional(),
 	onlyItem: z.string().optional(),
 	onlyGate: z.string().optional(),
 	outDir: z.string().optional()

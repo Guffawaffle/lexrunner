@@ -91,6 +91,11 @@ function createServer(): Server {
 					inputSchema: {
 						type: "object",
 						properties: {
+							planFile: {
+								type: "string",
+								description:
+									"Path to external plan.json file (optional, uses internal state if not provided)",
+							},
 							onlyItem: {
 								type: "string",
 								description: "Run gates for specific item only",
@@ -284,16 +289,43 @@ async function handleGatesRun(
 	try {
 		const env = getMCPEnvironment();
 
-		// Resolve profile directory
-		const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
+		let planPath: string;
+		let outDirBase: string;
 
-		// Load plan from resolved profile directory
-		const planPath = path.join(resolved.path, "runner", "plan.json");
-		if (!fs.existsSync(planPath)) {
-			throw new Error("No plan found. Run plan.create first.");
+		// Use planFile if provided, otherwise fall back to internal state
+		if (args.planFile) {
+			// Validate that the plan file exists
+			if (!fs.existsSync(args.planFile)) {
+				throw new Error(`Plan file not found: ${args.planFile}`);
+			}
+
+			planPath = args.planFile;
+			// For external plans, use the plan file's directory as the base for output
+			outDirBase = path.dirname(args.planFile);
+		} else {
+			// Resolve profile directory for internal state
+			const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
+
+			// Load plan from resolved profile directory
+			planPath = path.join(resolved.path, "runner", "plan.json");
+			if (!fs.existsSync(planPath)) {
+				throw new Error("No plan found. Run plan.create first or provide planFile parameter.");
+			}
+
+			outDirBase = path.join(resolved.path, "runner");
 		}
 
-		const planContent = fs.readFileSync(planPath, "utf-8");
+		let planContent: string;
+		try {
+			planContent = fs.readFileSync(planPath, "utf-8");
+		} catch (error) {
+			throw new Error(
+				`Failed to read plan file ${planPath}: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
+
 		const plan = loadPlan(planContent);
 
 		// Create execution state
@@ -301,7 +333,7 @@ async function handleGatesRun(
 
 		// Determine output directory
 		const outDir =
-			args.outDir || path.join(resolved.path, "runner", "gates");
+			args.outDir || path.join(outDirBase, "gates");
 
 		// Execute gates (this modifies executionState in place)
 		await executeGatesWithPolicy(plan, executionState, outDir);
