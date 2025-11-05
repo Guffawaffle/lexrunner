@@ -32,16 +32,50 @@ describe('MCP Contract Tests', () => {
 
 	describe('Parameter validation schemas', () => {
 		it('should validate PlanCreateArgs schema correctly', () => {
-			// Valid arguments
+			// Valid arguments - basic
 			expect(() => PlanCreateArgs.parse({})).not.toThrow();
 			expect(() => PlanCreateArgs.parse({ json: true })).not.toThrow();
 			expect(() => PlanCreateArgs.parse({ json: false })).not.toThrow();
 			expect(() => PlanCreateArgs.parse({ outDir: '/tmp' })).not.toThrow();
 			expect(() => PlanCreateArgs.parse({ json: true, outDir: '/tmp' })).not.toThrow();
 
+			// Valid arguments - GitHub auto-discovery
+			expect(() => PlanCreateArgs.parse({ fromGithub: true })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, query: 'is:open label:feature' })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, labels: ['bug', 'feature'] })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, includeDrafts: false })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, excludePRs: [123, 456] })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, githubToken: 'ghp_token123' })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, owner: 'testowner', repo: 'testrepo' })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, requiredGates: ['lint', 'test', 'typecheck'] })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, maxWorkers: 4 })).not.toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: true, target: 'develop' })).not.toThrow();
+
+			// Valid arguments - complex GitHub scenarios
+			expect(() => PlanCreateArgs.parse({
+				fromGithub: true,
+				query: 'is:open label:stack:*',
+				labels: ['priority:high'],
+				excludePRs: [100, 200],
+				includeDrafts: true,
+				githubToken: 'token',
+				owner: 'org',
+				repo: 'repo',
+				requiredGates: ['lint', 'test'],
+				maxWorkers: 2,
+				target: 'main',
+				outDir: '/tmp/plan'
+			})).not.toThrow();
+
 			// Invalid arguments
 			expect(() => PlanCreateArgs.parse({ json: 'true' })).toThrow();
 			expect(() => PlanCreateArgs.parse({ outDir: 123 })).toThrow();
+			expect(() => PlanCreateArgs.parse({ fromGithub: 'true' })).toThrow(); // Should be boolean
+			expect(() => PlanCreateArgs.parse({ labels: 'bug,feature' })).toThrow(); // Should be array
+			expect(() => PlanCreateArgs.parse({ excludePRs: '123,456' })).toThrow(); // Should be array of numbers
+			expect(() => PlanCreateArgs.parse({ excludePRs: [123, '456'] })).toThrow(); // Should be numbers, not strings
+			expect(() => PlanCreateArgs.parse({ maxWorkers: '4' })).toThrow(); // Should be number
+			expect(() => PlanCreateArgs.parse({ requiredGates: 'lint,test' })).toThrow(); // Should be array
 		});
 
 		it('should validate GatesRunArgs schema correctly', () => {
@@ -174,6 +208,35 @@ describe('MCP Contract Tests', () => {
 			} catch (error) {
 				expect(error).toBeDefined();
 			}
+		});
+
+		it('should parse GitHub auto-discovery parameters with correct types', () => {
+			const githubArgs = PlanCreateArgs.parse({
+				fromGithub: true,
+				query: 'is:open label:feature',
+				labels: ['bug', 'enhancement'],
+				includeDrafts: false,
+				excludePRs: [100, 200, 300],
+				githubToken: 'ghp_test_token',
+				owner: 'testorg',
+				repo: 'testrepo',
+				requiredGates: ['lint', 'test', 'security'],
+				maxWorkers: 4,
+				target: 'develop'
+			});
+
+			// Verify all fields are present and have correct types
+			expect(githubArgs.fromGithub).toBe(true);
+			expect(githubArgs.query).toBe('is:open label:feature');
+			expect(githubArgs.labels).toEqual(['bug', 'enhancement']);
+			expect(githubArgs.includeDrafts).toBe(false);
+			expect(githubArgs.excludePRs).toEqual([100, 200, 300]);
+			expect(githubArgs.githubToken).toBe('ghp_test_token');
+			expect(githubArgs.owner).toBe('testorg');
+			expect(githubArgs.repo).toBe('testrepo');
+			expect(githubArgs.requiredGates).toEqual(['lint', 'test', 'security']);
+			expect(githubArgs.maxWorkers).toBe(4);
+			expect(githubArgs.target).toBe('develop');
 		});
 	});
 

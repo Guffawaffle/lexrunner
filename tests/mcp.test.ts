@@ -60,9 +60,25 @@ describe('MCP Parameter Validation', () => {
 		expect(() => PlanCreateArgs.parse({ outDir: '/tmp' })).not.toThrow();
 		expect(() => PlanCreateArgs.parse({ json: false, outDir: '/tmp' })).not.toThrow();
 
+		// Valid GitHub args
+		expect(() => PlanCreateArgs.parse({ fromGithub: true })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, query: 'is:open' })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, labels: ['bug', 'feature'] })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, includeDrafts: false })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, excludePRs: [123, 456] })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, githubToken: 'ghp_token' })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, owner: 'owner', repo: 'repo' })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, requiredGates: ['lint', 'test'] })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, maxWorkers: 4 })).not.toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: true, target: 'develop' })).not.toThrow();
+
 		// Invalid args
 		expect(() => PlanCreateArgs.parse({ json: 'true' })).toThrow();
 		expect(() => PlanCreateArgs.parse({ outDir: 123 })).toThrow();
+		expect(() => PlanCreateArgs.parse({ fromGithub: 'true' })).toThrow();
+		expect(() => PlanCreateArgs.parse({ labels: 'bug,feature' })).toThrow(); // Should be array
+		expect(() => PlanCreateArgs.parse({ excludePRs: '123,456' })).toThrow(); // Should be array of numbers
+		expect(() => PlanCreateArgs.parse({ maxWorkers: '4' })).toThrow(); // Should be number
 	});
 
 	it('should validate GatesRunArgs', () => {
