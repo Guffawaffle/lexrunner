@@ -409,5 +409,40 @@ describe('SARIF Adapter', () => {
 			expect(content).toContain('\n');
 			expect(content).toContain('  ');
 		});
+
+		it('should generate SARIF parseable by existing SARIF parser', async () => {
+			const events: EventEnvelope[] = [
+				{
+					schema_version: '0.1.0',
+					event: 'vuln_found',
+					ts: '2024-11-05T00:00:00.000Z',
+					level: 'warn',
+					session_id: 'test-session',
+					run_id: 'test-run',
+					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					actor: { type: 'cli' },
+					repo: {},
+					payload: {
+						cve: 'CVE-2024-1234',
+						severity: 'high',
+						package: 'lodash',
+						version: '4.17.20',
+						fixedIn: '4.17.21'
+					}
+				}
+			];
+
+			const report = await generateSARIF(events, '0.1.0');
+			const outputPath = join(testDir, 'audit-sarif.json');
+			await writeSARIF(report, outputPath);
+
+			// Verify it can be read back and parsed by the SARIF parser
+			const content = await readFile(outputPath, 'utf-8');
+			const { parseSarif } = await import('../../src/security/sarif.js');
+			
+			const scanResult = parseSarif(content);
+			expect(scanResult.vulnerabilities.length).toBeGreaterThan(0);
+			expect(scanResult.scanner).toBe('lex-pr-runner');
+		});
 	});
 });

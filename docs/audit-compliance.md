@@ -96,3 +96,189 @@ ls -1 ./tmp-audit-hipaa-enc
 
 - If you want strict fail‑closed behavior (exit non‑zero on encryption failure and remove plaintext), I can update the finalization logic to enforce that for `hipaa-strict`.
 - I can add a small `lex-pr audit decrypt` helper command and/or a Vitest integration that verifies encrypted artifact creation and plaintext cleanup.
+
+---
+
+## SARIF Output for Vulnerability Scanning
+
+### Overview
+
+The audit system can optionally generate [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) (Static Analysis Results Interchange Format) output from vulnerability findings. SARIF is a standard format supported by:
+
+- GitHub Code Scanning
+- GitLab SAST
+- Snyk
+- Veracode
+- Checkmarx
+- SonarQube
+
+### Enabling SARIF Output
+
+Add the `--audit-sarif` flag when running with an audit profile:
+
+```bash
+lex-pr execute --plan plan.json \
+  --audit soc2 \
+  --audit-sarif
+```
+
+This generates `audit-sarif.json` alongside the regular audit artifacts.
+
+### SARIF Generation Rules
+
+1. **Trigger**: SARIF is generated only when `vuln_found` events are present in the audit log
+2. **Output**: `audit-sarif.json` in the audit directory
+3. **Version**: SARIF 2.1.0 (current standard)
+4. **Empty runs**: If no vulnerabilities are found, no SARIF file is created
+
+### Severity Mapping
+
+| Vulnerability Severity | SARIF Level |
+|------------------------|-------------|
+| `critical`             | `error`     |
+| `high`                 | `error`     |
+| `medium`               | `warning`   |
+| `low`                  | `note`      |
+
+### Event-to-SARIF Mapping
+
+The SARIF adapter extracts fields from `vuln_found` events:
+
+| Audit Event Field       | SARIF Field                                      |
+|-------------------------|--------------------------------------------------|
+| `payload.cve`           | `result.ruleId`, `rule.id`                       |
+| `payload.severity`      | `result.level`, `rule.defaultConfiguration.level`|
+| `payload.package`       | `result.properties.package`                      |
+| `payload.version`       | `result.properties.version`                      |
+| `payload.fixedIn`       | `result.properties.fixedIn`                      |
+| `payload.file` (optional) | `result.locations[0].physicalLocation.artifactLocation.uri` |
+
+If `payload.file` is not specified, the location defaults to `package.json`.
+
+### GitHub Code Scanning Integration
+
+To upload SARIF results to GitHub Code Scanning:
+
+```yaml
+# .github/workflows/security.yml
+name: Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      
+      - name: Install lex-pr-runner
+        run: npm install -g lex-pr-runner
+      
+      - name: Run security scan with audit
+        run: |
+          lex-pr discover --state open | \
+          lex-pr plan --from-github | \
+          lex-pr execute --plan - \
+            --audit soc2 \
+            --audit-sarif
+      
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: .smartergpt.local/deliverables/weave-*/audit/audit-sarif.json
+        if: always()
+```
+
+### Example SARIF Output
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "lex-pr-runner",
+          "version": "0.1.0",
+          "informationUri": "https://smartergpt.dev/lex-pr-runner",
+          "rules": [
+            {
+              "id": "CVE-2024-1234",
+              "name": "CVE-2024-1234",
+              "shortDescription": {
+                "text": "High severity vulnerability in lodash@4.17.20"
+              },
+              "fullDescription": {
+                "text": "Vulnerability CVE-2024-1234 detected in lodash@4.17.20. Fixed in 4.17.21."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": ["security", "cve"],
+                "precision": "high"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2024-1234",
+          "level": "error",
+          "message": {
+            "text": "Vulnerability CVE-2024-1234: High severity in lodash@4.17.20. Fixed in 4.17.21."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "package.json"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "package": "lodash",
+            "version": "4.17.20",
+            "fixedIn": "4.17.21"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Recommended Profiles
+
+For compliance-oriented workflows (SOC2, HIPAA):
+
+```bash
+# SOC2 with SARIF
+lex-pr execute --plan plan.json \
+  --audit soc2 \
+  --audit-sarif
+
+# HIPAA-strict with SARIF and encryption
+export LEX_AUDIT_KEY_HEX=0123456789abcdef...
+lex-pr execute --plan plan.json \
+  --audit hipaa-strict \
+  --audit-sarif
+```
+
+### Validation
+
+Generated SARIF files can be validated using:
+
+1. **Official SARIF schema validator**: The SARIF schema is available at `https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json`
+2. **Internal parser**: The runner includes a SARIF parser in `src/security/sarif.ts` that can validate the format
+3. **GitHub Actions**: GitHub will validate SARIF on upload and provide feedback in the Code Scanning UI
+
