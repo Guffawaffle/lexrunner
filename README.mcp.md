@@ -93,9 +93,10 @@ Creates a plan from configuration files in the profile directory.
 
 ### gates.run
 
-Executes gates for plan items based on the current plan.
+Executes gates for plan items. Can work with either an internal plan (created via `plan.create`) or an external plan file.
 
 **Parameters:**
+- `planFile` (string, optional): Path to external plan.json file. If not provided, uses internal state from the profile directory.
 - `onlyItem` (string, optional): Run gates for specific item only
 - `onlyGate` (string, optional): Run specific gate only
 - `outDir` (string, optional): Output directory for gate results
@@ -119,7 +120,7 @@ Executes gates for plan items based on the current plan.
 }
 ```
 
-**Example:**
+**Example (using internal plan):**
 ```json
 {
   "name": "gates.run",
@@ -129,6 +130,22 @@ Executes gates for plan items based on the current plan.
   }
 }
 ```
+
+**Example (using external plan):**
+```json
+{
+  "name": "gates.run",
+  "arguments": {
+    "planFile": "/tmp/batch5-plan.json",
+    "outDir": "/tmp/gate-results"
+  }
+}
+```
+
+**Use Cases:**
+- **Internal state**: Run gates on a plan created via `plan.create` (default behavior)
+- **External orchestration**: Run gates on programmatically-created or externally-managed plan files
+- **Parallel workflows**: Execute gates on multiple independent plans in parallel merge-weave operations
 
 ### merge.apply
 
@@ -189,19 +206,53 @@ const client = new Client({
   cwd: "/path/to/lex-pr-runner"
 });
 
-// Create a plan
+// Create a plan (internal state)
 const planResult = await client.callTool("plan.create", {
   outDir: ".smartergpt/runner"
 });
 
-// Run gates
+// Run gates on internal plan
 const gatesResult = await client.callTool("gates.run", {
   outDir: ".smartergpt/runner/gates"
+});
+
+// Or run gates on external plan file
+const externalGatesResult = await client.callTool("gates.run", {
+  planFile: "/tmp/merge-batch/plan.json",
+  outDir: "/tmp/merge-batch/gates"
 });
 
 // Check merge eligibility (dry run)
 const mergeResult = await client.callTool("merge.apply", {
   dryRun: true
+});
+```
+
+### External Plan Files (Merge-Weave Workflows)
+
+The `planFile` parameter enables external orchestration workflows:
+
+```javascript
+// Programmatically create a plan
+const externalPlan = {
+  schemaVersion: "1.0.0",
+  target: "main",
+  items: [
+    {
+      name: "batch-item-1",
+      deps: [],
+      gates: [{ name: "lint", run: "npm run lint", env: {} }]
+    }
+  ]
+};
+
+// Write to disk
+fs.writeFileSync("/tmp/batch1-plan.json", JSON.stringify(externalPlan));
+
+// Execute gates on external plan
+const result = await client.callTool("gates.run", {
+  planFile: "/tmp/batch1-plan.json",
+  outDir: "/tmp/batch1-gates"
 });
 ```
 
