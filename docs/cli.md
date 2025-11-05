@@ -2,9 +2,139 @@
 
 Complete reference for the lex-pr-runner command-line interface, including all subcommands, options, and JSON output schemas.
 
-> **📖 See Also**: 
+> **📖 See Also**:
 > - [Autopilot Levels](./autopilot-levels.md) - Comprehensive guide to automation levels 0-4
 > - [Advanced CLI Features](./advanced-cli.md) - Power user tools and interactive modes
+> - [Command Creation Guide](./command-creation-guide.md) - How to add new commands to the CLI
+
+## Architecture
+
+The lex-pr-runner CLI uses a **modular command architecture** that provides:
+
+- **Maintainability**: Each command lives in its own module under `src/commands/`
+- **Testability**: Business logic separated from CLI registration
+- **Consistency**: Shared utilities for output, flags, and exit handling
+- **Extensibility**: Easy to add new commands following established patterns
+
+### Command Registration Flow
+
+```
+┌─────────────────┐
+│   src/cli.ts    │  Entry point, parses global flags
+└────────┬────────┘
+         │ registerCommands()
+         ↓
+┌─────────────────────────────────────────────┐
+│ src/commands/                               │
+│  ├── init.ts         → registerInitCommand  │
+│  ├── plan.ts         → registerPlanCommand  │
+│  ├── execute.ts      → registerExecuteCmd   │
+│  ├── merge.ts        → registerMergeCmd     │
+│  └── ...                                    │
+└─────────────────────────────────────────────┘
+         │
+         ↓ Each command registers with Commander
+┌─────────────────┐
+│  Commander.js   │  Handles argument parsing & dispatch
+└────────┬────────┘
+         │
+         ↓ .action() handler
+┌─────────────────────────────────────────────┐
+│ Business Logic (pure functions)             │
+│  • Separated from CLI concerns              │
+│  • Unit testable                            │
+│  • Returns typed results                    │
+└─────────────────────────────────────────────┘
+         │
+         ↓
+┌─────────────────────────────────────────────┐
+│ Shared Utilities                            │
+│  • src/cli/output.js    (JSON output)       │
+│  • src/cli/flags.js     (global flags)      │
+│  • src/cli/exitHandler.js (error handling)  │
+└─────────────────────────────────────────────┘
+```
+
+### Command Module Pattern
+
+Each command module exports a single registration function:
+
+```typescript
+// src/commands/myCommand.ts
+import { Command } from 'commander';
+
+export function registerMyCommandCommand(program: Command): void {
+  program
+    .command('my-command')
+    .description('Command description')
+    .action(async (args, options) => {
+      // Thin wrapper - delegates to business logic
+      const result = await executeMyCommand(args, options);
+      handleOutput(result, options);
+    });
+}
+
+// Pure, testable business logic
+async function executeMyCommand(args, options) {
+  // All logic here
+}
+```
+
+**Key Principles:**
+- **Separation of Concerns**: CLI registration separate from business logic
+- **Pure Functions**: Business logic has no side effects (testable)
+- **Consistent Output**: All commands support `--json` and human-readable formats
+- **Error Handling**: Use `throwExit()` from `src/cli/exitHandler.js`
+
+### Shared Utilities
+
+#### Output (`src/cli/output.js`)
+
+```typescript
+import { writeJsonOutput } from '../cli/output.js';
+
+// Canonical JSON output to stdout
+writeJsonOutput({ success: true, items: [...] });
+```
+
+#### Exit Handling (`src/cli/exitHandler.js`)
+
+```typescript
+import { throwExit, CLIExitSignal } from '../cli/exitHandler.js';
+
+// Graceful exit with error message
+throwExit(new Error('Operation failed'), 1);
+
+// Exit with success
+throw new CLIExitSignal(0, 'Operation complete');
+```
+
+#### Global Flags (`src/cli/flags.js`)
+
+```typescript
+import { parseGlobalFlags } from '../cli/flags.js';
+
+// Access global flags (--json, --no-color, etc.)
+const globalOpts = parseGlobalFlags(process.argv);
+```
+
+### Adding New Commands
+
+See the **[Command Creation Guide](./command-creation-guide.md)** for:
+- Step-by-step command creation
+- Templates and examples
+- Testing patterns
+- Documentation requirements
+- Complete checklist
+
+Quick reference:
+1. Create `src/commands/myCommand.ts`
+2. Export `registerMyCommandCommand(program: Command)`
+3. Register in `src/cli.ts`
+4. Add tests in `tests/commands/myCommand.spec.ts`
+5. Update this file (`docs/cli.md`) with command reference
+
+---
 
 ## Global Options
 
@@ -67,7 +197,7 @@ lex-pr plan --json
 Configuration values are resolved in the following order (highest to lowest priority):
 
 1. **Command-line flags** (`--out ./custom-dir`)
-2. **Environment variables** (`LEX_PR_OUT_DIR=./custom-dir`)  
+2. **Environment variables** (`LEX_PR_OUT_DIR=./custom-dir`)
 3. **Configuration files** (`.smartergpt/config.json`)
 4. **Built-in defaults**
 
@@ -460,7 +590,7 @@ When `--suggest-deps` is used, the planner analyzes file changes to suggest depe
 # Generate plan with default output directory
 lex-pr plan
 
-# Generate plan to custom directory  
+# Generate plan to custom directory
 lex-pr plan --out ./my-artifacts
 
 # JSON-only output for piping/processing
@@ -544,7 +674,7 @@ Example output with `--optimize`:
   "target": "main",
   "policy": {
     "requiredGates": ["string"],
-    "optionalGates": ["string"], 
+    "optionalGates": ["string"],
     "maxWorkers": 1,
     "retries": {},
     "overrides": {},
@@ -570,7 +700,7 @@ Example output with `--optimize`:
             "mounts": [
               {
                 "source": "string",
-                "target": "string", 
+                "target": "string",
                 "type": "bind|volume"
               }
             ]
@@ -643,7 +773,7 @@ lex-pr merge-order --plan ./configs/plan.json
 **Human-Readable Output:**
 ```
 Merge Order (3 levels):
-  Level 0: item-a, item-c  
+  Level 0: item-a, item-c
   Level 1: item-b
   Level 2: item-d
 
@@ -1041,7 +1171,7 @@ The `vuln` gate is a special built-in gate that scans for security vulnerabiliti
 
 **Supported Scanners:**
 - Trivy: `trivy fs --format sarif`
-- Snyk: `snyk test --sarif`  
+- Snyk: `snyk test --sarif`
 - CodeQL: `codeql database analyze --format=sarif-latest`
 - npm audit: `npm audit --json > npm-audit.json`
 
@@ -1054,7 +1184,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
 {
   "executionId": "string",       // Unique execution identifier
   "startedAt": "2024-01-15T10:30:00Z",
-  "completedAt": "2024-01-15T10:35:00Z", 
+  "completedAt": "2024-01-15T10:35:00Z",
   "status": "completed|failed|running",
   "totalItems": 4,
   "completedItems": 4,
@@ -1066,7 +1196,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
       "gates": [
         {
           "gate": "test",
-          "status": "pass|fail|blocked|skipped|retrying", 
+          "status": "pass|fail|blocked|skipped|retrying",
           "exitCode": 0,
           "duration": 1500,     // milliseconds
           "stdout": "string",
@@ -1090,7 +1220,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
 
 ---
 
-### `status` 
+### `status`
 
 Show current execution status and merge eligibility.
 
@@ -1102,7 +1232,7 @@ Arguments:
 
 Options:
   --plan <file>     Path to plan.json file
-  --json            Output JSON format  
+  --json            Output JSON format
   --state-dir <dir> Directory containing execution state (default: ".smartergpt/runner")
   -h, --help        Display help for command
 ```
@@ -1127,7 +1257,7 @@ lex-pr status --json plan.json
   "summary": {
     "totalItems": 4,
     "passedItems": 2,
-    "failedItems": 1, 
+    "failedItems": 1,
     "blockedItems": 1,
     "eligibleForMerge": 2
   },
@@ -1224,7 +1354,7 @@ lex-pr report --validate ./gate-results
 - **Total Items**: 4
 - **Total Gates**: 12
 - **Passed**: 10 ✅
-- **Failed**: 2 ❌  
+- **Failed**: 2 ❌
 - **Overall Status**: ❌ FAILED
 
 ## Item Results
@@ -1269,7 +1399,7 @@ lex-pr doctor --json
 **Success Response:**
 ```json
 {
-  "status": "healthy|warning|error", 
+  "status": "healthy|warning|error",
   "timestamp": "2024-01-15T10:30:00Z",
   "checks": [
     {
@@ -1308,7 +1438,7 @@ lex-pr doctor --json
 All CLI commands with `--json` output must guarantee:
 
 1. **Stable key ordering**: All JSON objects have keys sorted alphabetically
-2. **Consistent formatting**: Use 2-space indentation, no trailing whitespace  
+2. **Consistent formatting**: Use 2-space indentation, no trailing whitespace
 3. **Reproducible timestamps**: Avoid runtime timestamps except where semantically required
 4. **Sorted arrays**: Dependencies, items, errors sorted by name/path
 5. **Cross-platform consistency**: Same inputs produce identical outputs on Windows/macOS/Linux
@@ -1322,7 +1452,7 @@ git diff --exit-code  # Must be clean
 
 # Cross-platform verification
 lex-pr plan --json > output1.json
-lex-pr plan --json > output2.json  
+lex-pr plan --json > output2.json
 cmp output1.json output2.json     # Should be identical
 ```
 
@@ -1343,7 +1473,7 @@ The CLI uses a custom error class for all exits:
 ```typescript
 class CLIExitSignal extends Error {
   exitCode: number;
-  
+
   constructor(code: number, message?: string) {
     super(message ?? `CLI exited with code ${code}`);
     this.exitCode = code;
@@ -1383,7 +1513,7 @@ Use the standard exit codes consistently:
 
 ```typescript
 throwExit(0);  // Success
-throwExit(1);  // System/infrastructure errors  
+throwExit(1);  // System/infrastructure errors
 throwExit(2);  // User/validation errors
 ```
 
@@ -1447,14 +1577,14 @@ let jsonModeActive = false;
 command.action(async (opts) => {
   const previousJsonMode = jsonModeActive;
   jsonModeActive = !!opts.json;
-  
+
   try {
     if (opts.json) {
       // ONLY write JSON to stdout, nothing else
       process.stdout.write(canonicalJSONStringify(result));
       return;
     }
-    
+
     // Human-readable output
     console.log("✓ Success!");
     console.log(summary);
@@ -1565,29 +1695,29 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   }
 
   const err: any = e;
-  
+
   // Schema-specific error handling
   if (err?.code === schemaCode && Array.isArray(err.issues)) {
     console.log(JSON.stringify({ errors: err.issues }, null, 2));
     console.error(err.message);
     throwExit(2);
   }
-  
+
   // Handle known validation errors (exit 2)
-  if (e instanceof SchemaValidationError || 
-      e instanceof CycleError || 
+  if (e instanceof SchemaValidationError ||
+      e instanceof CycleError ||
       e instanceof UnknownDependencyError ||
       e instanceof WriteProtectionError ||
       e instanceof AutopilotConfigError) {
     console.error(`\n❌ Error: ${err.message}\n`);
-    
+
     // Add contextual help based on error type
     // e.g., for WriteProtectionError: suggest using local profile
     // e.g., for CycleError: suggest checking dependency declarations
-    
+
     throwExit(2);
   }
-  
+
   // Handle system errors (exit 1)
   console.error(`\n❌ Unexpected error: ${err.message}\n`);
   throwExit(1);

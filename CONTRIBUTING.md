@@ -96,12 +96,12 @@ describe("Dependency Parser", () => {
     const result = parsePRDescription(101, "Depends-on: #100");
     expect(result.dependencies).toEqual(["#100"]);
   });
-  
+
   it("should parse multiple dependencies", () => {
     const result = parsePRDescription(101, "Depends-on: #100, #102");
     expect(result.dependencies).toEqual(["#100", "#102"]);
   });
-  
+
   // Test determinism
   it("should produce stable sorted output", () => {
     const result1 = parsePRDescription(101, "Depends-on: #103, #100, #102");
@@ -149,6 +149,91 @@ When adding or modifying CLI commands, follow these critical patterns:
 - **Exit codes**: 0 = success, 1 = system error, 2 = user/validation error
 
 See [CLI Conventions](./docs/cli.md#cli-conventions) for detailed patterns and examples.
+
+## Adding New Commands
+
+The lex-pr-runner CLI uses a **modular command architecture** where each command lives in its own module. This makes the codebase maintainable and testable.
+
+### Quick Start
+
+1. **Create command module** in `src/commands/myCommand.ts`
+2. **Export registration function**: `registerMyCommandCommand(program: Command)`
+3. **Register in `src/cli.ts`**: Add import and call registration function
+4. **Add tests** in `tests/commands/myCommand.spec.ts`
+5. **Update documentation** in `docs/cli.md`
+
+### Command Module Pattern
+
+```typescript
+// src/commands/myCommand.ts
+import { Command } from 'commander';
+import { writeJsonOutput } from '../cli/output.js';
+import { throwExit } from '../cli/exitHandler.js';
+
+export function registerMyCommandCommand(program: Command): void {
+  program
+    .command('my-command')
+    .description('Brief description')
+    .argument('<arg>', 'Argument description')
+    .option('--json', 'Output as JSON')
+    .action(async (arg, options) => {
+      try {
+        const result = await executeMyCommand(arg, options);
+
+        if (options.json) {
+          writeJsonOutput(result);
+        } else {
+          console.log(formatOutput(result));
+        }
+      } catch (error) {
+        throwExit(error, 1);
+      }
+    });
+}
+
+// Pure, testable business logic
+async function executeMyCommand(arg: string, options: any) {
+  // Implementation here
+  return { success: true };
+}
+
+function formatOutput(result: any): string {
+  return `✅ ${result.success ? 'Success' : 'Failed'}`;
+}
+```
+
+### Best Practices
+
+✅ **DO:**
+- Separate business logic from CLI handling (pure functions)
+- Support both `--json` and human-readable output
+- Use `throwExit()` for error handling
+- Write unit tests for business logic
+- Add JSDoc comments to exported functions
+- Keep commands focused and single-purpose
+
+❌ **DON'T:**
+- Mix business logic into `.action()` handlers
+- Call `process.exit()` directly
+- Output to stdout when `--json` is used (except JSON itself)
+- Create commands with implicit dependencies
+
+### Examples
+
+- **Simple command**: `src/commands/completion.ts` (~50 lines)
+- **Medium command**: `src/commands/discover.ts` (~150 lines)
+- **Complex command**: `src/commands/execute.ts` (~300+ lines)
+
+### Full Guide
+
+For comprehensive documentation including:
+- Command templates
+- Testing patterns
+- Common utilities
+- Documentation requirements
+- Complete checklist
+
+See **[Command Creation Guide](./docs/command-creation-guide.md)**
 
 ## Opening an issue
 
