@@ -29,7 +29,19 @@ export function getMCPEnvironment(): MCPEnvironment {
 
 export const PlanCreateArgs = z.object({
 	json: z.boolean().optional(),
-	outDir: z.string().optional()
+	outDir: z.string().optional(),
+	// GitHub auto-discovery options
+	fromGithub: z.boolean().optional(),
+	query: z.string().optional(),
+	labels: z.array(z.string()).optional(),
+	includeDrafts: z.boolean().optional(),
+	excludePRs: z.array(z.number()).optional(),
+	githubToken: z.string().optional(),
+	owner: z.string().optional(),
+	repo: z.string().optional(),
+	requiredGates: z.array(z.string()).optional(),
+	maxWorkers: z.number().optional(),
+	target: z.string().optional()
 });
 export type PlanCreateArgs = z.infer<typeof PlanCreateArgs>;
 
