@@ -299,13 +299,6 @@ async function handleGatesRun(
 				throw new Error(`Plan file not found: ${args.planFile}`);
 			}
 
-			// Validate that the file is readable
-			try {
-				fs.accessSync(args.planFile, fs.constants.R_OK);
-			} catch (error) {
-				throw new Error(`Plan file is not readable: ${args.planFile}`);
-			}
-
 			planPath = args.planFile;
 			// For external plans, use the plan file's directory as the base for output
 			outDirBase = path.dirname(args.planFile);
@@ -322,7 +315,17 @@ async function handleGatesRun(
 			outDirBase = path.join(resolved.path, "runner");
 		}
 
-		const planContent = fs.readFileSync(planPath, "utf-8");
+		let planContent: string;
+		try {
+			planContent = fs.readFileSync(planPath, "utf-8");
+		} catch (error) {
+			throw new Error(
+				`Failed to read plan file ${planPath}: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
+
 		const plan = loadPlan(planContent);
 
 		// Create execution state
