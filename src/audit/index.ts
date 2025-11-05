@@ -47,3 +47,12 @@ export {
 	ingestSidecarFiles
 } from './sidecar.js';
 export type { SidecarEvent } from './sidecar.js';
+
+export { generateSARIF, writeSARIF } from './sarif.js';
+export type {
+	SARIFReport,
+	SARIFRun,
+	SARIFRule,
+	SARIFResult,
+	SARIFLocation
+} from './sarif.js';

@@ -111,6 +111,7 @@ export function registerExecuteCommand(program: Command, deps: ExecuteCommandDep
 			"Sampling percentage for noisy gates",
 			"100"
 		)
+		.option("--audit-sarif", "Generate SARIF output for vulnerability findings")
 		.addHelpText(
 			"after",
 			`
@@ -209,6 +210,7 @@ Common Issues:
 							: undefined,
 						phiRedaction: phiFlag,
 						encryptionKeyHex: keyToUse,
+						sarif: opts.auditSarif || false,
 					};
 
 					auditEmitter = await initAuditEmitter(auditOptions);

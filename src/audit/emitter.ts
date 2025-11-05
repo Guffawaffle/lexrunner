@@ -32,6 +32,8 @@ export interface AuditOptions {
 	// Optional HIPAA-related toggles
 	phiRedaction?: boolean; // redact PHI patterns when true
 	encryptionKeyHex?: string; // optional AES-256-GCM key (hex) to encrypt ndjson at finalize
+	// Optional SARIF output
+	sarif?: boolean; // generate SARIF output from vuln_found events
 }
 
 export interface AuditSummary {
@@ -408,6 +410,11 @@ export class AuditEmitter {
 			await this.generateGateMatrix();
 		}
 
+		// Generate SARIF output if requested
+		if (this.options.sarif) {
+			await this.generateSARIF();
+		}
+
 		// Create signature stub (Phase 2)
 		if (this.config.requireSignature) {
 			const sigPath = path.join(this.auditDir, 'audit.sig');
@@ -537,6 +544,57 @@ export class AuditEmitter {
 
 		const matrixPath = path.join(this.auditDir, 'audit-gate-matrix.json');
 		fs.writeFileSync(matrixPath, JSON.stringify(gateMatrix, null, 2));
+	}
+
+	/**
+	 * Generate SARIF report from vuln_found events
+	 * Uses streaming to handle large audit logs efficiently
+	 */
+	private async generateSARIF(): Promise<void> {
+		// Read audit log
+		const auditPath = path.join(this.auditDir, 'audit.ndjson');
+		if (!fs.existsSync(auditPath)) {
+			return;
+		}
+
+		const vulnEvents: EventEnvelope[] = [];
+
+		try {
+			// Use readline for memory-efficient line-by-line processing
+			const fileStream = fs.createReadStream(auditPath);
+			const rl = readline.createInterface({
+				input: fileStream,
+				crlfDelay: Infinity
+			});
+
+			for await (const line of rl) {
+				if (!line.trim()) continue;
+
+				try {
+					const event = JSON.parse(line) as EventEnvelope;
+					if (event.event === 'vuln_found') {
+						vulnEvents.push(event);
+					}
+				} catch (parseError) {
+					// Skip malformed lines
+					console.warn('[lex-pr] audit: skipping malformed line in audit.ndjson');
+				}
+			}
+		} catch (e) {
+			console.warn('[lex-pr] audit: failed to read audit.ndjson for SARIF (ignored)', String(e));
+			return;
+		}
+
+		// Only generate SARIF if we have vulnerability events
+		if (vulnEvents.length === 0) {
+			return;
+		}
+
+		// Generate and write SARIF
+		const { generateSARIF, writeSARIF } = await import('./sarif.js');
+		const sarifReport = await generateSARIF(vulnEvents, this.tool.version);
+		const sarifPath = path.join(this.auditDir, 'audit-sarif.json');
+		await writeSARIF(sarifReport, sarifPath);
 	}
 
 	/**
