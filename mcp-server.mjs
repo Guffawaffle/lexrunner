@@ -51,7 +51,7 @@ try {
 // MCP Tool implementations
 const tools = {
 	"plan.create": {
-		description: "Create a plan from configuration files",
+		description: "Create a plan from configuration files or auto-discover from GitHub PRs",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -63,6 +63,61 @@ const tools = {
 				outDir: {
 					type: "string",
 					description: "Output directory for plan artifacts",
+				},
+				fromGithub: {
+					type: "boolean",
+					description: "Auto-discover PRs from GitHub API",
+					default: false,
+				},
+				query: {
+					type: "string",
+					description: "GitHub search query (e.g., 'is:open label:stack:*')",
+				},
+				labels: {
+					type: "array",
+					description: "Filter PRs by labels",
+					items: {
+						type: "string",
+					},
+				},
+				includeDrafts: {
+					type: "boolean",
+					description: "Include draft PRs in the plan",
+					default: true,
+				},
+				excludePRs: {
+					type: "array",
+					description: "Exclude specific PRs by number",
+					items: {
+						type: "number",
+					},
+				},
+				githubToken: {
+					type: "string",
+					description: "GitHub API token (or use GITHUB_TOKEN env var)",
+				},
+				owner: {
+					type: "string",
+					description: "GitHub repository owner (auto-detected from git remote)",
+				},
+				repo: {
+					type: "string",
+					description: "GitHub repository name (auto-detected from git remote)",
+				},
+				requiredGates: {
+					type: "array",
+					description: "List of required gates (default: lint,typecheck,test)",
+					items: {
+						type: "string",
+					},
+				},
+				maxWorkers: {
+					type: "number",
+					description: "Maximum parallel workers for execution (default: 2)",
+				},
+				target: {
+					type: "string",
+					description: "Target branch for merging PRs (default: repo default branch)",
 				},
 			},
 		},
@@ -84,15 +139,53 @@ const tools = {
 					);
 				}
 
-				// Load inputs and generate plan
-				const {
-					loadInputs,
-					generatePlan,
-					generateSnapshot,
-					canonicalJSONStringify,
-				} = await import("./dist/cli.js");
-				const inputs = loadInputs(profilePath);
-				const plan = generatePlan(inputs);
+				let plan;
+				let inputs = null;
+
+				if (args.fromGithub) {
+					// GitHub mode: auto-discover PRs
+					const {
+						createGitHubClient,
+						generatePlanFromGitHub,
+					} = await import("./dist/cli.js");
+
+					const client = await createGitHubClient({
+						token: args.githubToken,
+						owner: args.owner,
+						repo: args.repo,
+					});
+
+					// Parse required gates if provided
+					const requiredGates = args.requiredGates || [
+						"lint",
+						"typecheck",
+						"test",
+					];
+
+					// Parse max workers if provided
+					const maxWorkers = args.maxWorkers || 2;
+
+					// Generate plan from GitHub
+					plan = await generatePlanFromGitHub(client, {
+						query: args.query,
+						labels: args.labels,
+						excludePRs: args.excludePRs,
+						includeDrafts: args.includeDrafts,
+						target: args.target,
+						policy: {
+							requiredGates,
+							maxWorkers,
+						},
+					});
+				} else {
+					// Traditional mode: load from configuration files
+					const {
+						loadInputs,
+						generatePlan,
+					} = await import("./dist/cli.js");
+					inputs = loadInputs(profilePath);
+					plan = generatePlan(inputs);
+				}
 
 				// Determine output directory
 				const outDir = args.outDir || resolve(profilePath, "runner");
@@ -103,12 +196,21 @@ const tools = {
 				}
 
 				// Write plan.json
+				const { canonicalJSONStringify } = await import(
+					"./dist/cli.js"
+				);
 				const planPath = resolve(outDir, "plan.json");
 				const planJson = canonicalJSONStringify(plan);
 				writeFileSync(planPath, planJson + "\n");
 
-				// Generate snapshot
-				const snapshot = generateSnapshot(plan, inputs);
+				// Generate snapshot - use GitHub snapshot for GitHub mode
+				const {
+					generateSnapshot,
+					generateGitHubSnapshot,
+				} = await import("./dist/cli.js");
+				const snapshot = args.fromGithub
+					? generateGitHubSnapshot(plan)
+					: generateSnapshot(plan, inputs);
 				const snapshotPath = resolve(outDir, "snapshot.md");
 				writeFileSync(snapshotPath, snapshot);
 
