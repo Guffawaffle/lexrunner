@@ -331,9 +331,16 @@ async function handlePlanCreate(
 		fs.writeFileSync(planPath, planJson + "\n");
 
 		// Generate snapshot - use GitHub snapshot for GitHub mode
-		const snapshot = args.fromGithub
-			? generateGitHubSnapshot(plan)
-			: generateSnapshot(plan, inputs!);
+		let snapshot: string;
+		if (args.fromGithub) {
+			snapshot = generateGitHubSnapshot(plan);
+		} else {
+			// In traditional mode, inputs is guaranteed to be set
+			if (!inputs) {
+				throw new Error("Internal error: inputs not loaded in traditional mode");
+			}
+			snapshot = generateSnapshot(plan, inputs);
+		}
 		const snapshotPath = path.join(outDir, "snapshot.md");
 		fs.writeFileSync(snapshotPath, snapshot);
 

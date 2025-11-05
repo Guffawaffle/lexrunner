@@ -208,9 +208,18 @@ const tools = {
 					generateSnapshot,
 					generateGitHubSnapshot,
 				} = await import("./dist/cli.js");
-				const snapshot = args.fromGithub
-					? generateGitHubSnapshot(plan)
-					: generateSnapshot(plan, inputs);
+				let snapshot;
+				if (args.fromGithub) {
+					snapshot = generateGitHubSnapshot(plan);
+				} else {
+					// In traditional mode, inputs is guaranteed to be set
+					if (!inputs) {
+						throw new Error(
+							"Internal error: inputs not loaded in traditional mode"
+						);
+					}
+					snapshot = generateSnapshot(plan, inputs);
+				}
 				const snapshotPath = resolve(outDir, "snapshot.md");
 				writeFileSync(snapshotPath, snapshot);
 
