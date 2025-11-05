@@ -16,7 +16,7 @@ import {
 
 import { loadInputs } from "../core/inputs.js";
 import { generatePlan } from "../core/plan.js";
-import { generateSnapshot } from "../core/snapshot.js";
+import { generateSnapshot, generateGitHubSnapshot } from "../core/snapshot.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { executeGatesWithPolicy } from "../gates.js";
 import { ExecutionState } from "../executionState.js";
@@ -24,6 +24,8 @@ import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { loadPlan, validatePlan } from "../schema.js";
 import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
+import { generatePlanFromGitHub } from "../core/githubPlan.js";
+import { createGitHubClient } from "../github/index.js";
 import {
 	getMCPEnvironment,
 	PlanCreateArgs,
@@ -68,7 +70,7 @@ function createServer(): Server {
 			tools: [
 				{
 					name: "plan.create",
-					description: "Create a plan from configuration files",
+					description: "Create a plan from configuration files or auto-discover from GitHub PRs",
 					inputSchema: {
 						type: "object",
 						properties: {
@@ -81,6 +83,61 @@ function createServer(): Server {
 								type: "string",
 								description:
 									"Output directory for plan artifacts",
+							},
+							fromGithub: {
+								type: "boolean",
+								description: "Auto-discover PRs from GitHub API",
+								default: false,
+							},
+							query: {
+								type: "string",
+								description: "GitHub search query (e.g., 'is:open label:stack:*')",
+							},
+							labels: {
+								type: "array",
+								description: "Filter PRs by labels",
+								items: {
+									type: "string",
+								},
+							},
+							includeDrafts: {
+								type: "boolean",
+								description: "Include draft PRs in the plan",
+								default: true,
+							},
+							excludePRs: {
+								type: "array",
+								description: "Exclude specific PRs by number",
+								items: {
+									type: "number",
+								},
+							},
+							githubToken: {
+								type: "string",
+								description: "GitHub API token (or use GITHUB_TOKEN env var)",
+							},
+							owner: {
+								type: "string",
+								description: "GitHub repository owner (auto-detected from git remote)",
+							},
+							repo: {
+								type: "string",
+								description: "GitHub repository name (auto-detected from git remote)",
+							},
+							requiredGates: {
+								type: "array",
+								description: "List of required gates (default: lint,typecheck,test)",
+								items: {
+									type: "string",
+								},
+							},
+							maxWorkers: {
+								type: "number",
+								description: "Maximum parallel workers for execution (default: 2)",
+							},
+							target: {
+								type: "string",
+								description: "Target branch for merging PRs (default: repo default branch)",
 							},
 						},
 					},
@@ -222,11 +279,40 @@ async function handlePlanCreate(
 		const profilePath = resolved.path;
 		const role = resolved.manifest.role;
 
-		// Load inputs from the profile directory
-		const inputs = loadInputs(profilePath);
+		let plan;
+		let inputs = null;
 
-		// Generate plan
-		const plan = generatePlan(inputs);
+		if (args.fromGithub) {
+			// GitHub mode: auto-discover PRs
+			const client = await createGitHubClient({
+				token: args.githubToken,
+				owner: args.owner,
+				repo: args.repo
+			});
+
+			// Parse required gates if provided
+			const requiredGates = args.requiredGates || ["lint", "typecheck", "test"];
+
+			// Parse max workers if provided
+			const maxWorkers = args.maxWorkers || 2;
+
+			// Generate plan from GitHub
+			plan = await generatePlanFromGitHub(client, {
+				query: args.query,
+				labels: args.labels,
+				excludePRs: args.excludePRs,
+				includeDrafts: args.includeDrafts,
+				target: args.target,
+				policy: {
+					requiredGates,
+					maxWorkers
+				}
+			});
+		} else {
+			// Traditional mode: load from configuration files
+			inputs = loadInputs(profilePath);
+			plan = generatePlan(inputs);
+		}
 
 		// Determine output directory
 		const outDir = args.outDir || path.join(profilePath, "runner");
@@ -244,8 +330,10 @@ async function handlePlanCreate(
 		const planJson = canonicalJSONStringify(plan);
 		fs.writeFileSync(planPath, planJson + "\n");
 
-		// Generate snapshot
-		const snapshot = generateSnapshot(plan, inputs);
+		// Generate snapshot - use GitHub snapshot for GitHub mode
+		const snapshot = args.fromGithub
+			? generateGitHubSnapshot(plan)
+			: generateSnapshot(plan, inputs!);
 		const snapshotPath = path.join(outDir, "snapshot.md");
 		fs.writeFileSync(snapshotPath, snapshot);
 
