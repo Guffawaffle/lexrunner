@@ -51,11 +51,14 @@ describe('MCP Contract Tests', () => {
 			expect(() => GatesRunArgs.parse({ onlyGate: 'test' })).not.toThrow();
 			expect(() => GatesRunArgs.parse({ outDir: '/tmp' })).not.toThrow();
 			expect(() => GatesRunArgs.parse({ onlyItem: 'item1', onlyGate: 'test' })).not.toThrow();
+			expect(() => GatesRunArgs.parse({ planFile: '/path/to/plan.json' })).not.toThrow();
+			expect(() => GatesRunArgs.parse({ planFile: '/path/to/plan.json', outDir: '/tmp' })).not.toThrow();
 
 			// Invalid arguments
 			expect(() => GatesRunArgs.parse({ onlyItem: 123 })).toThrow();
 			expect(() => GatesRunArgs.parse({ onlyGate: true })).toThrow();
 			expect(() => GatesRunArgs.parse({ outDir: null })).toThrow();
+			expect(() => GatesRunArgs.parse({ planFile: 123 })).toThrow();
 		});
 
 		it('should validate MergeApplyArgs schema correctly', () => {
