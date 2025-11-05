@@ -66,11 +66,24 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ### plan.create
 
-Creates a plan from configuration files in the profile directory.
+Creates a plan from configuration files or auto-discovers from GitHub PRs.
 
 **Parameters:**
 - `json` (boolean, optional): Output plan as JSON to stdout
 - `outDir` (string, optional): Output directory for plan artifacts
+
+**GitHub Auto-Discovery Parameters:**
+- `fromGithub` (boolean, optional): Enable auto-discovery of PRs from GitHub API
+- `query` (string, optional): GitHub search query (e.g., 'is:open label:feature')
+- `labels` (array of strings, optional): Filter PRs by labels
+- `includeDrafts` (boolean, optional): Include draft PRs (default: true)
+- `excludePRs` (array of numbers, optional): Exclude specific PR numbers
+- `githubToken` (string, optional): GitHub API token (or use GITHUB_TOKEN env var)
+- `owner` (string, optional): GitHub repository owner (auto-detected from git remote)
+- `repo` (string, optional): GitHub repository name (auto-detected from git remote)
+- `requiredGates` (array of strings, optional): Required gates (default: ["lint", "typecheck", "test"])
+- `maxWorkers` (number, optional): Maximum parallel workers (default: 2)
+- `target` (string, optional): Target branch for merging PRs (default: repo default branch)
 
 **Returns:**
 ```json
@@ -80,13 +93,44 @@ Creates a plan from configuration files in the profile directory.
 }
 ```
 
-**Example:**
+**Example - Traditional Mode (from configuration files):**
 ```json
 {
   "name": "plan.create",
   "arguments": {
     "json": true,
     "outDir": ".smartergpt/runner"
+  }
+}
+```
+
+**Example - GitHub Auto-Discovery Mode:**
+```json
+{
+  "name": "plan.create",
+  "arguments": {
+    "fromGithub": true,
+    "labels": ["feature", "bugfix"],
+    "excludePRs": [123, 456],
+    "requiredGates": ["lint", "test", "security"],
+    "maxWorkers": 4,
+    "target": "develop",
+    "outDir": "/tmp/lex-pr-runner-plan"
+  }
+}
+```
+
+**Example - Complex GitHub Query:**
+```json
+{
+  "name": "plan.create",
+  "arguments": {
+    "fromGithub": true,
+    "query": "is:open label:stack:* -label:wip",
+    "includeDrafts": false,
+    "githubToken": "ghp_...",
+    "owner": "myorg",
+    "repo": "myrepo"
   }
 }
 ```
@@ -189,9 +233,19 @@ const client = new Client({
   cwd: "/path/to/lex-pr-runner"
 });
 
-// Create a plan
+// Create a plan from configuration files (traditional mode)
 const planResult = await client.callTool("plan.create", {
   outDir: ".smartergpt/runner"
+});
+
+// Create a plan from GitHub PRs (auto-discovery mode)
+const githubPlanResult = await client.callTool("plan.create", {
+  fromGithub: true,
+  labels: ["feature", "priority:high"],
+  excludePRs: [100, 200],
+  requiredGates: ["lint", "test", "security"],
+  maxWorkers: 4,
+  outDir: "/tmp/lex-pr-runner-plan"
 });
 
 // Run gates
