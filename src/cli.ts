@@ -262,6 +262,9 @@ program
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
 	$ lex-pr doctor                         Validate environment and configuration
+	$ lex-pr config show                    Display configuration with precedence chain
+	$ lex-pr config show --key scope.target Show specific configuration value
+	$ lex-pr config show --json             Output configuration in JSON format
 	$ lex-pr config:inspect                 Display merged configuration with provenance map
 	$ lex-pr discover                       Find open PRs matching scope
 	$ lex-pr discover --suggest             Generate dependency suggestions with heuristics
