@@ -15,6 +15,18 @@
 - **CLI:** `lex-pr` (command-line interface)
 - **OSS Core:** [Lex](https://github.com/Guffawaffle/lex) (MIT license, frames & policy)
 
+### LexRunner (Proprietary) vs Lex (MIT OSS)
+
+| Aspect | **LexRunner** (Paid) | **Lex** (OSS) |
+|--------|---------------------|--------------|
+| **Purpose** | Enterprise merge-weave orchestration CLI | Atlas/Memory/Policy core frameworks |
+| **License** | Proprietary | MIT (open source) |
+| **Repo** | `Guffawaffle/lex-pr-runner` | `Guffawaffle/lex` |
+| **Audience** | Teams running automated fanout/merge workflows | Developers building on frames/policy primitives |
+
+👉 **Choose Lex if:** You need frames, policy scanning, or atlas functionality independently.
+👉 **Choose LexRunner if:** You need the full merge-weave orchestration CLI (built on Lex).
+
 ---
 
 ## MCP Multi-Repo Integration
