@@ -244,13 +244,13 @@ export function detectGitHubMode(baseDir: string = "."): {
 		const scopeConfig = ScopeConfig.parse(scopeSource.content);
 		
 		// Check if scope.yml has GitHub discovery filters
-		const hasQuery = scopeConfig.sources.length > 0 && scopeConfig.sources[0].query;
+		const hasQuery = scopeConfig.sources.length > 0 && scopeConfig.sources[0]?.query;
 		const hasLabels = scopeConfig.selectors.include_labels.length > 0;
 		
 		if (hasQuery || hasLabels) {
 			// Extract filters for GitHub discovery
 			const labels = scopeConfig.selectors.include_labels;
-			const query = hasQuery ? scopeConfig.sources[0].query : undefined;
+			const query = hasQuery ? scopeConfig.sources[0]?.query : undefined;
 			
 			return {
 				shouldUseGitHub: true,

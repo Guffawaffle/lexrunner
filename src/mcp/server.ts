@@ -298,7 +298,7 @@ async function handlePlanCreate(
 				if (!args.query && detection.scopeConfig?.query) {
 					args.query = detection.scopeConfig.query;
 				}
-				if (!args.labels && detection.scopeConfig?.labels) {
+				if (!args.labels && detection.scopeConfig?.labels && detection.scopeConfig.labels.length > 0) {
 					args.labels = detection.scopeConfig.labels;
 				}
 				if (!args.target && detection.scopeConfig?.target) {

@@ -105,7 +105,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			if (!opts.query && detection.scopeConfig?.query) {
 				opts.query = detection.scopeConfig.query;
 			}
-			if (!opts.labels && detection.scopeConfig?.labels) {
+			if (!opts.labels && detection.scopeConfig?.labels && detection.scopeConfig.labels.length > 0) {
 				opts.labels = detection.scopeConfig.labels.join(',');
 			}
 			if (!opts.target && detection.scopeConfig?.target) {
