@@ -14,7 +14,7 @@ import {
 	McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { loadInputs } from "../core/inputs.js";
+import { loadInputs, detectGitHubMode } from "../core/inputs.js";
 import { generatePlan } from "../core/plan.js";
 import { generateSnapshot, generateGitHubSnapshot } from "../core/snapshot.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
@@ -286,6 +286,28 @@ async function handlePlanCreate(
 
 		let plan;
 		let inputs = null;
+		let autoDetectedGitHubMode = false;
+
+		// Auto-detect GitHub mode from scope.yml if fromGithub not explicitly set
+		if (!args.fromGithub) {
+			const detection = detectGitHubMode(profilePath);
+			if (detection.shouldUseGitHub) {
+				autoDetectedGitHubMode = true;
+				// Merge scope.yml filters with args (args take precedence)
+				args.fromGithub = true;
+				if (!args.query && detection.scopeConfig?.query) {
+					args.query = detection.scopeConfig.query;
+				}
+				if (!args.labels && detection.scopeConfig?.labels) {
+					args.labels = detection.scopeConfig.labels;
+				}
+				if (!args.target && detection.scopeConfig?.target) {
+					args.target = detection.scopeConfig.target;
+				}
+				
+				console.error('[mcp:plan.create] Auto-detected GitHub mode from scope.yml filters');
+			}
+		}
 
 		if (args.fromGithub) {
 			// GitHub mode: auto-discover PRs
@@ -313,6 +335,19 @@ async function handlePlanCreate(
 					maxWorkers
 				}
 			});
+
+			// Log discovery results to stderr
+			const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
+			const filterInfo = args.labels ? ` labels=${args.labels.join(',')}` : '';
+			const queryInfo = args.query ? ` query="${args.query}"` : '';
+			console.error(`[mcp:plan.create] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length} PRs`);
+			
+			if (plan.items.length === 0) {
+				console.error(`[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`);
+			} else {
+				const prNumbers = plan.items.map(item => item.name).join(', ');
+				console.error(`[mcp:plan.create] PRs included: ${prNumbers}`);
+			}
 		} else {
 			// Traditional mode: load from configuration files
 			inputs = loadInputs(profilePath);

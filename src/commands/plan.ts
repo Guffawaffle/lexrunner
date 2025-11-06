@@ -5,7 +5,7 @@
 import { Command } from 'commander';
 import { Plan, loadPlan } from '../schema.js';
 import { computeMergeOrder, CycleError, UnknownDependencyError } from '../mergeOrder.js';
-import { loadInputs } from '../core/inputs.js';
+import { loadInputs, detectGitHubMode } from '../core/inputs.js';
 import { generatePlan, generateEmptyPlan } from '../core/plan.js';
 import { generateSnapshot, generatePlanSummary, generateGitHubSnapshot } from '../core/snapshot.js';
 import { generatePlanFromGitHub } from '../core/githubPlan.js';
@@ -93,6 +93,30 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 
 	let plan: Plan;
 	let inputs: any = null;
+	let autoDetectedGitHubMode = false;
+
+	// Auto-detect GitHub mode from scope.yml if --from-github not explicitly set
+	if (!opts.fromGithub) {
+		const detection = detectGitHubMode(resolved.path);
+		if (detection.shouldUseGitHub) {
+			autoDetectedGitHubMode = true;
+			// Merge scope.yml filters with CLI options (CLI takes precedence)
+			opts.fromGithub = true;
+			if (!opts.query && detection.scopeConfig?.query) {
+				opts.query = detection.scopeConfig.query;
+			}
+			if (!opts.labels && detection.scopeConfig?.labels) {
+				opts.labels = detection.scopeConfig.labels.join(',');
+			}
+			if (!opts.target && detection.scopeConfig?.target) {
+				opts.target = detection.scopeConfig.target;
+			}
+			
+			if (!deps.jsonModeActive()) {
+				console.error('[plan] Auto-detected GitHub mode from scope.yml filters');
+			}
+		}
+	}
 
 	if (opts.fromGithub) {
 		// GitHub mode: auto-discover PRs
@@ -201,9 +225,22 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 		if (deps.jsonModeActive()) {
 			// diagnostics to stderr only
 			const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
-			console.error(`[from-github] repo=${repoDiag} discovered=${plan.items.length}`);
+			const filterInfo = labels ? ` labels=${labels.join(',')}` : '';
+			const queryInfo = opts.query ? ` query="${opts.query}"` : '';
+			console.error(`[from-github] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length}`);
 		} else {
-			console.log(`✓ Auto-discovered ${plan.items.length} PRs from GitHub`);
+			const modeLabel = autoDetectedGitHubMode ? 'Auto-detected and discovered' : 'Auto-discovered';
+			console.log(`✓ ${modeLabel} ${plan.items.length} PRs from GitHub`);
+			if (labels && labels.length > 0) {
+				console.log(`  Filtered by labels: ${labels.join(', ')}`);
+			}
+			if (opts.query) {
+				console.log(`  Using query: ${opts.query}`);
+			}
+			if (plan.items.length === 0) {
+				console.log(`\n⚠️  No PRs found matching the criteria.`);
+				console.log(`    Try adjusting filters or check that PRs exist in the repository.`);
+			}
 		}
 	} else {
 		// Traditional mode: load from configuration files

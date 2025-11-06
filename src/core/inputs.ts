@@ -212,3 +212,59 @@ function sortRecord<T>(record: Record<string, T>): Record<string, T> {
 	}
 	return sorted;
 }
+
+/**
+ * Detect if scope.yml exists and has GitHub discovery filters
+ * Returns scope configuration if GitHub mode should be enabled
+ */
+export function detectGitHubMode(baseDir: string = "."): {
+	shouldUseGitHub: boolean;
+	scopeConfig?: {
+		query?: string;
+		labels?: string[];
+		target?: string;
+	};
+} {
+	const smartergptDir = path.join(baseDir, ".smartergpt");
+	const stackPath = path.join(smartergptDir, "stack.yml");
+	const scopePath = path.join(smartergptDir, "scope.yml");
+
+	// If stack.yml exists, don't auto-enable GitHub mode (traditional mode)
+	if (fs.existsSync(stackPath)) {
+		return { shouldUseGitHub: false };
+	}
+
+	// Check if scope.yml exists
+	const scopeSource = loadConfigFile(scopePath);
+	if (!scopeSource.exists) {
+		return { shouldUseGitHub: false };
+	}
+
+	try {
+		const scopeConfig = ScopeConfig.parse(scopeSource.content);
+		
+		// Check if scope.yml has GitHub discovery filters
+		const hasQuery = scopeConfig.sources.length > 0 && scopeConfig.sources[0].query;
+		const hasLabels = scopeConfig.selectors.include_labels.length > 0;
+		
+		if (hasQuery || hasLabels) {
+			// Extract filters for GitHub discovery
+			const labels = scopeConfig.selectors.include_labels;
+			const query = hasQuery ? scopeConfig.sources[0].query : undefined;
+			
+			return {
+				shouldUseGitHub: true,
+				scopeConfig: {
+					query,
+					labels: labels.length > 0 ? labels : undefined,
+					target: scopeConfig.target
+				}
+			};
+		}
+	} catch (error) {
+		// Invalid scope.yml, fall back to traditional mode
+		return { shouldUseGitHub: false };
+	}
+
+	return { shouldUseGitHub: false };
+}
