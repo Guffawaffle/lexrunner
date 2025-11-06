@@ -3,7 +3,6 @@
  */
 
 import { Command } from 'commander';
-import { resolveProfile, ResolvedProfile } from '../config/profileResolver.js';
 import { writeJsonOutput } from '../cli/output.js';
 import { throwExit } from '../cli/exitHandler.js';
 import chalk from 'chalk';
@@ -136,12 +135,19 @@ function resolveConfigWithPrecedence(baseDir: string = process.cwd()): ConfigSho
 			
 			if (!config) continue;
 			
+			// Determine source reference based on directory level
+			let sourceRef: string;
+			if (dir.level === 'env') {
+				sourceRef = `LEX_PR_PROFILE_DIR${configFile}`;
+			} else {
+				sourceRef = `${dir.source}${configFile}`;
+			}
+			
 			// Flatten configuration object to key-value pairs
 			const flatConfig = flattenObject(config, configFile.replace('.yml', ''));
 			
 			for (const [key, value] of Object.entries(flatConfig)) {
 				const fullKey = key;
-				const sourceRef = `${dir.source}${configFile}`;
 				
 				if (configMap.has(fullKey)) {
 					// Value is being overridden
