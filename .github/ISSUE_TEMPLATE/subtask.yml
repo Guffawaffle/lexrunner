@@ -1,0 +1,153 @@
+name: Subtask
+description: Create a focused Subtask within an Epic
+title: "Sub [Epic].[N]: [Title]"
+labels: ["subtask", "project:lexrunner-lex"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📝 Subtask Template
+
+        Use this template for individual work items that roll up to an Epic.
+
+  - type: input
+    id: title
+    attributes:
+      label: Subtask Title
+      description: "Brief, action-oriented title (e.g., Sub A.1: Define public API surface)"
+      placeholder: "Implement feature component X"
+    validations:
+      required: true
+
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent Epic
+      description: Issue number of the parent Epic (e.g., #307)
+      placeholder: "#307"
+    validations:
+      required: true
+
+  - type: textarea
+    id: task_description
+    attributes:
+      label: Task Description
+      description: What specific work needs to be done?
+      placeholder: "Define the event schema for fanout hooks, specifying data captured and passed to Lex..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Which milestone? (Should match parent Epic)
+      options:
+        - M1: Packaging bootstrap
+        - M2: Integration hooks
+        - M3: Memory sync + aliasing adoption
+        - M4: v0.1 release
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Primary area of work
+      options:
+        - area:packaging
+        - area:hooks
+        - area:memory
+        - area:dx
+        - area:ci
+        - area:docs
+        - area:licensing
+      multiple: true
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: overlap_ok
+    attributes:
+      label: Parallelization
+      description: Can this subtask be worked on in parallel with others?
+      options:
+        - label: "This subtask can be done in parallel (add `overlap-ok` label)"
+          required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        What must be delivered for this subtask to be complete?
+        Use checkboxes: `- [ ] Criterion`
+      placeholder: |
+        - [ ] Code implemented in `src/...`
+        - [ ] Tests passing
+        - [ ] Documentation updated
+      value: |
+        - [ ] Code implemented
+        - [ ] Tests passing
+        - [ ] Documentation updated
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: |
+        List expected artifacts (files, docs, test suites).
+      placeholder: |
+        - `src/events/schema.ts` with TypeScript interfaces
+        - `docs/EVENT_SCHEMA.md` with JSON schema
+        - `tests/events/schema.spec.ts` with test vectors
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition_of_done
+    attributes:
+      label: Definition of Done (DoD)
+      description: |
+        Detailed checklist for completion (technical requirements, testing, validation).
+        This section can be added/updated during implementation.
+      placeholder: |
+        ### Code Quality
+        - [ ] All functions have JSDoc comments
+        - [ ] TypeScript compiles with no errors
+
+        ### Testing
+        - [ ] Unit tests cover all branches
+        - [ ] Integration test passes
+
+        ### Validation
+        - [ ] npm run lint passes
+        - [ ] npm run typecheck passes
+      value: |
+        ### Code Quality
+        - [ ] All code follows project style guide
+        - [ ] No TODOs or FIXMEs in committed code
+
+        ### Testing
+        - [ ] Unit tests written and passing
+        - [ ] Integration tests (if applicable)
+
+        ### Validation
+        - [ ] `npm run lint` passes
+        - [ ] `npm run typecheck` passes
+        - [ ] `npm test` passes
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: |
+        Dependencies, blockers, or other context.
+      placeholder: "Blocked by: #XXX. Depends on: #YYY."
+    validations:
+      required: false

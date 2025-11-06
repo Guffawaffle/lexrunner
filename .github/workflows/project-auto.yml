@@ -1,0 +1,24 @@
+name: Project triage
+
+on:
+  issues:
+    types: [opened, labeled, edited]
+  pull_request:
+    types: [opened, labeled, edited]
+
+jobs:
+  triage:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      repository-projects: write
+    runs-on: ubuntu-latest
+    steps:
+      # PRIVATE program board (both repos): label `project:lexrunner-lex`
+      - name: Add to Program project (private)
+        if: contains(join(fromJson(toJson(github.event.*)).labels.*.name, ','), 'project:lexrunner-lex')
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/users/Guffawaffle/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
