@@ -104,7 +104,42 @@ Creates a plan from configuration files or auto-discovers from GitHub PRs.
 }
 ```
 
-**Example - GitHub Auto-Discovery Mode:**
+**Example - Auto-Detected GitHub Mode (from scope.yml):**
+
+When `scope.yml` contains GitHub discovery filters (labels or query), the tool automatically enables GitHub mode:
+
+```yaml
+# .smartergpt/scope.yml
+version: 1
+target: main
+sources:
+  - query: "is:open label:stack:*"
+selectors:
+  include_labels: ["ready-merge"]
+  exclude_labels: ["WIP"]
+defaults:
+  strategy: merge-weave
+  base: main
+pin_commits: false
+```
+
+Then call `plan.create` without any parameters - it will auto-detect and use GitHub mode:
+```json
+{
+  "name": "plan.create",
+  "arguments": {}
+}
+```
+
+The tool will:
+1. Detect that scope.yml has GitHub filters
+2. Automatically enable GitHub mode
+3. Use filters from scope.yml (`query`, `labels`, `target`)
+4. Log to stderr: `[mcp:plan.create] Auto-detected GitHub mode from scope.yml filters`
+5. Discover PRs matching the filters
+6. Generate plan.json with discovered PRs
+
+**Example - GitHub Auto-Discovery Mode (explicit):**
 ```json
 {
   "name": "plan.create",
