@@ -5,12 +5,19 @@
 import type { GateResult, GateStatus } from '../../../src/schema.js';
 
 /**
+ * Fixed timestamp for deterministic fixtures
+ * 2024-01-01T00:00:00.000Z
+ */
+const FIXTURE_TIMESTAMP = '2024-01-01T00:00:00.000Z';
+
+/**
  * Create a passing gate result
  */
 export function pass(gateName: string, options: {
   duration?: number;
   stdout?: string;
   attempts?: number;
+  timestamp?: string;
 } = {}): GateResult {
   return {
     gate: gateName,
@@ -21,7 +28,7 @@ export function pass(gateName: string, options: {
     stderr: '',
     artifacts: [],
     attempts: options.attempts ?? 1,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
@@ -33,6 +40,7 @@ export function fail(gateName: string, options: {
   stderr?: string;
   duration?: number;
   attempts?: number;
+  timestamp?: string;
 } = {}): GateResult {
   return {
     gate: gateName,
@@ -43,31 +51,35 @@ export function fail(gateName: string, options: {
     stderr: options.stderr ?? `${gateName} failed`,
     artifacts: [],
     attempts: options.attempts ?? 1,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
 /**
  * Create a blocked gate result
  */
-export function blocked(gateName: string): GateResult {
+export function blocked(gateName: string, options: {
+  timestamp?: string;
+} = {}): GateResult {
   return {
     gate: gateName,
     status: 'blocked' as GateStatus,
     attempts: 0,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
 /**
  * Create a skipped gate result
  */
-export function skipped(gateName: string): GateResult {
+export function skipped(gateName: string, options: {
+  timestamp?: string;
+} = {}): GateResult {
   return {
     gate: gateName,
     status: 'skipped' as GateStatus,
     attempts: 0,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
@@ -77,6 +89,7 @@ export function skipped(gateName: string): GateResult {
 export function retrying(gateName: string, options: {
   attempts?: number;
   lastError?: string;
+  timestamp?: string;
 } = {}): GateResult {
   return {
     gate: gateName,
@@ -84,7 +97,7 @@ export function retrying(gateName: string, options: {
     exitCode: 1,
     stderr: options.lastError ?? 'Temporary failure',
     attempts: options.attempts ?? 2,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
@@ -156,6 +169,7 @@ export function testSuite(options: {
   failed?: number;
   skipped?: number;
   duration?: number;
+  timestamp?: string;
 } = {}): GateResult {
   const total = options.total ?? 100;
   const passed = options.passed ?? 95;
@@ -174,7 +188,7 @@ export function testSuite(options: {
     stderr: failed > 0 ? 'Some tests failed' : '',
     artifacts: ['coverage/'],
     attempts: 1,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }
 
@@ -185,6 +199,7 @@ export function lintResult(options: {
   errors?: number;
   warnings?: number;
   duration?: number;
+  timestamp?: string;
 } = {}): GateResult {
   const errors = options.errors ?? 0;
   const warnings = options.warnings ?? 2;
@@ -201,6 +216,6 @@ export function lintResult(options: {
     stderr: errors > 0 ? 'Linting errors found' : '',
     artifacts: [],
     attempts: 1,
-    lastAttempt: new Date().toISOString()
+    lastAttempt: options.timestamp ?? FIXTURE_TIMESTAMP
   };
 }

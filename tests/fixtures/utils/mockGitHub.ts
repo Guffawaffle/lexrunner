@@ -113,7 +113,7 @@ export function createRateLimitedMock(
     if (callCount % resetAfter < limit) {
       return;
     }
-    const error: any = new Error('API rate limit exceeded');
+    const error = new Error('API rate limit exceeded') as APIError;
     error.status = 403;
     throw error;
   };
@@ -214,4 +214,11 @@ export function createSlowMock(
       }
     }
   };
+}
+
+/**
+ * Extended error type with status code
+ */
+interface APIError extends Error {
+  status: number;
 }

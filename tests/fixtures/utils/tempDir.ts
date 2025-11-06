@@ -4,6 +4,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { ulid } from 'ulid';
 
 /**
@@ -11,7 +12,7 @@ import { ulid } from 'ulid';
  * Returns the absolute path to the directory
  */
 export async function create(prefix: string = 'lex-test'): Promise<string> {
-  const tmpBase = '/tmp';
+  const tmpBase = os.tmpdir();
   const dirName = `${prefix}-${ulid()}`;
   const tmpDir = path.join(tmpBase, dirName);
 

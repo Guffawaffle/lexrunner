@@ -79,8 +79,8 @@ export function basic(options: BasicPROptions): MockPR {
       changes: 15
     })),
     labels: labels.map(name => ({ name })),
-    created_at: new Date(2024, 0, number).toISOString(),
-    updated_at: new Date(2024, 0, number + 1).toISOString()
+    created_at: new Date(Date.UTC(2024, 0, 1 + number - 100)).toISOString(),
+    updated_at: new Date(Date.UTC(2024, 0, 2 + number - 100)).toISOString()
   };
 }
 
@@ -143,6 +143,12 @@ export function withLabels(options: {
     ...options
   });
 }
+
+/**
+ * Fixed base timestamp for deterministic fixture dates
+ * 2024-01-01T00:00:00.000Z
+ */
+const FIXTURE_BASE_TIMESTAMP = '2024-01-01T00:00:00.000Z';
 
 /**
  * Create a closed/merged PR
