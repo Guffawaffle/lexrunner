@@ -1,0 +1,123 @@
+name: Epic
+description: Create a new Epic-level feature grouping
+title: "Epic: [Title]"
+labels: ["epic", "project:lexrunner-lex"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🎯 Epic Template
+
+        Use this template to create a high-level Epic that groups multiple related subtasks.
+
+  - type: input
+    id: title
+    attributes:
+      label: Epic Title
+      description: Brief, action-oriented title (e.g., "Bundle Lex inside LexRunner")
+      placeholder: "Implement feature X with capability Y"
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What is the high-level objective of this Epic?
+      placeholder: "Enable LexRunner to consume Lex as a dependency and emit Frames during operations..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        Provide background: Why is this work needed? What's the current state?
+      placeholder: "Currently, LexRunner and Lex are separate. This Epic enables integration by..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Which milestone does this Epic belong to?
+      options:
+        - M1: Packaging bootstrap
+        - M2: Integration hooks
+        - M3: Memory sync + aliasing adoption
+        - M4: v0.1 release
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Primary area of work
+      options:
+        - area:packaging
+        - area:hooks
+        - area:memory
+        - area:dx
+        - area:ci
+        - area:docs
+        - area:licensing
+      multiple: false
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        What conditions must be met for this Epic to be considered complete?
+        Use checkboxes: `- [ ] Criterion`
+      placeholder: |
+        - [ ] All subtasks completed
+        - [ ] Integration tests passing
+        - [ ] Documentation updated
+      value: |
+        - [ ] All subtasks completed
+        - [ ] Integration tests passing
+        - [ ] Documentation updated
+    validations:
+      required: true
+
+  - type: textarea
+    id: subtasks
+    attributes:
+      label: Sub-Tasks
+      description: |
+        List expected subtasks (will be created separately with references back to this Epic).
+        Use checkboxes with issue references: `- [ ] #123 Subtask title`
+      placeholder: |
+        - [ ] #XXX Sub 1: Define API surface
+        - [ ] #XXX Sub 2: Implement integration
+        - [ ] #XXX Sub 3: Add tests
+    validations:
+      required: false
+
+  - type: textarea
+    id: cross_repo
+    attributes:
+      label: Cross-Repo Links
+      description: |
+        If this Epic touches both lex-pr-runner and lex repos, list related issues/PRs.
+      placeholder: |
+        - lex-pr-runner: #XXX (implementation)
+        - lex: #YYY (API changes)
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: |
+        Any other context, constraints, or dependencies?
+      placeholder: "Note: Aliasing already exists in Lex (Epic #41, PRs #47-50). Do not rebuild; only integrate."
+    validations:
+      required: false

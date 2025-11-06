@@ -1,0 +1,105 @@
+name: GitHub Project Automation
+
+on:
+  issues:
+    types: [opened, reopened, closed, labeled, unlabeled]
+  pull_request:
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
+
+jobs:
+  project_automation:
+    name: Auto-add to Project & Update Status
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      repository-projects: write
+
+    steps:
+      - name: Add to LexRunner-Lex Project
+        if: |
+          (github.event_name == 'issues' && github.event.action == 'opened') ||
+          (github.event_name == 'pull_request' && github.event.action == 'opened')
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/users/Guffawaffle/projects/<PROJECT_NUMBER>
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          labeled: project:lexrunner-lex
+
+      - name: Set Status to In Progress
+        if: |
+          (github.event_name == 'pull_request' && github.event.action == 'opened') ||
+          (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'in-progress'))
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // TODO: Update project item status to "In Progress"
+            // Requires GitHub GraphQL API and project field IDs
+            console.log('Status update placeholder: In Progress');
+
+      - name: Set Status to Done
+        if: |
+          (github.event_name == 'issues' && github.event.action == 'closed') ||
+          (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // TODO: Update project item status to "Done"
+            // Requires GitHub GraphQL API and project field IDs
+            console.log('Status update placeholder: Done');
+
+      - name: Add Epic Label Automation
+        if: |
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          startsWith(github.event.issue.title, 'Epic')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['epic', 'project:lexrunner-lex']
+            });
+
+      - name: Add Subtask Label Automation
+        if: |
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          startsWith(github.event.issue.title, 'Sub ')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['subtask', 'project:lexrunner-lex']
+            });
+
+      - name: Link Subtask to Epic (Comment)
+        if: |
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          startsWith(github.event.issue.title, 'Sub ') &&
+          contains(github.event.issue.body, 'Parent Epic: #')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = context.payload.issue.body;
+            const match = body.match(/Parent Epic: #(\d+)/);
+            if (match) {
+              const epicNumber = match[1];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: `🔗 New subtask created: #${context.issue.number} - ${context.payload.issue.title}`
+              });
+            }
