@@ -67,6 +67,7 @@ import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/gene
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
+import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -420,6 +421,9 @@ registerMergeCommand(program, () => jsonModeActive, () => program.opts());
 
 // Doctor command - modularized in Phase 4.4
 registerDoctorCommand(program, () => jsonModeActive);
+
+// Config validate command - configuration validation
+registerConfigValidateCommand(program, () => jsonModeActive);
 
 // Init command - Interactive workspace setup
 program
