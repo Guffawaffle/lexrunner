@@ -242,7 +242,7 @@ function validateCrossReferences(
  */
 function validateProfile(
 	profilePath: string,
-	options: { strict?: boolean; fix?: boolean }
+	options: { strict?: boolean }
 ): ValidationResult {
 	const configFiles = [
 		'gates.yml',
@@ -288,12 +288,6 @@ function validateProfile(
 		fileResults.get(warning.file)?.warnings.push({ message: warning.message });
 	}
 
-	// Apply auto-fix if requested
-	if (options.fix && allErrors.length === 0) {
-		// For now, --fix only applies to formatting (future enhancement)
-		// Could add automatic formatting, sorting, etc.
-	}
-
 	// Determine overall validity
 	const hasErrors = allErrors.length > 0;
 	const hasWarnings = allWarnings.length > 0;
@@ -322,7 +316,6 @@ export function registerConfigValidateCommand(
 		.description('Validate profile configuration files')
 		.option('--profile-dir <dir>', 'Profile directory to validate')
 		.option('--strict', 'Fail on warnings as well as errors')
-		.option('--fix', 'Automatically fix fixable issues (formatting, sorting)')
 		.option('--json', 'Output JSON format')
 		.action((opts) => {
 			try {
@@ -339,15 +332,15 @@ export function registerConfigValidateCommand(
 						const profile = resolveProfile(opts.profileDir);
 						profilePath = profile.path;
 					} catch (error) {
-						// Fallback to .smartergpt if profile resolution fails
+						// Fallback to default .smartergpt directory if profile resolution fails
+						// This allows validation to work in repos with example profiles
 						profilePath = path.resolve(process.cwd(), '.smartergpt');
 					}
 				}
 
 				// Validate profile
 				const result = validateProfile(profilePath, {
-					strict: opts.strict,
-					fix: opts.fix
+					strict: opts.strict
 				});
 
 				// Check if JSON mode is active

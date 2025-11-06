@@ -64,7 +64,6 @@ describe('config validate command', () => {
 			const optionNames = options.map(opt => opt.long);
 			expect(optionNames).toContain('--profile-dir');
 			expect(optionNames).toContain('--strict');
-			expect(optionNames).toContain('--fix');
 			expect(optionNames).toContain('--json');
 		});
 	});

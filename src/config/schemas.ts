@@ -28,6 +28,9 @@ export type GatesConfig = z.infer<typeof GatesConfigSchema>;
 
 /**
  * Scope configuration schema (scope.yml)
+ * 
+ * Note: Empty include_labels/exclude_labels arrays are valid and mean
+ * "no label filtering" (i.e., all labels are included/none are excluded)
  */
 export const ScopeConfigSchema = z.object({
 	version: z.number().int().min(1),
