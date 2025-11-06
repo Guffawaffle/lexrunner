@@ -2,15 +2,15 @@
  * Config validate command - Validate profile configuration files
  */
 
-import { Command } from 'commander';
-import { resolveProfile } from '../../config/profileResolver.js';
-import { writeJsonOutput } from '../../cli/output.js';
-import { throwExit } from '../../cli/exitHandler.js';
-import { CONFIG_SCHEMAS, ConfigFileName } from '../../config/schemas.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import YAML from 'yaml';
-import { z } from 'zod';
+import { Command } from "commander";
+import { resolveProfile } from "../../config/profileResolver.js";
+import { writeJsonOutput } from "../../cli/output.js";
+import { throwExit } from "../../cli/exitHandler.js";
+import { CONFIG_SCHEMAS, ConfigFileName } from "../../config/schemas.js";
+import * as fs from "fs";
+import * as path from "path";
+import YAML from "yaml";
+import { z } from "zod";
 
 /**
  * Validation result for a single file
@@ -50,7 +50,10 @@ interface ValidationResult {
 /**
  * Validate YAML syntax and parse file
  */
-function validateYAMLSyntax(filePath: string, content: string): {
+function validateYAMLSyntax(
+	filePath: string,
+	content: string
+): {
 	valid: boolean;
 	parsed?: any;
 	error?: { line?: number; message: string };
@@ -67,13 +70,13 @@ function validateYAMLSyntax(filePath: string, content: string): {
 				valid: false,
 				error: {
 					line,
-					message: error.message
-				}
+					message: error.message,
+				},
 			};
 		}
 		return {
 			valid: false,
-			error: { message: String(error) }
+			error: { message: String(error) },
 		};
 	}
 }
@@ -95,9 +98,9 @@ function validateFileSchema(
 		return { valid: true, errors: [] };
 	}
 
-	const errors = result.error.issues.map(issue => ({
+	const errors = result.error.issues.map((issue) => ({
 		message: issue.message,
-		path: issue.path.join('.')
+		path: issue.path.join("."),
 	}));
 
 	return { valid: false, errors };
@@ -114,18 +117,22 @@ function validateConfigFile(
 		file: fileName,
 		valid: true,
 		errors: [],
-		warnings: []
+		warnings: [],
 	};
 
 	// Check if file exists
 	if (!fs.existsSync(filePath)) {
 		// Optional files - not an error
-		if (fileName === 'deps.yml' || fileName === 'stack.yml' || fileName === 'merge-policy.yml') {
+		if (
+			fileName === "deps.yml" ||
+			fileName === "stack.yml" ||
+			fileName === "merge-policy.yml"
+		) {
 			return result;
 		}
 		result.valid = false;
 		result.errors.push({
-			message: `File not found: ${fileName}`
+			message: `File not found: ${fileName}`,
 		});
 		return result;
 	}
@@ -133,11 +140,13 @@ function validateConfigFile(
 	// Read file content
 	let content: string;
 	try {
-		content = fs.readFileSync(filePath, 'utf-8');
+		content = fs.readFileSync(filePath, "utf-8");
 	} catch (error) {
 		result.valid = false;
 		result.errors.push({
-			message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`
+			message: `Failed to read file: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
 		});
 		return result;
 	}
@@ -148,7 +157,9 @@ function validateConfigFile(
 		result.valid = false;
 		result.errors.push({
 			line: syntaxValidation.error?.line,
-			message: `YAML syntax error: ${syntaxValidation.error?.message || 'Unknown error'}`
+			message: `YAML syntax error: ${
+				syntaxValidation.error?.message || "Unknown error"
+			}`,
 		});
 		return result;
 	}
@@ -166,7 +177,7 @@ function validateConfigFile(
 				result.errors.push({
 					message: error.path
 						? `${error.path}: ${error.message}`
-						: error.message
+						: error.message,
 				});
 			}
 		}
@@ -185,12 +196,12 @@ function validateCrossReferences(
 	const warnings: Array<{ file: string; message: string }> = [];
 
 	// Load gates.yml to get defined gates
-	const gatesPath = path.join(profilePath, 'gates.yml');
+	const gatesPath = path.join(profilePath, "gates.yml");
 	let definedGates: Set<string> = new Set();
 
 	if (fs.existsSync(gatesPath)) {
 		try {
-			const gatesContent = fs.readFileSync(gatesPath, 'utf-8');
+			const gatesContent = fs.readFileSync(gatesPath, "utf-8");
 			const gatesParsed = YAML.parse(gatesContent);
 			if (gatesParsed?.levels) {
 				for (const level of Object.values(gatesParsed.levels)) {
@@ -210,10 +221,10 @@ function validateCrossReferences(
 	}
 
 	// Check stack.yml for gate references
-	const stackPath = path.join(profilePath, 'stack.yml');
+	const stackPath = path.join(profilePath, "stack.yml");
 	if (fs.existsSync(stackPath)) {
 		try {
-			const stackContent = fs.readFileSync(stackPath, 'utf-8');
+			const stackContent = fs.readFileSync(stackPath, "utf-8");
 			const stackParsed = YAML.parse(stackContent);
 			if (stackParsed?.items) {
 				for (const item of stackParsed.items) {
@@ -221,8 +232,8 @@ function validateCrossReferences(
 						for (const gate of item.gates) {
 							if (gate?.name && !definedGates.has(gate.name)) {
 								warnings.push({
-									file: 'stack.yml',
-									message: `Referenced gate '${gate.name}' not defined in gates.yml`
+									file: "stack.yml",
+									message: `Referenced gate '${gate.name}' not defined in gates.yml`,
 								});
 							}
 						}
@@ -245,16 +256,16 @@ function validateProfile(
 	options: { strict?: boolean }
 ): ValidationResult {
 	const configFiles = [
-		'gates.yml',
-		'scope.yml',
-		'deps.yml',
-		'stack.yml',
-		'merge-policy.yml'
+		"gates.yml",
+		"scope.yml",
+		"deps.yml",
+		"stack.yml",
+		"merge-policy.yml",
 	];
 
 	const fileResults = new Map<string, FileValidationResult>();
-	const allErrors: ValidationResult['errors'] = [];
-	const allWarnings: ValidationResult['warnings'] = [];
+	const allErrors: ValidationResult["errors"] = [];
+	const allWarnings: ValidationResult["warnings"] = [];
 
 	// Validate each config file
 	for (const fileName of configFiles) {
@@ -267,7 +278,7 @@ function validateProfile(
 			allErrors.push({
 				file: fileName,
 				line: error.line,
-				message: error.message
+				message: error.message,
 			});
 		}
 
@@ -276,7 +287,7 @@ function validateProfile(
 			allWarnings.push({
 				file: fileName,
 				line: warning.line,
-				message: warning.message
+				message: warning.message,
 			});
 		}
 	}
@@ -285,7 +296,9 @@ function validateProfile(
 	const crossRefWarnings = validateCrossReferences(profilePath, fileResults);
 	for (const warning of crossRefWarnings) {
 		allWarnings.push(warning);
-		fileResults.get(warning.file)?.warnings.push({ message: warning.message });
+		fileResults
+			.get(warning.file)
+			?.warnings.push({ message: warning.message });
 	}
 
 	// Determine overall validity
@@ -298,7 +311,7 @@ function validateProfile(
 		profilePath,
 		files: Array.from(fileResults.values()),
 		errors: allErrors,
-		warnings: allWarnings
+		warnings: allWarnings,
 	};
 }
 
@@ -309,14 +322,21 @@ export function registerConfigValidateCommand(
 	program: Command,
 	jsonModeActive?: () => boolean
 ): void {
-	const configCommand = program.command('config').description('Configuration management commands');
+	// Get or create the config command (if not already created by registerConfigCommand)
+	let configCommand = program.commands.find((cmd) => cmd.name() === "config");
+
+	if (!configCommand) {
+		configCommand = program
+			.command("config")
+			.description("Configuration management commands");
+	}
 
 	configCommand
-		.command('validate')
-		.description('Validate profile configuration files')
-		.option('--profile-dir <dir>', 'Profile directory to validate')
-		.option('--strict', 'Fail on warnings as well as errors')
-		.option('--json', 'Output JSON format')
+		.command("validate")
+		.description("Validate profile configuration files")
+		.option("--profile-dir <dir>", "Profile directory to validate")
+		.option("--strict", "Fail on warnings as well as errors")
+		.option("--json", "Output JSON format")
 		.action((opts) => {
 			try {
 				// Resolve profile directory
@@ -334,17 +354,21 @@ export function registerConfigValidateCommand(
 					} catch (error) {
 						// Fallback to default .smartergpt directory if profile resolution fails
 						// This allows validation to work in repos with example profiles
-						profilePath = path.resolve(process.cwd(), '.smartergpt');
+						profilePath = path.resolve(
+							process.cwd(),
+							".smartergpt"
+						);
 					}
 				}
 
 				// Validate profile
 				const result = validateProfile(profilePath, {
-					strict: opts.strict
+					strict: opts.strict,
 				});
 
 				// Check if JSON mode is active
-				const isJsonMode = opts.json || (jsonModeActive && jsonModeActive());
+				const isJsonMode =
+					opts.json || (jsonModeActive && jsonModeActive());
 
 				if (isJsonMode) {
 					// JSON output
@@ -353,69 +377,75 @@ export function registerConfigValidateCommand(
 						profilePath: result.profilePath,
 						errors: result.errors,
 						warnings: result.warnings,
-						files: result.files.map(f => ({
+						files: result.files.map((f) => ({
 							file: f.file,
 							valid: f.valid,
 							errorCount: f.errors.length,
-							warningCount: f.warnings.length
-						}))
+							warningCount: f.warnings.length,
+						})),
 					});
 				} else {
 					// Human-readable output
 					console.log(`\nValidating profile: ${profilePath}`);
-					console.log('━'.repeat(60));
-					console.log('');
+					console.log("━".repeat(60));
+					console.log("");
 
 					// Show per-file results
 					for (const fileResult of result.files) {
-						const icon = fileResult.valid ? '✅' : '❌';
-						const status = fileResult.valid ? 'Valid' : 'Invalid';
+						const icon = fileResult.valid ? "✅" : "❌";
+						const status = fileResult.valid ? "Valid" : "Invalid";
 						console.log(`${icon} ${fileResult.file} - ${status}`);
 
 						// Show errors
 						for (const error of fileResult.errors) {
-							const lineInfo = error.line ? `Line ${error.line}: ` : '';
+							const lineInfo = error.line
+								? `Line ${error.line}: `
+								: "";
 							console.log(`   ${lineInfo}${error.message}`);
 						}
 
 						// Show warnings
 						if (fileResult.warnings.length > 0) {
-							console.log('');
+							console.log("");
 						}
 					}
 
 					// Show warnings separately
 					if (result.warnings.length > 0) {
-						console.log('');
+						console.log("");
 						for (const warning of result.warnings) {
 							console.log(`⚠️  ${warning.file} - Warning`);
 							console.log(`   ${warning.message}`);
 						}
 					}
 
-					console.log('');
-					console.log('━'.repeat(60));
+					console.log("");
+					console.log("━".repeat(60));
 
 					// Summary
 					const errorCount = result.errors.length;
 					const warningCount = result.warnings.length;
 
 					if (result.valid) {
-						console.log('✅ Validation passed');
+						console.log("✅ Validation passed");
 						if (warningCount > 0) {
 							console.log(`   ${warningCount} warning(s) found`);
 							if (!opts.strict) {
-								console.log('   Use --strict to fail on warnings');
+								console.log(
+									"   Use --strict to fail on warnings"
+								);
 							}
 						}
 					} else {
-						console.log(`❌ Validation failed: ${errorCount} error(s), ${warningCount} warning(s)`);
+						console.log(
+							`❌ Validation failed: ${errorCount} error(s), ${warningCount} warning(s)`
+						);
 						if (errorCount === 0 && warningCount > 0) {
-							console.log('   Use --strict to fail on warnings');
+							console.log("   Use --strict to fail on warnings");
 						}
 					}
 
-					console.log('');
+					console.log("");
 				}
 
 				// Exit with appropriate code
@@ -423,7 +453,11 @@ export function registerConfigValidateCommand(
 					throwExit(1);
 				}
 			} catch (error) {
-				console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+				console.error(
+					`Error: ${
+						error instanceof Error ? error.message : String(error)
+					}`
+				);
 				throwExit(1);
 			}
 		});
