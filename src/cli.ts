@@ -67,6 +67,7 @@ import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/gene
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
+import { registerConfigCommand } from "./commands/config.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -261,6 +262,9 @@ program
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
 	$ lex-pr doctor                         Validate environment and configuration
+	$ lex-pr config show                    Display configuration with precedence chain
+	$ lex-pr config show --key scope.target Show specific configuration value
+	$ lex-pr config show --json             Output configuration in JSON format
 	$ lex-pr config:inspect                 Display merged configuration with provenance map
 	$ lex-pr discover                       Find open PRs matching scope
 	$ lex-pr discover --suggest             Generate dependency suggestions with heuristics
@@ -420,6 +424,9 @@ registerMergeCommand(program, () => jsonModeActive, () => program.opts());
 
 // Doctor command - modularized in Phase 4.4
 registerDoctorCommand(program, () => jsonModeActive);
+
+// Config command - configuration inspection and debugging
+registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Init command - Interactive workspace setup
 program
