@@ -1,6 +1,33 @@
-# lex-pr-runner
+# LexRunner — Merge-Weave & Fanout CLI (`lex-pr`)
 
-**Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.**
+![Proprietary](https://img.shields.io/badge/License-Proprietary-red)
+![Uses Lex (MIT)](https://img.shields.io/badge/Powered%20by-Lex%20(MIT)-blue)
+
+**`lex-pr` powered by LexRunner.** Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.
+
+---
+
+## Branding & Licensing
+
+**LexRunner** is a proprietary product built on top of **Lex**, the MIT-licensed OSS core. See [ADR-000](docs/adr/ADR-000-product-naming-and-branding.md) for naming and branding decisions.
+
+- **Product:** LexRunner (proprietary, merged pyramid & fanout orchestration)
+- **CLI:** `lex-pr` (command-line interface)
+- **OSS Core:** [Lex](https://github.com/Guffawaffle/lex) (MIT license, frames & policy)
+
+### LexRunner (Proprietary) vs Lex (MIT OSS)
+
+| Aspect | **LexRunner** (Paid) | **Lex** (OSS) |
+|--------|---------------------|--------------|
+| **Purpose** | Enterprise merge-weave orchestration CLI | Atlas/Memory/Policy core frameworks |
+| **License** | Proprietary | MIT (open source) |
+| **Repo** | `Guffawaffle/lex-pr-runner` | `Guffawaffle/lex` |
+| **Audience** | Teams running automated fanout/merge workflows | Developers building on frames/policy primitives |
+
+👉 **Choose Lex if:** You need frames, policy scanning, or atlas functionality independently.
+👉 **Choose LexRunner if:** You need the full merge-weave orchestration CLI (built on Lex).
+
+---
 
 ## MCP Multi-Repo Integration
 

@@ -46,8 +46,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Issue triage and closure: #74 (Autopilot Levels), #90 (Gate Report Schema), #96 (Extended Autopilot), #103 (Documentation) closed.
 - Opened follow-up tracking issues: #128 (CLI UX), #129 (Security Phase 2), #130 (Test Infra Phase 2), #131 (Config Expansion), #132 (Release Pipeline), #133 (Planner Auto-Discovery), #134 (Contributor Onboarding).
 
-## [0.1.0] - 2024-XX-XX
-Initial tagged pre-release (placeholder – to be backfilled once versioning workflow lands).
+## [0.1.0] - 2025-11-06
+
+### Added
+- **ADR-000:** Product Naming & Branding decision (LexRunner proprietary vs Lex MIT OSS).
+- README branding and badge updates for LexRunner identity.
+- Release workflow on `lexrunner-v*` tag pattern for deterministic versioning.
+- Architecture Decision Record (ADR) directory and index in `docs/adr/`.
+
+### Changed
+- README header now prominently displays "LexRunner — Merge-Weave & Fanout CLI (`lex-pr`)".
+- Release workflow condition updated to trigger on `lexrunner-v*.*.*` tags (not legacy `v*` format).
+
+### Documentation
+- Added Lex (MIT OSS) cross-reference in README.
+- Added badges for licensing clarity (Proprietary + Powered by Lex).
+- Added "Branding & Licensing" section with link to ADR-000.
 
 ---
 

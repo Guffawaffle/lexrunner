@@ -1,0 +1,44 @@
+name: Guard wrong tags
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  block:
+    name: Block bare v* tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tag format
+        env:
+          TAG_NAME: ${{ github.ref }}
+        run: |
+          # Extract tag name
+          TAG=${TAG_NAME#refs/tags/}
+
+          # Reject bare v* tags (not lexrunner-v*)
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ ERROR: This repository only releases on tags prefixed with 'lexrunner-v'" >&2
+            echo "" >&2
+            echo "Current tag: $TAG" >&2
+            echo "Expected format: lexrunner-v0.1.0, lexrunner-v1.0.0, etc." >&2
+            echo "" >&2
+            echo "To delete this tag:" >&2
+            echo "  git push --delete origin $TAG" >&2
+            echo "  git tag --delete $TAG" >&2
+            exit 1
+          fi
+
+          # Accept lexrunner-v* tags (they're handled by release.yml)
+          if [[ "$TAG" =~ ^lexrunner-v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "✅ Valid tag format: $TAG"
+            exit 0
+          fi
+
+          # Reject anything else
+          echo "⚠️  Warning: Tag does not match expected pattern: $TAG" >&2
+          exit 0  # Warn but don't fail for other patterns
