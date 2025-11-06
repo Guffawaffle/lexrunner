@@ -107,7 +107,7 @@ function resolveConfigWithPrecedence(baseDir: string = process.cwd()): ConfigSho
 	const profileDirs = [
 		{ level: 'workspace', path: workspaceProfileDir, source: '.smartergpt/' },
 		{ level: 'local', path: localProfileDir, source: '.smartergpt.local/' },
-		{ level: 'env', path: envProfileDir || '', source: 'LEX_PR_PROFILE_DIR' }
+		...(envProfileDir ? [{ level: 'env', path: envProfileDir, source: 'LEX_PR_PROFILE_DIR' }] : [])
 	].filter(d => d.path && fs.existsSync(d.path));
 
 	// Add defaults first
@@ -174,15 +174,18 @@ function resolveConfigWithPrecedence(baseDir: string = process.cwd()): ConfigSho
 		const precedence: ConfigSourceLevel[] = [];
 		
 		// Check environment variables
+		const envFound = envProfileDir && configValue.source.startsWith('LEX_PR_PROFILE_DIR');
 		precedence.push({
 			level: 'env',
 			checked: true,
-			found: false,
+			found: envFound || false,
 			path: envProfileDir
 		});
 		
 		// Check each profile directory
 		for (const dir of profileDirs) {
+			if (dir.level === 'env') continue; // Already handled above
+			
 			const found = configValue.source.startsWith(dir.source);
 			const overridden = configValue.overrides?.source.startsWith(dir.source) || false;
 			

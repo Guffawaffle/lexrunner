@@ -226,8 +226,8 @@ describe('config show command (CLI integration)', () => {
 				cwd: testDir,
 				stdio: 'pipe'
 			});
-			// Should not reach here
-			expect(true).toBe(false);
+			// Should throw, so fail if we reach here
+			expect.fail('Expected command to exit with error for non-existent key');
 		} catch (error: any) {
 			// Error message goes to stdout
 			const output = error.stdout?.toString() || error.stderr?.toString() || '';
