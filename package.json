@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"engines": {
-		"node": ">=20"
+		"node": ">=20 <23"
 	},
 	"packageManager": "npm@10.0.0",
 	"auditSchemaVersion": "1.0.0",
@@ -12,6 +12,7 @@
 		"lex-pr": "dist/cli.js",
 		"lex-pr-runner-mcp": "./mcp-server.mjs"
 	},
+	"types": "dist/cli.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/cli.d.ts",
