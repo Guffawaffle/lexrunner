@@ -1,0 +1,134 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/execution-plan.schema.json",
+	"title": "Execution Plan Schema v1",
+	"description": "Detailed execution plan for implementing a feature across repositories",
+	"type": "object",
+	"required": ["milestones", "workstreams", "tasks", "generatedAt"],
+	"properties": {
+		"milestones": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "string",
+				"minLength": 3
+			},
+			"description": "High-level milestones for the project"
+		},
+		"workstreams": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "string",
+				"enum": [
+					"analysis",
+					"backend",
+					"frontend",
+					"runner",
+					"docs",
+					"ci",
+					"infra",
+					"testing"
+				]
+			},
+			"description": "Parallel streams of work"
+		},
+		"tasks": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["title", "repo", "labels", "deps", "ac"],
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 5,
+						"maxLength": 200,
+						"description": "Task title (will be Issue title)"
+					},
+					"repo": {
+						"type": "string",
+						"enum": ["lex", "lex-pr-runner"],
+						"description": "Target repository"
+					},
+					"labels": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "GitHub labels to apply"
+					},
+					"batch": {
+						"type": "integer",
+						"minimum": 1,
+						"description": "Batch number for Copilot parallelization"
+					},
+					"deps": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"description": "Task titles or IDs this depends on"
+						},
+						"description": "Dependencies (tasks that must complete first)"
+					},
+					"ac": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "string",
+							"minLength": 5
+						},
+						"description": "Acceptance criteria for this task"
+					},
+					"workstream": {
+						"type": "string",
+						"enum": [
+							"analysis",
+							"backend",
+							"frontend",
+							"runner",
+							"docs",
+							"ci",
+							"infra",
+							"testing"
+						],
+						"description": "Which workstream this belongs to"
+					},
+					"estimatedSize": {
+						"type": "string",
+						"enum": ["XS", "S", "M", "L", "XL"]
+					},
+					"priority": {
+						"type": "string",
+						"enum": ["P0", "P1", "P2", "P3"]
+					},
+					"assignee": {
+						"type": "string",
+						"pattern": "^@[a-zA-Z0-9-]+$",
+						"description": "GitHub username with @ prefix"
+					}
+				}
+			},
+			"description": "Detailed task list"
+		},
+		"generatedAt": {
+			"type": "string",
+			"format": "date-time",
+			"description": "When this plan was generated"
+		},
+		"sourceIdea": {
+			"type": "string",
+			"description": "Fingerprint or URL of the source idea"
+		},
+		"epicUrl": {
+			"type": "string",
+			"format": "uri",
+			"description": "URL of the created Epic issue"
+		},
+		"projectUrl": {
+			"type": "string",
+			"format": "uri",
+			"description": "URL of the GitHub Project board"
+		}
+	}
+}
