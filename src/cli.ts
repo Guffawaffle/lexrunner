@@ -379,7 +379,7 @@ program
 // Plan review command - modularized in Phase 2
 registerPlanReviewCommand(program, {
 	exitWith,
-	getProgramOpts: () => program.opts()
+	getProgramOpts: () => program.opts(),
 });
 
 // Merge order command - modular implementation
@@ -397,7 +397,7 @@ registerAutopilotCommand(program, {
 	exitWith,
 	getAuditProfile: () => program.opts().auditProfile as string | undefined,
 	getAuditKey: () => program.opts().auditKey as string | undefined,
-	finalizeAuditGuard
+	finalizeAuditGuard,
 });
 
 // Execute plan command (replaces gate command)
@@ -405,7 +405,7 @@ registerAutopilotCommand(program, {
 registerExecuteCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith,
-	getProgramOpts: () => program.opts()
+	getProgramOpts: () => program.opts(),
 });
 
 // Status command - modularized in Phase 2.5
@@ -423,9 +423,11 @@ registerReportCommand(program);
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Merge command - Execute merge pyramid with git operations
-registerMergeCommand(program, () => jsonModeActive, () => program.opts());
-
-
+registerMergeCommand(
+	program,
+	() => jsonModeActive,
+	() => program.opts()
+);
 
 // Doctor command - modularized in Phase 4.4
 registerDoctorCommand(program, () => jsonModeActive);

@@ -45,7 +45,7 @@ describe('fingerprint utilities', () => {
 
 	describe('extractFingerprint', () => {
 		it('should extract fingerprint from HTML comment', () => {
-			const text = 'Some content\n\n<!-- fingerprint:abc123def4567890 -->';
+			const text = 'Some content\n\n<!-- lex-pr-idea-fingerprint: abc123def4567890 -->';
 			const fp = extractFingerprint(text);
 
 			expect(fp).toBe('abc123def4567890');
@@ -59,7 +59,7 @@ describe('fingerprint utilities', () => {
 		});
 
 		it('should extract fingerprint from middle of text', () => {
-			const text = 'Header\n<!-- fingerprint:1234567890abcdef -->\nFooter';
+			const text = 'Header\n<!-- lex-pr-idea-fingerprint: 1234567890abcdef -->\nFooter';
 			const fp = extractFingerprint(text);
 
 			expect(fp).toBe('1234567890abcdef');
@@ -72,7 +72,7 @@ describe('fingerprint utilities', () => {
 			const fp = 'abc123def4567890';
 			const result = injectFingerprint(text, fp);
 
-			expect(result).toContain('<!-- fingerprint:abc123def4567890 -->');
+			expect(result).toContain('<!-- lex-pr-idea-fingerprint: abc123def4567890 -->');
 			expect(result).toContain('Some content');
 		});
 

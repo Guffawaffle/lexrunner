@@ -46,3 +46,11 @@ export function validate<T>(data: unknown, schema: ZodSchema<T>): T {
   
   return result.data;
 }
+
+/**
+ * Check if data is valid against schema (returns boolean)
+ */
+export function isValid<T>(data: unknown, schema: ZodSchema<T>): boolean {
+  const result = schema.safeParse(data);
+  return result.success;
+}
