@@ -262,6 +262,8 @@ program
 		`
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
+	$ lex-pr idea                           Capture feature idea interactively
+	$ lex-pr idea --title "..." --description "..." --dry-run
 	$ lex-pr doctor                         Validate environment and configuration
 	$ lex-pr config show                    Display configuration with precedence chain
 	$ lex-pr config show --key scope.target Show specific configuration value
@@ -287,11 +289,12 @@ Power User Commands:
 	$ lex-pr completion bash                Generate bash completion script
 
 Workflow:
-	1. Discover:    lex-pr discover (optionally add --suggest for dependencies)
-	2. Plan:        lex-pr plan --from-github --json > plan.json
-	3. Review:      lex-pr plan-review plan.json
-	4. Execute:     lex-pr execute plan.json
-	5. Report:      lex-pr report artifacts --out md
+	1. Ideate:      lex-pr idea (capture feature ideas as GitHub Issues)
+	2. Discover:    lex-pr discover (optionally add --suggest for dependencies)
+	3. Plan:        lex-pr plan --from-github --json > plan.json
+	4. Review:      lex-pr plan-review plan.json
+	5. Execute:     lex-pr execute plan.json
+	6. Report:      lex-pr report artifacts --out md
 `
 	);
 
