@@ -1,0 +1,88 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/idea.schema.json",
+	"title": "Idea Schema v1",
+	"description": "Schema for captured ideas in the LexRunner front-end capture pipeline",
+	"type": "object",
+	"required": [
+		"title",
+		"summary",
+		"motivation",
+		"constraints",
+		"fingerprint",
+		"timestamp"
+	],
+	"properties": {
+		"title": {
+			"type": "string",
+			"minLength": 3,
+			"maxLength": 200,
+			"description": "Concise title for the idea"
+		},
+		"summary": {
+			"type": "string",
+			"minLength": 10,
+			"description": "Brief summary of the idea"
+		},
+		"motivation": {
+			"type": "string",
+			"minLength": 10,
+			"description": "Why this idea is important and what problem it solves"
+		},
+		"constraints": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 3
+			},
+			"description": "Known constraints, limitations, or boundaries"
+		},
+		"relatedIssues": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"format": "uri",
+				"pattern": "^https://github\\.com/[^/]+/[^/]+/(issues|pull)/[0-9]+$"
+			},
+			"description": "Links to related GitHub issues or PRs"
+		},
+		"fingerprint": {
+			"type": "string",
+			"pattern": "^[a-f0-9]{64}$",
+			"description": "SHA-256 fingerprint for idempotency (normalized_idea + repo_head + open_issues_digest)"
+		},
+		"timestamp": {
+			"type": "string",
+			"format": "date-time",
+			"description": "ISO 8601 timestamp when the idea was captured"
+		},
+		"repo": {
+			"type": "string",
+			"description": "Target repository name (e.g., 'lex', 'lex-pr-runner')"
+		},
+		"context": {
+			"type": "object",
+			"properties": {
+				"repoHead": {
+					"type": "string",
+					"pattern": "^[a-f0-9]{40}$",
+					"description": "Git commit SHA at capture time"
+				},
+				"defaultBranch": {
+					"type": "string",
+					"description": "Default branch name (e.g., 'main')"
+				},
+				"openIssuesCount": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Number of open issues at capture time"
+				},
+				"openPRsCount": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Number of open PRs at capture time"
+				}
+			}
+		}
+	}
+}
