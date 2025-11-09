@@ -68,6 +68,7 @@ import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerConfigCommand } from "./commands/config.js";
+import { registerIdeaCommand } from "./commands/idea.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -427,6 +428,9 @@ registerDoctorCommand(program, () => jsonModeActive);
 
 // Config command - configuration inspection and debugging
 registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });
+
+// Idea command - feature idea capture
+registerIdeaCommand(program);
 
 // Init command - Interactive workspace setup
 program
