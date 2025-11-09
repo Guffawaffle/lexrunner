@@ -70,6 +70,7 @@ import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
+import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -893,6 +894,9 @@ registerAssignBatchCommand(program);
 
 // Audit operations command
 registerAuditCommands(program);
+
+// Create project command
+registerCreateProjectCommand(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
