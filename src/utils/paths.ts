@@ -40,16 +40,13 @@ export async function ensureDir(dirPath: string): Promise<void> {
 export function isSafeArtifactPath(filePath: string): boolean {
 	const normalized = path.normalize(filePath);
 	
-	// Reject writes to PR artifact directories
-	const dangerousPatterns = [
-		'/pr-',
-		'\\pr-',
-		'/PR-',
-		'\\PR-'
-	];
+	// Handle both Unix and Windows path separators
+	const parts = normalized.split(/[/\\]/);
 	
-	for (const pattern of dangerousPatterns) {
-		if (normalized.includes(pattern)) {
+	// Check each directory component (excluding the last part which is the filename)
+	for (let i = 0; i < parts.length - 1; i++) {
+		const part = parts[i];
+		if (part.startsWith('pr-') || part.startsWith('PR-')) {
 			return false;
 		}
 	}
