@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "0.1.0",
+  "title": "Add dark mode support",
+  "description": "Implement theme switcher with light/dark modes",
+  "acceptanceCriteria": [
+    "User can toggle between light and dark themes",
+    "Theme preference persists across sessions",
+    "All UI components support both themes"
+  ],
+  "technicalContext": "Use CSS variables and localStorage",
+  "constraints": "Must work in IE11+",
+  "repo": "owner/repo",
+  "createdAt": "2025-11-09T14:30:00.000Z"
+}
