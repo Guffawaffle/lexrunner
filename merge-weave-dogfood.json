@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "title": "Dogfood: Merge 4 Copilot-Authored Configuration & Test PRs",
+  "description": "Test merge-weave execute with config commands (show/validate), test fixtures, and GitHub discovery fix. Tests both CLI and MCP paths.",
+  "policy": {
+    "requiredGates": ["lint", "typecheck"],
+    "optionalGates": [],
+    "mergeRule": "strict-required"
+  },
+  "nodes": [
+    {
+      "id": "PR-302",
+      "title": "Fix empty plan.json when scope.yml contains GitHub discovery filters",
+      "branch": "copilot/fix-empty-plan-json-issue",
+      "number": 302,
+      "dependsOn": [],
+      "gates": ["lint", "typecheck"]
+    },
+    {
+      "id": "PR-303",
+      "title": "Add `config show` command with precedence visualization",
+      "branch": "copilot/add-config-show-command",
+      "number": 303,
+      "dependsOn": [],
+      "gates": ["lint", "typecheck"]
+    },
+    {
+      "id": "PR-304",
+      "title": "Add `config validate` command for profile health checks",
+      "branch": "copilot/add-config-validate-command",
+      "number": 304,
+      "dependsOn": [],
+      "gates": ["lint", "typecheck"]
+    },
+    {
+      "id": "PR-305",
+      "title": "Create shared test fixture library with realistic scenarios",
+      "branch": "copilot/create-shared-test-fixture-library",
+      "number": 305,
+      "dependsOn": [],
+      "gates": ["lint", "typecheck"]
+    }
+  ],
+  "integrationBranch": "feat/dogfood-merge-weave-v1",
+  "targetBranch": "main"
+}
