@@ -1,16 +1,14 @@
 name: Release
 
 on:
-  # Canary releases on main merges
   push:
     branches:
       - main
-  
-  # Stable releases on version tags
-  push:
     tags:
-      - 'v*.*.*'
-  
+      # Stable releases on lexrunner version tags
+      # Tag format: lexrunner-v*.*.* (e.g., lexrunner-v0.1.0, lexrunner-v1.0.0)
+      - 'lexrunner-v*.*.*'
+
   # Manual release trigger
   workflow_dispatch:
     inputs:
@@ -34,32 +32,32 @@ jobs:
     name: Canary Release
     runs-on: ubuntu-latest
     if: |
-      github.ref == 'refs/heads/main' && 
+      github.ref == 'refs/heads/main' &&
       github.event_name == 'push' &&
       !startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for proper versioning
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Check determinism
         run: |
           npm run format
@@ -67,7 +65,7 @@ jobs:
             echo "❌ Build is not deterministic"
             exit 1
           fi
-      
+
       - name: Generate canary version
         id: canary_version
         run: |
@@ -76,17 +74,17 @@ jobs:
           CANARY_VERSION="${CURRENT_VERSION}-canary.${COMMIT_SHA}"
           echo "version=${CANARY_VERSION}" >> $GITHUB_OUTPUT
           echo "📦 Canary version: ${CANARY_VERSION}"
-      
+
       - name: Update version for canary
         run: |
           npm version ${{ steps.canary_version.outputs.version }} --no-git-tag-version
-      
+
       # Uncomment when ready to publish to npm
       # - name: Publish to npm (canary)
       #   run: npm publish --tag canary
       #   env:
       #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
+
       - name: Create canary release summary
         run: |
           echo "## 🚀 Canary Release Published" >> $GITHUB_STEP_SUMMARY
@@ -101,27 +99,27 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> ⚠️ Canary releases are for testing only. Use stable releases for production." >> $GITHUB_STEP_SUMMARY
 
-  # Stable release job - runs on version tags
+  # Stable release job - runs on lexrunner version tags
   stable-release:
     name: Stable Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
+    if: startsWith(github.ref, 'refs/tags/lexrunner-v')
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Verify tag format
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          if ! [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Tag must follow format: v*.*.* (e.g., v1.2.3)"
+          if ! [[ "$TAG_NAME" =~ ^lexrunner-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Tag must follow format: lexrunner-v*.*.* (e.g., lexrunner-v1.2.3)"
             exit 1
           fi
           echo "✅ Tag format is valid: $TAG_NAME"
-      
+
       - name: Verify tag signature
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
@@ -131,23 +129,23 @@ jobs:
             echo "⚠️ Warning: Tag is not signed or signature cannot be verified"
             echo "Continuing anyway, but consider signing tags in the future"
           fi
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Check determinism
         run: |
           npm run format
@@ -155,38 +153,38 @@ jobs:
             echo "❌ Build is not deterministic"
             exit 1
           fi
-      
+
       - name: Verify version matches tag
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#v}
           PKG_VERSION=$(node -p "require('./package.json').version")
-          
+
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "❌ Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
             exit 1
           fi
           echo "✅ Version match confirmed: $TAG_VERSION"
-      
+
       # Uncomment when ready to publish to npm
       # - name: Publish to npm (stable)
       #   run: npm publish
       #   env:
       #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
+
       - name: Extract changelog for this version
         id: changelog
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#v}
-          
+
           # Extract changelog section for this version (exclude section headers)
           awk "/## \[${TAG_VERSION}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
-          
+
           if [ ! -s release_notes.md ]; then
             echo "No changelog entry found for version ${TAG_VERSION}" > release_notes.md
           fi
-      
+
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
@@ -197,12 +195,12 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: false
-      
+
       - name: Create release summary
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#v}
-          
+
           echo "## 🎉 Stable Release Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${TAG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
@@ -215,34 +213,34 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
           cat release_notes.md >> $GITHUB_STEP_SUMMARY
-  
+
   # Manual release job - for workflow_dispatch events
   manual-release:
     name: Manual Release
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Manual release info
         run: |
           echo "## 📋 Manual Release Workflow" >> $GITHUB_STEP_SUMMARY
@@ -251,7 +249,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ github.event.inputs.release_type }}" == "stable" ]; then
             echo "1. Run \`npm run release:prepare\` locally" >> $GITHUB_STEP_SUMMARY
             echo "2. Review and commit changes" >> $GITHUB_STEP_SUMMARY
