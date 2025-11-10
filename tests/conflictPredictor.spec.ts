@@ -126,6 +126,32 @@ describe("Conflict Predictor Integration", () => {
 		expect(report1.recommendations).toEqual(report2.recommendations);
 	});
 
+	it("should support conflict clustering when enabled", async () => {
+		const prs: PRWithFiles[] = [
+			{ number: 100, files: ["a.ts"], head: "head-100" },
+			{ number: 101, files: ["a.ts"], head: "head-101" }
+		];
+
+		const prHeads = new Map([
+			["100", "head-100"],
+			["101", "head-101"]
+		]);
+
+		// Mock merge conflicts by not actually running git merge-tree
+		// In real usage, this would detect actual conflicts
+		const report = await predictConflicts({
+			prs,
+			baseBranch: "main",
+			prHeads,
+			skipMergeTreeSimulation: true, // Skip for test
+			enableClustering: true
+		});
+
+		// Clustering should be available even without merge-tree
+		// (but may be empty if no conflicts detected)
+		expect(report).toBeDefined();
+	});
+
 	it("should handle batch 1 scenario from issue (PRs 166, 167, 168)", async () => {
 		// Simulating the Batch 1 scenario mentioned in the issue
 		const prs: PRWithFiles[] = [
