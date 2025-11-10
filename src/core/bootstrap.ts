@@ -61,10 +61,16 @@ export function bootstrapWorkspace(
 		suggestions.push(`Create .smartergpt directory: mkdir ${profileDir}`);
 		missingFiles.push(...expectedFiles);
 	} else {
-		// Check individual files
+		// Check for files in runner/ subdirectory first, then flat structure
+		const runnerDir = path.join(profileDir, "runner");
+		
 		for (const file of expectedFiles) {
-			const filePath = path.join(profileDir, file);
-			if (!fs.existsSync(filePath)) {
+			// Try new structure first (runner/)
+			const runnerPath = path.join(runnerDir, file);
+			// Fallback to legacy flat structure
+			const flatPath = path.join(profileDir, file);
+			
+			if (!fs.existsSync(runnerPath) && !fs.existsSync(flatPath)) {
 				missingFiles.push(file);
 			}
 		}
@@ -114,29 +120,31 @@ export function createMinimalWorkspace(
 	// Validate write operation is allowed
 	validateWriteOperation(profileDir, role, "create minimal workspace");
 
-	// Ensure directory exists
+	// Ensure directory and runner/ subdirectory exist
 	fs.mkdirSync(profileDir, { recursive: true });
+	const runnerDir = path.join(profileDir, "runner");
+	fs.mkdirSync(runnerDir, { recursive: true });
 
-	// Create minimal intent.md
-	const intentPath = path.join(profileDir, "intent.md");
+	// Create minimal intent.md in runner/
+	const intentPath = path.join(runnerDir, "intent.md");
 	if (!fs.existsSync(intentPath)) {
 		fs.writeFileSync(intentPath, getMinimalTemplate("intent"));
 	}
 
-	// Create minimal scope.yml
-	const scopePath = path.join(profileDir, "scope.yml");
+	// Create minimal scope.yml in runner/
+	const scopePath = path.join(runnerDir, "scope.yml");
 	if (!fs.existsSync(scopePath)) {
 		fs.writeFileSync(scopePath, getMinimalTemplate("scope"));
 	}
 
-	// Create minimal deps.yml
-	const depsPath = path.join(profileDir, "deps.yml");
+	// Create minimal deps.yml in runner/
+	const depsPath = path.join(runnerDir, "deps.yml");
 	if (!fs.existsSync(depsPath)) {
 		fs.writeFileSync(depsPath, getMinimalTemplate("deps"));
 	}
 
-	// Create minimal gates.yml
-	const gatesPath = path.join(profileDir, "gates.yml");
+	// Create minimal gates.yml in runner/
+	const gatesPath = path.join(runnerDir, "gates.yml");
 	if (!fs.existsSync(gatesPath)) {
 		fs.writeFileSync(gatesPath, getMinimalTemplate("gates"));
 	}

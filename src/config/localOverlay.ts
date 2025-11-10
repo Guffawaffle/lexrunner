@@ -115,23 +115,28 @@ function copyRelevantFiles(baseDir: string, localDir: string): string[] {
 		return copiedFiles; // No .smartergpt to copy from
 	}
 	
+	// Create runner/ subdirectory
+	const runnerDir = path.join(localDir, "runner");
+	fs.mkdirSync(runnerDir, { recursive: true });
+	
 	// Files to potentially copy (excluding runtime artifacts)
 	const candidateFiles = [
 		"intent.md",
 		"scope.yml",
 		"deps.yml",
 		"gates.yml",
+		"stack.yml",
 		"pull-request-template.md"
 	];
 	
 	for (const file of candidateFiles) {
 		const sourcePath = path.join(smartergptDir, file);
-		const destPath = path.join(localDir, file);
+		const destPath = path.join(runnerDir, file); // Changed from localDir to runnerDir
 		
 		// Only copy if source exists and destination doesn't
 		if (fs.existsSync(sourcePath) && !fs.existsSync(destPath)) {
 			fs.copyFileSync(sourcePath, destPath);
-			copiedFiles.push(file);
+			copiedFiles.push(`runner/${file}`);
 		}
 	}
 	

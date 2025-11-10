@@ -71,6 +71,7 @@ import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
 import { registerCreateProjectCommand } from "./commands/create-project.js";
+import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -632,6 +633,74 @@ program
 		} catch (error) {
 			console.error(
 				`Error initializing local overlay: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+			throwExit(1);
+		}
+	});
+
+// Migrate profile command
+program
+	.command("migrate-profile")
+	.description("Migrate profile configuration structure")
+	.option("--from-flat", "Migrate from flat structure to runner/ subdirectory")
+	.option("--dry-run", "Show what would be migrated without making changes")
+	.option("--profile-dir <path>", "Profile directory to migrate (default: auto-detect)")
+	.action(async (opts) => {
+		try {
+			const result = await runMigrateProfile({
+				fromFlat: opts.fromFlat,
+				dryRun: opts.dryRun,
+				profileDir: opts.profileDir
+			});
+
+			if (opts.json || jsonModeActive) {
+				console.log(
+					canonicalJSONStringify({
+						success: result.success,
+						message: result.message,
+						migratedFiles: result.migratedFiles,
+						backupPath: result.backupPath,
+						skippedFiles: result.skippedFiles
+					})
+				);
+			} else {
+				if (result.success) {
+					if (result.migratedFiles.length > 0) {
+						console.log("✅ Migration successful!");
+						console.log("");
+						console.log(`📦 Migrated ${result.migratedFiles.length} file(s):`);
+						result.migratedFiles.forEach(file => {
+							console.log(`  ✓ ${file}`);
+						});
+						if (result.backupPath) {
+							console.log("");
+							console.log(`💾 Backup created: ${result.backupPath}`);
+						}
+						if (result.skippedFiles.length > 0) {
+							console.log("");
+							console.log("ℹ️  Skipped files:");
+							result.skippedFiles.forEach(file => {
+								console.log(`  • ${file}`);
+							});
+						}
+					} else {
+						console.log("ℹ️  " + result.message);
+					}
+				} else {
+					console.log("❌ Migration failed");
+					console.log("");
+					console.log(result.message);
+				}
+			}
+
+			if (!result.success) {
+				throwExit(1);
+			}
+		} catch (error) {
+			console.error(
+				`Error during migration: ${
 					error instanceof Error ? error.message : String(error)
 				}`
 			);
