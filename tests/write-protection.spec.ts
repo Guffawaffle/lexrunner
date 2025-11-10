@@ -69,11 +69,12 @@ describe('Write Protection Integration Tests', () => {
         createMinimalWorkspace(tempDir);
       }).not.toThrow();
 
-      // Verify files were created
-      expect(fs.existsSync(path.join(localDir, 'intent.md'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'scope.yml'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'deps.yml'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'gates.yml'))).toBe(true);
+      // Verify files were created in runner/
+      const runnerDir = path.join(localDir, 'runner');
+      expect(fs.existsSync(path.join(runnerDir, 'intent.md'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'scope.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'deps.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'gates.yml'))).toBe(true);
     });
 
     it('should succeed when using LEX_PR_PROFILE_DIR env var pointing to writable profile', () => {
@@ -96,11 +97,12 @@ describe('Write Protection Integration Tests', () => {
           createMinimalWorkspace(tempDir);
         }).not.toThrow();
 
-        // Verify files were created in custom directory
-        expect(fs.existsSync(path.join(customDir, 'intent.md'))).toBe(true);
-        expect(fs.existsSync(path.join(customDir, 'scope.yml'))).toBe(true);
-        expect(fs.existsSync(path.join(customDir, 'deps.yml'))).toBe(true);
-        expect(fs.existsSync(path.join(customDir, 'gates.yml'))).toBe(true);
+        // Verify files were created in custom directory runner/
+        const runnerDir = path.join(customDir, 'runner');
+        expect(fs.existsSync(path.join(runnerDir, 'intent.md'))).toBe(true);
+        expect(fs.existsSync(path.join(runnerDir, 'scope.yml'))).toBe(true);
+        expect(fs.existsSync(path.join(runnerDir, 'deps.yml'))).toBe(true);
+        expect(fs.existsSync(path.join(runnerDir, 'gates.yml'))).toBe(true);
       } finally {
         // Restore env
         if (originalEnv) {
@@ -168,11 +170,12 @@ describe('Write Protection Integration Tests', () => {
       // Should succeed (exit code 0 or null for success)
       expect(result.status).toBe(0);
       
-      // Files should be created
-      expect(fs.existsSync(path.join(localDir, 'intent.md'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'scope.yml'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'deps.yml'))).toBe(true);
-      expect(fs.existsSync(path.join(localDir, 'gates.yml'))).toBe(true);
+      // Files should be created in runner/
+      const runnerDir = path.join(localDir, 'runner');
+      expect(fs.existsSync(path.join(runnerDir, 'intent.md'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'scope.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'deps.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(runnerDir, 'gates.yml'))).toBe(true);
     });
   });
 
