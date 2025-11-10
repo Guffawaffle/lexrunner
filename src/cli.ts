@@ -248,6 +248,16 @@ program
 		"Log output format: 'json' or 'human'",
 		process.env.LOG_FORMAT || "human"
 	)
+	.option(
+		"--token-budget <number>",
+		"Maximum token budget for operations (default: 5000)",
+		"5000"
+	)
+	.option(
+		"--max-prompts <number>",
+		"Maximum number of prompts allowed (default: 3)",
+		"3"
+	)
 	.hook("preAction", (thisCommand) => {
 		// Initialize color control based on global flags
 		const opts = thisCommand.optsWithGlobals();
