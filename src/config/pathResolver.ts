@@ -68,7 +68,10 @@ export function resolveConfigPath(
  * Show one-time migration notice to stderr
  */
 export function showMigrationNotice(): void {
-	console.error("⚠️  Legacy flat structure detected. Consider migrating with: lex-pr migrate-profile --from-flat");
+	// Don't show notice in test environment
+	if (!process.env.VITEST) {
+		console.error("⚠️  Legacy flat structure detected. Consider migrating with: lex-pr migrate-profile --from-flat");
+	}
 }
 
 /**
@@ -100,8 +103,8 @@ export function logPathResolution(
 		})
 	};
 
-	// Only log to stderr in non-JSON mode to avoid polluting stdout
-	if (!process.env.LEX_JSON_MODE) {
+	// Only log to stderr in non-JSON mode and not in test environment
+	if (!process.env.LEX_JSON_MODE && !process.env.VITEST) {
 		console.error(JSON.stringify(logEntry));
 	}
 }

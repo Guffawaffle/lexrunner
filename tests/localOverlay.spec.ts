@@ -119,16 +119,17 @@ describe('Local Overlay Setup', () => {
 			const result = initLocalOverlay(tempDir);
 
 			expect(result.copiedFiles.length).toBeGreaterThan(0);
-			expect(result.copiedFiles).toContain('intent.md');
-			expect(result.copiedFiles).toContain('scope.yml');
-			expect(result.copiedFiles).toContain('deps.yml');
-			expect(result.copiedFiles).toContain('gates.yml');
+			expect(result.copiedFiles).toContain('runner/intent.md');
+			expect(result.copiedFiles).toContain('runner/scope.yml');
+			expect(result.copiedFiles).toContain('runner/deps.yml');
+			expect(result.copiedFiles).toContain('runner/gates.yml');
 
-			// Verify files were actually copied
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'intent.md'))).toBe(true);
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'scope.yml'))).toBe(true);
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'deps.yml'))).toBe(true);
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'gates.yml'))).toBe(true);
+			// Verify files were actually copied to runner/
+			const runnerDir = path.join(tempDir, '.smartergpt.local', 'runner');
+			expect(fs.existsSync(path.join(runnerDir, 'intent.md'))).toBe(true);
+			expect(fs.existsSync(path.join(runnerDir, 'scope.yml'))).toBe(true);
+			expect(fs.existsSync(path.join(runnerDir, 'deps.yml'))).toBe(true);
+			expect(fs.existsSync(path.join(runnerDir, 'gates.yml'))).toBe(true);
 		});
 
 		it('should not overwrite existing files in local overlay', () => {
@@ -163,20 +164,22 @@ describe('Local Overlay Setup', () => {
 
 			const result = initLocalOverlay(tempDir);
 
-			expect(result.copiedFiles).toContain('pull-request-template.md');
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'pull-request-template.md'))).toBe(true);
+			expect(result.copiedFiles).toContain('runner/pull-request-template.md');
+			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'runner', 'pull-request-template.md'))).toBe(true);
 		});
 
 		it('should not copy runtime artifacts', () => {
 			const smartergptDir = path.join(tempDir, '.smartergpt');
 			fs.mkdirSync(smartergptDir, { recursive: true });
-			fs.mkdirSync(path.join(smartergptDir, 'runner'), { recursive: true });
+			fs.mkdirSync(path.join(smartergptDir, 'runner-artifacts'), { recursive: true });
 			fs.mkdirSync(path.join(smartergptDir, 'gate-results'), { recursive: true });
-			fs.writeFileSync(path.join(smartergptDir, 'runner', 'plan.json'), '{}');
+			fs.writeFileSync(path.join(smartergptDir, 'runner-artifacts', 'plan.json'), '{}');
 
 			const result = initLocalOverlay(tempDir);
 
-			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'runner'))).toBe(false);
+			const localRunnerDir = path.join(tempDir, '.smartergpt.local', 'runner');
+			// runner/ directory should exist (we create it) but shouldn't have copied artifacts
+			expect(fs.existsSync(localRunnerDir)).toBe(true);
 			expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'gate-results'))).toBe(false);
 		});
 	});
