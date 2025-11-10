@@ -35,6 +35,9 @@ export interface GitHubClient {
 	getOctokit(): any; // Returns Octokit instance for advanced operations
 	getOwner(): string;
 	getRepo(): string;
+	// Minimal context support
+	getPRDiff(prNumber: number): Promise<string>;
+	getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>>;
 }
 
 export class GitHubClientImpl implements GitHubClient {
@@ -340,6 +343,93 @@ export class GitHubClientImpl implements GitHubClient {
 
 	getRepo(): string {
 		return this.repo;
+	}
+
+	/**
+	 * Get unified diff for a pull request
+	 */
+	async getPRDiff(prNumber: number): Promise<string> {
+		try {
+			// Use the GitHub API to get the diff in unified format
+			const response = await this.octokit.rest.pulls.get({
+				owner: this.owner,
+				repo: this.repo,
+				pull_number: prNumber,
+				mediaType: {
+					format: 'diff'
+				}
+			});
+
+			// The response data will be the diff as a string when format is 'diff'
+			return response.data as unknown as string;
+		} catch (error: any) {
+			return this.handleAPIError(error);
+		}
+	}
+
+	/**
+	 * Get files from a pull request with their content
+	 */
+	async getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>> {
+		try {
+			// Get list of files changed in the PR
+			const { data: files } = await this.octokit.rest.pulls.listFiles({
+				owner: this.owner,
+				repo: this.repo,
+				pull_number: prNumber,
+				per_page: 100
+			});
+
+			// Get the PR details to find the head SHA
+			const { data: pr } = await this.octokit.rest.pulls.get({
+				owner: this.owner,
+				repo: this.repo,
+				pull_number: prNumber
+			});
+
+			const headSha = pr.head.sha;
+
+			// Fetch content for each file
+			const filesWithContent = await Promise.all(
+				files
+					.filter(file => {
+						// Only fetch TypeScript/JavaScript files for symbol extraction
+						return /\.(ts|tsx|js|jsx)$/.test(file.filename);
+					})
+					.filter(file => {
+						// Skip deleted files
+						return file.status !== 'removed';
+					})
+					.slice(0, 20) // Limit to 20 files to avoid rate limits
+					.map(async (file) => {
+						try {
+							const { data: content } = await this.octokit.rest.repos.getContent({
+								owner: this.owner,
+								repo: this.repo,
+								path: file.filename,
+								ref: headSha
+							});
+
+							// Content is base64 encoded
+							if ('content' in content && typeof content.content === 'string') {
+								const decoded = Buffer.from(content.content, 'base64').toString('utf-8');
+								return {
+									path: file.filename,
+									content: decoded
+								};
+							}
+							return null;
+						} catch (error) {
+							// File might not exist or be too large
+							return null;
+						}
+					})
+			);
+
+			return filesWithContent.filter((f): f is { path: string; content: string } => f !== null);
+		} catch (error: any) {
+			return this.handleAPIError(error);
+		}
 	}
 }
 

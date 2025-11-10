@@ -8,3 +8,4 @@ export * from "./contextDiet.js";
 export * from "./diffHunks.js";
 export * from "./symbolMap.js";
 export * from "./minimalContext.js";
+export * from "./minimalContextClient.js";
