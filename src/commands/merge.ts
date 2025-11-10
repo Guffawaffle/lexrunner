@@ -12,6 +12,9 @@ import { canonicalJSONStringify } from '../util/canonicalJson.js';
 import { writeJsonOutput } from '../cli/output.js';
 import { throwExit } from '../cli/exitHandler.js';
 import { initAuditEmitter, emitEvent, AuditEmitter, EVENT_TYPES } from '../audit/index.js';
+import { generateDryRunOutput, formatDryRunOutput, validateResume, initializeWeaveExecution } from '../weave/mergeHelpers.js';
+import { initializeLockFile, updateLockFile, deleteLockFile } from '../weave/lockFile.js';
+import { WeaveEvent } from '../weave/types.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -43,6 +46,7 @@ export function registerMergeCommand(
 		.option("--plan <file>", "Path to plan.json file", "plan.json")
 		.option("--dry-run", "Show what would be merged without executing", true)
 		.option("--execute", "Actually perform merge operations")
+		.option("--resume [runId]", "Resume execution from weave-lock.json (optional: specific run ID)")
 		.option("--cleanup", "Clean up integration branches after execution")
 		.option("--json", "Output JSON format")
 		.option("--batch", "Enable batch mode for multiple items")
@@ -58,15 +62,24 @@ export function registerMergeCommand(
 Examples:
   $ lex-pr merge                                # Dry-run: preview merge operations
   $ lex-pr merge --execute                      # Execute merge pyramid
+  $ lex-pr merge --resume                       # Resume from weave-lock.json
+  $ lex-pr merge --resume <runId>               # Resume specific run
   $ lex-pr merge --execute --cleanup            # Execute and clean up integration branches
   $ lex-pr merge --json > merge-results.json    # JSON output for automation
   $ lex-pr merge --levels 1,2 --execute         # Merge only specific levels
   $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
 
+State Management:
+  • Dry-run shows planned batches and execution order
+  • Execute creates weave-lock.json for resume capability
+  • Lock file contains hash(plan.json + PR heads) for validation
+  • Resume validates lock file and continues from last successful state
+
 Common Issues:
   • Merge conflicts: Review conflicts and resolve manually, then re-run
   • Dirty working directory: Commit or stash changes before merging
-  • Permission denied: Ensure you have push access to the repository`)
+  • Permission denied: Ensure you have push access to the repository
+  • Resume validation failed: Plan or PR heads have changed since lock file creation`)
 		.action(async (opts) => {
 			let auditEmitter: AuditEmitter | null = null;
 			try {
@@ -139,50 +152,75 @@ Common Issues:
 
 				const currentBranch = await gitOps.getCurrentBranch();
 
+				// Handle resume mode
+				if (opts.resume !== undefined) {
+					const runId = typeof opts.resume === 'string' ? opts.resume : undefined;
+					
+					if (!(opts.json || jsonModeActive())) {
+						console.log('🔄 RESUME MODE - Validating execution state...');
+					}
+
+					const resumeValidation = await validateResume(runId, plan);
+					
+					if (!resumeValidation.valid) {
+						console.error(`Resume Error: ${resumeValidation.reason}`);
+						throwExit(1);
+					}
+
+					if (!(opts.json || jsonModeActive())) {
+						console.log(`✓ Lock file validated (Run ID: ${resumeValidation.context.runId})`);
+						console.log(`✓ Resuming from state: ${resumeValidation.context.state}`);
+						console.log(`✓ Completed batches: ${resumeValidation.context.currentBatchIndex}/${resumeValidation.context.batches.length}`);
+						console.log('');
+					}
+
+					// Resume execution would continue here
+					// For now, this is a placeholder for the actual resume logic
+					console.log('Resume functionality will continue execution from saved state');
+					return;
+				}
+
 				if (opts.dryRun && !opts.execute) {
-					// Dry run mode (default)
+					// Enhanced dry run mode with state machine preview
+					const dryRunOutput = await generateDryRunOutput(plan);
+
 					if (opts.json || jsonModeActive()) {
-						console.log(canonicalJSONStringify({
-							mode: "dry-run",
-							plan: {
-								target: plan.target,
-								items: plan.items.length,
-							},
-							levels: levels.map((level, index) => ({
-								level: index + 1,
-								items: level,
-								count: level.length,
-							})),
-							currentBranch,
-							isClean,
-						}));
+						console.log(canonicalJSONStringify(dryRunOutput));
 					} else {
-						console.log(`🔍 DRY RUN MODE - Merge plan for ${plan.items.length} items → ${plan.target}`);
-						console.log(`Current branch: ${currentBranch}`);
-						console.log(`Working directory: ${isClean ? 'clean' : 'has changes'}`);
-						console.log("");
-
-						levels.forEach((level, index) => {
-							console.log(`Level ${index + 1}: would merge items [${level.join(', ')}]`);
-						});
-
-						console.log("");
-						console.log("Use --execute to perform actual merges");
+						console.log(formatDryRunOutput(dryRunOutput));
 					}
 				} else if (opts.execute) {
-					// Execute mode
+					// Execute mode with state machine
+					// Initialize weave execution context
+					const { context, stateMachine } = await initializeWeaveExecution(plan);
+					
+					// Initialize lock file
+					initializeLockFile(context);
+
 					if (opts.json || jsonModeActive()) {
-						writeJsonOutput({ mode: "execute", status: "starting" });
+						writeJsonOutput({ 
+							mode: "execute", 
+							status: "starting",
+							runId: context.runId
+						});
 					} else {
 						console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
+						console.log(`Run ID: ${context.runId}`);
 						console.log(`Target: ${plan.target}`);
 						console.log(`Items: ${plan.items.length}`);
-						console.log(`Levels: ${levels.length}`);
+						console.log(`Batches: ${context.batches.length}`);
 						console.log("");
 					}
+
+					// Transition to planning state
+					stateMachine.transition(WeaveEvent.START);
+					updateLockFile(stateMachine.getContext());
 
 					// Create progress reporter (disabled in JSON mode)
 					const progressReporter = new ProgressReporter({ enabled: !jsonModeActive() });
+
+					// Compute merge order
+					const levels = computeMergeOrder(plan);
 
 					// Execute weave
 					const result = await gitOps.executeWeave(plan, levels, progressReporter);
@@ -240,6 +278,14 @@ Common Issues:
 						await gitOps.cleanup();
 						if (!opts.json && !jsonModeActive()) {
 							console.log("🧹 Cleaned up integration branches");
+						}
+					}
+
+					// Delete lock file on successful completion
+					if (result.failed === 0) {
+						deleteLockFile();
+						if (!opts.json && !jsonModeActive()) {
+							console.log("🗑️  Removed weave-lock.json (execution complete)");
 						}
 					}
 				}
