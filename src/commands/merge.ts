@@ -12,6 +12,8 @@ import { canonicalJSONStringify } from '../util/canonicalJson.js';
 import { writeJsonOutput } from '../cli/output.js';
 import { throwExit } from '../cli/exitHandler.js';
 import { initAuditEmitter, emitEvent, AuditEmitter, EVENT_TYPES } from '../audit/index.js';
+import { computeLockHash, formatLockHash, generateLockBranchName } from '../util/lockHash.js';
+import { parseWeaveLock, serializeWeaveLock, WeaveLock } from '../schema/weaveLock.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -44,6 +46,7 @@ export function registerMergeCommand(
 		.option("--dry-run", "Show what would be merged without executing", true)
 		.option("--execute", "Actually perform merge operations")
 		.option("--cleanup", "Clean up integration branches after execution")
+		.option("--force", "Force execution even if same lock hash exists")
 		.option("--json", "Output JSON format")
 		.option("--batch", "Enable batch mode for multiple items")
 		.option("--filter <query>", "Filter items using query language")
@@ -59,9 +62,15 @@ Examples:
   $ lex-pr merge                                # Dry-run: preview merge operations
   $ lex-pr merge --execute                      # Execute merge pyramid
   $ lex-pr merge --execute --cleanup            # Execute and clean up integration branches
+  $ lex-pr merge --execute --force              # Force execution even if lock exists
   $ lex-pr merge --json > merge-results.json    # JSON output for automation
   $ lex-pr merge --levels 1,2 --execute         # Merge only specific levels
   $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
+
+Idempotency:
+  • Lock hash computed from plan.json + PR head commits
+  • Duplicate runs are skipped unless --force is used
+  • Lock hash included in all logs and audit events
 
 Common Issues:
   • Merge conflicts: Review conflicts and resolve manually, then re-run
@@ -113,6 +122,65 @@ Common Issues:
 				const planContent = fs.readFileSync(opts.plan, "utf-8");
 				const plan = loadPlan(planContent);
 
+				// Initialize git operations early (needed for lock hash computation)
+				const gitOps = createGitOperations();
+
+				// Compute lock hash from plan + PR head commits
+				const prHeads = await Promise.all(
+					plan.items.map(async (item) => {
+						const sha = await gitOps.getBranchHead(item.name);
+						return {
+							name: item.name,
+							sha: sha || 'unknown'
+						};
+					})
+				);
+
+				const lockHashResult = computeLockHash(plan, prHeads);
+				const lockHash = lockHashResult.hash;
+				const lockHashShort = formatLockHash(lockHash);
+
+				// Check for existing lock file
+				const lockFilePath = path.join(path.dirname(opts.plan), 'weave-lock.json');
+				let existingLock: WeaveLock | null = null;
+				
+				if (fs.existsSync(lockFilePath)) {
+					try {
+						const lockContent = fs.readFileSync(lockFilePath, 'utf-8');
+						existingLock = parseWeaveLock(lockContent);
+					} catch (e) {
+						console.warn(`Warning: Could not parse existing lock file: ${e instanceof Error ? e.message : String(e)}`);
+					}
+				}
+
+				// Check if we should skip due to existing lock (unless --force)
+				if (existingLock && existingLock.lockHash === lockHash && !opts.force && opts.execute) {
+					if (opts.json || jsonModeActive()) {
+						console.log(canonicalJSONStringify({
+							mode: "skipped",
+							reason: "identical-lock",
+							lockHash: lockHashShort,
+							message: "Same plan and PR heads already executed. Use --force to override."
+						}));
+					} else {
+						console.log(`🔒 Lock Hash: ${lockHashShort}`);
+						console.log(`\n⏭️  Skipping execution - identical lock hash found`);
+						console.log(`   Lock file: ${lockFilePath}`);
+						console.log(`   This plan with these exact PR heads has already been executed.`);
+						console.log(`\n💡 Use --force to override and execute anyway`);
+					}
+					return; // Exit early
+				}
+
+				// Display lock hash (unless in JSON mode)
+				if (!opts.json && !jsonModeActive()) {
+					console.log(`🔒 Lock Hash: ${lockHashShort}`);
+					if (opts.force && existingLock) {
+						console.log(`   Force mode: overriding existing lock`);
+					}
+					console.log("");
+				}
+
 				// Initialize audit emitter from global flag if present
 				const globalOpts = getProgramOpts();
 				const globalAudit = globalOpts.auditProfile as string | undefined;
@@ -121,14 +189,15 @@ Common Issues:
 					const envKey = process.env.LEX_AUDIT_KEY_HEX;
 					const phiFlag = (globalAudit === 'hipaa-strict') || process.env.LEX_AUDIT_PHI === '1';
 					auditEmitter = await initAuditEmitter({ profile: globalAudit as any, dir: auditDir, phiRedaction: phiFlag, encryptionKeyHex: envKey });
-					await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'merge', argv: process.argv.slice(2) });
+					
+					// Set lock hash in audit emitter so all events include it
+					auditEmitter.setLockHash(lockHash);
+					
+					await emitEvent(auditEmitter, EVENT_TYPES.COMMAND_INVOCATION, { command: 'merge', argv: process.argv.slice(2), lockHash: lockHashShort });
 				}
 
 				// Compute merge order
 				const levels = computeMergeOrder(plan);
-
-				// Initialize git operations
-				const gitOps = createGitOperations();
 
 				// Check git status
 				const isClean = await gitOps.isClean();
@@ -144,6 +213,7 @@ Common Issues:
 					if (opts.json || jsonModeActive()) {
 						console.log(canonicalJSONStringify({
 							mode: "dry-run",
+							lockHash: lockHashShort,
 							plan: {
 								target: plan.target,
 								items: plan.items.length,
@@ -170,9 +240,19 @@ Common Issues:
 						console.log("Use --execute to perform actual merges");
 					}
 				} else if (opts.execute) {
+					// Write lock file before execution
+					const lockData: WeaveLock = {
+						lockHash,
+						planHash: lockHashResult.inputs.planHash,
+						prHeads: lockHashResult.inputs.prHeads,
+						timestamp: lockHashResult.timestamp,
+						status: 'in-progress'
+					};
+					fs.writeFileSync(lockFilePath, serializeWeaveLock(lockData));
+
 					// Execute mode
 					if (opts.json || jsonModeActive()) {
-						writeJsonOutput({ mode: "execute", status: "starting" });
+						writeJsonOutput({ mode: "execute", status: "starting", lockHash: lockHashShort });
 					} else {
 						console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
 						console.log(`Target: ${plan.target}`);
@@ -187,10 +267,21 @@ Common Issues:
 					// Execute weave
 					const result = await gitOps.executeWeave(plan, levels, progressReporter);
 
+					// Update lock file status based on result
+					const finalLockData: WeaveLock = {
+						lockHash,
+						planHash: lockHashResult.inputs.planHash,
+						prHeads: lockHashResult.inputs.prHeads,
+						timestamp: lockHashResult.timestamp,
+						status: result.failed > 0 ? 'failed' : 'completed'
+					};
+					fs.writeFileSync(lockFilePath, serializeWeaveLock(finalLockData));
+
 					if (opts.json || jsonModeActive()) {
 						console.log(canonicalJSONStringify({
 							mode: "execute",
 							status: "completed",
+							lockHash: lockHashShort,
 							result: {
 								successful: result.successful,
 								failed: result.failed,
