@@ -1,0 +1,157 @@
+/**
+ * Unit tests for path validation utilities
+ * 
+ * Validates that artifact path restrictions work correctly
+ */
+
+import { describe, it, expect } from 'vitest';
+import { normalizePath, isSafeArtifactPath, validateOutputPath } from '../../src/utils/paths.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
+
+describe('paths: normalizePath', () => {
+	it('should convert backslashes to forward slashes', () => {
+		expect(normalizePath('C:\\path\\to\\file.txt')).toBe('C:/path/to/file.txt');
+		expect(normalizePath('path\\to\\file')).toBe('path/to/file');
+	});
+	
+	it('should leave forward slashes unchanged', () => {
+		expect(normalizePath('/path/to/file.txt')).toBe('/path/to/file.txt');
+		expect(normalizePath('path/to/file')).toBe('path/to/file');
+	});
+	
+	it('should handle mixed slashes', () => {
+		expect(normalizePath('path/to\\file\\test.txt')).toBe('path/to/file/test.txt');
+	});
+});
+
+describe('paths: isSafeArtifactPath', () => {
+	describe('should block PR artifact paths', () => {
+		it('should block /pr-<number>/ paths', () => {
+			expect(() => isSafeArtifactPath('/path/to/pr-123')).toThrow('SAFETY VIOLATION');
+			expect(() => isSafeArtifactPath('/path/to/pr-123')).toThrow('PR artifact directory');
+			expect(() => isSafeArtifactPath('/artifacts/pr-456/output.json')).toThrow('SAFETY VIOLATION');
+		});
+		
+		it('should block /PR-<number>/ paths (case insensitive)', () => {
+			expect(() => isSafeArtifactPath('/path/to/PR-123')).toThrow('SAFETY VIOLATION');
+			expect(() => isSafeArtifactPath('/path/to/Pr-456')).toThrow('SAFETY VIOLATION');
+		});
+		
+		it('should block Windows-style paths with PR directories', () => {
+			expect(() => isSafeArtifactPath('C:\\path\\to\\pr-123')).toThrow('SAFETY VIOLATION');
+			expect(() => isSafeArtifactPath('C:\\artifacts\\PR-456\\output.json')).toThrow('SAFETY VIOLATION');
+		});
+		
+		it('should block /artifacts/PR-*/ paths', () => {
+			expect(() => isSafeArtifactPath('artifacts/PR-123/spec.json')).toThrow('SAFETY VIOLATION');
+			expect(() => isSafeArtifactPath('/home/user/artifacts/pr-456/file.txt')).toThrow('SAFETY VIOLATION');
+		});
+		
+		it('should include helpful guidance in error message', () => {
+			try {
+				isSafeArtifactPath('/path/to/pr-123');
+				expect.fail('Should have thrown');
+			} catch (error) {
+				expect((error as Error).message).toContain('.smartergpt.local/deliverables/_session/');
+			}
+		});
+	});
+	
+	describe('should allow session deliverable paths', () => {
+		it('should allow .smartergpt.local/deliverables/_session/', () => {
+			expect(isSafeArtifactPath('.smartergpt.local/deliverables/_session/idea.json')).toBe(true);
+			expect(isSafeArtifactPath('/home/user/.smartergpt.local/deliverables/_session/spec.json')).toBe(true);
+		});
+		
+		it('should allow .smartergpt.local/runner/logs/', () => {
+			expect(isSafeArtifactPath('.smartergpt.local/runner/logs/output.log')).toBe(true);
+			expect(isSafeArtifactPath('/project/.smartergpt.local/runner/logs/debug.log')).toBe(true);
+		});
+		
+		it('should allow .smartergpt/deliverables/_session/', () => {
+			expect(isSafeArtifactPath('.smartergpt/deliverables/_session/file.json')).toBe(true);
+			expect(isSafeArtifactPath('/workspace/.smartergpt/deliverables/_session/output.txt')).toBe(true);
+		});
+		
+		it('should be case insensitive for allowed patterns', () => {
+			expect(isSafeArtifactPath('.SmartErGPT.Local/deliverables/_session/file.json')).toBe(true);
+			expect(isSafeArtifactPath('.SMARTERGPT/DELIVERABLES/_SESSION/file.txt')).toBe(true);
+		});
+	});
+	
+	describe('should allow other safe paths', () => {
+		it('should allow /tmp paths', () => {
+			expect(isSafeArtifactPath('/tmp/output.json')).toBe(true);
+			expect(isSafeArtifactPath('/tmp/work/file.txt')).toBe(true);
+		});
+		
+		it('should allow home directory paths', () => {
+			expect(isSafeArtifactPath('/home/user/documents/file.txt')).toBe(true);
+			expect(isSafeArtifactPath('~/projects/output.json')).toBe(true);
+		});
+		
+		it('should allow project root paths (if not in PR dir)', () => {
+			expect(isSafeArtifactPath('./output.json')).toBe(true);
+			expect(isSafeArtifactPath('output/file.txt')).toBe(true);
+		});
+	});
+	
+	describe('edge cases', () => {
+		it('should allow pr in filename without number', () => {
+			expect(isSafeArtifactPath('/path/to/pr-template.txt')).toBe(true);
+			// pr-<number> with digits is still caught
+		});
+		
+		it('should handle empty paths', () => {
+			expect(isSafeArtifactPath('')).toBe(true);
+		});
+		
+		it('should handle relative paths with ../', () => {
+			expect(isSafeArtifactPath('../output/file.txt')).toBe(true);
+			expect(() => isSafeArtifactPath('../pr-123/file.txt')).toThrow('SAFETY VIOLATION');
+		});
+	});
+});
+
+describe('paths: validateOutputPath', () => {
+	it('should pass for safe allowed paths', async () => {
+		const tmpDir = os.tmpdir();
+		const testPath = path.join(tmpDir, 'lex-pr-test', 'output.json');
+		
+		await expect(validateOutputPath(testPath)).resolves.not.toThrow();
+		
+		// Cleanup
+		try {
+			await fs.rm(path.dirname(testPath), { recursive: true, force: true });
+		} catch {
+			// Ignore cleanup errors
+		}
+	});
+	
+	it('should create parent directory if missing', async () => {
+		const tmpDir = os.tmpdir();
+		const testDir = path.join(tmpDir, 'lex-pr-test-' + Date.now());
+		const testPath = path.join(testDir, 'nested', 'dir', 'output.json');
+		
+		await validateOutputPath(testPath);
+		
+		// Check that parent directory was created
+		const parentDir = path.dirname(testPath);
+		await expect(fs.access(parentDir)).resolves.not.toThrow();
+		
+		// Cleanup
+		await fs.rm(testDir, { recursive: true, force: true });
+	});
+	
+	it('should throw for PR artifact paths', async () => {
+		await expect(validateOutputPath('/path/to/pr-123/output.json'))
+			.rejects.toThrow('SAFETY VIOLATION');
+	});
+	
+	it('should throw for artifacts/PR-* paths', async () => {
+		await expect(validateOutputPath('artifacts/PR-456/spec.json'))
+			.rejects.toThrow('SAFETY VIOLATION');
+	});
+});

@@ -165,6 +165,220 @@ lex-pr merge plan.json
 
 See [docs/quickstart.md](docs/quickstart.md) for a complete 5-minute onboarding guide.
 
+## Front-End Capture Pipeline
+
+The front-end capture pipeline enables rapid idea-to-project workflows using GitHub Issues (no PRs).
+
+### Commands
+
+#### `lex-pr idea`
+
+Capture feature ideas, generate Feature Spec v0, create/update Idea Issues.
+
+**Usage:**
+```bash
+# Interactive mode (prompts for all inputs)
+lex-pr idea
+
+# Non-interactive with flags
+lex-pr idea \
+  --title "Add dark mode support" \
+  --description "Implement theme switcher with light/dark modes"
+
+# Dry run (no Issue creation)
+lex-pr idea \
+  --title "Add dark mode support" \
+  --description "Implement theme switcher" \
+  --dry-run
+
+# Update existing Issue (idempotent via fingerprinting)
+lex-pr idea \
+  --title "Add dark mode support (revised)" \
+  --description "Implement theme switcher with auto-detection" \
+  --update-issue 123
+
+# Custom output path
+lex-pr idea \
+  --title "Add dark mode support" \
+  --description "Implement theme switcher" \
+  --output /tmp/my-idea.json
+```
+
+**Options:**
+- `--title <string>` - Idea title (interactive if omitted)
+- `--description <string>` - Brief description (interactive if omitted)
+- `--interactive` - Force interactive mode
+- `--dry-run` - Generate spec without creating Issue
+- `--output <path>` - Output path for Feature Spec v0 (default: `.smartergpt.local/deliverables/_session/idea-{timestamp}.json`)
+- `--repo <owner/repo>` - Target repository (default: auto-detect from git remote)
+- `--label <label>` - Additional labels (repeatable)
+- `--update-issue <num>` - Update existing Issue (idempotent)
+
+**Output:**
+- Feature Spec v0 JSON (validated against schema)
+- GitHub Idea Issue with `[IDEA]` prefix and `idea`, `needs-triage` labels
+- Fingerprint for idempotent updates
+
+---
+
+#### `lex-pr create-project`
+
+Load Feature Spec v0, generate Execution Plan v1, create Epic + Sub-Issues.
+
+**Usage:**
+```bash
+# Basic usage (requires Feature Spec v0 from lex-pr idea)
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json
+
+# Dry run (no Issue creation)
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json \
+  --dry-run
+
+# With custom labels
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json \
+  --epic-labels "phase-1,high-priority" \
+  --issue-labels "sprint-3"
+
+# Custom output path
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json \
+  --output /tmp/execution-plan.json
+
+# Skip sub-issue linking
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json \
+  --no-link
+```
+
+**Options:**
+- `--spec <path>` - Feature Spec v0 file (required)
+- `--dry-run` - Generate plan without creating Issues
+- `--output <path>` - Output path for Execution Plan v1 (default: `.smartergpt.local/deliverables/_session/plan-{timestamp}.json`)
+- `--repo <owner/repo>` - Target repository (default: auto-detect from spec)
+- `--project <name/num>` - Link Issues to GitHub Project (optional)
+- `--epic-labels <labels>` - Additional Epic labels (comma-separated)
+- `--issue-labels <labels>` - Additional sub-issue labels (comma-separated)
+- `--no-link` - Skip sub-issue linking
+
+**Output:**
+- Execution Plan v1 JSON (validated against schema)
+- GitHub Epic Issue with `epic` label
+- GitHub Sub-Issues (feature, testing, docs) linked to Epic
+
+---
+
+### Workflow Example
+
+**End-to-end: Idea → Epic + Sub-Issues**
+
+```bash
+# Step 1: Capture idea
+lex-pr idea \
+  --title "Add webhooks support" \
+  --description "Allow users to configure webhooks for events"
+
+# Output:
+# ✓ Feature Spec v0 written to: .smartergpt.local/deliverables/_session/idea-2025-11-09T14-30-00.json
+# ✓ Idea Issue created: https://github.com/owner/repo/issues/456
+
+# Step 2: Generate project
+lex-pr create-project \
+  --spec .smartergpt.local/deliverables/_session/idea-2025-11-09T14-30-00.json
+
+# Output:
+# ✓ Execution Plan v1 written to: .smartergpt.local/deliverables/_session/plan-2025-11-09T14-35-00.json
+# ✓ Epic created: https://github.com/owner/repo/issues/457
+# ✓ Sub-Issue created: https://github.com/owner/repo/issues/458 (feature)
+# ✓ Sub-Issue created: https://github.com/owner/repo/issues/459 (testing)
+# ✓ Sub-Issue created: https://github.com/owner/repo/issues/460 (docs)
+```
+
+---
+
+### Safety Mechanisms
+
+**PR Prevention:**
+- Commands are Issues-only; no PR creation logic
+- Runtime guards detect accidental PR API calls
+- PR-related flags (`--create-pr`, `--pr`) rejected
+
+**Artifact Path Restrictions:**
+- Writes allowed only to `.smartergpt.local/deliverables/_session/`
+- PR directories (`/PR-<number>/`, `/artifacts/PR-*/`) blocked
+- Custom output paths validated before write
+
+**Schema Validation:**
+- All inputs/outputs validated against Zod schemas
+- Pre-flight checks before Issue creation
+- Detailed error messages with line numbers
+
+---
+
+### Schemas
+
+**Feature Spec v0:**
+```json
+{
+  "schemaVersion": "0.1.0",
+  "title": "Add dark mode support",
+  "description": "Implement theme switcher with light/dark modes",
+  "acceptanceCriteria": [
+    "User can toggle between light and dark themes",
+    "Theme preference persists across sessions",
+    "All UI components support both themes"
+  ],
+  "technicalContext": "Use CSS variables and localStorage",
+  "constraints": "Must work in IE11+",
+  "repo": "owner/repo",
+  "createdAt": "2025-11-09T14:30:00.000Z"
+}
+```
+
+**Execution Plan v1:**
+```json
+{
+  "schemaVersion": "1.0.0",
+  "sourceSpec": { /* Feature Spec v0 */ },
+  "epic": {
+    "title": "Add dark mode support",
+    "description": "Implement theme switcher with light/dark modes",
+    "acceptanceCriteria": [ /* from Feature Spec */ ]
+  },
+  "subIssues": [
+    {
+      "id": "feature-impl",
+      "title": "Implement Add dark mode support",
+      "description": "Core implementation of feature",
+      "type": "feature",
+      "acceptanceCriteria": [ /* from Feature Spec */ ],
+      "dependsOn": []
+    },
+    {
+      "id": "tests",
+      "title": "Add tests for Add dark mode support",
+      "description": "Unit and integration tests",
+      "type": "testing",
+      "acceptanceCriteria": ["Unit tests pass", "Integration tests pass", "Coverage > 80%"],
+      "dependsOn": ["feature-impl"]
+    },
+    {
+      "id": "docs",
+      "title": "Document Add dark mode support",
+      "description": "User-facing documentation",
+      "type": "docs",
+      "acceptanceCriteria": ["README updated", "Examples added", "API docs complete"],
+      "dependsOn": ["feature-impl"]
+    }
+  ],
+  "createdAt": "2025-11-09T14:35:00.000Z"
+}
+```
+
+For complete documentation, see [docs/front-end-capture-pipeline.md](docs/front-end-capture-pipeline.md).
+
 ## 📚 Documentation
 
 Complete documentation and interactive plan review guides
@@ -173,6 +387,7 @@ See the full documentation index: [docs/README.md](docs/README.md)
 
 Quick links:
 - **Getting Started**: docs/quickstart.md — 5-minute onboarding
+- **Front-End Capture Pipeline**: docs/front-end-capture-pipeline.md — idea → project workflow (Issues-only)
 - **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
 - **Diffgraph Planner**: docs/diffgraph-planner.md — automatic dependency discovery & merge ordering
 - **Architecture Overview**: docs/architecture.md — system design & philosophy

@@ -69,6 +69,8 @@ import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-iss
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
+import { registerIdeaCommand } from "./commands/idea.js";
+import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
@@ -262,6 +264,8 @@ program
 		`
 Examples:
 	$ lex-pr init                           Initialize workspace with interactive setup
+	$ lex-pr idea                           Capture feature idea interactively
+	$ lex-pr idea --title "..." --description "..." --dry-run
 	$ lex-pr doctor                         Validate environment and configuration
 	$ lex-pr config show                    Display configuration with precedence chain
 	$ lex-pr config show --key scope.target Show specific configuration value
@@ -287,11 +291,12 @@ Power User Commands:
 	$ lex-pr completion bash                Generate bash completion script
 
 Workflow:
-	1. Discover:    lex-pr discover (optionally add --suggest for dependencies)
-	2. Plan:        lex-pr plan --from-github --json > plan.json
-	3. Review:      lex-pr plan-review plan.json
-	4. Execute:     lex-pr execute plan.json
-	5. Report:      lex-pr report artifacts --out md
+	1. Ideate:      lex-pr idea (capture feature ideas as GitHub Issues)
+	2. Discover:    lex-pr discover (optionally add --suggest for dependencies)
+	3. Plan:        lex-pr plan --from-github --json > plan.json
+	4. Review:      lex-pr plan-review plan.json
+	5. Execute:     lex-pr execute plan.json
+	6. Report:      lex-pr report artifacts --out md
 `
 	);
 
@@ -375,7 +380,7 @@ program
 // Plan review command - modularized in Phase 2
 registerPlanReviewCommand(program, {
 	exitWith,
-	getProgramOpts: () => program.opts()
+	getProgramOpts: () => program.opts(),
 });
 
 // Merge order command - modular implementation
@@ -393,7 +398,7 @@ registerAutopilotCommand(program, {
 	exitWith,
 	getAuditProfile: () => program.opts().auditProfile as string | undefined,
 	getAuditKey: () => program.opts().auditKey as string | undefined,
-	finalizeAuditGuard
+	finalizeAuditGuard,
 });
 
 // Execute plan command (replaces gate command)
@@ -401,7 +406,7 @@ registerAutopilotCommand(program, {
 registerExecuteCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith,
-	getProgramOpts: () => program.opts()
+	getProgramOpts: () => program.opts(),
 });
 
 // Status command - modularized in Phase 2.5
@@ -419,9 +424,11 @@ registerReportCommand(program);
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Merge command - Execute merge pyramid with git operations
-registerMergeCommand(program, () => jsonModeActive, () => program.opts());
-
-
+registerMergeCommand(
+	program,
+	() => jsonModeActive,
+	() => program.opts()
+);
 
 // Doctor command - modularized in Phase 4.4
 registerDoctorCommand(program, () => jsonModeActive);
@@ -431,6 +438,9 @@ registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Config validate command - configuration validation
 registerConfigValidateCommand(program, () => jsonModeActive);
+
+// Idea command - feature idea capture
+registerIdeaCommand(program);
 
 // Init command - Interactive workspace setup
 program
@@ -884,6 +894,9 @@ registerAssignBatchCommand(program);
 
 // Audit operations command
 registerAuditCommands(program);
+
+// Create project command
+registerCreateProjectCommand(program);
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
