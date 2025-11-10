@@ -246,11 +246,18 @@ export function registerDoctorCommand(program: Command, jsonModeActive?: () => b
 				console.log("ℹ plan.json: not found (run 'lex-pr plan' to generate)");
 			}
 
-			// Check .smartergpt directory structure
+			// Check .smartergpt directory structure with runner/ support
 			const smartergptDir = ".smartergpt";
 			if (fs.existsSync(smartergptDir)) {
 				const expectedFiles = ["intent.md", "scope.yml", "deps.yml", "gates.yml"];
-				const missingFiles = expectedFiles.filter(file => !fs.existsSync(path.join(smartergptDir, file)));
+				const runnerDir = path.join(smartergptDir, "runner");
+				
+				// Check both runner/ and flat structure
+				const missingFiles = expectedFiles.filter(file => {
+					const runnerPath = path.join(runnerDir, file);
+					const flatPath = path.join(smartergptDir, file);
+					return !fs.existsSync(runnerPath) && !fs.existsSync(flatPath);
+				});
 
 				if (missingFiles.length === 0) {
 					console.log(`✓ .smartergpt: all expected files present`);

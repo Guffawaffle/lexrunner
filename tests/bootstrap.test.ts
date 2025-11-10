@@ -76,11 +76,13 @@ describe('Bootstrap Configuration', () => {
       createMinimalWorkspace(tempDir);
 
       const expectedFiles = ['intent.md', 'scope.yml', 'deps.yml', 'gates.yml'];
+      const runnerDir = path.join(profileDir, 'runner');
 
       expect(fs.existsSync(profileDir)).toBe(true);
+      expect(fs.existsSync(runnerDir)).toBe(true);
       
       for (const file of expectedFiles) {
-        const filePath = path.join(profileDir, file);
+        const filePath = path.join(runnerDir, file);
         expect(fs.existsSync(filePath)).toBe(true);
         const content = fs.readFileSync(filePath, 'utf-8');
         expect(content.length).toBeGreaterThan(0);
@@ -118,18 +120,20 @@ describe('Bootstrap Configuration', () => {
       
       createMinimalWorkspace(tempDir);
       
+      const runnerDir = path.join(profileDir, 'runner');
+      
       // Check scope.yml has proper YAML structure
-      const scopeContent = fs.readFileSync(path.join(profileDir, 'scope.yml'), 'utf-8');
+      const scopeContent = fs.readFileSync(path.join(runnerDir, 'scope.yml'), 'utf-8');
       expect(scopeContent).toContain('version: 1');
       expect(scopeContent).toContain('target: main');
 
       // Check deps.yml has proper YAML structure
-      const depsContent = fs.readFileSync(path.join(profileDir, 'deps.yml'), 'utf-8');
+      const depsContent = fs.readFileSync(path.join(runnerDir, 'deps.yml'), 'utf-8');
       expect(depsContent).toContain('version: 1');
       expect(depsContent).toContain('target: main');
 
       // Check gates.yml has proper YAML structure
-      const gatesContent = fs.readFileSync(path.join(profileDir, 'gates.yml'), 'utf-8');
+      const gatesContent = fs.readFileSync(path.join(runnerDir, 'gates.yml'), 'utf-8');
       expect(gatesContent).toContain('version: 1');
       expect(gatesContent).toContain('gates:');
     });

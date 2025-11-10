@@ -92,6 +92,10 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 		if (!fs.existsSync(profileDir)) {
 			fs.mkdirSync(profileDir, { recursive: true });
 		}
+		
+		// Ensure runner/ subdirectory exists
+		const runnerDir = path.join(profileDir, 'runner');
+		fs.mkdirSync(runnerDir, { recursive: true });
 
 		// Create or update profile manifest
 		const manifestPath = path.join(profileDir, 'profile.yml');
@@ -106,8 +110,8 @@ description: Auto-generated workspace for local development
 		// Create minimal workspace
 		createMinimalWorkspace(baseDir, profileDir);
 
-		// Create pull-request-template.md with dependency syntax examples
-		const templatePath = path.join(profileDir, 'pull-request-template.md');
+		// Create pull-request-template.md in runner/
+		const templatePath = path.join(runnerDir, 'pull-request-template.md');
 		if (!fs.existsSync(templatePath)) {
 			const templateContent = getPRTemplateContent();
 			fs.writeFileSync(templatePath, templateContent);
@@ -116,16 +120,16 @@ description: Auto-generated workspace for local development
 		console.log(`\n✅ Workspace initialized successfully!\n`);
 		console.log(`📂 Profile directory: ${profileDir}`);
 		console.log(`\n📝 Created files:`);
-		console.log(`   - intent.md (project goals and scope)`);
-		console.log(`   - scope.yml (PR discovery rules)`);
-		console.log(`   - deps.yml (dependency relationships)`);
-		console.log(`   - gates.yml (quality gates configuration)`);
-		console.log(`   - pull-request-template.md (PR template with dependency syntax)`);
+		console.log(`   - runner/intent.md (project goals and scope)`);
+		console.log(`   - runner/scope.yml (PR discovery rules)`);
+		console.log(`   - runner/deps.yml (dependency relationships)`);
+		console.log(`   - runner/gates.yml (quality gates configuration)`);
+		console.log(`   - runner/pull-request-template.md (PR template with dependency syntax)`);
 		
 		console.log(`\n📚 Next steps:`);
-		console.log(`   1. Edit ${profileDir}/intent.md to describe your project`);
-		console.log(`   2. Configure ${profileDir}/scope.yml for PR discovery`);
-		console.log(`   3. Set up quality gates in ${profileDir}/gates.yml`);
+		console.log(`   1. Edit ${profileDir}/runner/intent.md to describe your project`);
+		console.log(`   2. Configure ${profileDir}/runner/scope.yml for PR discovery`);
+		console.log(`   3. Set up quality gates in ${profileDir}/runner/gates.yml`);
 		console.log(`   4. Run 'lex-pr doctor' to verify your setup`);
 		console.log(`   5. Run 'lex-pr discover' to find open PRs\n`);
 

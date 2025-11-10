@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import YAML from "yaml";
 import { detectProjectType } from "../core/bootstrap.js";
+import { resolveConfigPath } from "./pathResolver.js";
 
 export interface LocalOverlayConfig {
 	role: string;
@@ -115,23 +116,29 @@ function copyRelevantFiles(baseDir: string, localDir: string): string[] {
 		return copiedFiles; // No .smartergpt to copy from
 	}
 	
+	// Create runner/ subdirectory
+	const runnerDir = path.join(localDir, "runner");
+	fs.mkdirSync(runnerDir, { recursive: true });
+	
 	// Files to potentially copy (excluding runtime artifacts)
 	const candidateFiles = [
 		"intent.md",
 		"scope.yml",
 		"deps.yml",
 		"gates.yml",
+		"stack.yml",
 		"pull-request-template.md"
 	];
 	
 	for (const file of candidateFiles) {
-		const sourcePath = path.join(smartergptDir, file);
-		const destPath = path.join(localDir, file);
+		// Use resolveConfigPath to check both runner/ and flat structures
+		const sourceResolved = resolveConfigPath(smartergptDir, file);
+		const destPath = path.join(runnerDir, file);
 		
 		// Only copy if source exists and destination doesn't
-		if (fs.existsSync(sourcePath) && !fs.existsSync(destPath)) {
-			fs.copyFileSync(sourcePath, destPath);
-			copiedFiles.push(file);
+		if (sourceResolved.exists && !fs.existsSync(destPath)) {
+			fs.copyFileSync(sourceResolved.path, destPath);
+			copiedFiles.push(`runner/${file}`);
 		}
 	}
 	

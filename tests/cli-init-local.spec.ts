@@ -119,12 +119,12 @@ describe('CLI init-local Integration Tests', () => {
 		});
 
 		expect(output).toContain('Copied files from .smartergpt/');
-		expect(output).toContain('intent.md');
-		expect(output).toContain('scope.yml');
+		expect(output).toContain('runner/intent.md');
+		expect(output).toContain('runner/scope.yml');
 
-		// Verify files were copied
-		expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'intent.md'))).toBe(true);
-		expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'scope.yml'))).toBe(true);
+		// Verify files were copied to runner/
+		expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'runner', 'intent.md'))).toBe(true);
+		expect(fs.existsSync(path.join(tempDir, '.smartergpt.local', 'runner', 'scope.yml'))).toBe(true);
 	});
 
 	it('should have deterministic JSON output', () => {

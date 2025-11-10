@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { resolveProfile } from "../../config/profileResolver.js";
+import { resolveConfigPath } from "../../config/pathResolver.js";
 import { writeJsonOutput } from "../../cli/output.js";
 import { throwExit } from "../../cli/exitHandler.js";
 import { CONFIG_SCHEMAS, ConfigFileName } from "../../config/schemas.js";
@@ -110,7 +111,7 @@ function validateFileSchema(
  * Validate a single configuration file
  */
 function validateConfigFile(
-	filePath: string,
+	profilePath: string,
 	fileName: string
 ): FileValidationResult {
 	const result: FileValidationResult = {
@@ -120,8 +121,12 @@ function validateConfigFile(
 		warnings: [],
 	};
 
+	// Resolve config path with runner/ support
+	const resolved = resolveConfigPath(profilePath, fileName);
+	const filePath = resolved.path;
+
 	// Check if file exists
-	if (!fs.existsSync(filePath)) {
+	if (!resolved.exists) {
 		// Optional files - not an error
 		if (
 			fileName === "deps.yml" ||
@@ -195,13 +200,13 @@ function validateCrossReferences(
 ): Array<{ file: string; message: string }> {
 	const warnings: Array<{ file: string; message: string }> = [];
 
-	// Load gates.yml to get defined gates
-	const gatesPath = path.join(profilePath, "gates.yml");
+	// Load gates.yml to get defined gates with runner/ support
+	const gatesResolved = resolveConfigPath(profilePath, "gates.yml");
 	let definedGates: Set<string> = new Set();
 
-	if (fs.existsSync(gatesPath)) {
+	if (gatesResolved.exists) {
 		try {
-			const gatesContent = fs.readFileSync(gatesPath, "utf-8");
+			const gatesContent = fs.readFileSync(gatesResolved.path, "utf-8");
 			const gatesParsed = YAML.parse(gatesContent);
 			if (gatesParsed?.levels) {
 				for (const level of Object.values(gatesParsed.levels)) {
@@ -220,11 +225,11 @@ function validateCrossReferences(
 		}
 	}
 
-	// Check stack.yml for gate references
-	const stackPath = path.join(profilePath, "stack.yml");
-	if (fs.existsSync(stackPath)) {
+	// Check stack.yml for gate references with runner/ support
+	const stackResolved = resolveConfigPath(profilePath, "stack.yml");
+	if (stackResolved.exists) {
 		try {
-			const stackContent = fs.readFileSync(stackPath, "utf-8");
+			const stackContent = fs.readFileSync(stackResolved.path, "utf-8");
 			const stackParsed = YAML.parse(stackContent);
 			if (stackParsed?.items) {
 				for (const item of stackParsed.items) {
@@ -269,8 +274,7 @@ function validateProfile(
 
 	// Validate each config file
 	for (const fileName of configFiles) {
-		const filePath = path.join(profilePath, fileName);
-		const result = validateConfigFile(filePath, fileName);
+		const result = validateConfigFile(profilePath, fileName);
 		fileResults.set(fileName, result);
 
 		// Collect errors

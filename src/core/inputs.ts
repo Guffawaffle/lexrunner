@@ -8,6 +8,7 @@ import * as path from "path";
 import YAML from "yaml";
 import { z } from "zod";
 import { stableSort } from "../util/canonicalJson.js";
+import { resolveConfigPath, showMigrationNotice, logPathResolution } from "../config/pathResolver.js";
 
 /**
  * Configuration source types
@@ -119,11 +120,20 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 		sources: [],
 		provenance
 	};
+	
+	let showedMigrationNotice = false;
 
-	// Load stack.yml (highest precedence)
-	const stackPath = path.join(smartergptDir, "stack.yml");
-	const stackSource = loadConfigFile(stackPath);
+	// Load stack.yml (highest precedence) with path resolution
+	const stackResolved = resolveConfigPath(smartergptDir, "stack.yml");
+	const stackSource = loadConfigFile(stackResolved.path);
 	sources.push(stackSource);
+	
+	// Log and show migration notice if needed
+	if (stackResolved.shouldNotifyMigration) {
+		showMigrationNotice();
+		showedMigrationNotice = true;
+	}
+	logPathResolution("loadStack", stackResolved);
 
 	if (stackSource.exists) {
 		const stackConfig = StackConfig.parse(stackSource.content);
@@ -153,10 +163,17 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 			};
 		});
 	} else {
-		// Fallback: try scope.yml and deps.yml
-		const scopePath = path.join(smartergptDir, "scope.yml");
-		const scopeSource = loadConfigFile(scopePath);
+		// Fallback: try scope.yml and deps.yml with path resolution
+		const scopeResolved = resolveConfigPath(smartergptDir, "scope.yml");
+		const scopeSource = loadConfigFile(scopeResolved.path);
 		sources.push(scopeSource);
+		
+		// Log and show migration notice if needed
+		if (scopeResolved.shouldNotifyMigration && !showedMigrationNotice) {
+			showMigrationNotice();
+			showedMigrationNotice = true;
+		}
+		logPathResolution("loadScope", scopeResolved);
 
 		if (scopeSource.exists) {
 			const scopeConfig = ScopeConfig.parse(scopeSource.content);
@@ -167,9 +184,12 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 		}
 
 		// deps.yml would be loaded here if it existed
-		const depsPath = path.join(smartergptDir, "deps.yml");
-		const depsSource = loadConfigFile(depsPath);
+		const depsResolved = resolveConfigPath(smartergptDir, "deps.yml");
+		const depsSource = loadConfigFile(depsResolved.path);
 		sources.push(depsSource);
+		
+		// Log (no migration notice needed as we only show once)
+		logPathResolution("loadDeps", depsResolved);
 	}
 
 	// Sort items by name for deterministic output
@@ -226,19 +246,22 @@ export function detectGitHubMode(baseDir: string = "."): {
 	};
 } {
 	const smartergptDir = path.join(baseDir, ".smartergpt");
-	const stackPath = path.join(smartergptDir, "stack.yml");
-	const scopePath = path.join(smartergptDir, "scope.yml");
-
+	
+	// Check stack.yml with path resolution
+	const stackResolved = resolveConfigPath(smartergptDir, "stack.yml");
+	
 	// If stack.yml exists, don't auto-enable GitHub mode (traditional mode)
-	if (fs.existsSync(stackPath)) {
+	if (stackResolved.exists) {
 		return { shouldUseGitHub: false };
 	}
 
-	// Check if scope.yml exists
-	const scopeSource = loadConfigFile(scopePath);
-	if (!scopeSource.exists) {
+	// Check scope.yml with path resolution
+	const scopeResolved = resolveConfigPath(smartergptDir, "scope.yml");
+	if (!scopeResolved.exists) {
 		return { shouldUseGitHub: false };
 	}
+	
+	const scopeSource = loadConfigFile(scopeResolved.path);
 
 	try {
 		const scopeConfig = ScopeConfig.parse(scopeSource.content);

@@ -30,20 +30,26 @@ describe('Init Command', () => {
       expect(result.success).toBe(true);
       expect(result.profileDir).toContain('.smartergpt.local');
       
-      // Check that files were created
-      const expectedFiles = [
+      // Check that files were created in runner/ subdirectory
+      const runnerDir = path.join(result.profileDir, 'runner');
+      expect(fs.existsSync(runnerDir)).toBe(true);
+      
+      const configFiles = [
         'intent.md',
         'scope.yml',
         'deps.yml',
         'gates.yml',
-        'pull-request-template.md',
-        'profile.yml'
+        'pull-request-template.md'
       ];
 
-      for (const file of expectedFiles) {
-        const filePath = path.join(result.profileDir, file);
+      for (const file of configFiles) {
+        const filePath = path.join(runnerDir, file);
         expect(fs.existsSync(filePath)).toBe(true);
       }
+      
+      // Check profile.yml is in root of profile dir
+      const profileManifest = path.join(result.profileDir, 'profile.yml');
+      expect(fs.existsSync(profileManifest)).toBe(true);
     });
 
     it('should respect --profile-dir option', async () => {
@@ -81,8 +87,8 @@ describe('Init Command', () => {
       // Create initial configuration
       const result1 = await runInit({ nonInteractive: true });
       
-      // Modify a file
-      const intentPath = path.join(result1.profileDir, 'intent.md');
+      // Modify a file in runner/
+      const intentPath = path.join(result1.profileDir, 'runner', 'intent.md');
       const originalContent = fs.readFileSync(intentPath, 'utf-8');
       fs.writeFileSync(intentPath, '# Modified content');
 
@@ -130,7 +136,7 @@ describe('Init Command', () => {
     it('should create intent.md with project goals template', async () => {
       const result = await runInit({ nonInteractive: true });
 
-      const intentPath = path.join(result.profileDir, 'intent.md');
+      const intentPath = path.join(result.profileDir, 'runner', 'intent.md');
       const content = fs.readFileSync(intentPath, 'utf-8');
 
       expect(content).toContain('# Project Intent');
@@ -141,7 +147,7 @@ describe('Init Command', () => {
     it('should create scope.yml with proper structure', async () => {
       const result = await runInit({ nonInteractive: true });
 
-      const scopePath = path.join(result.profileDir, 'scope.yml');
+      const scopePath = path.join(result.profileDir, 'runner', 'scope.yml');
       const content = fs.readFileSync(scopePath, 'utf-8');
 
       expect(content).toContain('version: 1');
@@ -152,7 +158,7 @@ describe('Init Command', () => {
     it('should create gates.yml with example gates', async () => {
       const result = await runInit({ nonInteractive: true });
 
-      const gatesPath = path.join(result.profileDir, 'gates.yml');
+      const gatesPath = path.join(result.profileDir, 'runner', 'gates.yml');
       const content = fs.readFileSync(gatesPath, 'utf-8');
 
       expect(content).toContain('version: 1');
@@ -164,7 +170,7 @@ describe('Init Command', () => {
     it('should create pull-request-template.md with dependency syntax', async () => {
       const result = await runInit({ nonInteractive: true });
 
-      const templatePath = path.join(result.profileDir, 'pull-request-template.md');
+      const templatePath = path.join(result.profileDir, 'runner', 'pull-request-template.md');
       const content = fs.readFileSync(templatePath, 'utf-8');
 
       expect(content).toContain('Depends-On:');
@@ -185,7 +191,7 @@ describe('Init Command', () => {
     it('should not overwrite existing files', async () => {
       const result = await runInit({ nonInteractive: true });
 
-      const intentPath = path.join(result.profileDir, 'intent.md');
+      const intentPath = path.join(result.profileDir, 'runner', 'intent.md');
       const customContent = '# My Custom Intent';
       fs.writeFileSync(intentPath, customContent);
 
