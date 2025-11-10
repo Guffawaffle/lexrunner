@@ -129,7 +129,7 @@ export function loadInputs(baseDir: string = "."): InputConfig {
 	sources.push(stackSource);
 	
 	// Log and show migration notice if needed
-	if (stackResolved.shouldNotifyMigration && !showedMigrationNotice) {
+	if (stackResolved.shouldNotifyMigration) {
 		showMigrationNotice();
 		showedMigrationNotice = true;
 	}

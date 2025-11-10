@@ -4,7 +4,6 @@ import * as path from 'path';
 import * as os from 'os';
 import {
 	resolveConfigPath,
-	showMigrationNotice,
 	resetMigrationNotice
 } from '../src/config/pathResolver.js';
 

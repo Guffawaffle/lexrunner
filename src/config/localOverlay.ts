@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import YAML from "yaml";
 import { detectProjectType } from "../core/bootstrap.js";
+import { resolveConfigPath } from "./pathResolver.js";
 
 export interface LocalOverlayConfig {
 	role: string;
@@ -130,12 +131,13 @@ function copyRelevantFiles(baseDir: string, localDir: string): string[] {
 	];
 	
 	for (const file of candidateFiles) {
-		const sourcePath = path.join(smartergptDir, file);
-		const destPath = path.join(runnerDir, file); // Changed from localDir to runnerDir
+		// Use resolveConfigPath to check both runner/ and flat structures
+		const sourceResolved = resolveConfigPath(smartergptDir, file);
+		const destPath = path.join(runnerDir, file);
 		
 		// Only copy if source exists and destination doesn't
-		if (fs.existsSync(sourcePath) && !fs.existsSync(destPath)) {
-			fs.copyFileSync(sourcePath, destPath);
+		if (sourceResolved.exists && !fs.existsSync(destPath)) {
+			fs.copyFileSync(sourceResolved.path, destPath);
 			copiedFiles.push(`runner/${file}`);
 		}
 	}
