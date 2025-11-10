@@ -1,0 +1,58 @@
+{
+  "$id": "https://smartergpt.dev/schemas/lex/feature-spec-v0.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Feature Spec v0",
+  "description": "Feature specification for idea capture",
+  "required": ["schemaVersion", "title", "description", "acceptanceCriteria", "repo", "createdAt"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.1.0",
+      "description": "Schema version"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Feature title"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "Brief feature description"
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Testable acceptance criteria"
+    },
+    "technicalContext": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Technical context, constraints, dependencies"
+    },
+    "constraints": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Constraints or limitations"
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^[^/]+/[^/]+$",
+      "description": "Target repository (owner/repo)"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp (ISO 8601)"
+    }
+  }
+}
