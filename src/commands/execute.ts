@@ -15,6 +15,7 @@ import { throwExit, CLIExitSignal } from '../cli/exitHandler.js';
 import { initAuditEmitter, emitEvent, AuditEmitter, AuditOptions, EVENT_TYPES } from '../audit/index.js';
 import { sha256 } from '../util/hash.js';
 import { getStatusIcon, formatStatusTable } from '../cli/formatters.js';
+import { BudgetTracker, BudgetExceededError } from '../budget/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -133,6 +134,13 @@ Common Issues:
 			let auditEmitter: AuditEmitter | null = null;
 
 			try {
+				// Initialize budget tracker from global options
+				const programOpts = deps.getProgramOpts();
+				const budgetTracker = new BudgetTracker({
+					tokenBudget: parseInt(programOpts.tokenBudget || '5000', 10),
+					maxPrompts: parseInt(programOpts.maxPrompts || '3', 10),
+				});
+
 				// Parse and validate autopilot configuration
 				let autopilotConfig;
 				try {
@@ -173,6 +181,29 @@ Common Issues:
 				const planContent = fs.readFileSync(planFile, "utf-8");
 				const plan = loadPlan(planContent);
 				const timeoutMs = parseInt(opts.timeout);
+
+				// Record initial prompt (plan loading)
+				try {
+					budgetTracker.recordPrompt(planContent);
+				} catch (error) {
+					if (error instanceof BudgetExceededError) {
+						if (opts.json || deps.jsonModeActive()) {
+							const output = {
+								error: 'Budget exceeded',
+								type: error.type,
+								current: error.current,
+								limit: error.limit,
+								budget: budgetTracker.formatJSON(),
+							};
+							writeJsonOutput(output);
+						} else {
+							console.error(`\n❌ ${error.message}\n`);
+							console.log(budgetTracker.formatHuman());
+						}
+						throwExit(1);
+					}
+					throw error;
+				}
 
 				// Initialize audit emitter if profile is not 'off'
 				if (opts.audit && opts.audit !== "off") {
@@ -282,6 +313,7 @@ Common Issues:
 									  }
 									: undefined,
 							},
+							budget: budgetTracker.formatJSON(),
 						};
 						writeJsonOutput(output);
 					} else {
@@ -302,6 +334,9 @@ Common Issues:
 								} retry configs`
 							);
 						}
+
+						// Print budget summary
+						console.log(budgetTracker.formatHuman());
 					}
 
 					// Finalize audit emitter on dry-run so background tasks run and optional
@@ -378,6 +413,7 @@ Common Issues:
 							mergeSummary,
 							artifactDir: opts.artifactDir,
 						},
+						budget: budgetTracker.formatJSON(),
 					};
 					writeJsonOutput(output);
 				} else if (opts.statusTable) {
@@ -424,6 +460,9 @@ Common Issues:
 							mergeSummary.failed.length
 						} - [${mergeSummary.failed.join(", ")}]`
 					);
+
+					// Print budget summary
+					console.log(budgetTracker.formatHuman());
 				}
 
 				// Exit with appropriate code
