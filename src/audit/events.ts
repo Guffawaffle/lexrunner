@@ -64,6 +64,7 @@ export const EventEnvelopeSchema = z.object({
 	actor: ActorSchema,
 	repo: RepoSchema,
 	context: ContextSchema.optional(),
+	lock_hash: z.string().optional(), // Lock hash for merge-weave idempotency
 	payload: z.any()
 });
 
