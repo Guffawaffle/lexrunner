@@ -6,7 +6,8 @@
 import { buildConflictGraph } from "./conflictGraph.js";
 import { computeAllMISBatches } from "./mis.js";
 import { simulateBatchMerges } from "./mergeTreeSimulator.js";
-import type { ConflictReport, PRWithFiles } from "./types.js";
+import { generateClusteredReport, writeConflictsJson } from "./conflictClustering.js";
+import type { ConflictReport, PRWithFiles, ClusteredConflictReport } from "./types.js";
 
 export interface PredictConflictsOptions {
 	prs: PRWithFiles[];
@@ -14,6 +15,8 @@ export interface PredictConflictsOptions {
 	prHeads?: Map<string, string>;
 	workingDir?: string;
 	skipMergeTreeSimulation?: boolean;
+	enableClustering?: boolean;
+	writeWeaveConflicts?: boolean;
 }
 
 /**
@@ -21,8 +24,8 @@ export interface PredictConflictsOptions {
  */
 export async function predictConflicts(
 	options: PredictConflictsOptions
-): Promise<ConflictReport> {
-	const { prs, baseBranch, prHeads, workingDir, skipMergeTreeSimulation = false } = options;
+): Promise<ConflictReport & { clusteredReport?: ClusteredConflictReport }> {
+	const { prs, baseBranch, prHeads, workingDir, skipMergeTreeSimulation = false, enableClustering = false, writeWeaveConflicts = false } = options;
 
 	// 1. Build conflict graph
 	const conflictGraph = buildConflictGraph(prs);
@@ -65,7 +68,30 @@ export async function predictConflicts(
 	// 4. Generate recommendations
 	const recommendations = generateRecommendations(misBatches, mergeTreeSimulation);
 
-	return {
+	// 5. Optional: Generate clustered conflict report
+	let clusteredReport: ClusteredConflictReport | undefined;
+	
+	if (enableClustering) {
+		// Collect all conflicts from merge-tree simulation
+		const allConflicts = Object.values(mergeTreeSimulation)
+			.filter((result: any) => result.status === 'conflict')
+			.flatMap((result: any) => result.conflicts);
+		
+		if (allConflicts.length > 0) {
+			clusteredReport = await generateClusteredReport(
+				allConflicts,
+				baseBranch,
+				workingDir
+			);
+			
+			// Optionally write to .weave/conflicts.json
+			if (writeWeaveConflicts) {
+				await writeConflictsJson(clusteredReport, workingDir ? `${workingDir}/.weave` : ".weave");
+			}
+		}
+	}
+
+	const report: ConflictReport & { clusteredReport?: ClusteredConflictReport } = {
 		analyzedAt: new Date().toISOString(),
 		baseBranch,
 		conflictGraph,
@@ -73,6 +99,12 @@ export async function predictConflicts(
 		mergeTreeSimulation,
 		recommendations
 	};
+
+	if (clusteredReport) {
+		report.clusteredReport = clusteredReport;
+	}
+
+	return report;
 }
 
 /**
