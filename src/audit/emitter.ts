@@ -65,6 +65,7 @@ export class AuditEmitter {
 	private startTime: number;
 	private dropDir: string;
 	private sidecarIngestInterval: NodeJS.Timeout | null = null;
+	private lockHash?: string; // Optional lock hash for merge-weave runs
 
 	constructor(options: AuditOptions) {
 		this.options = options;
@@ -169,6 +170,7 @@ export class AuditEmitter {
 				actor: { type: 'object' },
 				repo: { type: 'object' },
 				context: { type: 'object' },
+				lock_hash: { type: 'string', description: 'Lock hash for merge-weave idempotency' },
 				payload: { type: 'object' }
 			}
 		};
@@ -234,6 +236,7 @@ export class AuditEmitter {
 			actor: this.actor,
 			repo: this.repo,
 			context: this.context,
+			lock_hash: this.lockHash, // Include lock hash if set
 			payload: redactedPayload
 		};
 
@@ -257,6 +260,13 @@ export class AuditEmitter {
 	 */
 	setRepo(repo: Partial<Repo>): void {
 		this.repo = { ...this.repo, ...repo };
+	}
+
+	/**
+	 * Set lock hash for merge-weave runs
+	 */
+	setLockHash(lockHash: string): void {
+		this.lockHash = lockHash;
 	}
 
 	/**

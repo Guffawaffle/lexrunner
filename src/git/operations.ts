@@ -68,6 +68,23 @@ export class GitOperations {
 	}
 
 	/**
+	 * Get commit SHA for a branch
+	 */
+	async getBranchHead(branchName: string): Promise<string | null> {
+		try {
+			// Fetch latest changes for the branch
+			await this.git.fetch('origin', branchName);
+			
+			// Get the commit SHA for the remote branch
+			const log = await this.git.log([`origin/${branchName}`, '-1']);
+			return log.latest?.hash || null;
+		} catch (error) {
+			// Branch might not exist or fetch failed
+			return null;
+		}
+	}
+
+	/**
 	 * Create and checkout a new branch for weave operations
 	 */
 	async createWeaveBranch(baseBranch: string = 'main'): Promise<string> {

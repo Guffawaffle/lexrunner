@@ -63,3 +63,41 @@ export interface PRWithFiles {
 	files: string[];
 	head?: string;
 }
+
+/**
+ * Symbol information extracted from code
+ */
+export interface Symbol {
+	name: string;
+	type: "function" | "class" | "interface" | "type" | "const" | "let" | "var" | "import" | "export";
+	line: number;
+	signature?: string;
+}
+
+/**
+ * Clustered conflict group by file and symbol
+ */
+export interface ConflictCluster {
+	file: string;
+	symbols: string[];
+	conflictType: "both-modified" | "rename" | "whitespace" | "mixed";
+	details: {
+		lineRange: string;
+		affectedSymbols: Symbol[];
+	};
+}
+
+/**
+ * Complete conflict clustering report
+ */
+export interface ClusteredConflictReport {
+	analyzedAt: string;
+	baseBranch: string;
+	clusters: ConflictCluster[];
+	summary: {
+		totalClusters: number;
+		fileCount: number;
+		symbolCount: number;
+		conflictTypes: Record<string, number>;
+	};
+}

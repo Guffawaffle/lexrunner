@@ -4,6 +4,7 @@
  * Includes:
  * - Conflict prediction and batch optimization
  * - Agent assignment for batch operations
+ * - Conflict clustering by file and symbol
  */
 
 // Conflict prediction exports
@@ -22,8 +23,23 @@ export type {
 	MISBatch,
 	PRWithFiles,
 	ConflictDetail,
-	MergeSimulationResult
+	MergeSimulationResult,
+	Symbol,
+	ConflictCluster,
+	ClusteredConflictReport
 } from "./types.js";
+
+// Conflict clustering exports
+export {
+	extractSymbols,
+	normalizeSignature,
+	normalizeWhitespace,
+	detectRename,
+	findAffectedSymbols,
+	clusterConflicts,
+	generateClusteredReport,
+	writeConflictsJson
+} from "./conflictClustering.js";
 
 // Agent assignment exports
 export * from './agentAssigner.js';

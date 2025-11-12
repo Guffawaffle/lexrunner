@@ -13,6 +13,8 @@ export interface GlobalFlags {
 	noColor?: boolean;
 	verbose?: boolean;
 	quiet?: boolean;
+	tokenBudget?: number;
+	maxPrompts?: number;
 }
 
 /**
@@ -24,7 +26,9 @@ export function registerGlobalFlags(program: Command): void {
 		.option('--no-color', 'Disable ANSI color codes in output')
 		.option('--json', 'Enable JSON output mode (implies --no-color)')
 		.option('--verbose', 'Enable verbose logging')
-		.option('--quiet', 'Suppress non-essential output');
+		.option('--quiet', 'Suppress non-essential output')
+		.option('--token-budget <number>', 'Maximum token budget (default: 5000)', '5000')
+		.option('--max-prompts <number>', 'Maximum number of prompts (default: 3)', '3');
 }
 
 /**
@@ -53,11 +57,26 @@ export function parseGlobalFlags(opts: any): GlobalFlags {
 		return undefined;
 	};
 	
+	// Helper to parse numeric value with env fallback
+	const getNumeric = (cliValue: any, envVar: string, defaultValue: number): number => {
+		if (cliValue !== undefined) {
+			const parsed = parseInt(cliValue, 10);
+			return isNaN(parsed) ? defaultValue : parsed;
+		}
+		if (process.env[envVar]) {
+			const parsed = parseInt(process.env[envVar]!, 10);
+			return isNaN(parsed) ? defaultValue : parsed;
+		}
+		return defaultValue;
+	};
+	
 	return {
 		json: getFlag(opts.json, 'LEX_PR_JSON'),
 		noColor: getFlag(opts.noColor, 'NO_COLOR'),
 		verbose: getFlag(opts.verbose, 'LEX_PR_VERBOSE'),
 		quiet: opts.quiet ?? false,
+		tokenBudget: getNumeric(opts.tokenBudget, 'LEX_PR_TOKEN_BUDGET', 5000),
+		maxPrompts: getNumeric(opts.maxPrompts, 'LEX_PR_MAX_PROMPTS', 3),
 	};
 }
 
