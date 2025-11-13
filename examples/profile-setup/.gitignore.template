@@ -1,0 +1,66 @@
+# lex-pr-runner Gitignore Template
+
+# Local development profile (gitignored)
+.smartergpt.local/
+
+# Working directories (gitignored even in tracked profile)
+.smartergpt/runner/
+.smartergpt/cache/
+
+# Deliverables (optional - may track examples in .smartergpt/deliverables/)
+# Uncomment if you want to ignore all deliverables:
+# .smartergpt/deliverables/
+
+# Gate results (temporary execution artifacts)
+.smartergpt/gate-results/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+dist/
+build/
+*.js.map
+*.d.ts.map
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Package manager lockfiles (optional)
+# Uncomment if using different package managers across team:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
