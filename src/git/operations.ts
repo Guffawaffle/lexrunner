@@ -85,6 +85,34 @@ export class GitOperations {
 	}
 
 	/**
+	 * Get list of conflicted files using git diff
+	 * This captures files with unmerged status (UU, AA, DU, UD, etc.)
+	 */
+	async getConflictedFiles(): Promise<string[]> {
+		try {
+			// Use git diff to find unmerged files
+			const result = await this.git.raw(['diff', '--name-only', '--diff-filter=U']);
+			const files = result.trim().split('\n').filter(f => f.length > 0);
+			
+			// Also check git status for conflicted files
+			const status = await this.git.status();
+			const conflictedFromStatus = status.conflicted || [];
+			
+			// Combine and deduplicate
+			const allConflicts = [...new Set([...files, ...conflictedFromStatus])];
+			return allConflicts;
+		} catch (error) {
+			// If command fails, fall back to status.conflicted
+			try {
+				const status = await this.git.status();
+				return status.conflicted || [];
+			} catch {
+				return [];
+			}
+		}
+	}
+
+	/**
 	 * Create and checkout a new branch for weave operations
 	 */
 	async createWeaveBranch(baseBranch: string = 'main'): Promise<string> {
@@ -139,57 +167,77 @@ export class GitOperations {
 
 			let gitMergeResult: any;
 			let sha: string | undefined;
+			let mergeError: Error | null = null;
 
-			switch (strategy) {
-				case "merge-weave":
-					gitMergeResult = await this.git.merge([`origin/${branchName}`, '--no-ff']);
-					break;
-				
-				case "squash-weave":
-					gitMergeResult = await this.git.merge([`origin/${branchName}`, '--squash']);
-					if (gitMergeResult && !gitMergeResult.failed) {
-						// For squash merges, we need to commit manually
-						await this.git.commit(`Squash merge: ${item.name}`);
-					}
-					break;
-				
-				case "rebase-weave":
-					// For rebase weave, we actually merge with --ff-only after rebasing
-					try {
-						await this.git.rebase([`origin/${branchName}`]);
-						gitMergeResult = await this.git.merge([`origin/${branchName}`, '--ff-only']);
-					} catch (rebaseError) {
-						profiler.end(operationId);
-						metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: 'rebase_conflict' });
-						return {
-							success: false,
-							item,
-							conflicts: ['Rebase conflicts detected'],
-							message: `Rebase failed: ${rebaseError instanceof Error ? rebaseError.message : String(rebaseError)}`,
-						};
-					}
-					break;
+			try {
+				switch (strategy) {
+					case "merge-weave":
+						gitMergeResult = await this.git.merge([`origin/${branchName}`, '--no-ff']);
+						break;
+					
+					case "squash-weave":
+						gitMergeResult = await this.git.merge([`origin/${branchName}`, '--squash']);
+						if (gitMergeResult && !gitMergeResult.failed) {
+							// For squash merges, we need to commit manually
+							await this.git.commit(`Squash merge: ${item.name}`);
+						}
+						break;
+					
+					case "rebase-weave":
+						// For rebase weave, we actually merge with --ff-only after rebasing
+						try {
+							await this.git.rebase([`origin/${branchName}`]);
+							gitMergeResult = await this.git.merge([`origin/${branchName}`, '--ff-only']);
+						} catch (rebaseError) {
+							// Get conflicted files for rebase
+							const conflictedFiles = await this.getConflictedFiles();
+							profiler.end(operationId);
+							metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: 'rebase_conflict' });
+							return {
+								success: false,
+								item,
+								conflicts: conflictedFiles.length > 0 ? conflictedFiles : ['Rebase conflicts detected'],
+								message: `Rebase failed: ${rebaseError instanceof Error ? rebaseError.message : String(rebaseError)}`,
+							};
+						}
+						break;
+				}
+			} catch (error) {
+				// Merge command threw an error - likely due to conflicts
+				mergeError = error instanceof Error ? error : new Error(String(error));
 			}
 
-			// Get the current commit SHA after merge
-			const log = await this.git.log(['-1']);
-			sha = log.latest?.hash;
+			// Check for conflicts more thoroughly
+			// 1. Check if merge result indicates failure
+			// 2. Check if there was a merge error
+			// 3. Check actual git status for unmerged files
+			const hasMergeFailure = gitMergeResult?.failed || mergeError !== null;
+			const conflictedFiles = await this.getConflictedFiles();
 
-			// Check if merge was successful
-			if (gitMergeResult?.failed) {
-				const status = await this.git.status();
-				const conflictedFiles = status.conflicted || [];
-
+			if (hasMergeFailure || conflictedFiles.length > 0) {
 				profiler.end(operationId, { item: operation.item.name, status: 'conflict' });
 				metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: 'conflict' });
+
+				// Format message to include conflict summary
+				let message = 'Merge conflicts detected';
+				if (conflictedFiles.length > 0) {
+					message = `CONFLICTS: ${conflictedFiles.join(', ')}`;
+				}
+				if (mergeError) {
+					message += ` (${mergeError.message})`;
+				}
 
 				return {
 					success: false,
 					item,
 					conflicts: conflictedFiles,
-					message: 'Merge conflicts detected',
+					message,
 				};
 			}
+
+			// Get the current commit SHA after successful merge
+			const log = await this.git.log(['-1']);
+			sha = log.latest?.hash;
 
 			profiler.end(operationId, { item: operation.item.name, status: 'success' });
 			metrics.incrementCounter(METRICS.MERGE_SUCCESS_TOTAL, { strategy: operation.strategy });
@@ -204,9 +252,19 @@ export class GitOperations {
 		} catch (error) {
 			profiler.end(operationId, { item: operation.item.name, status: 'error' });
 			metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: 'exception' });
+			
+			// Try to get conflicted files even on exception
+			let conflictedFiles: string[] = [];
+			try {
+				conflictedFiles = await this.getConflictedFiles();
+			} catch {
+				// Ignore errors getting conflict files
+			}
+			
 			return {
 				success: false,
 				item: operation.item,
+				conflicts: conflictedFiles.length > 0 ? conflictedFiles : undefined,
 				message: `Merge operation failed: ${error instanceof Error ? error.message : String(error)}`,
 			};
 		}
@@ -229,6 +287,13 @@ export class GitOperations {
 			// Process each level in dependency order
 			for (const [levelIndex, level] of levels.entries()) {
 				const levelNum = levelIndex + 1;
+				
+				// Check for unresolved conflicts before starting next level
+				const unresolvedConflicts = await this.getConflictedFiles();
+				if (unresolvedConflicts.length > 0) {
+					console.log(`Stopping execution: unresolved conflicts detected in ${unresolvedConflicts.join(', ')}`);
+					break;
+				}
 				
 				// Report level start
 				if (progressReporter) {
