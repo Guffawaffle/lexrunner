@@ -46,6 +46,7 @@ New to lex-pr-runner? Start here:
 ### Workspace Setup
 
 - **[Profile Resolution](./profile-resolution.md)** - Configuration precedence
+- **[Prompts Configuration](./prompts.md)** - Prompts precedence, cross-repo usage, token expansion
 - **[TERMS](./TERMS.md)** - Canonical terminology
 
 ### File Reference
