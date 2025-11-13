@@ -3,9 +3,18 @@ name: CLI Smoke Test
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/cli-smoke-test.yml'
   push:
     branches:
       - main
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
   workflow_dispatch: {}
 
 permissions:
