@@ -20,6 +20,16 @@ Profile directories are resolved in the following order (highest to lowest prior
 
 The first existing profile directory in this chain is selected.
 
+### Prompts Precedence (Independent)
+
+Prompts are resolved separately with their own precedence chain:
+
+1. **`LEX_PROMPTS_DIR` env variable** - Cross-repository prompt override
+2. **`.smartergpt.local/prompts/`** - Local prompt overlay
+3. **`.smartergpt/prompts/`** - Tracked canonical prompts
+
+**See:** [prompts.md](./prompts.md) for comprehensive prompts documentation including token expansion and cross-repo usage.
+
 ## Profile Roles
 
 Each profile has a `role` defined in `profile.yml`:
@@ -48,9 +58,24 @@ lex-pr-runner gates run
 **Result:**
 - `.smartergpt.local/` created with `role: development`
 - Project type auto-detected (Python/JS/TypeScript/etc.)
-- Relevant config files copied from `.smartergpt/` as templates
-- All runner artifacts go to `.smartergpt.local/runner/`
+- Relevant config files copied from `.smartergpt/` as templates to profile root
+- Config files (intent.md, scope.yml, gates.yml) live at profile root, not in subdirectories
+- Working artifacts (plan.json, cache, logs) go to `.smartergpt.local/runner/`
 - Git ignores `.smartergpt.local/` (via `.gitignore`)
+
+**Directory structure:**
+```
+.smartergpt.local/
+├── profile.yml              # Profile metadata
+├── intent.md                # Config at root
+├── scope.yml
+├── gates.yml
+├── prompts/                 # Local prompt overlays
+└── runner/                  # Working artifacts only
+    ├── plan.json
+    ├── cache/
+    └── logs/
+```
 
 ### CI/CD Environment
 

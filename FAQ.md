@@ -45,3 +45,78 @@ The security scanning service is present (`src/security/scanning.ts`) and a SARI
 ## How do I contribute?
 
 See `CONTRIBUTING.md`. Keep PRs small and deterministic. Include a "How to verify" section.
+
+## Why are config files at profile root instead of in `runner/`?
+
+Config files (`intent.md`, `scope.yml`, `gates.yml`, etc.) define runner behavior and live at the **profile root** for easy access. The `runner/` directory is reserved for **working artifacts** (plan.json, cache, logs) generated during execution.
+
+**Structure:**
+```
+.smartergpt.local/
+├── intent.md              # Config at root
+├── scope.yml              # Config at root
+├── gates.yml              # Config at root
+└── runner/                # Working artifacts only
+    ├── plan.json
+    ├── cache/
+    └── logs/
+```
+
+## What's the difference between `.smartergpt/` and `.smartergpt.local/`?
+
+- **`.smartergpt/`**: Tracked example profile (read-only). Contains canonical config and prompts for the repository.
+- **`.smartergpt.local/`**: Local development profile (gitignored). Your working copy where you customize config and the runner writes artifacts.
+
+**Profile precedence:** `.smartergpt.local/` files override `.smartergpt/` files.
+
+## How do prompts work? Can I share prompts across repositories?
+
+Yes! Prompts use a three-level precedence chain:
+
+1. **`LEX_PROMPTS_DIR` env variable** - Cross-repository override
+2. **`.smartergpt.local/prompts/`** - Local prompt overlay
+3. **`.smartergpt/prompts/`** - Tracked canonical prompts
+
+**Cross-repo usage example:**
+```bash
+# Point LexRunner to Lex prompts
+export LEX_PROMPTS_DIR=/srv/lex-mcp/lex/.smartergpt/prompts
+lex-pr plan --from-github
+```
+
+**See:** `docs/prompts.md` for comprehensive guide including token expansion (`{{today}}`, `{{branch}}`, etc.) and usage patterns.
+
+## What tokens can I use in prompts?
+
+Prompts support dynamic token expansion:
+
+| Token | Expands To | Example |
+|-------|------------|---------|
+| `{{today}}` | YYYY-MM-DD | `2025-11-13` |
+| `{{now}}` | ISO timestamp | `2025-11-13T14-30-45` |
+| `{{repo_root}}` | Repo path | `/path/to/repo` |
+| `{{branch}}` | Current branch | `main` |
+| `{{commit}}` | Commit SHA | `a1b2c3d4...` |
+
+**See:** `docs/prompts.md` for complete token reference.
+
+## Why does `.smartergpt/` have a `deliverables/` directory?
+
+This is legacy from early development. In practice:
+- **Tracked profiles** (`role: example`) should NOT write deliverables
+- **Local profiles** (`role: development`) write to `.smartergpt.local/deliverables/`
+
+The runner enforces write protection based on profile role.
+
+## How do I migrate from an old structure with config in `runner/`?
+
+1. Run `lex-pr doctor` to check current structure
+2. Move config files from `runner/` to profile root:
+   ```bash
+   mv .smartergpt.local/runner/intent.md .smartergpt.local/
+   mv .smartergpt.local/runner/scope.yml .smartergpt.local/
+   mv .smartergpt.local/runner/gates.yml .smartergpt.local/
+   ```
+3. Verify with `lex-pr doctor` again
+
+**See:** `docs/specs/smartergpt-structure-v1.md` for complete migration guide.
