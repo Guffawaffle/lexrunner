@@ -2,6 +2,39 @@
 
 This directory contains utility scripts for lex-pr-runner development and adoption tracking.
 
+## Dogfood Merge-Weave Workflow
+
+### dogfood-merge-weave.sh
+
+A parameterized, repo-agnostic script for executing merge-weave workflows. This script automates the complete workflow from plan generation to merge execution and reporting.
+
+**Documentation:** [docs/dogfood-merge-weave-script.md](../docs/dogfood-merge-weave-script.md)
+
+**Quick Start:**
+
+```bash
+# Dry run with existing plan
+./scripts/dogfood-merge-weave.sh --plan merge-weave-dogfood.json --dry-run
+
+# Execute from GitHub discovery
+./scripts/dogfood-merge-weave.sh \
+  --from-github \
+  --owner myorg \
+  --repo-name myrepo \
+  --labels "ready-to-merge" \
+  --execute
+
+# Show help
+./scripts/dogfood-merge-weave.sh --help
+```
+
+**Features:**
+- Load plan from file or discover PRs from GitHub
+- Automated workflow: validation → gates → analysis → merge → report
+- Configurable artifacts directory with timestamps
+- Rich output: JSON, Markdown reports, colored console output
+- Graceful error handling for schema validation failures
+
 ## Adoption Metrics
 
 ### metrics-template.ts
