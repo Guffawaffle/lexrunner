@@ -1,0 +1,51 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/runner.stack.schema.json",
+	"title": "Runner Stack Configuration",
+	"description": "Configuration for the runner execution stack",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"version": {
+			"type": "string",
+			"description": "Schema version for runner stack configuration"
+		},
+		"stack": {
+			"type": "array",
+			"description": "Ordered array of stack layers/components",
+			"items": {
+				"type": "object",
+				"required": ["name", "type"],
+				"additionalProperties": false,
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "Name of the stack component"
+					},
+					"type": {
+						"type": "string",
+						"description": "Type of stack component (e.g., runtime, middleware, handler)"
+					},
+					"enabled": {
+						"type": "boolean",
+						"description": "Whether this component is enabled",
+						"default": true
+					},
+					"config": {
+						"type": "object",
+						"description": "Component-specific configuration (intentionally loose)",
+						"additionalProperties": true
+					}
+				}
+			}
+		},
+		"timeout": {
+			"type": "number",
+			"description": "Default timeout in seconds for stack execution"
+		},
+		"retries": {
+			"type": "number",
+			"description": "Number of retry attempts for failed operations"
+		}
+	}
+}

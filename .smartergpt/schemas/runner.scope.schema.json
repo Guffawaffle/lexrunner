@@ -1,0 +1,75 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/runner.scope.schema.json",
+	"title": "Runner Scope Configuration",
+	"description": "Configuration for runner execution scope and boundaries",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"version": {
+			"type": "string",
+			"description": "Schema version for runner scope configuration"
+		},
+		"scope": {
+			"type": "object",
+			"description": "Scope boundaries and constraints",
+			"additionalProperties": false,
+			"properties": {
+				"modules": {
+					"type": "array",
+					"description": "List of modules in scope",
+					"items": {
+						"type": "string"
+					}
+				},
+				"directories": {
+					"type": "array",
+					"description": "List of directories in scope",
+					"items": {
+						"type": "string"
+					}
+				},
+				"files": {
+					"type": "array",
+					"description": "List of specific files in scope",
+					"items": {
+						"type": "string"
+					}
+				},
+				"exclude": {
+					"type": "array",
+					"description": "Patterns to exclude from scope",
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		},
+		"permissions": {
+			"type": "array",
+			"description": "Permissions required for this scope",
+			"items": {
+				"type": "string"
+			}
+		},
+		"limits": {
+			"type": "object",
+			"description": "Resource limits for this scope",
+			"additionalProperties": false,
+			"properties": {
+				"maxFiles": {
+					"type": "number",
+					"description": "Maximum number of files that can be modified"
+				},
+				"maxLines": {
+					"type": "number",
+					"description": "Maximum number of lines that can be changed"
+				},
+				"maxDuration": {
+					"type": "number",
+					"description": "Maximum execution duration in seconds"
+				}
+			}
+		}
+	}
+}
