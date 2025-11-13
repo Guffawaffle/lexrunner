@@ -6,6 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import YAML from "yaml";
+import { getEnvWithAlias } from "../util/envUtils.js";
 
 /**
  * Profile manifest schema
@@ -52,24 +53,27 @@ export function resolveProfile(
 			: path.resolve(baseDir, profileDirFlag);
 		source = "--profile-dir";
 	}
-	// Precedence 2: LEX_PR_PROFILE_DIR environment variable
-	else if (process.env.LEX_PR_PROFILE_DIR) {
-		profilePath = path.isAbsolute(process.env.LEX_PR_PROFILE_DIR)
-			? process.env.LEX_PR_PROFILE_DIR
-			: path.resolve(baseDir, process.env.LEX_PR_PROFILE_DIR);
-		source = "LEX_PR_PROFILE_DIR";
-	}
-	// Precedence 3: .smartergpt.local/ (local override)
+	// Precedence 2: LEX_PR_PROFILE_DIR environment variable (with LEXRUNNER_PROFILE_DIR alias)
 	else {
-		const localPath = path.resolve(baseDir, ".smartergpt.local");
-		if (fs.existsSync(localPath)) {
-			profilePath = localPath;
-			source = ".smartergpt.local/";
+		const envProfileDir = getEnvWithAlias('LEX_PR_PROFILE_DIR', 'LEXRUNNER_PROFILE_DIR');
+		if (envProfileDir) {
+			profilePath = path.isAbsolute(envProfileDir)
+				? envProfileDir
+				: path.resolve(baseDir, envProfileDir);
+			source = "LEX_PR_PROFILE_DIR";
 		}
-		// Precedence 4: .smartergpt/ (tracked profile)
+		// Precedence 3: .smartergpt.local/ (local override)
 		else {
-			profilePath = path.resolve(baseDir, ".smartergpt");
-			source = ".smartergpt/";
+			const localPath = path.resolve(baseDir, ".smartergpt.local");
+			if (fs.existsSync(localPath)) {
+				profilePath = localPath;
+				source = ".smartergpt.local/";
+			}
+			// Precedence 4: .smartergpt/ (tracked profile)
+			else {
+				profilePath = path.resolve(baseDir, ".smartergpt");
+				source = ".smartergpt/";
+			}
 		}
 	}
 
