@@ -15,10 +15,14 @@ The Deliverables Management System provides comprehensive artifact tracking, ver
 
 ## Directory Structure
 
+Deliverables location depends on the active profile:
+
+### Tracked Profile (`.smartergpt/deliverables/`)
+
 ```
 .smartergpt/
 └── deliverables/
-    ├── latest -> weave-2024-10-04T10-30-00/  # Symlink to latest (or directory copy on Windows)
+    ├── latest -> weave-2024-10-04T10-30-00/  # Symlink to latest
     ├── weave-2024-10-04T10-30-00/
     │   ├── manifest.json                      # Deliverables manifest
     │   ├── analysis.json                      # Analysis data
@@ -29,6 +33,44 @@ The Deliverables Management System provides comprehensive artifact tracking, ver
     └── weave-2024-10-04T09-15-00/
         └── ...
 ```
+
+**Note:** If using tracked profile (`.smartergpt/`), deliverables may be tracked in git for example outputs. Use sparingly as deliverables can be large.
+
+### Local Profile (`.smartergpt.local/deliverables/`)
+
+```
+.smartergpt.local/
+└── deliverables/
+    ├── latest -> weave-2024-10-04T10-30-00/
+    ├── weave-2024-10-04T10-30-00/
+    │   └── [same structure as above]
+    └── weave-2024-10-04T09-15-00/
+        └── ...
+```
+
+**Recommended:** Always use `.smartergpt.local/` (or custom profile) for development and CI/CD. This directory is gitignored, preventing accidental commits of large deliverables.
+
+### Profile-Aware Behavior
+
+The runner automatically places deliverables in the active profile's `deliverables/` directory:
+
+```bash
+# Using .smartergpt.local/ profile (default for development)
+lex-pr autopilot plan.json
+# Deliverables go to .smartergpt.local/deliverables/
+
+# Using .smartergpt/ profile (tracked example)
+lex-pr autopilot plan.json --profile-dir .smartergpt
+# ERROR: Cannot write to profile with role=example
+# Use .smartergpt.local/ or custom profile instead
+
+# Using custom profile
+export LEX_PR_PROFILE_DIR=/tmp/ci-profile
+lex-pr autopilot plan.json
+# Deliverables go to /tmp/ci-profile/deliverables/
+```
+
+**See Also:** [Profile Resolution](./profile-resolution.md) and [SmartGPT Structure v1 Spec](./specs/smartergpt-structure-v1.md) for complete profile documentation.
 
 ### Windows Compatibility
 
@@ -421,6 +463,8 @@ See [DeliverableManager API](../src/autopilot/deliverables.ts) for detailed prog
 
 ## Related Documentation
 
-- [Autopilot Levels](./autopilot-levels.md)
-- [Monitoring Integration](./monitoring-implementation.md)
-- [Schema Management](./schema-management.md)
+- [Autopilot Levels](./autopilot-levels.md) - Autopilot execution levels
+- [Profile Resolution](./profile-resolution.md) - Profile precedence and selection
+- [SmartGPT Structure v1 Spec](./specs/smartergpt-structure-v1.md) - Complete structure specification
+- [Monitoring Integration](./monitoring-implementation.md) - Monitoring and observability
+- [Schema Management](./schemas.md) - Schema validation and versioning
