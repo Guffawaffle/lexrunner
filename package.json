@@ -30,6 +30,14 @@
 		"./schemas/runner-scope": {
 			"types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
 			"import": "./.smartergpt/schemas/runner.scope.schema.js"
+		},
+		"./schemas/execution-plan-v1": {
+			"types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
+			"import": "./.smartergpt/schemas/execution-plan-v1.js"
+		},
+		"./schemas/gates": {
+			"types": "./.smartergpt/schemas/gates.schema.d.ts",
+			"import": "./.smartergpt/schemas/gates.schema.js"
 		}
 	},
 	"scripts": {
