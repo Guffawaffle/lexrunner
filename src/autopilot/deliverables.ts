@@ -62,7 +62,8 @@ export class DeliverablesManager {
 
 	constructor(profilePath: string, customDeliverablesDir?: string) {
 		this.profilePath = profilePath;
-		this.deliverablesRoot = customDeliverablesDir || path.join(profilePath, "deliverables");
+		this.deliverablesRoot =
+			customDeliverablesDir || path.join(profilePath, "deliverables");
 	}
 
 	/**
@@ -74,7 +75,9 @@ export class DeliverablesManager {
 		runnerVersion: string,
 		timestamp?: string
 	): Promise<string> {
-		const ts = timestamp || new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
+		const ts =
+			timestamp ||
+			new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
 		const deliverableDir = path.join(this.deliverablesRoot, `weave-${ts}`);
 
 		// Create directory
@@ -95,7 +98,7 @@ export class DeliverablesManager {
 			const parts = ts.split("T");
 			const datePart = parts[0];
 			const timePart = parts[1];
-			
+
 			// Split time and milliseconds if present
 			const timeSegments = timePart.split("-");
 			if (timeSegments.length >= 3) {
@@ -103,7 +106,8 @@ export class DeliverablesManager {
 				const hours = timeSegments[0];
 				const minutes = timeSegments[1];
 				const seconds = timeSegments[2];
-				const millis = timeSegments.length > 3 ? `.${timeSegments[3]}` : "";
+				const millis =
+					timeSegments.length > 3 ? `.${timeSegments[3]}` : "";
 				isoTimestamp = `${datePart}T${hours}:${minutes}:${seconds}${millis}Z`;
 			} else {
 				// Invalid format, fall back to current time
@@ -127,18 +131,29 @@ export class DeliverablesManager {
 				workingDirectory: process.cwd(),
 				environment: process.env.CI ? "ci" : "local",
 				actor: process.env.GITHUB_ACTOR,
-				correlationId: process.env.CORRELATION_ID
-			}
+				correlationId: process.env.CORRELATION_ID,
+			},
 		};
 
 		// Write manifest
 		const manifestPath = path.join(deliverableDir, "manifest.json");
-		fs.writeFileSync(manifestPath, canonicalJSONStringify(manifest) + "\n", "utf-8");
+		fs.writeFileSync(
+			manifestPath,
+			canonicalJSONStringify(manifest) + "\n",
+			"utf-8"
+		);
 
 		// Generate and write toolchain manifest
 		const toolchainManifest = await generateToolchainManifest();
-		const toolchainPath = path.join(deliverableDir, "toolchain-manifest.json");
-		fs.writeFileSync(toolchainPath, canonicalJSONStringify(toolchainManifest) + "\n", "utf-8");
+		const toolchainPath = path.join(
+			deliverableDir,
+			"toolchain-manifest.json"
+		);
+		fs.writeFileSync(
+			toolchainPath,
+			canonicalJSONStringify(toolchainManifest) + "\n",
+			"utf-8"
+		);
 
 		return deliverableDir;
 	}
@@ -152,7 +167,7 @@ export class DeliverablesManager {
 		type: "json" | "markdown" | "log"
 	): Promise<void> {
 		const manifestPath = path.join(deliverableDir, "manifest.json");
-		
+
 		if (!fs.existsSync(manifestPath)) {
 			throw new Error(`Manifest not found at ${manifestPath}`);
 		}
@@ -173,32 +188,88 @@ export class DeliverablesManager {
 			path: path.relative(deliverableDir, artifactPath),
 			type,
 			size: stats.size,
-			hash: artifactHash
+			hash: artifactHash,
 		};
 
 		manifest.artifacts.push(entry);
 
 		// Update manifest
-		fs.writeFileSync(manifestPath, canonicalJSONStringify(manifest) + "\n", "utf-8");
+		fs.writeFileSync(
+			manifestPath,
+			canonicalJSONStringify(manifest) + "\n",
+			"utf-8"
+		);
 	}
 
 	/**
 	 * Create or update 'latest' symlink to most recent deliverables
+	 * Falls back to directory copy on Windows if symlink fails
 	 */
 	async updateLatestSymlink(deliverableDir: string): Promise<void> {
 		const latestLink = path.join(this.deliverablesRoot, "latest");
 
-		// Remove existing symlink if it exists
+		// Remove existing link/copy if it exists
 		if (fs.existsSync(latestLink)) {
 			const stats = fs.lstatSync(latestLink);
 			if (stats.isSymbolicLink()) {
 				fs.unlinkSync(latestLink);
+			} else {
+				// Remove directory copy
+				fs.rmSync(latestLink, { recursive: true, force: true });
 			}
 		}
 
 		// Create new symlink (relative path for portability)
-		const relativePath = path.relative(this.deliverablesRoot, deliverableDir);
-		fs.symlinkSync(relativePath, latestLink, "dir");
+		const relativePath = path.relative(
+			this.deliverablesRoot,
+			deliverableDir
+		);
+
+		try {
+			// Try symlink first (use 'junction' type on Windows for better compatibility)
+			const symlinkType =
+				process.platform === "win32" ? "junction" : "dir";
+			fs.symlinkSync(relativePath, latestLink, symlinkType);
+		} catch (error) {
+			// Fallback to directory copy on Windows when symlink fails
+			if (process.platform === "win32") {
+				console.warn(
+					"⚠️  Symlink failed, using directory copy fallback"
+				);
+				console.warn(
+					"   (Windows requires Developer Mode or admin privileges for symlinks)"
+				);
+				this.copyDirectory(deliverableDir, latestLink);
+			} else {
+				// On non-Windows platforms, symlink failure is unexpected
+				throw error;
+			}
+		}
+	}
+
+	/**
+	 * Recursively copy directory contents
+	 * Used as fallback for Windows systems without symlink support
+	 */
+	private copyDirectory(src: string, dest: string): void {
+		// Create destination directory
+		fs.mkdirSync(dest, { recursive: true });
+
+		// Read source directory
+		const entries = fs.readdirSync(src, { withFileTypes: true });
+
+		for (const entry of entries) {
+			const srcPath = path.join(src, entry.name);
+			const destPath = path.join(dest, entry.name);
+
+			if (entry.isDirectory()) {
+				// Recursively copy subdirectories
+				this.copyDirectory(srcPath, destPath);
+			} else {
+				// Copy file
+				fs.copyFileSync(srcPath, destPath);
+			}
+		}
 	}
 
 	/**
@@ -210,11 +281,17 @@ export class DeliverablesManager {
 		}
 
 		const deliverables: DeliverablesManifest[] = [];
-		const entries = fs.readdirSync(this.deliverablesRoot, { withFileTypes: true });
+		const entries = fs.readdirSync(this.deliverablesRoot, {
+			withFileTypes: true,
+		});
 
 		for (const entry of entries) {
 			if (entry.isDirectory() && entry.name.startsWith("weave-")) {
-				const manifestPath = path.join(this.deliverablesRoot, entry.name, "manifest.json");
+				const manifestPath = path.join(
+					this.deliverablesRoot,
+					entry.name,
+					"manifest.json"
+				);
 				if (fs.existsSync(manifestPath)) {
 					const content = fs.readFileSync(manifestPath, "utf-8");
 					const manifest = JSON.parse(content);
@@ -227,7 +304,10 @@ export class DeliverablesManager {
 
 		// Sort by timestamp (newest first)
 		deliverables.sort((a, b) => {
-			return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+			return (
+				new Date(b.timestamp).getTime() -
+				new Date(a.timestamp).getTime()
+			);
 		});
 
 		return deliverables;
@@ -241,7 +321,7 @@ export class DeliverablesManager {
 		const result: CleanupResult = {
 			removed: [],
 			kept: [],
-			freedSpace: 0
+			freedSpace: 0,
 		};
 
 		if (deliverables.length === 0) {
@@ -260,29 +340,37 @@ export class DeliverablesManager {
 		if (policy.maxAge !== undefined && policy.maxAge > 0) {
 			const cutoffDate = new Date();
 			cutoffDate.setDate(cutoffDate.getDate() - policy.maxAge);
-			toKeep = toKeep.filter(d => new Date(d.timestamp) > cutoffDate);
+			toKeep = toKeep.filter((d) => new Date(d.timestamp) > cutoffDate);
 		}
 
 		// Ensure latest is kept if policy requires it
-		if (policy.keepLatest && deliverables.length > 0 && !toKeep.includes(deliverables[0])) {
+		if (
+			policy.keepLatest &&
+			deliverables.length > 0 &&
+			!toKeep.includes(deliverables[0])
+		) {
 			toKeep = [deliverables[0], ...toKeep];
 		}
 
 		// Build keep set
-		const keepSet = new Set(toKeep.map(d => d.timestamp));
+		const keepSet = new Set(toKeep.map((d) => d.timestamp));
 
 		// Remove deliverables not in keep set
 		for (const deliverable of deliverables) {
-			const dirName = (deliverable as any)._dirName || `weave-${deliverable.timestamp.replace(/[:.]/g, "-").replace("Z", "")}`;
+			const dirName =
+				(deliverable as any)._dirName ||
+				`weave-${deliverable.timestamp
+					.replace(/[:.]/g, "-")
+					.replace("Z", "")}`;
 			const dirPath = path.join(this.deliverablesRoot, dirName);
 
 			if (!keepSet.has(deliverable.timestamp)) {
 				// Calculate size before removal
 				const size = this.calculateDirectorySize(dirPath);
-				
+
 				// Remove directory
 				fs.rmSync(dirPath, { recursive: true, force: true });
-				
+
 				result.removed.push(dirPath);
 				result.freedSpace += size;
 			} else {
@@ -330,7 +418,7 @@ export class DeliverablesManager {
 	 */
 	getLatestPath(): string | null {
 		const latestLink = path.join(this.deliverablesRoot, "latest");
-		
+
 		if (fs.existsSync(latestLink)) {
 			const stats = fs.lstatSync(latestLink);
 			if (stats.isSymbolicLink()) {
