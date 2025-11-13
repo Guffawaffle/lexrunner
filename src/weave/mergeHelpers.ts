@@ -17,6 +17,7 @@ import {
 	readLockFile
 } from '../weave/lockFile.js';
 import { simpleGit } from 'simple-git';
+import { detectPreflightConflicts, skipPreflightDetection } from './preflightConflicts.js';
 
 /**
  * Fetch current PR head information from git
@@ -55,7 +56,8 @@ export async function fetchPRHeads(plan: Plan): Promise<PRHead[]> {
  */
 export async function generateDryRunOutput(
 	plan: Plan,
-	workingDir: string = process.cwd()
+	workingDir: string = process.cwd(),
+	skipPreflight: boolean = false
 ): Promise<DryRunOutput> {
 	const git = simpleGit(workingDir);
 
@@ -98,15 +100,31 @@ export async function generateDryRunOutput(
 		status: head.sha === 'unknown' ? 'not-found' : 'ready'
 	}));
 
-	// Basic conflict prediction (simplified)
-	const conflictsPredicted = 0; // TODO: Implement conflict analysis
-
 	// Check if target branch exists
 	let branchExists = true;
 	try {
 		await git.revparse([plan.target]);
 	} catch {
 		branchExists = false;
+	}
+
+	// Run preflight conflict detection (unless skipped)
+	let preflightResults;
+	if (skipPreflight) {
+		preflightResults = skipPreflightDetection("Preflight detection skipped by flag");
+	} else if (!branchExists) {
+		preflightResults = skipPreflightDetection("Target branch does not exist");
+	} else if (!cleanWorkingDirectory) {
+		preflightResults = skipPreflightDetection("Working directory is not clean");
+	} else {
+		try {
+			preflightResults = await detectPreflightConflicts(plan, workingDir);
+		} catch (error) {
+			// If preflight detection fails, skip it with error reason
+			preflightResults = skipPreflightDetection(
+				`Preflight detection failed: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
 	}
 
 	return {
@@ -121,8 +139,9 @@ export async function generateDryRunOutput(
 		checks: {
 			cleanWorkingDirectory,
 			branchExists,
-			conflictsPredicted
-		}
+			conflictsPredicted: preflightResults.conflictsDetected
+		},
+		preflight: preflightResults
 	};
 }
 
@@ -171,6 +190,47 @@ export function formatDryRunOutput(output: DryRunOutput): string {
 	lines.push(`- Clean working directory: ${output.checks.cleanWorkingDirectory ? '✓' : '✗'}`);
 	lines.push(`- Target branch exists: ${output.checks.branchExists ? '✓' : '✗'}`);
 	lines.push(`- Predicted conflicts: ${output.checks.conflictsPredicted}`);
+
+	// Add preflight conflict detection results
+	if (output.preflight) {
+		lines.push('');
+		lines.push('## Preflight Conflict Detection');
+		
+		if (output.preflight.skipped) {
+			lines.push(`⚠️  Skipped: ${output.preflight.skipReason}`);
+		} else if (output.preflight.conflictsDetected === 0) {
+			lines.push('✓ No conflicts detected - all items can merge cleanly');
+		} else {
+			lines.push(`⚠️  ${output.preflight.conflictsDetected} conflict(s) detected across ${output.preflight.items.filter(i => i.hasConflicts).length} item(s)`);
+			lines.push('');
+			
+			for (const item of output.preflight.items) {
+				if (item.hasConflicts) {
+					lines.push(`### ${item.name}`);
+					lines.push(`- Conflicts: ${item.conflicts.length} file(s)`);
+					
+					if (item.conflicts.length > 0) {
+						const conflictTable: string[] = [];
+						conflictTable.push('| File | Type | Lines |');
+						conflictTable.push('|------|------|-------|');
+						
+						for (const conflict of item.conflicts) {
+							const linesStr = conflict.lines || '—';
+							conflictTable.push(`| ${conflict.path} | ${conflict.type} | ${linesStr} |`);
+						}
+						
+						lines.push(...conflictTable);
+					}
+					
+					lines.push('');
+				} else if (item.error) {
+					lines.push(`### ${item.name}`);
+					lines.push(`❌ Error: ${item.error}`);
+					lines.push('');
+				}
+			}
+		}
+	}
 
 	lines.push('');
 	lines.push('---');

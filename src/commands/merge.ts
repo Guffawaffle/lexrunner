@@ -115,6 +115,14 @@ export function registerMergeCommand(
 			"Prefix for integration branch names",
 			"integration/"
 		)
+		.option(
+			"--skip-preflight",
+			"Skip preflight conflict detection in dry-run mode"
+		)
+		.option(
+			"--fail-on-preflight-conflict",
+			"Exit with error if preflight conflict detection finds conflicts"
+		)
 		.addHelpText(
 			"after",
 			`
@@ -128,6 +136,8 @@ Examples:
   $ lex-pr merge --json > merge-results.json    # JSON output for automation
   $ lex-pr merge --levels 1,2 --execute         # Merge only specific levels
   $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
+  $ lex-pr merge --skip-preflight               # Skip conflict detection
+  $ lex-pr merge --fail-on-preflight-conflict   # Abort if conflicts detected
 
 <<<<<<< HEAD
 State Management:
@@ -142,6 +152,12 @@ Idempotency:
   • Duplicate runs are skipped unless --force is used
   • Lock hash included in all logs and audit events
 >>>>>>> copilot/implement-plan-lock-mechanism
+
+Preflight Conflict Detection:
+  • Enabled by default in dry-run mode
+  • Uses git merge-tree to simulate merges without modifying working tree
+  • Detects conflicts early for each item before execution
+  • Use --skip-preflight to disable or --fail-on-preflight-conflict to abort
 
 Common Issues:
   • Merge conflicts: Review conflicts and resolve manually, then re-run
@@ -381,7 +397,40 @@ Common Issues:
 
 				if (opts.dryRun && !opts.execute) {
 					// Enhanced dry run mode with state machine preview
-					const dryRunOutput = await generateDryRunOutput(plan);
+					const dryRunOutput = await generateDryRunOutput(
+						plan,
+						process.cwd(),
+						opts.skipPreflight || false
+					);
+
+					// Check for preflight conflicts and fail if requested
+					if (
+						opts.failOnPreflightConflict &&
+						dryRunOutput.preflight &&
+						!dryRunOutput.preflight.skipped &&
+						dryRunOutput.preflight.conflictsDetected > 0
+					) {
+						if (opts.json || jsonModeActive()) {
+							console.log(
+								canonicalJSONStringify({
+									...dryRunOutput,
+									lockHash: lockHashShort,
+									error: "Preflight conflict detection found conflicts",
+									exitCode: 1,
+								})
+							);
+						} else {
+							console.log(formatDryRunOutput(dryRunOutput));
+							console.log("");
+							console.error(
+								`❌ Preflight conflict detection found ${dryRunOutput.preflight.conflictsDetected} conflict(s)`
+							);
+							console.error(
+								"   Use --execute to proceed anyway or resolve conflicts first"
+							);
+						}
+						throwExit(1);
+					}
 
 					if (opts.json || jsonModeActive()) {
 						// Merge lock hash into dry run output
