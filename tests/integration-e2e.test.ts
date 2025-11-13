@@ -172,9 +172,12 @@ describe('End-to-End Integration Tests', () => {
 
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run`);
 
-      expect(stdout).toContain('DRY RUN MODE');
-      expect(stdout).toContain('Level 1: would merge items [feature-a]');
-      expect(stdout).toContain('Level 2: would merge items [feature-b]');
+      // Updated for new dry-run format
+      expect(stdout).toContain('DRY RUN: Merge Execution Plan');
+      expect(stdout).toContain('Batch 1');
+      expect(stdout).toContain('Items: feature-a');
+      expect(stdout).toContain('Batch 2');
+      expect(stdout).toContain('Items: feature-b');
       expect(stdout).toContain('Use --execute to perform actual merges');
     });
 
@@ -199,11 +202,12 @@ describe('End-to-End Integration Tests', () => {
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run --json`);
 
       const result = JSON.parse(stdout);
-      expect(result.mode).toBe('dry-run');
-      expect(result.plan.target).toBe('main');
-      expect(result.plan.items).toBe(1);
-      expect(result.levels).toBeDefined();
-      expect(result.levels).toHaveLength(1);
+      // Updated for new dry-run output structure
+      expect(result.summary).toBeDefined();
+      expect(result.summary.targetBranch).toBe('main');
+      expect(result.summary.totalItems).toBe(1);
+      expect(result.batches).toBeDefined();
+      expect(result.batches).toHaveLength(1);
     });
   });
 
