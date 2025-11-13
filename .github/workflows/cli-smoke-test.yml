@@ -38,26 +38,26 @@ jobs:
         run: npm ci
       - name: Build distribution
         run: npm run build
-      
+
       - name: Test JSON purity on built artifacts
         run: |
           echo "Testing JSON mode with plan command..."
-          
+
           # Use GitHub Actions temp directory for security
           STDOUT_FILE="${RUNNER_TEMP}/stdout.json"
           STDERR_FILE="${RUNNER_TEMP}/stderr.txt"
-          
+
           # Run CLI in JSON mode and capture stdout/stderr separately
           node dist/cli.js --json plan tests/fixtures/plan.tiny.json > "$STDOUT_FILE" 2> "$STDERR_FILE"
           EXIT_CODE=$?
-          
+
           # Verify exit code is 0
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ CLI exited with non-zero code: $EXIT_CODE"
             exit 1
           fi
           echo "✅ Exit code: $EXIT_CODE"
-          
+
           # Verify stdout is valid JSON
           if ! node -e "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" 2>&1; then
             echo "❌ stdout is not valid JSON:"
@@ -65,7 +65,7 @@ jobs:
             exit 1
           fi
           echo "✅ stdout is valid JSON"
-          
+
           # Verify JSON has expected structure
           if ! node -e "const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8')); if (!data.items || !data.schemaVersion) { console.error('Missing expected fields'); process.exit(1); }"; then
             echo "❌ JSON output missing expected fields"
@@ -73,13 +73,13 @@ jobs:
             exit 1
           fi
           echo "✅ JSON output has expected structure (items, schemaVersion)"
-          
+
           # Display stderr for diagnostics (should be empty or contain only diagnostics, not JSON)
           echo "Stderr output (should not contain JSON):"
           cat "$STDERR_FILE" || echo "(empty)"
-          
+
           echo "✅ JSON purity smoke test passed"
-  
+
   execute-dogfood-test:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -93,16 +93,16 @@ jobs:
         run: npm ci
       - name: Build distribution
         run: npm run build
-      
+
       - name: Test execute command with plan-defined gates
         run: |
           echo "Testing execute command dogfooding..."
-          
+
           # Use GitHub Actions temp directory
           ARTIFACT_DIR="${RUNNER_TEMP}/artifacts"
           STDOUT_FILE="${RUNNER_TEMP}/execute-stdout.json"
           STDERR_FILE="${RUNNER_TEMP}/execute-stderr.txt"
-          
+
           # Run execute command with plan-defined gates
           node dist/cli.js execute \
             --plan tests/fixtures/plan.dogfood-execute.json \
@@ -110,7 +110,7 @@ jobs:
             --timeout 60000 \
             --json > "$STDOUT_FILE" 2> "$STDERR_FILE"
           EXIT_CODE=$?
-          
+
           # Verify exit code is 0
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Execute command exited with non-zero code: $EXIT_CODE"
@@ -121,7 +121,7 @@ jobs:
             exit 1
           fi
           echo "✅ Exit code: $EXIT_CODE"
-          
+
           # Verify stdout is valid JSON
           if ! node -e "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" 2>&1; then
             echo "❌ stdout is not valid JSON:"
@@ -129,29 +129,29 @@ jobs:
             exit 1
           fi
           echo "✅ stdout is valid JSON"
-          
+
           # Verify JSON has expected execute structure
           node -e "
             const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'));
-            
+
             // Check top-level structure
             if (!data.plan || !data.execution) {
               console.error('❌ Missing plan or execution fields');
               process.exit(1);
             }
-            
+
             // Check plan structure
             if (!data.plan.schemaVersion || !data.plan.target || typeof data.plan.itemCount !== 'number') {
               console.error('❌ Invalid plan structure');
               process.exit(1);
             }
-            
+
             // Check execution structure
             if (!data.execution.results || !data.execution.mergeSummary) {
               console.error('❌ Missing results or mergeSummary');
               process.exit(1);
             }
-            
+
             // Verify all gates passed
             const results = data.execution.results;
             const allPassed = Object.values(results).every(r => r.status === 'pass');
@@ -160,7 +160,7 @@ jobs:
               console.error(JSON.stringify(results, null, 2));
               process.exit(1);
             }
-            
+
             // Verify gate execution details
             for (const [name, result] of Object.entries(results)) {
               if (!Array.isArray(result.gates)) {
@@ -174,23 +174,23 @@ jobs:
                 }
               }
             }
-            
+
             // Verify artifact collection
             if (!data.execution.artifactDir) {
               console.error('❌ Missing artifactDir in execution');
               process.exit(1);
             }
-            
+
             console.log('✅ All structure validations passed');
           "
-          
+
           # Verify artifacts were created
           if [ ! -d "$ARTIFACT_DIR" ]; then
             echo "❌ Artifact directory was not created"
             exit 1
           fi
           echo "✅ Artifact directory created: $ARTIFACT_DIR"
-          
+
           # Verify individual item artifact directories exist
           for item in check-package check-schema run-typecheck; do
             if [ ! -d "$ARTIFACT_DIR/$item" ]; then
@@ -199,7 +199,7 @@ jobs:
             fi
           done
           echo "✅ All item artifact directories created"
-          
+
           # Display summary
           echo "Execution summary:"
           node -e "
@@ -209,24 +209,24 @@ jobs:
             console.log('  Failed:', data.execution.mergeSummary.failed.length);
             console.log('  Blocked:', data.execution.mergeSummary.blocked.length);
           "
-          
+
           echo "✅ Execute dogfood test passed"
-      
+
       - name: Test execute command with status-table output
         run: |
           echo "Testing execute --status-table output..."
-          
+
           # Use GitHub Actions temp directory
           ARTIFACT_DIR="${RUNNER_TEMP}/status-artifacts"
           OUTPUT_FILE="${RUNNER_TEMP}/status-output.txt"
-          
+
           # Run execute command with status-table format
           node dist/cli.js execute \
             --plan tests/fixtures/plan.dogfood-execute.json \
             --artifact-dir "$ARTIFACT_DIR" \
             --timeout 60000 \
             --status-table > "$OUTPUT_FILE" 2>&1
-          
+
           # Verify output contains expected table markers
           if ! grep -q "## Execution Status Table" "$OUTPUT_FILE"; then
             echo "❌ Status table header not found"
@@ -234,21 +234,21 @@ jobs:
             exit 1
           fi
           echo "✅ Status table header found"
-          
+
           if ! grep -q "| Node | Status | Gates |" "$OUTPUT_FILE"; then
             echo "❌ Table column headers not found"
             cat "$OUTPUT_FILE"
             exit 1
           fi
           echo "✅ Table column headers found"
-          
+
           if ! grep -q "### Summary" "$OUTPUT_FILE"; then
             echo "❌ Summary section not found"
             cat "$OUTPUT_FILE"
             exit 1
           fi
           echo "✅ Summary section found"
-          
+
           # Verify all items are in the table
           for item in check-package check-schema run-typecheck; do
             if ! grep -q "| $item |" "$OUTPUT_FILE"; then
@@ -258,12 +258,12 @@ jobs:
             fi
           done
           echo "✅ All items found in status table"
-          
+
           echo "Status table output:"
           cat "$OUTPUT_FILE"
-          
+
           echo "✅ Status table test passed"
-  
+
   execute-failure-handling-test:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -277,16 +277,16 @@ jobs:
         run: npm ci
       - name: Build distribution
         run: npm run build
-      
+
       - name: Test execute command failure detection
         run: |
           echo "Testing execute command failure handling..."
-          
+
           # Use GitHub Actions temp directory
           ARTIFACT_DIR="${RUNNER_TEMP}/fail-artifacts"
           STDOUT_FILE="${RUNNER_TEMP}/fail-stdout.json"
           STDERR_FILE="${RUNNER_TEMP}/fail-stderr.txt"
-          
+
           # Run execute command with a plan that has failures (expect exit code 1)
           set +e
           node dist/cli.js execute \
@@ -296,14 +296,14 @@ jobs:
             --json > "$STDOUT_FILE" 2> "$STDERR_FILE"
           EXIT_CODE=$?
           set -e
-          
+
           # Verify exit code is 1 (failures detected)
           if [ $EXIT_CODE -ne 1 ]; then
             echo "❌ Execute command should exit with code 1 when gates fail, got: $EXIT_CODE"
             exit 1
           fi
           echo "✅ Exit code: $EXIT_CODE (expected failure)"
-          
+
           # Verify stdout is valid JSON
           if ! node -e "JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'))" 2>&1; then
             echo "❌ stdout is not valid JSON:"
@@ -311,34 +311,34 @@ jobs:
             exit 1
           fi
           echo "✅ stdout is valid JSON"
-          
+
           # Verify failure is properly reported
           node -e "
             const data = JSON.parse(require('fs').readFileSync('$STDOUT_FILE', 'utf-8'));
-            
+
             // Check that mergeSummary has failures
             if (!data.execution.mergeSummary.failed || data.execution.mergeSummary.failed.length === 0) {
               console.error('❌ No failures detected in mergeSummary');
               process.exit(1);
             }
-            
+
             // Check that failed item has correct status
             const failedItem = data.execution.results['always-fail'];
             if (!failedItem || failedItem.status !== 'fail') {
               console.error('❌ Failed item does not have fail status');
               process.exit(1);
             }
-            
+
             // Check that passed item still passed
             const passedItem = data.execution.results['always-pass'];
             if (!passedItem || passedItem.status !== 'pass') {
               console.error('❌ Passed item does not have pass status');
               process.exit(1);
             }
-            
+
             console.log('✅ Failures properly detected and reported');
             console.log('  Failed items:', data.execution.mergeSummary.failed.join(', '));
             console.log('  Passed items:', data.execution.mergeSummary.eligible.join(', '));
           "
-          
+
           echo "✅ Execute failure handling test passed"
