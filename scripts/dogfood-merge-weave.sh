@@ -443,13 +443,19 @@ else
     
     DRY_RUN_FILE="$ARTIFACTS_DIR/dry-run.json"
     
+    # Run merge command and capture exit code, but don't fail if it errors in dry-run
     if [ "$VERBOSE" = true ]; then
-        $LEX_PR_CMD merge $MERGE_OPTS --json | tee "$DRY_RUN_FILE"
+        $LEX_PR_CMD merge $MERGE_OPTS --json | tee "$DRY_RUN_FILE" || true
     else
-        $LEX_PR_CMD merge $MERGE_OPTS --json > "$DRY_RUN_FILE" 2>&1
+        $LEX_PR_CMD merge $MERGE_OPTS --json > "$DRY_RUN_FILE" 2>&1 || true
     fi
     
-    print_success "Dry-run completed"
+    # Check if the dry-run file contains an error
+    if [ -f "$DRY_RUN_FILE" ] && grep -qi "error" "$DRY_RUN_FILE" 2>/dev/null; then
+        print_warning "Dry-run completed with warnings/errors (continuing)"
+    else
+        print_success "Dry-run completed"
+    fi
     
     if command -v jq &> /dev/null && [ -f "$DRY_RUN_FILE" ]; then
         echo ""
