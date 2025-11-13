@@ -6,8 +6,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import YAML from "yaml";
-import { exec } from 'child_process';
-import { resolveProfile, validateWriteOperation, WriteProtectionError } from "../config/profileResolver.js";
+import { exec } from "child_process";
+import {
+	resolveProfile,
+	validateWriteOperation,
+	WriteProtectionError,
+} from "../config/profileResolver.js";
 
 // Cached Docker availability probe. null = unknown, true = available, false = not available
 let dockerAvailable: boolean | null = null;
@@ -17,7 +21,7 @@ let dockerAvailable: boolean | null = null;
 // inaccessible. This keeps `getEnvironmentSuggestions()` non-blocking.
 (function probeDockerAvailability() {
 	try {
-		exec('docker --version', { timeout: 2000 }, (err) => {
+		exec("docker --version", { timeout: 2000 }, (err) => {
 			dockerAvailable = err ? false : true;
 		});
 	} catch {
@@ -40,7 +44,7 @@ export interface WorkspaceTemplate {
 
 /**
  * Bootstrap workspace configuration with intelligent defaults
- * 
+ *
  * @param baseDir - Base directory for profile resolution
  * @param profileDirFlag - Optional profile directory override (from CLI --profile-dir)
  */
@@ -58,19 +62,19 @@ export function bootstrapWorkspace(
 
 	// Check if profile directory exists
 	if (!fs.existsSync(profileDir)) {
-		suggestions.push(`Create .smartergpt directory: mkdir ${profileDir}`);
+		suggestions.push(
+			`Create .smartergpt.local directory: mkdir ${profileDir}`
+		);
 		missingFiles.push(...expectedFiles);
 	} else {
-		// Check for files in runner/ subdirectory first, then flat structure
-		const runnerDir = path.join(profileDir, "runner");
-		
+		// Check for config files at profile root (v1 structure)
 		for (const file of expectedFiles) {
-			// Try new structure first (runner/)
-			const runnerPath = path.join(runnerDir, file);
-			// Fallback to legacy flat structure
-			const flatPath = path.join(profileDir, file);
-			
-			if (!fs.existsSync(runnerPath) && !fs.existsSync(flatPath)) {
+			const filePath = path.join(profileDir, file);
+
+			// Also check legacy runner/ location for backwards compatibility
+			const legacyPath = path.join(profileDir, "runner", file);
+
+			if (!fs.existsSync(filePath) && !fs.existsSync(legacyPath)) {
 				missingFiles.push(file);
 			}
 		}
@@ -78,7 +82,9 @@ export function bootstrapWorkspace(
 
 	// Generate contextual suggestions
 	if (missingFiles.includes("intent.md")) {
-		suggestions.push("Create intent.md to describe project goals and scope");
+		suggestions.push(
+			"Create intent.md to describe project goals and scope"
+		);
 	}
 
 	if (missingFiles.includes("scope.yml")) {
@@ -103,7 +109,7 @@ export function bootstrapWorkspace(
 
 /**
  * Create minimal workspace configuration
- * 
+ *
  * @param baseDir - Base directory for profile resolution
  * @param profileDirFlag - Optional profile directory override (from CLI --profile-dir)
  * @throws WriteProtectionError if attempting to write to a read-only profile
@@ -116,35 +122,34 @@ export function createMinimalWorkspace(
 	const resolved = resolveProfile(profileDirFlag, baseDir);
 	const profileDir = resolved.path;
 	const role = resolved.manifest.role;
-	
+
 	// Validate write operation is allowed
 	validateWriteOperation(profileDir, role, "create minimal workspace");
 
-	// Ensure directory and runner/ subdirectory exist
+	// Ensure profile directory exists
 	fs.mkdirSync(profileDir, { recursive: true });
+
+	// Create runner/ subdirectory for working artifacts
 	const runnerDir = path.join(profileDir, "runner");
 	fs.mkdirSync(runnerDir, { recursive: true });
 
-	// Create minimal intent.md in runner/
-	const intentPath = path.join(runnerDir, "intent.md");
+	// Create config files at profile root (v1 structure)
+	const intentPath = path.join(profileDir, "intent.md");
 	if (!fs.existsSync(intentPath)) {
 		fs.writeFileSync(intentPath, getMinimalTemplate("intent"));
 	}
 
-	// Create minimal scope.yml in runner/
-	const scopePath = path.join(runnerDir, "scope.yml");
+	const scopePath = path.join(profileDir, "scope.yml");
 	if (!fs.existsSync(scopePath)) {
 		fs.writeFileSync(scopePath, getMinimalTemplate("scope"));
 	}
 
-	// Create minimal deps.yml in runner/
-	const depsPath = path.join(runnerDir, "deps.yml");
+	const depsPath = path.join(profileDir, "deps.yml");
 	if (!fs.existsSync(depsPath)) {
 		fs.writeFileSync(depsPath, getMinimalTemplate("deps"));
 	}
 
-	// Create minimal gates.yml in runner/
-	const gatesPath = path.join(runnerDir, "gates.yml");
+	const gatesPath = path.join(profileDir, "gates.yml");
 	if (!fs.existsSync(gatesPath)) {
 		fs.writeFileSync(gatesPath, getMinimalTemplate("gates"));
 	}
@@ -236,9 +241,11 @@ export function detectProjectType(baseDir: string = "."): string {
 	}
 
 	// Check for Python project
-	if (fs.existsSync(path.join(baseDir, "pyproject.toml")) ||
+	if (
+		fs.existsSync(path.join(baseDir, "pyproject.toml")) ||
 		fs.existsSync(path.join(baseDir, "requirements.txt")) ||
-		fs.existsSync(path.join(baseDir, "setup.py"))) {
+		fs.existsSync(path.join(baseDir, "setup.py"))
+	) {
 		return "python";
 	}
 
@@ -263,12 +270,16 @@ export function getEnvironmentSuggestions(): string[] {
 
 	// Check for CI environment
 	if (process.env.CI) {
-		suggestions.push("Running in CI environment - consider CI-specific gate configurations");
+		suggestions.push(
+			"Running in CI environment - consider CI-specific gate configurations"
+		);
 	}
 
 	// Check for GitHub Actions
 	if (process.env.GITHUB_ACTIONS) {
-		suggestions.push("GitHub Actions detected - can use 'ci-service' runtime for gates");
+		suggestions.push(
+			"GitHub Actions detected - can use 'ci-service' runtime for gates"
+		);
 	}
 
 	// Docker availability is checked asynchronously on module load and cached in
@@ -276,7 +287,9 @@ export function getEnvironmentSuggestions(): string[] {
 	// or unknown (null) we don't block the event loop by running a sync check
 	// here. The async check is started once when the module is imported.
 	if (dockerAvailable === true) {
-		suggestions.push("Docker available - can use 'container' runtime for isolated gate execution");
+		suggestions.push(
+			"Docker available - can use 'container' runtime for isolated gate execution"
+		);
 	}
 
 	return suggestions;
