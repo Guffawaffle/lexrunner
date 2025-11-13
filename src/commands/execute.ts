@@ -16,6 +16,7 @@ import { initAuditEmitter, emitEvent, AuditEmitter, AuditOptions, EVENT_TYPES } 
 import { sha256 } from '../util/hash.js';
 import { getStatusIcon, formatStatusTable } from '../cli/formatters.js';
 import { BudgetTracker, BudgetExceededError } from '../budget/index.js';
+import { purgeCache } from '../cli/runnerLifecycle.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -62,6 +63,8 @@ export function registerExecuteCommand(program: Command, deps: ExecuteCommandDep
 		)
 		.option("--json", "Output results in JSON format")
 		.option("--status-table", "Generate status table for PR comments")
+		.option("--keep-cache", "Keep existing cache (do not purge on start)")
+		.option("--profile-dir <dir>", "Profile directory (default: auto-detect)")
 		.option(
 			"--skip-input-validation",
 			"Skip gate input schema validation (not recommended)"
@@ -134,6 +137,11 @@ Common Issues:
 			let auditEmitter: AuditEmitter | null = null;
 
 			try {
+				// Purge cache unless --keep-cache is specified
+				if (!deps.jsonModeActive()) {
+					purgeCache(opts.profileDir, opts.keepCache);
+				}
+
 				// Initialize budget tracker from global options
 				const programOpts = deps.getProgramOpts();
 				const budgetTracker = new BudgetTracker({

@@ -18,7 +18,7 @@ The Deliverables Management System provides comprehensive artifact tracking, ver
 ```
 .smartergpt/
 └── deliverables/
-    ├── latest -> weave-2024-10-04T10-30-00/  # Symlink to latest
+    ├── latest -> weave-2024-10-04T10-30-00/  # Symlink to latest (or directory copy on Windows)
     ├── weave-2024-10-04T10-30-00/
     │   ├── manifest.json                      # Deliverables manifest
     │   ├── analysis.json                      # Analysis data
@@ -29,6 +29,16 @@ The Deliverables Management System provides comprehensive artifact tracking, ver
     └── weave-2024-10-04T09-15-00/
         └── ...
 ```
+
+### Windows Compatibility
+
+The `latest` pointer uses symlinks on Unix-like systems. On Windows, symlinks require Developer Mode or administrator privileges. If symlink creation fails on Windows, the system automatically falls back to creating a directory copy instead.
+
+**To enable symlinks on Windows:**
+- Enable Developer Mode in Windows Settings → Update & Security → For developers
+- Or run the tool with administrator privileges
+
+**Note:** The directory copy fallback ensures the tool works on all Windows systems, but consumes more disk space. Regular cleanup is recommended.
 
 ## Manifest Schema
 

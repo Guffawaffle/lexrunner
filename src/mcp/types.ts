@@ -3,6 +3,7 @@
  */
 
 import { z } from "zod";
+import { getEnvWithAlias } from "../util/envUtils.js";
 
 /**
  * Environment configuration for MCP server
@@ -15,10 +16,11 @@ export interface MCPEnvironment {
 /**
  * Get MCP environment configuration with defaults
  * Supports LEX_PR_PROFILE_DIR for profile resolution precedence
+ * Supports LEXRUNNER_* aliases for backward compatibility
  */
 export function getMCPEnvironment(): MCPEnvironment {
 	return {
-		LEX_PR_PROFILE_DIR: process.env.LEX_PR_PROFILE_DIR,
+		LEX_PR_PROFILE_DIR: getEnvWithAlias('LEX_PR_PROFILE_DIR', 'LEXRUNNER_PROFILE_DIR'),
 		ALLOW_MUTATIONS: process.env.ALLOW_MUTATIONS === "true"
 	};
 }

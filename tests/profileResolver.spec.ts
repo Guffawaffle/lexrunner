@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { resolveProfile, ProfileResolverError, logProfileMessage } from '../src/config/profileResolver.js';
+import { resetDeprecationNotices } from '../src/util/envUtils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -12,6 +13,8 @@ describe('Profile Resolver', () => {
 	beforeEach(() => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'profile-test-'));
 		originalEnv = { ...process.env };
+		// Reset deprecation notices to allow testing them
+		resetDeprecationNotices();
 		// Spy on console.error since telemetry now uses stderr
 		consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
@@ -322,6 +325,71 @@ describe('Profile Resolver', () => {
 			expect(() => resolveProfile(customDir, tempDir)).toThrow(
 				/from --profile-dir/
 			);
+		});
+	});
+
+	describe('Environment Variable Aliases', () => {
+		it('should use LEXRUNNER_PROFILE_DIR as alias for LEX_PR_PROFILE_DIR', () => {
+			const aliasDir = path.join(tempDir, 'alias');
+			fs.mkdirSync(aliasDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(aliasDir, 'profile.yml'),
+				'role: alias\nname: Alias Profile'
+			);
+
+			process.env.LEXRUNNER_PROFILE_DIR = aliasDir;
+			fs.mkdirSync(path.join(tempDir, '.smartergpt'), { recursive: true });
+
+			const result = resolveProfile(undefined, tempDir);
+
+			expect(result.path).toBe(aliasDir);
+			expect(result.manifest.role).toBe('alias');
+			expect(result.manifest.name).toBe('Alias Profile');
+			expect(result.source).toBe('LEX_PR_PROFILE_DIR');
+		});
+
+		it('should prefer LEX_PR_PROFILE_DIR over LEXRUNNER_PROFILE_DIR', () => {
+			const primaryDir = path.join(tempDir, 'primary');
+			const aliasDir = path.join(tempDir, 'alias');
+			fs.mkdirSync(primaryDir, { recursive: true });
+			fs.mkdirSync(aliasDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(primaryDir, 'profile.yml'),
+				'role: primary'
+			);
+			fs.writeFileSync(
+				path.join(aliasDir, 'profile.yml'),
+				'role: alias'
+			);
+
+			process.env.LEX_PR_PROFILE_DIR = primaryDir;
+			process.env.LEXRUNNER_PROFILE_DIR = aliasDir;
+
+			const result = resolveProfile(undefined, tempDir);
+
+			expect(result.path).toBe(primaryDir);
+			expect(result.manifest.role).toBe('primary');
+		});
+
+		it('should show deprecation warning for LEXRUNNER_PROFILE_DIR', () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			
+			const aliasDir = path.join(tempDir, 'alias');
+			fs.mkdirSync(aliasDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(aliasDir, 'profile.yml'),
+				'role: alias'
+			);
+
+			process.env.LEXRUNNER_PROFILE_DIR = aliasDir;
+
+			resolveProfile(undefined, tempDir);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining('LEXRUNNER_PROFILE_DIR is deprecated')
+			);
+
+			warnSpy.mockRestore();
 		});
 	});
 

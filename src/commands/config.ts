@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml';
+import { getEnvWithAlias } from '../util/envUtils.js';
 
 /**
  * Configuration source level in precedence chain
@@ -64,7 +65,7 @@ function loadConfigFile(filePath: string): any | null {
  */
 function resolveConfigWithPrecedence(baseDir: string = process.cwd()): ConfigShowResult {
 	// Determine profile directories in precedence order
-	const envProfileDir = process.env.LEX_PR_PROFILE_DIR;
+	const envProfileDir = getEnvWithAlias('LEX_PR_PROFILE_DIR', 'LEXRUNNER_PROFILE_DIR');
 	const localProfileDir = path.resolve(baseDir, '.smartergpt.local');
 	const workspaceProfileDir = path.resolve(baseDir, '.smartergpt');
 

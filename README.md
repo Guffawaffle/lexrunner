@@ -390,6 +390,7 @@ Quick links:
 - **Front-End Capture Pipeline**: docs/front-end-capture-pipeline.md — idea → project workflow (Issues-only)
 - **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
 - **Diffgraph Planner**: docs/diffgraph-planner.md — automatic dependency discovery & merge ordering
+- **Prompts Configuration**: docs/prompts.md — prompts precedence, cross-repo usage, token expansion
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
@@ -448,6 +449,8 @@ lex-pr execute --plan plan.json
 
 ### Documentation
 
+- **[Environment Variables](docs/environment-variables.md)** - environment configuration, CI safety, and aliasing
+- **[Profile Resolution](docs/profile-resolution.md)** - profile precedence and configuration
 - **[Complete Guide](docs/diffgraph-planner.md)** - full feature documentation
 - **[Troubleshooting](docs/troubleshooting-planner.md)** - common errors and solutions
 - **[Tutorials](docs/tutorials/diffgraph-planner/)** - step-by-step guides
