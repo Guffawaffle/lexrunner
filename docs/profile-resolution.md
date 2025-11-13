@@ -386,6 +386,7 @@ jobs:
 ---
 
 **Next Steps:**
+- Read [Environment Variables](./environment-variables.md) for environment configuration and CI safety
 - Read [CLI Usage](./cli.md) for command details
 - See [AGENTS.md](../AGENTS.md) for architectural context
 - Check [examples/](../examples/) for more use cases

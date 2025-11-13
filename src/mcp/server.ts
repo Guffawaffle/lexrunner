@@ -44,6 +44,10 @@ import {
 	validateWriteOperation,
 	WriteProtectionError,
 } from "../config/profileResolver.js";
+import {
+	getCIMutationPolicy,
+	validateCIEnvironment,
+} from "../util/envUtils.js";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -537,8 +541,17 @@ async function handleMergeApply(
 	try {
 		const env = getMCPEnvironment();
 
+		// Resolve profile directory first to check role
+		const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
+		
+		// Validate CI environment if role is 'ci'
+		validateCIEnvironment(resolved.manifest);
+		
+		// Get CI-aware mutation policy
+		const allowMutations = getCIMutationPolicy(resolved.manifest);
+
 		// Check if mutations are allowed
-		if (!env.ALLOW_MUTATIONS && !args.dryRun) {
+		if (!allowMutations && !args.dryRun) {
 			const result: MergeApplyResult = {
 				allowed: false,
 				message:
@@ -554,9 +567,6 @@ async function handleMergeApply(
 				],
 			};
 		}
-
-		// Resolve profile directory
-		const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
 
 		// Load plan and execution state
 		const planPath = path.join(resolved.path, "runner", "plan.json");
@@ -578,10 +588,10 @@ async function handleMergeApply(
 		const summary = evaluator.getMergeSummary();
 
 		const result: MergeApplyResult = {
-			allowed: env.ALLOW_MUTATIONS && !args.dryRun,
+			allowed: allowMutations && !args.dryRun,
 			message: args.dryRun
 				? `Dry run: ${summary.eligible.length} items eligible, ${summary.failed.length} failed`
-				: env.ALLOW_MUTATIONS
+				: allowMutations
 				? `Ready to merge ${summary.eligible.length} eligible items`
 				: "Mutations disabled. Set ALLOW_MUTATIONS=true to enable merging.",
 		};

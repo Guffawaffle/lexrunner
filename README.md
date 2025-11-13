@@ -449,6 +449,8 @@ lex-pr execute --plan plan.json
 
 ### Documentation
 
+- **[Environment Variables](docs/environment-variables.md)** - environment configuration, CI safety, and aliasing
+- **[Profile Resolution](docs/profile-resolution.md)** - profile precedence and configuration
 - **[Complete Guide](docs/diffgraph-planner.md)** - full feature documentation
 - **[Troubleshooting](docs/troubleshooting-planner.md)** - common errors and solutions
 - **[Tutorials](docs/tutorials/diffgraph-planner/)** - step-by-step guides
