@@ -515,6 +515,20 @@ Common Issues:
 							`- **Conflicts**: ${result.conflicts}/${result.totalOperations}`
 						);
 
+						// Display detailed conflict information if any
+						if (result.conflicts > 0) {
+							console.log("");
+							console.log("### Conflicted Files");
+							for (const operation of result.operations) {
+								if (operation.conflicts && operation.conflicts.length > 0) {
+									console.log(`\n**${operation.item.name}**:`);
+									for (const file of operation.conflicts) {
+										console.log(`  - ${file}`);
+									}
+								}
+							}
+						}
+
 						if (result.failed > 0) {
 							console.log("");
 							console.log(
