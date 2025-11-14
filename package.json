@@ -41,6 +41,7 @@
 		}
 	},
 	"scripts": {
+		"postinstall": "node -e \"console.log('\\n📦 lex-pr-runner installed! Run \\\"npx lex-pr init\\\" to set up your workspace.\\n')\"",
 		"dev": "tsx watch src/cli.ts",
 		"cli": "tsx src/cli.ts",
 		"cli:built": "node dist/cli.js",

@@ -38,13 +38,21 @@ The wizard will:
 
 ```
 .smartergpt.local/
-├── intent.md                    # Project goals and scope
-├── scope.yml                    # PR discovery rules
-├── deps.yml                     # Dependency relationships
-├── gates.yml                    # Quality gates configuration
+├── profile.yml                  # Profile metadata (role: development)
+├── intent.md                    # Project goals and scope (at root)
+├── scope.yml                    # PR discovery rules (at root)
+├── deps.yml                     # Dependency relationships (at root)
+├── gates.yml                    # Quality gates configuration (at root)
 ├── pull-request-template.md     # PR template with dependency syntax
-└── profile.yml                  # Profile metadata
+├── prompts/                     # Local prompt overlays (optional)
+├── runner/                      # Working directory for artifacts
+│   ├── plan.json                # Generated plan
+│   ├── cache/                   # Ephemeral cache
+│   └── logs/                    # Execution logs
+└── deliverables/                # Generated outputs
 ```
+
+**Note:** Configuration files live at the profile root, not in a `runner/` subdirectory. The `runner/` directory contains only working artifacts.
 
 ### Non-Interactive Setup
 
@@ -113,6 +121,27 @@ gates:
     run: npm run lint
     runtime: local
 ```
+
+### (Optional) Set Up Cross-Repository Prompts
+
+If you want to share prompts across repositories (e.g., use Lex prompts in LexRunner):
+
+**Option 1: Environment Variable**
+```bash
+export LEX_PROMPTS_DIR=/path/to/shared/prompts
+```
+
+**Option 2: Symlink**
+```bash
+ln -s ../other-repo/.smartergpt/prompts .smartergpt.local/prompts
+```
+
+**Option 3: Copy and Customize**
+```bash
+cp -r ../other-repo/.smartergpt/prompts .smartergpt.local/
+```
+
+**See:** [docs/prompts.md](./prompts.md) for detailed prompts configuration including token expansion.
 
 ## Step 4: Verify Your Setup
 
@@ -423,14 +452,14 @@ lex-pr execute plan.json --json
    ```bash
    # Interactive plan exploration
    lex-pr view plan.json
-   
+
    # Query and analyze plans
    lex-pr query plan.json --stats
    lex-pr query plan.json "level eq 1"
-   
+
    # Batch operations
    lex-pr merge --batch --levels "1,2" --execute
-   
+
    # Shell completion
    eval "$(lex-pr completion bash)"
    ```

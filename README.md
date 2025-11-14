@@ -135,32 +135,45 @@ Use `npm run cli -- doctor` to verify your environment meets all requirements.
 
 ## Quick start
 
+### Installation
+
+```bash
+# Install globally
+npm install -g lex-pr-runner
+
+# Or install in your project
+npm install --save-dev lex-pr-runner
+```
+
+After installation, you'll see a reminder to initialize your workspace:
+
+```
+📦 lex-pr-runner installed! Run "npx lex-pr init" to set up your workspace.
+```
+
 ### For New Users
 
 ```bash
-# 1. Install globally or in your project
-npm install -g lex-pr-runner
+# 1. Initialize workspace (creates .smartergpt.local/ with v1 structure)
+npx lex-pr init
 
-# 2. Initialize workspace (interactive)
-lex-pr init
+# 2. Verify environment
+npx lex-pr doctor
 
-# 3. Verify environment
-lex-pr doctor
+# 3. Discover PRs
+npx lex-pr discover
 
-# 4. Discover PRs
-lex-pr discover
+# 4. Generate plan
+npx lex-pr plan --from-github
 
-# 5. Generate plan
-lex-pr plan --from-github
+# 5. Review plan interactively
+npx lex-pr plan-review plan.json
 
-# 6. Review plan interactively
-lex-pr plan-review plan.json
+# 6. Execute gates
+npx lex-pr execute plan.json
 
-# 7. Execute gates
-lex-pr execute plan.json
-
-# 8. Merge PRs
-lex-pr merge plan.json
+# 7. Merge PRs
+npx lex-pr merge plan.json
 ```
 
 See [docs/quickstart.md](docs/quickstart.md) for a complete 5-minute onboarding guide.
