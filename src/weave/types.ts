@@ -160,6 +160,47 @@ export interface WeaveLockFile {
 }
 
 /**
+ * Preflight conflict detection result for a single item
+ */
+export interface PreflightItemConflict {
+	/** Item name (branch name) */
+	name: string;
+	/** Whether conflicts were detected */
+	hasConflicts: boolean;
+	/** List of conflicted files */
+	conflicts: Array<{
+		/** Path to the conflicted file */
+		path: string;
+		/** Type of conflict */
+		type: 'both-modified' | 'rename' | 'delete-modify' | 'add-add' | 'unknown';
+		/** Whether our side changed this file */
+		oursChanged: boolean;
+		/** Whether their side changed this file */
+		theirsChanged: boolean;
+		/** Line range of conflict (if available) */
+		lines?: string;
+	}>;
+	/** Merge base SHA used for simulation */
+	mergeBase?: string;
+	/** Error message if simulation failed */
+	error?: string;
+}
+
+/**
+ * Preflight conflict detection results
+ */
+export interface PreflightResults {
+	/** Total number of conflicts detected across all items */
+	conflictsDetected: number;
+	/** Per-item conflict details */
+	items: PreflightItemConflict[];
+	/** Whether preflight detection was skipped */
+	skipped?: boolean;
+	/** Reason for skipping (if applicable) */
+	skipReason?: string;
+}
+
+/**
  * Dry run output structure
  */
 export interface DryRunOutput {
@@ -189,4 +230,6 @@ export interface DryRunOutput {
 		branchExists: boolean;
 		conflictsPredicted: number;
 	};
+	/** Preflight conflict detection results (optional) */
+	preflight?: PreflightResults;
 }
