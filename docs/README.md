@@ -48,6 +48,7 @@ New to lex-pr-runner? Start here:
 - **[SmartGPT Structure v1 Spec](./specs/smartergpt-structure-v1.md)** - Complete structure specification
 - **[Profile Resolution](./profile-resolution.md)** - Configuration precedence
 - **[Prompts Configuration](./prompts.md)** - Prompts precedence, cross-repo usage, token expansion
+- **[SmartGPT Structure v1 Specification](./specs/smartergpt-structure-v1.md)** - Complete directory structure spec
 - **[TERMS](./TERMS.md)** - Canonical terminology
 
 ### File Reference
@@ -270,6 +271,6 @@ grep -r "Issue:" docs/troubleshooting.md
 
 ---
 
-**Last Updated:** 2024  
-**Version:** 0.1.0  
+**Last Updated:** 2024
+**Version:** 0.1.0
 **Maintainers:** lex-pr-runner team

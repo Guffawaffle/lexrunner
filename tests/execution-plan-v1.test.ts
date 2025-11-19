@@ -1,11 +1,4 @@
-/**
- * Tests for Execution Plan v1 Schema validation
- *
- * Run with: npx tsx --test tests/execution-plan-v1.test.ts
- */
-
-import { test, describe } from "node:test";
-import assert from "node:assert";
+import { describe, it, expect } from "vitest";
 import {
 	ExecutionPlanV1Schema,
 	SubIssueSchema,
@@ -13,7 +6,7 @@ import {
 import type { FeatureSpecV0 } from "../.smartergpt/schemas/feature-spec-v0.js";
 
 describe("SubIssueSchema", () => {
-	test("validates valid sub-issue", () => {
+	it("validates valid sub-issue", () => {
 		const validSubIssue = {
 			id: "feature-impl",
 			title: "Implement feature",
@@ -24,10 +17,10 @@ describe("SubIssueSchema", () => {
 		};
 
 		const result = SubIssueSchema.safeParse(validSubIssue);
-		assert.ok(result.success, "Valid sub-issue should parse successfully");
+		expect(result.success).toBe(true);
 	});
 
-	test("validates sub-issue with dependencies", () => {
+	it("validates sub-issue with dependencies", () => {
 		const validSubIssue = {
 			id: "tests",
 			title: "Add tests",
@@ -38,13 +31,10 @@ describe("SubIssueSchema", () => {
 		};
 
 		const result = SubIssueSchema.safeParse(validSubIssue);
-		assert.ok(
-			result.success,
-			"Valid sub-issue with dependencies should parse successfully"
-		);
+		expect(result.success).toBe(true);
 	});
 
-	test("rejects invalid sub-issue type", () => {
+	it("rejects invalid sub-issue type", () => {
 		const invalidSubIssue = {
 			id: "invalid",
 			title: "Test",
@@ -55,10 +45,10 @@ describe("SubIssueSchema", () => {
 		};
 
 		const result = SubIssueSchema.safeParse(invalidSubIssue);
-		assert.ok(!result.success, "Sub-issue with invalid type should fail");
+		expect(result.success).toBe(false);
 	});
 
-	test("rejects invalid id format", () => {
+	it("rejects invalid id format", () => {
 		const invalidSubIssue = {
 			id: "Invalid_ID",
 			title: "Test",
@@ -69,13 +59,10 @@ describe("SubIssueSchema", () => {
 		};
 
 		const result = SubIssueSchema.safeParse(invalidSubIssue);
-		assert.ok(
-			!result.success,
-			"Sub-issue with invalid id format should fail"
-		);
+		expect(result.success).toBe(false);
 	});
 
-	test("validates all sub-issue types", () => {
+	it("validates all sub-issue types", () => {
 		const types = ["feature", "testing", "docs"] as const;
 
 		types.forEach((type) => {
@@ -89,10 +76,7 @@ describe("SubIssueSchema", () => {
 			};
 
 			const result = SubIssueSchema.safeParse(subIssue);
-			assert.ok(
-				result.success,
-				`Sub-issue with type '${type}' should parse successfully`
-			);
+			expect(result.success).toBe(true);
 		});
 	});
 });
@@ -107,7 +91,7 @@ describe("ExecutionPlanV1Schema", () => {
 		createdAt: "2025-11-09T14:30:00.000Z",
 	};
 
-	test("validates valid execution plan", () => {
+	it("validates valid execution plan", () => {
 		const validPlan = {
 			schemaVersion: "1.0.0",
 			sourceSpec: validSourceSpec,
@@ -130,13 +114,10 @@ describe("ExecutionPlanV1Schema", () => {
 		};
 
 		const result = ExecutionPlanV1Schema.safeParse(validPlan);
-		assert.ok(
-			result.success,
-			"Valid execution plan should parse successfully"
-		);
+		expect(result.success).toBe(true);
 	});
 
-	test("validates execution plan with multiple sub-issues", () => {
+	it("validates execution plan with multiple sub-issues", () => {
 		const validPlan = {
 			schemaVersion: "1.0.0",
 			sourceSpec: validSourceSpec,
@@ -175,13 +156,10 @@ describe("ExecutionPlanV1Schema", () => {
 		};
 
 		const result = ExecutionPlanV1Schema.safeParse(validPlan);
-		assert.ok(
-			result.success,
-			"Valid execution plan with multiple sub-issues should parse successfully"
-		);
+		expect(result.success).toBe(true);
 	});
 
-	test("rejects empty sub-issues array", () => {
+	it("rejects empty sub-issues array", () => {
 		const invalidPlan = {
 			schemaVersion: "1.0.0",
 			sourceSpec: validSourceSpec,
@@ -195,10 +173,10 @@ describe("ExecutionPlanV1Schema", () => {
 		};
 
 		const result = ExecutionPlanV1Schema.safeParse(invalidPlan);
-		assert.ok(!result.success, "Plan with empty sub-issues should fail");
+		expect(result.success).toBe(false);
 	});
 
-	test("rejects invalid schema version", () => {
+	it("rejects invalid schema version", () => {
 		const invalidPlan = {
 			schemaVersion: "0.1.0",
 			sourceSpec: validSourceSpec,
@@ -221,13 +199,10 @@ describe("ExecutionPlanV1Schema", () => {
 		};
 
 		const result = ExecutionPlanV1Schema.safeParse(invalidPlan);
-		assert.ok(
-			!result.success,
-			"Plan with wrong schema version should fail"
-		);
+		expect(result.success).toBe(false);
 	});
 
-	test("rejects missing epic fields", () => {
+	it("rejects missing epic fields", () => {
 		const invalidPlan = {
 			schemaVersion: "1.0.0",
 			sourceSpec: validSourceSpec,
@@ -250,10 +225,7 @@ describe("ExecutionPlanV1Schema", () => {
 		};
 
 		const result = ExecutionPlanV1Schema.safeParse(invalidPlan);
-		assert.ok(
-			!result.success,
-			"Plan with missing epic description should fail"
-		);
+		expect(result.success).toBe(false);
 	});
 
 	test("rejects invalid source spec", () => {
