@@ -1,316 +1,360 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrapWorkspace, createMinimalWorkspace, detectProjectType, getEnvironmentSuggestions, BootstrapError } from '../src/core/bootstrap.js';
-import { WriteProtectionError, canWriteToProfile } from '../src/config/profileResolver.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+	bootstrapWorkspace,
+	createMinimalWorkspace,
+	detectProjectType,
+	getEnvironmentSuggestions,
+	BootstrapError,
+} from "../src/core/bootstrap.js";
+import {
+	WriteProtectionError,
+	canWriteToProfile,
+} from "../src/config/profileResolver.js";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
-describe('Bootstrap Configuration', () => {
-  let tempDir: string;
+describe("Bootstrap Configuration", () => {
+	let tempDir: string;
 
-  beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bootstrap-test-'));
-  });
+	beforeEach(() => {
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bootstrap-test-"));
+	});
 
-  afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
-  });
+	afterEach(() => {
+		if (fs.existsSync(tempDir)) {
+			fs.rmSync(tempDir, { recursive: true });
+		}
+	});
 
-  describe('bootstrapWorkspace', () => {
-    it('should detect missing configuration', () => {
-      const result = bootstrapWorkspace(tempDir);
+	describe("bootstrapWorkspace", () => {
+		it("should detect missing configuration", () => {
+			const result = bootstrapWorkspace(tempDir);
 
-      expect(result.hasConfiguration).toBe(false);
-      expect(result.missingFiles).toEqual(['intent.md', 'scope.yml', 'deps.yml', 'gates.yml']);
-      expect(result.suggestions.length).toBeGreaterThan(0);
-      expect(result.profileDir).toBe(path.join(tempDir, '.smartergpt'));
-    });
+			expect(result.hasConfiguration).toBe(false);
+			expect(result.missingFiles).toEqual([
+				"intent.md",
+				"scope.yml",
+				"deps.yml",
+				"gates.yml",
+			]);
+			expect(result.suggestions.length).toBeGreaterThan(0);
+			expect(result.profileDir).toBe(path.join(tempDir, ".smartergpt"));
+		});
 
-    it('should detect existing configuration', () => {
-      const profileDir = path.join(tempDir, '.smartergpt');
-      fs.mkdirSync(profileDir);
-      
-      // Create all expected files
-      fs.writeFileSync(path.join(profileDir, 'intent.md'), '# Intent');
-      fs.writeFileSync(path.join(profileDir, 'scope.yml'), 'version: 1');
-      fs.writeFileSync(path.join(profileDir, 'deps.yml'), 'version: 1');
-      fs.writeFileSync(path.join(profileDir, 'gates.yml'), 'version: 1');
+		it("should detect existing configuration", () => {
+			const profileDir = path.join(tempDir, ".smartergpt");
+			fs.mkdirSync(profileDir);
 
-      const result = bootstrapWorkspace(tempDir);
+			// Create all expected files
+			fs.writeFileSync(path.join(profileDir, "intent.md"), "# Intent");
+			fs.writeFileSync(path.join(profileDir, "scope.yml"), "version: 1");
+			fs.writeFileSync(path.join(profileDir, "deps.yml"), "version: 1");
+			fs.writeFileSync(path.join(profileDir, "gates.yml"), "version: 1");
 
-      expect(result.hasConfiguration).toBe(true);
-      expect(result.missingFiles).toEqual([]);
-      expect(result.suggestions.length).toBe(0);
-    });
+			const result = bootstrapWorkspace(tempDir);
 
-    it('should detect partial configuration', () => {
-      const profileDir = path.join(tempDir, '.smartergpt');
-      fs.mkdirSync(profileDir);
-      
-      // Create only some files
-      fs.writeFileSync(path.join(profileDir, 'intent.md'), '# Intent');
-      fs.writeFileSync(path.join(profileDir, 'scope.yml'), 'version: 1');
+			expect(result.hasConfiguration).toBe(true);
+			expect(result.missingFiles).toEqual([]);
+			expect(result.suggestions.length).toBe(0);
+		});
 
-      const result = bootstrapWorkspace(tempDir);
+		it("should detect partial configuration", () => {
+			const profileDir = path.join(tempDir, ".smartergpt");
+			fs.mkdirSync(profileDir);
 
-      expect(result.hasConfiguration).toBe(false);
-      expect(result.missingFiles).toEqual(['deps.yml', 'gates.yml']);
-      expect(result.suggestions.length).toBeGreaterThan(0);
-    });
-  });
+			// Create only some files
+			fs.writeFileSync(path.join(profileDir, "intent.md"), "# Intent");
+			fs.writeFileSync(path.join(profileDir, "scope.yml"), "version: 1");
 
-  describe('createMinimalWorkspace', () => {
-    it('should create all required configuration files', () => {
-      // Use .smartergpt.local which will be auto-discovered
-      const profileDir = path.join(tempDir, '.smartergpt.local');
-      fs.mkdirSync(profileDir, { recursive: true });
-      
-      // Create a manifest with writable role
-      fs.writeFileSync(
-        path.join(profileDir, 'profile.yml'),
-        'role: local\nname: Test Local Profile\n'
-      );
-      
-      createMinimalWorkspace(tempDir);
+			const result = bootstrapWorkspace(tempDir);
 
-      const expectedFiles = ['intent.md', 'scope.yml', 'deps.yml', 'gates.yml'];
-      const runnerDir = path.join(profileDir, 'runner');
+			expect(result.hasConfiguration).toBe(false);
+			expect(result.missingFiles).toEqual(["deps.yml", "gates.yml"]);
+			expect(result.suggestions.length).toBeGreaterThan(0);
+		});
+	});
 
-      expect(fs.existsSync(profileDir)).toBe(true);
-      expect(fs.existsSync(runnerDir)).toBe(true);
-      
-      for (const file of expectedFiles) {
-        const filePath = path.join(runnerDir, file);
-        expect(fs.existsSync(filePath)).toBe(true);
-        const content = fs.readFileSync(filePath, 'utf-8');
-        expect(content.length).toBeGreaterThan(0);
-      }
-    });
+	describe("createMinimalWorkspace", () => {
+		it("should create all required configuration files", () => {
+			// Use .smartergpt.local which will be auto-discovered
+			const profileDir = path.join(tempDir, ".smartergpt.local");
+			fs.mkdirSync(profileDir, { recursive: true });
 
-    it('should not overwrite existing files', () => {
-      const profileDir = path.join(tempDir, '.smartergpt.local');
-      fs.mkdirSync(profileDir, { recursive: true });
-      
-      // Create a manifest with writable role
-      fs.writeFileSync(
-        path.join(profileDir, 'profile.yml'),
-        'role: local\nname: Test Local Profile\n'
-      );
-      
-      const existingContent = '# Existing content';
-      fs.writeFileSync(path.join(profileDir, 'intent.md'), existingContent);
+			// Create a manifest with writable role
+			fs.writeFileSync(
+				path.join(profileDir, "profile.yml"),
+				"role: local\nname: Test Local Profile\n"
+			);
 
-      createMinimalWorkspace(tempDir);
+			createMinimalWorkspace(tempDir);
 
-      const content = fs.readFileSync(path.join(profileDir, 'intent.md'), 'utf-8');
-      expect(content).toBe(existingContent);
-    });
+			const expectedFiles = [
+				"intent.md",
+				"scope.yml",
+				"deps.yml",
+				"gates.yml",
+			];
 
-    it('should create proper YAML structure in configuration files', () => {
-      const profileDir = path.join(tempDir, '.smartergpt.local');
-      fs.mkdirSync(profileDir, { recursive: true });
-      
-      // Create a manifest with writable role
-      fs.writeFileSync(
-        path.join(profileDir, 'profile.yml'),
-        'role: local\nname: Test Local Profile\n'
-      );
-      
-      createMinimalWorkspace(tempDir);
-      
-      const runnerDir = path.join(profileDir, 'runner');
-      
-      // Check scope.yml has proper YAML structure
-      const scopeContent = fs.readFileSync(path.join(runnerDir, 'scope.yml'), 'utf-8');
-      expect(scopeContent).toContain('version: 1');
-      expect(scopeContent).toContain('target: main');
+			// In v1 structure, config files live at profile root and runner/ holds artifacts
+			const runnerDir = path.join(profileDir, "runner");
 
-      // Check deps.yml has proper YAML structure
-      const depsContent = fs.readFileSync(path.join(runnerDir, 'deps.yml'), 'utf-8');
-      expect(depsContent).toContain('version: 1');
-      expect(depsContent).toContain('target: main');
+			expect(fs.existsSync(profileDir)).toBe(true);
+			expect(fs.existsSync(runnerDir)).toBe(true);
 
-      // Check gates.yml has proper YAML structure
-      const gatesContent = fs.readFileSync(path.join(runnerDir, 'gates.yml'), 'utf-8');
-      expect(gatesContent).toContain('version: 1');
-      expect(gatesContent).toContain('gates:');
-    });
-  });
+			for (const file of expectedFiles) {
+				const rootPath = path.join(profileDir, file);
+				expect(fs.existsSync(rootPath)).toBe(true);
+				const content = fs.readFileSync(rootPath, "utf-8");
+				expect(content.length).toBeGreaterThan(0);
+			}
+		});
 
-  describe('detectProjectType', () => {
-    it('should detect Node.js project', () => {
-      fs.writeFileSync(path.join(tempDir, 'package.json'), '{}');
-      
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('nodejs');
-    });
+		it("should not overwrite existing files", () => {
+			const profileDir = path.join(tempDir, ".smartergpt.local");
+			fs.mkdirSync(profileDir, { recursive: true });
 
-    it('should detect Python project with pyproject.toml', () => {
-      fs.writeFileSync(path.join(tempDir, 'pyproject.toml'), '[tool.poetry]');
-      
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('python');
-    });
+			// Create a manifest with writable role
+			fs.writeFileSync(
+				path.join(profileDir, "profile.yml"),
+				"role: local\nname: Test Local Profile\n"
+			);
 
-    it('should detect Python project with requirements.txt', () => {
-      fs.writeFileSync(path.join(tempDir, 'requirements.txt'), 'requests==2.28.0');
-      
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('python');
-    });
+			const existingContent = "# Existing content";
+			fs.writeFileSync(
+				path.join(profileDir, "intent.md"),
+				existingContent
+			);
 
-    it('should detect Rust project', () => {
-      fs.writeFileSync(path.join(tempDir, 'Cargo.toml'), '[package]');
-      
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('rust');
-    });
+			createMinimalWorkspace(tempDir);
 
-    it('should detect Go project', () => {
-      fs.writeFileSync(path.join(tempDir, 'go.mod'), 'module example');
-      
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('go');
-    });
+			const content = fs.readFileSync(
+				path.join(profileDir, "intent.md"),
+				"utf-8"
+			);
+			expect(content).toBe(existingContent);
+		});
 
-    it('should default to generic for unknown projects', () => {
-      const projectType = detectProjectType(tempDir);
-      expect(projectType).toBe('generic');
-    });
-  });
+		it("should create proper YAML structure in configuration files", () => {
+			const profileDir = path.join(tempDir, ".smartergpt.local");
+			fs.mkdirSync(profileDir, { recursive: true });
 
-  describe('getEnvironmentSuggestions', () => {
-    let originalEnv: NodeJS.ProcessEnv;
+			// Create a manifest with writable role
+			fs.writeFileSync(
+				path.join(profileDir, "profile.yml"),
+				"role: local\nname: Test Local Profile\n"
+			);
 
-    beforeEach(() => {
-      originalEnv = { ...process.env };
-    });
+			createMinimalWorkspace(tempDir);
 
-    afterEach(() => {
-      process.env = originalEnv;
-    });
+			// In v1 structure, config files live at profile root
+			const scopeContent = fs.readFileSync(
+				path.join(profileDir, "scope.yml"),
+				"utf-8"
+			);
+			expect(scopeContent).toContain("version: 1");
+			expect(scopeContent).toContain("target: main");
 
-    it('should suggest CI-specific configurations in CI environment', () => {
-      process.env.CI = 'true';
-      
-      const suggestions = getEnvironmentSuggestions();
-      
-      expect(suggestions.some(s => s.includes('CI environment'))).toBe(true);
-    });
+			// Check deps.yml has proper YAML structure
+			const depsContent = fs.readFileSync(
+				path.join(profileDir, "deps.yml"),
+				"utf-8"
+			);
+			expect(depsContent).toContain("version: 1");
+			expect(depsContent).toContain("target: main");
 
-    it('should suggest GitHub Actions configurations', () => {
-      process.env.GITHUB_ACTIONS = 'true';
-      
-      const suggestions = getEnvironmentSuggestions();
-      
-      expect(suggestions.some(s => s.includes('GitHub Actions'))).toBe(true);
-    });
+			// Check gates.yml has proper YAML structure
+			const gatesContent = fs.readFileSync(
+				path.join(profileDir, "gates.yml"),
+				"utf-8"
+			);
+			expect(gatesContent).toContain("version: 1");
+			expect(gatesContent).toContain("gates:");
+		});
+	});
 
-    it('should return empty array in minimal environment', () => {
-      delete process.env.CI;
-      delete process.env.GITHUB_ACTIONS;
-      
-      const suggestions = getEnvironmentSuggestions();
-      
-      // Should still work, might be empty or have Docker suggestion
-      expect(Array.isArray(suggestions)).toBe(true);
-    });
-  });
+	describe("detectProjectType", () => {
+		it("should detect Node.js project", () => {
+			fs.writeFileSync(path.join(tempDir, "package.json"), "{}");
 
-  describe('BootstrapError', () => {
-    it('should create proper error instances', () => {
-      const error = new BootstrapError('Test bootstrap error');
-      
-      expect(error).toBeInstanceOf(Error);
-      expect(error).toBeInstanceOf(BootstrapError);
-      expect(error.message).toBe('Test bootstrap error');
-      expect(error.name).toBe('BootstrapError');
-    });
-  });
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("nodejs");
+		});
 
-  describe('Write Protection', () => {
-    it('should prevent writing to role="example" profiles', () => {
-      const trackedDir = path.join(tempDir, '.smartergpt');
-      fs.mkdirSync(trackedDir, { recursive: true });
-      
-      // .smartergpt without manifest defaults to role=example
-      // Attempting to create workspace should fail
-      expect(() => {
-        createMinimalWorkspace(tempDir);
-      }).toThrow(WriteProtectionError);
-    });
+		it("should detect Python project with pyproject.toml", () => {
+			fs.writeFileSync(
+				path.join(tempDir, "pyproject.toml"),
+				"[tool.poetry]"
+			);
 
-    it('should allow writing to role="local" profiles', () => {
-      const localDir = path.join(tempDir, '.smartergpt.local');
-      fs.mkdirSync(localDir, { recursive: true });
-      
-      // Create manifest with role=local
-      fs.writeFileSync(
-        path.join(localDir, 'profile.yml'),
-        'role: local\nname: Local Profile\n'
-      );
-      
-      // Should succeed
-      expect(() => {
-        createMinimalWorkspace(tempDir);
-      }).not.toThrow();
-    });
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("python");
+		});
 
-    it('should allow writing to custom writable profiles via env var', () => {
-      const customDir = path.join(tempDir, 'custom-profile');
-      fs.mkdirSync(customDir, { recursive: true });
-      
-      // Create manifest with custom role
-      fs.writeFileSync(
-        path.join(customDir, 'profile.yml'),
-        'role: development\nname: Dev Profile\n'
-      );
-      
-      // Set env var to point to custom profile
-      const originalEnv = process.env.LEX_PR_PROFILE_DIR;
-      process.env.LEX_PR_PROFILE_DIR = customDir;
-      
-      try {
-        // Should succeed
-        expect(() => {
-          createMinimalWorkspace(tempDir);
-        }).not.toThrow();
-      } finally {
-        // Restore env
-        if (originalEnv) {
-          process.env.LEX_PR_PROFILE_DIR = originalEnv;
-        } else {
-          delete process.env.LEX_PR_PROFILE_DIR;
-        }
-      }
-    });
+		it("should detect Python project with requirements.txt", () => {
+			fs.writeFileSync(
+				path.join(tempDir, "requirements.txt"),
+				"requests==2.28.0"
+			);
 
-    it('should validate write permissions with canWriteToProfile helper', () => {
-      // role="example" should not be writable
-      expect(canWriteToProfile('/some/path', 'example')).toBe(false);
-      
-      // Other roles should be writable
-      expect(canWriteToProfile('/some/path', 'local')).toBe(true);
-      expect(canWriteToProfile('/some/path', 'development')).toBe(true);
-      expect(canWriteToProfile('/some/path', 'production')).toBe(true);
-      expect(canWriteToProfile('/some/path', 'custom')).toBe(true);
-    });
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("python");
+		});
 
-    it('should provide clear error message for write protection violations', () => {
-      const trackedDir = path.join(tempDir, '.smartergpt');
-      fs.mkdirSync(trackedDir, { recursive: true });
-      
-      try {
-        createMinimalWorkspace(tempDir);
-        expect.fail('Should have thrown WriteProtectionError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(WriteProtectionError);
-        expect((error as Error).message).toContain('role="example"');
-        expect((error as Error).message).toContain('read-only');
-        expect((error as Error).message).toContain('.smartergpt.local');
-      }
-    });
-  });
+		it("should detect Rust project", () => {
+			fs.writeFileSync(path.join(tempDir, "Cargo.toml"), "[package]");
+
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("rust");
+		});
+
+		it("should detect Go project", () => {
+			fs.writeFileSync(path.join(tempDir, "go.mod"), "module example");
+
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("go");
+		});
+
+		it("should default to generic for unknown projects", () => {
+			const projectType = detectProjectType(tempDir);
+			expect(projectType).toBe("generic");
+		});
+	});
+
+	describe("getEnvironmentSuggestions", () => {
+		let originalEnv: NodeJS.ProcessEnv;
+
+		beforeEach(() => {
+			originalEnv = { ...process.env };
+		});
+
+		afterEach(() => {
+			process.env = originalEnv;
+		});
+
+		it("should suggest CI-specific configurations in CI environment", () => {
+			process.env.CI = "true";
+
+			const suggestions = getEnvironmentSuggestions();
+
+			expect(suggestions.some((s) => s.includes("CI environment"))).toBe(
+				true
+			);
+		});
+
+		it("should suggest GitHub Actions configurations", () => {
+			process.env.GITHUB_ACTIONS = "true";
+
+			const suggestions = getEnvironmentSuggestions();
+
+			expect(suggestions.some((s) => s.includes("GitHub Actions"))).toBe(
+				true
+			);
+		});
+
+		it("should return empty array in minimal environment", () => {
+			delete process.env.CI;
+			delete process.env.GITHUB_ACTIONS;
+
+			const suggestions = getEnvironmentSuggestions();
+
+			// Should still work, might be empty or have Docker suggestion
+			expect(Array.isArray(suggestions)).toBe(true);
+		});
+	});
+
+	describe("BootstrapError", () => {
+		it("should create proper error instances", () => {
+			const error = new BootstrapError("Test bootstrap error");
+
+			expect(error).toBeInstanceOf(Error);
+			expect(error).toBeInstanceOf(BootstrapError);
+			expect(error.message).toBe("Test bootstrap error");
+			expect(error.name).toBe("BootstrapError");
+		});
+	});
+
+	describe("Write Protection", () => {
+		it('should prevent writing to role="example" profiles', () => {
+			const trackedDir = path.join(tempDir, ".smartergpt");
+			fs.mkdirSync(trackedDir, { recursive: true });
+
+			// .smartergpt without manifest defaults to role=example
+			// Attempting to create workspace should fail
+			expect(() => {
+				createMinimalWorkspace(tempDir);
+			}).toThrow(WriteProtectionError);
+		});
+
+		it('should allow writing to role="local" profiles', () => {
+			const localDir = path.join(tempDir, ".smartergpt.local");
+			fs.mkdirSync(localDir, { recursive: true });
+
+			// Create manifest with role=local
+			fs.writeFileSync(
+				path.join(localDir, "profile.yml"),
+				"role: local\nname: Local Profile\n"
+			);
+
+			// Should succeed
+			expect(() => {
+				createMinimalWorkspace(tempDir);
+			}).not.toThrow();
+		});
+
+		it("should allow writing to custom writable profiles via env var", () => {
+			const customDir = path.join(tempDir, "custom-profile");
+			fs.mkdirSync(customDir, { recursive: true });
+
+			// Create manifest with custom role
+			fs.writeFileSync(
+				path.join(customDir, "profile.yml"),
+				"role: development\nname: Dev Profile\n"
+			);
+
+			// Set env var to point to custom profile
+			const originalEnv = process.env.LEX_PR_PROFILE_DIR;
+			process.env.LEX_PR_PROFILE_DIR = customDir;
+
+			try {
+				// Should succeed
+				expect(() => {
+					createMinimalWorkspace(tempDir);
+				}).not.toThrow();
+			} finally {
+				// Restore env
+				if (originalEnv) {
+					process.env.LEX_PR_PROFILE_DIR = originalEnv;
+				} else {
+					delete process.env.LEX_PR_PROFILE_DIR;
+				}
+			}
+		});
+
+		it("should validate write permissions with canWriteToProfile helper", () => {
+			// role="example" should not be writable
+			expect(canWriteToProfile("/some/path", "example")).toBe(false);
+
+			// Other roles should be writable
+			expect(canWriteToProfile("/some/path", "local")).toBe(true);
+			expect(canWriteToProfile("/some/path", "development")).toBe(true);
+			expect(canWriteToProfile("/some/path", "production")).toBe(true);
+			expect(canWriteToProfile("/some/path", "custom")).toBe(true);
+		});
+
+		it("should provide clear error message for write protection violations", () => {
+			const trackedDir = path.join(tempDir, ".smartergpt");
+			fs.mkdirSync(trackedDir, { recursive: true });
+
+			try {
+				createMinimalWorkspace(tempDir);
+				expect.fail("Should have thrown WriteProtectionError");
+			} catch (error) {
+				expect(error).toBeInstanceOf(WriteProtectionError);
+				expect((error as Error).message).toContain('role="example"');
+				expect((error as Error).message).toContain("read-only");
+				expect((error as Error).message).toContain(".smartergpt.local");
+			}
+		});
+	});
 });
