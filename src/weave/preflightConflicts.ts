@@ -89,32 +89,30 @@ async function simulateItemMerge(
 			itemRef = itemBranch;
 		}
 
-		// Get the merge base
-		const { stdout: mergeBase } = await execa(
-			"git",
-			["merge-base", targetRef, itemRef],
-			{ cwd: workingDir }
-		);
+	// Get the merge base
+	const { stdout: mergeBase } = await execa(
+		"git",
+		["merge-base", targetRef, itemRef],
+		{ cwd: workingDir }
+	);
 
-		// Run git merge-tree to simulate the merge
-		const { stdout, exitCode } = await execa(
-			"git",
-			[
-				"merge-tree",
-				mergeBase.trim(),
-				targetRef,
-				itemRef,
-			],
-			{
-				cwd: workingDir,
-				reject: false, // Don't throw on non-zero exit
-			}
-		);
+	// Run git merge-tree to simulate the merge
+	const { stdout } = await execa(
+		"git",
+		[
+			"merge-tree",
+			mergeBase.trim(),
+			targetRef,
+			itemRef,
+		],
+		{
+			cwd: workingDir,
+			reject: false, // Don't throw on non-zero exit
+		}
+	);
 
-		// Parse the output for conflicts
-		const conflicts = parseMergeTreeOutput(stdout);
-
-		return {
+	// Parse the output for conflicts
+	const conflicts = parseMergeTreeOutput(stdout);		return {
 			name: itemBranch,
 			hasConflicts: conflicts.length > 0,
 			conflicts,
