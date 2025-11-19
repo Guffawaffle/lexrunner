@@ -72,6 +72,21 @@ describe('Git Operations', () => {
       expect(result.conflicts).toEqual(['file1.txt', 'file2.txt']);
       expect(result.message).toBe('Merge conflicts detected');
     });
+
+    it('should include conflict files in message when detected', () => {
+      const result = {
+        success: false,
+        item: { name: 'test-item', deps: [], gates: [] },
+        conflicts: ['src/index.ts', 'package.json'],
+        message: 'CONFLICTS: src/index.ts, package.json',
+      };
+
+      expect(result.success).toBe(false);
+      expect(result.conflicts).toHaveLength(2);
+      expect(result.message).toContain('CONFLICTS:');
+      expect(result.message).toContain('src/index.ts');
+      expect(result.message).toContain('package.json');
+    });
   });
 
   describe('WeaveExecutionResult interface', () => {
@@ -93,6 +108,41 @@ describe('Git Operations', () => {
       expect(result.conflicts).toBe(1);
       expect(result.totalOperations).toBe(3);
       expect(result.operations).toHaveLength(3);
+    });
+
+    it('should correctly count conflicts when multiple items have conflicts', () => {
+      const result = {
+        operations: [
+          { success: false, item: { name: 'a', deps: [], gates: [] }, conflicts: ['file1.txt'] },
+          { success: false, item: { name: 'b', deps: [], gates: [] }, conflicts: ['file2.txt', 'file3.txt'] },
+          { success: true, item: { name: 'c', deps: [], gates: [] } },
+        ],
+        successful: 1,
+        failed: 2,
+        conflicts: 2, // Two items have conflicts
+        totalOperations: 3,
+      };
+
+      expect(result.conflicts).toBe(2);
+      expect(result.failed).toBe(2);
+      expect(result.successful).toBe(1);
+    });
+
+    it('should report zero conflicts when none detected', () => {
+      const result = {
+        operations: [
+          { success: true, item: { name: 'a', deps: [], gates: [] } },
+          { success: true, item: { name: 'b', deps: [], gates: [] } },
+        ],
+        successful: 2,
+        failed: 0,
+        conflicts: 0,
+        totalOperations: 2,
+      };
+
+      expect(result.conflicts).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(result.successful).toBe(2);
     });
   });
 });
