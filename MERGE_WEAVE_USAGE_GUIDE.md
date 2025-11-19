@@ -4,6 +4,53 @@
 
 ---
 
+## ⚠️ CRITICAL SAFETY REQUIREMENT
+
+**Merge-weave operations MUST NEVER target the `main` branch.**
+
+### Why This Matters
+
+- **Data integrity**: Merge-weave is experimental integration testing, not promotion to production
+- **PR history**: Main should only receive merged PRs through normal PR/review workflow  
+- **Rollback safety**: Temporary branch can be deleted if issues found; main commits are permanent
+- **Audit trail**: Prevents bypassing code review process
+
+### Enforcement
+
+The codebase enforces this safety requirement at multiple levels:
+
+1. **`createWeaveBranch()`** - Throws error if `baseBranch === 'main'`
+2. **`executeWeave()`** - Throws error if `plan.target === 'main'`
+
+**Error message you'll see:**
+```
+SAFETY: Merge-weave cannot target main branch.
+Merge-weave is for experimental integration testing only.
+Use a temporary integration branch (e.g., weave/integration-*, merge-weave-*) instead.
+Main should only receive changes through normal PR review workflow.
+```
+
+### Correct Usage
+
+✅ **DO**: Use temporary integration branches
+```bash
+# Good - uses temporary branch
+lex-pr execute plan.json  # Creates weave/integration-2025-11-19T...
+
+# Good - explicit temporary target
+plan.target = "weave/integration-2025-11-19"
+plan.target = "merge-weave-batch-1"
+plan.target = "develop"  # Or any non-main branch
+```
+
+❌ **DON'T**: Target main branch
+```bash
+# Bad - will be rejected
+plan.target = "main"  # ❌ Throws error
+```
+
+---
+
 ## The Core Value Proposition
 
 Merge-weave solves a critical problem: **How do you merge 50+ parallel PRs without token explosion?**

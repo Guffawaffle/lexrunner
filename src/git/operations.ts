@@ -114,8 +114,22 @@ export class GitOperations {
 
 	/**
 	 * Create and checkout a new branch for weave operations
+	 * 
+	 * SAFETY: Merge-weave operations must NEVER target the main branch.
+	 * This is experimental integration testing, not promotion to production.
+	 * Use a temporary integration branch instead (e.g., weave/*, merge-weave-*).
 	 */
 	async createWeaveBranch(baseBranch: string = 'main'): Promise<string> {
+		// SAFETY GUARD: Prevent merge-weave from targeting main branch
+		if (baseBranch === 'main') {
+			throw new GitOperationError(
+				'SAFETY: Merge-weave cannot target main branch. ' +
+				'Merge-weave is for experimental integration testing only. ' +
+				'Use a temporary integration branch (e.g., weave/integration-*, merge-weave-*) instead. ' +
+				'Main should only receive changes through normal PR review workflow.'
+			);
+		}
+
 		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 		const branchName = `weave/integration-${timestamp}`;
 
@@ -272,6 +286,8 @@ export class GitOperations {
 
 	/**
 	 * Execute merge pyramid with dependency ordering
+	 * 
+	 * SAFETY: This method validates that merge-weave never targets the main branch.
 	 */
 	async executeWeave(plan: Plan, levels: string[][], progressReporter?: ProgressReporter): Promise<WeaveExecutionResult> {
 		const results: WeaveResult[] = [];
@@ -280,6 +296,15 @@ export class GitOperations {
 		let conflicts = 0;
 
 		try {
+			// SAFETY GUARD: Prevent execution targeting main branch
+			if (plan.target === 'main') {
+				throw new GitOperationError(
+					'SAFETY: Cannot execute merge-weave targeting main branch. ' +
+					'Merge-weave is for experimental integration testing only. ' +
+					'Update plan.target to use a temporary integration branch (e.g., weave/integration-*, merge-weave-*) instead.'
+				);
+			}
+
 			// Create integration branch
 			const integrationBranch = await this.createWeaveBranch(plan.target);
 			console.log(`Created integration branch: ${integrationBranch}`);
