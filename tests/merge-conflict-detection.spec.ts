@@ -63,7 +63,7 @@ describe('Merge Conflict Detection and Reporting', () => {
 	});
 
 	describe('WeaveExecutionResult conflict counting', () => {
-		it('should count conflicts correctly when multiple items have conflicts', () => {
+		it('should count total unique conflicted files across operations', () => {
 			const operations: WeaveResult[] = [
 				{
 					success: false,
@@ -84,15 +84,15 @@ describe('Merge Conflict Detection and Reporting', () => {
 				},
 			];
 
-			// Simulate conflict counting logic
-			let conflicts = 0;
+			// Simulate conflict counting logic with Set for deduplication
+			const allConflictedFiles = new Set<string>();
 			for (const op of operations) {
 				if (op.conflicts && op.conflicts.length > 0) {
-					conflicts++;
+					op.conflicts.forEach(file => allConflictedFiles.add(file));
 				}
 			}
 
-			expect(conflicts).toBe(2); // Two items have conflicts
+			expect(allConflictedFiles.size).toBe(3); // Three unique files: file1.ts, file2.ts, file3.ts
 		});
 
 		it('should report zero conflicts when all merges succeed', () => {
@@ -109,14 +109,14 @@ describe('Merge Conflict Detection and Reporting', () => {
 				},
 			];
 
-			let conflicts = 0;
+			const allConflictedFiles = new Set<string>();
 			for (const op of operations) {
 				if (op.conflicts && op.conflicts.length > 0) {
-					conflicts++;
+					op.conflicts.forEach(file => allConflictedFiles.add(file));
 				}
 			}
 
-			expect(conflicts).toBe(0);
+			expect(allConflictedFiles.size).toBe(0);
 		});
 
 		it('should properly count when some items fail without conflicts', () => {
@@ -139,17 +139,53 @@ describe('Merge Conflict Detection and Reporting', () => {
 				},
 			];
 
-			let conflicts = 0;
+			const allConflictedFiles = new Set<string>();
 			let failed = 0;
 			for (const op of operations) {
 				if (!op.success) failed++;
 				if (op.conflicts && op.conflicts.length > 0) {
-					conflicts++;
+					op.conflicts.forEach(file => allConflictedFiles.add(file));
 				}
 			}
 
 			expect(failed).toBe(2); // Two failures
-			expect(conflicts).toBe(1); // But only one with conflicts
+			expect(allConflictedFiles.size).toBe(1); // But only one unique conflicted file
+		});
+
+		it('should deduplicate conflicted files across multiple operations', () => {
+			const operations: WeaveResult[] = [
+				{
+					success: false,
+					item: { name: 'branch-1', deps: [], gates: [] },
+					conflicts: ['file1.ts', 'file2.ts'],
+					message: 'CONFLICTS: file1.ts, file2.ts',
+				},
+				{
+					success: false,
+					item: { name: 'branch-2', deps: [], gates: [] },
+					conflicts: ['file2.ts', 'file3.ts'], // file2.ts appears again
+					message: 'CONFLICTS: file2.ts, file3.ts',
+				},
+				{
+					success: false,
+					item: { name: 'branch-3', deps: [], gates: [] },
+					conflicts: ['file1.ts'], // file1.ts appears again
+					message: 'CONFLICTS: file1.ts',
+				},
+			];
+
+			// Simulate deduplication logic
+			const allConflictedFiles = new Set<string>();
+			for (const op of operations) {
+				if (op.conflicts && op.conflicts.length > 0) {
+					op.conflicts.forEach(file => allConflictedFiles.add(file));
+				}
+			}
+
+			// Should have 3 unique files: file1.ts, file2.ts, file3.ts
+			// Even though they appear 5 times total across operations
+			expect(allConflictedFiles.size).toBe(3);
+			expect(Array.from(allConflictedFiles).sort()).toEqual(['file1.ts', 'file2.ts', 'file3.ts']);
 		});
 	});
 
@@ -224,7 +260,7 @@ describe('Merge Conflict Detection and Reporting', () => {
 				],
 				successful: 0,
 				failed: 1,
-				conflicts: 1,
+				conflicts: 2, // Two unique conflicted files
 				totalOperations: 1,
 			};
 
@@ -232,7 +268,7 @@ describe('Merge Conflict Detection and Reporting', () => {
 			const json = JSON.stringify(result);
 			const parsed = JSON.parse(json);
 
-			expect(parsed.conflicts).toBe(1);
+			expect(parsed.conflicts).toBe(2); // Two unique files
 			expect(parsed.operations[0].conflicts).toHaveLength(2);
 			expect(parsed.operations[0].conflicts).toContain('src/index.ts');
 		});
