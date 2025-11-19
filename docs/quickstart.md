@@ -39,20 +39,18 @@ The wizard will:
 ```
 .smartergpt.local/
 ├── profile.yml                  # Profile metadata (role: development)
-├── intent.md                    # Project goals and scope (at root)
-├── scope.yml                    # PR discovery rules (at root)
-├── deps.yml                     # Dependency relationships (at root)
-├── gates.yml                    # Quality gates configuration (at root)
-├── pull-request-template.md     # PR template with dependency syntax
-├── prompts/                     # Local prompt overlays (optional)
-├── runner/                      # Working directory for artifacts
-│   ├── plan.json                # Generated plan
-│   ├── cache/                   # Ephemeral cache
-│   └── logs/                    # Execution logs
-└── deliverables/                # Generated outputs
+├── intent.md                    # Project goals and scope (config)
+├── scope.yml                    # PR discovery rules (config)
+├── deps.yml                     # Dependency relationships (config)
+├── gates.yml                    # Quality gates configuration (config)
+├── pull-request-template.md     # PR template with dependency syntax (config)
+└── runner/                      # Working directory (gitignored)
+  ├── plan.json                # Generated execution plan
+  ├── cache/                   # Ephemeral cache
+  └── logs/                    # Execution logs
 ```
 
-**Note:** Configuration files live at the profile root, not in a `runner/` subdirectory. The `runner/` directory contains only working artifacts.
+**Note:** Configuration files are at the **profile root**, not in a `runner/` subdirectory. The `runner/` directory contains only working artifacts (plan.json, cache, logs), which are gitignored.
 
 ### Non-Interactive Setup
 
@@ -122,28 +120,59 @@ gates:
     runtime: local
 ```
 
-### (Optional) Set Up Cross-Repository Prompts
+### Set Up Prompts (Optional)
 
-If you want to share prompts across repositories (e.g., use Lex prompts in LexRunner):
+Prompts are template files used for plan generation and automation. They support token expansion (`{{today}}`, `{{branch}}`, etc.) and cross-repository sharing.
 
-**Option 1: Environment Variable**
+#### Using Tracked Prompts (Default)
+
+By default, prompts are loaded from `.smartergpt/prompts/`:
+
 ```bash
-export LEX_PROMPTS_DIR=/path/to/shared/prompts
+lex-pr plan --from-github
+# Uses .smartergpt/prompts/create-project.md
 ```
 
-**Option 2: Symlink**
+#### Custom Local Prompts
+
+Create custom prompts in `.smartergpt.local/prompts/`:
+
 ```bash
-ln -s ../other-repo/.smartergpt/prompts .smartergpt.local/prompts
+mkdir -p .smartergpt.local/prompts
+
+# Copy and customize
+cp .smartergpt/prompts/create-project.md .smartergpt.local/prompts/
+vim .smartergpt.local/prompts/create-project.md
+
+# Automatically uses local version
+lex-pr plan --from-github
 ```
 
-**Option 3: Copy and Customize**
+#### Cross-Repository Prompts
+
+Share prompts across repositories using one of three methods:
+
+**Method 1: Environment Variable (Recommended for CI/CD)**
 ```bash
-cp -r ../other-repo/.smartergpt/prompts .smartergpt.local/
+export LEX_PROMPTS_DIR=/path/to/lex/.smartergpt/prompts
+lex-pr plan --from-github
 ```
 
-**See:** [docs/prompts.md](./prompts.md) for detailed prompts configuration including token expansion.
+**Method 2: Symlink (Recommended for Development)**
+```bash
+ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
+lex-pr plan --from-github
+```
 
-## Step 4: Verify Your Setup
+**Method 3: Copy (Recommended for Customization)**
+```bash
+cp -r ../lex/.smartergpt/prompts .smartergpt.local/
+lex-pr plan --from-github
+```
+
+**See Also:** [Prompts Configuration](./prompts.md) for complete documentation on token expansion, frontmatter, and cross-repo usage.
+
+## Step 5: Verify Your Setup
 
 Run the doctor command to ensure everything is configured correctly:
 
@@ -170,7 +199,7 @@ Expected output:
 ✅ All checks passed - environment looks good!
 ```
 
-## Step 5: Discover PRs
+## Step 6: Discover PRs
 
 Find open pull requests that match your scope:
 
@@ -180,7 +209,7 @@ lex-pr discover
 
 This will show you PRs that can be merged based on your configuration.
 
-## Step 6: Generate a Merge Plan
+## Step 7: Generate a Merge Plan
 
 Create a merge plan from discovered PRs. You have several options:
 
@@ -263,7 +292,7 @@ Create `plan.json` manually for full control:
 - Merge order (topologically sorted)
 - Policy configuration
 
-## Step 7: Execute Quality Gates
+## Step 8: Execute Quality Gates
 
 Run quality gates on your plan:
 
@@ -276,7 +305,7 @@ Gates run in dependency order, ensuring:
 - Parallel execution where possible
 - Clear status reporting
 
-## Step 8: Merge PRs
+## Step 9: Merge PRs
 
 Once all gates pass, merge your PRs:
 

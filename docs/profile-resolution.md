@@ -1,7 +1,7 @@
 # Profile Resolution
 
 **Status:** Stable (v0.1.0)
-**Last Updated:** 2025-10-02
+**Last Updated:** 2025-11-13
 
 ## Overview
 
@@ -20,15 +20,49 @@ Profile directories are resolved in the following order (highest to lowest prior
 
 The first existing profile directory in this chain is selected.
 
-### Prompts Precedence (Independent)
+## Directory Structure
 
-Prompts are resolved separately with their own precedence chain:
+### Configuration File Placement
 
-1. **`LEX_PROMPTS_DIR` env variable** - Cross-repository prompt override
-2. **`.smartergpt.local/prompts/`** - Local prompt overlay
+Configuration files (`intent.md`, `scope.yml`, `gates.yml`, `deps.yml`, etc.) are located at the **profile root**, not in a subdirectory:
+
+```
+.smartergpt/                  # Tracked profile
+├── intent.md                 # ✅ Config at root
+├── scope.yml                 # ✅ Config at root
+├── gates.yml                 # ✅ Config at root
+├── prompts/                  # Canon prompts directory
+│   ├── create-project.md
+│   └── idea.md
+└── runner/                   # ✅ Working artifacts only
+  ├── plan.json             # Generated plan
+  ├── cache/                # Ephemeral cache
+  └── logs/                 # Execution logs
+```
+
+### Working Directory vs Configuration
+
+**Important distinction:**
+- **Profile root** - Contains configuration files
+- **`runner/` directory** - Contains only working artifacts (plan.json, cache, logs)
+
+The `runner/` directory should be **gitignored** as it contains ephemeral working files, not configuration.
+
+### Prompts Directory Precedence
+
+Prompts are resolved using a **separate precedence chain** from profiles:
+
+1. **`LEX_PROMPTS_DIR`** (environment variable) - Explicit override for cross-repo usage
+2. **`.smartergpt.local/prompts/`** - Local overlay (not tracked)
 3. **`.smartergpt/prompts/`** - Tracked canonical prompts
 
-**See:** [prompts.md](./prompts.md) for comprehensive prompts documentation including token expansion and cross-repo usage.
+**Key Features:**
+- Independent from profile resolution (e.g., can use `.smartergpt/` profile with Lex prompts)
+- Enables cross-repository prompt sharing
+- Supports token expansion (`{{today}}`, `{{now}}`, `{{repo_root}}`, `{{branch}}`, `{{commit}}`)
+- File-level overlay (entire prompt file is replaced, not merged)
+
+**See Also:** [Prompts Configuration](./prompts.md) for complete documentation on prompts precedence, token expansion, and cross-repo usage.
 
 ## Profile Roles
 
@@ -309,6 +343,8 @@ ls -la .smartergpt.local/ .smartergpt/
 
 ## Related Documentation
 
+- [SmartGPT Structure v1 Spec](./specs/smartergpt-structure-v1.md) - Complete structure specification
+- [Prompts Configuration](./prompts.md) - Prompts precedence and token expansion
 - [CLI Usage](./cli.md) - Command-line interface and flags
 - [MCP Server](../README.mcp.md) - Model Context Protocol integration
 - [Terms](./TERMS.md) - Canonical terminology

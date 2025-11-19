@@ -45,6 +45,7 @@ New to lex-pr-runner? Start here:
 
 ### Workspace Setup
 
+- **[SmartGPT Structure v1 Spec](./specs/smartergpt-structure-v1.md)** - Complete structure specification
 - **[Profile Resolution](./profile-resolution.md)** - Configuration precedence
 - **[Prompts Configuration](./prompts.md)** - Prompts precedence, cross-repo usage, token expansion
 - **[SmartGPT Structure v1 Specification](./specs/smartergpt-structure-v1.md)** - Complete directory structure spec
