@@ -35,15 +35,15 @@ Configuration files (`intent.md`, `scope.yml`, `gates.yml`, `deps.yml`, etc.) ar
 │   ├── create-project.md
 │   └── idea.md
 └── runner/                   # ✅ Working artifacts only
-  ├── plan.json             # Generated plan
-  ├── cache/                # Ephemeral cache
-  └── logs/                 # Execution logs
+    ├── plan.json             # Generated plan
+    ├── cache/                # Ephemeral cache
+    └── logs/                 # Execution logs
 ```
 
 ### Working Directory vs Configuration
 
 **Important distinction:**
-- **Profile root** - Contains configuration files
+- **Profile root** (`runner/`, NOT in a subdirectory) - Contains configuration files
 - **`runner/` directory** - Contains only working artifacts (plan.json, cache, logs)
 
 The `runner/` directory should be **gitignored** as it contains ephemeral working files, not configuration.
@@ -92,24 +92,9 @@ lex-pr-runner gates run
 **Result:**
 - `.smartergpt.local/` created with `role: development`
 - Project type auto-detected (Python/JS/TypeScript/etc.)
-- Relevant config files copied from `.smartergpt/` as templates to profile root
-- Config files (intent.md, scope.yml, gates.yml) live at profile root, not in subdirectories
-- Working artifacts (plan.json, cache, logs) go to `.smartergpt.local/runner/`
+- Relevant config files copied from `.smartergpt/` as templates
+- All runner artifacts go to `.smartergpt.local/runner/`
 - Git ignores `.smartergpt.local/` (via `.gitignore`)
-
-**Directory structure:**
-```
-.smartergpt.local/
-├── profile.yml              # Profile metadata
-├── intent.md                # Config at root
-├── scope.yml
-├── gates.yml
-├── prompts/                 # Local prompt overlays
-└── runner/                  # Working artifacts only
-    ├── plan.json
-    ├── cache/
-    └── logs/
-```
 
 ### CI/CD Environment
 

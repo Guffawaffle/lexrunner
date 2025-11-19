@@ -45,9 +45,9 @@ The wizard will:
 ├── gates.yml                    # Quality gates configuration (config)
 ├── pull-request-template.md     # PR template with dependency syntax (config)
 └── runner/                      # Working directory (gitignored)
-  ├── plan.json                # Generated execution plan
-  ├── cache/                   # Ephemeral cache
-  └── logs/                    # Execution logs
+    ├── plan.json                # Generated execution plan
+    ├── cache/                   # Ephemeral cache
+    └── logs/                    # Execution logs
 ```
 
 **Note:** Configuration files are at the **profile root**, not in a `runner/` subdirectory. The `runner/` directory contains only working artifacts (plan.json, cache, logs), which are gitignored.
@@ -481,14 +481,14 @@ lex-pr execute plan.json --json
    ```bash
    # Interactive plan exploration
    lex-pr view plan.json
-
+   
    # Query and analyze plans
    lex-pr query plan.json --stats
    lex-pr query plan.json "level eq 1"
-
+   
    # Batch operations
    lex-pr merge --batch --levels "1,2" --execute
-
+   
    # Shell completion
    eval "$(lex-pr completion bash)"
    ```

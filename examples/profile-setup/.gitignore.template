@@ -1,66 +1,3 @@
-<<<<<<< HEAD
-# Gitignore Template for LexRunner Workspaces
-
-# Local development profile (never commit)
-.smartergpt.local/
-
-# Runner working artifacts
-.smartergpt/runner/
-.smartergpt/cache/
-.smartergpt/deliverables/
-
-# OS-specific
-.DS_Store
-Thumbs.db
-
-# Editor-specific
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Node.js (if applicable)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Python (if applicable)
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-*.egg-info/
-dist/
-build/
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Environment files (may contain secrets)
-.env
-.env.local
-.env.*.local
-
-# Coverage reports
-coverage/
-.coverage
-*.lcov
-
-# Build artifacts
-dist/
-build/
-out/
-||||||| 0c946b1
-=======
 # lex-pr-runner Gitignore Template
 
 # Local development profile (gitignored)
@@ -127,4 +64,3 @@ Desktop.ini
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
->>>>>>> pr-395
