@@ -1,6 +1,6 @@
 /**
  * Tests for AI Conflict Resolution Strategy Integration
- * 
+ *
  * Tests the complete workflow including caching, risk assessment,
  * abstention, and fallback behavior.
  */
@@ -11,7 +11,7 @@ import {
 	resolveConflictsBatch,
 	getCacheStats,
 	clearCache,
-	ConflictResolutionCache
+	ConflictResolutionCache,
 } from "../src/ai/conflictStrategy.js";
 import type { ConflictResolutionInput } from "../src/ai/conflictStrategySchema.js";
 
@@ -30,11 +30,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "import-order", message: "Import order conflict", confidence: 0.95 }
-				]
+					{
+						type: "import-order",
+						message: "Import order conflict",
+						confidence: 0.95,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.abstained).toBe(false);
 			expect(result.strategy).toBe("auto-resolve");
@@ -48,15 +55,22 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: Array.from({ length: 5 }, () => "a".repeat(64)),
 				symbols: [
 					{ name: "ClassA", type: "class", path: "src/file1.ts" },
-					{ name: "ClassB", type: "class", path: "src/file2.ts" }
+					{ name: "ClassB", type: "class", path: "src/file2.ts" },
 				],
 				hints: [
 					{ type: "semantic", message: "Complex", confidence: 0.3 },
-					{ type: "structural", message: "Major change", confidence: 0.2 }
-				]
+					{
+						type: "structural",
+						message: "Major change",
+						confidence: 0.2,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.abstained).toBe(true);
 			expect(result.risk).toBeGreaterThan(0.35);
@@ -68,7 +82,7 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			// First request - cache miss
@@ -89,15 +103,19 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			// First request
 			await resolveConflict(input, { cache, forceHeuristic: true });
-			
+
 			// Second request with skipCache - skips reading but still writes
-			await resolveConflict(input, { cache, skipCache: true, forceHeuristic: true });
-			
+			await resolveConflict(input, {
+				cache,
+				skipCache: true,
+				forceHeuristic: true,
+			});
+
 			const stats = getCacheStats(cache);
 			expect(stats.hits).toBe(0); // No hits since skipCache was used
 			expect(stats.misses).toBe(1); // Only first miss (second skipped cache read)
@@ -108,13 +126,16 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
-			const mockAICaller = async (system: string, user: string): Promise<string> => {
+			const mockAICaller = async (
+				system: string,
+				user: string
+			): Promise<string> => {
 				expect(system).toContain("conflict resolution expert");
 				expect(user).toContain("src/file1.ts");
-				
+
 				return JSON.stringify({
 					strategy: "auto-resolve",
 					ops: [
@@ -122,17 +143,17 @@ describe("AI Conflict Strategy Integration", () => {
 							type: "accept-ours",
 							path: "src/file1.ts",
 							hunkHash: "a".repeat(64),
-							rationale: "Safe to accept our version"
-						}
+							rationale: "Safe to accept our version",
+						},
 					],
 					risk: 0.15,
-					explanation: "AI determined this is safe"
+					explanation: "AI determined this is safe",
 				});
 			};
 
-			const result = await resolveConflict(input, { 
-				cache, 
-				aiCaller: mockAICaller 
+			const result = await resolveConflict(input, {
+				cache,
+				aiCaller: mockAICaller,
 			});
 
 			expect(result.strategy).toBe("auto-resolve");
@@ -146,17 +167,21 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "whitespace", message: "Whitespace", confidence: 1.0 }
-				]
+					{
+						type: "whitespace",
+						message: "Whitespace",
+						confidence: 1.0,
+					},
+				],
 			};
 
 			const failingAICaller = async (): Promise<string> => {
 				throw new Error("AI service unavailable");
 			};
 
-			const result = await resolveConflict(input, { 
-				cache, 
-				aiCaller: failingAICaller 
+			const result = await resolveConflict(input, {
+				cache,
+				aiCaller: failingAICaller,
 			});
 
 			expect(result.abstained).toBe(true);
@@ -169,21 +194,26 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const shortTTL = 1; // 1 second
 
 			// First request with TTL
-			await resolveConflict(input, { cache, cacheTTL: shortTTL, forceHeuristic: true });
+			await resolveConflict(input, {
+				cache,
+				cacheTTL: shortTTL,
+				forceHeuristic: true,
+			});
 
 			// Immediate second request - should hit cache
 			await resolveConflict(input, { cache, forceHeuristic: true });
 			let stats = getCacheStats(cache);
 			expect(stats.hits).toBe(1);
 
-			// Wait for expiration
-			await new Promise(resolve => setTimeout(resolve, 1100));
+			// Wait for expiration - use 1500ms to ensure we're well past the 1000ms TTL
+			// accounting for event loop jitter and timing uncertainty
+			await new Promise((resolve) => setTimeout(resolve, 1500));
 
 			// Third request - cache should be expired
 			await resolveConflict(input, { cache, forceHeuristic: true });
@@ -199,19 +229,31 @@ describe("AI Conflict Strategy Integration", () => {
 					paths: ["src/file1.ts"],
 					hunkHashes: ["a".repeat(64)],
 					symbols: [],
-					hints: [{ type: "import-order", message: "Import", confidence: 0.9 }]
+					hints: [
+						{
+							type: "import-order",
+							message: "Import",
+							confidence: 0.9,
+						},
+					],
 				},
 				{
 					paths: ["src/file2.ts"],
 					hunkHashes: ["b".repeat(64)],
 					symbols: [],
-					hints: [{ type: "whitespace", message: "Whitespace", confidence: 1.0 }]
-				}
+					hints: [
+						{
+							type: "whitespace",
+							message: "Whitespace",
+							confidence: 1.0,
+						},
+					],
+				},
 			];
 
-			const results = await resolveConflictsBatch(inputs, { 
-				cache, 
-				forceHeuristic: true 
+			const results = await resolveConflictsBatch(inputs, {
+				cache,
+				forceHeuristic: true,
 			});
 
 			expect(results).toHaveLength(2);
@@ -224,12 +266,15 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			// Process same input twice in batch
 			const inputs = [input, input];
-			await resolveConflictsBatch(inputs, { cache, forceHeuristic: true });
+			await resolveConflictsBatch(inputs, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			const stats = getCacheStats(cache);
 			expect(stats.hits).toBe(1); // Second request hits cache
@@ -244,11 +289,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "import-order", message: "Import order", confidence: 0.9 }
-				]
+					{
+						type: "import-order",
+						message: "Import order",
+						confidence: 0.9,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.strategy).toBe("auto-resolve");
 			expect(result.ops[0].type).toBe("merge-both");
@@ -261,11 +313,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "whitespace", message: "Whitespace", confidence: 1.0 }
-				]
+					{
+						type: "whitespace",
+						message: "Whitespace",
+						confidence: 1.0,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.strategy).toBe("auto-resolve");
 			expect(result.ops[0].type).toBe("accept-theirs");
@@ -278,11 +337,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "formatting", message: "Formatting", confidence: 1.0 }
-				]
+					{
+						type: "formatting",
+						message: "Formatting",
+						confidence: 1.0,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.strategy).toBe("auto-resolve");
 			expect(result.ops[0].type).toBe("accept-theirs");
@@ -294,11 +360,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "semantic", message: "Logic conflict", confidence: 0.7 }
-				]
+					{
+						type: "semantic",
+						message: "Logic conflict",
+						confidence: 0.7,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.strategy).toBe("manual-review");
 			expect(result.ops[0].type).toBe("manual-review");
@@ -311,11 +384,18 @@ describe("AI Conflict Strategy Integration", () => {
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
 				hints: [
-					{ type: "structural", message: "Class changes", confidence: 0.6 }
-				]
+					{
+						type: "structural",
+						message: "Class changes",
+						confidence: 0.6,
+					},
+				],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result.strategy).toBe("manual-review");
 			expect(result.ops[0].type).toBe("manual-review");
@@ -328,10 +408,13 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result).toBeDefined();
 			expect(result.ops).toHaveLength(1);
@@ -342,10 +425,13 @@ describe("AI Conflict Strategy Integration", () => {
 				paths: ["src/file1.ts", "src/file2.ts"],
 				hunkHashes: ["a".repeat(64), "b".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
-			const result = await resolveConflict(input, { cache, forceHeuristic: true });
+			const result = await resolveConflict(input, {
+				cache,
+				forceHeuristic: true,
+			});
 
 			expect(result).toBeDefined();
 			expect(result.ops.length).toBeGreaterThan(0);
