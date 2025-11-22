@@ -21,6 +21,31 @@
 
 ---
 
+## 🌟 Mission: Democratizing AI Capability Through Cognitive Architecture
+
+### North Star — EsoBench as Proof of Value
+
+Our success criterion is measurable and transformative:
+
+**If we can elevate locally run, open-source models on consumer hardware (8GB VRAM baseline) to near-parity with cutting-edge commercial models on EsoBench, we have succeeded.**
+
+This outcome would prove that:
+
+- **The stack raises the floor** of model capability, not just polishes the ceiling
+- Brilliant developers with modest hardware can execute **proven, powerful reasoning workflows** without renting expensive frontier models
+- The value resides in **cognitive architecture** (episodic memory, behavioral rules, execution orchestration), not exclusive access to proprietary models
+
+For higher-end models, the same architecture provides a natural improvement curve: better base models unlock more headroom through Lex and LexRunner. We avoid per-model special cases wherever possible; any model-specific paths must be minimal, justified, and validated against benchmarks like EsoBench.
+
+**Why This Matters:**
+- **Accessibility:** Powerful AI workflows become available to anyone with consumer hardware
+- **Transparency:** Open architecture beats black-box API dependence
+- **Sustainability:** Cognitive scaffolding compounds over time, creating durable value beyond model generations
+
+This is the future we're building: where the **architecture** matters more than the **model**, and where **memory, identity, and orchestration** lift every agent's performance.
+
+---
+
 ## 🎯 Alignment Context
 
 ### Lex Current State (v0.4.4-alpha)
