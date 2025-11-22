@@ -12,7 +12,7 @@
 **Goal:** Align LexRunner 0.4.0 release with current Lex 0.4.4-alpha state and prepare for Lex 0.5.0 production hardening.
 
 **Key Deliverables:**
-- **Tier 1 (BLOCKING):** Canon asset consumption from `@guffawaffle/lex` package
+- **Tier 1 (BLOCKING):** Canon asset consumption from `@smartergpt/lex` package
 - **Tier 2 (STRATEGIC):** Precedence chain alignment (ENV → local → package)
 - **Tier 3 (OPERATIONAL):** LexSona behavioral rule support (prepare for 0.5.0)
 - **Tier 4 (INFRASTRUCTURE):** Schema validation, CI updates, legacy cleanup
@@ -25,7 +25,7 @@
 
 ### Lex Current State (v0.4.4-alpha)
 ✅ **Published & Working:**
-- npm package `@guffawaffle/lex` (v0.4.4-alpha)
+- npm package `@smartergpt/lex` (v0.4.4-alpha)
 - Canon assets structure: `canon/prompts/`, `canon/schemas/`
 - Schema hardening: `$id`, `additionalProperties: false`
 - Frame schema v2: `runId`, `planHash`, `spend` fields
@@ -52,16 +52,16 @@
 
 ### TIER 1: CANON CONSUMPTION (Blocking)
 
-#### Epic: Consume Canon from @guffawaffle/lex
+#### Epic: Consume Canon from @smartergpt/lex
 
 **Issue #370: R-CANON-CONSUME**
 - **Effort:** 2-3 weeks
 - **Status:** Open, needs update
 - **Changes Required:**
-  - Update loaders to import from `@guffawaffle/lex/canon/prompts`
-  - Update loaders to import from `@guffawaffle/lex/canon/schemas`
+  - Update loaders to import from `@smartergpt/lex/canon/prompts`
+  - Update loaders to import from `@smartergpt/lex/canon/schemas`
   - Add LexSona rule fetching (prepare for 0.5.0)
-  - Update package.json dependency: `@guffawaffle/lex: ^0.4.4`
+  - Update package.json dependency: `@smartergpt/lex: ^0.4.4`
   - Remove local schema/prompt duplicates
 
 **Acceptance Criteria:**
@@ -240,7 +240,7 @@
                  ▼
         ┌────────────────┐
         │  #370          │  R-CANON-CONSUME (Week 1-3)
-        │  Canon Import  │  Import from @guffawaffle/lex
+        │  Canon Import  │  Import from @smartergpt/lex
         └────────┬───────┘
                  │
          ┌───────┴────────┐
