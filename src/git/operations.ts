@@ -277,7 +277,7 @@ export class GitOperations {
 		const results: WeaveResult[] = [];
 		let successful = 0;
 		let failed = 0;
-		let conflicts = 0;
+		const allConflictedFiles = new Set<string>();
 
 		try {
 			// Create integration branch
@@ -333,7 +333,8 @@ export class GitOperations {
 					} else {
 						failed++;
 						if (result.conflicts && result.conflicts.length > 0) {
-							conflicts++;
+							// Add each conflicted file to the set (auto-deduplicates)
+							result.conflicts.forEach(file => allConflictedFiles.add(file));
 						}
 					}
 				}
@@ -355,7 +356,7 @@ export class GitOperations {
 				operations: results,
 				successful,
 				failed,
-				conflicts,
+				conflicts: allConflictedFiles.size,
 				totalOperations: results.length,
 			};
 
