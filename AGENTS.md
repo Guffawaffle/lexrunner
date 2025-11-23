@@ -10,6 +10,23 @@ should remain stable even as implementation details evolve.
 
 ---
 
+## Commit Signing Policy (Mandatory)
+
+**All commits in this repository MUST be GPG-signed.**
+
+Before committing, ensure:
+1. GPG key is configured: `git config user.signingkey <YOUR_KEY_ID>`
+2. GPG_TTY is set in your shell: `export GPG_TTY=$(tty)`
+3. Commits are signed: Use `git commit -S` or enable auto-signing with `git config commit.gpgsign true`
+
+**Verification:** Run `git log --show-signature -1` to confirm signature presence.
+
+**Troubleshooting:**
+- If you see "gpg failed to sign the data": Check `gpg --list-secret-keys` and verify `git config user.signingkey` is correct
+- If key is set to `--unset`: Run `git config user.signingkey <YOUR_KEY_ID>` to fix
+
+---
+
 ## 0) Core Premise (Do Not Drift)
 
 1. **Deterministic Program for Merges.** At **integration time**, the runner consumes a **single frozen input** (`plan.json`, Schema v1), executes a **deterministic merge plan**, and emits verifiable artifacts.

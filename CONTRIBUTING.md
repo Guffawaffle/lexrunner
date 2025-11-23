@@ -4,6 +4,21 @@ Thanks for your interest in contributing! This project builds a deterministic CL
 
 This guide keeps contributions small, deterministic, and easy to review.
 
+## Commit Signing Policy (Mandatory)
+
+**All commits to this repository MUST be GPG-signed.**
+
+Before committing, ensure:
+1. GPG key is configured: `git config user.signingkey <YOUR_KEY_ID>`
+2. GPG_TTY is set in your shell: `export GPG_TTY=$(tty)`
+3. Commits are signed: Use `git commit -S` or enable auto-signing with `git config commit.gpgsign true`
+
+**Verification:** Run `git log --show-signature -1` to confirm signature presence.
+
+**Troubleshooting:**
+- If you see "gpg failed to sign the data": Check `gpg --list-secret-keys` and verify `git config user.signingkey` is correct
+- If key is set to `--unset`: Run `git config user.signingkey <YOUR_KEY_ID>` to fix
+
 ## Quick start
 
 - Node.js: 20.x (see `.nvmrc` and `package.json` engines)
