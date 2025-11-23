@@ -11,7 +11,13 @@ on:
       - '.github/workflows/**'
       - 'vitest.config.ts'
       - 'tsup.config.ts'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      run_determinism_check:
+        description: 'Run determinism verification (expensive)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -26,9 +32,53 @@ env:
   LC_ALL: en_US.UTF-8
 
 jobs:
+  # Stage 0: Verify Commit Signatures (MANDATORY)
+  verify-signatures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to check all commits
+
+      - name: Import GPG keys from repository secrets
+        run: |
+          # Import trusted GPG public keys (add to repo secrets)
+          echo "${{ secrets.TRUSTED_GPG_KEYS }}" | base64 -d | gpg --import
+        continue-on-error: true  # Allow if no secrets configured yet
+
+      - name: Verify commit signatures
+        run: |
+          # Get the range of commits to verify
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            COMMIT_RANGE="${{ github.event.pull_request.base.sha }}..${{ github.sha }}"
+          else
+            # For push events, check the pushed commits
+            COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
+          fi
+
+          echo "Verifying commits in range: $COMMIT_RANGE"
+
+          # Check each commit for signature
+          UNSIGNED_COMMITS=$(git log --show-signature --format="%H %s" $COMMIT_RANGE 2>&1 | \
+            grep -B1 "No signature" | grep -E "^[0-9a-f]{40}" | cut -d' ' -f1 || true)
+
+          if [ -n "$UNSIGNED_COMMITS" ]; then
+            echo "❌ ERROR: The following commits are NOT signed:"
+            echo "$UNSIGNED_COMMITS" | while read commit; do
+              git log --format="%H %an <%ae> %s" -n 1 $commit
+            done
+            echo ""
+            echo "All commits MUST be GPG-signed. Please see CONTRIBUTING.md for setup instructions."
+            echo "To sign commits: git commit --amend -S --no-edit && git push --force-with-lease"
+            exit 1
+          fi
+
+          echo "✅ All commits are properly signed."
+
   # Setup job - install dependencies once, cache for all jobs
   setup:
     runs-on: ubuntu-latest
+    needs: verify-signatures
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@v4
@@ -112,8 +162,10 @@ jobs:
 
   determinism:
     runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: [verify-signatures, setup]
+    if: |
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      (github.event_name == 'workflow_dispatch' && inputs.run_determinism_check || github.event_name == 'push')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
