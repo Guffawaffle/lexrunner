@@ -138,6 +138,16 @@ export class AutopilotLevel4 extends AutopilotLevel3 {
 		integrationBranch: string,
 		targetBranch: string
 	): Promise<{ success: boolean; sha?: string; error?: string }> {
+		// SAFETY GUARD: Prevent merge-weave from targeting main branch
+		if (targetBranch === 'main') {
+			return {
+				success: false,
+				error: 'SAFETY: Cannot merge integration branch to main. ' +
+					'Merge-weave is for experimental integration testing only. ' +
+					'Use a temporary target branch instead.'
+			};
+		}
+
 		try {
 			// Checkout target branch
 			await gitOps['git'].checkout(targetBranch);

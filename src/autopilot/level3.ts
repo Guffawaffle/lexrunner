@@ -133,12 +133,23 @@ export class AutopilotLevel3 extends AutopilotLevel2 {
 
 	/**
 	 * Create integration branch with custom naming
+	 * 
+	 * SAFETY: Merge-weave operations must NEVER target the main branch.
 	 */
 	private async createIntegrationBranch(
 		gitOps: GitOperations,
 		baseBranch: string,
 		branchName: string
 	): Promise<string> {
+		// SAFETY GUARD: Prevent merge-weave from targeting main branch
+		if (baseBranch === 'main') {
+			throw new Error(
+				'SAFETY: Merge-weave cannot target main branch. ' +
+				'Merge-weave is for experimental integration testing only. ' +
+				'Update plan.target to use a temporary integration branch instead.'
+			);
+		}
+
 		try {
 			// Get current branch to restore later if needed
 			const currentBranch = await gitOps.getCurrentBranch();
