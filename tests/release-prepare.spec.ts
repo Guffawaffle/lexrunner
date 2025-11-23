@@ -7,6 +7,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { initTestGitRepo, gitAdd, gitCommit } from "./helpers/gitTestUtils.js";
 
 describe("release:prepare script", () => {
 	let testDir: string;
@@ -18,10 +19,8 @@ describe("release:prepare script", () => {
 		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-test-"));
 		process.chdir(testDir);
 
-		// Initialize git repo
-		execSync("git init", { cwd: testDir });
-		execSync('git config user.name "Test User"', { cwd: testDir });
-		execSync('git config user.email "test@example.com"', { cwd: testDir });
+		// Initialize git repo with GPG signing disabled
+		initTestGitRepo(testDir, "main");
 
 		// Create package.json
 		const pkg = {
@@ -51,8 +50,8 @@ Initial release.
 	fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
 
 	// Initial commit
-	execSync("git add .", { cwd: testDir });
-	execSync('git commit -m "Initial commit"', { cwd: testDir });
+	gitAdd(testDir);
+	gitCommit(testDir, "Initial commit");
 	execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
 });	afterEach(() => {
 		process.chdir(originalCwd);
@@ -78,7 +77,7 @@ Initial release.
 
 	it("should compute patch version for fix commits", () => {
 		// Add a fix commit
-		execSync('git commit --allow-empty -m "fix: resolve bug"', { cwd: testDir });
+		gitCommit(testDir, "fix: resolve bug", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
@@ -100,8 +99,8 @@ Initial release.
 	});
 
 	it("should compute minor version for feat commits", () => {
-		// Add a feature commit
-		execSync('git commit --allow-empty -m "feat: add new feature"', { cwd: testDir });
+		// Add a feat commit
+		gitCommit(testDir, "feat: add new feature", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
@@ -124,7 +123,7 @@ Initial release.
 
 	it("should compute major version for breaking changes", () => {
 		// Add a breaking change commit
-		execSync('git commit --allow-empty -m "feat!: breaking change"', { cwd: testDir });
+		gitCommit(testDir, "feat!: breaking change", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
@@ -147,11 +146,11 @@ Initial release.
 
 	it("should group commits by type in changelog", () => {
 		// Add multiple commits of different types
-		execSync('git commit --allow-empty -m "feat: new feature 1"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "feat(scope): new feature 2"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "fix: bug fix"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "docs: update readme"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "chore: update deps"', { cwd: testDir });
+		gitCommit(testDir, "feat: new feature 1", true);
+		gitCommit(testDir, "feat(scope): new feature 2", true);
+		gitCommit(testDir, "fix: bug fix", true);
+		gitCommit(testDir, "docs: update readme", true);
+		gitCommit(testDir, "chore: update deps", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
@@ -175,7 +174,7 @@ Initial release.
 		execSync("git tag -d v1.0.0", { cwd: testDir });
 
 		// Add a commit
-		execSync('git commit --allow-empty -m "feat: first feature"', { cwd: testDir });
+		gitCommit(testDir, "feat: first feature", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
@@ -189,7 +188,7 @@ Initial release.
 
 	it("should preserve unreleased section in changelog", () => {
 		// Add a commit
-		execSync('git commit --allow-empty -m "fix: bug fix"', { cwd: testDir });
+		gitCommit(testDir, "fix: bug fix", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
@@ -207,7 +206,7 @@ Initial release.
 
 	it("should handle non-conventional commits gracefully", () => {
 		// Add a non-conventional commit
-		execSync('git commit --allow-empty -m "random commit message"', { cwd: testDir });
+		gitCommit(testDir, "random commit message", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
@@ -225,7 +224,7 @@ Initial release.
 
 	it("should provide next steps instructions", () => {
 		// Add a commit
-		execSync('git commit --allow-empty -m "feat: new feature"', { cwd: testDir });
+		gitCommit(testDir, "feat: new feature", true);
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {

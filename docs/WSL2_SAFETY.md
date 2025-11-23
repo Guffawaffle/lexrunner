@@ -51,18 +51,18 @@ async cleanup(): Promise<void> {
 // ✅ SAFE: Server-side filtering with hard limits
 async cleanup(branchPattern: string = 'weave/integration-*'): Promise<void> {
     const MAX_CLEANUP_BRANCHES = 100;  // Hard limit to prevent runaway ops
-    
+
     // Use pattern in git command (server-side filter)
     const result = await this.git.raw(['branch', '--list', branchPattern]);
     const branches = result.trim().split('\n')
         .map(b => b.trim().replace(/^\*\s*/, ''))
         .filter(b => b.length > 0);
-    
+
     // Enforce limit with explicit warning
     if (branches.length > MAX_CLEANUP_BRANCHES) {
         console.warn(`Found ${branches.length} branches, limiting to ${MAX_CLEANUP_BRANCHES}`);
     }
-    
+
     const branchesToDelete = branches.slice(0, MAX_CLEANUP_BRANCHES);
     // ... process only limited set
 }
@@ -83,7 +83,7 @@ async cleanup(branchPattern: string = 'weave/integration-*'): Promise<void> {
 async function findAllPythonFiles(dir: string): Promise<string[]> {
     const files: string[] = [];
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    
+
     for (const entry of entries) {
         if (entry.isDirectory()) {
             files.push(...await findAllPythonFiles(path.join(dir, entry.name)));  // No depth limit
@@ -91,7 +91,7 @@ async function findAllPythonFiles(dir: string): Promise<string[]> {
             files.push(path.join(dir, entry.name));
         }
     }
-    
+
     return files;
 }
 ```
@@ -107,25 +107,25 @@ async function findAllPythonFiles(dir: string): Promise<string[]> {
 async function findPythonFiles(dir: string, maxDepth: number = 3): Promise<string[]> {
     const MAX_FILES = 1000;  // Safety limit
     const files: string[] = [];
-    
+
     async function search(currentDir: string, depth: number): Promise<void> {
         if (depth > maxDepth || files.length >= MAX_FILES) {
             return;  // Hit limit, stop recursion
         }
-        
+
         // WSL2 Guard: Ensure we're within workspace
         if (!currentDir.startsWith(workspaceRoot)) {
             console.warn(`Skipping ${currentDir}: outside workspace`);
             return;
         }
-        
+
         const entries = await fs.readdir(currentDir, { withFileTypes: true });
-        
+
         for (const entry of entries) {
             if (files.length >= MAX_FILES) break;
-            
+
             const fullPath = path.join(currentDir, entry.name);
-            
+
             if (entry.isDirectory() && !entry.name.startsWith('.')) {
                 await search(fullPath, depth + 1);
             } else if (entry.name.endsWith('.py')) {
@@ -133,7 +133,7 @@ async function findPythonFiles(dir: string, maxDepth: number = 3): Promise<strin
             }
         }
     }
-    
+
     await search(dir, 0);
     return files;
 }
@@ -172,7 +172,7 @@ watcher.on('all', (event, path) => {
 import chokidar from 'chokidar';
 
 export async function watchConfigFile(
-    filePath: string, 
+    filePath: string,
     callback: () => void
 ): Promise<() => void> {
     // Only watch specific file, not globs
@@ -184,9 +184,9 @@ export async function watchConfigFile(
             pollInterval: 100
         }
     });
-    
+
     watcher.on('change', callback);
-    
+
     // Return cleanup function
     return () => watcher.close();
 }
@@ -216,22 +216,22 @@ describe('WSL2 Safety', () => {
     it('should not perform unbounded operations', async () => {
         // Validate explicit limits exist
         const MAX_ALLOWED = 100;
-        
+
         // Mock/simulate large data scenario
         const mockData = Array.from({ length: 500 }, (_, i) => `item-${i}`);
-        
+
         // Operation should self-limit
         const result = await boundedOperation(mockData);
-        
+
         expect(result.length).toBeLessThanOrEqual(MAX_ALLOWED);
     });
-    
+
     it('should warn on excessive data', () => {
         const consoleWarnSpy = vi.spyOn(console, 'warn');
-        
+
         // Trigger warning condition
         boundedOperationWithWarning(Array(200).fill('item'));
-        
+
         expect(consoleWarnSpy).toHaveBeenCalledWith(
             expect.stringContaining('limiting to')
         );
@@ -250,7 +250,7 @@ export function isWSL2(): boolean {
     try {
         // Check for WSL-specific markers
         const procVersion = fs.readFileSync('/proc/version', 'utf8');
-        return procVersion.toLowerCase().includes('microsoft') || 
+        return procVersion.toLowerCase().includes('microsoft') ||
                procVersion.toLowerCase().includes('wsl2');
     } catch {
         return false;
@@ -260,16 +260,16 @@ export function isWSL2(): boolean {
 export function getWorkspaceRoot(): string {
     // Ensure we never operate outside workspace
     const cwd = process.cwd();
-    
+
     // WSL2 Guard: If on /mnt/c, prefer workspace path
     if (cwd.startsWith('/mnt/')) {
         // Use git to find repo root as safer anchor
-        const gitRoot = execSync('git rev-parse --show-toplevel', { 
-            encoding: 'utf8' 
+        const gitRoot = execSync('git rev-parse --show-toplevel', {
+            encoding: 'utf8'
         }).trim();
         return gitRoot;
     }
-    
+
     return cwd;
 }
 ```

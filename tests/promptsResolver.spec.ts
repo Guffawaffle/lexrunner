@@ -12,6 +12,7 @@ import {
 	expandPromptTokens,
 	PromptsResolverError
 } from "../src/config/promptsResolver.js";
+import { initTestGitRepo, gitAdd, gitCommit } from "./helpers/gitTestUtils.js";
 
 describe("Prompts Resolver", () => {
 	let testDir: string;
@@ -213,37 +214,24 @@ Workspace: {{workspace_root}}`;
 			expect(expanded).toBe(`Workspace: ${testDir}`);
 		});
 
-		it("should expand {{repo_root}} to git repository root", () => {
-			// Initialize a git repo
-			const { execSync } = require("child_process");
-			execSync("git init", { cwd: testDir });
+	it("should expand {{repo_root}} to git repository root", () => {
+		// Initialize a git repo
+		initTestGitRepo(testDir, "main");
 
-			const content = "Repo: {{repo_root}}";
-			const expanded = expandPromptTokens(content, testDir);
+		const content = "Repo: {{repo_root}}";
+		const expanded = expandPromptTokens(content, testDir);
 
-			expect(expanded).toBe(`Repo: ${testDir}`);
-		});
+		expect(expanded).toBe(`Repo: ${testDir}`);
+	});
 
-		it("should expand {{branch}} to current git branch", () => {
-			// Initialize a git repo with a branch
-			const { execSync } = require("child_process");
-			
-			try {
-				execSync("git init -b main", { cwd: testDir, stdio: "pipe" });
-			} catch {
-				// Fallback for older git versions
-				execSync("git init", { cwd: testDir, stdio: "pipe" });
-			}
-			
-			execSync("git config user.email 'test@test.com'", { cwd: testDir, stdio: "pipe" });
-			execSync("git config user.name 'Test'", { cwd: testDir, stdio: "pipe" });
-			
-			// Create initial commit so branch is established
-			fs.writeFileSync(path.join(testDir, "test.txt"), "test");
-			execSync("git add .", { cwd: testDir, stdio: "pipe" });
-			execSync("git commit -m 'initial'", { cwd: testDir, stdio: "pipe" });
-
-			const content = "Branch: {{branch}}";
+	it("should expand {{branch}} to current git branch", () => {
+		// Initialize a git repo with a branch
+		initTestGitRepo(testDir, "main");
+		
+		// Create initial commit so branch is established
+		fs.writeFileSync(path.join(testDir, "test.txt"), "test");
+		gitAdd(testDir);
+		gitCommit(testDir, "initial");			const content = "Branch: {{branch}}";
 			const expanded = expandPromptTokens(content, testDir);
 
 			// Should have some branch name (main, master, or other)
@@ -251,17 +239,12 @@ Workspace: {{workspace_root}}`;
 			expect(expanded).not.toBe("Branch: ");
 		});
 
-		it("should expand {{commit}} to current git commit SHA", () => {
-			// Initialize git repo with a commit
-			const { execSync } = require("child_process");
-			execSync("git init -b main", { cwd: testDir });
-			execSync("git config user.email 'test@test.com'", { cwd: testDir });
-			execSync("git config user.name 'Test'", { cwd: testDir });
-			fs.writeFileSync(path.join(testDir, "test.txt"), "test");
-			execSync("git add .", { cwd: testDir });
-			execSync("git commit -m 'test'", { cwd: testDir });
-
-			const content = "Commit: {{commit}}";
+	it("should expand {{commit}} to current git commit SHA", () => {
+		// Initialize git repo with a commit
+		initTestGitRepo(testDir, "main");
+		fs.writeFileSync(path.join(testDir, "test.txt"), "test");
+		gitAdd(testDir);
+		gitCommit(testDir, "test");			const content = "Commit: {{commit}}";
 			const expanded = expandPromptTokens(content, testDir);
 
 			expect(expanded).toMatch(/Commit: [0-9a-f]{40}/);

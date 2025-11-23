@@ -8,7 +8,7 @@ import { GitHubClientImpl } from "../src/github/client.js";
 import { generatePlanFromGitHub } from "../src/core/githubPlan.js";
 import { PullRequest, PullRequestDetails } from "../src/github/index.js";
 
-// Mock Octokit
+// Mock Octokit as a proper constructor
 const mockOctokit = {
 	rest: {
 		repos: {
@@ -22,8 +22,11 @@ const mockOctokit = {
 	}
 };
 
+// Mock Octokit constructor function
+const MockOctokit = vi.fn().mockImplementation(() => mockOctokit);
+
 vi.mock("@octokit/rest", () => ({
-	Octokit: vi.fn().mockImplementation(() => mockOctokit)
+	Octokit: MockOctokit
 }));
 
 describe("GitHub Integration", () => {

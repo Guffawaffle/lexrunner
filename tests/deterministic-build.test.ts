@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import { initTestGitRepo, gitAdd, gitCommit } from './helpers/gitTestUtils.js';
 
 describe('deterministic build and format', () => {
 	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-build-test');
@@ -53,19 +54,15 @@ describe('deterministic build and format', () => {
 
 		copyDir(path.join(repoRoot, 'src'), 'src');
 
-		// Install dependencies (use the existing node_modules via symlink for speed)
-		fs.symlinkSync(path.join(repoRoot, 'node_modules'), 'node_modules');
+	// Install dependencies (use the existing node_modules via symlink for speed)
+	fs.symlinkSync(path.join(repoRoot, 'node_modules'), 'node_modules');
 
-		// Initialize git repo
-		execSync('git init', { stdio: 'pipe' });
-		execSync('git config user.name "Test User"', { stdio: 'pipe' });
-		execSync('git config user.email "test@example.com"', { stdio: 'pipe' });
+	// Initialize git repo with GPG signing disabled
+	initTestGitRepo(testDir, 'main');
 
-		// Add all files and commit
-		execSync('git add .', { stdio: 'pipe' });
-		execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
-
-		// Run format only (skip build to avoid loop)
+	// Add all files and commit
+	gitAdd(testDir);
+	gitCommit(testDir, 'Initial commit');		// Run format only (skip build to avoid loop)
 		execSync('npm run format', { stdio: 'pipe' });
 
 		// Check git status - should be clean (ignored files like dist/ shouldn't appear)

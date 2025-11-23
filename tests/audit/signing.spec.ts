@@ -137,14 +137,20 @@ describe('Audit Signing - KMS mocked', () => {
 	});
 
 	it('should sign with AWS KMS (mocked)', async () => {
-		// Mock AWS SDK
+		// Mock AWS SDK with proper constructor function
 		const mockSend = vi.fn().mockResolvedValue({
 			Signature: Buffer.from('mock-signature-data')
 		});
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/abc-123';
@@ -182,12 +188,18 @@ describe('Audit Signing - KMS mocked', () => {
 	});
 
 	it('should handle AWS KMS signing errors gracefully', async () => {
-		// Mock AWS SDK to throw error
+		// Mock AWS SDK to throw error with proper constructor function
 		const mockSend = vi.fn().mockRejectedValue(new Error('KMS key not found'));
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/invalid';

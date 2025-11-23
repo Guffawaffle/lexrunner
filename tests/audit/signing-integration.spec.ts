@@ -61,14 +61,20 @@ describe('Audit Signing Integration', () => {
 	});
 
 	it('should call signing when signer option is provided (KMS mocked)', async () => {
-		// Mock AWS SDK
+		// Mock AWS SDK with proper constructor function
 		const mockSend = vi.fn().mockResolvedValue({
 			Signature: Buffer.from('mock-kms-signature')
 		});
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/integration-test';
@@ -127,12 +133,18 @@ describe('Audit Signing Integration', () => {
 	});
 
 	it('should propagate signing errors during finalize', async () => {
-		// Mock AWS SDK to throw error
+		// Mock AWS SDK to throw error with proper constructor function
 		const mockSend = vi.fn().mockRejectedValue(new Error('KMS AccessDeniedException'));
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		const emitter = await initAuditEmitter({
@@ -150,14 +162,20 @@ describe('Audit Signing Integration', () => {
 	});
 
 	it('should work with encrypted audit logs and signing', async () => {
-		// Mock KMS
+		// Mock KMS with proper constructor function
 		const mockSend = vi.fn().mockResolvedValue({
 			Signature: Buffer.from('encrypted-audit-signature')
 		});
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		// Generate 32-byte hex key for encryption
@@ -202,14 +220,20 @@ describe('Audit Signing Integration', () => {
 	});
 
 	it('should create deterministic manifest with signing metadata', async () => {
-		// Mock KMS with deterministic response
+		// Mock KMS with deterministic response using proper constructor function
 		const mockSend = vi.fn().mockResolvedValue({
 			Signature: Buffer.from('deterministic-signature')
 		});
 
+		const MockKMSClient = vi.fn().mockImplementation(() => ({
+			send: mockSend
+		}));
+
+		const MockSignCommand = vi.fn((params) => params);
+
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: MockKMSClient,
+			SignCommand: MockSignCommand
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/deterministic-test';

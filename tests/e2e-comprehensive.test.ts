@@ -6,6 +6,7 @@ import * as os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { canonicalJSONStringify } from "../src/util/canonicalJson";
+import { initTestGitRepoWithCommit } from "./helpers/gitTestUtils.js";
 
 const execAsync = promisify(exec);
 
@@ -26,17 +27,8 @@ describe("Comprehensive E2E Automation Pipeline", () => {
 		projectDir = path.dirname(__dirname); // Root of the project
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
 
-		// Initialize git repository for all tests
-		await execAsync("git init", { cwd: tempDir });
-		await execAsync('git config user.email "e2e-test@lex-pr.dev"', {
-			cwd: tempDir,
-		});
-		await execAsync('git config user.name "E2E Test Runner"', {
-			cwd: tempDir,
-		});
-		await execAsync('git commit --allow-empty -m "Initial commit"', {
-			cwd: tempDir,
-		});
+		// Initialize git repository for all tests with GPG signing disabled
+		initTestGitRepoWithCommit(tempDir, "main", "Initial commit");
 	});
 
 	afterEach(() => {
