@@ -1,12 +1,12 @@
 /**
  * WSL2-safe cleanup utilities for tests
- * 
+ *
  * WSL2 has issues with rapid temp directory creation/deletion and concurrent
  * child process spawning. These helpers mitigate those issues.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Safely remove a directory with retry logic for WSL2 file system delays
@@ -18,7 +18,12 @@ export function safeRmSync(dirPath: string, maxRetries = 3): void {
 
 	for (let i = 0; i < maxRetries; i++) {
 		try {
-			fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+			fs.rmSync(dirPath, {
+				recursive: true,
+				force: true,
+				maxRetries: 3,
+				retryDelay: 100,
+			});
 			return;
 		} catch (err: any) {
 			if (i === maxRetries - 1) {

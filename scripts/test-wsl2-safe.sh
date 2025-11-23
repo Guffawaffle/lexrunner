@@ -12,7 +12,7 @@ echo "📦 Batch 1: Schema and parsing tests"
 npx vitest run tests/schema.spec.ts tests/plan-*.spec.ts tests/policy*.spec.ts tests/gates/schema.spec.ts
 
 # Run git tests in isolation
-echo "📦 Batch 2: Git operation tests"  
+echo "📦 Batch 2: Git operation tests"
 npx vitest run tests/merge-*.spec.ts tests/preflightConflicts.spec.ts tests/gates/operations.spec.ts
 
 # Run CLI tests (moderate risk)
