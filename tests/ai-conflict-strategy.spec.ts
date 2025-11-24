@@ -5,7 +5,7 @@
  * abstention, and fallback behavior.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
 	resolveConflict,
 	resolveConflictsBatch,
@@ -19,8 +19,13 @@ describe("AI Conflict Strategy Integration", () => {
 	let cache: ConflictResolutionCache;
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		cache = new ConflictResolutionCache();
 		clearCache(cache);
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	describe("resolveConflict", () => {
@@ -213,7 +218,7 @@ describe("AI Conflict Strategy Integration", () => {
 
 			// Wait for expiration - use 1500ms to ensure we're well past the 1000ms TTL
 			// accounting for event loop jitter and timing uncertainty
-			await new Promise((resolve) => setTimeout(resolve, 1500));
+			vi.advanceTimersByTime(1500);
 
 			// Third request - cache should be expired
 			await resolveConflict(input, { cache, forceHeuristic: true });

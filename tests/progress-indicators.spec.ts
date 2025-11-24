@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ProgressReporter } from "../src/util/progress.js";
 
 describe("Progress Indicators", () => {
 	describe("ProgressReporter", () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
 		it("should show level start/complete in human mode", () => {
 			const logs: string[] = [];
 			const originalLog = console.log;
@@ -47,7 +55,7 @@ describe("Progress Indicators", () => {
 
 			// Use 2500ms delay to ensure we're well above the 2000ms threshold
 			// accounting for event loop jitter and timing uncertainty
-			await new Promise((resolve) => setTimeout(resolve, 2500));
+			vi.advanceTimersByTime(2500);
 			reporter.nodeComplete("slow-node", true);
 
 			console.log = originalLog;
@@ -68,7 +76,7 @@ describe("Progress Indicators", () => {
 			reporter.nodeStart("fast-node");
 
 			// Simulate a delay <2s
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			vi.advanceTimersByTime(1000);
 			reporter.nodeComplete("fast-node", true);
 
 			console.log = originalLog;
@@ -106,7 +114,7 @@ describe("Progress Indicators", () => {
 
 			// Test seconds formatting (2.1s)
 			reporter.nodeStart("node-seconds");
-			await new Promise((resolve) => setTimeout(resolve, 2100));
+			vi.advanceTimersByTime(2100);
 			reporter.nodeComplete("node-seconds", true);
 
 			console.log = originalLog;
@@ -127,12 +135,12 @@ describe("Progress Indicators", () => {
 
 			// Test success
 			reporter.nodeStart("success-node");
-			await new Promise((resolve) => setTimeout(resolve, 2100));
+			vi.advanceTimersByTime(2100);
 			reporter.nodeComplete("success-node", true);
 
 			// Test failure
 			reporter.nodeStart("fail-node");
-			await new Promise((resolve) => setTimeout(resolve, 2100));
+			vi.advanceTimersByTime(2100);
 			reporter.nodeComplete("fail-node", false);
 
 			console.log = originalLog;
