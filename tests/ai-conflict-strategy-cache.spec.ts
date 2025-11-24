@@ -2,12 +2,15 @@
  * Tests for Conflict Resolution Cache
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	ConflictResolutionCache,
-	generateCacheKey
+	generateCacheKey,
 } from "../src/ai/conflictStrategyCache.js";
-import type { ConflictResolutionInput, ConflictResolutionOutput } from "../src/ai/conflictStrategySchema.js";
+import type {
+	ConflictResolutionInput,
+	ConflictResolutionOutput,
+} from "../src/ai/conflictStrategySchema.js";
 
 describe("Conflict Resolution Cache", () => {
 	describe("generateCacheKey", () => {
@@ -16,7 +19,7 @@ describe("Conflict Resolution Cache", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const key = generateCacheKey(input);
@@ -28,11 +31,11 @@ describe("Conflict Resolution Cache", () => {
 				paths: ["src/file1.ts", "src/file2.ts"],
 				hunkHashes: ["a".repeat(64), "b".repeat(64)],
 				symbols: [
-					{ name: "MyClass", type: "class", path: "src/file1.ts" }
+					{ name: "MyClass", type: "class", path: "src/file1.ts" },
 				],
 				hints: [
-					{ type: "import-order", message: "test", confidence: 0.9 }
-				]
+					{ type: "import-order", message: "test", confidence: 0.9 },
+				],
 			};
 
 			const key1 = generateCacheKey(input);
@@ -46,14 +49,14 @@ describe("Conflict Resolution Cache", () => {
 				paths: ["src/file1.ts", "src/file2.ts"],
 				hunkHashes: ["a".repeat(64), "b".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const input2: ConflictResolutionInput = {
 				paths: ["src/file2.ts", "src/file1.ts"],
 				hunkHashes: ["b".repeat(64), "a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const key1 = generateCacheKey(input1);
@@ -67,14 +70,14 @@ describe("Conflict Resolution Cache", () => {
 				paths: ["src/file1.ts"],
 				hunkHashes: ["a".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const input2: ConflictResolutionInput = {
 				paths: ["src/file2.ts"],
 				hunkHashes: ["b".repeat(64)],
 				symbols: [],
-				hints: []
+				hints: [],
 			};
 
 			const key1 = generateCacheKey(input1);
@@ -89,12 +92,20 @@ describe("Conflict Resolution Cache", () => {
 				hunkHashes: ["a".repeat(64), "b".repeat(64)],
 				symbols: [
 					{ name: "ClassA", type: "class", path: "src/file1.ts" },
-					{ name: "funcB", type: "function", path: "src/file2.ts" }
+					{ name: "funcB", type: "function", path: "src/file2.ts" },
 				],
 				hints: [
-					{ type: "semantic", message: "Complex conflict", confidence: 0.5 },
-					{ type: "import-order", message: "Import conflict", confidence: 0.9 }
-				]
+					{
+						type: "semantic",
+						message: "Complex conflict",
+						confidence: 0.5,
+					},
+					{
+						type: "import-order",
+						message: "Import conflict",
+						confidence: 0.9,
+					},
+				],
 			};
 
 			const key = generateCacheKey(input);
@@ -114,7 +125,7 @@ describe("Conflict Resolution Cache", () => {
 				strategy: "auto-resolve",
 				ops: [],
 				risk: 0.25,
-				abstained: false
+				abstained: false,
 			};
 		});
 
@@ -126,7 +137,7 @@ describe("Conflict Resolution Cache", () => {
 		it("should return cached value for cache hit", () => {
 			cache.set(testKey, testResolution);
 			const result = cache.get(testKey);
-			
+
 			expect(result).not.toBeNull();
 			expect(result?.strategy).toBe("auto-resolve");
 			expect(result?.risk).toBe(0.25);
@@ -154,7 +165,7 @@ describe("Conflict Resolution Cache", () => {
 
 		it("should calculate hit rate correctly", () => {
 			cache.set(testKey, testResolution);
-			
+
 			cache.get(testKey); // hit
 			cache.get("different-key"); // miss
 			cache.get(testKey); // hit
@@ -164,6 +175,7 @@ describe("Conflict Resolution Cache", () => {
 		});
 
 		it("should respect TTL", async () => {
+			vi.useFakeTimers();
 			const shortTTL = 1; // 1 second
 			cache.set(testKey, testResolution, shortTTL);
 
@@ -172,28 +184,31 @@ describe("Conflict Resolution Cache", () => {
 			expect(result).not.toBeNull();
 
 			// Wait for TTL to expire
-			await new Promise(resolve => setTimeout(resolve, 1100));
+			vi.advanceTimersByTime(1100);
 
 			// Should be expired
 			result = cache.get(testKey);
 			expect(result).toBeNull();
+			vi.useRealTimers();
 		});
 
 		it("should not expire entries without TTL", async () => {
+			vi.useFakeTimers();
 			cache.set(testKey, testResolution); // No TTL
 
 			// Wait a bit
-			await new Promise(resolve => setTimeout(resolve, 500));
+			vi.advanceTimersByTime(500);
 
 			// Should still be cached
 			const result = cache.get(testKey);
 			expect(result).not.toBeNull();
+			vi.useRealTimers();
 		});
 
 		it("should clear all entries", () => {
 			cache.set(testKey, testResolution);
 			cache.set("key2", testResolution);
-			
+
 			let stats = cache.getStats();
 			expect(stats.size).toBe(2);
 
@@ -213,14 +228,15 @@ describe("Conflict Resolution Cache", () => {
 		});
 
 		it("should cleanup expired entries", async () => {
+			vi.useFakeTimers();
 			const shortTTL = 1; // 1 second
 			cache.set("key1", testResolution, shortTTL);
 			cache.set("key2", testResolution); // No TTL
 
 			// Wait for first entry to expire
-			await new Promise(resolve => setTimeout(resolve, 1100));
+			vi.advanceTimersByTime(1100);
 
-			// Before cleanup
+			// Before cleanup (lazy expiration hasn't happened yet for key1 unless accessed, but cleanup() forces it)
 			let stats = cache.getStats();
 			expect(stats.size).toBe(2);
 
@@ -228,6 +244,7 @@ describe("Conflict Resolution Cache", () => {
 			cache.cleanup();
 			stats = cache.getStats();
 			expect(stats.size).toBe(1);
+			vi.useRealTimers();
 		});
 
 		it("should handle multiple concurrent accesses", () => {
@@ -237,7 +254,7 @@ describe("Conflict Resolution Cache", () => {
 				return cache.get(key);
 			});
 
-			const results = promises.every(r => r !== null);
+			const results = promises.every((r) => r !== null);
 			expect(results).toBe(true);
 		});
 	});
