@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "deps": [],
+      "gates": [],
+      "name": "alpha-first"
+    },
+    {
+      "deps": [],
+      "gates": [],
+      "name": "zebra-last"
+    }
+  ],
+  "schemaVersion": "1.0.0",
+  "target": "main"
+}

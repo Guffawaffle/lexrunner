@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "test",
+      "branch": "feat/test",
+      "deps": ["nonexistent-dependency"]
+    }
+  ]
+}

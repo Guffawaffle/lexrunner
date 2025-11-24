@@ -1,0 +1,12 @@
+{
+  "lockHash": "test-lock-hash",
+  "planHash": "test-plan-hash",
+  "prHeads": [
+    {
+      "name": "test-item",
+      "sha": "test-sha"
+    }
+  ],
+  "timestamp": "2025-11-24T03:42:58.898Z",
+  "status": "completed"
+}

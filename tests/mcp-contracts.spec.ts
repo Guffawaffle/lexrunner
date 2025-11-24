@@ -16,13 +16,12 @@ describe('MCP Contract Tests', () => {
 		testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-test-'));
 		process.env.LEX_PR_PROFILE_DIR = testDir;
 		process.env.ALLOW_MUTATIONS = 'false';
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 	});
 
 	afterEach(() => {
 		// Restore environment
 		process.env = originalEnv;
-		process.chdir('/');
 		
 		// Cleanup test directory
 		if (fs.existsSync(testDir)) {

@@ -22,14 +22,13 @@ describe('Weave Contract Verification', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
 	});
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

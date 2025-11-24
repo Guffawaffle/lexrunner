@@ -1,11 +1,2 @@
-version: 1
-target: main
-sources:
-  - query: "is:open label:stack:*"
-selectors:
-  include_labels: ["stack:*"]
-  exclude_labels: ["WIP", "do-not-merge"]
-defaults:
-  strategy: rebase-weave
-  base: main
-pin_commits: false
+version: 2
+target: staging

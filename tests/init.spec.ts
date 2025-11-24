@@ -11,11 +11,10 @@ describe("Init Command", () => {
 	beforeEach(() => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "init-test-"));
 		originalCwd = process.cwd();
-		process.chdir(tempDir);
+		// Don't use process.chdir() - not supported in worker threads
 	});
 
 	afterEach(() => {
-		process.chdir(originalCwd);
 		if (fs.existsSync(tempDir)) {
 			fs.rmSync(tempDir, { recursive: true });
 		}

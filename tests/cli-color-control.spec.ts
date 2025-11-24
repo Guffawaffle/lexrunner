@@ -15,7 +15,7 @@ describe('CLI Color and JSON Output Control', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		// Gate tests on CLI build
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
@@ -23,7 +23,6 @@ describe('CLI Color and JSON Output Control', () => {
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

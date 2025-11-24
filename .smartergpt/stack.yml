@@ -1,16 +1,7 @@
+
 version: 1
 target: main
 items:
-  - id: 1
-    branch: feature/auth-system
-    sha: abc123def456
-    needs: []
-    strategy: rebase-weave
-  - id: 2
-    branch: feature/api-endpoints
-    needs: [1]
-    strategy: merge-weave
-  - id: 3
-    branch: feature/frontend-ui
-    needs: [1, 2]
-    strategy: rebase-weave
+  - id: test-ordering
+    branch: feat/ordering
+    deps: []

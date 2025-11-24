@@ -27,13 +27,11 @@ describe('config validate command', () => {
 		// Create test profile directory
 		testProfileDir = path.join(testDir, 'test-profile');
 		fs.mkdirSync(testProfileDir, { recursive: true });
-		
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 	});
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir(originalCwd);
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

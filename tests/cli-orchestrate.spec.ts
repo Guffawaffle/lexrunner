@@ -19,7 +19,7 @@ describe('CLI orchestrate:pin-toolchain', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		// Central CLI build gate
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
@@ -27,7 +27,6 @@ describe('CLI orchestrate:pin-toolchain', () => {
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

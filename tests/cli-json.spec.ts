@@ -16,7 +16,7 @@ describe('CLI JSON Output Tests', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		// Gate tests on CLI build
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
@@ -24,7 +24,6 @@ describe('CLI JSON Output Tests', () => {
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

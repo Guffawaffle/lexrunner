@@ -66,16 +66,16 @@ describe('config show command (CLI integration)', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 		
 		// Create minimal .smartergpt profile
-		fs.mkdirSync('.smartergpt', { recursive: true });
-		fs.writeFileSync('.smartergpt/scope.yml', 'version: 1\ntarget: main\n');
+		const smartergptDir = path.join(testDir, '.smartergpt');
+		fs.mkdirSync(smartergptDir, { recursive: true });
+		fs.writeFileSync(path.join(smartergptDir, 'scope.yml'), 'version: 1\ntarget: main\n');
 	});
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir(originalCwd);
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

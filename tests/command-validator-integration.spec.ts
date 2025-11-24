@@ -18,9 +18,7 @@ describe('Gate Execution with Command Validation', () => {
 		
 		await mkdir(join(testDir, '.smartergpt'), { recursive: true });
 		await mkdir(artifactDir, { recursive: true });
-		
-		// Change to test directory so validator can find whitelist
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 		
 		resetCommandValidator();
 	});

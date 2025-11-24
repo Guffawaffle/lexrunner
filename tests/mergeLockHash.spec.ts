@@ -15,12 +15,11 @@ describe('merge command lock hash integration', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 	});
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir(repoRoot);
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}

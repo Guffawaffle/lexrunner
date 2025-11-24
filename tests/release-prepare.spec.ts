@@ -17,7 +17,7 @@ describe("release:prepare script", () => {
 		// Create a temporary test directory
 		originalCwd = process.cwd();
 		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-test-"));
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		// Initialize git repo with GPG signing disabled
 		initTestGitRepo(testDir, "main");
@@ -54,7 +54,6 @@ Initial release.
 	gitCommit(testDir, "Initial commit");
 	execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
 });	afterEach(() => {
-		process.chdir(originalCwd);
 		// Clean up test directory
 		fs.rmSync(testDir, { recursive: true, force: true });
 	});

@@ -19,7 +19,7 @@ describe('CLI Determinism Integration Tests', () => {
 			fs.rmSync(testDir, { recursive: true });
 		}
 		fs.mkdirSync(testDir, { recursive: true });
-		process.chdir(testDir);
+		// Don't use process.chdir() - not supported in worker threads
 
 		// Central CLI build gate
 		if (skipIfCliNotBuilt({ skip: context.skip })) return;
@@ -27,7 +27,6 @@ describe('CLI Determinism Integration Tests', () => {
 
 	afterEach(() => {
 		// Cleanup
-		process.chdir('/');
 		if (fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true });
 		}
@@ -162,12 +161,10 @@ items:
 `);
 			}
 
-			// Generate plans from different directories
-			process.chdir(dir1);
-			const output1 = execSync(`node ${cliPath} plan --json`, { encoding: 'utf8' });
+			// Generate plans from different directories using absolute paths
+			const output1 = execSync(`node ${cliPath} plan --json`, { cwd: dir1, encoding: 'utf8' });
 
-			process.chdir(dir2);
-			const output2 = execSync(`node ${cliPath} plan --json`, { encoding: 'utf8' });
+			const output2 = execSync(`node ${cliPath} plan --json`, { cwd: dir2, encoding: 'utf8' });
 
 			expect(output1).toBe(output2);
 		});
