@@ -26,7 +26,7 @@ describe("release:prepare script", () => {
 		const pkg = {
 			name: "test-package",
 			version: "1.0.0",
-			private: true
+			private: true,
 		};
 		fs.writeFileSync(
 			path.join(testDir, "package.json"),
@@ -47,13 +47,14 @@ All notable changes to this project will be documented in this file.
 
 Initial release.
 `;
-	fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
+		fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
 
-	// Initial commit
-	gitAdd(testDir);
-	gitCommit(testDir, "Initial commit");
-	execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
-});	afterEach(() => {
+		// Initial commit
+		gitAdd(testDir);
+		gitCommit(testDir, "Initial commit");
+		execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
+	});
+	afterEach(() => {
 		// Clean up test directory
 		fs.rmSync(testDir, { recursive: true, force: true });
 	});
@@ -65,7 +66,7 @@ Initial release.
 		try {
 			const output = execSync(`tsx ${scriptPath}`, {
 				cwd: testDir,
-				encoding: "utf-8"
+				encoding: "utf-8",
 			});
 			expect(output).toContain("No commits since last release");
 		} catch (error) {
@@ -81,18 +82,23 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: PATCH");
 		expect(output).toContain("Next version: 1.0.0 → 1.0.1");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("1.0.1");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [1.0.1]");
 		expect(changelog).toContain("### Fixed");
 	});
@@ -104,18 +110,23 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: MINOR");
 		expect(output).toContain("Next version: 1.0.0 → 1.1.0");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("1.1.0");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [1.1.0]");
 		expect(changelog).toContain("### Added");
 	});
@@ -127,18 +138,23 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: MAJOR");
 		expect(output).toContain("Next version: 1.0.0 → 2.0.0");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("2.0.0");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [2.0.0]");
 		expect(changelog).toContain("### ⚠ BREAKING CHANGES");
 	});
@@ -154,7 +170,10 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 
 		// Check sections exist
 		expect(changelog).toContain("### Added");
@@ -164,7 +183,9 @@ Initial release.
 
 		// Check specific entries
 		expect(changelog).toMatch(/new feature 1.*\([a-f0-9]{7}\)/);
-		expect(changelog).toMatch(/\*\*scope\*\*: new feature 2.*\([a-f0-9]{7}\)/);
+		expect(changelog).toMatch(
+			/\*\*scope\*\*: new feature 2.*\([a-f0-9]{7}\)/
+		);
 		expect(changelog).toMatch(/bug fix.*\([a-f0-9]{7}\)/);
 	});
 
@@ -178,7 +199,7 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Last tag: (none)");
@@ -192,7 +213,10 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 
 		// Unreleased section should still exist
 		expect(changelog).toContain("## [Unreleased]");
@@ -210,14 +234,17 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		// Should still work and bump patch
 		expect(output).toContain("Version bump type: PATCH");
 		expect(output).toContain("Next version: 1.0.0 → 1.0.1");
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("### Other");
 	});
 
@@ -228,7 +255,7 @@ Initial release.
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		// Check for next steps
