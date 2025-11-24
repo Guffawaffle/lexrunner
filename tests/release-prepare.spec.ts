@@ -22,12 +22,13 @@ describe("release:prepare script", () => {
 		execSync("git init", { cwd: testDir });
 		execSync('git config user.name "Test User"', { cwd: testDir });
 		execSync('git config user.email "test@example.com"', { cwd: testDir });
+		execSync("git config commit.gpgsign false", { cwd: testDir });
 
 		// Create package.json
 		const pkg = {
 			name: "test-package",
 			version: "1.0.0",
-			private: true
+			private: true,
 		};
 		fs.writeFileSync(
 			path.join(testDir, "package.json"),
@@ -48,13 +49,14 @@ All notable changes to this project will be documented in this file.
 
 Initial release.
 `;
-	fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
+		fs.writeFileSync(path.join(testDir, "CHANGELOG.md"), changelog);
 
-	// Initial commit
-	execSync("git add .", { cwd: testDir });
-	execSync('git commit -m "Initial commit"', { cwd: testDir });
-	execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
-});	afterEach(() => {
+		// Initial commit
+		execSync("git add .", { cwd: testDir });
+		execSync('git commit -m "Initial commit"', { cwd: testDir });
+		execSync("git tag -a v1.0.0 -m 'v1.0.0'", { cwd: testDir });
+	});
+	afterEach(() => {
 		process.chdir(originalCwd);
 		// Clean up test directory
 		fs.rmSync(testDir, { recursive: true, force: true });
@@ -67,7 +69,7 @@ Initial release.
 		try {
 			const output = execSync(`tsx ${scriptPath}`, {
 				cwd: testDir,
-				encoding: "utf-8"
+				encoding: "utf-8",
 			});
 			expect(output).toContain("No commits since last release");
 		} catch (error) {
@@ -78,85 +80,119 @@ Initial release.
 
 	it("should compute patch version for fix commits", () => {
 		// Add a fix commit
-		execSync('git commit --allow-empty -m "fix: resolve bug"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "fix: resolve bug"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: PATCH");
 		expect(output).toContain("Next version: 1.0.0 → 1.0.1");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("1.0.1");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [1.0.1]");
 		expect(changelog).toContain("### Fixed");
 	});
 
 	it("should compute minor version for feat commits", () => {
 		// Add a feature commit
-		execSync('git commit --allow-empty -m "feat: add new feature"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "feat: add new feature"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: MINOR");
 		expect(output).toContain("Next version: 1.0.0 → 1.1.0");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("1.1.0");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [1.1.0]");
 		expect(changelog).toContain("### Added");
 	});
 
 	it("should compute major version for breaking changes", () => {
 		// Add a breaking change commit
-		execSync('git commit --allow-empty -m "feat!: breaking change"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "feat!: breaking change"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Version bump type: MAJOR");
 		expect(output).toContain("Next version: 1.0.0 → 2.0.0");
 
 		// Verify package.json was updated
-		const pkg = JSON.parse(fs.readFileSync(path.join(testDir, "package.json"), "utf-8"));
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(testDir, "package.json"), "utf-8")
+		);
 		expect(pkg.version).toBe("2.0.0");
 
 		// Verify CHANGELOG was updated
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("## [2.0.0]");
 		expect(changelog).toContain("### ⚠ BREAKING CHANGES");
 	});
 
 	it("should group commits by type in changelog", () => {
 		// Add multiple commits of different types
-		execSync('git commit --allow-empty -m "feat: new feature 1"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "feat(scope): new feature 2"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "fix: bug fix"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "docs: update readme"', { cwd: testDir });
-		execSync('git commit --allow-empty -m "chore: update deps"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "feat: new feature 1"', {
+			cwd: testDir,
+		});
+		execSync('git commit --allow-empty -m "feat(scope): new feature 2"', {
+			cwd: testDir,
+		});
+		execSync('git commit --allow-empty -m "fix: bug fix"', {
+			cwd: testDir,
+		});
+		execSync('git commit --allow-empty -m "docs: update readme"', {
+			cwd: testDir,
+		});
+		execSync('git commit --allow-empty -m "chore: update deps"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 
 		// Check sections exist
 		expect(changelog).toContain("### Added");
@@ -166,7 +202,9 @@ Initial release.
 
 		// Check specific entries
 		expect(changelog).toMatch(/new feature 1.*\([a-f0-9]{7}\)/);
-		expect(changelog).toMatch(/\*\*scope\*\*: new feature 2.*\([a-f0-9]{7}\)/);
+		expect(changelog).toMatch(
+			/\*\*scope\*\*: new feature 2.*\([a-f0-9]{7}\)/
+		);
 		expect(changelog).toMatch(/bug fix.*\([a-f0-9]{7}\)/);
 	});
 
@@ -175,12 +213,14 @@ Initial release.
 		execSync("git tag -d v1.0.0", { cwd: testDir });
 
 		// Add a commit
-		execSync('git commit --allow-empty -m "feat: first feature"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "feat: first feature"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		expect(output).toContain("Last tag: (none)");
@@ -189,12 +229,17 @@ Initial release.
 
 	it("should preserve unreleased section in changelog", () => {
 		// Add a commit
-		execSync('git commit --allow-empty -m "fix: bug fix"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "fix: bug fix"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		execSync(`tsx ${scriptPath}`, { cwd: testDir, encoding: "utf-8" });
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 
 		// Unreleased section should still exist
 		expect(changelog).toContain("## [Unreleased]");
@@ -207,30 +252,37 @@ Initial release.
 
 	it("should handle non-conventional commits gracefully", () => {
 		// Add a non-conventional commit
-		execSync('git commit --allow-empty -m "random commit message"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "random commit message"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		// Should still work and bump patch
 		expect(output).toContain("Version bump type: PATCH");
 		expect(output).toContain("Next version: 1.0.0 → 1.0.1");
 
-		const changelog = fs.readFileSync(path.join(testDir, "CHANGELOG.md"), "utf-8");
+		const changelog = fs.readFileSync(
+			path.join(testDir, "CHANGELOG.md"),
+			"utf-8"
+		);
 		expect(changelog).toContain("### Other");
 	});
 
 	it("should provide next steps instructions", () => {
 		// Add a commit
-		execSync('git commit --allow-empty -m "feat: new feature"', { cwd: testDir });
+		execSync('git commit --allow-empty -m "feat: new feature"', {
+			cwd: testDir,
+		});
 
 		const scriptPath = path.join(originalCwd, "scripts/release-prepare.ts");
 		const output = execSync(`tsx ${scriptPath}`, {
 			cwd: testDir,
-			encoding: "utf-8"
+			encoding: "utf-8",
 		});
 
 		// Check for next steps

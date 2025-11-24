@@ -331,3 +331,11 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 5. **Run gates:** Same CLI locally and in CI; confirm artifacts appear under `<nodeId>/<gateName>/`.
 6. **Merge pyramid:** Runner computes topo order, merges eligible nodes.
 7. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
+
+## 16) Environment Stability (WSL2/CI)
+
+- **Resource Limits:** Test runners (Vitest) must be configured with explicit concurrency limits (`maxWorkers: 1`) to prevent resource exhaustion in constrained environments like WSL2 or shared CI runners.
+- **Crash Prevention:** Avoid unbounded recursion or excessive memory allocation in tests.
+- **Process Isolation:** Ensure tests clean up temporary directories and processes.
+- **Git Configuration:** Tests creating git repositories MUST explicitly disable GPG signing (`git config commit.gpgsign false`) to prevent interactive prompts that hang the test runner and crash the environment.
+- **Git Tests:** Tests that perform git commits or require a git environment are EXCLUDED from the default `npm test` run. Run them explicitly with `npm run test:git`. These tests MUST NOT run in CI.

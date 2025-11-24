@@ -34,6 +34,9 @@ describe("Comprehensive E2E Automation Pipeline", () => {
 		await execAsync('git config user.name "E2E Test Runner"', {
 			cwd: tempDir,
 		});
+		await execAsync("git config commit.gpgsign false", {
+			cwd: tempDir,
+		});
 		await execAsync('git commit --allow-empty -m "Initial commit"', {
 			cwd: tempDir,
 		});

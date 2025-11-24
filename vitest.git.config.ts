@@ -9,12 +9,6 @@ export default defineConfig({
 			"**/dist/**",
 			"**/.smartergpt/**",
 			"**/coverage/**",
-			// Exclude tests that perform git commits by default
-			"**/tests/release-prepare.spec.ts",
-			"**/tests/promptsResolver.spec.ts",
-			"**/tests/e2e-comprehensive.test.ts",
-			"**/tests/autopilot-e2e-level3-4.spec.ts",
-			"**/tests/deterministic-build.test.ts",
 		],
 		// Limit concurrency to prevent WSL2 resource exhaustion/crashes
 		maxWorkers: 1,

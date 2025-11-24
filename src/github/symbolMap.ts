@@ -4,8 +4,19 @@
  */
 
 import * as parser from "@babel/parser";
-import traverse from "@babel/traverse";
-import type { Node } from "@babel/types";
+import _traverse, { NodePath } from "@babel/traverse";
+import type {
+	Node,
+	FunctionDeclaration,
+	ClassDeclaration,
+	TSInterfaceDeclaration,
+	TSTypeAliasDeclaration,
+	VariableDeclaration,
+	ImportDeclaration,
+} from "@babel/types";
+
+// Handle ESM/CJS interop for babel traverse
+const traverse = (_traverse as any).default || _traverse;
 
 export interface SymbolLocation {
 	/** Line number where symbol is defined */
@@ -22,7 +33,16 @@ export interface Symbol {
 	/** Symbol name */
 	name: string;
 	/** Symbol type: function, class, interface, type, const, let, var, import, export */
-	type: "function" | "class" | "interface" | "type" | "const" | "let" | "var" | "import" | "export";
+	type:
+		| "function"
+		| "class"
+		| "interface"
+		| "type"
+		| "const"
+		| "let"
+		| "var"
+		| "import"
+		| "export";
 	/** Location in file */
 	location: SymbolLocation;
 	/** Is exported? */
@@ -58,7 +78,10 @@ export interface SymbolMapContext {
 /**
  * Extract symbols from TypeScript/JavaScript source code
  */
-export function extractSymbolMap(filePath: string, sourceCode: string): FileSymbolMap {
+export function extractSymbolMap(
+	filePath: string,
+	sourceCode: string
+): FileSymbolMap {
 	const symbols: Symbol[] = [];
 	const imports: string[] = [];
 	const exports: string[] = [];
@@ -70,15 +93,16 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			plugins: ["typescript", "jsx"],
 		});
 
-		const totalLines = sourceCode.split('\n').length;
+		const totalLines = sourceCode.split("\n").length;
 
 		// Traverse AST and extract symbols
 		traverse(ast, {
 			// Function declarations
-			FunctionDeclaration(path) {
+			FunctionDeclaration(path: NodePath<FunctionDeclaration>) {
 				const node = path.node;
 				if (node.id && node.loc) {
-					const isExported = path.parent.type === "ExportNamedDeclaration" ||
+					const isExported =
+						path.parent.type === "ExportNamedDeclaration" ||
 						path.parent.type === "ExportDefaultDeclaration";
 
 					symbols.push({
@@ -91,7 +115,10 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 							endColumn: node.loc.end.column,
 						},
 						exported: isExported,
-						docComment: extractLeadingComment(path.node, sourceCode),
+						docComment: extractLeadingComment(
+							path.node,
+							sourceCode
+						),
 					});
 
 					if (isExported) {
@@ -101,10 +128,11 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			},
 
 			// Class declarations
-			ClassDeclaration(path) {
+			ClassDeclaration(path: NodePath<ClassDeclaration>) {
 				const node = path.node;
 				if (node.id && node.loc) {
-					const isExported = path.parent.type === "ExportNamedDeclaration" ||
+					const isExported =
+						path.parent.type === "ExportNamedDeclaration" ||
 						path.parent.type === "ExportDefaultDeclaration";
 
 					symbols.push({
@@ -117,7 +145,10 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 							endColumn: node.loc.end.column,
 						},
 						exported: isExported,
-						docComment: extractLeadingComment(path.node, sourceCode),
+						docComment: extractLeadingComment(
+							path.node,
+							sourceCode
+						),
 					});
 
 					if (isExported) {
@@ -126,7 +157,11 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 
 					// Extract class methods
 					for (const method of node.body.body) {
-						if (method.type === "ClassMethod" && method.key.type === "Identifier" && method.loc) {
+						if (
+							method.type === "ClassMethod" &&
+							method.key.type === "Identifier" &&
+							method.loc
+						) {
 							symbols.push({
 								name: method.key.name,
 								type: "function",
@@ -145,10 +180,11 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			},
 
 			// TypeScript interfaces
-			TSInterfaceDeclaration(path) {
+			TSInterfaceDeclaration(path: NodePath<TSInterfaceDeclaration>) {
 				const node = path.node;
 				if (node.id && node.loc) {
-					const isExported = path.parent.type === "ExportNamedDeclaration";
+					const isExported =
+						path.parent.type === "ExportNamedDeclaration";
 
 					symbols.push({
 						name: node.id.name,
@@ -160,7 +196,10 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 							endColumn: node.loc.end.column,
 						},
 						exported: isExported,
-						docComment: extractLeadingComment(path.node, sourceCode),
+						docComment: extractLeadingComment(
+							path.node,
+							sourceCode
+						),
 					});
 
 					if (isExported) {
@@ -170,10 +209,11 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			},
 
 			// TypeScript type aliases
-			TSTypeAliasDeclaration(path) {
+			TSTypeAliasDeclaration(path: NodePath<TSTypeAliasDeclaration>) {
 				const node = path.node;
 				if (node.id && node.loc) {
-					const isExported = path.parent.type === "ExportNamedDeclaration";
+					const isExported =
+						path.parent.type === "ExportNamedDeclaration";
 
 					symbols.push({
 						name: node.id.name,
@@ -185,7 +225,10 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 							endColumn: node.loc.end.column,
 						},
 						exported: isExported,
-						docComment: extractLeadingComment(path.node, sourceCode),
+						docComment: extractLeadingComment(
+							path.node,
+							sourceCode
+						),
 					});
 
 					if (isExported) {
@@ -195,9 +238,10 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			},
 
 			// Variable declarations (const, let, var)
-			VariableDeclaration(path) {
+			VariableDeclaration(path: NodePath<VariableDeclaration>) {
 				const node = path.node;
-				const isExported = path.parent.type === "ExportNamedDeclaration";
+				const isExported =
+					path.parent.type === "ExportNamedDeclaration";
 
 				for (const declarator of node.declarations) {
 					if (declarator.id.type === "Identifier" && declarator.loc) {
@@ -221,17 +265,24 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 			},
 
 			// Import declarations
-			ImportDeclaration(path) {
+			ImportDeclaration(path: NodePath<ImportDeclaration>) {
 				const node = path.node;
 				const source = node.source.value;
 
 				for (const specifier of node.specifiers) {
 					if (specifier.type === "ImportDefaultSpecifier") {
 						imports.push(`default from ${source}`);
-					} else if (specifier.type === "ImportSpecifier" && specifier.imported.type === "Identifier") {
-						imports.push(`${specifier.imported.name} from ${source}`);
+					} else if (
+						specifier.type === "ImportSpecifier" &&
+						specifier.imported.type === "Identifier"
+					) {
+						imports.push(
+							`${specifier.imported.name} from ${source}`
+						);
 					} else if (specifier.type === "ImportNamespaceSpecifier") {
-						imports.push(`* as ${specifier.local.name} from ${source}`);
+						imports.push(
+							`* as ${specifier.local.name} from ${source}`
+						);
 					}
 				}
 			},
@@ -252,7 +303,7 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 		return {
 			path: filePath,
 			symbols: [],
-			totalLines: sourceCode.split('\n').length,
+			totalLines: sourceCode.split("\n").length,
 			imports: [],
 			exports: [],
 		};
@@ -262,19 +313,30 @@ export function extractSymbolMap(filePath: string, sourceCode: string): FileSymb
 /**
  * Extract leading JSDoc comment from a node
  */
-function extractLeadingComment(node: Node, sourceCode: string): string | undefined {
+function extractLeadingComment(
+	node: Node,
+	sourceCode: string
+): string | undefined {
 	if (!node.leadingComments || node.leadingComments.length === 0) {
 		return undefined;
 	}
 
 	const lastComment = node.leadingComments[node.leadingComments.length - 1];
-	if (lastComment.type === "CommentBlock" && lastComment.value.startsWith("*")) {
+	if (
+		lastComment.type === "CommentBlock" &&
+		lastComment.value.startsWith("*")
+	) {
 		// Extract first line of JSDoc (summary)
-		const lines = lastComment.value.split('\n');
+		const lines = lastComment.value.split("\n");
 		const summary = lines
-			.find(line => line.trim() && !line.trim().startsWith('*') && !line.trim().startsWith('@'))
+			.find(
+				(line) =>
+					line.trim() &&
+					!line.trim().startsWith("*") &&
+					!line.trim().startsWith("@")
+			)
 			?.trim()
-			.replace(/^\*\s*/, '');
+			.replace(/^\*\s*/, "");
 		return summary;
 	}
 
@@ -284,12 +346,17 @@ function extractLeadingComment(node: Node, sourceCode: string): string | undefin
 /**
  * Build symbol maps for multiple files
  */
-export function buildSymbolMaps(files: Array<{ path: string; content: string }>): SymbolMapContext {
+export function buildSymbolMaps(
+	files: Array<{ path: string; content: string }>
+): SymbolMapContext {
 	const symbolMaps = files
-		.filter(file => /\.(ts|tsx|js|jsx)$/.test(file.path))
-		.map(file => extractSymbolMap(file.path, file.content));
+		.filter((file) => /\.(ts|tsx|js|jsx)$/.test(file.path))
+		.map((file) => extractSymbolMap(file.path, file.content));
 
-	const symbolCount = symbolMaps.reduce((sum, map) => sum + map.symbols.length, 0);
+	const symbolCount = symbolMaps.reduce(
+		(sum, map) => sum + map.symbols.length,
+		0
+	);
 	const mapSize = JSON.stringify(symbolMaps).length;
 
 	return {
@@ -308,30 +375,32 @@ export function formatSymbolMap(symbolMap: FileSymbolMap): string {
 	lines.push(`# ${symbolMap.path} (${symbolMap.totalLines} lines)`);
 
 	if (symbolMap.imports.length > 0) {
-		lines.push('\n## Imports');
+		lines.push("\n## Imports");
 		for (const imp of symbolMap.imports) {
 			lines.push(`- ${imp}`);
 		}
 	}
 
 	if (symbolMap.exports.length > 0) {
-		lines.push('\n## Exports');
+		lines.push("\n## Exports");
 		for (const exp of symbolMap.exports) {
 			lines.push(`- ${exp}`);
 		}
 	}
 
 	if (symbolMap.symbols.length > 0) {
-		lines.push('\n## Symbols');
+		lines.push("\n## Symbols");
 		for (const symbol of symbolMap.symbols) {
-			const prefix = symbol.exported ? 'export ' : '';
-			const parent = symbol.parent ? `${symbol.parent}.` : '';
-			const doc = symbol.docComment ? ` // ${symbol.docComment}` : '';
-			lines.push(`- L${symbol.location.line}: ${prefix}${symbol.type} ${parent}${symbol.name}${doc}`);
+			const prefix = symbol.exported ? "export " : "";
+			const parent = symbol.parent ? `${symbol.parent}.` : "";
+			const doc = symbol.docComment ? ` // ${symbol.docComment}` : "";
+			lines.push(
+				`- L${symbol.location.line}: ${prefix}${symbol.type} ${parent}${symbol.name}${doc}`
+			);
 		}
 	}
 
-	return lines.join('\n');
+	return lines.join("\n");
 }
 
 /**
@@ -340,13 +409,15 @@ export function formatSymbolMap(symbolMap: FileSymbolMap): string {
 export function formatSymbolMaps(context: SymbolMapContext): string {
 	const parts: string[] = [];
 
-	parts.push(`# Symbol Maps (${context.files.length} files, ${context.symbolCount} symbols)`);
-	parts.push('');
+	parts.push(
+		`# Symbol Maps (${context.files.length} files, ${context.symbolCount} symbols)`
+	);
+	parts.push("");
 
 	for (const fileMap of context.files) {
 		parts.push(formatSymbolMap(fileMap));
-		parts.push('');
+		parts.push("");
 	}
 
-	return parts.join('\n');
+	return parts.join("\n");
 }

@@ -1,10 +1,14 @@
 /**
  * Prompts directory resolution with precedence chain
- * Implements: LEX_PROMPTS_DIR (env) → .smartergpt.local/prompts → .smartergpt/prompts
+ * Implements: LEX_PROMPTS_DIR (env) → .smartergpt.local/prompts → .smartergpt/prompts → @smartergpt/lex package
  */
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 /**
  * Resolved prompts directory information
@@ -12,8 +16,34 @@ import * as path from "path";
 export interface ResolvedPromptsDir {
 	/** Absolute path to the prompts directory */
 	path: string;
-	/** Source of resolution (LEX_PROMPTS_DIR, .smartergpt.local/prompts, .smartergpt/prompts) */
+	/** Source of resolution (LEX_PROMPTS_DIR, .smartergpt.local/prompts, .smartergpt/prompts, @smartergpt/lex package) */
 	source: string;
+}
+
+/**
+ * Resolve path to the @smartergpt/lex package prompts directory
+ *
+ * @returns Absolute path to the Lex package prompts directory, or null if not found
+ */
+function resolveLexPackagePromptsDir(): string | null {
+	try {
+		// Try to dynamically import the package to verify it exists
+		// Using dynamic import is more consistent with ES modules
+		const lexPkgPath = require.resolve("@smartergpt/lex/package.json");
+		const lexPkgDir = path.dirname(lexPkgPath);
+		const promptsDir = path.join(lexPkgDir, "prompts");
+
+		// Check if prompts directory exists
+		if (fs.existsSync(promptsDir)) {
+			return promptsDir;
+		}
+
+		return null;
+	} catch (error) {
+		// Package not installed or prompts not available
+		// This is expected when @smartergpt/lex is not installed
+		return null;
+	}
 }
 
 /**
@@ -23,6 +53,7 @@ export interface ResolvedPromptsDir {
  * 1. LEX_PROMPTS_DIR environment variable (explicit override)
  * 2. .smartergpt.local/prompts (local overlay)
  * 3. .smartergpt/prompts (tracked canon)
+ * 4. @smartergpt/lex package prompts (fallback defaults)
  *
  * @param baseDir - Base directory to resolve relative paths (default: current working directory)
  * @returns Resolved prompts directory information
@@ -35,13 +66,11 @@ export function resolvePromptsDir(
 	if (process.env.LEX_PROMPTS_DIR) {
 		const dir = path.resolve(process.env.LEX_PROMPTS_DIR);
 		if (!fs.existsSync(dir)) {
-			throw new PromptsResolverError(
-				`LEX_PROMPTS_DIR not found: ${dir}`
-			);
+			throw new PromptsResolverError(`LEX_PROMPTS_DIR not found: ${dir}`);
 		}
 		return {
 			path: dir,
-			source: "LEX_PROMPTS_DIR"
+			source: "LEX_PROMPTS_DIR",
 		};
 	}
 
@@ -50,7 +79,7 @@ export function resolvePromptsDir(
 	if (fs.existsSync(localOverlay)) {
 		return {
 			path: localOverlay,
-			source: ".smartergpt.local/prompts"
+			source: ".smartergpt.local/prompts",
 		};
 	}
 
@@ -59,16 +88,26 @@ export function resolvePromptsDir(
 	if (fs.existsSync(trackedCanon)) {
 		return {
 			path: trackedCanon,
-			source: ".smartergpt/prompts"
+			source: ".smartergpt/prompts",
+		};
+	}
+
+	// Precedence 4: @smartergpt/lex package prompts (fallback defaults)
+	const lexPackagePrompts = resolveLexPackagePromptsDir();
+	if (lexPackagePrompts) {
+		return {
+			path: lexPackagePrompts,
+			source: "@smartergpt/lex package",
 		};
 	}
 
 	// No prompts directory found - provide helpful error
 	throw new PromptsResolverError(
 		"Prompts directory not found. Expected one of:\n" +
-		`  - LEX_PROMPTS_DIR (env var)\n` +
-		`  - ${localOverlay}\n` +
-		`  - ${trackedCanon}`
+			`  - LEX_PROMPTS_DIR (env var)\n` +
+			`  - ${localOverlay}\n` +
+			`  - ${trackedCanon}\n` +
+			`  - @smartergpt/lex package (not installed or prompts not available)`
 	);
 }
 
@@ -119,7 +158,7 @@ export function loadPrompt(
 	if (!fs.existsSync(promptPath)) {
 		throw new PromptsResolverError(
 			`Prompt not found: ${name} in ${promptsDir.path}\n` +
-			`Source: ${promptsDir.source}`
+				`Source: ${promptsDir.source}`
 		);
 	}
 
@@ -134,7 +173,7 @@ export function loadPrompt(
 	return {
 		content,
 		metadata,
-		path: promptPath
+		path: promptPath,
 	};
 }
 
@@ -160,7 +199,7 @@ function parsePromptMetadata(
 	if (!frontmatterMatch) {
 		// No frontmatter - return defaults
 		return {
-			name: defaultName
+			name: defaultName,
 		};
 	}
 
@@ -168,7 +207,7 @@ function parsePromptMetadata(
 		// Simple YAML-like parsing (supports basic key: value pairs)
 		const frontmatter = frontmatterMatch[1];
 		const metadata: PromptMetadata = {
-			name: defaultName
+			name: defaultName,
 		};
 
 		// Extract fields using regex
@@ -178,8 +217,11 @@ function parsePromptMetadata(
 		const versionMatch = frontmatter.match(/^version:\s*(.+)$/m);
 		if (versionMatch) metadata.version = versionMatch[1].trim();
 
-		const schemaVersionMatch = frontmatter.match(/^schemaVersion:\s*(.+)$/m);
-		if (schemaVersionMatch) metadata.schemaVersion = schemaVersionMatch[1].trim();
+		const schemaVersionMatch = frontmatter.match(
+			/^schemaVersion:\s*(.+)$/m
+		);
+		if (schemaVersionMatch)
+			metadata.schemaVersion = schemaVersionMatch[1].trim();
 
 		const descriptionMatch = frontmatter.match(/^description:\s*(.+)$/m);
 		if (descriptionMatch) metadata.description = descriptionMatch[1].trim();
@@ -188,7 +230,7 @@ function parsePromptMetadata(
 	} catch (error) {
 		// If parsing fails, return defaults
 		return {
-			name: defaultName
+			name: defaultName,
 		};
 	}
 }
@@ -214,7 +256,10 @@ export function expandPromptTokens(
 ): string {
 	// Date/time tokens
 	const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-	const now = new Date().toISOString().replace(/[:\.]/g, "-").replace("Z", ""); // ISO without colons and dots
+	const now = new Date()
+		.toISOString()
+		.replace(/[:\.]/g, "-")
+		.replace("Z", ""); // ISO without colons and dots
 
 	// Path tokens
 	const workspaceRoot = path.resolve(baseDir);
@@ -260,7 +305,7 @@ function getCurrentBranch(cwd: string): string {
 		const branch = execSync("git rev-parse --abbrev-ref HEAD", {
 			cwd,
 			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "ignore"]
+			stdio: ["pipe", "pipe", "ignore"],
 		});
 		return branch.trim();
 	} catch {
@@ -277,7 +322,7 @@ function getCurrentCommit(cwd: string): string {
 		const commit = execSync("git rev-parse HEAD", {
 			cwd,
 			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "ignore"]
+			stdio: ["pipe", "pipe", "ignore"],
 		});
 		return commit.trim();
 	} catch {

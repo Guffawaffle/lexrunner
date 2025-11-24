@@ -21,13 +21,16 @@ Prompts are resolved using the following precedence chain (highest to lowest):
 1. **`LEX_PROMPTS_DIR`** (environment variable) - Explicit override
 2. **`.smartergpt.local/prompts/`** - Local overlay (not tracked)
 3. **`.smartergpt/prompts/`** - Tracked canonical prompts
+4. **`@smartergpt/lex` package** - Fallback defaults from Lex package
 
 ### Precedence Rules
 
 - If `LEX_PROMPTS_DIR` is set, it takes precedence over all other sources
 - If `LEX_PROMPTS_DIR` is set but doesn't exist, an error is thrown
 - If `.smartergpt.local/prompts/` exists, it takes precedence over `.smartergpt/prompts/`
-- If no prompts directory is found, an error is thrown with helpful message
+- If `.smartergpt/prompts/` exists, it takes precedence over package prompts
+- If no prompts directory is found (including package), an error is thrown with helpful message
+- Package prompts provide a fallback when no local prompts are configured
 
 ### Error Messages
 
@@ -38,6 +41,49 @@ PromptsResolverError: Prompts directory not found. Expected one of:
   - LEX_PROMPTS_DIR (env var)
   - /path/to/project/.smartergpt.local/prompts
   - /path/to/project/.smartergpt/prompts
+  - @smartergpt/lex package (not installed or prompts not available)
+```
+
+## Lex Package Integration
+
+### Package Fallback (New in v0.4.0)
+
+LexRunner now integrates with the `@smartergpt/lex` npm package to provide canonical prompt templates as a fallback. This ensures that projects always have access to standard prompts even without local configuration.
+
+**How it works:**
+- If no local prompts are configured, LexRunner attempts to load from `@smartergpt/lex/prompts/`
+- Package prompts are automatically available when `@smartergpt/lex` is installed as a dependency
+- Local prompts always take precedence over package prompts
+
+**Benefits:**
+- **Zero configuration:** New projects get prompts automatically
+- **Canonical defaults:** Shared prompt templates across the ecosystem
+- **Easy updates:** Update prompts by upgrading the Lex package
+- **Customization preserved:** Local overrides still work as expected
+
+**Package vs. Local Prompts:**
+
+| Aspect | Package Prompts | Local Prompts |
+|--------|----------------|---------------|
+| **Location** | `node_modules/@smartergpt/lex/prompts/` | `.smartergpt/prompts/` |
+| **Updates** | Via `npm update @smartergpt/lex` | Manual edit |
+| **Customization** | Not recommended (overwritten on update) | Fully customizable |
+| **Precedence** | Lowest (fallback only) | Higher (after env and local overlay) |
+| **Version Control** | Not tracked (in node_modules) | Tracked in repo |
+
+**Example: Using package prompts**
+
+```bash
+# Install lex-pr-runner (includes @smartergpt/lex)
+npm install lex-pr-runner
+
+# Prompts are automatically available - no setup needed
+lex-pr plan --from-github
+
+# To customize: copy package prompt to local directory
+mkdir -p .smartergpt/prompts
+cp node_modules/@smartergpt/lex/prompts/idea.md .smartergpt/prompts/
+# Edit .smartergpt/prompts/idea.md as needed
 ```
 
 ## Cross-Repository Prompts Usage
