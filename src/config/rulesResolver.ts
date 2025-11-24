@@ -16,9 +16,11 @@
 export function isLexSonaAvailable(): boolean {
 	try {
 		// Try to resolve the @smartergpt/lex/rules module
+		// Using require.resolve for compatibility with current Node.js version
 		require.resolve("@smartergpt/lex/rules");
 		return true;
-	} catch {
+	} catch (error) {
+		// Package not installed or rules module not available
 		return false;
 	}
 }
@@ -103,8 +105,19 @@ export async function loadLexSonaRules(
 		
 		return rules;
 	} catch (error) {
-		// Gracefully handle errors
-		console.error("Failed to load LexSona rules:", error);
+		// Handle specific error cases for better debugging
+		if (error instanceof Error) {
+			if (error.message.includes("Cannot find module")) {
+				// Module not found - package not installed or rules not exported
+				console.error("LexSona rules module not found:", error.message);
+			} else if (error.message.includes("listRules") || error.message.includes("getRule")) {
+				// Expected functions not exported
+				console.error("LexSona rules API mismatch:", error.message);
+			} else {
+				// Other errors (parsing, etc.)
+				console.error("Failed to load LexSona rules:", error.message);
+			}
+		}
 		return [];
 	}
 }

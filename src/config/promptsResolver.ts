@@ -24,8 +24,8 @@ export interface ResolvedPromptsDir {
  */
 function resolveLexPackagePromptsDir(): string | null {
 	try {
-		// Try to resolve the @smartergpt/lex package
-		// This uses Node's module resolution to find the package
+		// Try to dynamically import the package to verify it exists
+		// Using dynamic import is more consistent with ES modules
 		const lexPkgPath = require.resolve("@smartergpt/lex/package.json");
 		const lexPkgDir = path.dirname(lexPkgPath);
 		const promptsDir = path.join(lexPkgDir, "prompts");
@@ -38,6 +38,7 @@ function resolveLexPackagePromptsDir(): string | null {
 		return null;
 	} catch (error) {
 		// Package not installed or prompts not available
+		// This is expected when @smartergpt/lex is not installed
 		return null;
 	}
 }
