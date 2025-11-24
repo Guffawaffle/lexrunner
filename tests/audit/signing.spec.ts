@@ -2,62 +2,79 @@
  * Tests for audit manifest signing (KMS + GPG)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseSignerOption, signManifest, verifyManifestSignature, computeManifestHash } from '../../src/audit/signing.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { canonicalJSONStringify } from '../../src/util/canonicalJson.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+	parseSignerOption,
+	signManifest,
+	verifyManifestSignature,
+	computeManifestHash,
+} from "../../src/audit/signing.js";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 
-describe('Audit Signing - parseSignerOption', () => {
-	it('should parse KMS signer option', () => {
-		const result = parseSignerOption('kms:arn:aws:kms:us-east-1:123456789012:key/abc-123');
+describe("Audit Signing - parseSignerOption", () => {
+	it("should parse KMS signer option", () => {
+		const result = parseSignerOption(
+			"kms:arn:aws:kms:us-east-1:123456789012:key/abc-123"
+		);
 		expect(result).toEqual({
-			provider: 'kms',
-			keyRef: 'arn:aws:kms:us-east-1:123456789012:key/abc-123'
+			provider: "kms",
+			keyRef: "arn:aws:kms:us-east-1:123456789012:key/abc-123",
 		});
 	});
 
-	it('should parse GPG signer option', () => {
-		const result = parseSignerOption('gpg:ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234');
+	it("should parse GPG signer option", () => {
+		const result = parseSignerOption(
+			"gpg:ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234"
+		);
 		expect(result).toEqual({
-			provider: 'gpg',
-			keyRef: 'ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234'
+			provider: "gpg",
+			keyRef: "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234",
 		});
 	});
 
-	it('should handle none provider', () => {
-		const result = parseSignerOption('none');
+	it("should handle none provider", () => {
+		const result = parseSignerOption("none");
 		expect(result).toEqual({
-			provider: 'none'
+			provider: "none",
 		});
 	});
 
-	it('should handle empty string', () => {
-		const result = parseSignerOption('');
+	it("should handle empty string", () => {
+		const result = parseSignerOption("");
 		expect(result).toEqual({
-			provider: 'none'
+			provider: "none",
 		});
 	});
 
-	it('should throw on invalid format', () => {
-		expect(() => parseSignerOption('invalid-format')).toThrow('Invalid signer option format');
+	it("should throw on invalid format", () => {
+		expect(() => parseSignerOption("invalid-format")).toThrow(
+			"Invalid signer option format"
+		);
 	});
 
-	it('should throw on unsupported provider', () => {
-		expect(() => parseSignerOption('unsupported:key123')).toThrow('Unsupported signing provider');
+	it("should throw on unsupported provider", () => {
+		expect(() => parseSignerOption("unsupported:key123")).toThrow(
+			"Unsupported signing provider"
+		);
 	});
 
-	it('should throw on missing key reference', () => {
-		expect(() => parseSignerOption('kms:')).toThrow('Key reference is required');
+	it("should throw on missing key reference", () => {
+		expect(() => parseSignerOption("kms:")).toThrow(
+			"Key reference is required"
+		);
 	});
 });
 
-describe('Audit Signing - computeManifestHash', () => {
+describe("Audit Signing - computeManifestHash", () => {
 	let tmpDir: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-test-'));
+		tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "lex-audit-signing-test-")
+		);
 	});
 
 	afterEach(() => {
@@ -66,40 +83,36 @@ describe('Audit Signing - computeManifestHash', () => {
 		}
 	});
 
-	it('should compute SHA-256 hash of manifest using canonical JSON', () => {
-		const manifestPath = path.join(tmpDir, 'audit-manifest.json');
+	it("should compute SHA-256 hash of manifest using canonical JSON", () => {
+		const manifestPath = path.join(tmpDir, "audit-manifest.json");
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
-			files: [
-				{ file: 'audit.ndjson', sha256: 'abc123', bytes: 100 }
-			],
-			totalBytes: 100
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
+			files: [{ file: "audit.ndjson", sha256: "abc123", bytes: 100 }],
+			totalBytes: 100,
 		};
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 		const hash = computeManifestHash(manifestPath);
-		
+
 		// Hash should be deterministic based on canonical JSON
 		expect(hash).toBeDefined();
 		expect(hash).toHaveLength(64); // SHA-256 hex string
 		expect(/^[0-9a-f]{64}$/.test(hash)).toBe(true);
 	});
 
-	it('should produce consistent hash regardless of JSON formatting', () => {
+	it("should produce consistent hash regardless of JSON formatting", () => {
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
-			files: [
-				{ file: 'audit.ndjson', sha256: 'abc123', bytes: 100 }
-			],
-			totalBytes: 100
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
+			files: [{ file: "audit.ndjson", sha256: "abc123", bytes: 100 }],
+			totalBytes: 100,
 		};
 
 		// Write with different formatting
-		const path1 = path.join(tmpDir, 'manifest1.json');
-		const path2 = path.join(tmpDir, 'manifest2.json');
-		
+		const path1 = path.join(tmpDir, "manifest1.json");
+		const path2 = path.join(tmpDir, "manifest2.json");
+
 		fs.writeFileSync(path1, JSON.stringify(manifest, null, 2)); // Pretty
 		fs.writeFileSync(path2, JSON.stringify(manifest)); // Compact
 
@@ -110,21 +123,21 @@ describe('Audit Signing - computeManifestHash', () => {
 	});
 });
 
-describe('Audit Signing - KMS mocked', () => {
+describe("Audit Signing - KMS mocked", () => {
 	let tmpDir: string;
 	let manifestPath: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-kms-'));
-		manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		
+		tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "lex-audit-signing-kms-")
+		);
+		manifestPath = path.join(tmpDir, "audit-manifest.json");
+
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
-			files: [
-				{ file: 'audit.ndjson', sha256: 'abc123', bytes: 100 }
-			],
-			totalBytes: 100
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
+			files: [{ file: "audit.ndjson", sha256: "abc123", bytes: 100 }],
+			totalBytes: 100,
 		};
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 	});
@@ -136,97 +149,101 @@ describe('Audit Signing - KMS mocked', () => {
 		vi.clearAllMocks();
 	});
 
-	it('should sign with AWS KMS (mocked)', async () => {
+	it("should sign with AWS KMS (mocked)", async () => {
 		// Mock AWS SDK with proper constructor function
 		const mockSend = vi.fn().mockResolvedValue({
-			Signature: Buffer.from('mock-signature-data')
+			Signature: Buffer.from("mock-signature-data"),
 		});
 
 		const MockKMSClient = vi.fn().mockImplementation(() => ({
-			send: mockSend
+			send: mockSend,
 		}));
 
 		const MockSignCommand = vi.fn((params) => params);
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
+		vi.doMock("@aws-sdk/client-kms", () => ({
 			KMSClient: MockKMSClient,
-			SignCommand: MockSignCommand
+			SignCommand: MockSignCommand,
 		}));
 
-		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/abc-123';
-		
+		const keyArn = "arn:aws:kms:us-east-1:123456789012:key/abc-123";
+
 		await signManifest(manifestPath, {
-			provider: 'kms',
-			keyRef: keyArn
+			provider: "kms",
+			keyRef: keyArn,
 		});
 
 		// Verify signature files were created
-		const sigPath = path.join(tmpDir, 'audit-manifest.sig');
-		const metaPath = path.join(tmpDir, 'audit-manifest.sig.meta');
+		const sigPath = path.join(tmpDir, "audit-manifest.sig");
+		const metaPath = path.join(tmpDir, "audit-manifest.sig.meta");
 
 		expect(fs.existsSync(sigPath)).toBe(true);
 		expect(fs.existsSync(metaPath)).toBe(true);
 
 		// Verify metadata structure
-		const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-		expect(metadata.provider).toBe('kms');
-		expect(metadata.algorithm).toBe('RSASSA_PSS_SHA_256');
+		const metadata = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+		expect(metadata.provider).toBe("kms");
+		expect(metadata.algorithm).toBe("RSASSA_PSS_SHA_256");
 		expect(metadata.key_ref).toBe(keyArn);
 		expect(metadata.signed_at).toBeDefined();
 		expect(metadata.manifest_sha256).toBeDefined();
 		expect(metadata.manifest_sha256).toHaveLength(64);
 
 		// Verify manifest was updated with signing metadata
-		const updatedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+		const updatedManifest = JSON.parse(
+			fs.readFileSync(manifestPath, "utf-8")
+		);
 		expect(updatedManifest.signing).toBeDefined();
-		expect(updatedManifest.signing.provider).toBe('kms');
+		expect(updatedManifest.signing.provider).toBe("kms");
 		expect(updatedManifest.signing.key_ref).toBe(keyArn);
-		expect(updatedManifest.signing.signature_file).toBe('audit.sig');
-		expect(updatedManifest.signing.metadata_file).toBe('audit.sig.meta');
+		expect(updatedManifest.signing.signature_file).toBe("audit.sig");
+		expect(updatedManifest.signing.metadata_file).toBe("audit.sig.meta");
 
-		vi.doUnmock('@aws-sdk/client-kms');
+		vi.doUnmock("@aws-sdk/client-kms");
 	});
 
-	it('should handle AWS KMS signing errors gracefully', async () => {
+	it("should handle AWS KMS signing errors gracefully", async () => {
 		// Mock AWS SDK to throw error with proper constructor function
-		const mockSend = vi.fn().mockRejectedValue(new Error('KMS key not found'));
+		const mockSend = vi
+			.fn()
+			.mockRejectedValue(new Error("KMS key not found"));
 
 		const MockKMSClient = vi.fn().mockImplementation(() => ({
-			send: mockSend
+			send: mockSend,
 		}));
 
 		const MockSignCommand = vi.fn((params) => params);
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
+		vi.doMock("@aws-sdk/client-kms", () => ({
 			KMSClient: MockKMSClient,
-			SignCommand: MockSignCommand
+			SignCommand: MockSignCommand,
 		}));
 
-		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/invalid';
+		const keyArn = "arn:aws:kms:us-east-1:123456789012:key/invalid";
 
 		await expect(
-			signManifest(manifestPath, { provider: 'kms', keyRef: keyArn })
-		).rejects.toThrow('AWS KMS signing failed');
+			signManifest(manifestPath, { provider: "kms", keyRef: keyArn })
+		).rejects.toThrow("AWS KMS signing failed");
 
-		vi.doUnmock('@aws-sdk/client-kms');
+		vi.doUnmock("@aws-sdk/client-kms");
 	});
 });
 
-describe('Audit Signing - GPG behavior', () => {
+describe("Audit Signing - GPG behavior", () => {
 	let tmpDir: string;
 	let manifestPath: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-gpg-'));
-		manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		
+		tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "lex-audit-signing-gpg-")
+		);
+		manifestPath = path.join(tmpDir, "audit-manifest.json");
+
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
-			files: [
-				{ file: 'audit.ndjson', sha256: 'abc123', bytes: 100 }
-			],
-			totalBytes: 100
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
+			files: [{ file: "audit.ndjson", sha256: "abc123", bytes: 100 }],
+			totalBytes: 100,
 		};
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 	});
@@ -238,41 +255,43 @@ describe('Audit Signing - GPG behavior', () => {
 		vi.clearAllMocks();
 	});
 
-	it('should handle GPG signing failure with missing key', async () => {
+	it("should handle GPG signing failure with missing key", async () => {
 		// This test uses real GPG, expects it to fail with missing key
-		const fingerprint = 'ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234';
+		const fingerprint = "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234";
 
 		await expect(
 			signManifest(manifestPath, {
-				provider: 'gpg',
-				keyRef: fingerprint
+				provider: "gpg",
+				keyRef: fingerprint,
 			})
-		).rejects.toThrow('GPG signing failed');
+		).rejects.toThrow("GPG signing failed");
 	});
 
-	it('should validate GPG signature structure requirements', () => {
+	it("should validate GPG signature structure requirements", () => {
 		// Test that the GPG signing metadata structure is correct
-		const fingerprint = 'ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234';
+		const fingerprint = "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234";
 		const options = parseSignerOption(`gpg:${fingerprint}`);
-		
-		expect(options.provider).toBe('gpg');
+
+		expect(options.provider).toBe("gpg");
 		expect(options.keyRef).toBe(fingerprint);
 	});
 });
 
-describe('Audit Signing - Integration with none provider', () => {
+describe("Audit Signing - Integration with none provider", () => {
 	let tmpDir: string;
 	let manifestPath: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-none-'));
-		manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		
+		tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "lex-audit-signing-none-")
+		);
+		manifestPath = path.join(tmpDir, "audit-manifest.json");
+
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
 			files: [],
-			totalBytes: 0
+			totalBytes: 0,
 		};
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 	});
@@ -283,27 +302,29 @@ describe('Audit Signing - Integration with none provider', () => {
 		}
 	});
 
-	it('should skip signing when provider is none', async () => {
-		await signManifest(manifestPath, { provider: 'none' });
+	it("should skip signing when provider is none", async () => {
+		await signManifest(manifestPath, { provider: "none" });
 
 		// No signature files should be created
-		const sigPath = path.join(tmpDir, 'audit-manifest.sig');
-		const metaPath = path.join(tmpDir, 'audit-manifest.sig.meta');
+		const sigPath = path.join(tmpDir, "audit-manifest.sig");
+		const metaPath = path.join(tmpDir, "audit-manifest.sig.meta");
 
 		expect(fs.existsSync(sigPath)).toBe(false);
 		expect(fs.existsSync(metaPath)).toBe(false);
 
 		// Manifest should remain unchanged
-		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
 		expect(manifest.signing).toBeUndefined();
 	});
 });
 
-describe('Audit Signing - Deterministic behavior', () => {
+describe("Audit Signing - Deterministic behavior", () => {
 	let tmpDir: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-det-'));
+		tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "lex-audit-signing-det-")
+		);
 	});
 
 	afterEach(() => {
@@ -312,19 +333,19 @@ describe('Audit Signing - Deterministic behavior', () => {
 		}
 	});
 
-	it('should produce deterministic manifest hash for same content', () => {
+	it("should produce deterministic manifest hash for same content", () => {
 		const manifest = {
-			schemaVersion: '1.0.0',
-			timestamp: '2025-01-01T00:00:00Z',
+			schemaVersion: "1.0.0",
+			timestamp: "2025-01-01T00:00:00Z",
 			files: [
-				{ file: 'file1.txt', sha256: 'hash1', bytes: 100 },
-				{ file: 'file2.txt', sha256: 'hash2', bytes: 200 }
+				{ file: "file1.txt", sha256: "hash1", bytes: 100 },
+				{ file: "file2.txt", sha256: "hash2", bytes: 200 },
 			],
-			totalBytes: 300
+			totalBytes: 300,
 		};
 
-		const path1 = path.join(tmpDir, 'manifest1.json');
-		const path2 = path.join(tmpDir, 'manifest2.json');
+		const path1 = path.join(tmpDir, "manifest1.json");
+		const path2 = path.join(tmpDir, "manifest2.json");
 
 		// Write with different whitespace
 		fs.writeFileSync(path1, JSON.stringify(manifest, null, 2));
@@ -336,10 +357,10 @@ describe('Audit Signing - Deterministic behavior', () => {
 		expect(hash1).toBe(hash2);
 	});
 
-	it('should use canonical JSON for hash computation', () => {
+	it("should use canonical JSON for hash computation", () => {
 		// Create two manifests with different key ordering
-		const manifestPath1 = path.join(tmpDir, 'manifest1.json');
-		const manifestPath2 = path.join(tmpDir, 'manifest2.json');
+		const manifestPath1 = path.join(tmpDir, "manifest1.json");
+		const manifestPath2 = path.join(tmpDir, "manifest2.json");
 
 		// Keys in different order
 		const manifest1 = { b: 2, a: 1 };

@@ -12,21 +12,21 @@ import { PullRequest, PullRequestDetails } from "../src/github/index.js";
 const mockOctokit = {
 	rest: {
 		repos: {
-			get: vi.fn()
+			get: vi.fn(),
 		},
 		pulls: {
 			list: vi.fn(),
 			get: vi.fn(),
-			listFiles: vi.fn()
-		}
-	}
+			listFiles: vi.fn(),
+		},
+	},
 };
 
 // Mock Octokit constructor function
 const MockOctokit = vi.fn().mockImplementation(() => mockOctokit);
 
 vi.mock("@octokit/rest", () => ({
-	Octokit: MockOctokit
+	Octokit: MockOctokit,
 }));
 
 describe("GitHub Integration", () => {
@@ -34,10 +34,10 @@ describe("GitHub Integration", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		
+
 		client = new GitHubClientImpl({
 			owner: "testowner",
-			repo: "testrepo"
+			repo: "testrepo",
 		});
 	});
 
@@ -46,8 +46,8 @@ describe("GitHub Integration", () => {
 			mockOctokit.rest.repos.get.mockResolvedValue({
 				data: {
 					default_branch: "main",
-					html_url: "https://github.com/testowner/testrepo"
-				}
+					html_url: "https://github.com/testowner/testrepo",
+				},
 			});
 
 			const repoInfo = await client.validateRepository();
@@ -56,7 +56,7 @@ describe("GitHub Integration", () => {
 				owner: "testowner",
 				repo: "testrepo",
 				defaultBranch: "main",
-				url: "https://github.com/testowner/testrepo"
+				url: "https://github.com/testowner/testrepo",
 			});
 		});
 
@@ -73,8 +73,8 @@ describe("GitHub Integration", () => {
 					draft: false,
 					user: { login: "developer1" },
 					created_at: "2023-01-01T00:00:00Z",
-					updated_at: "2023-01-02T00:00:00Z"
-				}
+					updated_at: "2023-01-02T00:00:00Z",
+				},
 			];
 
 			mockOctokit.rest.pulls.list.mockResolvedValue({ data: mockPRs });
@@ -91,7 +91,7 @@ describe("GitHub Integration", () => {
 				sort: "created",
 				direction: "desc",
 				per_page: 30,
-				page: 1
+				page: 1,
 			});
 		});
 
@@ -108,14 +108,14 @@ describe("GitHub Integration", () => {
 				mergeable: true,
 				user: { login: "developer1" },
 				createdAt: "2023-01-01T00:00:00Z",
-				updatedAt: "2023-01-02T00:00:00Z"
+				updatedAt: "2023-01-02T00:00:00Z",
 			};
 
 			const dependencies = await client.getPRDependencies(mockPR);
 
 			expect(dependencies).toEqual([
 				"testowner/testrepo#456",
-				"testowner/testrepo#789"
+				"testowner/testrepo#789",
 			]);
 		});
 
@@ -132,7 +132,7 @@ describe("GitHub Integration", () => {
 				mergeable: true,
 				user: { login: "developer1" },
 				createdAt: "2023-01-01T00:00:00Z",
-				updatedAt: "2023-01-02T00:00:00Z"
+				updatedAt: "2023-01-02T00:00:00Z",
 			};
 
 			const dependencies = await client.getPRDependencies(mockPR);
@@ -140,7 +140,7 @@ describe("GitHub Integration", () => {
 			expect(dependencies).toEqual([
 				"otherowner/otherrepo#789",
 				"testowner/testrepo#101",
-				"testowner/testrepo#456"
+				"testowner/testrepo#456",
 			]);
 		});
 
@@ -157,7 +157,7 @@ describe("GitHub Integration", () => {
 				mergeable: true,
 				user: { login: "developer1" },
 				createdAt: "2023-01-01T00:00:00Z",
-				updatedAt: "2023-01-02T00:00:00Z"
+				updatedAt: "2023-01-02T00:00:00Z",
 			};
 
 			const dependencies = await client.getPRDependencies(mockPR);
@@ -175,12 +175,12 @@ describe("GitHub Integration", () => {
 				state: "open",
 				labels: [
 					{ name: "stack:feature", color: "0052cc" },
-					{ name: "gate:typecheck", color: "ff0000" }
+					{ name: "gate:typecheck", color: "ff0000" },
 				],
 				draft: false,
 				user: { login: "developer1" },
 				created_at: "2023-01-01T00:00:00Z",
-				updated_at: "2023-01-02T00:00:00Z"
+				updated_at: "2023-01-02T00:00:00Z",
 			};
 
 			mockOctokit.rest.pulls.get.mockResolvedValue({ data: mockPRData });
@@ -190,7 +190,12 @@ describe("GitHub Integration", () => {
 			expect(prDetails.number).toBe(123);
 			expect(prDetails.dependencies).toEqual(["testowner/testrepo#456"]);
 			expect(prDetails.tags).toEqual(["feature"]);
-			expect(prDetails.requiredGates).toEqual(["custom", "lint", "test", "typecheck"]);
+			expect(prDetails.requiredGates).toEqual([
+				"custom",
+				"lint",
+				"test",
+				"typecheck",
+			]);
 		});
 	});
 
@@ -202,7 +207,7 @@ describe("GitHub Integration", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -217,7 +222,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
+						updatedAt: "2023-01-02T00:00:00Z",
 					},
 					{
 						number: 456,
@@ -231,10 +236,10 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev2" },
 						createdAt: "2023-01-03T00:00:00Z",
-						updatedAt: "2023-01-04T00:00:00Z"
-					}
+						updatedAt: "2023-01-04T00:00:00Z",
+					},
 				]),
-				getPRDetails: vi.fn()
+				getPRDetails: vi.fn(),
 			};
 
 			// Mock PR details calls
@@ -254,11 +259,11 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				})
 				.mockResolvedValueOnce({
 					number: 456,
-					title: "Feature B", 
+					title: "Feature B",
 					body: "Depends on A\n\nDepends-on: #123",
 					head: { ref: "feature-b", sha: "def789" },
 					base: { ref: "main", sha: "def456" },
@@ -271,14 +276,14 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-04T00:00:00Z",
 					dependencies: ["testowner/testrepo#123"],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				});
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				policy: {
 					requiredGates: ["lint", "test"],
-					maxWorkers: 2
-				}
+					maxWorkers: 2,
+				},
 			});
 
 			expect(plan.schemaVersion).toBe("1.0.0");
@@ -295,7 +300,10 @@ describe("GitHub Integration", () => {
 
 			// Check gates
 			expect(plan.items[0].gates).toHaveLength(2);
-			expect(plan.items[0].gates.map(g => g.name)).toEqual(["lint", "test"]);
+			expect(plan.items[0].gates.map((g) => g.name)).toEqual([
+				"lint",
+				"test",
+			]);
 
 			// Check policy
 			expect(plan.policy).toBeDefined();
@@ -309,9 +317,9 @@ describe("GitHub Integration", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
-				listOpenPRs: vi.fn().mockResolvedValue([])
+				listOpenPRs: vi.fn().mockResolvedValue([]),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any);
@@ -325,9 +333,9 @@ describe("GitHub Integration", () => {
 			const mockClient = {
 				validateRepository: vi.fn().mockResolvedValue({
 					owner: "testowner",
-					repo: "testrepo", 
+					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -342,13 +350,13 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
-					}
-				])
+						updatedAt: "2023-01-02T00:00:00Z",
+					},
+				]),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
-				includeDrafts: false
+				includeDrafts: false,
 			});
 
 			expect(plan.items).toHaveLength(0);
@@ -360,7 +368,7 @@ describe("GitHub Integration", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -375,7 +383,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
+						updatedAt: "2023-01-02T00:00:00Z",
 					},
 					{
 						number: 154,
@@ -389,7 +397,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev2" },
 						createdAt: "2023-01-02T00:00:00Z",
-						updatedAt: "2023-01-03T00:00:00Z"
+						updatedAt: "2023-01-03T00:00:00Z",
 					},
 					{
 						number: 456,
@@ -403,10 +411,10 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev3" },
 						createdAt: "2023-01-04T00:00:00Z",
-						updatedAt: "2023-01-05T00:00:00Z"
-					}
+						updatedAt: "2023-01-05T00:00:00Z",
+					},
 				]),
-				getPRDetails: vi.fn()
+				getPRDetails: vi.fn(),
 			};
 
 			// Mock PR details for non-excluded PRs only
@@ -426,7 +434,7 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				})
 				.mockResolvedValueOnce({
 					number: 456,
@@ -443,22 +451,24 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-05T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				});
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				excludePRs: [154],
 				policy: {
 					requiredGates: ["lint", "test"],
-					maxWorkers: 2
-				}
+					maxWorkers: 2,
+				},
 			});
 
 			expect(plan.items).toHaveLength(2);
 			expect(plan.items[0].name).toBe("PR-123");
 			expect(plan.items[1].name).toBe("PR-456");
 			// Verify PR-154 is not in the plan
-			expect(plan.items.find(item => item.name === "PR-154")).toBeUndefined();
+			expect(
+				plan.items.find((item) => item.name === "PR-154")
+			).toBeUndefined();
 		});
 
 		it("should exclude multiple PRs when excludePRs contains multiple numbers", async () => {
@@ -467,7 +477,7 @@ describe("GitHub Integration", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -482,7 +492,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
+						updatedAt: "2023-01-02T00:00:00Z",
 					},
 					{
 						number: 101,
@@ -496,7 +506,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev2" },
 						createdAt: "2023-01-02T00:00:00Z",
-						updatedAt: "2023-01-03T00:00:00Z"
+						updatedAt: "2023-01-03T00:00:00Z",
 					},
 					{
 						number: 102,
@@ -510,7 +520,7 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev3" },
 						createdAt: "2023-01-03T00:00:00Z",
-						updatedAt: "2023-01-04T00:00:00Z"
+						updatedAt: "2023-01-04T00:00:00Z",
 					},
 					{
 						number: 103,
@@ -524,10 +534,10 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev4" },
 						createdAt: "2023-01-04T00:00:00Z",
-						updatedAt: "2023-01-05T00:00:00Z"
-					}
+						updatedAt: "2023-01-05T00:00:00Z",
+					},
 				]),
-				getPRDetails: vi.fn()
+				getPRDetails: vi.fn(),
 			};
 
 			// Mock PR details for non-excluded PRs only (100 and 102)
@@ -547,7 +557,7 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				})
 				.mockResolvedValueOnce({
 					number: 102,
@@ -564,18 +574,22 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-04T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
+					requiredGates: [],
 				});
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
-				excludePRs: [101, 103]
+				excludePRs: [101, 103],
 			});
 
 			expect(plan.items).toHaveLength(2);
 			expect(plan.items[0].name).toBe("PR-100");
 			expect(plan.items[1].name).toBe("PR-102");
-			expect(plan.items.find(item => item.name === "PR-101")).toBeUndefined();
-			expect(plan.items.find(item => item.name === "PR-103")).toBeUndefined();
+			expect(
+				plan.items.find((item) => item.name === "PR-101")
+			).toBeUndefined();
+			expect(
+				plan.items.find((item) => item.name === "PR-103")
+			).toBeUndefined();
 		});
 
 		it("should handle excludePRs with empty array", async () => {
@@ -584,7 +598,7 @@ describe("GitHub Integration", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -599,8 +613,8 @@ describe("GitHub Integration", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
-					}
+						updatedAt: "2023-01-02T00:00:00Z",
+					},
 				]),
 				getPRDetails: vi.fn().mockResolvedValue({
 					number: 123,
@@ -617,12 +631,12 @@ describe("GitHub Integration", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
-				})
+					requiredGates: [],
+				}),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
-				excludePRs: []
+				excludePRs: [],
 			});
 
 			expect(plan.items).toHaveLength(1);
@@ -634,44 +648,46 @@ describe("GitHub Integration", () => {
 		it("should analyze file changes for GitHub PRs", async () => {
 			// Reset and setup mock
 			vi.resetAllMocks();
-			
+
 			const localMockOctokit = {
 				rest: {
 					pulls: {
-						listFiles: vi.fn()
-					}
-				}
+						listFiles: vi.fn(),
+					},
+				},
 			};
 
 			// Mock file changes implementation
-			localMockOctokit.rest.pulls.listFiles.mockImplementation(async ({ pull_number }: any) => {
-				if (pull_number === 201) {
-					return {
-						data: [
-							{
-								filename: "src/shared.ts",
-								status: "modified",
-								additions: 20,
-								deletions: 10,
-								changes: 30
-							}
-						]
-					};
-				} else if (pull_number === 202) {
-					return {
-						data: [
-							{
-								filename: "src/shared.ts",
-								status: "modified",
-								additions: 15,
-								deletions: 8,
-								changes: 23
-							}
-						]
-					};
+			localMockOctokit.rest.pulls.listFiles.mockImplementation(
+				async ({ pull_number }: any) => {
+					if (pull_number === 201) {
+						return {
+							data: [
+								{
+									filename: "src/shared.ts",
+									status: "modified",
+									additions: 20,
+									deletions: 10,
+									changes: 30,
+								},
+							],
+						};
+					} else if (pull_number === 202) {
+						return {
+							data: [
+								{
+									filename: "src/shared.ts",
+									status: "modified",
+									additions: 15,
+									deletions: 8,
+									changes: 23,
+								},
+							],
+						};
+					}
+					return { data: [] };
 				}
-				return { data: [] };
-			});
+			);
 
 			// Mock client with required methods
 			const mockClient = {
@@ -681,7 +697,7 @@ describe("GitHub Integration", () => {
 				validateRepository: vi.fn(),
 				getOctokit: vi.fn(() => localMockOctokit),
 				getOwner: vi.fn(() => "testowner"),
-				getRepo: vi.fn(() => "testrepo")
+				getRepo: vi.fn(() => "testrepo"),
 			};
 
 			// Mock PR details
@@ -700,7 +716,7 @@ describe("GitHub Integration", () => {
 				updatedAt: "2023-01-02T00:00:00Z",
 				dependencies: [],
 				tags: [],
-				requiredGates: []
+				requiredGates: [],
 			};
 
 			const pr2: PullRequestDetails = {
@@ -718,15 +734,25 @@ describe("GitHub Integration", () => {
 				updatedAt: "2023-01-04T00:00:00Z",
 				dependencies: [],
 				tags: [],
-				requiredGates: []
+				requiredGates: [],
 			};
 
-			const { analyzeGitHubPRFiles } = await import("../src/core/githubPlan.js");
-			const analysis = await analyzeGitHubPRFiles(mockClient as any, [pr1, pr2]);
+			const { analyzeGitHubPRFiles } = await import(
+				"../src/core/githubPlan.js"
+			);
+			const analysis = await analyzeGitHubPRFiles(mockClient as any, [
+				pr1,
+				pr2,
+			]);
 
 			expect(analysis.fileIntersections).toHaveLength(1);
-			expect(analysis.fileIntersections[0].prs).toEqual(["PR-201", "PR-202"]);
-			expect(analysis.fileIntersections[0].files).toEqual(["src/shared.ts"]);
+			expect(analysis.fileIntersections[0].prs).toEqual([
+				"PR-201",
+				"PR-202",
+			]);
+			expect(analysis.fileIntersections[0].files).toEqual([
+				"src/shared.ts",
+			]);
 			expect(analysis.suggestions).toHaveLength(1);
 			expect(analysis.conflicts).toHaveLength(1);
 		});

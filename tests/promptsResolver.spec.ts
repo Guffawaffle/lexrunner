@@ -10,7 +10,7 @@ import {
 	resolvePromptsDir,
 	loadPrompt,
 	expandPromptTokens,
-	PromptsResolverError
+	PromptsResolverError,
 } from "../src/config/promptsResolver.js";
 import { initTestGitRepo, gitAdd, gitCommit } from "./helpers/gitTestUtils.js";
 
@@ -44,8 +44,12 @@ describe("Prompts Resolver", () => {
 			process.env.LEX_PROMPTS_DIR = envDir;
 
 			// Create other directories to test precedence
-			fs.mkdirSync(path.join(testDir, ".smartergpt.local/prompts"), { recursive: true });
-			fs.mkdirSync(path.join(testDir, ".smartergpt/prompts"), { recursive: true });
+			fs.mkdirSync(path.join(testDir, ".smartergpt.local/prompts"), {
+				recursive: true,
+			});
+			fs.mkdirSync(path.join(testDir, ".smartergpt/prompts"), {
+				recursive: true,
+			});
 
 			const resolved = resolvePromptsDir(testDir);
 
@@ -57,8 +61,12 @@ describe("Prompts Resolver", () => {
 			const nonExistentDir = path.join(testDir, "non-existent");
 			process.env.LEX_PROMPTS_DIR = nonExistentDir;
 
-			expect(() => resolvePromptsDir(testDir)).toThrow(PromptsResolverError);
-			expect(() => resolvePromptsDir(testDir)).toThrow(/LEX_PROMPTS_DIR not found/);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				PromptsResolverError
+			);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				/LEX_PROMPTS_DIR not found/
+			);
 		});
 
 		it("should resolve .smartergpt.local/prompts when no env var (second precedence)", () => {
@@ -68,7 +76,9 @@ describe("Prompts Resolver", () => {
 			fs.mkdirSync(localDir, { recursive: true });
 
 			// Create tracked canon as well
-			fs.mkdirSync(path.join(testDir, ".smartergpt/prompts"), { recursive: true });
+			fs.mkdirSync(path.join(testDir, ".smartergpt/prompts"), {
+				recursive: true,
+			});
 
 			const resolved = resolvePromptsDir(testDir);
 
@@ -91,11 +101,19 @@ describe("Prompts Resolver", () => {
 		it("should throw error with helpful message when no prompts directory found", () => {
 			delete process.env.LEX_PROMPTS_DIR;
 
-			expect(() => resolvePromptsDir(testDir)).toThrow(PromptsResolverError);
-			expect(() => resolvePromptsDir(testDir)).toThrow(/Prompts directory not found/);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				PromptsResolverError
+			);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				/Prompts directory not found/
+			);
 			expect(() => resolvePromptsDir(testDir)).toThrow(/LEX_PROMPTS_DIR/);
-			expect(() => resolvePromptsDir(testDir)).toThrow(/\.smartergpt\.local\/prompts/);
-			expect(() => resolvePromptsDir(testDir)).toThrow(/\.smartergpt\/prompts/);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				/\.smartergpt\.local\/prompts/
+			);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				/\.smartergpt\/prompts/
+			);
 		});
 
 		it("should resolve absolute paths correctly", () => {
@@ -128,8 +146,12 @@ describe("Prompts Resolver", () => {
 			const promptsDir = path.join(testDir, ".smartergpt/prompts");
 			fs.mkdirSync(promptsDir, { recursive: true });
 
-			expect(() => loadPrompt("nonexistent", testDir)).toThrow(PromptsResolverError);
-			expect(() => loadPrompt("nonexistent", testDir)).toThrow(/Prompt not found: nonexistent/);
+			expect(() => loadPrompt("nonexistent", testDir)).toThrow(
+				PromptsResolverError
+			);
+			expect(() => loadPrompt("nonexistent", testDir)).toThrow(
+				/Prompt not found: nonexistent/
+			);
 		});
 
 		it("should extract metadata from frontmatter", () => {
@@ -202,7 +224,9 @@ Workspace: {{workspace_root}}`;
 			const expanded = expandPromptTokens(content, testDir);
 
 			// Should be in format YYYY-MM-DDTHH-MM-SS-mmm (no colons, no dots, no Z)
-			expect(expanded).toMatch(/Timestamp: \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}$/);
+			expect(expanded).toMatch(
+				/Timestamp: \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}$/
+			);
 			// Should not contain the original token
 			expect(expanded).not.toContain("{{now}}");
 		});
@@ -214,24 +238,25 @@ Workspace: {{workspace_root}}`;
 			expect(expanded).toBe(`Workspace: ${testDir}`);
 		});
 
-	it("should expand {{repo_root}} to git repository root", () => {
-		// Initialize a git repo
-		initTestGitRepo(testDir, "main");
+		it("should expand {{repo_root}} to git repository root", () => {
+			// Initialize a git repo
+			initTestGitRepo(testDir, "main");
 
-		const content = "Repo: {{repo_root}}";
-		const expanded = expandPromptTokens(content, testDir);
+			const content = "Repo: {{repo_root}}";
+			const expanded = expandPromptTokens(content, testDir);
 
-		expect(expanded).toBe(`Repo: ${testDir}`);
-	});
+			expect(expanded).toBe(`Repo: ${testDir}`);
+		});
 
-	it("should expand {{branch}} to current git branch", () => {
-		// Initialize a git repo with a branch
-		initTestGitRepo(testDir, "main");
-		
-		// Create initial commit so branch is established
-		fs.writeFileSync(path.join(testDir, "test.txt"), "test");
-		gitAdd(testDir);
-		gitCommit(testDir, "initial");			const content = "Branch: {{branch}}";
+		it("should expand {{branch}} to current git branch", () => {
+			// Initialize a git repo with a branch
+			initTestGitRepo(testDir, "main");
+
+			// Create initial commit so branch is established
+			fs.writeFileSync(path.join(testDir, "test.txt"), "test");
+			gitAdd(testDir);
+			gitCommit(testDir, "initial");
+			const content = "Branch: {{branch}}";
 			const expanded = expandPromptTokens(content, testDir);
 
 			// Should have some branch name (main, master, or other)
@@ -239,12 +264,13 @@ Workspace: {{workspace_root}}`;
 			expect(expanded).not.toBe("Branch: ");
 		});
 
-	it("should expand {{commit}} to current git commit SHA", () => {
-		// Initialize git repo with a commit
-		initTestGitRepo(testDir, "main");
-		fs.writeFileSync(path.join(testDir, "test.txt"), "test");
-		gitAdd(testDir);
-		gitCommit(testDir, "test");			const content = "Commit: {{commit}}";
+		it("should expand {{commit}} to current git commit SHA", () => {
+			// Initialize git repo with a commit
+			initTestGitRepo(testDir, "main");
+			fs.writeFileSync(path.join(testDir, "test.txt"), "test");
+			gitAdd(testDir);
+			gitCommit(testDir, "test");
+			const content = "Commit: {{commit}}";
 			const expanded = expandPromptTokens(content, testDir);
 
 			expect(expanded).toMatch(/Commit: [0-9a-f]{40}/);
@@ -286,7 +312,10 @@ Time: {{now}}`;
 			fs.mkdirSync(lexPromptsDir, { recursive: true });
 
 			const lexPrompt = "# Lex Prompt\n\nFrom Lex repository";
-			fs.writeFileSync(path.join(lexPromptsDir, "lex-prompt.md"), lexPrompt);
+			fs.writeFileSync(
+				path.join(lexPromptsDir, "lex-prompt.md"),
+				lexPrompt
+			);
 
 			// Simulate LexRunner repo
 			const runnerRepoDir = path.join(testDir, "runner-repo");
@@ -313,8 +342,13 @@ Time: {{now}}`;
 
 			// Simulate LexRunner repo with symlink
 			const runnerRepoDir = path.join(testDir, "runner-repo");
-			const runnerLocalPromptsDir = path.join(runnerRepoDir, ".smartergpt.local/prompts");
-			fs.mkdirSync(path.dirname(runnerLocalPromptsDir), { recursive: true });
+			const runnerLocalPromptsDir = path.join(
+				runnerRepoDir,
+				".smartergpt.local/prompts"
+			);
+			fs.mkdirSync(path.dirname(runnerLocalPromptsDir), {
+				recursive: true,
+			});
 
 			// Create symlink
 			fs.symlinkSync(lexPromptsDir, runnerLocalPromptsDir, "dir");
@@ -336,7 +370,10 @@ Time: {{now}}`;
 
 			// Simulate LexRunner repo
 			const runnerRepoDir = path.join(testDir, "runner-repo");
-			const runnerLocalPromptsDir = path.join(runnerRepoDir, ".smartergpt.local/prompts");
+			const runnerLocalPromptsDir = path.join(
+				runnerRepoDir,
+				".smartergpt.local/prompts"
+			);
 			fs.mkdirSync(runnerLocalPromptsDir, { recursive: true });
 
 			// Copy prompt
@@ -349,7 +386,9 @@ Time: {{now}}`;
 			const loaded = loadPrompt("copied", runnerRepoDir);
 
 			expect(loaded.content).toContain("From Lex");
-			expect(loaded.path).toBe(path.join(runnerLocalPromptsDir, "copied.md"));
+			expect(loaded.path).toBe(
+				path.join(runnerLocalPromptsDir, "copied.md")
+			);
 		});
 	});
 
@@ -363,7 +402,9 @@ Time: {{now}}`;
 			} catch (error) {
 				if (error instanceof PromptsResolverError) {
 					expect(error.message).toContain("LEX_PROMPTS_DIR");
-					expect(error.message).toContain(".smartergpt.local/prompts");
+					expect(error.message).toContain(
+						".smartergpt.local/prompts"
+					);
 					expect(error.message).toContain(".smartergpt/prompts");
 				} else {
 					throw error;
@@ -380,7 +421,9 @@ Time: {{now}}`;
 				expect.fail("Should have thrown error");
 			} catch (error) {
 				if (error instanceof PromptsResolverError) {
-					expect(error.message).toContain("Prompt not found: missing");
+					expect(error.message).toContain(
+						"Prompt not found: missing"
+					);
 					expect(error.message).toContain(".smartergpt/prompts");
 				} else {
 					throw error;
