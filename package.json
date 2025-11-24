@@ -57,6 +57,8 @@
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
 		"ci:debug": "bash scripts/ci-debug.sh",
+		"ci:local": "bash scripts/test-ci-local.sh",
+		"ci:docker": "bash scripts/docker-ci.sh",
 		"test:run": "vitest run"
 	},
 	"dependencies": {
