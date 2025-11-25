@@ -52,6 +52,21 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 
+// Senior Dev executor imports
+import {
+	prepareReviewContext,
+	recallSeniorDevContext,
+	captureSeniorDevFrame,
+	EXECUTOR_MODES,
+} from "../executors/seniorDev/index.js";
+import type {
+	PrepareContextInput,
+	RecallContextInput,
+	CaptureFrameInput,
+	RecallQueryType,
+	Severity,
+} from "../executors/seniorDev/index.js";
+
 /**
  * Create and configure the MCP server
  */
@@ -74,7 +89,8 @@ function createServer(): Server {
 			tools: [
 				{
 					name: "plan.create",
-					description: "Create a plan from configuration files or auto-discover from GitHub PRs",
+					description:
+						"Create a plan from configuration files or auto-discover from GitHub PRs",
 					inputSchema: {
 						type: "object",
 						properties: {
@@ -90,12 +106,14 @@ function createServer(): Server {
 							},
 							fromGithub: {
 								type: "boolean",
-								description: "Auto-discover PRs from GitHub API",
+								description:
+									"Auto-discover PRs from GitHub API",
 								default: false,
 							},
 							query: {
 								type: "string",
-								description: "GitHub search query (e.g., 'is:open label:stack:*')",
+								description:
+									"GitHub search query (e.g., 'is:open label:stack:*')",
 							},
 							labels: {
 								type: "array",
@@ -118,30 +136,36 @@ function createServer(): Server {
 							},
 							githubToken: {
 								type: "string",
-								description: "GitHub API token (or use GITHUB_TOKEN env var)",
+								description:
+									"GitHub API token (or use GITHUB_TOKEN env var)",
 							},
 							owner: {
 								type: "string",
-								description: "GitHub repository owner (auto-detected from git remote)",
+								description:
+									"GitHub repository owner (auto-detected from git remote)",
 							},
 							repo: {
 								type: "string",
-								description: "GitHub repository name (auto-detected from git remote)",
+								description:
+									"GitHub repository name (auto-detected from git remote)",
 							},
 							requiredGates: {
 								type: "array",
-								description: "List of required gates (default: lint,typecheck,test)",
+								description:
+									"List of required gates (default: lint,typecheck,test)",
 								items: {
 									type: "string",
 								},
 							},
 							maxWorkers: {
 								type: "number",
-								description: "Maximum parallel workers for execution (default: 2)",
+								description:
+									"Maximum parallel workers for execution (default: 2)",
 							},
 							target: {
 								type: "string",
-								description: "Target branch for merging PRs (default: repo default branch)",
+								description:
+									"Target branch for merging PRs (default: repo default branch)",
 							},
 						},
 					},
@@ -236,6 +260,150 @@ function createServer(): Server {
 						},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// Senior Dev Executor Tools
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "senior-dev.prepare-context",
+					description:
+						"Phase 1: Gather deterministic artifacts for code review (lint, typecheck, tests, diff, PR metadata)",
+					inputSchema: {
+						type: "object",
+						properties: {
+							pr_number: {
+								type: "string",
+								description: "PR number to prepare context for",
+							},
+							base_branch: {
+								type: "string",
+								description:
+									"Base branch for diff (default: main)",
+								default: "main",
+							},
+							output_dir: {
+								type: "string",
+								description:
+									"Output directory for artifacts (default: /tmp/senior-dev-review-...)",
+							},
+							skip_tests: {
+								type: "boolean",
+								description: "Skip running tests",
+								default: false,
+							},
+							skip_lint: {
+								type: "boolean",
+								description: "Skip running lint",
+								default: false,
+							},
+							skip_typecheck: {
+								type: "boolean",
+								description: "Skip running typecheck",
+								default: false,
+							},
+						},
+						required: ["pr_number"],
+					},
+				},
+				{
+					name: "senior-dev.recall-context",
+					description:
+						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns)",
+					inputSchema: {
+						type: "object",
+						properties: {
+							query_type: {
+								type: "string",
+								enum: ["module", "developer", "pattern", "pr"],
+								description:
+									"Type of query: module, developer, pattern, or pr",
+							},
+							query: {
+								type: "string",
+								description:
+									"Query value (required for module, developer, pr; optional for pattern)",
+							},
+							limit: {
+								type: "number",
+								description:
+									"Maximum frames to return (default: 10)",
+								default: 10,
+							},
+						},
+						required: ["query_type"],
+					},
+				},
+				{
+					name: "senior-dev.capture-frame",
+					description:
+						"Phase 4: Capture review session as a Frame in Lex memory (the receipt)",
+					inputSchema: {
+						type: "object",
+						properties: {
+							pr_number: {
+								type: "string",
+								description: "PR number being reviewed",
+							},
+							module: {
+								type: "string",
+								description:
+									"Primary module (must match lexmap.policy.json)",
+							},
+							summary: {
+								type: "string",
+								description:
+									"One-line summary of review findings",
+							},
+							next_action: {
+								type: "string",
+								description: "Follow-up action required",
+							},
+							developer: {
+								type: "string",
+								description:
+									"Developer name for tracking (default: unknown)",
+								default: "unknown",
+							},
+							severity: {
+								type: "string",
+								enum: [
+									"blocker",
+									"must-fix",
+									"should-fix",
+									"nit",
+									"praise",
+									"review",
+								],
+								description:
+									"Highest severity level (default: review)",
+								default: "review",
+							},
+							jira: {
+								type: "string",
+								description: "Jira ticket ID if applicable",
+							},
+							blockers: {
+								type: "array",
+								items: { type: "string" },
+								description: "List of blockers",
+							},
+						},
+						required: [
+							"pr_number",
+							"module",
+							"summary",
+							"next_action",
+						],
+					},
+				},
+				{
+					name: "senior-dev.modes",
+					description:
+						"List available executor modes (triage, deep_review, pattern_mining, mentorship)",
+					inputSchema: {
+						type: "object",
+						properties: {},
+					},
+				},
 			],
 		};
 	});
@@ -262,6 +430,25 @@ function createServer(): Server {
 
 			case "health":
 				return await handleHealth(args as { includeMetrics?: boolean });
+
+			// Senior Dev executor tools
+			case "senior-dev.prepare-context":
+				return await handleSeniorDevPrepareContext(
+					args as unknown as PrepareContextInput
+				);
+
+			case "senior-dev.recall-context":
+				return await handleSeniorDevRecallContext(
+					args as unknown as RecallContextInput
+				);
+
+			case "senior-dev.capture-frame":
+				return await handleSeniorDevCaptureFrame(
+					args as unknown as CaptureFrameInput
+				);
+
+			case "senior-dev.modes":
+				return await handleSeniorDevModes();
 
 			default:
 				throw new McpError(
@@ -302,14 +489,20 @@ async function handlePlanCreate(
 				if (!args.query && detection.scopeConfig?.query) {
 					args.query = detection.scopeConfig.query;
 				}
-				if (!args.labels && detection.scopeConfig?.labels && detection.scopeConfig.labels.length > 0) {
+				if (
+					!args.labels &&
+					detection.scopeConfig?.labels &&
+					detection.scopeConfig.labels.length > 0
+				) {
 					args.labels = detection.scopeConfig.labels;
 				}
 				if (!args.target && detection.scopeConfig?.target) {
 					args.target = detection.scopeConfig.target;
 				}
-				
-				console.error('[mcp:plan.create] Auto-detected GitHub mode from scope.yml filters');
+
+				console.error(
+					"[mcp:plan.create] Auto-detected GitHub mode from scope.yml filters"
+				);
 			}
 		}
 
@@ -318,11 +511,15 @@ async function handlePlanCreate(
 			const client = await createGitHubClient({
 				token: args.githubToken,
 				owner: args.owner,
-				repo: args.repo
+				repo: args.repo,
 			});
 
 			// Parse required gates if provided
-			const requiredGates = args.requiredGates || ["lint", "typecheck", "test"];
+			const requiredGates = args.requiredGates || [
+				"lint",
+				"typecheck",
+				"test",
+			];
 
 			// Parse max workers if provided
 			const maxWorkers = args.maxWorkers || 2;
@@ -336,20 +533,28 @@ async function handlePlanCreate(
 				target: args.target,
 				policy: {
 					requiredGates,
-					maxWorkers
-				}
+					maxWorkers,
+				},
 			});
 
 			// Log discovery results to stderr
 			const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
-			const filterInfo = args.labels ? ` labels=${args.labels.join(',')}` : '';
-			const queryInfo = args.query ? ` query="${args.query}"` : '';
-			console.error(`[mcp:plan.create] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length} PRs`);
-			
+			const filterInfo = args.labels
+				? ` labels=${args.labels.join(",")}`
+				: "";
+			const queryInfo = args.query ? ` query="${args.query}"` : "";
+			console.error(
+				`[mcp:plan.create] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length} PRs`
+			);
+
 			if (plan.items.length === 0) {
-				console.error(`[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`);
+				console.error(
+					`[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`
+				);
 			} else {
-				const prNumbers = plan.items.map(item => item.name).join(', ');
+				const prNumbers = plan.items
+					.map((item) => item.name)
+					.join(", ");
 				console.error(`[mcp:plan.create] PRs included: ${prNumbers}`);
 			}
 		} else {
@@ -381,7 +586,9 @@ async function handlePlanCreate(
 		} else {
 			// In traditional mode, inputs is guaranteed to be set
 			if (!inputs) {
-				throw new Error("Internal error: inputs not loaded in traditional mode");
+				throw new Error(
+					"Internal error: inputs not loaded in traditional mode"
+				);
 			}
 			snapshot = generateSnapshot(plan, inputs);
 		}
@@ -438,12 +645,17 @@ async function handleGatesRun(
 			outDirBase = path.dirname(args.planFile);
 		} else {
 			// Resolve profile directory for internal state
-			const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
+			const resolved = resolveProfile(
+				env.LEX_PR_PROFILE_DIR,
+				process.cwd()
+			);
 
 			// Load plan from resolved profile directory
 			planPath = path.join(resolved.path, "runner", "plan.json");
 			if (!fs.existsSync(planPath)) {
-				throw new Error("No plan found. Run plan.create first or provide planFile parameter.");
+				throw new Error(
+					"No plan found. Run plan.create first or provide planFile parameter."
+				);
 			}
 
 			outDirBase = path.join(resolved.path, "runner");
@@ -466,8 +678,7 @@ async function handleGatesRun(
 		const executionState = new ExecutionState(plan);
 
 		// Determine output directory
-		const outDir =
-			args.outDir || path.join(outDirBase, "gates");
+		const outDir = args.outDir || path.join(outDirBase, "gates");
 
 		// Execute gates (this modifies executionState in place)
 		await executeGatesWithPolicy(plan, executionState, outDir);
@@ -543,10 +754,10 @@ async function handleMergeApply(
 
 		// Resolve profile directory first to check role
 		const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
-		
+
 		// Validate CI environment if role is 'ci'
 		validateCIEnvironment(resolved.manifest);
-		
+
 		// Get CI-aware mutation policy
 		const allowMutations = getCIMutationPolicy(resolved.manifest);
 
@@ -735,6 +946,98 @@ async function main() {
 	await new Promise<void>(() => {
 		// This promise never resolves, keeping the process alive
 	});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Senior Dev Executor Handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Handle senior-dev.prepare-context tool
+ */
+async function handleSeniorDevPrepareContext(
+	args: PrepareContextInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		const result = await prepareReviewContext(args);
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to prepare review context: ${(error as Error).message}`
+		);
+	}
+}
+
+/**
+ * Handle senior-dev.recall-context tool
+ */
+async function handleSeniorDevRecallContext(
+	args: RecallContextInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		const result = await recallSeniorDevContext(args);
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to recall context: ${(error as Error).message}`
+		);
+	}
+}
+
+/**
+ * Handle senior-dev.capture-frame tool
+ */
+async function handleSeniorDevCaptureFrame(
+	args: CaptureFrameInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		const result = await captureSeniorDevFrame(args);
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to capture frame: ${(error as Error).message}`
+		);
+	}
+}
+
+/**
+ * Handle senior-dev.modes tool
+ */
+async function handleSeniorDevModes(): Promise<{
+	content: [{ type: "text"; text: string }];
+}> {
+	return {
+		content: [
+			{
+				type: "text",
+				text: JSON.stringify(EXECUTOR_MODES, null, 2),
+			},
+		],
+	};
 }
 
 // Handle uncaught errors

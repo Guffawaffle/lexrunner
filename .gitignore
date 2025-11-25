@@ -3,6 +3,10 @@ node_modules/
 dist/
 coverage/
 
+# Project workspaces (local-only, never tracked)
+project/
+project/**
+
 # Environment and IDE
 .env
 .DS_Store

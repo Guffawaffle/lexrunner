@@ -71,6 +71,7 @@ import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
 import { registerCreateProjectCommand } from "./commands/create-project.js";
+import { registerSeniorDevCommand } from "./commands/seniorDev.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -453,6 +454,9 @@ registerConfigValidateCommand(program, () => jsonModeActive);
 // Idea command - feature idea capture
 registerIdeaCommand(program);
 
+// Senior Dev executor commands
+registerSeniorDevCommand(program, () => jsonModeActive);
+
 // Init command - Interactive workspace setup
 program
 	.command("init")
@@ -654,15 +658,21 @@ program
 program
 	.command("migrate-profile")
 	.description("Migrate profile configuration structure")
-	.option("--from-flat", "Migrate from flat structure to runner/ subdirectory")
+	.option(
+		"--from-flat",
+		"Migrate from flat structure to runner/ subdirectory"
+	)
 	.option("--dry-run", "Show what would be migrated without making changes")
-	.option("--profile-dir <path>", "Profile directory to migrate (default: auto-detect)")
+	.option(
+		"--profile-dir <path>",
+		"Profile directory to migrate (default: auto-detect)"
+	)
 	.action(async (opts) => {
 		try {
 			const result = await runMigrateProfile({
 				fromFlat: opts.fromFlat,
 				dryRun: opts.dryRun,
-				profileDir: opts.profileDir
+				profileDir: opts.profileDir,
 			});
 
 			if (opts.json || jsonModeActive) {
@@ -672,7 +682,7 @@ program
 						message: result.message,
 						migratedFiles: result.migratedFiles,
 						backupPath: result.backupPath,
-						skippedFiles: result.skippedFiles
+						skippedFiles: result.skippedFiles,
 					})
 				);
 			} else {
@@ -680,18 +690,22 @@ program
 					if (result.migratedFiles.length > 0) {
 						console.log("✅ Migration successful!");
 						console.log("");
-						console.log(`📦 Migrated ${result.migratedFiles.length} file(s):`);
-						result.migratedFiles.forEach(file => {
+						console.log(
+							`📦 Migrated ${result.migratedFiles.length} file(s):`
+						);
+						result.migratedFiles.forEach((file) => {
 							console.log(`  ✓ ${file}`);
 						});
 						if (result.backupPath) {
 							console.log("");
-							console.log(`💾 Backup created: ${result.backupPath}`);
+							console.log(
+								`💾 Backup created: ${result.backupPath}`
+							);
 						}
 						if (result.skippedFiles.length > 0) {
 							console.log("");
 							console.log("ℹ️  Skipped files:");
-							result.skippedFiles.forEach(file => {
+							result.skippedFiles.forEach((file) => {
 								console.log(`  • ${file}`);
 							});
 						}
