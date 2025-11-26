@@ -105,6 +105,9 @@ export class RunManager {
 	/**
 	 * List runs with optional filtering
 	 *
+	 * Note: Filters are applied to the index first, so only matching entries
+	 * are loaded. Use the `limit` filter to control the number of runs loaded.
+	 *
 	 * @param filter - Optional filter criteria
 	 * @returns Array of RunState objects matching the filter
 	 */
