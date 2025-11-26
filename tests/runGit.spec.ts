@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 import {
 	runGit,
 	getCurrentBranch,
@@ -184,8 +186,6 @@ describe("runGit wrapper", () => {
 			const root = getRepositoryRoot();
 			expect(root).toBeTruthy();
 			// Verify it's a valid git repository root by checking for .git directory
-			const fs = require("fs");
-			const path = require("path");
 			expect(fs.existsSync(path.join(root, ".git"))).toBe(true);
 		});
 
