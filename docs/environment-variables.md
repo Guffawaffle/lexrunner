@@ -66,6 +66,64 @@ export ALLOW_MUTATIONS=true
 lex-pr-runner-mcp
 ```
 
+### Git Runtime Control
+
+#### `LEX_GIT_MODE`
+
+Controls whether git operations are enabled. Default is "off" for safe CI/ephemeral environment behavior.
+
+- **Type:** String (`"off"` | `"live"`)
+- **Default:** `"off"`
+- **Case Sensitivity:** Case-insensitive
+
+**Behavior:**
+| Value | Git Operations | Use Case |
+|-------|---------------|----------|
+| `off` (default) | Disabled, returns safe fallbacks | CI/CD, ephemeral environments, testing |
+| `live` | Enabled, executes actual git commands | Local development, git-dependent workflows |
+
+**Example:**
+```bash
+# Enable git operations for local development
+export LEX_GIT_MODE=live
+lex-pr plan
+
+# CI/CD (default - git disabled)
+# LEX_GIT_MODE not set → defaults to "off"
+```
+
+#### `LEX_DEFAULT_BRANCH`
+
+Fallback branch name when git is disabled or unavailable.
+
+- **Type:** String
+- **Default:** `"main"`
+- **Used When:** `LEX_GIT_MODE=off` or git commands fail
+
+**Example:**
+```bash
+export LEX_GIT_MODE=off
+export LEX_DEFAULT_BRANCH=develop
+# Branch tokens will resolve to "develop"
+```
+
+#### `LEX_DEFAULT_COMMIT`
+
+Fallback commit SHA when git is disabled or unavailable.
+
+- **Type:** String (typically 40-character hex)
+- **Default:** `"0000000000000000000000000000000000000000"` (40 zeros)
+- **Used When:** `LEX_GIT_MODE=off` or git commands fail
+
+**Example:**
+```bash
+export LEX_GIT_MODE=off
+export LEX_DEFAULT_COMMIT=abc123def456789012345678901234567890abcd
+# Commit tokens will resolve to the custom value
+```
+
+**See Also:** [Git Feature Flag Spec](specs/git-feature-flag-redesign.md)
+
 ### CI/CD Integration
 
 #### `GITHUB_TOKEN` / `GH_TOKEN`

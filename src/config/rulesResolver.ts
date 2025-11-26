@@ -8,10 +8,6 @@
  * @module config/rulesResolver
  */
 
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-
 /**
  * Check if LexSona rules are available from the Lex package
  *
@@ -60,6 +56,19 @@ export interface BehavioralRule {
 }
 
 /**
+ * Rule structure from Lex package (may vary by version)
+ */
+interface ResolvedRule {
+	id?: string;
+	title?: string;
+	description?: string;
+	content?: string;
+	guidance?: string;
+	scope?: RuleScope;
+	priority?: number;
+}
+
+/**
  * Load LexSona behavioral rules (when enabled)
  *
  * This is a preparation for v0.5.0 when LexSona rules will be fully integrated.
@@ -71,9 +80,10 @@ export interface BehavioralRule {
  */
 export async function loadLexSonaRules(
 	scope?: RuleScope,
+	// TODO: Enable in v0.5.0 - tracked by LexSona integration epic
 	enabled: boolean = false
 ): Promise<BehavioralRule[]> {
-	// Feature flag: LexSona not enabled yet
+	// Feature flag: LexSona not enabled yet (v0.5.0 target)
 	if (!enabled) {
 		return [];
 	}
@@ -86,7 +96,10 @@ export async function loadLexSonaRules(
 	try {
 		// Dynamic import of rules module
 		// This will be used in v0.5.0 when the feature is fully enabled
-		const rulesModule = await import("@smartergpt/lex/rules");
+		const rulesModule = (await import("@smartergpt/lex/rules")) as {
+			listRules?: () => string[];
+			getRule?: (name: string) => ResolvedRule | null;
+		};
 
 		// List available rules
 		const ruleNames = rulesModule.listRules ? rulesModule.listRules() : [];
@@ -98,28 +111,13 @@ export async function loadLexSonaRules(
 				? rulesModule.getRule(ruleName)
 				: null;
 			if (rule) {
-				// Map Lex package rule format to local BehavioralRule format
-				// Lex package uses: rule_id, text, category, scope: { agent_family, ... }
 				rules.push({
-					id: (rule as any).rule_id || (rule as any).id || ruleName,
-					title:
-						(rule as any).category ||
-						(rule as any).title ||
-						ruleName,
-					description: (rule as any).description || "",
-					content:
-						(rule as any).text ||
-						(rule as any).content ||
-						(rule as any).guidance ||
-						"",
-					scope: {
-						environment: (rule as any).scope?.environment,
-						project: (rule as any).scope?.project,
-						agentFamily:
-							(rule as any).scope?.agent_family ||
-							(rule as any).scope?.agentFamily,
-					},
-					priority: (rule as any).priority,
+					id: rule.id || ruleName,
+					title: rule.title || ruleName,
+					description: rule.description || "",
+					content: rule.content || rule.guidance || "",
+					scope: rule.scope,
+					priority: rule.priority,
 				});
 			}
 		}

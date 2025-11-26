@@ -13,6 +13,7 @@
 import { execSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { getCurrentBranch as getGitBranch } from "../../shared/git/runGit.js";
 import type {
 	PrepareContextInput,
 	PrepareContextResult,
@@ -76,14 +77,8 @@ function runCommand(
 }
 
 function getCurrentBranch(cwd?: string): string {
-	try {
-		return execSync("git rev-parse --abbrev-ref HEAD", {
-			cwd,
-			encoding: "utf8",
-		}).trim();
-	} catch {
-		return "unknown";
-	}
+	const branch = getGitBranch(cwd);
+	return branch || "unknown";
 }
 
 function detectModulesFromFiles(files: string[]): string[] {
