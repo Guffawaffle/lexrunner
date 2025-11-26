@@ -10,9 +10,11 @@ import type {
 	RunState,
 	CreateRunParams,
 	RunFilter,
-	RunIndexEntry
+	RunIndexEntry,
+	StartRunInput,
+	GetStatusInput,
 } from "./types.js";
-import { parseRunState } from "./types.js";
+import { parseRunState, RunNotFoundError } from "./types.js";
 import {
 	writeRunState,
 	readRunState,
@@ -22,13 +24,20 @@ import {
 	removeIndexEntry,
 	ensureRunDir,
 	appendToRunLog,
-	readRunLog
+	readRunLog,
+	getRunsDir as getRunsDirPath,
 } from "./storage.js";
+import { buildStatusResponse } from "./statusBuilder.js";
 
 /**
  * Default initial state for new runs
  */
 const DEFAULT_INITIAL_STATE = "initialized";
+
+/**
+ * MCP-compatible initial state (matches LR-060 expectations)
+ */
+const MCP_INITIAL_STATE = "planning";
 
 /**
  * RunManager - Core run lifecycle management
@@ -45,6 +54,15 @@ export class RunManager {
 	 */
 	constructor(baseDir: string = process.cwd()) {
 		this.baseDir = baseDir;
+	}
+
+	/**
+	 * Get the runs directory path
+	 *
+	 * @returns Path to the runs directory
+	 */
+	getRunsDir(): string {
+		return getRunsDirPath(this.baseDir);
 	}
 
 	/**
@@ -72,7 +90,7 @@ export class RunManager {
 			currentStep: null,
 			params: params.params ?? {},
 			metadata: params.metadata ?? {},
-			persona: params.persona
+			persona: params.persona,
 		};
 
 		// Validate the run state
@@ -111,26 +129,28 @@ export class RunManager {
 	 * @param filter - Optional filter criteria
 	 * @returns Array of RunState objects matching the filter
 	 */
-	async listRuns(filter?: RunFilter): Promise<RunState[]> {
+	async listRunStates(filter?: RunFilter): Promise<RunState[]> {
 		const index = readIndex(this.baseDir);
 		let entries = index.runs;
 
 		// Apply filters
 		if (filter) {
 			if (filter.state) {
-				entries = entries.filter(e => e.state === filter.state);
+				entries = entries.filter((e) => e.state === filter.state);
 			}
 			if (filter.procedure) {
-				entries = entries.filter(e => e.procedure === filter.procedure);
+				entries = entries.filter(
+					(e) => e.procedure === filter.procedure
+				);
 			}
 			if (filter.mode) {
-				entries = entries.filter(e => e.mode === filter.mode);
+				entries = entries.filter((e) => e.mode === filter.mode);
 			}
 			if (filter.since) {
-				entries = entries.filter(e => e.createdAt >= filter.since!);
+				entries = entries.filter((e) => e.createdAt >= filter.since!);
 			}
 			if (filter.until) {
-				entries = entries.filter(e => e.createdAt <= filter.until!);
+				entries = entries.filter((e) => e.createdAt <= filter.until!);
 			}
 			if (filter.limit && filter.limit > 0) {
 				entries = entries.slice(0, filter.limit);
@@ -150,6 +170,18 @@ export class RunManager {
 	}
 
 	/**
+	 * List run IDs (synchronous)
+	 *
+	 * Returns sorted list of run IDs from the index.
+	 *
+	 * @returns Sorted array of run IDs
+	 */
+	listRuns(): string[] {
+		const index = readIndex(this.baseDir);
+		return index.runs.map((e) => e.runId).sort();
+	}
+
+	/**
 	 * Update a run
 	 *
 	 * Applies updates atomically and persists changes.
@@ -159,7 +191,10 @@ export class RunManager {
 	 * @returns Updated RunState
 	 * @throws Error if run not found
 	 */
-	async updateRun(runId: string, updates: Partial<RunState>): Promise<RunState> {
+	async updateRun(
+		runId: string,
+		updates: Partial<RunState>
+	): Promise<RunState> {
 		const current = await this.getRun(runId);
 
 		if (!current) {
@@ -172,7 +207,7 @@ export class RunManager {
 			...updates,
 			runId: current.runId, // Prevent runId from being changed
 			createdAt: current.createdAt, // Prevent createdAt from being changed
-			updatedAt: new Date().toISOString()
+			updatedAt: new Date().toISOString(),
 		};
 
 		// Validate the updated state
@@ -217,19 +252,24 @@ export class RunManager {
 			...current,
 			state: newState,
 			updatedAt: now,
-			completedAt: isTerminal ? now : current.completedAt
+			completedAt: isTerminal ? now : current.completedAt,
 		};
 
 		// Validate the updated state
 		parseRunState(updated);
 
 		// Log state transition
-		appendToRunLog(runId, "decisions", {
-			type: "state_transition",
-			from: previousState,
-			to: newState,
-			ts: now
-		}, this.baseDir);
+		appendToRunLog(
+			runId,
+			"decisions",
+			{
+				type: "state_transition",
+				from: previousState,
+				to: newState,
+				ts: now,
+			},
+			this.baseDir
+		);
 
 		// Persist updated state
 		writeRunState(updated, this.baseDir);
@@ -249,7 +289,11 @@ export class RunManager {
 	 * @param nextStep - The next step to set as current (optional)
 	 * @returns Updated RunState
 	 */
-	async completeStep(runId: string, stepId: string, nextStep?: string | null): Promise<RunState> {
+	async completeStep(
+		runId: string,
+		stepId: string,
+		nextStep?: string | null
+	): Promise<RunState> {
 		const current = await this.getRun(runId);
 
 		if (!current) {
@@ -263,7 +307,8 @@ export class RunManager {
 
 		return this.updateRun(runId, {
 			completedSteps,
-			currentStep: nextStep !== undefined ? nextStep : current.currentStep
+			currentStep:
+				nextStep !== undefined ? nextStep : current.currentStep,
 		});
 	}
 
@@ -273,7 +318,10 @@ export class RunManager {
 	 * @param runId - The run identifier
 	 * @param decision - The decision to log
 	 */
-	async logDecision(runId: string, decision: Record<string, unknown>): Promise<void> {
+	async logDecision(
+		runId: string,
+		decision: Record<string, unknown>
+	): Promise<void> {
 		appendToRunLog(runId, "decisions", decision, this.baseDir);
 	}
 
@@ -283,7 +331,10 @@ export class RunManager {
 	 * @param runId - The run identifier
 	 * @param failure - The failure to log
 	 */
-	async logFailure(runId: string, failure: Record<string, unknown>): Promise<void> {
+	async logFailure(
+		runId: string,
+		failure: Record<string, unknown>
+	): Promise<void> {
 		appendToRunLog(runId, "failures", failure, this.baseDir);
 	}
 
@@ -317,22 +368,201 @@ export class RunManager {
 			metadata: {
 				...(await this.getRun(runId))?.metadata,
 				archived: true,
-				archivedAt: new Date().toISOString()
-			}
+				archivedAt: new Date().toISOString(),
+			},
 		});
 	}
 
 	/**
-	 * Delete a run and all associated data
+	 * Delete a run and all associated data (sync version)
 	 *
 	 * @param runId - The run identifier
+	 * @returns true if run was deleted, false if not found
 	 */
-	async deleteRun(runId: string): Promise<void> {
+	deleteRun(runId: string): boolean {
+		// Check if run exists first
+		if (!this.runExists(runId)) {
+			return false;
+		}
+
 		// Delete state file and run directory
 		deleteRunState(runId, this.baseDir);
 
 		// Remove from index
 		removeIndexEntry(runId, this.baseDir);
+
+		return true;
+	}
+
+	/**
+	 * Delete a run and all associated data (async version)
+	 *
+	 * @param runId - The run identifier
+	 */
+	async deleteRunAsync(runId: string): Promise<void> {
+		// Delete state file and run directory
+		deleteRunState(runId, this.baseDir);
+
+		// Remove from index
+		removeIndexEntry(runId, this.baseDir);
+	}
+
+	/**
+	 * Start a new run (MCP tool interface)
+	 *
+	 * Convenience wrapper around createRun for MCP tool usage.
+	 * Maps StartRunInput to CreateRunParams and returns a structured result.
+	 *
+	 * @param input - MCP tool input for starting a run
+	 * @returns Result object with runId, status, message, and initialStatus
+	 */
+	startRun(input: StartRunInput): {
+		runId: string;
+		status: string;
+		message: string;
+		initialStatus: ReturnType<typeof buildStatusResponse>;
+	} {
+		// Use MCP_INITIAL_STATE ("planning") for MCP-triggered runs
+		const runState = this.createRunSync({
+			mode: input.mode,
+			procedure: input.procedure,
+			repo: input.repo,
+			task: input.task,
+			params: input.params,
+			initialState: MCP_INITIAL_STATE,
+		});
+
+		const statusResponse = buildStatusResponse(runState);
+
+		return {
+			runId: runState.runId,
+			status: runState.state,
+			message: `Run started successfully with ID: ${runState.runId}`,
+			initialStatus: statusResponse,
+		};
+	}
+
+	/**
+	 * Check if a run exists
+	 *
+	 * @param runId - The run identifier
+	 * @returns true if run exists, false otherwise
+	 */
+	runExists(runId: string): boolean {
+		return readRunState(runId, this.baseDir) !== null;
+	}
+
+	/**
+	 * Load run state (synchronous)
+	 *
+	 * @param runId - The run identifier
+	 * @returns RunState
+	 * @throws Error if run not found
+	 */
+	loadRunState(runId: string): RunState {
+		const runState = readRunState(runId, this.baseDir);
+		if (!runState) {
+			throw new RunNotFoundError(runId);
+		}
+		return runState;
+	}
+
+	/**
+	 * Update run state (synchronous)
+	 *
+	 * @param runId - The run identifier
+	 * @param updates - Partial updates to apply
+	 * @returns Updated RunState
+	 * @throws Error if run not found
+	 */
+	updateRunState(runId: string, updates: Partial<RunState>): RunState {
+		const current = readRunState(runId, this.baseDir);
+		if (!current) {
+			throw new RunNotFoundError(runId);
+		}
+
+		// Apply updates
+		const updated: RunState = {
+			...current,
+			...updates,
+			runId: current.runId, // Prevent runId from being changed
+			createdAt: current.createdAt, // Prevent createdAt from being changed
+			updatedAt: new Date().toISOString(),
+		};
+
+		// Validate the updated state
+		parseRunState(updated);
+
+		// Persist updated state
+		writeRunState(updated, this.baseDir);
+
+		// Update index
+		const indexEntry = this.createIndexEntry(updated);
+		upsertIndexEntry(indexEntry, this.baseDir);
+
+		return updated;
+	}
+
+	/**
+	 * Get status of a run (MCP tool interface)
+	 *
+	 * Convenience wrapper around getRun for MCP tool usage.
+	 * Returns a structured status response.
+	 *
+	 * @param input - MCP tool input for getting status
+	 * @returns Status response object
+	 * @throws RunNotFoundError if run not found
+	 */
+	getStatus(input: GetStatusInput): ReturnType<typeof buildStatusResponse> {
+		const runState = readRunState(input.runId, this.baseDir);
+
+		if (!runState) {
+			throw new RunNotFoundError(input.runId);
+		}
+
+		return buildStatusResponse(runState);
+	}
+
+	/**
+	 * Synchronous version of createRun for MCP compatibility
+	 *
+	 * @param params - Run creation parameters
+	 * @returns The created RunState
+	 */
+	private createRunSync(params: CreateRunParams): RunState {
+		const now = new Date().toISOString();
+		const runId = ulid();
+
+		const runState: RunState = {
+			runId,
+			mode: params.mode,
+			procedure: params.procedure,
+			repo: params.repo,
+			task: params.task,
+			state: params.initialState ?? DEFAULT_INITIAL_STATE,
+			createdAt: now,
+			updatedAt: now,
+			completedSteps: [],
+			currentStep: null,
+			params: params.params ?? {},
+			metadata: params.metadata ?? {},
+			persona: params.persona,
+		};
+
+		// Validate the run state
+		parseRunState(runState);
+
+		// Persist run state
+		writeRunState(runState, this.baseDir);
+
+		// Ensure run directory exists
+		ensureRunDir(runId, this.baseDir);
+
+		// Update index
+		const indexEntry = this.createIndexEntry(runState);
+		upsertIndexEntry(indexEntry, this.baseDir);
+
+		return runState;
 	}
 
 	/**
@@ -346,7 +576,7 @@ export class RunManager {
 			state: runState.state,
 			createdAt: runState.createdAt,
 			updatedAt: runState.updatedAt,
-			completedAt: runState.completedAt
+			completedAt: runState.completedAt,
 		};
 	}
 

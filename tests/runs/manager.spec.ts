@@ -7,8 +7,18 @@ import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { existsSync, readFileSync, readdirSync } from "fs";
-import { RunManager, createRunManager, readIndex, readRunState, readRunLog } from "../../src/runs/index.js";
-import type { CreateRunParams, RunFilter, PersonaSnapshot } from "../../src/runs/types.js";
+import {
+	RunManager,
+	createRunManager,
+	readIndex,
+	readRunState,
+	readRunLog,
+} from "../../src/runs/index.js";
+import type {
+	CreateRunParams,
+	RunFilter,
+	PersonaSnapshot,
+} from "../../src/runs/types.js";
 import type { PersonaSnapshot as PersonaSnapshotType } from "../../src/schemas/runCentric.js";
 
 describe("RunManager", () => {
@@ -29,7 +39,7 @@ describe("RunManager", () => {
 			const params: CreateRunParams = {
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "owner/repo"
+				repo: "owner/repo",
 			};
 
 			const run = await manager.createRun(params);
@@ -51,13 +61,18 @@ describe("RunManager", () => {
 				mode: "eager-pm",
 				procedure: "pr-review",
 				repo: "test/repo",
-				task: "Review PR #42"
+				task: "Review PR #42",
 			};
 
 			const run = await manager.createRun(params);
 
 			// Verify file exists
-			const statePath = join(testDir, ".lexrunner", "runs", `${run.runId}.json`);
+			const statePath = join(
+				testDir,
+				".lexrunner",
+				"runs",
+				`${run.runId}.json`
+			);
 			expect(existsSync(statePath)).toBe(true);
 
 			// Verify content
@@ -70,7 +85,7 @@ describe("RunManager", () => {
 			const run = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			const runDir = join(testDir, ".lexrunner", "runs", run.runId);
@@ -82,7 +97,7 @@ describe("RunManager", () => {
 			const run = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			const index = readIndex(testDir);
@@ -96,7 +111,7 @@ describe("RunManager", () => {
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
 				repo: "test/repo",
-				initialState: "planning"
+				initialState: "planning",
 			});
 
 			expect(run.state).toBe("planning");
@@ -108,7 +123,7 @@ describe("RunManager", () => {
 				procedure: "merge-weave-main",
 				repo: "test/repo",
 				params: { targetBranch: "main", dryRun: true },
-				metadata: { source: "cli", version: "1.0.0" }
+				metadata: { source: "cli", version: "1.0.0" },
 			});
 
 			expect(run.params).toEqual({ targetBranch: "main", dryRun: true });
@@ -119,14 +134,14 @@ describe("RunManager", () => {
 			const persona: PersonaSnapshotType = {
 				mode: "senior-dev",
 				forbidden: ["force-push"],
-				completionGates: ["lint", "test"]
+				completionGates: ["lint", "test"],
 			};
 
 			const run = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
 				repo: "test/repo",
-				persona
+				persona,
 			});
 
 			expect(run.persona).toEqual(persona);
@@ -138,7 +153,7 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			const retrieved = await manager.getRun(created.runId);
@@ -156,63 +171,117 @@ describe("RunManager", () => {
 		});
 	});
 
-	describe("listRuns", () => {
+	describe("listRunStates", () => {
 		it("should list all runs when no filter", async () => {
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo1" });
-			await manager.createRun({ mode: "eager-pm", procedure: "pr-review", repo: "test/repo2" });
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo3" });
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo1",
+			});
+			await manager.createRun({
+				mode: "eager-pm",
+				procedure: "pr-review",
+				repo: "test/repo2",
+			});
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo3",
+			});
 
-			const runs = await manager.listRuns();
+			const runs = await manager.listRunStates();
 
 			expect(runs).toHaveLength(3);
 		});
 
 		it("should filter by state", async () => {
-			const run1 = await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo1" });
-			await manager.createRun({ mode: "eager-pm", procedure: "pr-review", repo: "test/repo2" });
+			const run1 = await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo1",
+			});
+			await manager.createRun({
+				mode: "eager-pm",
+				procedure: "pr-review",
+				repo: "test/repo2",
+			});
 
 			// Update first run to a different state
 			await manager.updateRun(run1.runId, { state: "executing" });
 
-			const runs = await manager.listRuns({ state: "executing" });
+			const runs = await manager.listRunStates({ state: "executing" });
 
 			expect(runs).toHaveLength(1);
 			expect(runs[0].state).toBe("executing");
 		});
 
 		it("should filter by procedure", async () => {
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo1" });
-			await manager.createRun({ mode: "eager-pm", procedure: "pr-review", repo: "test/repo2" });
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo3" });
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo1",
+			});
+			await manager.createRun({
+				mode: "eager-pm",
+				procedure: "pr-review",
+				repo: "test/repo2",
+			});
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo3",
+			});
 
-			const runs = await manager.listRuns({ procedure: "merge-weave" });
+			const runs = await manager.listRunStates({
+				procedure: "merge-weave",
+			});
 
 			expect(runs).toHaveLength(2);
-			runs.forEach(run => expect(run.procedure).toBe("merge-weave"));
+			runs.forEach((run) => expect(run.procedure).toBe("merge-weave"));
 		});
 
 		it("should filter by mode", async () => {
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo1" });
-			await manager.createRun({ mode: "eager-pm", procedure: "pr-review", repo: "test/repo2" });
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo1",
+			});
+			await manager.createRun({
+				mode: "eager-pm",
+				procedure: "pr-review",
+				repo: "test/repo2",
+			});
 
-			const runs = await manager.listRuns({ mode: "eager-pm" });
+			const runs = await manager.listRunStates({ mode: "eager-pm" });
 
 			expect(runs).toHaveLength(1);
 			expect(runs[0].mode).toBe("eager-pm");
 		});
 
 		it("should apply limit", async () => {
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo1" });
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo2" });
-			await manager.createRun({ mode: "senior-dev", procedure: "merge-weave", repo: "test/repo3" });
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo1",
+			});
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo2",
+			});
+			await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave",
+				repo: "test/repo3",
+			});
 
-			const runs = await manager.listRuns({ limit: 2 });
+			const runs = await manager.listRunStates({ limit: 2 });
 
 			expect(runs).toHaveLength(2);
 		});
 
 		it("should return empty array when no runs exist", async () => {
-			const runs = await manager.listRuns();
+			const runs = await manager.listRunStates();
 
 			expect(runs).toEqual([]);
 		});
@@ -223,15 +292,15 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			// Small delay to ensure timestamps differ
-			await new Promise(resolve => setTimeout(resolve, 10));
+			await new Promise((resolve) => setTimeout(resolve, 10));
 
 			const updated = await manager.updateRun(created.runId, {
 				state: "executing",
-				currentStep: "merge-step-1"
+				currentStep: "merge-step-1",
 			});
 
 			expect(updated.state).toBe("executing");
@@ -244,13 +313,13 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			// Simulate update
 			await manager.updateRun(created.runId, {
 				state: "executing",
-				completedSteps: ["step1", "step2"]
+				completedSteps: ["step1", "step2"],
 			});
 
 			// Read directly from disk
@@ -264,11 +333,11 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			const updated = await manager.updateRun(created.runId, {
-				runId: "FAKE_ID_SHOULD_NOT_WORK"
+				runId: "FAKE_ID_SHOULD_NOT_WORK",
 			} as any);
 
 			expect(updated.runId).toBe(created.runId);
@@ -276,7 +345,9 @@ describe("RunManager", () => {
 
 		it("should throw error for unknown runId", async () => {
 			await expect(
-				manager.updateRun("01UNKNOWN123456789012345", { state: "executing" })
+				manager.updateRun("01UNKNOWN123456789012345", {
+					state: "executing",
+				})
 			).rejects.toThrow("Run not found");
 		});
 
@@ -284,7 +355,7 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.updateRun(created.runId, { state: "completed" });
@@ -299,10 +370,13 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
-			const updated = await manager.transitionState(created.runId, "executing");
+			const updated = await manager.transitionState(
+				created.runId,
+				"executing"
+			);
 
 			expect(updated.state).toBe("executing");
 		});
@@ -311,7 +385,7 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.transitionState(created.runId, "executing");
@@ -327,10 +401,13 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
-			const updated = await manager.transitionState(created.runId, "completed");
+			const updated = await manager.transitionState(
+				created.runId,
+				"completed"
+			);
 
 			expect(updated.completedAt).toBeDefined();
 		});
@@ -347,10 +424,14 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
-			const updated = await manager.completeStep(created.runId, "step1", "step2");
+			const updated = await manager.completeStep(
+				created.runId,
+				"step1",
+				"step2"
+			);
 
 			expect(updated.completedSteps).toContain("step1");
 			expect(updated.currentStep).toBe("step2");
@@ -360,13 +441,19 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.completeStep(created.runId, "step1", "step2");
-			const updated = await manager.completeStep(created.runId, "step1", "step3");
+			const updated = await manager.completeStep(
+				created.runId,
+				"step1",
+				"step3"
+			);
 
-			const stepCount = updated.completedSteps.filter(s => s === "step1").length;
+			const stepCount = updated.completedSteps.filter(
+				(s) => s === "step1"
+			).length;
 			expect(stepCount).toBe(1);
 		});
 	});
@@ -376,19 +463,19 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.logDecision(created.runId, {
 				type: "user_choice",
 				action: "skip_gate",
-				rationale: "Gate is flaky"
+				rationale: "Gate is flaky",
 			});
 
 			await manager.logDecision(created.runId, {
 				type: "auto_choice",
 				action: "retry_gate",
-				context: { attempt: 2 }
+				context: { attempt: 2 },
 			});
 
 			const decisions = await manager.getDecisions(created.runId);
@@ -404,13 +491,13 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.logFailure(created.runId, {
 				step: "lint",
 				error: "ESLint found 5 errors",
-				recoverable: true
+				recoverable: true,
 			});
 
 			const failures = await manager.getFailures(created.runId);
@@ -426,7 +513,7 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.archiveRun(created.runId);
@@ -442,13 +529,18 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.deleteRun(created.runId);
 
 			// Verify state file is gone
-			const statePath = join(testDir, ".lexrunner", "runs", `${created.runId}.json`);
+			const statePath = join(
+				testDir,
+				".lexrunner",
+				"runs",
+				`${created.runId}.json`
+			);
 			expect(existsSync(statePath)).toBe(false);
 
 			// Verify run directory is gone
@@ -464,7 +556,7 @@ describe("RunManager", () => {
 			const created = await manager.createRun({
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
-				repo: "test/repo"
+				repo: "test/repo",
 			});
 
 			await manager.deleteRun(created.runId);
@@ -481,7 +573,7 @@ describe("RunManager", () => {
 				mode: "senior-dev",
 				procedure: "merge-weave-main",
 				repo: "test/repo",
-				task: "Merge PRs #1, #2, #3"
+				task: "Merge PRs #1, #2, #3",
 			});
 
 			expect(run.state).toBe("initialized");
@@ -491,7 +583,11 @@ describe("RunManager", () => {
 			expect(current.state).toBe("planning");
 
 			// Step 3: Complete planning step
-			current = await manager.completeStep(run.runId, "analyze-deps", "execute-merges");
+			current = await manager.completeStep(
+				run.runId,
+				"analyze-deps",
+				"execute-merges"
+			);
 			expect(current.completedSteps).toContain("analyze-deps");
 			expect(current.currentStep).toBe("execute-merges");
 
@@ -503,11 +599,15 @@ describe("RunManager", () => {
 			await manager.logDecision(run.runId, {
 				type: "merge_decision",
 				pr: 1,
-				action: "merge"
+				action: "merge",
 			});
 
 			// Step 6: Complete execution
-			current = await manager.completeStep(run.runId, "execute-merges", null);
+			current = await manager.completeStep(
+				run.runId,
+				"execute-merges",
+				null
+			);
 			expect(current.completedSteps).toContain("execute-merges");
 			expect(current.currentStep).toBeNull();
 
@@ -523,7 +623,10 @@ describe("RunManager", () => {
 			// Verify full lifecycle is persisted
 			const persisted = await manager.getRun(run.runId);
 			expect(persisted!.state).toBe("completed");
-			expect(persisted!.completedSteps).toEqual(["analyze-deps", "execute-merges"]);
+			expect(persisted!.completedSteps).toEqual([
+				"analyze-deps",
+				"execute-merges",
+			]);
 		});
 	});
 });

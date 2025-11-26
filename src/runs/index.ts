@@ -10,14 +10,23 @@ export type {
 	CreateRunParams,
 	RunFilter,
 	RunIndexEntry,
-	RunIndex
+	RunIndex,
+	StartRunInput,
+	GetStatusInput,
+	RunStateFile,
 } from "./types.js";
 
 export {
 	RunStateSchema,
 	parseRunState,
-	safeParseRunState
+	safeParseRunState,
+	StartRunInputSchema,
+	GetStatusInputSchema,
+	RunNotFoundError,
 } from "./types.js";
+
+// Status builder
+export { buildStatusResponse, getDefaultNextOptions } from "./statusBuilder.js";
 
 // Storage utilities
 export {
@@ -35,7 +44,7 @@ export {
 	removeIndexEntry,
 	ensureRunDir,
 	appendToRunLog,
-	readRunLog
+	readRunLog,
 } from "./storage.js";
 
 // Manager

@@ -50,7 +50,7 @@ export const RunStateSchema = z.object({
 
 	// Persona snapshot (frozen at run start)
 	/** Snapshot of the active persona configuration */
-	persona: PersonaSnapshotSchema.optional()
+	persona: PersonaSnapshotSchema.optional(),
 });
 
 export type RunState = z.infer<typeof RunStateSchema>;
@@ -130,16 +130,87 @@ export function parseRunState(data: unknown): RunState {
 /**
  * Safely parse RunState with error handling
  */
-export function safeParseRunState(data: unknown): {
-	success: true;
-	data: RunState;
-} | {
-	success: false;
-	error: z.ZodError;
-} {
+export function safeParseRunState(data: unknown):
+	| {
+			success: true;
+			data: RunState;
+	  }
+	| {
+			success: false;
+			error: z.ZodError;
+	  } {
 	const result = RunStateSchema.safeParse(data);
 	if (result.success) {
 		return { success: true, data: result.data };
 	}
 	return { success: false, error: result.error };
+}
+
+/**
+ * Input parameters for starting a run (MCP tool)
+ */
+export const StartRunInputSchema = z.object({
+	/** Persona mode, e.g. "senior-dev", "eager-pm" */
+	mode: z.string(),
+	/** Procedure identifier, e.g. "merge-weave-main", "pr-review" */
+	procedure: z.string(),
+	/** Repository in "owner/repo" format */
+	repo: z.string(),
+	/** Human-readable task description */
+	task: z.string().optional(),
+	/** Procedure-specific parameters */
+	params: z.record(z.unknown()).optional(),
+});
+
+export type StartRunInput = z.infer<typeof StartRunInputSchema>;
+
+/**
+ * Input for getStatus (MCP tool)
+ */
+export const GetStatusInputSchema = z.object({
+	runId: z.string(),
+});
+
+export type GetStatusInput = z.infer<typeof GetStatusInputSchema>;
+
+/**
+ * Error thrown when a run is not found
+ */
+export class RunNotFoundError extends Error {
+	constructor(runId: string) {
+		super(`Run not found: ${runId}`);
+		this.name = "RunNotFoundError";
+	}
+}
+
+/**
+ * RunStateFile - Lenient type for testing and backwards compatibility
+ *
+ * This is a partial RunState that allows optional fields like completedSteps.
+ * Used primarily for test fixtures and backwards compatibility with LR-060 tests.
+ */
+export interface RunStateFile {
+	runId: string;
+	mode: string;
+	procedure: string;
+	repo: string;
+	state: string;
+	createdAt: string;
+	updatedAt: string;
+	task?: string;
+	completedAt?: string;
+	completedSteps?: string[];
+	currentStep?: string | null;
+	params?: Record<string, unknown>;
+	metadata?: Record<string, unknown>;
+	/** Optional blockers for status display */
+	blockers?: string[];
+	/** Optional progress info for status display */
+	progress?: {
+		current: number;
+		total: number;
+		phase?: string;
+	};
+	/** Optional context for status display */
+	context?: Record<string, unknown>;
 }

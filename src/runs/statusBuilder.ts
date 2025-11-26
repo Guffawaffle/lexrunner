@@ -1,75 +1,133 @@
 /**
  * Status builder for constructing StatusResponse from run state
- * 
+ *
  * Derives nextOptions from current state and builds rich context for model orientation.
  */
 
-import type { StatusResponse, NextOption, PersonaSnapshot } from "../schemas/runCentric.js";
-import type { RunStateFile, RunState } from "./types.js";
+import type {
+	StatusResponse,
+	NextOption,
+	PersonaSnapshot,
+} from "../schemas/runCentric.js";
+import type { RunState, RunStateFile } from "./types.js";
+
+/**
+ * Input type for statusBuilder - accepts both RunState and lenient RunStateFile
+ */
+type StatusBuilderInput = RunState | RunStateFile;
+
+/**
+ * RunState state field values
+ */
+type StateValue =
+	| "planning"
+	| "gated"
+	| "executing"
+	| "completed"
+	| "failed"
+	| "paused"
+	| "aborted";
 
 /**
  * Default next options by state
  */
-const DEFAULT_OPTIONS_BY_STATE: Record<RunState, NextOption[]> = {
+const DEFAULT_OPTIONS_BY_STATE: Record<StateValue, NextOption[]> = {
 	planning: [
 		{ action: "continue", description: "Continue with planning phase." },
 		{ action: "pause", description: "Pause the run for later resumption." },
-		{ action: "abort", description: "Abort the run entirely.", riskLevel: "medium" }
+		{
+			action: "abort",
+			description: "Abort the run entirely.",
+			riskLevel: "medium",
+		},
 	],
 	gated: [
 		{ action: "continue", description: "Continue after gate passes." },
 		{ action: "retry", description: "Retry the failing gate." },
-		{ action: "skip", description: "Skip the current gate.", requiresLLMDecision: true, riskLevel: "medium" },
+		{
+			action: "skip",
+			description: "Skip the current gate.",
+			requiresLLMDecision: true,
+			riskLevel: "medium",
+		},
 		{ action: "pause", description: "Pause the run for later resumption." },
-		{ action: "abort", description: "Abort the run entirely.", riskLevel: "medium" }
+		{
+			action: "abort",
+			description: "Abort the run entirely.",
+			riskLevel: "medium",
+		},
 	],
 	executing: [
 		{ action: "continue", description: "Continue execution." },
 		{ action: "pause", description: "Pause the run for later resumption." },
-		{ action: "abort", description: "Abort the run entirely.", riskLevel: "medium" }
+		{
+			action: "abort",
+			description: "Abort the run entirely.",
+			riskLevel: "medium",
+		},
 	],
 	completed: [
-		{ action: "restart", description: "Start a new run with same parameters." }
+		{
+			action: "restart",
+			description: "Start a new run with same parameters.",
+		},
 	],
 	failed: [
 		{ action: "retry", description: "Retry the failed operation." },
-		{ action: "restart", description: "Start a new run with same parameters." },
-		{ action: "abort", description: "Mark the run as permanently failed.", riskLevel: "low" }
+		{
+			action: "restart",
+			description: "Start a new run with same parameters.",
+		},
+		{
+			action: "abort",
+			description: "Mark the run as permanently failed.",
+			riskLevel: "low",
+		},
 	],
 	paused: [
 		{ action: "resume", description: "Resume the paused run." },
-		{ action: "abort", description: "Abort the paused run.", riskLevel: "medium" }
+		{
+			action: "abort",
+			description: "Abort the paused run.",
+			riskLevel: "medium",
+		},
 	],
 	aborted: [
-		{ action: "restart", description: "Start a new run with same parameters." }
-	]
+		{
+			action: "restart",
+			description: "Start a new run with same parameters.",
+		},
+	],
 };
 
 /**
  * Generate a summary string for the current state
  */
-function generateSummary(runState: RunStateFile): string {
-	const { state, procedure, repo, progress, blockers } = runState;
-	
+function generateSummary(runState: StatusBuilderInput): string {
+	const {
+		state,
+		procedure,
+		repo,
+		currentStep,
+		completedSteps = [],
+	} = runState;
+
 	switch (state) {
 		case "planning":
 			return `Planning ${procedure} for ${repo}.`;
 		case "gated":
-			if (blockers && blockers.length > 0) {
-				return `Waiting for gate: ${blockers[0]}.`;
+			if (currentStep) {
+				return `Running gate: ${currentStep}.`;
 			}
 			return `Waiting for gates to pass on ${repo}.`;
 		case "executing":
-			if (progress?.current) {
-				return `Executing step: ${progress.current}.`;
+			if (currentStep) {
+				return `Executing step: ${currentStep}.`;
 			}
 			return `Executing ${procedure} on ${repo}.`;
 		case "completed":
-			return `Successfully completed ${procedure} for ${repo}.`;
+			return `Successfully completed ${procedure} for ${repo}. ${completedSteps.length} steps completed.`;
 		case "failed":
-			if (blockers && blockers.length > 0) {
-				return `Failed: ${blockers[0]}.`;
-			}
 			return `Failed to complete ${procedure} for ${repo}.`;
 		case "paused":
 			return `Paused ${procedure} for ${repo}.`;
@@ -81,9 +139,14 @@ function generateSummary(runState: RunStateFile): string {
 }
 
 /**
- * Build a persona snapshot from mode
+ * Build a persona snapshot from mode or existing persona
  */
-function buildPersonaSnapshot(mode: string): PersonaSnapshot {
+function buildPersonaSnapshot(runState: StatusBuilderInput): PersonaSnapshot {
+	// If persona is already defined on the run, use it
+	if ("persona" in runState && runState.persona) {
+		return runState.persona as PersonaSnapshot;
+	}
+
 	// Default persona configuration based on mode
 	const personaConfigs: Record<string, Partial<PersonaSnapshot>> = {
 		"senior-dev": {
@@ -92,8 +155,8 @@ function buildPersonaSnapshot(mode: string): PersonaSnapshot {
 			decisionStyle: {
 				preferSmallDiffs: true,
 				requireRationaleForSkips: true,
-				escalateSecurityFindings: true
-			}
+				escalateSecurityFindings: true,
+			},
 		},
 		"eager-pm": {
 			forbidden: ["force-push"],
@@ -101,50 +164,65 @@ function buildPersonaSnapshot(mode: string): PersonaSnapshot {
 			decisionStyle: {
 				preferSmallDiffs: false,
 				requireRationaleForSkips: false,
-				escalateSecurityFindings: false
-			}
-		}
+				escalateSecurityFindings: false,
+			},
+		},
 	};
-	
-	const config = personaConfigs[mode] || {
+
+	const config = personaConfigs[runState.mode] || {
 		forbidden: [],
 		completionGates: [],
-		decisionStyle: {}
+		decisionStyle: {},
 	};
-	
+
 	return {
-		mode,
+		mode: runState.mode,
 		forbidden: config.forbidden || [],
 		completionGates: config.completionGates || [],
-		decisionStyle: config.decisionStyle
+		decisionStyle: config.decisionStyle,
+	};
+}
+
+/**
+ * Build progress from RunState
+ */
+function buildProgress(
+	runState: StatusBuilderInput
+):
+	| { completed: string[]; current: string | null; remaining: string[] }
+	| undefined {
+	return {
+		completed: runState.completedSteps || [],
+		current: runState.currentStep || null,
+		remaining: [], // Can be populated from procedure definition later
 	};
 }
 
 /**
  * Build a StatusResponse from run state
  */
-export function buildStatusResponse(runState: RunStateFile): StatusResponse {
-	const state = runState.state as RunState;
-	const nextOptions = DEFAULT_OPTIONS_BY_STATE[state] || [];
-	
+export function buildStatusResponse(
+	runState: StatusBuilderInput
+): StatusResponse {
+	const stateValue = runState.state as StateValue;
+	const nextOptions = DEFAULT_OPTIONS_BY_STATE[stateValue] || [];
+
 	return {
 		runId: runState.runId,
 		state: runState.state,
 		mode: runState.mode,
 		procedure: runState.procedure,
 		summary: generateSummary(runState),
-		progress: runState.progress,
+		progress: buildProgress(runState),
 		nextOptions,
-		context: runState.context,
-		riskFlags: runState.riskFlags,
-		blockers: runState.blockers,
-		persona: buildPersonaSnapshot(runState.mode)
+		context: runState.metadata,
+		persona: buildPersonaSnapshot(runState),
 	};
 }
 
 /**
  * Get default next options for a given state
  */
-export function getDefaultNextOptions(state: RunState): NextOption[] {
+export function getDefaultNextOptions(state: StateValue): NextOption[] {
 	return DEFAULT_OPTIONS_BY_STATE[state] || [];
 }
