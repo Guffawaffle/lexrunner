@@ -54,6 +54,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:git": "vitest run -c vitest.git.config.ts tests/release-prepare.spec.ts tests/promptsResolver.spec.ts tests/e2e-comprehensive.test.ts tests/autopilot-e2e-level3-4.spec.ts tests/deterministic-build.test.ts",
+		"test:cli:slow": "vitest run -c vitest.slow-cli.config.ts",
 		"release:prepare": "tsx scripts/release-prepare.ts",
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",

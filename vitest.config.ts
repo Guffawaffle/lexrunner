@@ -15,6 +15,8 @@ export default defineConfig({
 			"**/tests/e2e-comprehensive.test.ts",
 			"**/tests/autopilot-e2e-level3-4.spec.ts",
 			"**/tests/deterministic-build.test.ts",
+			// Exclude slow CLI tests (run via test:cli:slow with LEX_ENABLE_SLOW_CLI_TESTS=true)
+			"**/tests/cli-progress.spec.ts",
 		],
 		// Limit concurrency to prevent WSL2 resource exhaustion/crashes
 		maxWorkers: 1,
