@@ -1102,3 +1102,6 @@ export {
 	// Monitoring
 	healthChecker,
 };
+
+// Run management exports for MCP tools
+export { createRunManager } from "./runs/index.js";
