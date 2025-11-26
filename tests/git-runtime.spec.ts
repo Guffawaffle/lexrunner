@@ -122,7 +122,7 @@ describe("Git Runtime Gate", () => {
 			expect(getDefaultBranch()).toBe("feature/my-branch");
 		});
 
-		it("should return empty string if LEX_DEFAULT_BRANCH is empty", () => {
+		it("should return default value if LEX_DEFAULT_BRANCH is empty string", () => {
 			process.env.LEX_DEFAULT_BRANCH = "";
 			expect(getDefaultBranch()).toBe("main");
 		});
@@ -145,7 +145,7 @@ describe("Git Runtime Gate", () => {
 			expect(getDefaultCommit()).toBe("invalid-sha");
 		});
 
-		it("should return default if LEX_DEFAULT_COMMIT is empty", () => {
+		it("should return default value if LEX_DEFAULT_COMMIT is empty string", () => {
 			process.env.LEX_DEFAULT_COMMIT = "";
 			expect(getDefaultCommit()).toBe("0000000000000000000000000000000000000000");
 		});
