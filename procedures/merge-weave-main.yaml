@@ -1,0 +1,223 @@
+# merge-weave-main Procedure Definition
+# Canonical merge pyramid workflow for integrating multiple PRs
+#
+# State diagram:
+#   planning → gated → weaving → completed
+#                 ↓
+#           decision_gate_failure → failed
+
+version: 1
+id: merge-weave-main
+name: Merge-Weave Main
+description: >
+  Canonical merge pyramid workflow for integrating multiple PRs.
+  Discovers PRs, computes dependency order, runs gates, and merges cleanly.
+
+# States in the procedure lifecycle
+states:
+  planning:
+    description: Discovering PRs, computing dependency order
+    terminal: false
+    
+  gated:
+    description: Running gates on each PR
+    terminal: false
+    
+  decision_gate_failure:
+    description: One or more gates failed, awaiting decision
+    terminal: false
+    
+  weaving:
+    description: Merging PRs in computed order
+    terminal: false
+    
+  completed:
+    description: All PRs merged successfully
+    terminal: true
+    
+  failed:
+    description: Run aborted or unrecoverable failure
+    terminal: true
+
+# State transitions with triggering events
+transitions:
+  planning:
+    PLAN_READY:
+      to: gated
+      description: Plan is ready, proceed to running gates
+    PLAN_EMPTY:
+      to: completed
+      description: No PRs to merge
+    PLAN_FAILED:
+      to: failed
+      description: Planning phase failed
+      
+  gated:
+    ALL_GATES_PASSED:
+      to: weaving
+      description: All gates passed, proceed to merging
+    SOME_GATES_FAILED:
+      to: decision_gate_failure
+      description: One or more gates failed, requires decision
+      
+  decision_gate_failure:
+    RETRY_GATES:
+      to: gated
+      description: Retry running the failed gates
+    SKIP_FAILED:
+      to: weaving
+      description: Skip failed items and continue with successful ones
+    ABORT:
+      to: failed
+      description: Abort the run
+      
+  weaving:
+    ALL_MERGED:
+      to: completed
+      description: All PRs merged successfully
+    MERGE_CONFLICT:
+      to: decision_gate_failure
+      description: Merge conflict detected, requires decision
+    MERGE_FAILED:
+      to: failed
+      description: Unrecoverable merge failure
+
+# Decision points requiring LLM or human input
+decisionPoints:
+  gate_failure:
+    state: decision_gate_failure
+    trigger: SOME_GATES_FAILED
+    prompt: "Gate(s) failed. Review failures in artifacts and decide."
+    options:
+      - action: retry_gates
+        description: Re-run failed gates
+        riskLevel: low
+      - action: skip_failed
+        description: Continue without failed items
+        requiresLLMDecision: true
+        prompt: "Provide rationale for skipping failed items."
+        riskLevel: medium
+        constraints:
+          - Requires explicit rationale
+          - Should only skip if failures are non-critical
+      - action: abort
+        description: Stop the run
+        riskLevel: low
+        
+  conflict_resolution:
+    state: decision_gate_failure
+    trigger: MERGE_CONFLICT
+    prompt: "Merge conflict detected. Review conflict report and decide."
+    options:
+      - action: resolve_conflict
+        description: Apply resolution to the conflict
+        requiresLLMDecision: true
+        prompt: "Provide conflict resolution strategy."
+        riskLevel: medium
+        constraints:
+          - Preserve functionality from both branches
+          - Do not remove existing tests
+      - action: skip_pr
+        description: Skip the conflicting PR
+        requiresLLMDecision: true
+        prompt: "Provide rationale for skipping this PR."
+        riskLevel: medium
+      - action: abort
+        description: Stop the run
+        riskLevel: low
+
+# Next options available in each state
+nextOptions:
+  planning:
+    - action: wait
+      description: Plan is computing (no action needed)
+      riskLevel: low
+    - action: abort
+      description: Cancel the run
+      riskLevel: medium
+      
+  gated:
+    - action: wait
+      description: Gates are running
+      riskLevel: low
+    - action: pause
+      description: Pause gate execution
+      riskLevel: low
+    - action: abort
+      description: Cancel the run
+      riskLevel: medium
+      
+  decision_gate_failure:
+    - action: retry_gates
+      description: Re-run failed gates
+      riskLevel: low
+    - action: skip_failed
+      description: Continue without failed items
+      requiresLLMDecision: true
+      prompt: "Provide rationale for skipping failed items."
+      riskLevel: medium
+    - action: resolve_conflict
+      description: Apply conflict resolution
+      requiresLLMDecision: true
+      prompt: "Provide conflict resolution strategy."
+      riskLevel: medium
+    - action: skip_pr
+      description: Skip the conflicting PR
+      requiresLLMDecision: true
+      prompt: "Provide rationale for skipping this PR."
+      riskLevel: medium
+    - action: abort
+      description: Stop the run
+      riskLevel: low
+      
+  weaving:
+    - action: wait
+      description: Merges are in progress
+      riskLevel: low
+    - action: pause
+      description: Pause after current merge
+      riskLevel: low
+    - action: abort
+      description: Cancel the run (leaves partial state)
+      riskLevel: high
+      
+  completed:
+    - action: view_summary
+      description: View merge summary
+      riskLevel: low
+    - action: create_release
+      description: Create release (optional)
+      riskLevel: medium
+      
+  failed:
+    - action: view_logs
+      description: View failure logs
+      riskLevel: low
+    - action: retry
+      description: Retry the entire procedure
+      riskLevel: medium
+    - action: cleanup
+      description: Clean up partial state
+      riskLevel: medium
+
+# Integration with existing weave state machine
+integration:
+  stateMachine: src/weave/stateMachine.ts
+  types: src/weave/types.ts
+  mapping:
+    # Maps procedure states to weave state machine states
+    planning: 
+      - IDLE
+      - PLANNING
+      - COMPUTING_ORDER
+    gated:
+      - READY
+      - VALIDATING
+    decision_gate_failure:
+      - PAUSED
+    weaving:
+      - MERGING
+    completed:
+      - COMPLETED
+    failed:
+      - FAILED
