@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
+import { isGitEnabled, getDefaultBranch, getDefaultCommit } from "../shared/git/runtime.js";
 
 const require = createRequire(import.meta.url);
 
@@ -298,8 +299,14 @@ function findRepoRoot(startDir: string): string {
 
 /**
  * Get current git branch name (synchronous)
+ * Returns safe fallback when git is disabled via LEX_GIT_MODE
  */
 function getCurrentBranch(cwd: string): string {
+	// Check runtime gate first
+	if (!isGitEnabled()) {
+		return getDefaultBranch();
+	}
+
 	try {
 		const { execSync } = require("child_process");
 		const branch = execSync("git rev-parse --abbrev-ref HEAD", {
@@ -309,14 +316,20 @@ function getCurrentBranch(cwd: string): string {
 		});
 		return branch.trim();
 	} catch {
-		return "";
+		return getDefaultBranch();
 	}
 }
 
 /**
  * Get current git commit SHA (synchronous)
+ * Returns safe fallback when git is disabled via LEX_GIT_MODE
  */
 function getCurrentCommit(cwd: string): string {
+	// Check runtime gate first
+	if (!isGitEnabled()) {
+		return getDefaultCommit();
+	}
+
 	try {
 		const { execSync } = require("child_process");
 		const commit = execSync("git rev-parse HEAD", {
@@ -326,6 +339,6 @@ function getCurrentCommit(cwd: string): string {
 		});
 		return commit.trim();
 	} catch {
-		return "";
+		return getDefaultCommit();
 	}
 }
