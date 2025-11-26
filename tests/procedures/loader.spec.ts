@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import YAML from "yaml";
 import {
 	ProcedureLoader,
 	ProcedureLoadError,
@@ -352,10 +353,9 @@ describe("ProcedureLoader", () => {
 	});
 
 	const writeProcedure = (filename: string, content: object): void => {
-		const yaml = require("yaml");
 		fs.writeFileSync(
 			path.join(tempDir, filename),
-			yaml.stringify(content),
+			YAML.stringify(content),
 			"utf8"
 		);
 	};
@@ -419,7 +419,7 @@ describe("ProcedureLoader", () => {
 	});
 
 	it("throws for invalid YAML", async () => {
-		fs.writeFileSync(path.join(tempDir, "invalid.yaml"), "{ invalid yaml", "utf8");
+		fs.writeFileSync(path.join(tempDir, "invalid.yaml"), "{ unclosed: brace", "utf8");
 
 		await expect(loader.loadProcedure("invalid")).rejects.toThrow(
 			ProcedureLoadError
@@ -476,7 +476,7 @@ describe("ProcedureLoader", () => {
 			transitions: { s: {} }
 		});
 
-		fs.writeFileSync(path.join(tempDir, "invalid.yaml"), "{ invalid", "utf8");
+		fs.writeFileSync(path.join(tempDir, "invalid.yaml"), "{ unclosed: brace", "utf8");
 
 		const summaries = await loader.listProcedures();
 		expect(summaries.length).toBe(1);
