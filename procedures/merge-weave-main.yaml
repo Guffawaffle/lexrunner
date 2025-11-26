@@ -205,19 +205,19 @@ integration:
   stateMachine: src/weave/stateMachine.ts
   types: src/weave/types.ts
   mapping:
-    # Maps procedure states to weave state machine states
+    # Maps procedure states to weave state machine states (lowercase values match WeaveState enum)
     planning: 
-      - IDLE
-      - PLANNING
-      - COMPUTING_ORDER
+      - idle
+      - planning
+      - computing_order
     gated:
-      - READY
-      - VALIDATING
+      - ready
+      - validating
     decision_gate_failure:
-      - PAUSED
+      - paused
     weaving:
-      - MERGING
+      - merging
     completed:
-      - COMPLETED
+      - completed
     failed:
-      - FAILED
+      - failed

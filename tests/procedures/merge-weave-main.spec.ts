@@ -314,17 +314,17 @@ describe("merge-weave-main Procedure", () => {
 		});
 
 		it("should map procedure states to weave states", () => {
-			expect(procedure.integration.mapping.planning).toContain("IDLE");
-			expect(procedure.integration.mapping.planning).toContain("PLANNING");
-			expect(procedure.integration.mapping.planning).toContain("COMPUTING_ORDER");
+			expect(procedure.integration.mapping.planning).toContain("idle");
+			expect(procedure.integration.mapping.planning).toContain("planning");
+			expect(procedure.integration.mapping.planning).toContain("computing_order");
 			
-			expect(procedure.integration.mapping.gated).toContain("READY");
-			expect(procedure.integration.mapping.gated).toContain("VALIDATING");
+			expect(procedure.integration.mapping.gated).toContain("ready");
+			expect(procedure.integration.mapping.gated).toContain("validating");
 			
-			expect(procedure.integration.mapping.weaving).toContain("MERGING");
+			expect(procedure.integration.mapping.weaving).toContain("merging");
 			
-			expect(procedure.integration.mapping.completed).toContain("COMPLETED");
-			expect(procedure.integration.mapping.failed).toContain("FAILED");
+			expect(procedure.integration.mapping.completed).toContain("completed");
+			expect(procedure.integration.mapping.failed).toContain("failed");
 		});
 
 		it("should map all procedure states", () => {
@@ -435,9 +435,8 @@ describe("merge-weave-main Procedure", () => {
 			
 			for (const [procedureState, mappedStates] of Object.entries(procedure.integration.mapping)) {
 				for (const mappedState of mappedStates) {
-					// Convert to lowercase for comparison with enum values
-					const normalized = mappedState.toLowerCase();
-					expect(weaveStates.map(s => s.toLowerCase())).toContain(normalized);
+					// Mapping values should directly match WeaveState enum values (lowercase)
+					expect(weaveStates).toContain(mappedState);
 				}
 			}
 		});
