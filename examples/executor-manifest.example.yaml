@@ -1,0 +1,80 @@
+# Example Executor Manifest
+# Based on v0.3.0 thesis: Section 3.3 (Executors as Operational Units)
+#
+# An executor is a small, named, versioned unit that:
+# - implements a narrow role
+# - fixes its tool budget (which tools it may call, under what limits)
+# - binds to a particular guardrail profile (G_scope, G_tool, G_epist, G_style, G_audit)
+# - follows a simple Jordan-mode protocol
+
+schemaVersion: "executor-1.0.0"
+role: "senior-dev-review"
+description: "Code review with mentorship feedback"
+
+# Tool Budget: which tools the executor can use and under what constraints
+toolBudget:
+  allowed:
+    - grep_search
+    - read_file
+    - list_dir
+    - get_errors
+  denied:
+    - run_in_terminal
+    - create_file
+    - replace_string_in_file
+  limits:
+    maxToolCalls: 20
+    maxTokensOut: 2000
+
+# Guardrail Profile: binds all five guardrail types
+guardrailProfile:
+  # G_scope: controls which paths the executor can access
+  scope:
+    allowedPaths:
+      - "src/**"
+      - "tests/**"
+    deniedPaths:
+      - "*.env"
+      - "secrets/**"
+
+  # G_tool: specifies required and optional tool dependencies
+  tool:
+    required:
+      - get_errors
+    optional:
+      - grep_search
+
+  # G_epist: controls uncertainty handling and escalation
+  epistemic:
+    allowIDK: true
+    escalationThreshold: "high-risk"
+
+  # G_style: controls output formatting requirements
+  style:
+    requirePlan: true
+    requireSummary: true
+
+  # G_audit: controls logging and frame emission
+  audit:
+    level: "normal"
+    frameSchema: "frame-v2"
+
+# Jordan-Mode Protocol: the execution phases
+jordanModeProtocol:
+  # Phase 1: Deterministically prepare and validate inputs from E, L, S
+  prepPhase:
+    - load-context
+    - validate-scope
+
+  # Phase 2: Perform at most one irreducibly stochastic model call
+  stochasticPhase:
+    promptTemplate: "prompts/code-review.prompt.md"
+    maxCalls: 1
+
+  # Phase 3: Emit at least one Frame into F as a receipt
+  receiptPhase:
+    frameType: "review-frame"
+    fields:
+      - decision
+      - rationale
+      - suggestions
