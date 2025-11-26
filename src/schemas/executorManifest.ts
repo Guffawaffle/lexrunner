@@ -29,7 +29,7 @@ export const ExecutorSchemaVersion = z
  */
 export const ToolLimits = z.object({
 	maxToolCalls: z.number().int().min(1).optional(),
-	maxTokensOut: z.number().int().min(1).optional()
+	maxTokensOut: z.number().int().min(1).optional(),
 });
 export type ToolLimits = z.infer<typeof ToolLimits>;
 
@@ -40,7 +40,7 @@ export type ToolLimits = z.infer<typeof ToolLimits>;
 export const ToolBudget = z.object({
 	allowed: z.array(z.string()).default([]),
 	denied: z.array(z.string()).default([]),
-	limits: ToolLimits.optional()
+	limits: ToolLimits.optional(),
 });
 export type ToolBudget = z.infer<typeof ToolBudget>;
 
@@ -50,7 +50,7 @@ export type ToolBudget = z.infer<typeof ToolBudget>;
  */
 export const ScopeGuardrail = z.object({
 	allowedPaths: z.array(z.string()).default([]),
-	deniedPaths: z.array(z.string()).default([])
+	deniedPaths: z.array(z.string()).default([]),
 });
 export type ScopeGuardrail = z.infer<typeof ScopeGuardrail>;
 
@@ -60,7 +60,7 @@ export type ScopeGuardrail = z.infer<typeof ScopeGuardrail>;
  */
 export const ToolGuardrail = z.object({
 	required: z.array(z.string()).default([]),
-	optional: z.array(z.string()).default([])
+	optional: z.array(z.string()).default([]),
 });
 export type ToolGuardrail = z.infer<typeof ToolGuardrail>;
 
@@ -71,7 +71,7 @@ export const EscalationThreshold = z.enum([
 	"low-risk",
 	"medium-risk",
 	"high-risk",
-	"critical"
+	"critical",
 ]);
 export type EscalationThreshold = z.infer<typeof EscalationThreshold>;
 
@@ -81,7 +81,7 @@ export type EscalationThreshold = z.infer<typeof EscalationThreshold>;
  */
 export const EpistemicGuardrail = z.object({
 	allowIDK: z.boolean().default(true),
-	escalationThreshold: EscalationThreshold.optional()
+	escalationThreshold: EscalationThreshold.optional(),
 });
 export type EpistemicGuardrail = z.infer<typeof EpistemicGuardrail>;
 
@@ -91,7 +91,7 @@ export type EpistemicGuardrail = z.infer<typeof EpistemicGuardrail>;
  */
 export const StyleGuardrail = z.object({
 	requirePlan: z.boolean().default(false),
-	requireSummary: z.boolean().default(false)
+	requireSummary: z.boolean().default(false),
 });
 export type StyleGuardrail = z.infer<typeof StyleGuardrail>;
 
@@ -107,29 +107,31 @@ export type AuditLevel = z.infer<typeof AuditLevel>;
  */
 export const AuditGuardrail = z.object({
 	level: AuditLevel.default("normal"),
-	frameSchema: z.string().optional()
+	frameSchema: z.string().optional(),
 });
 export type AuditGuardrail = z.infer<typeof AuditGuardrail>;
 
 /**
- * Complete guardrail profile
- * Binds all guardrail types (G_scope, G_tool, G_epist, G_style, G_audit)
+ * Executor-specific guardrail configuration
+ *
+ * A simplified guardrail binding for executor manifests.
+ * For full GuardrailProfile specification, see src/types/guardrails.ts
  */
-export const GuardrailProfile = z.object({
+export const ExecutorGuardrails = z.object({
 	scope: ScopeGuardrail.optional(),
 	tool: ToolGuardrail.optional(),
 	epistemic: EpistemicGuardrail.optional(),
 	style: StyleGuardrail.optional(),
-	audit: AuditGuardrail.optional()
+	audit: AuditGuardrail.optional(),
 });
-export type GuardrailProfile = z.infer<typeof GuardrailProfile>;
+export type ExecutorGuardrails = z.infer<typeof ExecutorGuardrails>;
 
 /**
  * Stochastic phase configuration for Jordan-mode protocol
  */
 export const StochasticPhase = z.object({
 	promptTemplate: z.string(),
-	maxCalls: z.number().int().min(1).default(1)
+	maxCalls: z.number().int().min(1).default(1),
 });
 export type StochasticPhase = z.infer<typeof StochasticPhase>;
 
@@ -139,7 +141,7 @@ export type StochasticPhase = z.infer<typeof StochasticPhase>;
  */
 export const ReceiptPhase = z.object({
 	frameType: z.string(),
-	fields: z.array(z.string()).min(1, "At least one field is required")
+	fields: z.array(z.string()).min(1, "At least one field is required"),
 });
 export type ReceiptPhase = z.infer<typeof ReceiptPhase>;
 
@@ -154,7 +156,7 @@ export type ReceiptPhase = z.infer<typeof ReceiptPhase>;
 export const JordanModeProtocol = z.object({
 	prepPhase: z.array(z.string()).default([]),
 	stochasticPhase: StochasticPhase,
-	receiptPhase: ReceiptPhase
+	receiptPhase: ReceiptPhase,
 });
 export type JordanModeProtocol = z.infer<typeof JordanModeProtocol>;
 
@@ -170,8 +172,8 @@ export const ExecutorManifestSchema = z.object({
 	role: z.string().min(1, "Role is required"),
 	description: z.string().optional(),
 	toolBudget: ToolBudget,
-	guardrailProfile: GuardrailProfile.optional(),
-	jordanModeProtocol: JordanModeProtocol
+	guardrails: ExecutorGuardrails.optional(),
+	jordanModeProtocol: JordanModeProtocol,
 });
 export type ExecutorManifest = z.infer<typeof ExecutorManifestSchema>;
 
@@ -188,6 +190,8 @@ export function validateExecutorManifest(data: unknown): ExecutorManifest {
  * - { success: true, data: ExecutorManifest } on valid input
  * - { success: false, error: ZodError } on invalid input
  */
-export function safeParseExecutorManifest(data: unknown): z.SafeParseReturnType<unknown, ExecutorManifest> {
+export function safeParseExecutorManifest(
+	data: unknown
+): z.SafeParseReturnType<unknown, ExecutorManifest> {
 	return ExecutorManifestSchema.safeParse(data);
 }

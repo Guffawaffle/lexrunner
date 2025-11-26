@@ -26,8 +26,9 @@ toolBudget:
     maxToolCalls: 20
     maxTokensOut: 2000
 
-# Guardrail Profile: binds all five guardrail types
-guardrailProfile:
+# Guardrails: executor-specific guardrail configuration
+# For full GuardrailProfile specification, see src/types/guardrails.ts
+guardrails:
   # G_scope: controls which paths the executor can access
   scope:
     allowedPaths:

@@ -8,26 +8,34 @@ import {
 	ExecutorManifestSchema,
 	ExecutorSchemaVersion,
 	ToolBudget,
-	GuardrailProfile,
+	ExecutorGuardrails,
 	JordanModeProtocol,
 	ReceiptPhase,
 	StochasticPhase,
 	validateExecutorManifest,
-	safeParseExecutorManifest
+	safeParseExecutorManifest,
 } from "../../src/schemas/executorManifest.js";
 
 describe("Executor Manifest Schema", () => {
 	describe("ExecutorSchemaVersion", () => {
 		it("should validate correct executor schema version format", () => {
-			expect(() => ExecutorSchemaVersion.parse("executor-1.0.0")).not.toThrow();
-			expect(() => ExecutorSchemaVersion.parse("executor-2.1.3")).not.toThrow();
-			expect(() => ExecutorSchemaVersion.parse("executor-0.0.1")).not.toThrow();
+			expect(() =>
+				ExecutorSchemaVersion.parse("executor-1.0.0")
+			).not.toThrow();
+			expect(() =>
+				ExecutorSchemaVersion.parse("executor-2.1.3")
+			).not.toThrow();
+			expect(() =>
+				ExecutorSchemaVersion.parse("executor-0.0.1")
+			).not.toThrow();
 		});
 
 		it("should reject invalid version formats", () => {
 			expect(() => ExecutorSchemaVersion.parse("1.0.0")).toThrow();
 			expect(() => ExecutorSchemaVersion.parse("executor-1.0")).toThrow();
-			expect(() => ExecutorSchemaVersion.parse("executor-v1.0.0")).toThrow();
+			expect(() =>
+				ExecutorSchemaVersion.parse("executor-v1.0.0")
+			).toThrow();
 			expect(() => ExecutorSchemaVersion.parse("exec-1.0.0")).toThrow();
 		});
 	});
@@ -39,8 +47,8 @@ describe("Executor Manifest Schema", () => {
 				denied: ["run_in_terminal"],
 				limits: {
 					maxToolCalls: 20,
-					maxTokensOut: 2000
-				}
+					maxTokensOut: 2000,
+				},
 			};
 
 			const result = ToolBudget.parse(budget);
@@ -58,44 +66,44 @@ describe("Executor Manifest Schema", () => {
 		it("should validate limits constraints", () => {
 			expect(() =>
 				ToolBudget.parse({
-					limits: { maxToolCalls: 0 }
+					limits: { maxToolCalls: 0 },
 				})
 			).toThrow();
 
 			expect(() =>
 				ToolBudget.parse({
-					limits: { maxToolCalls: -1 }
+					limits: { maxToolCalls: -1 },
 				})
 			).toThrow();
 		});
 	});
 
-	describe("GuardrailProfile", () => {
+	describe("ExecutorGuardrails", () => {
 		it("should validate complete guardrail profile", () => {
 			const profile = {
 				scope: {
 					allowedPaths: ["src/**", "tests/**"],
-					deniedPaths: ["*.env", "secrets/**"]
+					deniedPaths: ["*.env", "secrets/**"],
 				},
 				tool: {
 					required: ["get_errors"],
-					optional: ["grep_search"]
+					optional: ["grep_search"],
 				},
 				epistemic: {
 					allowIDK: true,
-					escalationThreshold: "high-risk"
+					escalationThreshold: "high-risk",
 				},
 				style: {
 					requirePlan: true,
-					requireSummary: true
+					requireSummary: true,
 				},
 				audit: {
 					level: "normal",
-					frameSchema: "frame-v2"
-				}
+					frameSchema: "frame-v2",
+				},
 			};
 
-			const result = GuardrailProfile.parse(profile);
+			const result = ExecutorGuardrails.parse(profile);
 			expect(result.scope?.allowedPaths).toEqual(["src/**", "tests/**"]);
 			expect(result.epistemic?.escalationThreshold).toBe("high-risk");
 			expect(result.audit?.level).toBe("normal");
@@ -104,21 +112,26 @@ describe("Executor Manifest Schema", () => {
 		it("should allow partial guardrail profiles", () => {
 			const profile = {
 				scope: {
-					allowedPaths: ["src/**"]
-				}
+					allowedPaths: ["src/**"],
+				},
 			};
 
-			const result = GuardrailProfile.parse(profile);
+			const result = ExecutorGuardrails.parse(profile);
 			expect(result.scope?.allowedPaths).toEqual(["src/**"]);
 			expect(result.tool).toBeUndefined();
 		});
 
 		it("should validate escalation threshold enum", () => {
-			const validThresholds = ["low-risk", "medium-risk", "high-risk", "critical"];
+			const validThresholds = [
+				"low-risk",
+				"medium-risk",
+				"high-risk",
+				"critical",
+			];
 
 			for (const threshold of validThresholds) {
-				const result = GuardrailProfile.parse({
-					epistemic: { escalationThreshold: threshold }
+				const result = ExecutorGuardrails.parse({
+					epistemic: { escalationThreshold: threshold },
 				});
 				expect(result.epistemic?.escalationThreshold).toBe(threshold);
 			}
@@ -126,8 +139,8 @@ describe("Executor Manifest Schema", () => {
 
 		it("should reject invalid escalation threshold", () => {
 			expect(() =>
-				GuardrailProfile.parse({
-					epistemic: { escalationThreshold: "invalid" }
+				ExecutorGuardrails.parse({
+					epistemic: { escalationThreshold: "invalid" },
 				})
 			).toThrow();
 		});
@@ -136,8 +149,8 @@ describe("Executor Manifest Schema", () => {
 			const validLevels = ["minimal", "normal", "verbose", "debug"];
 
 			for (const level of validLevels) {
-				const result = GuardrailProfile.parse({
-					audit: { level }
+				const result = ExecutorGuardrails.parse({
+					audit: { level },
 				});
 				expect(result.audit?.level).toBe(level);
 			}
@@ -150,29 +163,34 @@ describe("Executor Manifest Schema", () => {
 				prepPhase: ["load-context", "validate-scope"],
 				stochasticPhase: {
 					promptTemplate: "prompts/code-review.prompt.md",
-					maxCalls: 1
+					maxCalls: 1,
 				},
 				receiptPhase: {
 					frameType: "review-frame",
-					fields: ["decision", "rationale", "suggestions"]
-				}
+					fields: ["decision", "rationale", "suggestions"],
+				},
 			};
 
 			const result = JordanModeProtocol.parse(protocol);
-			expect(result.prepPhase).toEqual(["load-context", "validate-scope"]);
-			expect(result.stochasticPhase.promptTemplate).toBe("prompts/code-review.prompt.md");
+			expect(result.prepPhase).toEqual([
+				"load-context",
+				"validate-scope",
+			]);
+			expect(result.stochasticPhase.promptTemplate).toBe(
+				"prompts/code-review.prompt.md"
+			);
 			expect(result.receiptPhase.fields).toHaveLength(3);
 		});
 
 		it("should apply default for prepPhase", () => {
 			const protocol = {
 				stochasticPhase: {
-					promptTemplate: "test.prompt.md"
+					promptTemplate: "test.prompt.md",
 				},
 				receiptPhase: {
 					frameType: "test-frame",
-					fields: ["output"]
-				}
+					fields: ["output"],
+				},
 			};
 
 			const result = JordanModeProtocol.parse(protocol);
@@ -182,12 +200,12 @@ describe("Executor Manifest Schema", () => {
 		it("should apply default maxCalls of 1", () => {
 			const protocol = {
 				stochasticPhase: {
-					promptTemplate: "test.prompt.md"
+					promptTemplate: "test.prompt.md",
 				},
 				receiptPhase: {
 					frameType: "test-frame",
-					fields: ["output"]
-				}
+					fields: ["output"],
+				},
 			};
 
 			const result = JordanModeProtocol.parse(protocol);
@@ -198,7 +216,7 @@ describe("Executor Manifest Schema", () => {
 			expect(() =>
 				JordanModeProtocol.parse({
 					stochasticPhase: { promptTemplate: "test.prompt.md" },
-					receiptPhase: { frameType: "test-frame", fields: [] }
+					receiptPhase: { frameType: "test-frame", fields: [] },
 				})
 			).toThrow();
 		});
@@ -208,7 +226,7 @@ describe("Executor Manifest Schema", () => {
 		it("should validate receipt phase with fields", () => {
 			const receipt = {
 				frameType: "review-frame",
-				fields: ["decision", "rationale"]
+				fields: ["decision", "rationale"],
 			};
 
 			const result = ReceiptPhase.parse(receipt);
@@ -220,7 +238,7 @@ describe("Executor Manifest Schema", () => {
 			expect(() =>
 				ReceiptPhase.parse({
 					frameType: "test-frame",
-					fields: []
+					fields: [],
 				})
 			).toThrow();
 		});
@@ -230,7 +248,7 @@ describe("Executor Manifest Schema", () => {
 		it("should validate stochastic phase", () => {
 			const phase = {
 				promptTemplate: "prompts/review.prompt.md",
-				maxCalls: 3
+				maxCalls: 3,
 			};
 
 			const result = StochasticPhase.parse(phase);
@@ -242,7 +260,7 @@ describe("Executor Manifest Schema", () => {
 			expect(() =>
 				StochasticPhase.parse({
 					promptTemplate: "test.prompt.md",
-					maxCalls: 0
+					maxCalls: 0,
 				})
 			).toThrow();
 		});
@@ -255,52 +273,58 @@ describe("Executor Manifest Schema", () => {
 			description: "Code review with mentorship feedback",
 			toolBudget: {
 				allowed: ["grep_search", "read_file", "list_dir", "get_errors"],
-				denied: ["run_in_terminal", "create_file", "replace_string_in_file"],
+				denied: [
+					"run_in_terminal",
+					"create_file",
+					"replace_string_in_file",
+				],
 				limits: {
 					maxToolCalls: 20,
-					maxTokensOut: 2000
-				}
+					maxTokensOut: 2000,
+				},
 			},
-			guardrailProfile: {
+			guardrails: {
 				scope: {
 					allowedPaths: ["src/**", "tests/**"],
-					deniedPaths: ["*.env", "secrets/**"]
+					deniedPaths: ["*.env", "secrets/**"],
 				},
 				tool: {
 					required: ["get_errors"],
-					optional: ["grep_search"]
+					optional: ["grep_search"],
 				},
 				epistemic: {
 					allowIDK: true,
-					escalationThreshold: "high-risk"
+					escalationThreshold: "high-risk",
 				},
 				style: {
 					requirePlan: true,
-					requireSummary: true
+					requireSummary: true,
 				},
 				audit: {
 					level: "normal",
-					frameSchema: "frame-v2"
-				}
+					frameSchema: "frame-v2",
+				},
 			},
 			jordanModeProtocol: {
 				prepPhase: ["load-context", "validate-scope"],
 				stochasticPhase: {
 					promptTemplate: "prompts/code-review.prompt.md",
-					maxCalls: 1
+					maxCalls: 1,
 				},
 				receiptPhase: {
 					frameType: "review-frame",
-					fields: ["decision", "rationale", "suggestions"]
-				}
-			}
+					fields: ["decision", "rationale", "suggestions"],
+				},
+			},
 		};
 
 		it("should validate complete executor manifest", () => {
 			const result = ExecutorManifestSchema.parse(validManifest);
 			expect(result.schemaVersion).toBe("executor-1.0.0");
 			expect(result.role).toBe("senior-dev-review");
-			expect(result.description).toBe("Code review with mentorship feedback");
+			expect(result.description).toBe(
+				"Code review with mentorship feedback"
+			);
 		});
 
 		it("should validate minimal executor manifest", () => {
@@ -310,26 +334,26 @@ describe("Executor Manifest Schema", () => {
 				toolBudget: {},
 				jordanModeProtocol: {
 					stochasticPhase: {
-						promptTemplate: "prompts/simple.prompt.md"
+						promptTemplate: "prompts/simple.prompt.md",
 					},
 					receiptPhase: {
 						frameType: "simple-frame",
-						fields: ["output"]
-					}
-				}
+						fields: ["output"],
+					},
+				},
 			};
 
 			const result = ExecutorManifestSchema.parse(minimalManifest);
 			expect(result.role).toBe("simple-executor");
 			expect(result.toolBudget.allowed).toEqual([]);
-			expect(result.guardrailProfile).toBeUndefined();
+			expect(result.guardrails).toBeUndefined();
 		});
 
 		it("should reject missing required fields", () => {
 			expect(() =>
 				ExecutorManifestSchema.parse({
 					schemaVersion: "executor-1.0.0",
-					role: "test"
+					role: "test",
 					// Missing toolBudget and jordanModeProtocol
 				})
 			).toThrow();
@@ -343,8 +367,8 @@ describe("Executor Manifest Schema", () => {
 					toolBudget: {},
 					jordanModeProtocol: {
 						stochasticPhase: { promptTemplate: "test.md" },
-						receiptPhase: { frameType: "test", fields: ["a"] }
-					}
+						receiptPhase: { frameType: "test", fields: ["a"] },
+					},
 				})
 			).toThrow();
 		});

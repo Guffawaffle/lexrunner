@@ -53,7 +53,7 @@
           },
           "additionalProperties": false
         },
-        "guardrailProfile": {
+        "guardrails": {
           "type": "object",
           "properties": {
             "scope": {
