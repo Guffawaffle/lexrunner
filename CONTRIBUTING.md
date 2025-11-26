@@ -70,6 +70,30 @@ See `docs/cli.md` for the full command reference.
 
 If adding public behavior or fixing a bug, prefer tests first (happy path + 1-2 edge cases). Ensure outputs are deterministic.
 
+### Slow CLI Tests
+
+Some CLI tests are excluded from the default `npm test` run because they involve long-running operations (e.g., sleep commands, extensive git operations). These tests run on a scheduled CI workflow instead.
+
+**To run slow CLI tests locally:**
+
+```bash
+LEX_ENABLE_SLOW_CLI_TESTS=true npm run test:cli:slow
+```
+
+**Test categorization:**
+
+| Category | Command | CI Lane |
+|----------|---------|---------|
+| Default tests | `npm test` | Every PR, fast |
+| Slow CLI tests | `npm run test:cli:slow` | Scheduled/manual |
+| Git-dependent tests | `npm run test:git` | Manual |
+
+**Adding new slow tests:**
+
+1. Add the test file to `vitest.slow-cli.config.ts` `include` array
+2. Add exclusion to `vitest.config.ts` `exclude` array
+3. Document why the test is slow in the test file
+
 ### Testing Planner Features
 
 When working on diffgraph planner features (`src/planner/`), follow these guidelines:
