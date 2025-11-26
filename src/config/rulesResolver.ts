@@ -80,9 +80,10 @@ interface ResolvedRule {
  */
 export async function loadLexSonaRules(
 	scope?: RuleScope,
+	// TODO: Enable in v0.5.0 - tracked by LexSona integration epic
 	enabled: boolean = false
 ): Promise<BehavioralRule[]> {
-	// Feature flag: LexSona not enabled yet
+	// Feature flag: LexSona not enabled yet (v0.5.0 target)
 	if (!enabled) {
 		return [];
 	}

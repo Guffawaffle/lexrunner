@@ -134,10 +134,11 @@ describe("runGit wrapper", () => {
 		it("returns dry-run fallback when LEX_GIT_MODE=off", () => {
 			process.env.LEX_GIT_MODE = "off";
 			const commit = getCurrentCommit();
-			expect(commit).toBe("abc1234567890def1234567890abc1234567890de");
+			// Now uses getDefaultCommit() from runtime.ts for consistency
+			expect(commit).toBe("0000000000000000000000000000000000000000");
 
 			const shortCommit = getCurrentCommit(undefined, true);
-			expect(shortCommit).toBe("abc1234");
+			expect(shortCommit).toBe("0000000");
 		});
 
 		it("returns empty string for non-git directory", () => {

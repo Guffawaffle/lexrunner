@@ -17,6 +17,7 @@ export default defineConfig({
 		environment: "node",
 		include: [
 			// Slow CLI tests with sleep commands for progress indicators
+			// TODO: Consider adopting *.slow.spec.ts naming convention for auto-discovery
 			"**/tests/cli-progress.spec.ts",
 		],
 		exclude: [

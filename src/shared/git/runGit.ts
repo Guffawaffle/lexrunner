@@ -8,6 +8,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { getDefaultBranch, getDefaultCommit } from "./runtime.js";
 
 /**
  * Result from a git command execution
@@ -49,6 +50,12 @@ const DEFAULT_DRY_RUN_FALLBACK: GitResult = {
  *
  * When LEX_GIT_MODE=off, git commands return configured fallback values
  * instead of executing actual git commands.
+ *
+ * Note: This is intentionally NOT `!isGitEnabled()` - when LEX_GIT_MODE is unset,
+ * git operations execute normally but with safe defaults (GPG disabled).
+ * Dry-run mode requires explicit opt-in via LEX_GIT_MODE=off.
+ *
+ * @see isGitEnabled in runtime.ts for the inverse check
  */
 export function isGitDryRun(): boolean {
 	return process.env.LEX_GIT_MODE === "off";
@@ -149,7 +156,7 @@ export function getCurrentBranch(cwd?: string): string {
 		disableGpgSign: false, // No GPG config needed for read operations
 		dryRunFallback: {
 			exitCode: 0,
-			stdout: "main",
+			stdout: getDefaultBranch(), // Use runtime.ts for consistent fallback
 			stderr: "",
 		},
 	});
@@ -179,12 +186,16 @@ export function getCurrentCommit(cwd?: string, short?: boolean): string {
 		? ["rev-parse", "--short", "HEAD"]
 		: ["rev-parse", "HEAD"];
 
+	// Use runtime.ts for consistent fallback SHA
+	const defaultCommit = getDefaultCommit();
+	const shortDefaultCommit = defaultCommit.substring(0, 7);
+
 	const result = runGit(args, {
 		cwd,
 		disableGpgSign: false, // No GPG config needed for read operations
 		dryRunFallback: {
 			exitCode: 0,
-			stdout: short ? "abc1234" : "abc1234567890def1234567890abc1234567890de",
+			stdout: short ? shortDefaultCommit : defaultCommit,
 			stderr: "",
 		},
 	});
