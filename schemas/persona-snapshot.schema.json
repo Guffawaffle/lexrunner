@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/persona-snapshot.schema.json",
+  "title": "Persona Snapshot Schema",
+  "description": "Schema for persona snapshot objects that capture the current persona mode and constraints.",
+  "version": "1.0.0",
+  "$ref": "#/definitions/PersonaSnapshot",
+  "definitions": {
+    "PersonaSnapshot": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completionGates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decisionStyle": {
+          "type": "object",
+          "properties": {
+            "preferSmallDiffs": {
+              "type": "boolean"
+            },
+            "requireRationaleForSkips": {
+              "type": "boolean"
+            },
+            "escalateSecurityFindings": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputFormat": {
+          "type": "object",
+          "properties": {
+            "severityLevels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "requireSeverityOnFindings": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "mode",
+        "forbidden",
+        "completionGates"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
