@@ -67,6 +67,16 @@ import type {
 	Severity,
 } from "../executors/seniorDev/index.js";
 
+// Run manager imports
+import {
+	createRunManager,
+	StartRunInput,
+	StartRunInputSchema,
+	GetStatusInput,
+	GetStatusInputSchema,
+	RunNotFoundError,
+} from "../runs/index.js";
+
 /**
  * Create and configure the MCP server
  */
@@ -404,6 +414,58 @@ function createServer(): Server {
 						properties: {},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// LexRunner Run Management Tools
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "lexrunner.startRun",
+					description:
+						"Start a new LexRunner procedure run and return a runId",
+					inputSchema: {
+						type: "object",
+						properties: {
+							mode: {
+								type: "string",
+								description:
+									"Persona mode (e.g., 'senior-dev', 'eager-pm')",
+							},
+							procedure: {
+								type: "string",
+								description:
+									"Procedure identifier (e.g., 'merge-weave-main', 'pr-review')",
+							},
+							repo: {
+								type: "string",
+								description:
+									"Repository in 'owner/repo' format",
+							},
+							task: {
+								type: "string",
+								description: "Human-readable task description",
+							},
+							params: {
+								type: "object",
+								description: "Procedure-specific parameters",
+							},
+						},
+						required: ["mode", "procedure", "repo"],
+					},
+				},
+				{
+					name: "lexrunner.getStatus",
+					description:
+						"Get current run state, summary, and next available actions",
+					inputSchema: {
+						type: "object",
+						properties: {
+							runId: {
+								type: "string",
+								description: "Unique run identifier",
+							},
+						},
+						required: ["runId"],
+					},
+				},
 			],
 		};
 	});
@@ -449,6 +511,13 @@ function createServer(): Server {
 
 			case "senior-dev.modes":
 				return await handleSeniorDevModes();
+
+			// LexRunner run management tools
+			case "lexrunner.startRun":
+				return await handleStartRun(args as unknown as StartRunInput);
+
+			case "lexrunner.getStatus":
+				return await handleGetStatus(args as unknown as GetStatusInput);
 
 			default:
 				throw new McpError(
@@ -1038,6 +1107,88 @@ async function handleSeniorDevModes(): Promise<{
 			},
 		],
 	};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LexRunner Run Management Handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Handle lexrunner.startRun tool
+ */
+async function handleStartRun(
+	args: StartRunInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate input
+		const validated = StartRunInputSchema.parse(args);
+
+		// Create run manager and start the run
+		const manager = createRunManager();
+		const result = manager.startRun(validated);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			throw new McpError(
+				ErrorCode.InvalidParams,
+				`Invalid startRun parameters: ${error.message}`
+			);
+		}
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to start run: ${(error as Error).message}`
+		);
+	}
+}
+
+/**
+ * Handle lexrunner.getStatus tool
+ */
+async function handleGetStatus(
+	args: GetStatusInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate input
+		const validated = GetStatusInputSchema.parse(args);
+
+		// Create run manager and get status
+		const manager = createRunManager();
+		const status = manager.getStatus(validated);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(status, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof RunNotFoundError) {
+			throw new McpError(
+				ErrorCode.InvalidParams,
+				error.message
+			);
+		}
+		if (error instanceof Error && error.name === "ZodError") {
+			throw new McpError(
+				ErrorCode.InvalidParams,
+				`Invalid getStatus parameters: ${error.message}`
+			);
+		}
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to get status: ${(error as Error).message}`
+		);
+	}
 }
 
 // Handle uncaught errors
