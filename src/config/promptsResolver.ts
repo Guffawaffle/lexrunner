@@ -7,6 +7,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
+import {
+	getCurrentBranch as getGitBranch,
+	getCurrentCommit as getGitCommit,
+} from "../shared/git/runGit.js";
 
 const require = createRequire(import.meta.url);
 
@@ -266,8 +270,8 @@ export function expandPromptTokens(
 	const repoRoot = findRepoRoot(baseDir);
 
 	// Git context tokens
-	const branch = getCurrentBranch(baseDir);
-	const commit = getCurrentCommit(baseDir);
+	const branch = getGitBranch(baseDir);
+	const commit = getGitCommit(baseDir);
 
 	return content
 		.replace(/\{\{today\}\}/g, today)
@@ -294,38 +298,4 @@ function findRepoRoot(startDir: string): string {
 
 	// If no .git found, return start directory
 	return path.resolve(startDir);
-}
-
-/**
- * Get current git branch name (synchronous)
- */
-function getCurrentBranch(cwd: string): string {
-	try {
-		const { execSync } = require("child_process");
-		const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-			cwd,
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "ignore"],
-		});
-		return branch.trim();
-	} catch {
-		return "";
-	}
-}
-
-/**
- * Get current git commit SHA (synchronous)
- */
-function getCurrentCommit(cwd: string): string {
-	try {
-		const { execSync } = require("child_process");
-		const commit = execSync("git rev-parse HEAD", {
-			cwd,
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "ignore"],
-		});
-		return commit.trim();
-	} catch {
-		return "";
-	}
 }
