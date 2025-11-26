@@ -183,7 +183,10 @@ export function validateExecutorManifest(data: unknown): ExecutorManifest {
 }
 
 /**
- * Safely parse an executor manifest, returning result object
+ * Safely parse an executor manifest without throwing.
+ * Returns a SafeParseReturnType containing either:
+ * - { success: true, data: ExecutorManifest } on valid input
+ * - { success: false, error: ZodError } on invalid input
  */
 export function safeParseExecutorManifest(data: unknown): z.SafeParseReturnType<unknown, ExecutorManifest> {
 	return ExecutorManifestSchema.safeParse(data);
