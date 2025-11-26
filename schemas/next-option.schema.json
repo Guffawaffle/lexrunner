@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/next-option.schema.json",
+  "title": "Next Option Schema",
+  "description": "Schema for next option objects that represent available actions in tool-grounded interactions.",
+  "version": "1.0.0",
+  "$ref": "#/definitions/NextOption",
+  "definitions": {
+    "NextOption": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "requiresLLMDecision": {
+          "type": "boolean"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "responseSchema": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "objective": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "brief",
+            "detailed"
+          ]
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "description"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

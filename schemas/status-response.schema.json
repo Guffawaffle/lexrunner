@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/status-response.schema.json",
+  "title": "Status Response Schema",
+  "description": "Schema for status response objects - the canonical response format for run status queries.",
+  "version": "1.0.0",
+  "$ref": "#/definitions/StatusResponse",
+  "definitions": {
+    "StatusResponse": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "procedure": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "object",
+          "properties": {
+            "completed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "current": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "remaining": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "completed",
+            "current",
+            "remaining"
+          ],
+          "additionalProperties": false
+        },
+        "nextOptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "requiresLLMDecision": {
+                "type": "boolean"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "responseSchema": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "objective": {
+                "type": "string"
+              },
+              "constraints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "style": {
+                "type": "string",
+                "enum": [
+                  "brief",
+                  "detailed"
+                ]
+              },
+              "riskLevel": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "riskFlags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "persona": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string"
+            },
+            "forbidden": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "completionGates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decisionStyle": {
+              "type": "object",
+              "properties": {
+                "preferSmallDiffs": {
+                  "type": "boolean"
+                },
+                "requireRationaleForSkips": {
+                  "type": "boolean"
+                },
+                "escalateSecurityFindings": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "outputFormat": {
+              "type": "object",
+              "properties": {
+                "severityLevels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "requireSeverityOnFindings": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mode",
+            "forbidden",
+            "completionGates"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "runId",
+        "state",
+        "mode",
+        "procedure",
+        "summary",
+        "nextOptions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
