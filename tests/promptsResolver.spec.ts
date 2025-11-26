@@ -16,11 +16,13 @@ import {
 describe("Prompts Resolver", () => {
 	let testDir: string;
 	let originalEnv: string | undefined;
+	let originalGitMode: string | undefined;
 
 	beforeEach(() => {
 		// Create temp directory for tests
 		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "prompts-test-"));
 		originalEnv = process.env.LEX_PROMPTS_DIR;
+		originalGitMode = process.env.LEX_GIT_MODE;
 	});
 
 	afterEach(() => {
@@ -33,6 +35,12 @@ describe("Prompts Resolver", () => {
 			process.env.LEX_PROMPTS_DIR = originalEnv;
 		} else {
 			delete process.env.LEX_PROMPTS_DIR;
+		}
+		// Restore git mode
+		if (originalGitMode) {
+			process.env.LEX_GIT_MODE = originalGitMode;
+		} else {
+			delete process.env.LEX_GIT_MODE;
 		}
 	});
 
@@ -273,6 +281,9 @@ Workspace: {{workspace_root}}`;
 		});
 
 		it("should expand {{branch}} to current git branch", () => {
+			// Enable git mode for this test
+			process.env.LEX_GIT_MODE = "live";
+			
 			// Initialize a git repo with a branch
 			const { execSync } = require("child_process");
 
@@ -313,6 +324,9 @@ Workspace: {{workspace_root}}`;
 		});
 
 		it("should expand {{commit}} to current git commit SHA", () => {
+			// Enable git mode for this test
+			process.env.LEX_GIT_MODE = "live";
+			
 			// Initialize git repo with a commit
 			const { execSync } = require("child_process");
 			execSync("git init -b main", { cwd: testDir });
@@ -328,12 +342,27 @@ Workspace: {{workspace_root}}`;
 			expect(expanded).toMatch(/Commit: [0-9a-f]{40}/);
 		});
 
-		it("should handle missing git context gracefully", () => {
-			// No git repo
+		it("should return safe fallbacks when git mode is off (default)", () => {
+			// Default behavior: LEX_GIT_MODE is not set (defaults to off)
+			delete process.env.LEX_GIT_MODE;
+			
 			const content = "Branch: {{branch}}, Commit: {{commit}}";
 			const expanded = expandPromptTokens(content, testDir);
 
-			expect(expanded).toBe("Branch: , Commit: ");
+			// Should return safe fallbacks (main and 40 zeros)
+			expect(expanded).toBe("Branch: main, Commit: 0000000000000000000000000000000000000000");
+		});
+
+		it("should return fallbacks when git mode is live but no git repo", () => {
+			// Enable git mode but no git repo
+			process.env.LEX_GIT_MODE = "live";
+			
+			// No git repo in testDir
+			const content = "Branch: {{branch}}, Commit: {{commit}}";
+			const expanded = expandPromptTokens(content, testDir);
+
+			// Should return fallbacks when git commands fail
+			expect(expanded).toBe("Branch: main, Commit: 0000000000000000000000000000000000000000");
 		});
 
 		it("should expand multiple tokens in same content", () => {
