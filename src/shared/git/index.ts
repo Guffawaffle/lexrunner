@@ -1,9 +1,13 @@
 /**
  * Shared git utilities
  *
- * @module src/shared/git
+ * Provides centralized git operations with safe defaults for automation.
+ * Exports runtime gate functions and git operation wrappers.
+ *
+ * @module shared/git
  */
 
+// Runtime gate for git operations (LEX_GIT_MODE)
 export {
 	getGitMode,
 	isGitEnabled,
@@ -11,3 +15,16 @@ export {
 	getDefaultCommit,
 	type GitMode,
 } from "./runtime.js";
+
+// Git operation wrappers with safe defaults
+export {
+	runGit,
+	getCurrentBranch,
+	getCurrentCommit,
+	getRemoteUrl,
+	isGitRepository,
+	getRepositoryRoot,
+	isGitDryRun,
+	type GitResult,
+	type RunGitOptions,
+} from "./runGit.js";
