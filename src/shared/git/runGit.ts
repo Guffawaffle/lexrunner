@@ -7,7 +7,7 @@
  * - Consistent return type: { exitCode, stdout, stderr }
  */
 
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 /**
  * Result from a git command execution
@@ -99,41 +99,34 @@ export function runGit(args: string[], options: RunGitOptions = {}): GitResult {
 	gitArgs.push(...args);
 
 	try {
-		const stdout = execSync(`git ${gitArgs.join(" ")}`, {
+		const result = spawnSync("git", gitArgs, {
 			cwd,
 			timeout,
 			encoding: "utf8",
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 
+		if (result.error) {
+			// Process error (e.g., timeout, spawn failure)
+			return {
+				exitCode: 1,
+				stdout: "",
+				stderr: result.error.message,
+			};
+		}
+
 		return {
-			exitCode: 0,
-			stdout: stdout,
-			stderr: "",
+			exitCode: result.status ?? 0,
+			stdout: result.stdout ?? "",
+			stderr: result.stderr ?? "",
 		};
 	} catch (error) {
-		const err = error as {
-			status?: number;
-			stdout?: Buffer | string;
-			stderr?: Buffer | string;
-			message?: string;
-		};
-
-		const stdout = err.stdout
-			? typeof err.stdout === "string"
-				? err.stdout
-				: err.stdout.toString()
-			: "";
-		const stderr = err.stderr
-			? typeof err.stderr === "string"
-				? err.stderr
-				: err.stderr.toString()
-			: err.message ?? "";
-
+		// Unexpected error (shouldn't happen with spawnSync)
+		const err = error as Error;
 		return {
-			exitCode: err.status ?? 1,
-			stdout,
-			stderr,
+			exitCode: 1,
+			stdout: "",
+			stderr: err.message ?? "Unknown error",
 		};
 	}
 }

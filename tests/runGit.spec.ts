@@ -183,7 +183,10 @@ describe("runGit wrapper", () => {
 		it("returns repository root for git repository", () => {
 			const root = getRepositoryRoot();
 			expect(root).toBeTruthy();
-			expect(root.endsWith("lex-pr-runner")).toBe(true);
+			// Verify it's a valid git repository root by checking for .git directory
+			const fs = require("fs");
+			const path = require("path");
+			expect(fs.existsSync(path.join(root, ".git"))).toBe(true);
 		});
 
 		it("returns empty string for non-git directory", () => {
