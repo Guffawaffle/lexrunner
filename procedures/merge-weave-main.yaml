@@ -1,0 +1,56 @@
+# Merge Weave to Main Procedure
+#
+# This procedure defines the state machine for the merge-weave workflow:
+# fan-out PRs, run gates, merge in dependency order.
+
+schemaVersion: "1.0.0"
+id: "merge-weave-main"
+name: "Merge Weave to Main"
+description: "Fan-out PRs, run gates, merge in dependency order"
+
+states:
+  - planning
+  - gated
+  - weaving
+  - completed
+  - failed
+  - decision_gate_failure
+
+initialState: planning
+
+transitions:
+  planning:
+    PLAN_READY: gated
+    PLAN_FAILED: failed
+  gated:
+    GATES_PASSED: weaving
+    GATES_FAILED: decision_gate_failure
+  decision_gate_failure:
+    RETRY: gated
+    SKIP: weaving
+    ABORT: failed
+  weaving:
+    WEAVE_COMPLETE: completed
+    CONFLICT_DETECTED: decision_gate_failure
+  completed: {}
+  failed: {}
+
+decisionPoints:
+  - state: decision_gate_failure
+    requiresLLMDecision: true
+    prompt: "Gate(s) failed. Review failures and decide: retry, skip, or abort?"
+    options:
+      - action: retry
+        description: "Retry failed gates"
+        riskLevel: low
+      - action: skip
+        description: "Skip failed gates (requires rationale)"
+        riskLevel: medium
+      - action: abort
+        description: "Stop the run"
+        riskLevel: low
+
+completionGates:
+  - lint
+  - typecheck
+  - test
