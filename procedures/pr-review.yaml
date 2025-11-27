@@ -1,0 +1,68 @@
+# pr-review Procedure Definition
+# Structured workflow for reviewing a single PR using the senior-dev executor
+#
+# State diagram:
+#   preparing → analyzing → reviewing → decision_findings → completed
+#                                              ↓
+#                                           failed
+
+schemaVersion: "1.0.0"
+id: pr-review
+name: PR Review
+description: >
+  Structured workflow for reviewing a single PR using the senior-dev executor.
+  Gathers PR context, runs static analysis, performs LLM review, and captures findings.
+
+# States in the procedure lifecycle (array format)
+states:
+  - preparing
+  - analyzing
+  - reviewing
+  - decision_findings
+  - completed
+  - failed
+
+# Initial state when procedure starts
+initialState: preparing
+
+# State transitions - mapping event names to next states
+transitions:
+  preparing:
+    CONTEXT_READY: analyzing
+    CONTEXT_FAILED: failed
+  analyzing:
+    ANALYSIS_COMPLETE: reviewing
+    ANALYSIS_FAILED: decision_findings  # Can proceed with warnings
+  reviewing:
+    REVIEW_COMPLETE: decision_findings
+    REVIEW_FAILED: failed
+  decision_findings:
+    APPROVE: completed
+    REQUEST_CHANGES: completed
+    NEEDS_MORE_CONTEXT: preparing  # Loop back for more context
+    ABORT: failed
+
+# Decision points requiring LLM or human input
+decisionPoints:
+  - state: decision_findings
+    requiresLLMDecision: true
+    prompt: "Review complete. Approve, request changes, or gather more context?"
+    options:
+      - action: approve
+        description: Approve PR
+        riskLevel: low
+      - action: request_changes
+        description: Request changes with comments
+        riskLevel: low
+      - action: needs_more_context
+        description: Read more files/context
+        riskLevel: low
+      - action: abort
+        description: Cancel review
+        riskLevel: low
+
+# Gates that must pass for completion
+completionGates:
+  - lint
+  - typecheck
+  - test
