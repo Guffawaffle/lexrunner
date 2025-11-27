@@ -575,6 +575,86 @@ const tools = {
 			}
 		},
 	},
+
+	"lexrunner.startRun": {
+		description: "Start a new LexRunner procedure run and return a runId",
+		inputSchema: {
+			type: "object",
+			properties: {
+				mode: {
+					type: "string",
+					description: "Persona mode (e.g., 'senior-dev', 'eager-pm')",
+				},
+				procedure: {
+					type: "string",
+					description: "Procedure identifier (e.g., 'merge-weave-main', 'pr-review')",
+				},
+				repo: {
+					type: "string",
+					description: "Repository in 'owner/repo' format",
+				},
+				task: {
+					type: "string",
+					description: "Human-readable task description",
+				},
+				params: {
+					type: "object",
+					description: "Procedure-specific parameters",
+				},
+			},
+			required: ["mode", "procedure", "repo"],
+		},
+		call: async (args) => {
+			try {
+				const { createRunManager } = await import("./dist/cli.js");
+				const manager = createRunManager();
+				const result = manager.startRun(args);
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(result, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to start run: ${error.message}`);
+			}
+		},
+	},
+
+	"lexrunner.getStatus": {
+		description: "Get current run state, summary, and next available actions",
+		inputSchema: {
+			type: "object",
+			properties: {
+				runId: {
+					type: "string",
+					description: "Unique run identifier",
+				},
+			},
+			required: ["runId"],
+		},
+		call: async (args) => {
+			try {
+				const { createRunManager } = await import("./dist/cli.js");
+				const manager = createRunManager();
+				const status = manager.getStatus(args);
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(status, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to get status: ${error.message}`);
+			}
+		},
+	},
 };
 
 // MCP Protocol handler - JSON-RPC 2.0 over stdio

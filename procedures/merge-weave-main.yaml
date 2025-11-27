@@ -1,0 +1,66 @@
+# merge-weave-main Procedure Definition
+# Canonical merge pyramid workflow for integrating multiple PRs
+#
+# State diagram:
+#   planning → gated → weaving → completed
+#                 ↓
+#           decision_gate_failure → failed
+
+schemaVersion: "1.0.0"
+id: merge-weave-main
+name: Merge Weave to Main
+description: >
+  Canonical merge pyramid workflow for integrating multiple PRs.
+  Discovers PRs, computes dependency order, runs gates, and merges cleanly.
+
+# States in the procedure lifecycle (array format)
+states:
+  - planning
+  - gated
+  - decision_gate_failure
+  - weaving
+  - completed
+  - failed
+
+# Initial state when procedure starts
+initialState: planning
+
+# State transitions - mapping event names to next states
+transitions:
+  planning:
+    PLAN_READY: gated
+    PLAN_EMPTY: completed
+    PLAN_FAILED: failed
+  gated:
+    ALL_GATES_PASSED: weaving
+    SOME_GATES_FAILED: decision_gate_failure
+  decision_gate_failure:
+    RETRY_GATES: gated
+    SKIP_FAILED: weaving
+    ABORT: failed
+  weaving:
+    ALL_MERGED: completed
+    MERGE_CONFLICT: decision_gate_failure
+    MERGE_FAILED: failed
+
+# Decision points requiring LLM or human input
+decisionPoints:
+  - state: decision_gate_failure
+    requiresLLMDecision: true
+    prompt: "Gate(s) failed or merge conflict detected. Review failures and decide how to proceed."
+    options:
+      - action: retry_gates
+        description: Re-run failed gates
+        riskLevel: low
+      - action: skip_failed
+        description: Continue without failed items
+        riskLevel: medium
+      - action: abort
+        description: Stop the run
+        riskLevel: low
+
+# Gates that must pass for completion
+completionGates:
+  - lint
+  - typecheck
+  - test
