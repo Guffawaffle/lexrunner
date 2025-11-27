@@ -655,6 +655,55 @@ const tools = {
 			}
 		},
 	},
+
+	"lexrunner.listArtifacts": {
+		description: "List and inspect artifacts and receipts for a run",
+		inputSchema: {
+			type: "object",
+			properties: {
+				runId: {
+					type: "string",
+					description: "Unique run identifier",
+				},
+				type: {
+					type: "string",
+					description: 'Filter by type: "plan", "decision", "failure", "gate", "report", "log"',
+					enum: ["plan", "decision", "failure", "gate", "report", "log"],
+				},
+				path: {
+					type: "string",
+					description: "Filter by path pattern (supports * and ** wildcards)",
+				},
+				latestOnly: {
+					type: "boolean",
+					description: "Only return the most recent artifact of each type",
+				},
+				inline: {
+					type: "boolean",
+					description: "Include content for small artifacts (< 10KB)",
+				},
+			},
+			required: ["runId"],
+		},
+		call: async (args) => {
+			try {
+				const { createRunManager } = await import("./dist/cli.js");
+				const manager = createRunManager();
+				const result = manager.listArtifacts(args);
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(result, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to list artifacts: ${error.message}`);
+			}
+		},
+	},
 };
 
 // MCP Protocol handler - JSON-RPC 2.0 over stdio
