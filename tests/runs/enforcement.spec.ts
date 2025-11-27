@@ -12,7 +12,6 @@ import { tmpdir } from "os";
 import {
 	ViolationType,
 	ViolationSeverity,
-	EnforcementMode,
 	DEFAULT_ENFORCEMENT_CONFIG,
 	requiresEnforcement,
 	detectGitViolation,
@@ -26,6 +25,7 @@ import {
 	checkAndLogViolation,
 } from "../../src/runs/enforcement.js";
 import { createRunManager } from "../../src/runs/manager.js";
+import { buildStatusResponse } from "../../src/runs/statusBuilder.js";
 
 describe("Enforcement Module", () => {
 	let testDir: string;
@@ -592,10 +592,6 @@ describe("Enforcement Module", () => {
 
 	describe("StatusResponse integration", () => {
 		it("should include violation risk flags in status", async () => {
-			const { buildStatusResponse } = await import(
-				"../../src/runs/statusBuilder.js"
-			);
-
 			const manager = createRunManager(testDir);
 			const run = await manager.createRun({
 				mode: "senior-dev",
@@ -622,10 +618,6 @@ describe("Enforcement Module", () => {
 		});
 
 		it("should not include risk flags when no violations", async () => {
-			const { buildStatusResponse } = await import(
-				"../../src/runs/statusBuilder.js"
-			);
-
 			const manager = createRunManager(testDir);
 			const run = await manager.createRun({
 				mode: "senior-dev",

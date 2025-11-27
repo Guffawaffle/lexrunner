@@ -156,7 +156,7 @@ export function detectGitViolation(
 	// Check for merge operations first (higher severity)
 	if (
 		normalizedCommand.startsWith("git merge") ||
-		normalizedCommand.includes("git pull --rebase")
+		normalizedCommand.startsWith("git pull --rebase")
 	) {
 		return ViolationType.DIRECT_MERGE;
 	}
@@ -275,12 +275,16 @@ export function getViolations(
 ): ViolationEntry[] {
 	const failures = readRunLog(runId, "failures", baseDir);
 
-	// Filter for violation entries
-	return failures.filter(
-		(entry): entry is ViolationEntry & Record<string, unknown> =>
-			typeof entry.violation === "string" &&
-			Object.values(ViolationType).includes(entry.violation as ViolationType)
-	) as unknown as ViolationEntry[];
+	// Filter and validate violation entries
+	const violations: ViolationEntry[] = [];
+	for (const entry of failures) {
+		const result = ViolationEntrySchema.safeParse(entry);
+		if (result.success) {
+			violations.push(result.data);
+		}
+	}
+
+	return violations;
 }
 
 /**
