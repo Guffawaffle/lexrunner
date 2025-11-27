@@ -53,7 +53,8 @@ describe('Schema Validation', () => {
 			const validationError = error as SchemaValidationError;
 			expect(validationError.issues).toHaveLength(1);
 			expect(validationError.issues[0].path).toEqual(['items']);
-			expect(validationError.issues[0].message).toContain('Expected array');
+			// Zod v4 uses different error message format
+			expect(validationError.issues[0].message).toMatch(/array/i);
 		}
 	});
 

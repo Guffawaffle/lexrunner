@@ -102,7 +102,7 @@ export const NextOptionSchema = z.object({
 	/** Prompt to present to the LLM for decision-making */
 	prompt: z.string().optional(),
 	/** JSON Schema describing the expected response format */
-	responseSchema: z.record(z.unknown()).optional(),
+	responseSchema: z.record(z.string(), z.unknown()).optional(),
 
 	// Guidance
 	/** The objective to achieve with this action */
@@ -188,7 +188,7 @@ export const StatusResponseSchema = z.object({
 
 	// Additional context
 	/** Additional context as key-value pairs */
-	context: z.record(z.unknown()).optional(),
+	context: z.record(z.string(), z.unknown()).optional(),
 	/** Risk flags for the current state */
 	riskFlags: z.array(z.string()).optional(),
 	/** Blocking issues that prevent progress */
@@ -230,7 +230,7 @@ function formatValidationErrors(error: z.ZodError): RunCentricValidationError[] 
 			} else if (path.includes('nextOptions')) {
 				suggestion = 'Must be an array of NextOption objects';
 			}
-		} else if (issue.code === 'invalid_enum_value') {
+		} else if (issue.code === 'invalid_value') {
 			if (path.includes('riskLevel')) {
 				suggestion = 'Valid values: "low", "medium", "high"';
 			} else if (path.includes('style')) {

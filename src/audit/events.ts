@@ -43,9 +43,9 @@ export type Repo = z.infer<typeof RepoSchema>;
  * Context blocks
  */
 export const ContextSchema = z.object({
-	git: z.record(z.any()).optional(),
-	ci: z.record(z.any()).optional(),
-	os: z.record(z.any()).optional()
+	git: z.record(z.string(), z.any()).optional(),
+	ci: z.record(z.string(), z.any()).optional(),
+	os: z.record(z.string(), z.any()).optional()
 });
 
 export type Context = z.infer<typeof ContextSchema>;
@@ -183,7 +183,7 @@ export const RunSummaryPayloadSchema = z.object({
 		passed: z.number(),
 		failed: z.number()
 	}),
-	pass_fail_matrix: z.record(z.record(z.string())),
+	pass_fail_matrix: z.record(z.string(), z.record(z.string(), z.string())),
 	final_status: z.string()
 });
 

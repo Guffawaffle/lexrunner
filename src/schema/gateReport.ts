@@ -41,7 +41,7 @@ export const GateReport = z.object({
 	/** Optional path to stdout output file */
 	stdout_path: z.string().optional(),
 	/** Optional metadata as string key-value pairs */
-	meta: z.record(z.string()).optional(),
+	meta: z.record(z.string(), z.string()).optional(),
 	/** Optional artifacts metadata */
 	artifacts: z.array(ArtifactMetadata).optional()
 }).strict();
@@ -78,7 +78,7 @@ export function formatValidationErrors(error: z.ZodError): GateReportValidationE
 			} else if (path === 'item' || path === 'gate') {
 				suggestion = 'Must be a non-empty string identifier';
 			}
-		} else if (issue.code === 'invalid_enum_value') {
+		} else if (issue.code === 'invalid_value') {
 			if (path === 'status') {
 				suggestion = 'Valid values: "pass" or "fail"';
 			}

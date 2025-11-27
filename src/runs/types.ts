@@ -44,9 +44,9 @@ export const RunStateSchema = z.object({
 
 	// Context
 	/** Runtime parameters for the run */
-	params: z.record(z.unknown()),
+	params: z.record(z.string(), z.unknown()),
 	/** Additional metadata for the run */
-	metadata: z.record(z.unknown()),
+	metadata: z.record(z.string(), z.unknown()),
 
 	// Persona snapshot (frozen at run start)
 	/** Snapshot of the active persona configuration */
@@ -159,7 +159,7 @@ export const StartRunInputSchema = z.object({
 	/** Human-readable task description */
 	task: z.string().optional(),
 	/** Procedure-specific parameters */
-	params: z.record(z.unknown()).optional(),
+	params: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type StartRunInput = z.infer<typeof StartRunInputSchema>;

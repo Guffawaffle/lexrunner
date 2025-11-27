@@ -92,8 +92,9 @@ describe('validation: validateOrThrow', () => {
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
 				expect.stringContaining('Expected: string')
 			);
+			// Zod v4 may have different error message format, check for the type mismatch indication
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				expect.stringContaining('received: number')
+				expect.stringMatching(/number|Invalid input/)
 			);
 		}
 	});

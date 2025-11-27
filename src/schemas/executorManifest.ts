@@ -11,7 +11,7 @@
  * - follows a simple Jordan-mode protocol
  */
 
-import { z } from "zod";
+import { z, type ZodSafeParseResult } from "zod";
 
 /**
  * Schema version for executor manifests
@@ -192,6 +192,6 @@ export function validateExecutorManifest(data: unknown): ExecutorManifest {
  */
 export function safeParseExecutorManifest(
 	data: unknown
-): z.SafeParseReturnType<unknown, ExecutorManifest> {
+): ZodSafeParseResult<ExecutorManifest> {
 	return ExecutorManifestSchema.safeParse(data);
 }

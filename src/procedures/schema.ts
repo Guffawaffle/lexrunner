@@ -45,7 +45,7 @@ export const DecisionPointSchema = z.object({
 /**
  * Transition map schema - event to next state
  */
-export const TransitionMapSchema = z.record(z.string());
+export const TransitionMapSchema = z.record(z.string(), z.string());
 
 /**
  * Schema version - follows SemVer 1.x.y format
@@ -71,7 +71,7 @@ export const ProcedureDefinitionSchema = z.object({
 	/** Initial state when the procedure starts */
 	initialState: z.string().min(1),
 	/** State transition definitions */
-	transitions: z.record(TransitionMapSchema),
+	transitions: z.record(z.string(), TransitionMapSchema),
 	/** Decision points that may require input */
 	decisionPoints: z.array(DecisionPointSchema).optional(),
 	/** Gates that must pass for completion */
