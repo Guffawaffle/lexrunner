@@ -121,12 +121,12 @@ export const VulnPolicy = z.object({
 	blockHigh: z.boolean().default(true),
 	maxMedium: z.number().int().min(0).default(5),
 	maxLow: z.number().int().min(0).default(10),
-}).default({
+}).default(() => ({
 	blockCritical: true,
 	blockHigh: true,
 	maxMedium: 5,
 	maxLow: 10,
-});
+}));
 export type VulnPolicy = z.infer<typeof VulnPolicy>;
 
 /**

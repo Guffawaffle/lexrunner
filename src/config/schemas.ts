@@ -46,7 +46,7 @@ export const ScopeConfigSchema = z.object({
 	defaults: z.object({
 		strategy: z.enum(["rebase-weave", "merge-weave", "squash-weave"]),
 		base: z.string()
-	}).default({ strategy: "merge-weave", base: "main" }),
+	}).default(() => ({ strategy: "merge-weave" as const, base: "main" })),
 	pin_commits: z.boolean().default(false)
 }).strict();
 
