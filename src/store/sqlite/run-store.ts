@@ -249,7 +249,7 @@ export class SqliteRunStore implements RunStore {
 		}
 		if (updates.metadata !== undefined) {
 			fields.push("metadata = ?");
-			values.push(JSON.stringify(updates.metadata));
+			values.push(updates.metadata ? JSON.stringify(updates.metadata) : null);
 		}
 
 		if (fields.length === 0) {
