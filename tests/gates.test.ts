@@ -3,6 +3,8 @@ import { executeGate, executeItemGates, executeGatesWithPolicy } from '../src/ga
 import { loadPlan, Policy, Gate } from '../src/schema.js';
 import { ExecutionState } from '../src/executionState.js';
 import { resetCommandValidator } from '../src/security/commandValidator.js';
+import { getGateFailures, FailureErrorCode } from '../src/runs/failures.js';
+import { ensureRunDir } from '../src/runs/storage.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -196,4 +198,52 @@ describe('Gate Execution', () => {
 			}
 		}
 	}, 10000); // 10 second timeout
+
+	it('logs gate failures to failures.ndjson when runId is provided', async () => {
+		const runId = 'test-run-' + Math.random().toString(36).substring(7);
+		
+		// Ensure run directory exists
+		ensureRunDir(runId, tempDir);
+		
+		const item = {
+			name: 'test-item-failure-logging',
+			deps: [],
+			gates: [
+				{ 
+					name: 'failing-gate', 
+					run: 'bash -c "echo network error >&2; exit 1"', 
+					env: {}, 
+					runtime: 'local' as const, 
+					artifacts: [] 
+				}
+			]
+		};
+
+		const executionState = new ExecutionState({
+			schemaVersion: '1.0.0',
+			target: 'main',
+			items: [item]
+		});
+
+		const results = await executeItemGates(
+			item, 
+			defaultPolicy, 
+			executionState, 
+			tempDir, 
+			5000, 
+			false, 
+			undefined, 
+			{ runId, baseDir: tempDir }
+		);
+
+		expect(results).toHaveLength(1);
+		expect(results[0].status).toBe('fail');
+
+		// Verify failure was logged
+		const failures = getGateFailures(runId, tempDir);
+		expect(failures).toHaveLength(1);
+		expect(failures[0].gate).toBe('failing-gate');
+		expect(failures[0].error.code).toBe(FailureErrorCode.NETWORK_ERROR);
+		expect(failures[0].error.retryable).toBe(true);
+	});
 });

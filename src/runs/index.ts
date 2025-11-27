@@ -73,3 +73,26 @@ export type {
 	ViolationEntry,
 	EnforcementConfig,
 } from "./enforcement.js";
+
+// Failures - LR-064
+export {
+	FailureErrorCode,
+	isRetryableErrorCode,
+	FailureErrorSchema,
+	RecommendedActionSchema,
+	FailureRecordSchema,
+	FailureHandlingPayloadSchema,
+	classifyGateError,
+	buildRecommendedActions,
+	wrapGateFailure,
+	logGateFailure,
+	getGateFailures,
+	toNextOptions,
+} from "./failures.js";
+
+export type {
+	FailureError,
+	RecommendedAction,
+	FailureRecord,
+	FailureHandlingPayload,
+} from "./failures.js";
