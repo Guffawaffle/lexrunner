@@ -12,6 +12,7 @@ import { FlakeReport, AttemptRecord } from "./schema/flakeReport.js";
 import { canonicalJSONStringify } from "./util/canonicalJson.js";
 import { ProgressReporter } from "./util/progress.js";
 import { validateGateInput } from "./gates/validator.js";
+import { wrapGateFailure, logGateFailure, type FailureHandlingPayload } from "./runs/failures.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -521,7 +522,11 @@ export async function executeItemGates(
 	artifactDir: string,
 	timeoutMs: number = 30000,
 	skipValidation: boolean = false,
-	repoRoot?: string
+	repoRoot?: string,
+	options?: {
+		runId?: string;
+		baseDir?: string;
+	}
 ): Promise<GateResult[]> {
 	if (!item.gates || item.gates.length === 0) {
 		return [];
@@ -549,26 +554,43 @@ export async function executeItemGates(
 				lastAttempt: new Date().toISOString()
 			};
 			results.push(blockedResult);
-		executionState.updateGateResult(item.name, blockedResult);
-		continue;
-	}
+			executionState.updateGateResult(item.name, blockedResult);
+			continue;
+		}
 
-	// Special handling for 'vuln' gate
-	if (gate.name === 'vuln') {
-		// Extract security policy from plan policy if available
-		const securityPolicy = (policy as any).security || DEFAULT_SECURITY_POLICY;
-		const result = checkVulnGate(itemArtifactDir, securityPolicy);
+		// Special handling for 'vuln' gate
+		if (gate.name === 'vuln') {
+			// Extract security policy from plan policy if available
+			const securityPolicy = (policy as any).security || DEFAULT_SECURITY_POLICY;
+			const result = checkVulnGate(itemArtifactDir, securityPolicy);
+			results.push(result);
+			executionState.updateGateResult(item.name, result);
+
+			// Log failure if gate failed and runId is provided
+			if (result.status === 'fail' && options?.runId) {
+				logGateFailure(options.runId, result, {
+					isFlaky: false,
+				}, options.baseDir);
+			}
+			continue;
+		}
+
+		const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation, repoRoot);
 		results.push(result);
+
+		// Update execution state
 		executionState.updateGateResult(item.name, result);
-		continue;
+
+		// Log failure if gate failed and runId is provided
+		if (result.status === 'fail' && options?.runId) {
+			// Check if gate is marked as flaky in policy
+			const isFlaky = Boolean(policy.retries[gate.name]?.maxAttempts && policy.retries[gate.name].maxAttempts > 1);
+			logGateFailure(options.runId, result, {
+				isFlaky,
+			}, options.baseDir);
+		}
 	}
-
-	const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation, repoRoot);
-	results.push(result);
-
-	// Update execution state
-	executionState.updateGateResult(item.name, result);
-}	return results;
+	return results;
 }
 
 /**
@@ -594,7 +616,11 @@ export async function executeGatesWithPolicy(
 	timeoutMs: number = 30000,
 	progressReporter?: ProgressReporter,
 	skipValidation: boolean = false,
-	repoRoot?: string
+	repoRoot?: string,
+	options?: {
+		runId?: string;
+		baseDir?: string;
+	}
 ): Promise<void> {
 	// Capture repository root once at the start of execution
 	const workingDir = repoRoot || process.cwd();
@@ -657,7 +683,7 @@ export async function executeGatesWithPolicy(
 			}
 
 			const item = plan.items.find(i => i.name === node)!;
-			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation, workingDir)
+			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation, workingDir, options)
 				.then(() => {
 					executing.delete(node);
 					completedNodes.add(node);
