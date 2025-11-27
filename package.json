@@ -62,7 +62,8 @@
 		"ci:smoke": "node scripts/ci-smoke.mjs",
 		"ci:local": "npm run lint && npm run build && npm test",
 		"ci:docker": "echo '⚠️ Docker CI not configured, falling back to local' && npm run ci:local",
-		"test:run": "vitest run"
+		"test:run": "vitest run",
+		"check:release-drift": "node scripts/check-release-drift.mjs"
 	},
 	"dependencies": {
 		"@babel/parser": "^7.28.4",
