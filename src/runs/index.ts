@@ -69,49 +69,46 @@ export {
 	checkAndLogViolation,
 } from "./enforcement.js";
 
-export type {
-	ViolationEntry,
-	EnforcementConfig,
-} from "./enforcement.js";
+export type { ViolationEntry, EnforcementConfig } from "./enforcement.js";
 
 // Failures - LR-064
 export {
-        FailureErrorCode,
-        isRetryableErrorCode,
-        FailureErrorSchema,
-        RecommendedActionSchema,
-        FailureRecordSchema,
-        FailureHandlingPayloadSchema,
-        classifyGateError,
-        buildRecommendedActions,
-        wrapGateFailure,
-        logGateFailure,
-        getGateFailures,
-        toNextOptions,
+	FailureErrorCode,
+	isRetryableErrorCode,
+	FailureErrorSchema,
+	RecommendedActionSchema,
+	FailureRecordSchema,
+	FailureHandlingPayloadSchema,
+	classifyGateError,
+	buildRecommendedActions,
+	wrapGateFailure,
+	logGateFailure,
+	getGateFailures,
+	toNextOptions,
 } from "./failures.js";
 
 export type {
-        FailureError,
-        RecommendedAction,
-        FailureRecord,
-        FailureHandlingPayload,
+	FailureError,
+	RecommendedAction,
+	FailureRecord,
+	FailureHandlingPayload,
 } from "./failures.js";
 
 // Artifacts
 export {
-        ARTIFACT_TYPES,
-        ListArtifactsInputSchema,
-        ArtifactDescriptorSchema,
-        ListArtifactsOutputSchema,
-        getArtifactType,
-        matchesPattern,
-        listArtifacts,
-        getArtifact,
+	ARTIFACT_TYPES,
+	ListArtifactsInputSchema,
+	ArtifactDescriptorSchema,
+	ListArtifactsOutputSchema,
+	getArtifactType,
+	matchesPattern,
+	listArtifacts,
+	getArtifact,
 } from "./artifacts.js";
 
 export type {
-        ArtifactType,
-        ListArtifactsInput,
-        ArtifactDescriptor,
-        ListArtifactsOutput,
+	ArtifactType,
+	ListArtifactsInput,
+	ArtifactDescriptor,
+	ListArtifactsOutput,
 } from "./artifacts.js";
