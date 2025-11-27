@@ -28,6 +28,11 @@ import {
 	getRunsDir as getRunsDirPath,
 } from "./storage.js";
 import { buildStatusResponse } from "./statusBuilder.js";
+import {
+	listArtifacts as listArtifactsImpl,
+	type ListArtifactsInput,
+	type ListArtifactsOutput,
+} from "./artifacts.js";
 
 /**
  * Default initial state for new runs
@@ -521,6 +526,27 @@ export class RunManager {
 		}
 
 		return buildStatusResponse(runState);
+	}
+
+	/**
+	 * List artifacts for a run (MCP tool interface)
+	 *
+	 * Returns metadata for all artifacts in a run directory,
+	 * with optional filtering by type, path pattern, and recency.
+	 *
+	 * @param input - MCP tool input for listing artifacts
+	 * @returns ListArtifactsOutput with artifacts array and total count
+	 * @throws RunNotFoundError if run not found
+	 */
+	listArtifacts(input: ListArtifactsInput): ListArtifactsOutput {
+		// Check if run exists first
+		const runState = readRunState(input.runId, this.baseDir);
+
+		if (!runState) {
+			throw new RunNotFoundError(input.runId);
+		}
+
+		return listArtifactsImpl(input, this.baseDir);
 	}
 
 	/**

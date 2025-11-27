@@ -73,3 +73,22 @@ export type {
 	ViolationEntry,
 	EnforcementConfig,
 } from "./enforcement.js";
+
+// Artifacts
+export {
+	ARTIFACT_TYPES,
+	ListArtifactsInputSchema,
+	ArtifactDescriptorSchema,
+	ListArtifactsOutputSchema,
+	getArtifactType,
+	matchesPattern,
+	listArtifacts,
+	getArtifact,
+} from "./artifacts.js";
+
+export type {
+	ArtifactType,
+	ListArtifactsInput,
+	ArtifactDescriptor,
+	ListArtifactsOutput,
+} from "./artifacts.js";
