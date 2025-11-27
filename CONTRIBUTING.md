@@ -271,5 +271,38 @@ Never commit secrets. See `docs/SECURITY_IMPLEMENTATION.md`. Use the `lex-pr sec
 
 After `npm run build && npm run format`, the tree should be clean (`git diff --exit-code`). If generation changes are intentional, include them in the PR.
 
+## Releasing
+
+LexRunner follows the same release discipline as Lex. See [Lex RELEASE.md](https://github.com/Guffawaffle/lex/blob/main/RELEASE.md) for the full process.
+
+### Version Alignment Check
+
+Before releasing, verify package.json and Git tags are aligned:
+
+```bash
+npm run check:release-drift
+```
+
+### Quick Release Checklist
+
+1. **Bump version** in `package.json`
+2. **Update CHANGELOG.md** with changes
+3. **Run gates**: `npm run build && npm run typecheck && npm test`
+4. **Commit**: `git commit -am "chore: bump version to X.Y.Z"`
+5. **Tag**: `git tag -s "vX.Y.Z" -m "Release vX.Y.Z"`
+6. **Push**: `git push origin main "vX.Y.Z"`
+7. **Create GitHub release**: `gh release create vX.Y.Z --verify-tag --notes "See CHANGELOG.md"`
+
+### Catch-Up Release (One-Time)
+
+As of 2025-11-27, tag v0.5.0 exists but no GitHub release. To create:
+
+```bash
+gh release create v0.5.0 \
+  --title "v0.5.0: Initial Release" \
+  --notes "Initial public release. See CHANGELOG.md for details." \
+  --verify-tag
+```
+
 ---
 Thank you for helping improve lex-pr-runner! 💙
