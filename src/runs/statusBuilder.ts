@@ -10,6 +10,7 @@ import type {
 	PersonaSnapshot,
 } from "../schemas/runCentric.js";
 import type { RunState, RunStateFile } from "./types.js";
+import { getViolations, generateViolationRiskFlags } from "./enforcement.js";
 
 /**
  * Input type for statusBuilder - accepts both RunState and lenient RunStateFile
@@ -202,10 +203,25 @@ function buildProgress(
  * Build a StatusResponse from run state
  */
 export function buildStatusResponse(
-	runState: StatusBuilderInput
+	runState: StatusBuilderInput,
+	options?: { baseDir?: string }
 ): StatusResponse {
 	const stateValue = runState.state as StateValue;
 	const nextOptions = DEFAULT_OPTIONS_BY_STATE[stateValue] || [];
+
+	// Build risk flags from violations if baseDir is provided
+	let riskFlags: string[] | undefined;
+	if (options?.baseDir) {
+		try {
+			const violations = getViolations(runState.runId, options.baseDir);
+			const violationFlags = generateViolationRiskFlags(violations);
+			if (violationFlags.length > 0) {
+				riskFlags = violationFlags;
+			}
+		} catch {
+			// Ignore errors reading violations - run may not have any logged yet
+		}
+	}
 
 	return {
 		runId: runState.runId,
@@ -217,6 +233,7 @@ export function buildStatusResponse(
 		nextOptions,
 		context: runState.metadata,
 		persona: buildPersonaSnapshot(runState),
+		riskFlags,
 	};
 }
 

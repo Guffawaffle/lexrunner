@@ -49,3 +49,27 @@ export {
 
 // Manager
 export { RunManager, createRunManager } from "./manager.js";
+
+// Enforcement
+export {
+	ViolationType,
+	ViolationSeverity,
+	EnforcementMode,
+	ViolationEntrySchema,
+	DEFAULT_ENFORCEMENT_CONFIG,
+	requiresEnforcement,
+	detectGitViolation,
+	detectGhViolation,
+	detectCiConfigViolation,
+	getViolationSeverity,
+	logViolation,
+	getViolations,
+	countViolationsBySeverity,
+	generateViolationRiskFlags,
+	checkAndLogViolation,
+} from "./enforcement.js";
+
+export type {
+	ViolationEntry,
+	EnforcementConfig,
+} from "./enforcement.js";
