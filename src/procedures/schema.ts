@@ -3,6 +3,10 @@
  *
  * Validates procedure definitions at load time to ensure
  * they are well-formed and complete.
+ *
+ * @internal This module is internal to lex-pr-runner and should not be
+ * imported directly by external consumers. The procedure format may
+ * change between minor versions.
  */
 
 import { z } from "zod";
@@ -21,7 +25,7 @@ export const DecisionOptionSchema = z.object({
 	/** Human-readable description */
 	description: z.string().min(1),
 	/** Risk level for this option */
-	riskLevel: RiskLevelSchema.optional()
+	riskLevel: RiskLevelSchema.optional(),
 });
 
 /**
@@ -35,7 +39,7 @@ export const DecisionPointSchema = z.object({
 	/** Prompt to present to the LLM */
 	prompt: z.string().min(1),
 	/** Available options for this decision */
-	options: z.array(DecisionOptionSchema).min(1)
+	options: z.array(DecisionOptionSchema).min(1),
 });
 
 /**
@@ -46,10 +50,9 @@ export const TransitionMapSchema = z.record(z.string());
 /**
  * Schema version - follows SemVer 1.x.y format
  */
-export const ProcedureSchemaVersion = z.string().regex(
-	/^1\.\d+\.\d+$/,
-	"Schema version must be 1.x.y format"
-);
+export const ProcedureSchemaVersion = z
+	.string()
+	.regex(/^1\.\d+\.\d+$/, "Schema version must be 1.x.y format");
 
 /**
  * Complete procedure definition schema
@@ -72,10 +75,12 @@ export const ProcedureDefinitionSchema = z.object({
 	/** Decision points that may require input */
 	decisionPoints: z.array(DecisionPointSchema).optional(),
 	/** Gates that must pass for completion */
-	completionGates: z.array(z.string().min(1)).optional()
+	completionGates: z.array(z.string().min(1)).optional(),
 });
 
-export type ProcedureDefinitionParsed = z.infer<typeof ProcedureDefinitionSchema>;
+export type ProcedureDefinitionParsed = z.infer<
+	typeof ProcedureDefinitionSchema
+>;
 
 /**
  * Validate procedure definition against schema
@@ -95,11 +100,11 @@ export function validateProcedureSchema(data: unknown): {
 
 	return {
 		valid: false,
-		errors: result.error.issues.map(issue => ({
+		errors: result.error.issues.map((issue) => ({
 			path: issue.path.join("."),
 			message: issue.message,
-			code: issue.code
-		}))
+			code: issue.code,
+		})),
 	};
 }
 
@@ -122,17 +127,19 @@ export function validateProcedureSemantics(
 		errors.push({
 			path: "initialState",
 			message: `Initial state "${definition.initialState}" is not in states list`,
-			code: "invalid_initial_state"
+			code: "invalid_initial_state",
 		});
 	}
 
 	// Check all transition targets are valid states
-	for (const [fromState, transitions] of Object.entries(definition.transitions)) {
+	for (const [fromState, transitions] of Object.entries(
+		definition.transitions
+	)) {
 		if (!statesSet.has(fromState)) {
 			errors.push({
 				path: `transitions.${fromState}`,
 				message: `State "${fromState}" in transitions is not in states list`,
-				code: "invalid_transition_source"
+				code: "invalid_transition_source",
 			});
 		}
 
@@ -141,7 +148,7 @@ export function validateProcedureSemantics(
 				errors.push({
 					path: `transitions.${fromState}.${event}`,
 					message: `Target state "${toState}" is not in states list`,
-					code: "invalid_transition_target"
+					code: "invalid_transition_target",
 				});
 			}
 		}
@@ -155,7 +162,7 @@ export function validateProcedureSemantics(
 				errors.push({
 					path: `decisionPoints[${i}].state`,
 					message: `Decision point state "${dp.state}" is not in states list`,
-					code: "invalid_decision_point_state"
+					code: "invalid_decision_point_state",
 				});
 			}
 		}

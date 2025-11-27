@@ -3,6 +3,10 @@
  *
  * Provides procedures for different workflow types (merge-weave, PR review,
  * sprint planning). Procedures are config-driven state machines loaded from YAML.
+ *
+ * @internal This module is internal to lex-pr-runner. The procedure format and
+ * API may change between minor versions. External consumers should not depend
+ * on the procedure system directly.
  */
 
 // Types
@@ -17,7 +21,7 @@ export type {
 	ProcedureSummary,
 	ProcedureValidationResult,
 	ProcedureValidationError,
-	Procedure
+	Procedure,
 } from "./types.js";
 
 // Schema
@@ -29,7 +33,7 @@ export {
 	ProcedureSchemaVersion,
 	ProcedureDefinitionSchema,
 	validateProcedureSchema,
-	validateProcedureSemantics
+	validateProcedureSemantics,
 } from "./schema.js";
 export type { ProcedureDefinitionParsed } from "./schema.js";
 
@@ -40,6 +44,6 @@ export { ProcedureStateMachine } from "./stateMachine.js";
 export {
 	ProcedureLoader,
 	ProcedureLoadError,
-	createProcedureLoader
+	createProcedureLoader,
 } from "./loader.js";
 export type { ProcedureLoaderOptions } from "./loader.js";
