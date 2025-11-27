@@ -28,6 +28,48 @@ import {
 } from "../src/config/rulesResolver.js";
 
 /**
+ * Minimum required version of @smartergpt/lex for precedence tests
+ */
+const LEX_MIN_VERSION = { major: 0, minor: 4, patch: 6 };
+
+/**
+ * Check if a semver version string meets the minimum requirement
+ * @param version - Version string (e.g., "0.4.6-alpha")
+ * @returns true if version >= 0.4.6
+ */
+function meetsLexMinVersion(version: string): boolean {
+	const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+	if (!match) return false;
+
+	const major = parseInt(match[1], 10);
+	const minor = parseInt(match[2], 10);
+	const patch = parseInt(match[3], 10);
+
+	return (
+		major > LEX_MIN_VERSION.major ||
+		(major === LEX_MIN_VERSION.major && minor > LEX_MIN_VERSION.minor) ||
+		(major === LEX_MIN_VERSION.major &&
+			minor === LEX_MIN_VERSION.minor &&
+			patch >= LEX_MIN_VERSION.patch)
+	);
+}
+
+/**
+ * Get the @smartergpt/lex package.json if installed
+ * @returns Package JSON object or null if not found
+ */
+function getLexPackageJson(): { version: string; exports: Record<string, unknown> } | null {
+	const lexPkgPath = path.join(
+		process.cwd(),
+		"node_modules/@smartergpt/lex/package.json"
+	);
+	if (fs.existsSync(lexPkgPath)) {
+		return JSON.parse(fs.readFileSync(lexPkgPath, "utf-8"));
+	}
+	return null;
+}
+
+/**
  * Test fixture for precedence chain testing
  */
 interface PrecedenceTestFixture {
@@ -280,21 +322,10 @@ describe("Precedence Resolution Tests", () => {
 			});
 
 			it("should verify @smartergpt/lex >= 0.4.6-alpha is available", () => {
-				// Check that the lex package is installed with correct version
-				// Read package.json directly since subpath exports don't include it
-				const lexPkgPath = path.join(
-					process.cwd(),
-					"node_modules/@smartergpt/lex/package.json"
-				);
-				if (fs.existsSync(lexPkgPath)) {
-					const lexPackageJson = JSON.parse(
-						fs.readFileSync(lexPkgPath, "utf-8")
-					);
-					expect(lexPackageJson.version).toMatch(
-						/^0\.(4\.[6-9]|[5-9]|[1-9]\d)/
-					);
+				const lexPkg = getLexPackageJson();
+				if (lexPkg) {
+					expect(meetsLexMinVersion(lexPkg.version)).toBe(true);
 				} else {
-					// Package not installed - skip
 					console.warn("@smartergpt/lex package not found");
 				}
 			});
@@ -597,66 +628,45 @@ This prompt comes from an external repository.
 
 	describe("Package Version Verification", () => {
 		it("should verify @smartergpt/lex package version meets minimum requirement", () => {
-			try {
-				// Read package.json directly from filesystem since subpath exports don't include it
-				const lexPkgPath = path.join(
-					process.cwd(),
-					"node_modules/@smartergpt/lex/package.json"
-				);
-				if (!fs.existsSync(lexPkgPath)) {
-					console.warn("@smartergpt/lex package not installed");
-					return;
-				}
-				const lexPackageJson = JSON.parse(
-					fs.readFileSync(lexPkgPath, "utf-8")
-				);
-				const version = lexPackageJson.version;
-
-				// Should be >= 0.4.6-alpha
-				// Parse version for comparison
-				const versionMatch = version.match(
-					/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/
-				);
-				expect(versionMatch).not.toBeNull();
-
-				if (versionMatch) {
-					const major = parseInt(versionMatch[1], 10);
-					const minor = parseInt(versionMatch[2], 10);
-					const patch = parseInt(versionMatch[3], 10);
-
-					// Check version >= 0.4.6
-					const meetsMinimum =
-						major > 0 ||
-						(major === 0 && minor > 4) ||
-						(major === 0 && minor === 4 && patch >= 6);
-
-					expect(meetsMinimum).toBe(true);
-				}
-			} catch (error) {
-				// Package not installed - skip test
+			const lexPkg = getLexPackageJson();
+			if (!lexPkg) {
 				console.warn("@smartergpt/lex package not installed");
+				return;
 			}
+
+			expect(meetsLexMinVersion(lexPkg.version)).toBe(true);
 		});
 
 		it("should have rules export in @smartergpt/lex package", () => {
-			try {
-				// Check if the rules export exists in package.json
-				const lexPkgPath = path.join(
-					process.cwd(),
-					"node_modules/@smartergpt/lex/package.json"
-				);
-				if (!fs.existsSync(lexPkgPath)) {
-					console.warn("@smartergpt/lex package not accessible");
-					return;
-				}
-				const lexPackageJson = JSON.parse(
-					fs.readFileSync(lexPkgPath, "utf-8")
-				);
-				expect(lexPackageJson.exports).toBeDefined();
-				expect(lexPackageJson.exports["./rules"]).toBeDefined();
-			} catch (error) {
+			const lexPkg = getLexPackageJson();
+			if (!lexPkg) {
 				console.warn("@smartergpt/lex package not accessible");
+				return;
 			}
+
+			expect(lexPkg.exports).toBeDefined();
+			expect(lexPkg.exports["./rules"]).toBeDefined();
+		});
+
+		describe("meetsLexMinVersion helper", () => {
+			it("should return true for version >= 0.4.6", () => {
+				expect(meetsLexMinVersion("0.4.6")).toBe(true);
+				expect(meetsLexMinVersion("0.4.7")).toBe(true);
+				expect(meetsLexMinVersion("0.5.0")).toBe(true);
+				expect(meetsLexMinVersion("1.0.0")).toBe(true);
+				expect(meetsLexMinVersion("0.4.6-alpha")).toBe(true);
+			});
+
+			it("should return false for version < 0.4.6", () => {
+				expect(meetsLexMinVersion("0.4.5")).toBe(false);
+				expect(meetsLexMinVersion("0.3.0")).toBe(false);
+				expect(meetsLexMinVersion("0.1.0")).toBe(false);
+			});
+
+			it("should return false for invalid version strings", () => {
+				expect(meetsLexMinVersion("invalid")).toBe(false);
+				expect(meetsLexMinVersion("")).toBe(false);
+			});
 		});
 	});
 });
