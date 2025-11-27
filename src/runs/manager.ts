@@ -3,6 +3,9 @@
  *
  * Core infrastructure for creating, tracking, and persisting run state
  * across the tool-grounded lifecycle.
+ *
+ * Supports dual-write mode: persists to both NDJSON files (backward compatible)
+ * and optional RunStore for structured queries.
  */
 
 import { ulid } from "ulid";
@@ -33,6 +36,7 @@ import {
 	type ListArtifactsInput,
 	type ListArtifactsOutput,
 } from "./artifacts.js";
+import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
 
 /**
  * Default initial state for new runs
@@ -45,20 +49,48 @@ const DEFAULT_INITIAL_STATE = "initialized";
 const MCP_INITIAL_STATE = "planning";
 
 /**
+ * Options for creating a RunManager
+ */
+export interface RunManagerOptions {
+	/**
+	 * Base directory for run storage (defaults to cwd)
+	 */
+	baseDir?: string;
+
+	/**
+	 * Optional RunStore for structured persistence.
+	 * If provided, step outcomes and receipts will be persisted to this store.
+	 * NDJSON coexistence is maintained regardless.
+	 */
+	runStore?: RunStore;
+}
+
+/**
  * RunManager - Core run lifecycle management
  *
  * Handles creation, retrieval, updates, and cleanup of run state.
+ * Supports dual-write mode: NDJSON files for backward compatibility,
+ * plus optional RunStore for structured queries.
  */
 export class RunManager {
 	private baseDir: string;
+	private runStore: RunStore | undefined;
 
 	/**
 	 * Create a new RunManager
 	 *
-	 * @param baseDir - Base directory for run storage (defaults to cwd)
+	 * @param baseDirOrOptions - Base directory string (deprecated) or options object
 	 */
-	constructor(baseDir: string = process.cwd()) {
-		this.baseDir = baseDir;
+	constructor(baseDirOrOptions: string | RunManagerOptions = process.cwd()) {
+		if (typeof baseDirOrOptions === "string") {
+			// Legacy: string baseDir for backward compatibility
+			this.baseDir = baseDirOrOptions;
+			this.runStore = undefined;
+		} else {
+			// New: options object with optional runStore
+			this.baseDir = baseDirOrOptions.baseDir ?? process.cwd();
+			this.runStore = baseDirOrOptions.runStore;
+		}
 	}
 
 	/**
@@ -343,6 +375,145 @@ export class RunManager {
 		appendToRunLog(runId, "failures", failure, this.baseDir);
 	}
 
+	// ─────────────────────────────────────────────────────────────────────────
+	// RunStore Integration (Step Outcomes & Receipts)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Get the RunStore instance (if configured)
+	 *
+	 * @returns The RunStore instance, or undefined if not configured
+	 */
+	getRunStore(): RunStore | undefined {
+		return this.runStore;
+	}
+
+	/**
+	 * Record a step outcome to the RunStore.
+	 *
+	 * Step outcomes are persisted to both:
+	 * 1. NDJSON log (backward compatible)
+	 * 2. RunStore (if configured)
+	 *
+	 * @param outcome - The step outcome to record
+	 *
+	 * @example
+	 * ```typescript
+	 * await manager.recordStepOutcome({
+	 *   stepId: "step-001",
+	 *   runId: "run-001",
+	 *   nodeId: "pr-42",
+	 *   gateName: "lint",
+	 *   status: "pass",
+	 *   durationMs: 1234,
+	 *   timestamp: new Date().toISOString()
+	 * });
+	 * ```
+	 */
+	async recordStepOutcome(outcome: StepOutcome): Promise<void> {
+		// Always log to NDJSON for backward compatibility
+		appendToRunLog(
+			outcome.runId,
+			"steps",
+			{
+				type: "step_outcome",
+				...outcome,
+			},
+			this.baseDir
+		);
+
+		// Also persist to RunStore if configured
+		if (this.runStore) {
+			await this.runStore.appendStep(outcome);
+		}
+	}
+
+	/**
+	 * Record a receipt (scope/risk escalation) to the RunStore.
+	 *
+	 * Receipts are persisted to both:
+	 * 1. NDJSON log (backward compatible)
+	 * 2. RunStore (if configured)
+	 *
+	 * @param receipt - The receipt to record
+	 *
+	 * @example
+	 * ```typescript
+	 * await manager.recordReceipt({
+	 *   receiptId: "receipt-001",
+	 *   runId: "run-001",
+	 *   reason: "Scope expanded beyond initial plan",
+	 *   approver: "alice@example.com",
+	 *   timestamp: new Date().toISOString()
+	 * });
+	 * ```
+	 */
+	async recordReceipt(receipt: Receipt): Promise<void> {
+		// Always log to NDJSON for backward compatibility
+		appendToRunLog(
+			receipt.runId,
+			"receipts",
+			{
+				type: "receipt",
+				...receipt,
+			},
+			this.baseDir
+		);
+
+		// Also persist to RunStore if configured
+		if (this.runStore) {
+			await this.runStore.saveReceipt(receipt);
+		}
+	}
+
+	/**
+	 * Get step outcomes for a run.
+	 *
+	 * Queries the RunStore if configured, otherwise returns from NDJSON logs.
+	 *
+	 * @param runId - The run identifier
+	 * @returns Array of step outcomes for the run
+	 */
+	async getStepOutcomes(runId: string): Promise<StepOutcome[]> {
+		// Prefer RunStore if configured
+		if (this.runStore) {
+			return this.runStore.getStepsForRun(runId);
+		}
+
+		// Fallback to NDJSON logs
+		const logs = readRunLog(runId, "steps", this.baseDir);
+		return logs
+			.filter((log) => log.type === "step_outcome")
+			.map((log) => {
+				const { type, ...outcome } = log;
+				return outcome as unknown as StepOutcome;
+			});
+	}
+
+	/**
+	 * Get receipts for a run.
+	 *
+	 * Queries the RunStore if configured, otherwise returns from NDJSON logs.
+	 *
+	 * @param runId - The run identifier
+	 * @returns Array of receipts for the run
+	 */
+	async getReceipts(runId: string): Promise<Receipt[]> {
+		// Prefer RunStore if configured
+		if (this.runStore) {
+			return this.runStore.getReceiptsForRun(runId);
+		}
+
+		// Fallback to NDJSON logs
+		const logs = readRunLog(runId, "receipts", this.baseDir);
+		return logs
+			.filter((log) => log.type === "receipt")
+			.map((log) => {
+				const { type, ...receipt } = log;
+				return receipt as unknown as Receipt;
+			});
+	}
+
 	/**
 	 * Get decisions for a run
 	 *
@@ -617,9 +788,22 @@ export class RunManager {
 /**
  * Create a new RunManager instance
  *
- * @param baseDir - Base directory for run storage
+ * @param baseDirOrOptions - Base directory string or options object
  * @returns A new RunManager instance
+ *
+ * @example
+ * ```typescript
+ * // Legacy: string baseDir
+ * const manager = createRunManager("/path/to/project");
+ *
+ * // New: options object with RunStore
+ * const store = new InMemoryRunStore();
+ * const manager = createRunManager({ baseDir: "/path/to/project", runStore: store });
+ * ```
  */
-export function createRunManager(baseDir?: string): RunManager {
-	return new RunManager(baseDir);
+export function createRunManager(baseDirOrOptions?: string | RunManagerOptions): RunManager {
+	if (typeof baseDirOrOptions === "string" || baseDirOrOptions === undefined) {
+		return new RunManager(baseDirOrOptions);
+	}
+	return new RunManager(baseDirOrOptions);
 }
