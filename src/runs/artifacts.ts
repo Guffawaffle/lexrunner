@@ -20,7 +20,7 @@ export const ARTIFACT_TYPES = {
 	plan: "plan.json",
 	decision: "decisions.ndjson",
 	failure: "failures.ndjson",
-	gate: "gates/**/**/report.json",
+	gate: "gates/**/report.json",
 	report: "reports/*.md",
 	log: "logs/*.log",
 } as const;
@@ -130,8 +130,8 @@ export function matchesPattern(filePath: string, pattern: string): boolean {
 		.replace(/\*\*/g, "\0")
 		// Replace * with single-segment match (anything except /)
 		.replace(/\*/g, "[^/]*")
-		// Replace placeholder with multi-segment match (anything)
-		.replace(/\0/g, ".*");
+		// Replace placeholder with multi-segment match (one or more characters)
+		.replace(/\0/g, ".+");
 
 	const regex = new RegExp(`^${regexPattern}$`);
 	return regex.test(normalizedPath);
