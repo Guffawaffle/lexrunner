@@ -128,11 +128,13 @@ async function runSmokeTest() {
 			success(`Package version: ${version}`);
 
 			// Check if version is acceptable (must be 0.4.x or higher)
+			// This means major >= 1 OR (major === 0 AND minor >= 4)
 			const versionMatch = version.match(/^(\d+)\.(\d+)/);
 			if (versionMatch) {
 				const major = parseInt(versionMatch[1], 10);
 				const minor = parseInt(versionMatch[2], 10);
-				if (major === 0 && minor < 4) {
+				const isAcceptable = major >= 1 || (major === 0 && minor >= 4);
+				if (!isAcceptable) {
 					failure(`Package version ${version} is below minimum (0.4.x)`);
 					errors.push(`Package version ${version} is below minimum required version (0.4.x)`);
 				} else {
@@ -221,8 +223,25 @@ async function runSmokeTest() {
 	section("Step 6: Prompt Resolution Precedence Chain");
 
 	const cwd = process.cwd();
+
+	// Helper to get LEX_PROMPTS_DIR status with validation
+	function getLexPromptsDirStatus() {
+		const envValue = process.env.LEX_PROMPTS_DIR;
+		if (!envValue) {
+			return "not set";
+		}
+		if (!fs.existsSync(envValue)) {
+			return `set but path not found: ${envValue}`;
+		}
+		const stat = fs.statSync(envValue);
+		if (!stat.isDirectory()) {
+			return `set but not a directory: ${envValue}`;
+		}
+		return `set: ${envValue}`;
+	}
+
 	const precedenceLocations = [
-		{ path: "LEX_PROMPTS_DIR (env var)", status: process.env.LEX_PROMPTS_DIR ? "set" : "not set" },
+		{ path: "LEX_PROMPTS_DIR (env var)", status: getLexPromptsDirStatus() },
 		{
 			path: path.join(cwd, ".smartergpt.local/prompts"),
 			status: fs.existsSync(path.join(cwd, ".smartergpt.local/prompts")) ? "exists" : "not found",
