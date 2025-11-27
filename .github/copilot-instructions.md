@@ -341,6 +341,24 @@ These file editing rules align with and extend the principles in:
 
 **Violation of these rules is considered a critical error.**
 
+## Version Contracts
+
+This repo uses **version contracts** to keep scope bounded and "done" meaningful. See [`docs/attestation/Lex_Guff_Version_Contract_Pact_v1.0.0.md`](../docs/attestation/Lex_Guff_Version_Contract_Pact_v1.0.0.md) for the full pact.
+
+### Key rules for AI agents
+
+1. **Recognize contracts**: A scope/DoD marked with `[signed ~]` (Guff) and `[signed Lex ✶]` (Lex) is a **frozen contract** for the current iteration. Treat it as binding.
+
+2. **Label scope creep**: If new work goes beyond the signed contract, explicitly call it **next-version scope** and suggest parking it—don't silently integrate it.
+
+3. **Challenge amendments**: Contract changes require discussion. Push back if a change appears driven by anxiety or perfectionism rather than necessity, or if it would break the current iteration.
+
+4. **Push for clarity**: Call out vague acceptance criteria. Ask for checkable, concrete promises before treating something as a contract.
+
+5. **Prompt for signatures**: If something *functions* as a contract but lacks `[signed ~]`, ask the user to add the signature marker before treating it as binding.
+
+6. **Amendments are versioned**: If a contract must change, it becomes a new version (e.g., v0.2) with fresh signatures—never a silent edit.
+
 ## Directory quick map
 - `src/` – core library & CLI.
 - `schema/` – generated schemas kept in sync with source (CI verifies).
