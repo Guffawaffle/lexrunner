@@ -328,6 +328,22 @@ function getTimestamp(): string {
   return new Date().toISOString();
 }
 
+// Placeholder: Implement these functions based on your executor's needs
+async function gatherContext(target: string): Promise<unknown> {
+  // Your context-gathering logic here
+  return { target };
+}
+
+function parseModelResponse(response: string): unknown {
+  // Your response parsing logic here
+  return JSON.parse(response);
+}
+
+async function emitFrame(data: unknown): Promise<string> {
+  // Your frame emission logic here (e.g., call Lex memory API)
+  return `frame-${Date.now()}`;
+}
+
 /**
  * Phase 1: Deterministic preparation
  */
