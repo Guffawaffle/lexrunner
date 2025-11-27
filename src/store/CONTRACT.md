@@ -1,7 +1,7 @@
 # RunStore Contract v1.0.0
 
-> **Status:** Frozen for 1.0.0  
-> **Last Updated:** 2025-11-27  
+> **Status:** Frozen for 1.0.0
+> **Last Updated:** 2025-11-27
 > **Schema Version:** `1.0.0`
 
 This document defines the persistence contract for Runs. All implementations of `RunStore` must conform to this specification.
