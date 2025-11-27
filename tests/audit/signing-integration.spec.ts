@@ -67,8 +67,12 @@ describe('Audit Signing Integration', () => {
 		});
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/integration-test';
@@ -131,8 +135,12 @@ describe('Audit Signing Integration', () => {
 		const mockSend = vi.fn().mockRejectedValue(new Error('KMS AccessDeniedException'));
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		const emitter = await initAuditEmitter({
@@ -156,8 +164,12 @@ describe('Audit Signing Integration', () => {
 		});
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		// Generate 32-byte hex key for encryption
@@ -208,8 +220,12 @@ describe('Audit Signing Integration', () => {
 		});
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/deterministic-test';

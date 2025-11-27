@@ -143,8 +143,12 @@ describe('Audit Signing - KMS mocked', () => {
 		});
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/abc-123';
@@ -186,8 +190,12 @@ describe('Audit Signing - KMS mocked', () => {
 		const mockSend = vi.fn().mockRejectedValue(new Error('KMS key not found'));
 
 		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(() => ({ send: mockSend })),
-			SignCommand: vi.fn((params) => params)
+			KMSClient: vi.fn(function () {
+				return { send: mockSend };
+			}),
+			SignCommand: vi.fn(function (params) {
+				return params;
+			})
 		}));
 
 		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/invalid';

@@ -23,7 +23,9 @@ const mockOctokit = {
 };
 
 vi.mock("@octokit/rest", () => ({
-	Octokit: vi.fn().mockImplementation(() => mockOctokit)
+	Octokit: vi.fn(function () {
+		return mockOctokit;
+	}),
 }));
 
 describe("GitHub Integration", () => {

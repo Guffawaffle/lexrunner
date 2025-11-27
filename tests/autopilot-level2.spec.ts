@@ -53,15 +53,17 @@ describe('AutopilotLevel2', () => {
 
 			// Mock the ArtifactWriter to avoid filesystem operations
 			vi.doMock('../src/autopilot/artifacts.js', () => ({
-				ArtifactWriter: vi.fn().mockImplementation(() => ({
-					initialize: vi.fn().mockResolvedValue(undefined),
-					writeAnalysis: vi.fn().mockResolvedValue('/tmp/analysis.json'),
-					writeWeaveReport: vi.fn().mockResolvedValue('/tmp/weave-report.md'),
-					writeGatePredictions: vi.fn().mockResolvedValue('/tmp/gate-predictions.json'),
-					writeExecutionLog: vi.fn().mockResolvedValue('/tmp/execution-log.md'),
-					writeMetadata: vi.fn().mockResolvedValue('/tmp/metadata.json'),
-					getOutputDir: vi.fn().mockReturnValue('/tmp/deliverables')
-				}))
+				ArtifactWriter: vi.fn(function () {
+					return {
+						initialize: vi.fn().mockResolvedValue(undefined),
+						writeAnalysis: vi.fn().mockResolvedValue('/tmp/analysis.json'),
+						writeWeaveReport: vi.fn().mockResolvedValue('/tmp/weave-report.md'),
+						writeGatePredictions: vi.fn().mockResolvedValue('/tmp/gate-predictions.json'),
+						writeExecutionLog: vi.fn().mockResolvedValue('/tmp/execution-log.md'),
+						writeMetadata: vi.fn().mockResolvedValue('/tmp/metadata.json'),
+						getOutputDir: vi.fn().mockReturnValue('/tmp/deliverables')
+					};
+				})
 			}));
 
 			const result = await autopilot.execute();
@@ -98,7 +100,9 @@ describe('AutopilotLevel2', () => {
 
 			// Mock Octokit import
 			vi.doMock('@octokit/rest', () => ({
-				Octokit: vi.fn().mockImplementation(() => mockOctokit)
+				Octokit: vi.fn(function () {
+					return mockOctokit;
+				})
 			}));
 
 			// Mock ArtifactWriter
