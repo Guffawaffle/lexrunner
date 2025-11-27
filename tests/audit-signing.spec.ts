@@ -117,12 +117,16 @@ describe('Audit Signing', () => {
 
 			// Mock AWS SDK
 			vi.doMock('@aws-sdk/client-kms', () => ({
-				KMSClient: vi.fn(() => ({
-					send: vi.fn().mockResolvedValue({
-						Signature: Buffer.from('mock-signature')
-					})
-				})),
-				SignCommand: vi.fn()
+				KMSClient: vi.fn(function () {
+					return {
+						send: vi.fn().mockResolvedValue({
+							Signature: Buffer.from('mock-signature')
+						})
+					};
+				}),
+				SignCommand: vi.fn(function () {
+					return {};
+				})
 			}));
 
 			await signManifest(manifestPath, {
@@ -148,11 +152,13 @@ describe('Audit Signing', () => {
 
 			// Mock GCP SDK
 			vi.doMock('@google-cloud/kms', () => ({
-				KeyManagementServiceClient: vi.fn(() => ({
-					asymmetricSign: vi.fn().mockResolvedValue([{
-						signature: Buffer.from('mock-signature')
-					}])
-				}))
+				KeyManagementServiceClient: vi.fn(function () {
+					return {
+						asymmetricSign: vi.fn().mockResolvedValue([{
+							signature: Buffer.from('mock-signature')
+						}])
+					};
+				})
 			}));
 
 			await signManifest(manifestPath, {
@@ -178,15 +184,19 @@ describe('Audit Signing', () => {
 
 			// Mock Azure SDK
 			vi.doMock('@azure/keyvault-keys', () => ({
-				CryptographyClient: vi.fn(() => ({
-					sign: vi.fn().mockResolvedValue({
-						result: Buffer.from('mock-signature')
-					})
-				}))
+				CryptographyClient: vi.fn(function () {
+					return {
+						sign: vi.fn().mockResolvedValue({
+							result: Buffer.from('mock-signature')
+						})
+					};
+				})
 			}));
 
 			vi.doMock('@azure/identity', () => ({
-				DefaultAzureCredential: vi.fn()
+				DefaultAzureCredential: vi.fn(function () {
+					return {};
+				})
 			}));
 
 			await signManifest(manifestPath, {
@@ -306,12 +316,16 @@ describe('Audit Signing', () => {
 
 			// Mock AWS SDK
 			vi.doMock('@aws-sdk/client-kms', () => ({
-				KMSClient: vi.fn(() => ({
-					send: vi.fn().mockResolvedValue({
-						Signature: Buffer.from('mock-signature')
-					})
-				})),
-				SignCommand: vi.fn()
+				KMSClient: vi.fn(function () {
+					return {
+						send: vi.fn().mockResolvedValue({
+							Signature: Buffer.from('mock-signature')
+						})
+					};
+				}),
+				SignCommand: vi.fn(function () {
+					return {};
+				})
 			}));
 
 			await signManifest(manifestPath, {
@@ -338,12 +352,16 @@ describe('Audit Signing', () => {
 
 			// Mock AWS SDK
 			vi.doMock('@aws-sdk/client-kms', () => ({
-				KMSClient: vi.fn(() => ({
-					send: vi.fn().mockResolvedValue({
-						Signature: Buffer.from('mock-signature')
-					})
-				})),
-				SignCommand: vi.fn()
+				KMSClient: vi.fn(function () {
+					return {
+						send: vi.fn().mockResolvedValue({
+							Signature: Buffer.from('mock-signature')
+						})
+					};
+				}),
+				SignCommand: vi.fn(function () {
+					return {};
+				})
 			}));
 
 			await signManifest(manifestPath, {

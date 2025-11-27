@@ -14,15 +14,15 @@
  * @returns true if rules can be loaded, false otherwise
  */
 export function isLexSonaAvailable(): boolean {
-	try {
-		// Try to resolve the @smartergpt/lex/rules module
-		// Using require.resolve for compatibility with current Node.js version
-		require.resolve("@smartergpt/lex/rules");
-		return true;
-	} catch (error) {
-		// Package not installed or rules module not available
-		return false;
-	}
+	// TODO: The @smartergpt/lex/rules export does not yet exist.
+	// This is speculative code for future integration.
+	// Return false until the export is implemented.
+	//
+	// Future implementation will use:
+	// require.resolve("@smartergpt/lex/rules");
+	//
+	// See: LexSona integration epic for implementation timeline
+	return false;
 }
 
 /**
@@ -79,69 +79,30 @@ interface ResolvedRule {
  * @returns Array of behavioral rules
  */
 export async function loadLexSonaRules(
-	scope?: RuleScope,
+	_scope?: RuleScope,
 	// TODO: Enable in v0.5.0 - tracked by LexSona integration epic
 	enabled: boolean = false
 ): Promise<BehavioralRule[]> {
 	// Feature flag: LexSona not enabled yet (v0.5.0 target)
+	// The @smartergpt/lex/rules export does not yet exist - this is
+	// speculative code for future integration. Return early to avoid
+	// breaking import resolution.
 	if (!enabled) {
 		return [];
 	}
 
-	// Check if Lex package is available
-	if (!isLexSonaAvailable()) {
-		return [];
-	}
+	// TODO: Implement when @smartergpt/lex exports a ./rules subpath
+	// For now, return empty array since the feature is disabled
+	// and the export doesn't exist yet.
+	//
+	// Future implementation will:
+	// 1. Check if Lex package is available via isLexSonaAvailable()
+	// 2. Dynamic import of rules module
+	// 3. List and load rules with scope filtering
+	//
+	// See: LexSona integration epic for implementation timeline
 
-	try {
-		// Dynamic import of rules module
-		// This will be used in v0.5.0 when the feature is fully enabled
-		const rulesModule = (await import("@smartergpt/lex/rules")) as {
-			listRules?: () => string[];
-			getRule?: (name: string) => ResolvedRule | null;
-		};
-
-		// List available rules
-		const ruleNames = rulesModule.listRules ? rulesModule.listRules() : [];
-
-		// Load rules
-		const rules: BehavioralRule[] = [];
-		for (const ruleName of ruleNames) {
-			const rule = rulesModule.getRule
-				? rulesModule.getRule(ruleName)
-				: null;
-			if (rule) {
-				rules.push({
-					id: rule.id || ruleName,
-					title: rule.title || ruleName,
-					description: rule.description || "",
-					content: rule.content || rule.guidance || "",
-					scope: rule.scope,
-					priority: rule.priority,
-				});
-			}
-		}
-
-		return rules;
-	} catch (error) {
-		// Handle specific error cases for better debugging
-		if (error instanceof Error) {
-			if (error.message.includes("Cannot find module")) {
-				// Module not found - package not installed or rules not exported
-				console.error("LexSona rules module not found:", error.message);
-			} else if (
-				error.message.includes("listRules") ||
-				error.message.includes("getRule")
-			) {
-				// Expected functions not exported
-				console.error("LexSona rules API mismatch:", error.message);
-			} else {
-				// Other errors (parsing, etc.)
-				console.error("Failed to load LexSona rules:", error.message);
-			}
-		}
-		return [];
-	}
+	return [];
 }
 
 /**
