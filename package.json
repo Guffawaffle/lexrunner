@@ -59,6 +59,7 @@
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
 		"ci:debug": "bash scripts/ci-debug.sh",
+		"ci:smoke": "node scripts/ci-smoke.mjs",
 		"ci:local": "npm run lint && npm run build && npm test",
 		"ci:docker": "echo '⚠️ Docker CI not configured, falling back to local' && npm run ci:local",
 		"test:run": "vitest run"
