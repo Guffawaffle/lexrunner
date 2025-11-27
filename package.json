@@ -81,7 +81,7 @@
 		"simple-git": "^3.24.0",
 		"ulid": "^3.0.1",
 		"yaml": "^2.6.0",
-		"zod": "^3.25.76"
+		"zod": "^4.1.13"
 	},
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",

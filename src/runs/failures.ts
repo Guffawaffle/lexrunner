@@ -83,7 +83,7 @@ export const RecommendedActionSchema = z.object({
 	/** Prompt for LLM decision */
 	prompt: z.string().optional(),
 	/** JSON schema for response */
-	responseSchema: z.record(z.unknown()).optional(),
+	responseSchema: z.record(z.string(), z.unknown()).optional(),
 	/** Risk level assessment */
 	riskLevel: z.enum(["low", "medium", "high"]).optional(),
 });
@@ -128,7 +128,7 @@ export const FailureHandlingPayloadSchema = z.object({
 	/** Recommended actions for recovery */
 	recommendedActions: z.array(RecommendedActionSchema),
 	/** Schema for failure record logging */
-	failureRecordSchema: z.record(z.unknown()).optional(),
+	failureRecordSchema: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type FailureHandlingPayload = z.infer<

@@ -7,7 +7,7 @@
  * @module types/guardrails
  */
 
-import { z } from "zod";
+import { z, type ZodSafeParseResult } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // G_scope — Access Boundaries
@@ -438,7 +438,7 @@ export function validateGuardrailProfile(profile: unknown): GuardrailProfile {
  */
 export function safeValidateGuardrailProfile(
 	profile: unknown
-): z.SafeParseReturnType<unknown, GuardrailProfile> {
+): ZodSafeParseResult<GuardrailProfile> {
 	return GuardrailProfileSchema.safeParse(profile);
 }
 

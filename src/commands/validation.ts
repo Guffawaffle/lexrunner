@@ -5,7 +5,7 @@
  * before creating Issues or writing artifacts
  */
 
-import { ZodSchema } from 'zod';
+import { ZodSchema, type ZodIssue } from 'zod';
 import chalk from 'chalk';
 import * as fs from 'fs/promises';
 
@@ -28,11 +28,11 @@ export function validateOrThrow<T>(
 	if (!result.success) {
 		console.error(chalk.red(`\nSchema validation failed (${context}):`));
 		
-		result.error.errors.forEach((err, idx) => {
+		result.error.issues.forEach((err: ZodIssue, idx: number) => {
 			console.error(chalk.red(`  ${idx + 1}. ${err.path.join('.')}: ${err.message}`));
 			
 			if (err.code === 'invalid_type') {
-				console.error(chalk.gray(`     Expected: ${err.expected}, received: ${err.received}`));
+				console.error(chalk.gray(`     Expected: ${(err as any).expected}, received: ${(err as any).received}`));
 			}
 		});
 		

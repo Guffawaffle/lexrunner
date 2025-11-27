@@ -73,7 +73,7 @@ const StackConfig = z.object({
 			name: z.string(),
 			run: z.string(),
 			cwd: z.string().optional(),
-			env: z.record(z.string()).optional(),
+			env: z.record(z.string(), z.string()).optional(),
 			runtime: z.enum(["local", "container", "ci-service"]).optional(),
 			artifacts: z.array(z.string()).optional()
 		})).optional()
@@ -89,11 +89,11 @@ const ScopeConfig = z.object({
 	selectors: z.object({
 		include_labels: z.array(z.string()).default([]),
 		exclude_labels: z.array(z.string()).default([])
-	}).default({}),
+	}).default(() => ({ include_labels: [], exclude_labels: [] })),
 	defaults: z.object({
 		strategy: z.enum(["rebase-weave", "merge-weave", "squash-weave"]).default("merge-weave"),
 		base: z.string().default("main")
-	}).default({}),
+	}).default(() => ({ strategy: "merge-weave" as const, base: "main" })),
 	pin_commits: z.boolean().default(false)
 }).strict();
 

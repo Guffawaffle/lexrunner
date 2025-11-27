@@ -11,12 +11,13 @@ import { z } from "zod";
 export const GatesConfigSchema = z.object({
 	version: z.number().int().min(1),
 	levels: z.record(
+		z.string(),
 		z.array(
 			z.object({
 				name: z.string(),
 				run: z.string(),
 				cwd: z.string().optional(),
-				env: z.record(z.string()).optional(),
+				env: z.record(z.string(), z.string()).optional(),
 				runtime: z.enum(["local", "container", "ci-service"]).optional(),
 				artifacts: z.array(z.string()).optional()
 			})
@@ -41,7 +42,7 @@ export const ScopeConfigSchema = z.object({
 	selectors: z.object({
 		include_labels: z.array(z.string()).default([]),
 		exclude_labels: z.array(z.string()).default([])
-	}).default({}),
+	}).default(() => ({ include_labels: [], exclude_labels: [] })),
 	defaults: z.object({
 		strategy: z.enum(["rebase-weave", "merge-weave", "squash-weave"]),
 		base: z.string()
@@ -57,7 +58,7 @@ export type ScopeConfig = z.infer<typeof ScopeConfigSchema>;
 export const DepsConfigSchema = z.object({
 	version: z.number().int().min(1),
 	depends_on: z.array(z.string()).default([]),
-	strategies: z.record(z.enum(["rebase-weave", "merge-weave", "squash-weave"])).default({})
+	strategies: z.record(z.string(), z.enum(["rebase-weave", "merge-weave", "squash-weave"])).default(() => ({}))
 }).strict();
 
 export type DepsConfig = z.infer<typeof DepsConfigSchema>;
@@ -79,7 +80,7 @@ export const StackConfigSchema = z.object({
 			name: z.string(),
 			run: z.string(),
 			cwd: z.string().optional(),
-			env: z.record(z.string()).optional(),
+			env: z.record(z.string(), z.string()).optional(),
 			runtime: z.enum(["local", "container", "ci-service"]).optional(),
 			artifacts: z.array(z.string()).optional()
 		})).optional()

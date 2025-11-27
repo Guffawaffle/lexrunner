@@ -104,7 +104,13 @@ export const PerformanceConfig = z.object({
 	enableCaching: z.boolean().default(true), // Enable operation caching
 	throttleOnMemory: z.boolean().default(true), // Throttle workers when memory high
 	memoryThresholdPercent: z.number().min(0).max(100).default(80) // Memory threshold %
-}).default({});
+}).default(() => ({
+	batchSize: 50,
+	cacheTTLSeconds: 3600,
+	enableCaching: true,
+	throttleOnMemory: true,
+	memoryThresholdPercent: 80
+}));
 export type PerformanceConfig = z.infer<typeof PerformanceConfig>;
 
 /**
@@ -130,10 +136,10 @@ export const Policy = z.object({
 	requiredGates: z.array(z.string()).default([]),
 	optionalGates: z.array(z.string()).default([]),
 	maxWorkers: z.number().int().min(1).default(1),
-	retries: z.record(RetryConfig).default({}),
+	retries: z.record(z.string(), RetryConfig).default(() => ({})),
 	overrides: z.object({
 		adminGreen: AdminOverride.optional()
-	}).default({}),
+	}).default(() => ({})),
 	blockOn: z.array(z.string()).default([]),
 	mergeRule: MergeRule.default({ type: "strict-required" }),
 	performance: PerformanceConfig.optional(), // Performance tuning options
@@ -165,7 +171,7 @@ export const Gate = z.object({
 	name: z.string(),
 	run: z.string(),
 	cwd: z.string().optional(),
-	env: z.record(z.string()).default({}),
+	env: z.record(z.string(), z.string()).default(() => ({})),
 	// Runtime configuration
 	runtime: z.enum(["local", "container", "ci-service"]).default("local"),
 	// Container spec (only used when runtime is "container")
@@ -173,7 +179,7 @@ export const Gate = z.object({
 	// Expected artifact paths (for output collection)
 	artifacts: z.array(z.string()).default([]),
 	// Optional input data for gates that require structured inputs (validated against gate-specific schemas)
-	input: z.record(z.unknown()).optional()
+	input: z.record(z.string(), z.unknown()).optional()
 }).strict();
 export type Gate = z.infer<typeof Gate>;
 

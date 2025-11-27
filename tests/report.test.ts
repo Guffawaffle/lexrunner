@@ -16,7 +16,8 @@ describe('Gate Report Schema', () => {
 		};
 
 		const result = validateGateReport(validReport);
-		expect(result).toEqual(validReport);
+		// Zod v4 applies defaults, so schemaVersion is added
+		expect(result).toEqual({ ...validReport, schemaVersion: "1.0.0" });
 	});
 
 	it('validates gate report with optional fields', () => {
@@ -35,7 +36,8 @@ describe('Gate Report Schema', () => {
 		};
 
 		const result = validateGateReport(validReport);
-		expect(result).toEqual(validReport);
+		// Zod v4 applies defaults, so schemaVersion is added
+		expect(result).toEqual({ ...validReport, schemaVersion: "1.0.0" });
 	});
 
 	it('rejects invalid status values', () => {
@@ -85,7 +87,8 @@ describe('Gate Report Schema', () => {
 		const result = safeValidateGateReport(validReport);
 		expect(result.success).toBe(true);
 		if (result.success) {
-			expect(result.data).toEqual(validReport);
+			// Zod v4 applies defaults, so schemaVersion is added
+			expect(result.data).toEqual({ ...validReport, schemaVersion: "1.0.0" });
 		}
 	});
 
@@ -145,7 +148,8 @@ describe('Report Aggregator', () => {
 		expect(result.items).toHaveLength(1);
 		expect(result.items[0].item).toBe("test-item");
 		expect(result.items[0].gates).toHaveLength(1);
-		expect(result.items[0].gates[0]).toEqual(reportData);
+		// Zod v4 applies defaults, so schemaVersion is added
+		expect(result.items[0].gates[0]).toEqual({ ...reportData, schemaVersion: "1.0.0" });
 		expect(result.allGreen).toBe(true);
 	});
 

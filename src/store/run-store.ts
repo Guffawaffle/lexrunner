@@ -13,7 +13,7 @@
  * @module store/run-store
  */
 
-import { z } from "zod";
+import { z, type ZodSafeParseResult } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Run State Machine
@@ -86,7 +86,7 @@ export const RunRecordSchema = z.object({
 	completedAt: z.string().datetime({ message: "completedAt must be UTC ISO 8601 format" }).optional(),
 
 	/** Arbitrary metadata for extensibility. */
-	metadata: z.record(z.unknown()).optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type RunRecord = z.infer<typeof RunRecordSchema>;
@@ -355,7 +355,7 @@ export function parseRunRecord(data: unknown): RunRecord {
  * @param data - The data to validate
  * @returns Success with data, or failure with error
  */
-export function safeParseRunRecord(data: unknown): z.SafeParseReturnType<unknown, RunRecord> {
+export function safeParseRunRecord(data: unknown): ZodSafeParseResult<RunRecord> {
 	return RunRecordSchema.safeParse(data);
 }
 
@@ -376,7 +376,7 @@ export function parseStepOutcome(data: unknown): StepOutcome {
  * @param data - The data to validate
  * @returns Success with data, or failure with error
  */
-export function safeParseStepOutcome(data: unknown): z.SafeParseReturnType<unknown, StepOutcome> {
+export function safeParseStepOutcome(data: unknown): ZodSafeParseResult<StepOutcome> {
 	return StepOutcomeSchema.safeParse(data);
 }
 
@@ -397,6 +397,6 @@ export function parseReceipt(data: unknown): Receipt {
  * @param data - The data to validate
  * @returns Success with data, or failure with error
  */
-export function safeParseReceipt(data: unknown): z.SafeParseReturnType<unknown, Receipt> {
+export function safeParseReceipt(data: unknown): ZodSafeParseResult<Receipt> {
 	return ReceiptSchema.safeParse(data);
 }

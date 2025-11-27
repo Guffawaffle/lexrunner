@@ -20,7 +20,8 @@ describe('Gate Report Schema Validation', () => {
 			};
 
 			const result = validateGateReport(validReport);
-			expect(result).toEqual(validReport);
+			// Zod v4 applies defaults, so schemaVersion is added
+			expect(result).toEqual({ ...validReport, schemaVersion: "1.0.0" });
 		});
 
 		it('validates gate report with schema version', () => {

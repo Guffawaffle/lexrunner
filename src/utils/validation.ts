@@ -24,7 +24,7 @@ export async function loadAndValidate<T>(
 	if (!result.success) {
 		throw new Error(
 			`Schema validation failed for ${filePath}:\n` +
-				result.error.errors
+				result.error.issues
 					.map((e) => `  - ${e.path.join(".")}: ${e.message}`)
 					.join("\n")
 		);
@@ -42,7 +42,7 @@ export function validate<T>(data: unknown, schema: ZodSchema<T>): T {
 	if (!result.success) {
 		throw new Error(
 			`Schema validation failed:\n` +
-				result.error.errors
+				result.error.issues
 					.map((e) => `  - ${e.path.join(".")}: ${e.message}`)
 					.join("\n")
 		);

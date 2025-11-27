@@ -352,8 +352,9 @@ describe('Autopilot Config Edge Cases', () => {
 	it('should reject fractional levels', () => {
 		expect(() => parseAutopilotConfig({ maxLevel: 3.7 }))
 			.toThrow(AutopilotConfigError);
+		// Zod v4 uses different error message format
 		expect(() => parseAutopilotConfig({ maxLevel: 3.7 }))
-			.toThrow(/Expected integer/);
+			.toThrow(/int|integer|Invalid/i);
 	});
 
 	it('should handle NaN as validation error', () => {
