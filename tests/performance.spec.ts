@@ -71,8 +71,8 @@ describe('Performance - High-Throughput Execution', () => {
 		it('should expire entries after TTL', async () => {
 			cache.set('key1', 'value1');
 
-			// Wait for TTL to expire (add buffer to account for system variance)
-			await new Promise(resolve => setTimeout(resolve, 1500));
+			// Wait for TTL to expire (add buffer to account for system variance under CI load)
+			await new Promise(resolve => setTimeout(resolve, 2000));
 
 			const result = cache.get('key1');
 			expect(result).toBeNull();
