@@ -43,6 +43,9 @@ out*.json
 # Local overlay (development only, not tracked)
 .smartergpt.local/
 
+# Runtime database and cache
+.lexrunner/
+
 # Generated plan artifacts (runtime)
 snapshot.md
 plan-*.json
