@@ -5,6 +5,9 @@
  * from the @smartergpt/lex package. Rules provide behavioral guidance and
  * policy enforcement for AI agents.
  *
+ * Types in this module align with the behavior-rule.schema.ts in .smartergpt/schemas/
+ * which is the canonical Zod schema for cross-repo validation.
+ *
  * @module config/rulesResolver
  */
 
@@ -27,6 +30,7 @@ export function isLexSonaAvailable(): boolean {
 
 /**
  * Rule scope metadata for context filtering
+ * @see .smartergpt/schemas/behavior-rule.schema.ts for the canonical Zod schema
  */
 export interface RuleScope {
 	/** Environment (e.g., "development", "production") */
@@ -39,6 +43,7 @@ export interface RuleScope {
 
 /**
  * Behavioral rule structure
+ * @see .smartergpt/schemas/behavior-rule.schema.ts for the canonical Zod schema
  */
 export interface BehavioralRule {
 	/** Unique rule identifier */

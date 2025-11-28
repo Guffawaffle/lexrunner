@@ -38,6 +38,10 @@
 		"./schemas/gates": {
 			"types": "./.smartergpt/schemas/gates.schema.d.ts",
 			"import": "./.smartergpt/schemas/gates.schema.js"
+		},
+		"./schemas/behavior-rule": {
+			"types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
+			"import": "./.smartergpt/schemas/behavior-rule.schema.js"
 		}
 	},
 	"scripts": {

@@ -110,6 +110,71 @@ export const ArtifactMetadata = z.object({
 
 **See Also:** [Gate Report Examples](./gate-report-examples.md) for complete usage examples.
 
+### Behavior Rule Schema (`.smartergpt/schemas/behavior-rule.schema.ts`)
+
+The Behavior Rule schema defines the structure for behavioral rules that provide guidance and policy enforcement for AI agents in the LexRunner ecosystem.
+
+```typescript
+// Rule scope for context filtering
+const RuleScopeSchema = z.object({
+  environment: z.string().optional(),  // "development", "production"
+  project: z.string().optional(),       // Project identifier
+  agentFamily: z.string().optional()    // "copilot", "claude"
+}).strict();
+
+// Single behavioral rule
+const BehaviorRuleItemSchema = z.object({
+  id: z.string(),                       // Unique rule identifier
+  title: z.string(),                    // Rule title/name
+  description: z.string(),              // Rule description
+  content: z.string(),                  // Rule content/guidance
+  scope: RuleScopeSchema.optional(),    // Scope metadata
+  priority: z.number().int().min(0).optional() // Priority (higher = more important)
+}).strict();
+
+// Behavior rules container
+export const BehaviorRuleSchema = z.object({
+  version: z.string().optional(),       // Schema version
+  rules: z.array(BehaviorRuleItemSchema).optional()
+}).strict();
+```
+
+**Key Features:**
+
+- **Schema $id**: `https://github.com/Guffawaffle/lex-pr-runner/schemas/behavior-rule.schema.json`
+- **Scope Filtering**: Rules can be scoped to specific environments, projects, or agent families
+- **Priority Ordering**: Rules with higher priority values take precedence
+- **Strict Validation**: No additional properties allowed
+
+**Example:**
+
+```json
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "code-review-required",
+      "title": "Code Review Required",
+      "description": "All code changes must be reviewed before merge",
+      "content": "Before merging any pull request, ensure at least one peer review has been completed.",
+      "priority": 10
+    },
+    {
+      "id": "no-force-push",
+      "title": "No Force Push to Main",
+      "description": "Prevent force pushing to protected branches",
+      "content": "Never use git push --force on main or release branches.",
+      "scope": {
+        "environment": "production"
+      },
+      "priority": 100
+    }
+  ]
+}
+```
+
+**Export Path:** `lex-pr-runner/schemas/behavior-rule`
+
 ## Schema Versioning
 
 Schemas follow semantic versioning principles:
