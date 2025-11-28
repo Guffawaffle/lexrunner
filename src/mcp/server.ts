@@ -13,6 +13,7 @@ import {
 	ListToolsRequestSchema,
 	McpError,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 import { loadInputs, detectGitHubMode } from "../core/inputs.js";
 import { generatePlan } from "../core/plan.js";
@@ -106,9 +107,6 @@ const ListRunsInputSchema = z.object({
 	state: z.enum(["pending", "running", "completed", "failed", "aborted"]).optional(),
 });
 type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
-
-// Import z from zod for the schema
-import { z } from "zod";
 
 /**
  * Create and configure the MCP server
@@ -1071,7 +1069,11 @@ async function main() {
 	// Handle graceful shutdown when stdin closes
 	process.stdin.on("end", async () => {
 		console.error("MCP server shutting down");
-		await runStore.close();
+		try {
+			await runStore.close();
+		} catch (error) {
+			console.error("Error closing RunStore:", error);
+		}
 		process.exit(0);
 	});
 
