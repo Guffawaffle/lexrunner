@@ -37,6 +37,7 @@ import {
 	type ListArtifactsOutput,
 } from "./artifacts.js";
 import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
+import { safeParseStepOutcome, safeParseReceipt } from "../store/run-store.js";
 
 /**
  * Default initial state for new runs
@@ -480,14 +481,23 @@ export class RunManager {
 			return this.runStore.getStepsForRun(runId);
 		}
 
-		// Fallback to NDJSON logs
+		// Fallback to NDJSON logs with Zod validation
 		const logs = readRunLog(runId, "steps", this.baseDir);
-		return logs
-			.filter((log) => log.type === "step_outcome")
-			.map((log) => {
-				const { type, ...outcome } = log;
-				return outcome as unknown as StepOutcome;
-			});
+		const results: StepOutcome[] = [];
+
+		for (const log of logs) {
+			if (log.type !== "step_outcome") continue;
+
+			// Extract step data (excluding 'type' field added by logging)
+			const { type, ...stepData } = log;
+			const parsed = safeParseStepOutcome(stepData);
+			if (parsed.success) {
+				results.push(parsed.data);
+			}
+			// Silently skip invalid entries (best-effort recovery from legacy data)
+		}
+
+		return results;
 	}
 
 	/**
@@ -504,14 +514,23 @@ export class RunManager {
 			return this.runStore.getReceiptsForRun(runId);
 		}
 
-		// Fallback to NDJSON logs
+		// Fallback to NDJSON logs with Zod validation
 		const logs = readRunLog(runId, "receipts", this.baseDir);
-		return logs
-			.filter((log) => log.type === "receipt")
-			.map((log) => {
-				const { type, ...receipt } = log;
-				return receipt as unknown as Receipt;
-			});
+		const results: Receipt[] = [];
+
+		for (const log of logs) {
+			if (log.type !== "receipt") continue;
+
+			// Extract receipt data (excluding 'type' field added by logging)
+			const { type, ...receiptData } = log;
+			const parsed = safeParseReceipt(receiptData);
+			if (parsed.success) {
+				results.push(parsed.data);
+			}
+			// Silently skip invalid entries (best-effort recovery from legacy data)
+		}
+
+		return results;
 	}
 
 	/**
