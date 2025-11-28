@@ -88,7 +88,7 @@ items:
 
 			expect(executeOutput1).toBe(executeOutput2);
 			expect(sha256(Buffer.from(executeOutput1))).toBe(sha256(Buffer.from(executeOutput2)));
-		});
+		}, 30000); // 30 second timeout for 8 CLI calls
 
 		it('should maintain determinism with complex dependency graphs', (ctx) => {
 			if (skipIfCliNotBuilt({ skip: ctx.skip })) return;
@@ -288,7 +288,7 @@ items:
 				expect(outputs[i]).toBe(outputs[0]);
 				expect(hashes[i]).toBe(hashes[0]);
 			}
-		});
+		}, 30000); // 30 second timeout for 10 CLI calls
 
 		it('should maintain consistency with file system state changes', (ctx) => {
 			if (skipIfCliNotBuilt({ skip: ctx.skip })) return;
