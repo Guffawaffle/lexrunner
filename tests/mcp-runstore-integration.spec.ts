@@ -63,15 +63,16 @@ describe("MCP Server - RunStore Integration", () => {
 		});
 
 		it("should create SqliteRunStore with baseDir option", async () => {
-			const { createRunStore } = await import(
-				"../src/store/index.js"
-			);
+			const { createRunStore } = await import("../src/store/index.js");
 
 			// Default uses .smartergpt/runner/.lexrunner/runs.db relative to baseDir
 			const store = createRunStore({ baseDir: testDir });
 			expect(store).toBeDefined();
 
-			const expectedPath = path.join(testDir, ".smartergpt/runner/.lexrunner/runs.db");
+			const expectedPath = path.join(
+				testDir,
+				".smartergpt/runner/.lexrunner/runs.db"
+			);
 			expect(fs.existsSync(expectedPath)).toBe(true);
 
 			await store.close();
@@ -198,7 +199,9 @@ describe("MCP Server - RunStore Integration", () => {
 			expect(runningRuns).toHaveLength(1);
 			expect(runningRuns[0].runId).toBe("run-running");
 
-			const completedRuns = await runStore.listRuns({ state: "completed" });
+			const completedRuns = await runStore.listRuns({
+				state: "completed",
+			});
 			expect(completedRuns).toHaveLength(1);
 			expect(completedRuns[0].runId).toBe("run-completed");
 		});
@@ -263,7 +266,9 @@ describe("MCP Server - RunStore Integration", () => {
 
 			const receipts = await runStore.getReceiptsForRun("receipts-test");
 			expect(receipts).toHaveLength(1);
-			expect(receipts[0].reason).toBe("Scope expanded beyond initial plan");
+			expect(receipts[0].reason).toBe(
+				"Scope expanded beyond initial plan"
+			);
 			expect(receipts[0].approver).toBe("alice@example.com");
 		});
 	});
