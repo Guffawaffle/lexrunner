@@ -29,6 +29,7 @@ artifacts*/
 gate-results/
 deliverables/
 out*.json
+.lexrunner/
 
 # Keep test fixtures
 !tests/fixtures/deliverables/
