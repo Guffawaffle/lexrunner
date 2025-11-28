@@ -62,14 +62,19 @@ describe("MCP Server - RunStore Integration", () => {
 			expect(typeof createRunStore).toBe("function");
 		});
 
-		it("should create SqliteRunStore with default path", async () => {
-			const { createRunStore, DEFAULT_RUNSTORE_DB_PATH } = await import(
+		it("should create SqliteRunStore with baseDir option", async () => {
+			const { createRunStore } = await import(
 				"../src/store/index.js"
 			);
 
-			expect(DEFAULT_RUNSTORE_DB_PATH).toBeDefined();
-			expect(DEFAULT_RUNSTORE_DB_PATH).toContain(".lexrunner");
-			expect(DEFAULT_RUNSTORE_DB_PATH).toContain("runs.db");
+			// Default uses .lexrunner/runs.db relative to baseDir
+			const store = createRunStore({ baseDir: testDir });
+			expect(store).toBeDefined();
+
+			const expectedPath = path.join(testDir, ".lexrunner", "runs.db");
+			expect(fs.existsSync(expectedPath)).toBe(true);
+
+			await store.close();
 		});
 
 		it("should create store with custom path", async () => {
