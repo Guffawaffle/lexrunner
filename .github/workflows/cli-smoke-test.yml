@@ -48,7 +48,8 @@ jobs:
           STDERR_FILE="${RUNNER_TEMP}/stderr.txt"
 
           # Run CLI in JSON mode and capture stdout/stderr separately
-          node dist/cli.js --json plan tests/fixtures/plan.tiny.json > "$STDOUT_FILE" 2> "$STDERR_FILE"
+          # The plan command reads from .smartergpt/stack.yml in the workspace
+          node dist/cli.js --json plan --dry-run > "$STDOUT_FILE" 2> "$STDERR_FILE"
           EXIT_CODE=$?
 
           # Verify exit code is 0
