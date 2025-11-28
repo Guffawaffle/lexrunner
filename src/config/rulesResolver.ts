@@ -125,25 +125,47 @@ export async function loadLexSonaRules(
 
 	try {
 		// Dynamic import of rules module using variable to avoid TypeScript static analysis
+		// The @smartergpt/lex/rules module may not exist at compile time, so we use a dynamic
+		// import with unknown type and validate the structure at runtime.
 		const modulePath = "@smartergpt/lex/rules";
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const rulesModule = await (import(modulePath) as Promise<any>);
+		const rulesModule: unknown = await import(modulePath);
 
-		// Get rules list function if available
-		const listRules = rulesModule.listRules || rulesModule.default?.listRules;
+		// Validate module structure and get rules list function
+		const moduleObj = rulesModule as Record<string, unknown> | null;
+		if (!moduleObj || typeof moduleObj !== "object") {
+			return [];
+		}
+
+		// Try to get listRules from module or default export
+		let listRules: unknown;
+		if (typeof moduleObj.listRules === "function") {
+			listRules = moduleObj.listRules;
+		} else if (
+			moduleObj.default &&
+			typeof moduleObj.default === "object" &&
+			typeof (moduleObj.default as Record<string, unknown>).listRules === "function"
+		) {
+			listRules = (moduleObj.default as Record<string, unknown>).listRules;
+		}
+
 		if (typeof listRules !== "function") {
 			return [];
 		}
 
 		// Load and filter rules
-		const rawRules: ResolvedRule[] = await listRules(scope);
+		const rawRules: ResolvedRule[] = await (listRules as (scope?: RuleScope) => Promise<ResolvedRule[]>)(scope);
 
 		// Normalize rules to BehavioralRule format
+		// Use type guards to ensure values are present before mapping
 		return rawRules
-			.filter((rule) => rule.id && rule.title && (rule.content || rule.guidance))
+			.filter((rule): rule is ResolvedRule & { id: string; title: string } =>
+				typeof rule.id === "string" &&
+				typeof rule.title === "string" &&
+				(typeof rule.content === "string" || typeof rule.guidance === "string")
+			)
 			.map((rule) => ({
-				id: rule.id!,
-				title: rule.title!,
+				id: rule.id,
+				title: rule.title,
 				description: rule.description || "",
 				content: rule.content || rule.guidance || "",
 				scope: rule.scope,
