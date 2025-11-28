@@ -43,8 +43,9 @@ export { SqliteRunStore } from "./sqlite/index.js";
 
 /**
  * Default database path relative to baseDir.
+ * Runtime artifacts live under .smartergpt/runner/.
  */
-const DEFAULT_DB_PATH = ".lexrunner/runs.db";
+const DEFAULT_DB_PATH = ".smartergpt/runner/.lexrunner/runs.db";
 
 /**
  * Options for creating a RunStore.
@@ -52,7 +53,7 @@ const DEFAULT_DB_PATH = ".lexrunner/runs.db";
 export interface CreateRunStoreOptions {
 	/**
 	 * Path to SQLite database file.
-	 * Defaults to `.lexrunner/runs.db` relative to baseDir.
+	 * Defaults to `.smartergpt/runner/.lexrunner/runs.db` relative to baseDir.
 	 */
 	dbPath?: string;
 
@@ -66,7 +67,7 @@ export interface CreateRunStoreOptions {
 /**
  * Create a RunStore instance with default configuration.
  *
- * Uses SqliteRunStore by default with a database at `.lexrunner/runs.db`.
+ * Uses SqliteRunStore by default with a database at `.smartergpt/runner/.lexrunner/runs.db`.
  * Ensures the parent directory exists before creating the store.
  *
  * @param options - Optional configuration

@@ -67,11 +67,11 @@ describe("MCP Server - RunStore Integration", () => {
 				"../src/store/index.js"
 			);
 
-			// Default uses .lexrunner/runs.db relative to baseDir
+			// Default uses .smartergpt/runner/.lexrunner/runs.db relative to baseDir
 			const store = createRunStore({ baseDir: testDir });
 			expect(store).toBeDefined();
 
-			const expectedPath = path.join(testDir, ".lexrunner", "runs.db");
+			const expectedPath = path.join(testDir, ".smartergpt/runner/.lexrunner/runs.db");
 			expect(fs.existsSync(expectedPath)).toBe(true);
 
 			await store.close();

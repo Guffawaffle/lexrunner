@@ -33,8 +33,10 @@ describe("createRunStore factory", () => {
 		it("should create SqliteRunStore instance", async () => {
 			testDir = await mkdtemp(join(tmpdir(), "store-factory-test-"));
 
-			// Ensure .lexrunner directory exists
-			await mkdir(join(testDir, ".lexrunner"), { recursive: true });
+			// Ensure .smartergpt/runner directory exists
+			await mkdir(join(testDir, ".smartergpt/runner"), {
+				recursive: true,
+			});
 
 			const store = createRunStore({ baseDir: testDir });
 			stores.push(store);
@@ -57,8 +59,10 @@ describe("createRunStore factory", () => {
 		it("should create database at default path", async () => {
 			testDir = await mkdtemp(join(tmpdir(), "store-factory-test-"));
 
-			// Ensure .lexrunner directory exists
-			await mkdir(join(testDir, ".lexrunner"), { recursive: true });
+			// Ensure .smartergpt/runner directory exists
+			await mkdir(join(testDir, ".smartergpt/runner"), {
+				recursive: true,
+			});
 
 			const store = createRunStore({ baseDir: testDir });
 			stores.push(store);
@@ -71,8 +75,11 @@ describe("createRunStore factory", () => {
 				startedAt: new Date().toISOString(),
 			});
 
-			// Verify database file exists at expected location
-			const expectedPath = join(testDir, ".lexrunner", "runs.db");
+			// Verify database file exists at expected location (.smartergpt/runner/.lexrunner/runs.db)
+			const expectedPath = join(
+				testDir,
+				".smartergpt/runner/.lexrunner/runs.db"
+			);
 			expect(existsSync(expectedPath)).toBe(true);
 		});
 	});
@@ -100,7 +107,9 @@ describe("createRunStore factory", () => {
 		it("should use custom baseDir when provided", async () => {
 			testDir = await mkdtemp(join(tmpdir(), "store-factory-test-"));
 			const customBaseDir = join(testDir, "custom-base");
-			await mkdir(join(customBaseDir, ".lexrunner"), { recursive: true });
+			await mkdir(join(customBaseDir, ".smartergpt/runner"), {
+				recursive: true,
+			});
 
 			const store = createRunStore({ baseDir: customBaseDir });
 			stores.push(store);
@@ -113,8 +122,11 @@ describe("createRunStore factory", () => {
 				startedAt: new Date().toISOString(),
 			});
 
-			// Verify database file exists in custom base directory
-			const expectedPath = join(customBaseDir, ".lexrunner", "runs.db");
+			// Verify database file exists in custom base directory under .smartergpt/runner
+			const expectedPath = join(
+				customBaseDir,
+				".smartergpt/runner/.lexrunner/runs.db"
+			);
 			expect(existsSync(expectedPath)).toBe(true);
 		});
 	});
@@ -122,7 +134,9 @@ describe("createRunStore factory", () => {
 	describe("SqliteRunStore functionality", () => {
 		it("should support full run lifecycle", async () => {
 			testDir = await mkdtemp(join(tmpdir(), "store-factory-test-"));
-			await mkdir(join(testDir, ".lexrunner"), { recursive: true });
+			await mkdir(join(testDir, ".smartergpt/runner"), {
+				recursive: true,
+			});
 
 			const store = createRunStore({ baseDir: testDir });
 			stores.push(store);
