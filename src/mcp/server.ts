@@ -13,6 +13,7 @@ import {
 	ListToolsRequestSchema,
 	McpError,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 import { loadInputs, detectGitHubMode } from "../core/inputs.js";
 import { generatePlan } from "../core/plan.js";
@@ -77,10 +78,42 @@ import {
 	RunNotFoundError,
 } from "../runs/index.js";
 
+// RunStore imports
+import {
+	createRunStore,
+	type RunStore,
+	type ListRunsOptions,
+} from "../store/index.js";
+import { ulid } from "ulid";
+import * as crypto from "crypto";
+
+/**
+ * Options for creating the MCP server.
+ */
+export interface McpServerOptions {
+	/**
+	 * RunStore instance for persisting run lifecycle data.
+	 * If not provided, a default SqliteRunStore will be created.
+	 */
+	runStore?: RunStore;
+}
+
+/**
+ * Input schema for lexrunner.listRuns tool
+ */
+const ListRunsInputSchema = z.object({
+	limit: z.number().int().positive().optional(),
+	offset: z.number().int().nonnegative().optional(),
+	state: z.enum(["pending", "running", "completed", "failed", "aborted"]).optional(),
+});
+type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
+
 /**
  * Create and configure the MCP server
  */
-function createServer(): Server {
+function createServer(options?: McpServerOptions): Server {
+	// Initialize RunStore (use provided or create default)
+	const runStore = options?.runStore ?? createRunStore();
 	const server = new Server(
 		{
 			name: "lex-pr-runner",
@@ -466,6 +499,29 @@ function createServer(): Server {
 						required: ["runId"],
 					},
 				},
+				{
+					name: "lexrunner.listRuns",
+					description:
+						"List runs from the store with optional filtering",
+					inputSchema: {
+						type: "object",
+						properties: {
+							limit: {
+								type: "number",
+								description: "Maximum number of runs to return",
+							},
+							offset: {
+								type: "number",
+								description: "Number of runs to skip (for pagination)",
+							},
+							state: {
+								type: "string",
+								enum: ["pending", "running", "completed", "failed", "aborted"],
+								description: "Filter by run state",
+							},
+						},
+					},
+				},
 			],
 		};
 	});
@@ -514,10 +570,13 @@ function createServer(): Server {
 
 			// LexRunner run management tools
 			case "lexrunner.startRun":
-				return await handleStartRun(args as unknown as StartRunInput);
+				return await handleStartRun(args as unknown as StartRunInput, runStore);
 
 			case "lexrunner.getStatus":
-				return await handleGetStatus(args as unknown as GetStatusInput);
+				return await handleGetStatus(args as unknown as GetStatusInput, runStore);
+
+			case "lexrunner.listRuns":
+				return await handleListRuns(args as unknown as ListRunsInput, runStore);
 
 			default:
 				throw new McpError(
@@ -992,7 +1051,9 @@ async function handleHealth(args: {
  * Main server startup
  */
 async function main() {
-	const server = createServer();
+	// Create RunStore (will be closed on shutdown)
+	const runStore = createRunStore();
+	const server = createServer({ runStore });
 	const transport = new StdioServerTransport();
 
 	// Connect the server to stdio transport
@@ -1006,8 +1067,13 @@ async function main() {
 	process.stdin.resume();
 
 	// Handle graceful shutdown when stdin closes
-	process.stdin.on("end", () => {
+	process.stdin.on("end", async () => {
 		console.error("MCP server shutting down");
+		try {
+			await runStore.close();
+		} catch (error) {
+			console.error("Error closing RunStore:", error);
+		}
 		process.exit(0);
 	});
 
@@ -1114,18 +1180,50 @@ async function handleSeniorDevModes(): Promise<{
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Generate a plan hash from run parameters for RunRecord storage.
+ */
+function generatePlanHash(input: StartRunInput): string {
+	const hashContent = JSON.stringify({
+		mode: input.mode,
+		procedure: input.procedure,
+		repo: input.repo,
+		params: input.params,
+	});
+	return "sha256:" + crypto.createHash("sha256").update(hashContent).digest("hex");
+}
+
+/**
  * Handle lexrunner.startRun tool
+ *
+ * Creates a run record in both the RunStore (for persistence) and RunManager
+ * (for orchestration state).
  */
 async function handleStartRun(
-	args: StartRunInput
+	args: StartRunInput,
+	runStore: RunStore
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		// Validate input
 		const validated = StartRunInputSchema.parse(args);
 
-		// Create run manager and start the run
+		// Create run manager and start the run (for orchestration state)
 		const manager = createRunManager();
 		const result = manager.startRun(validated);
+
+		// Also create a record in the RunStore for persistence
+		const now = new Date().toISOString();
+		await runStore.createRun({
+			runId: result.runId,
+			planHash: generatePlanHash(validated),
+			state: "pending", // RunStore uses its own state machine
+			startedAt: now,
+			metadata: {
+				mode: validated.mode,
+				procedure: validated.procedure,
+				repo: validated.repo,
+				task: validated.task,
+			},
+		});
 
 		return {
 			content: [
@@ -1151,23 +1249,44 @@ async function handleStartRun(
 
 /**
  * Handle lexrunner.getStatus tool
+ *
+ * Queries run state from RunManager, and also fetches step/receipt data
+ * from RunStore for enhanced status reporting.
  */
 async function handleGetStatus(
-	args: GetStatusInput
+	args: GetStatusInput,
+	runStore: RunStore
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		// Validate input
 		const validated = GetStatusInputSchema.parse(args);
 
-		// Create run manager and get status
+		// Get orchestration status from run manager
 		const manager = createRunManager();
 		const status = manager.getStatus(validated);
+
+		// Fetch additional data from RunStore if available
+		const runRecord = await runStore.getRun(validated.runId);
+		const steps = await runStore.getStepsForRun(validated.runId);
+		const receipts = await runStore.getReceiptsForRun(validated.runId);
+
+		// Enhance status with store data
+		const enhancedStatus = {
+			...status,
+			store: runRecord
+				? {
+						runRecord,
+						steps,
+						receipts,
+				  }
+				: null,
+		};
 
 		return {
 			content: [
 				{
 					type: "text",
-					text: JSON.stringify(status, null, 2),
+					text: JSON.stringify(enhancedStatus, null, 2),
 				},
 			],
 		};
@@ -1187,6 +1306,63 @@ async function handleGetStatus(
 		throw new McpError(
 			ErrorCode.InternalError,
 			`Failed to get status: ${(error as Error).message}`
+		);
+	}
+}
+
+/**
+ * Handle lexrunner.listRuns tool
+ *
+ * Queries the RunStore for run records with optional filtering and pagination.
+ */
+async function handleListRuns(
+	args: ListRunsInput,
+	runStore: RunStore
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate input
+		const validated = ListRunsInputSchema.parse(args);
+
+		// Query runs from the store
+		const options: ListRunsOptions = {};
+		if (validated.limit !== undefined) {
+			options.limit = validated.limit;
+		}
+		if (validated.offset !== undefined) {
+			options.offset = validated.offset;
+		}
+		if (validated.state !== undefined) {
+			options.state = validated.state;
+		}
+
+		const runs = await runStore.listRuns(options);
+		const count = await runStore.getRunCount(validated.state);
+
+		const result = {
+			runs,
+			total: count,
+			limit: validated.limit,
+			offset: validated.offset ?? 0,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			throw new McpError(
+				ErrorCode.InvalidParams,
+				`Invalid listRuns parameters: ${error.message}`
+			);
+		}
+		throw new McpError(
+			ErrorCode.InternalError,
+			`Failed to list runs: ${(error as Error).message}`
 		);
 	}
 }

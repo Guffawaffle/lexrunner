@@ -6,39 +6,45 @@
  * @module store
  */
 
+import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+import type { RunStore } from "./run-store.js";
+import { SqliteRunStore } from "./sqlite/index.js";
+
 // Interface and types
 export type {
-        RunStore,
-        RunRecord,
-        StepOutcome,
-        Receipt,
-        RunState,
-        StepStatus,
-        ListRunsOptions,
+	RunStore,
+	RunRecord,
+	StepOutcome,
+	Receipt,
+	RunState,
+	StepStatus,
+	ListRunsOptions,
 } from "./run-store.js";
 
 export {
-        RunRecordSchema,
-        StepOutcomeSchema,
-        ReceiptSchema,
-        RunStateSchema,
-        StepStatusSchema,
-        parseRunRecord,
-        safeParseRunRecord,
-        parseStepOutcome,
-        safeParseStepOutcome,
-        parseReceipt,
-        safeParseReceipt,
+	RunRecordSchema,
+	StepOutcomeSchema,
+	ReceiptSchema,
+	RunStateSchema,
+	StepStatusSchema,
+	parseRunRecord,
+	safeParseRunRecord,
+	parseStepOutcome,
+	safeParseStepOutcome,
+	parseReceipt,
+	safeParseReceipt,
 } from "./run-store.js";
 
 // Implementations
 export { InMemoryRunStore, InMemoryRunStoreOptions } from "./inmemory/index.js";
 export { SqliteRunStore } from "./sqlite/index.js";
 
-// Import for factory
-import type { RunStore } from "./run-store.js";
-import { SqliteRunStore } from "./sqlite/index.js";
-import { join } from "path";
+/**
+ * Default database path relative to baseDir.
+ */
+const DEFAULT_DB_PATH = ".lexrunner/runs.db";
 
 /**
  * Options for creating a RunStore.
@@ -58,14 +64,10 @@ export interface CreateRunStoreOptions {
 }
 
 /**
- * Default database path relative to baseDir.
- */
-const DEFAULT_DB_PATH = ".lexrunner/runs.db";
-
-/**
  * Create a RunStore instance with default configuration.
  *
  * Uses SqliteRunStore by default with a database at `.lexrunner/runs.db`.
+ * Ensures the parent directory exists before creating the store.
  *
  * @param options - Optional configuration
  * @returns A configured RunStore instance
@@ -84,6 +86,13 @@ const DEFAULT_DB_PATH = ".lexrunner/runs.db";
  */
 export function createRunStore(options: CreateRunStoreOptions = {}): RunStore {
 	const baseDir = options.baseDir ?? process.cwd();
-	const dbPath = options.dbPath ?? join(baseDir, DEFAULT_DB_PATH);
+	const dbPath = options.dbPath ?? path.join(baseDir, DEFAULT_DB_PATH);
+
+	// Ensure parent directory exists
+	const dbDir = path.dirname(dbPath);
+	if (!fs.existsSync(dbDir)) {
+		fs.mkdirSync(dbDir, { recursive: true });
+	}
+
 	return new SqliteRunStore(dbPath);
 }
