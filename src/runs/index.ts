@@ -49,6 +49,7 @@ export {
 
 // Manager
 export { RunManager, createRunManager } from "./manager.js";
+export type { RunManagerOptions } from "./manager.js";
 
 // Enforcement
 export {
