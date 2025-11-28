@@ -43,6 +43,27 @@ export const DecisionPointSchema = z.object({
 });
 
 /**
+ * Keystone policy schema for governing issues implemented directly
+ * on the umbrella branch during merge-weave operations
+ */
+export const KeystonePolicySchema = z.object({
+	/** Maximum keystone issues allowed per wave */
+	maxPerWave: z.number().int().min(0).default(2),
+	/** Ideal number of keystone issues (typically 0) */
+	ideal: z.number().int().min(0).default(0),
+	/** Question to determine if keystone treatment is justified */
+	litmusTest: z.string().min(1),
+	/** Scenarios when keystone treatment is appropriate */
+	whenToUse: z.array(z.string().min(1)).min(1),
+	/** Scenarios when keystone treatment should NOT be used */
+	whenNotToUse: z.array(z.string().min(1)).min(1),
+	/** Risks associated with overusing keystone issues */
+	risks: z.array(z.string().min(1)).min(1),
+	/** Documentation requirements for keystone issues */
+	requiredDocumentation: z.array(z.string().min(1)).optional(),
+});
+
+/**
  * Transition map schema - event to next state
  */
 export const TransitionMapSchema = z.record(z.string(), z.string());
@@ -76,6 +97,8 @@ export const ProcedureDefinitionSchema = z.object({
 	decisionPoints: z.array(DecisionPointSchema).optional(),
 	/** Gates that must pass for completion */
 	completionGates: z.array(z.string().min(1)).optional(),
+	/** Keystone policy for issues implemented directly on umbrella branch */
+	keystonePolicy: KeystonePolicySchema.optional(),
 });
 
 export type ProcedureDefinitionParsed = z.infer<

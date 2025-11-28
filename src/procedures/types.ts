@@ -40,6 +40,27 @@ export interface DecisionPoint {
 }
 
 /**
+ * Keystone policy for governing issues implemented directly
+ * on the umbrella branch during merge-weave operations
+ */
+export interface KeystonePolicy {
+	/** Maximum keystone issues allowed per wave */
+	maxPerWave: number;
+	/** Ideal number of keystone issues (typically 0) */
+	ideal: number;
+	/** Question to determine if keystone treatment is justified */
+	litmusTest: string;
+	/** Scenarios when keystone treatment is appropriate */
+	whenToUse: string[];
+	/** Scenarios when keystone treatment should NOT be used */
+	whenNotToUse: string[];
+	/** Risks associated with overusing keystone issues */
+	risks: string[];
+	/** Documentation requirements for keystone issues */
+	requiredDocumentation?: string[];
+}
+
+/**
  * Transition map from one state to another based on events
  */
 export type TransitionMap = Record<string, string>;
@@ -83,6 +104,8 @@ export interface ProcedureDefinition {
 	decisionPoints?: DecisionPoint[];
 	/** Gates that must pass for completion */
 	completionGates?: string[];
+	/** Keystone policy for issues implemented directly on umbrella branch */
+	keystonePolicy?: KeystonePolicy;
 }
 
 /**

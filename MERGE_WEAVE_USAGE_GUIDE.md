@@ -268,6 +268,68 @@ Savings: ~38,500 tokens (92% reduction!)
 
 ---
 
+## Keystone Issue Governance
+
+During merge-weave operations, occasionally issues need to be implemented directly on the umbrella branch rather than via a fanned-out PR. These are called **keystone issues** and should be the exception, not the rule.
+
+### What is a Keystone Issue?
+
+A keystone issue is an issue implemented directly on the umbrella branch during merge-weave, bypassing the normal PR fanout process. They are reserved for true cross-cutting concerns that cannot be safely fanned out.
+
+**Key Principle:** The ideal merge-weave has **zero** keystone issues.
+
+### Litmus Test
+
+Before treating any issue as a keystone:
+
+> **"Could this be split into fannable pieces? If yes, split it."**
+
+### When to Use Keystone Issues
+
+- **True cross-cutting concerns**: Shared files touched by N PRs in the wave
+- **Hot-path fixes**: Changes that would conflict with all PRs in the wave
+- **Critical fixes**: Issues discovered during merge-weave validation that must be addressed immediately
+
+### When NOT to Use Keystone Issues
+
+- **Single-PR issues**: Even if they're "small"
+- **Pre/post wave work**: Issues that could be done before or after the wave
+- **Convenience**: Just because the executor is already looking at the code
+
+### Risks of Keystone Issues
+
+1. **Bottleneck creep**: Executor becomes the only one who can merge
+2. **Less parallelism**: Serial work instead of parallel
+3. **Harder to audit**: Changes not visible in PR review
+4. **Copilot atrophy**: AI agents don't learn from these issues
+
+### Governance Rules
+
+| Constraint | Value | Description |
+|------------|-------|-------------|
+| `maxPerWave` | 2 | Maximum keystone issues per merge-weave wave |
+| `ideal` | 0 | Target number of keystone issues |
+
+### Required Documentation
+
+When implementing a keystone issue, you **must**:
+
+1. Include the **issue number** in the commit message
+2. Provide a brief **rationale** for why it couldn't be fanned out
+3. Reference the keystone in the **umbrella PR description**
+
+### Example Commit Message
+
+```
+Fix shared import paths for all modules (#LR-123)
+
+Keystone rationale: This import path change touches every module
+in the wave and would cause conflicts in all 8 PRs. Implementing
+directly on umbrella branch to avoid N-way merge conflicts.
+```
+
+---
+
 ## Questions & Troubleshooting
 
 ### Q: What if a template doesn't match?

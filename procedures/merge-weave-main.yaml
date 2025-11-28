@@ -64,3 +64,27 @@ completionGates:
   - lint
   - typecheck
   - test
+
+# Keystone policy for issues implemented directly on umbrella branch
+# Keystones are reserved for true cross-cutting concerns that cannot be safely fanned out
+keystonePolicy:
+  maxPerWave: 2
+  ideal: 0
+  litmusTest: "Could this be split into fannable pieces? If yes, split it."
+  whenToUse:
+    - True cross-cutting concerns (shared file touched by N PRs)
+    - Hot-path fixes that would conflict with all PRs in wave
+    - Critical fixes discovered during merge-weave validation
+  whenNotToUse:
+    - Single-PR issues (even if "small")
+    - Issues that could be done before/after wave
+    - Convenience (just because executor is already looking at code)
+  risks:
+    - Bottleneck creep (executor becomes only one who can merge)
+    - Less parallelism (serial instead of parallel work)
+    - Harder to audit (changes not visible in PR review)
+    - Copilot atrophy (agents don't learn from these issues)
+  requiredDocumentation:
+    - Issue number in commit message
+    - Rationale for why not fanned out
+    - Reference in umbrella PR description
