@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+- LexSona rule injection now enabled by default with environment variable configuration
+- Updated `loadLexSonaRules()` API to use `RuleInjectionConfig` object instead of boolean parameter
+- Removed legacy runner/ location fallback for config files in bootstrap
+
+### Removed
+- `src/cli-old.ts` dead code (old CLI implementation, was already excluded from build)
+- Deprecated `migrateGateReport` alias (use `normalizeGateReport` instead)
+
+### Added
+- New LexSona rule injection helpers: `getRuleInjectionConfig()`, `injectRulesIntoPrompt()`
+- Environment variable configuration for rule injection: `LEX_RULES_ENABLED`, `LEX_RULES_SOURCE`, `LEX_RULES_PATH`
+
+### Documentation
+- Updated LexSona rules documentation with v0.5.0 API changes
+- Documented remaining compatibility shims with removal timeline (v2.0.0)
+
 ## [0.5.0] - 2025-11-27
 
 ### Added

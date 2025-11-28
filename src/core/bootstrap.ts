@@ -71,10 +71,7 @@ export function bootstrapWorkspace(
 		for (const file of expectedFiles) {
 			const filePath = path.join(profileDir, file);
 
-			// Also check legacy runner/ location for backwards compatibility
-			const legacyPath = path.join(profileDir, "runner", file);
-
-			if (!fs.existsSync(filePath) && !fs.existsSync(legacyPath)) {
+			if (!fs.existsSync(filePath)) {
 				missingFiles.push(file);
 			}
 		}

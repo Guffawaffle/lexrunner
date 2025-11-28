@@ -203,11 +203,6 @@ export function normalizeGateReport(data: unknown): GateReport {
 }
 
 /**
- * @deprecated Use normalizeGateReport() instead. Will be removed at v1.0.0.
- */
-export const migrateGateReport = normalizeGateReport;
-
-/**
  * Check if a gate report needs migration
  */
 export function needsMigration(data: unknown): boolean {

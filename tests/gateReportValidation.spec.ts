@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { 
 	validateGateReport, 
 	validateGateReportWithErrors, 
-	migrateGateReport,
+	normalizeGateReport,
 	needsMigration,
 	formatValidationErrors
 } from '../src/schema/gateReport.js';
@@ -225,7 +225,7 @@ describe('Gate Report Schema Validation', () => {
 				start_time: "2024-01-15T10:30:00Z"
 			};
 
-			const migrated = migrateGateReport(legacyReport);
+			const migrated = normalizeGateReport(legacyReport);
 			expect(migrated.status).toBe("pass");
 			expect(migrated.duration_ms).toBe(1500);
 			expect(migrated.started_at).toBe("2024-01-15T10:30:00Z");
@@ -241,7 +241,7 @@ describe('Gate Report Schema Validation', () => {
 				start_time: "2024-01-15T10:30:00Z"
 			};
 
-			const migrated = migrateGateReport(legacyReport);
+			const migrated = normalizeGateReport(legacyReport);
 			expect(migrated.status).toBe("fail");
 		});
 
@@ -254,7 +254,7 @@ describe('Gate Report Schema Validation', () => {
 				started_at: "2024-01-15T10:30:00Z"
 			};
 
-			const migrated = migrateGateReport(report);
+			const migrated = normalizeGateReport(report);
 			expect(migrated.schemaVersion).toBe("1.0.0");
 		});
 
@@ -268,7 +268,7 @@ describe('Gate Report Schema Validation', () => {
 				started_at: "2024-01-15T10:30:00Z"
 			};
 
-			const migrated = migrateGateReport(validReport);
+			const migrated = normalizeGateReport(validReport);
 			expect(migrated).toEqual(validReport);
 		});
 
@@ -283,7 +283,7 @@ describe('Gate Report Schema Validation', () => {
 				meta: { key: "value" }
 			};
 
-			const migrated = migrateGateReport(legacyReport);
+			const migrated = normalizeGateReport(legacyReport);
 			expect(migrated.stderr_path).toBe("/path/to/stderr.log");
 			expect(migrated.meta).toEqual({ key: "value" });
 		});
@@ -294,7 +294,7 @@ describe('Gate Report Schema Validation', () => {
 				// missing critical fields that can't be inferred
 			};
 
-			expect(() => migrateGateReport(invalidReport)).toThrow();
+			expect(() => normalizeGateReport(invalidReport)).toThrow();
 		});
 	});
 
