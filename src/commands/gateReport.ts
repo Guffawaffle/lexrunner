@@ -3,7 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { validateGateReportWithErrors, migrateGateReport, needsMigration } from '../schema/gateReport.js';
+import { validateGateReportWithErrors, normalizeGateReport, needsMigration } from '../schema/gateReport.js';
 import { throwExit } from '../cli/exitHandler.js';
 import * as fs from 'fs';
 
@@ -53,7 +53,7 @@ export function registerGateReportCommand(program: Command): void {
 						// Check if migration is needed
 						if (opts.migrate && needsMigration(data)) {
 							try {
-								const migrated = migrateGateReport(data);
+								const migrated = normalizeGateReport(data);
 								if (opts.json) {
 									console.log(JSON.stringify({
 										valid: true,

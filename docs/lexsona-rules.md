@@ -1,16 +1,16 @@
 # LexSona Behavioral Rules
 
-**Status:** 🚧 Preparation for v0.5.0 (Currently Disabled)
+**Status:** ✅ v0.5.0 Ready
 
 ## Overview
 
-LexSona is a behavioral rule system that provides AI agents with architectural guidance, policy enforcement, and best practices. This module prepares the infrastructure for integrating LexSona rules from the `@smartergpt/lex` package.
+LexSona is a behavioral rule system that provides AI agents with architectural guidance, policy enforcement, and best practices. This module provides infrastructure for integrating LexSona rules from the `@smartergpt/lex` package.
 
 ## Current Status
 
 - ✅ Infrastructure implemented and tested
 - ✅ Package integration ready
-- ⚠️ **Feature disabled by default** (will be enabled in v0.5.0)
+- ✅ **Feature enabled by default** (v0.5.0)
 
 ## Architecture
 
@@ -31,15 +31,25 @@ interface BehavioralRule {
 }
 ```
 
-### Precedence Chain (When Enabled)
+### Rule Injection Configuration
 
-1. **`LEX_RULES_DIR`** (environment variable) - Explicit override
-2. **`.smartergpt.local/canon/rules/`** - Workspace overlay
-3. **`@smartergpt/lex/rules/`** - Package defaults
+```typescript
+interface RuleInjectionConfig {
+  enabled: boolean;          // Whether injection is enabled
+  source: "package" | "local";  // Rule source
+  localRulesPath?: string;   // Optional path to local rules
+}
+```
 
-## Usage (v0.5.0)
+### Precedence Chain
 
-When the feature is enabled in v0.5.0:
+1. **`LEX_RULES_ENABLED`** - Enable/disable rules (default: "true")
+2. **`LEX_RULES_SOURCE`** - "package" or "local" (default: "package")
+3. **`LEX_RULES_PATH`** - Custom local rules path (optional)
+
+## Usage
+
+### Loading Rules
 
 ```typescript
 import { loadLexSonaRules, formatRulesForPrompt } from './config/rulesResolver.js';
@@ -49,10 +59,41 @@ const rules = await loadLexSonaRules({
   environment: 'development',
   project: 'lex-pr-runner',
   agentFamily: 'copilot'
-}, true); // enabled = true
+});
 
 // Format for system prompt injection
 const promptSection = formatRulesForPrompt(rules);
+```
+
+### Disabling Rules
+
+```typescript
+// Via configuration object
+const rules = await loadLexSonaRules(scope, { enabled: false });
+
+// Via environment variable
+// LEX_RULES_ENABLED=false
+```
+
+### Injecting Rules into Prompts
+
+```typescript
+import { injectRulesIntoPrompt } from './config/rulesResolver.js';
+
+const basePrompt = "You are a helpful assistant.";
+const promptWithRules = await injectRulesIntoPrompt(basePrompt, {
+  project: 'lex-pr-runner',
+  agentFamily: 'copilot'
+});
+```
+
+### Getting Configuration from Environment
+
+```typescript
+import { getRuleInjectionConfig } from './config/rulesResolver.js';
+
+const config = getRuleInjectionConfig();
+// Returns { enabled: true, source: "package" } by default
 ```
 
 ## Available Rules (Package)
@@ -72,21 +113,15 @@ Rules support scope filtering to provide context-appropriate guidance:
 - **project**: Specific project or repository
 - **agentFamily**: AI agent type (for agent-specific customization)
 
-## Feature Flag
+## Environment Variables
 
-The LexSona infrastructure is controlled by the `enabled` parameter in `loadLexSonaRules()`:
-
-```typescript
-// Currently disabled (default)
-await loadLexSonaRules(scope, false);  // Returns []
-
-// Will be enabled in v0.5.0
-await loadLexSonaRules(scope, true);   // Loads rules
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LEX_RULES_ENABLED` | Enable/disable rule injection | `true` |
+| `LEX_RULES_SOURCE` | Rule source: "package" or "local" | `package` |
+| `LEX_RULES_PATH` | Path to local rules directory | (none) |
 
 ## Testing
-
-All infrastructure is tested and ready:
 
 ```bash
 npm test -- tests/rulesResolver.spec.ts
@@ -98,23 +133,20 @@ Test coverage:
 - ✅ Scope filtering support
 - ✅ Prompt formatting
 - ✅ Priority-based sorting
+- ✅ Configuration from environment
+- ✅ Prompt injection
 
-## Roadmap
+## Remaining Compatibility Shims
 
-### v0.4.0 (Current)
-- ✅ Infrastructure implemented
-- ✅ Package integration ready
-- ⚠️ Feature disabled
+The following compatibility shims are documented for removal in v2.0.0:
 
-### v0.5.0 (Planned)
-- 🔜 Enable LexSona rules
-- 🔜 API integration for dynamic rule updates
-- 🔜 Rule versioning and compatibility checks
-- 🔜 Enhanced scope filtering
-- 🔜 Rule override mechanisms
+| Shim | Location | Removal Timeline |
+|------|----------|------------------|
+| `LEXRUNNER_*` env var aliases | `src/util/envUtils.ts` | v2.0.0 |
+| Legacy flat path resolution | `src/config/pathResolver.ts` | v2.0.0 |
 
 ## See Also
 
 - [Prompts Configuration](./prompts.md) - Prompts precedence chain
 - [Lex Package Integration](./schemas.md) - Schema alignment
-- [PROJECT_0.4.0_ALIGNMENT.md](../PROJECT_0.4.0_ALIGNMENT.md) - Release planning
+- [Migration Guide](./migration-guide.md) - Upgrading from previous versions

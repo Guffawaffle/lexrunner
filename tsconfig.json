@@ -14,6 +14,5 @@
 		"noEmit": true,
 		"types": ["node"]
 	},
-	"include": ["src"],
-	"exclude": ["src/cli-old.ts"]
+	"include": ["src"]
 }

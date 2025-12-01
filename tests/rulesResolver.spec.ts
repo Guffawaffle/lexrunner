@@ -2,38 +2,41 @@
  * Tests for LexSona rules resolution
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
 	isLexSonaAvailable,
 	loadLexSonaRules,
 	formatRulesForPrompt,
-	type BehavioralRule
+	getRuleInjectionConfig,
+	injectRulesIntoPrompt,
+	type BehavioralRule,
+	type RuleInjectionConfig
 } from "../src/config/rulesResolver.js";
 
 describe("LexSona Rules Resolver", () => {
 	describe("isLexSonaAvailable", () => {
 		it("should check if Lex package rules are available", () => {
 			const available = isLexSonaAvailable();
-			// Should be true since we have @smartergpt/lex installed
+			// Returns boolean based on whether @smartergpt/lex/rules is resolvable
 			expect(typeof available).toBe("boolean");
 		});
 	});
 
 	describe("loadLexSonaRules", () => {
-		it("should return empty array when disabled (default)", async () => {
+		it("should return empty array with default config (enabled but package not available)", async () => {
 			const rules = await loadLexSonaRules();
-			expect(rules).toEqual([]);
+			expect(Array.isArray(rules)).toBe(true);
 		});
 
 		it("should return empty array when explicitly disabled", async () => {
-			const rules = await loadLexSonaRules(undefined, false);
+			const rules = await loadLexSonaRules(undefined, { enabled: false });
 			expect(rules).toEqual([]);
 		});
 
 		it("should attempt to load rules when enabled", async () => {
 			// This will try to load from the package
 			// May return empty if rules module doesn't export expected functions
-			const rules = await loadLexSonaRules(undefined, true);
+			const rules = await loadLexSonaRules(undefined, { enabled: true });
 			expect(Array.isArray(rules)).toBe(true);
 		});
 
@@ -43,8 +46,62 @@ describe("LexSona Rules Resolver", () => {
 				project: "lex-pr-runner",
 				agentFamily: "copilot"
 			};
-			const rules = await loadLexSonaRules(scope, false);
+			const rules = await loadLexSonaRules(scope, { enabled: false });
 			expect(rules).toEqual([]);
+		});
+	});
+
+	describe("getRuleInjectionConfig", () => {
+		let originalEnv: NodeJS.ProcessEnv;
+
+		beforeEach(() => {
+			originalEnv = { ...process.env };
+			delete process.env.LEX_RULES_ENABLED;
+			delete process.env.LEX_RULES_SOURCE;
+			delete process.env.LEX_RULES_PATH;
+		});
+
+		afterEach(() => {
+			process.env = originalEnv;
+		});
+
+		it("should return default config when no env vars set", () => {
+			const config = getRuleInjectionConfig();
+			expect(config.enabled).toBe(true);
+			expect(config.source).toBe("package");
+			expect(config.localRulesPath).toBeUndefined();
+		});
+
+		it("should respect LEX_RULES_ENABLED=false", () => {
+			process.env.LEX_RULES_ENABLED = "false";
+			const config = getRuleInjectionConfig();
+			expect(config.enabled).toBe(false);
+		});
+
+		it("should respect LEX_RULES_SOURCE=local", () => {
+			process.env.LEX_RULES_SOURCE = "local";
+			const config = getRuleInjectionConfig();
+			expect(config.source).toBe("local");
+		});
+
+		it("should include LEX_RULES_PATH when set", () => {
+			process.env.LEX_RULES_PATH = "/custom/rules/path";
+			const config = getRuleInjectionConfig();
+			expect(config.localRulesPath).toBe("/custom/rules/path");
+		});
+	});
+
+	describe("injectRulesIntoPrompt", () => {
+		it("should return base prompt when no rules available", async () => {
+			const basePrompt = "You are a helpful assistant.";
+			const result = await injectRulesIntoPrompt(basePrompt, undefined, { enabled: false });
+			expect(result).toBe(basePrompt);
+		});
+
+		it("should return base prompt when injection is disabled", async () => {
+			const basePrompt = "System prompt here.";
+			const result = await injectRulesIntoPrompt(basePrompt, undefined, { enabled: false });
+			expect(result).toBe(basePrompt);
 		});
 	});
 

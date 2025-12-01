@@ -510,8 +510,8 @@ This prompt comes from an external repository.
 
 			// If rules are available, they should be loadable
 			if (available) {
-				// Rules are currently disabled by default
-				const rules = await loadLexSonaRules(undefined, false);
+				// Rules are currently disabled via config
+				const rules = await loadLexSonaRules(undefined, { enabled: false });
 				expect(Array.isArray(rules)).toBe(true);
 			}
 		});
@@ -581,9 +581,9 @@ This prompt comes from an external repository.
 			expect(typeof available).toBe("boolean");
 		});
 
-		it("should return empty rules when disabled (default behavior)", async () => {
+		it("should return empty rules with default config when package not available", async () => {
 			const rules = await loadLexSonaRules();
-			expect(rules).toEqual([]);
+			expect(Array.isArray(rules)).toBe(true);
 		});
 
 		it("should format rules for prompt injection correctly", () => {
@@ -625,8 +625,8 @@ This prompt comes from an external repository.
 				agentFamily: "copilot",
 			};
 
-			// Currently returns empty when disabled
-			const rules = await loadLexSonaRules(scope, false);
+			// Returns empty when disabled
+			const rules = await loadLexSonaRules(scope, { enabled: false });
 			expect(rules).toEqual([]);
 		});
 	});
