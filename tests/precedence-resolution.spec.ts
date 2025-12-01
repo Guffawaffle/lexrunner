@@ -302,12 +302,12 @@ describe("Precedence Resolution Tests", () => {
 
 				try {
 					const resolved = resolvePromptsDir(fixture.testDir);
-					// If we get here, package prompts were found
-					expect(resolved.source).toBe("@smartergpt/lex package");
+					// If we get here, package prompts were found (prompts or canon/prompts)
+					expect(["@smartergpt/lex/prompts", "@smartergpt/lex/canon/prompts"]).toContain(resolved.source);
 				} catch (error) {
 					// Package prompts may not exist in test environment
 					if (error instanceof PromptsResolverError) {
-						// Error message should list all precedence levels
+						// Error message should list all 5 precedence levels
 						expect(error.message).toContain(
 							"Prompts directory not found"
 						);
@@ -317,7 +317,10 @@ describe("Precedence Resolution Tests", () => {
 						);
 						expect(error.message).toContain(".smartergpt/prompts");
 						expect(error.message).toContain(
-							"@smartergpt/lex package"
+							"@smartergpt/lex/prompts"
+						);
+						expect(error.message).toContain(
+							"@smartergpt/lex/canon/prompts"
 						);
 					} else {
 						throw error;
@@ -343,11 +346,11 @@ describe("Precedence Resolution Tests", () => {
 			// No local directories created - pure package fallback scenario
 			try {
 				const resolved = resolvePromptsDir(fixture.testDir);
-				expect(resolved.source).toBe("@smartergpt/lex package");
+				expect(["@smartergpt/lex/prompts", "@smartergpt/lex/canon/prompts"]).toContain(resolved.source);
 			} catch (error) {
 				// Package may not have prompts directory
 				if (error instanceof PromptsResolverError) {
-					expect(error.message).toContain("@smartergpt/lex package");
+					expect(error.message).toContain("@smartergpt/lex");
 				} else {
 					throw error;
 				}
@@ -374,7 +377,7 @@ describe("Precedence Resolution Tests", () => {
 	});
 
 	describe("Error Message Chain Tests", () => {
-		it("should include full precedence chain in error when no prompts found", () => {
+		it("should include full 5-level precedence chain in error when no prompts found", () => {
 			delete process.env.LEX_PROMPTS_DIR;
 
 			try {
@@ -383,7 +386,7 @@ describe("Precedence Resolution Tests", () => {
 			} catch (error) {
 				expect(error).toBeInstanceOf(PromptsResolverError);
 				if (error instanceof PromptsResolverError) {
-					// Verify all levels are mentioned in error
+					// Verify all 5 levels are mentioned in error
 					const message = error.message;
 
 					// Level 1: Environment variable
@@ -392,11 +395,14 @@ describe("Precedence Resolution Tests", () => {
 					// Level 2: Local overlay
 					expect(message).toContain(".smartergpt.local/prompts");
 
-					// Level 3: Tracked canon
+					// Level 3: Workspace
 					expect(message).toContain(".smartergpt/prompts");
 
-					// Level 4: Package fallback
-					expect(message).toContain("@smartergpt/lex package");
+					// Level 4: Package prompts
+					expect(message).toContain("@smartergpt/lex/prompts");
+
+					// Level 5: Canon prompts
+					expect(message).toContain("@smartergpt/lex/canon/prompts");
 				}
 			}
 		});
@@ -711,7 +717,7 @@ describe("Precedence Resolution Snapshot Tests", () => {
 					/Prompts directory not found\. Expected one of:/;
 				expect(error.message).toMatch(expectedPattern);
 
-				// Should list all options
+				// Should list all 5 options
 				expect(error.message).toContain("- LEX_PROMPTS_DIR (env var)");
 				expect(error.message).toContain(
 					"- " + path.join(testDir, ".smartergpt.local/prompts")
@@ -719,7 +725,8 @@ describe("Precedence Resolution Snapshot Tests", () => {
 				expect(error.message).toContain(
 					"- " + path.join(testDir, ".smartergpt/prompts")
 				);
-				expect(error.message).toContain("- @smartergpt/lex package");
+				expect(error.message).toContain("- @smartergpt/lex/prompts");
+				expect(error.message).toContain("- @smartergpt/lex/canon/prompts");
 			}
 		}
 	});

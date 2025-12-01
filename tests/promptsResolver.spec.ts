@@ -118,7 +118,7 @@ describe("Prompts Resolver", () => {
 			expect(resolved.source).toBe(".smartergpt/prompts");
 		});
 
-		it("should fall back to @smartergpt/lex package when available (fourth precedence)", () => {
+		it("should fall back to @smartergpt/lex package when available (fourth/fifth precedence)", () => {
 			delete process.env.LEX_PROMPTS_DIR;
 
 			// Don't create any local directories
@@ -127,12 +127,12 @@ describe("Prompts Resolver", () => {
 
 			try {
 				const resolved = resolvePromptsDir(testDir);
-				// If we get here, package prompts were found
-				expect(resolved.source).toBe("@smartergpt/lex package");
+				// If we get here, package prompts were found (either prompts or canon/prompts)
+				expect(["@smartergpt/lex/prompts", "@smartergpt/lex/canon/prompts"]).toContain(resolved.source);
 			} catch (error) {
-				// Expected to fail since package prompts don't exist yet
+				// Expected to fail since package prompts might not exist
 				if (error instanceof PromptsResolverError) {
-					expect(error.message).toContain("@smartergpt/lex package");
+					expect(error.message).toContain("@smartergpt/lex");
 				} else {
 					throw error;
 				}
@@ -155,8 +155,12 @@ describe("Prompts Resolver", () => {
 			expect(() => resolvePromptsDir(testDir)).toThrow(
 				/\.smartergpt\/prompts/
 			);
+			// Check for the new 5-level error message format
 			expect(() => resolvePromptsDir(testDir)).toThrow(
-				/@smartergpt\/lex package/
+				/@smartergpt\/lex\/prompts/
+			);
+			expect(() => resolvePromptsDir(testDir)).toThrow(
+				/@smartergpt\/lex\/canon\/prompts/
 			);
 		});
 
@@ -447,7 +451,8 @@ Time: {{now}}`;
 						".smartergpt.local/prompts"
 					);
 					expect(error.message).toContain(".smartergpt/prompts");
-					expect(error.message).toContain("@smartergpt/lex package");
+					expect(error.message).toContain("@smartergpt/lex/prompts");
+					expect(error.message).toContain("@smartergpt/lex/canon/prompts");
 				} else {
 					throw error;
 				}

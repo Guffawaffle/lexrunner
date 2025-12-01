@@ -16,12 +16,13 @@ The lex-pr-runner supports flexible prompt loading with a precedence chain that 
 
 ## Prompts Directory Precedence
 
-Prompts are resolved using the following precedence chain (highest to lowest):
+Prompts are resolved using a 5-level precedence chain (highest to lowest):
 
 1. **`LEX_PROMPTS_DIR`** (environment variable) - Explicit override
 2. **`.smartergpt.local/prompts/`** - Local overlay (not tracked)
-3. **`.smartergpt/prompts/`** - Tracked canonical prompts
-4. **`@smartergpt/lex` package** - Fallback defaults from Lex package
+3. **`.smartergpt/prompts/`** - Workspace prompts (tracked)
+4. **`@smartergpt/lex/prompts`** - Package defaults (if present)
+5. **`@smartergpt/lex/canon/prompts`** - Canonical fallback from Lex package
 
 ### Precedence Rules
 
@@ -29,29 +30,31 @@ Prompts are resolved using the following precedence chain (highest to lowest):
 - If `LEX_PROMPTS_DIR` is set but doesn't exist, an error is thrown
 - If `.smartergpt.local/prompts/` exists, it takes precedence over `.smartergpt/prompts/`
 - If `.smartergpt/prompts/` exists, it takes precedence over package prompts
+- Package prompts are checked in two locations: first `@smartergpt/lex/prompts`, then `@smartergpt/lex/canon/prompts`
 - If no prompts directory is found (including package), an error is thrown with helpful message
-- Package prompts provide a fallback when no local prompts are configured
 
 ### Error Messages
 
-When no prompts directory is found, the error message lists all checked locations:
+When no prompts directory is found, the error message lists all 5 checked locations:
 
 ```
 PromptsResolverError: Prompts directory not found. Expected one of:
   - LEX_PROMPTS_DIR (env var)
   - /path/to/project/.smartergpt.local/prompts
   - /path/to/project/.smartergpt/prompts
-  - @smartergpt/lex package (not installed or prompts not available)
+  - @smartergpt/lex/prompts (package defaults)
+  - @smartergpt/lex/canon/prompts (canonical fallback)
 ```
 
 ## Lex Package Integration
 
-### Package Fallback (New in v0.4.0)
+### Package Fallback (Updated in v0.5.0)
 
 LexRunner now integrates with the `@smartergpt/lex` npm package to provide canonical prompt templates as a fallback. This ensures that projects always have access to standard prompts even without local configuration.
 
 **How it works:**
-- If no local prompts are configured, LexRunner attempts to load from `@smartergpt/lex/prompts/`
+- If no local prompts are configured, LexRunner attempts to load from `@smartergpt/lex/prompts/` first
+- If that doesn't exist, it falls back to `@smartergpt/lex/canon/prompts/`
 - Package prompts are automatically available when `@smartergpt/lex` is installed as a dependency
 - Local prompts always take precedence over package prompts
 
@@ -65,10 +68,10 @@ LexRunner now integrates with the `@smartergpt/lex` npm package to provide canon
 
 | Aspect | Package Prompts | Local Prompts |
 |--------|----------------|---------------|
-| **Location** | `node_modules/@smartergpt/lex/prompts/` | `.smartergpt/prompts/` |
+| **Location** | `node_modules/@smartergpt/lex/canon/prompts/` | `.smartergpt/prompts/` |
 | **Updates** | Via `npm update @smartergpt/lex` | Manual edit |
 | **Customization** | Not recommended (overwritten on update) | Fully customizable |
-| **Precedence** | Lowest (fallback only) | Higher (after env and local overlay) |
+| **Precedence** | Lowest (levels 4-5 fallback) | Higher (levels 2-3) |
 | **Version Control** | Not tracked (in node_modules) | Tracked in repo |
 
 **Example: Using package prompts**
@@ -82,8 +85,8 @@ lex-pr plan --from-github
 
 # To customize: copy package prompt to local directory
 mkdir -p .smartergpt/prompts
-cp node_modules/@smartergpt/lex/prompts/idea.md .smartergpt/prompts/
-# Edit .smartergpt/prompts/idea.md as needed
+cp node_modules/@smartergpt/lex/canon/prompts/remember.md .smartergpt/prompts/
+# Edit .smartergpt/prompts/remember.md as needed
 ```
 
 ## Cross-Repository Prompts Usage

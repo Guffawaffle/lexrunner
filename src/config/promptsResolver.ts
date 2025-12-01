@@ -1,6 +1,8 @@
 /**
- * Prompts directory resolution with precedence chain
- * Implements: LEX_PROMPTS_DIR (env) → .smartergpt.local/prompts → .smartergpt/prompts → @smartergpt/lex package
+ * Prompts directory resolution with 5-level precedence chain
+ * Implements: LEX_PROMPTS_DIR (env) → .smartergpt.local/prompts → .smartergpt/prompts → @smartergpt/lex/prompts → @smartergpt/lex/canon/prompts
+ * 
+ * @see Guffawaffle/lex-pr-runner#371 (R-LOADER)
  */
 
 import * as fs from "fs";
@@ -25,25 +27,49 @@ export interface ResolvedPromptsDir {
 }
 
 /**
- * Resolve path to the @smartergpt/lex package prompts directory
- *
- * @returns Absolute path to the Lex package prompts directory, or null if not found
+ * Result of Lex package prompts resolution
  */
-function resolveLexPackagePromptsDir(): string | null {
+interface LexPackagePromptsResult {
+	/** Path to the prompts directory */
+	path: string;
+	/** Source identifier for diagnostics */
+	source: "@smartergpt/lex/prompts" | "@smartergpt/lex/canon/prompts";
+}
+
+/**
+ * Resolve path to the @smartergpt/lex package prompts directory
+ * 
+ * Checks two locations in the Lex package:
+ * 1. @smartergpt/lex/prompts (package defaults - if present)
+ * 2. @smartergpt/lex/canon/prompts (canonical fallback)
+ *
+ * @returns Resolved prompts directory info, or null if not found
+ */
+function resolveLexPackagePromptsDir(): LexPackagePromptsResult | null {
 	try {
-		// Try to dynamically import the package to verify it exists
-		// Using dynamic import is more consistent with ES modules
 		const lexPkgPath = require.resolve("@smartergpt/lex/package.json");
 		const lexPkgDir = path.dirname(lexPkgPath);
-		const promptsDir = path.join(lexPkgDir, "prompts");
 
-		// Check if prompts directory exists
+		// Precedence 4: @smartergpt/lex/prompts (package defaults)
+		const promptsDir = path.join(lexPkgDir, "prompts");
 		if (fs.existsSync(promptsDir)) {
-			return promptsDir;
+			return {
+				path: promptsDir,
+				source: "@smartergpt/lex/prompts",
+			};
+		}
+
+		// Precedence 5: @smartergpt/lex/canon/prompts (canonical fallback)
+		const canonPromptsDir = path.join(lexPkgDir, "canon", "prompts");
+		if (fs.existsSync(canonPromptsDir)) {
+			return {
+				path: canonPromptsDir,
+				source: "@smartergpt/lex/canon/prompts",
+			};
 		}
 
 		return null;
-	} catch (error) {
+	} catch {
 		// Package not installed or prompts not available
 		// This is expected when @smartergpt/lex is not installed
 		return null;
@@ -51,13 +77,14 @@ function resolveLexPackagePromptsDir(): string | null {
 }
 
 /**
- * Resolve prompts directory with precedence chain
+ * Resolve prompts directory with 5-level precedence chain
  *
  * Precedence order (highest to lowest):
  * 1. LEX_PROMPTS_DIR environment variable (explicit override)
- * 2. .smartergpt.local/prompts (local overlay)
- * 3. .smartergpt/prompts (tracked canon)
- * 4. @smartergpt/lex package prompts (fallback defaults)
+ * 2. .smartergpt.local/prompts (local overlay, not tracked)
+ * 3. .smartergpt/prompts (workspace, tracked)
+ * 4. @smartergpt/lex/prompts (package defaults)
+ * 5. @smartergpt/lex/canon/prompts (canonical fallback)
  *
  * @param baseDir - Base directory to resolve relative paths (default: current working directory)
  * @returns Resolved prompts directory information
@@ -87,31 +114,32 @@ export function resolvePromptsDir(
 		};
 	}
 
-	// Precedence 3: .smartergpt/prompts (tracked canon)
-	const trackedCanon = path.resolve(baseDir, ".smartergpt/prompts");
-	if (fs.existsSync(trackedCanon)) {
+	// Precedence 3: .smartergpt/prompts (workspace)
+	const workspaceDir = path.resolve(baseDir, ".smartergpt/prompts");
+	if (fs.existsSync(workspaceDir)) {
 		return {
-			path: trackedCanon,
+			path: workspaceDir,
 			source: ".smartergpt/prompts",
 		};
 	}
 
-	// Precedence 4: @smartergpt/lex package prompts (fallback defaults)
+	// Precedence 4 & 5: @smartergpt/lex package (prompts or canon/prompts)
 	const lexPackagePrompts = resolveLexPackagePromptsDir();
 	if (lexPackagePrompts) {
 		return {
-			path: lexPackagePrompts,
-			source: "@smartergpt/lex package",
+			path: lexPackagePrompts.path,
+			source: lexPackagePrompts.source,
 		};
 	}
 
-	// No prompts directory found - provide helpful error
+	// No prompts directory found - provide helpful error with full precedence chain
 	throw new PromptsResolverError(
 		"Prompts directory not found. Expected one of:\n" +
 			`  - LEX_PROMPTS_DIR (env var)\n` +
 			`  - ${localOverlay}\n` +
-			`  - ${trackedCanon}\n` +
-			`  - @smartergpt/lex package (not installed or prompts not available)`
+			`  - ${workspaceDir}\n` +
+			`  - @smartergpt/lex/prompts (package defaults)\n` +
+			`  - @smartergpt/lex/canon/prompts (canonical fallback)`
 	);
 }
 
