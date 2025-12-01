@@ -161,6 +161,22 @@ export const JordanModeProtocol = z.object({
 export type JordanModeProtocol = z.infer<typeof JordanModeProtocol>;
 
 /**
+ * Executor authorities configuration
+ *
+ * Defines what high-level actions this executor is permitted to perform.
+ * Authorities are boolean flags that grant specific capabilities.
+ */
+export const ExecutorAuthorities = z.object({
+	/** Can perform code review operations */
+	codeReview: z.boolean().default(false),
+	/** Can persist frames to Lex memory */
+	framePersistence: z.boolean().default(false),
+	/** Can implement keystone issues directly on umbrella branches */
+	keystoneIssues: z.boolean().default(false),
+});
+export type ExecutorAuthorities = z.infer<typeof ExecutorAuthorities>;
+
+/**
  * Complete Executor Manifest Schema
  *
  * This is the canonical schema for executor-manifest.yaml files.
@@ -173,6 +189,7 @@ export const ExecutorManifestSchema = z.object({
 	description: z.string().optional(),
 	toolBudget: ToolBudget,
 	guardrails: ExecutorGuardrails.optional(),
+	authorities: ExecutorAuthorities.optional(),
 	jordanModeProtocol: JordanModeProtocol,
 });
 export type ExecutorManifest = z.infer<typeof ExecutorManifestSchema>;

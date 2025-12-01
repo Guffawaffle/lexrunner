@@ -9,6 +9,7 @@ import {
 	ExecutorSchemaVersion,
 	ToolBudget,
 	ExecutorGuardrails,
+	ExecutorAuthorities,
 	JordanModeProtocol,
 	ReceiptPhase,
 	StochasticPhase,
@@ -154,6 +155,39 @@ describe("Executor Manifest Schema", () => {
 				});
 				expect(result.audit?.level).toBe(level);
 			}
+		});
+	});
+
+	describe("ExecutorAuthorities", () => {
+		it("should validate complete authorities configuration", () => {
+			const authorities = {
+				codeReview: true,
+				framePersistence: true,
+				keystoneIssues: false,
+			};
+
+			const result = ExecutorAuthorities.parse(authorities);
+			expect(result.codeReview).toBe(true);
+			expect(result.framePersistence).toBe(true);
+			expect(result.keystoneIssues).toBe(false);
+		});
+
+		it("should apply defaults for missing authority fields", () => {
+			const result = ExecutorAuthorities.parse({});
+			expect(result.codeReview).toBe(false);
+			expect(result.framePersistence).toBe(false);
+			expect(result.keystoneIssues).toBe(false);
+		});
+
+		it("should allow partial authorities configuration", () => {
+			const authorities = {
+				codeReview: true,
+			};
+
+			const result = ExecutorAuthorities.parse(authorities);
+			expect(result.codeReview).toBe(true);
+			expect(result.framePersistence).toBe(false);
+			expect(result.keystoneIssues).toBe(false);
 		});
 	});
 
@@ -305,6 +339,11 @@ describe("Executor Manifest Schema", () => {
 					frameSchema: "frame-v2",
 				},
 			},
+			authorities: {
+				codeReview: true,
+				framePersistence: true,
+				keystoneIssues: true,
+			},
 			jordanModeProtocol: {
 				prepPhase: ["load-context", "validate-scope"],
 				stochasticPhase: {
@@ -347,6 +386,34 @@ describe("Executor Manifest Schema", () => {
 			expect(result.role).toBe("simple-executor");
 			expect(result.toolBudget.allowed).toEqual([]);
 			expect(result.guardrails).toBeUndefined();
+			expect(result.authorities).toBeUndefined();
+		});
+
+		it("should validate executor manifest with authorities", () => {
+			const manifestWithAuthorities = {
+				schemaVersion: "executor-1.0.0",
+				role: "senior-dev-review",
+				toolBudget: {},
+				authorities: {
+					codeReview: true,
+					framePersistence: true,
+					keystoneIssues: true,
+				},
+				jordanModeProtocol: {
+					stochasticPhase: {
+						promptTemplate: "prompts/review.prompt.md",
+					},
+					receiptPhase: {
+						frameType: "review-frame",
+						fields: ["output"],
+					},
+				},
+			};
+
+			const result = ExecutorManifestSchema.parse(manifestWithAuthorities);
+			expect(result.authorities?.codeReview).toBe(true);
+			expect(result.authorities?.framePersistence).toBe(true);
+			expect(result.authorities?.keystoneIssues).toBe(true);
 		});
 
 		it("should reject missing required fields", () => {

@@ -3,9 +3,9 @@ node_modules/
 dist/
 coverage/
 
-# Project workspaces (local-only, never tracked)
-project/
-project/**
+# Project workspaces (local-only R&D playground, never tracked except README)
+project/*
+!project/README.md
 
 # Environment and IDE
 .env
