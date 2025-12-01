@@ -39,9 +39,9 @@ interface LexPackagePromptsResult {
 /**
  * Resolve path to the @smartergpt/lex package prompts directory
  * 
- * Checks two locations in the Lex package:
- * 1. @smartergpt/lex/prompts (package defaults - if present)
- * 2. @smartergpt/lex/canon/prompts (canonical fallback)
+ * Checks two locations in the Lex package in order:
+ * 1. @smartergpt/lex/prompts - Package defaults (higher precedence, level 4)
+ * 2. @smartergpt/lex/canon/prompts - Canonical fallback (lower precedence, level 5)
  *
  * @returns Resolved prompts directory info, or null if not found
  */
@@ -50,7 +50,7 @@ function resolveLexPackagePromptsDir(): LexPackagePromptsResult | null {
 		const lexPkgPath = require.resolve("@smartergpt/lex/package.json");
 		const lexPkgDir = path.dirname(lexPkgPath);
 
-		// Precedence 4: @smartergpt/lex/prompts (package defaults)
+		// Precedence 4: @smartergpt/lex/prompts (package defaults - checked first)
 		const promptsDir = path.join(lexPkgDir, "prompts");
 		if (fs.existsSync(promptsDir)) {
 			return {
@@ -59,7 +59,7 @@ function resolveLexPackagePromptsDir(): LexPackagePromptsResult | null {
 			};
 		}
 
-		// Precedence 5: @smartergpt/lex/canon/prompts (canonical fallback)
+		// Precedence 5: @smartergpt/lex/canon/prompts (canonical fallback - checked second)
 		const canonPromptsDir = path.join(lexPkgDir, "canon", "prompts");
 		if (fs.existsSync(canonPromptsDir)) {
 			return {
@@ -70,8 +70,9 @@ function resolveLexPackagePromptsDir(): LexPackagePromptsResult | null {
 
 		return null;
 	} catch {
-		// Package not installed or prompts not available
-		// This is expected when @smartergpt/lex is not installed
+		// Error is intentionally ignored - this is expected when @smartergpt/lex 
+		// is not installed or the package.json cannot be resolved. Return null 
+		// to let the resolver continue with error handling.
 		return null;
 	}
 }
