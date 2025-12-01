@@ -50,17 +50,20 @@ The `runner/` directory should be **gitignored** as it contains ephemeral workin
 
 ### Prompts Directory Precedence
 
-Prompts are resolved using a **separate precedence chain** from profiles:
+Prompts are resolved using a **5-level precedence chain** separate from profiles:
 
 1. **`LEX_PROMPTS_DIR`** (environment variable) - Explicit override for cross-repo usage
 2. **`.smartergpt.local/prompts/`** - Local overlay (not tracked)
-3. **`.smartergpt/prompts/`** - Tracked canonical prompts
+3. **`.smartergpt/prompts/`** - Workspace prompts (tracked)
+4. **`@smartergpt/lex/prompts`** - Package defaults (if present)
+5. **`@smartergpt/lex/canon/prompts`** - Canonical fallback from Lex package
 
 **Key Features:**
 - Independent from profile resolution (e.g., can use `.smartergpt/` profile with Lex prompts)
 - Enables cross-repository prompt sharing
 - Supports token expansion (`{{today}}`, `{{now}}`, `{{repo_root}}`, `{{branch}}`, `{{commit}}`)
 - File-level overlay (entire prompt file is replaced, not merged)
+- Package fallback provides canonical prompts when no local prompts exist
 
 **See Also:** [Prompts Configuration](./prompts.md) for complete documentation on prompts precedence, token expansion, and cross-repo usage.
 
