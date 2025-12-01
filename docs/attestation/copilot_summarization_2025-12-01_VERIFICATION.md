@@ -1,7 +1,7 @@
 # Verification Instructions for Copilot Summarization Observation
 
-**Attestation Date:** 2025-12-01  
-**Document:** `copilot_summarization_behavior_observation_2025-12-01.md`  
+**Attestation Date:** 2025-12-01
+**Document:** `copilot_summarization_behavior_observation_2025-12-01.md`
 **Evidence:** `copilot_summarization_screenshot_2025-12-01.png`
 
 ---
@@ -22,9 +22,9 @@ deb5beb8b751734e95ebc0ed1b24667ed28574ef79d36ba2b45517be552955b4  copilot_summar
 
 ## 1. RFC 3161 Timestamp (FreeTSA)
 
-**File:** `timestamp_response.tsr`  
-**Authority:** FreeTSA (https://freetsa.org)  
-**Timestamp:** Dec 1 10:49:56 2025 GMT  
+**File:** `timestamp_response.tsr`
+**Authority:** FreeTSA (https://freetsa.org)
+**Timestamp:** Dec 1 10:49:56 2025 GMT
 
 ### Verification
 
@@ -46,8 +46,8 @@ openssl ts -reply -in timestamp_response.tsr -text
 
 ## 2. Bitcoin Blockchain Timestamp (OpenTimestamps)
 
-**File:** `copilot_summarization_2025-12-01.ots`  
-**Calendars:** OpenTimestamps (alice, bob), Catallaxy, EternityWall  
+**File:** `copilot_summarization_2025-12-01.ots`
+**Calendars:** OpenTimestamps (alice, bob), Catallaxy, EternityWall
 **Status:** Pending Bitcoin block confirmation (typically 1-24 hours)
 
 ### Verification
