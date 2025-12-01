@@ -151,6 +151,24 @@
           },
           "additionalProperties": false
         },
+        "authorities": {
+          "type": "object",
+          "properties": {
+            "codeReview": {
+              "type": "boolean",
+              "default": false
+            },
+            "framePersistence": {
+              "type": "boolean",
+              "default": false
+            },
+            "keystoneIssues": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        },
         "jordanModeProtocol": {
           "type": "object",
           "properties": {

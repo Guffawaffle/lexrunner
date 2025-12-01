@@ -1,0 +1,79 @@
+schemaVersion: "executor-1.0.0"
+role: "senior-dev-review"
+description: "Code review executor with mentorship feedback and Lex memory integration"
+
+# Tool Budget: What tools this executor may call and under what limits
+toolBudget:
+  allowed:
+    - gh pr view
+    - git diff
+    - npm run lint
+    - npm run typecheck
+    - npm test
+    - lex recall
+    - lex remember
+    - grep_search
+    - read_file
+    - list_dir
+    - get_errors
+  denied:
+    - git push
+    - git merge
+    - rm -rf
+    - run_in_terminal
+    - create_file
+    - replace_string_in_file
+  limits:
+    maxToolCalls: 50
+    maxTokensOut: 8000
+
+# Guardrails: Scope, tool, epistemic, style, and audit constraints
+guardrails:
+  scope:
+    allowedPaths:
+      - "src/**"
+      - "tests/**"
+      - "docs/**"
+    deniedPaths:
+      - "node_modules/**"
+      - ".git/**"
+      - "*.env"
+      - "secrets/**"
+  tool:
+    required:
+      - get_errors
+    optional:
+      - grep_search
+  epistemic:
+    allowIDK: true
+    escalationThreshold: "medium-risk"
+  style:
+    requirePlan: false
+    requireSummary: true
+  audit:
+    level: "normal"
+    frameSchema: "senior-dev-review"
+
+# Authorities: High-level permissions granted to this executor
+authorities:
+  codeReview: true
+  framePersistence: true
+  keystoneIssues: true
+
+# Jordan-Mode Protocol: prep → stochastic → receipt
+jordanModeProtocol:
+  prepPhase:
+    - load-context
+    - validate-scope
+    - prepare-review-context
+    - recall-context
+  stochasticPhase:
+    promptTemplate: "prompts/code-review.prompt.md"
+    maxCalls: 1
+  receiptPhase:
+    frameType: "review"
+    fields:
+      - reference_point
+      - summary_caption
+      - module_scope
+      - next_action
