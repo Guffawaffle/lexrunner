@@ -430,7 +430,7 @@ registerSchemaCommand(program, {
 });
 
 // Report command - modularized in Phase 3.4
-registerReportCommand(program);
+registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Discover command - modularized in Phase 2
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
@@ -965,7 +965,7 @@ program
 	});
 
 // Query command - modular implementation
-registerQueryCommand(program, exitWith);
+registerQueryCommand(program, { exitWith, jsonModeActive: () => jsonModeActive });
 
 // Retry command
 registerRetryCommand(program, () => jsonModeActive, exitWith);
