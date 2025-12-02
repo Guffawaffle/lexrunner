@@ -26,7 +26,7 @@ export function emitWeaveCompletionFrame(context: WeaveContext): FrameEmitResult
 		outcome = "failure";
 	}
 
-	// Collect merged PRs from batches
+	// Collect merged PRs from completed batches
 	const mergedPRs: string[] = [];
 	for (const batch of context.batches) {
 		if (batch.state === "completed") {
@@ -34,11 +34,17 @@ export function emitWeaveCompletionFrame(context: WeaveContext): FrameEmitResult
 		}
 	}
 
-	// If no completed batches, use all items from plan
-	if (mergedPRs.length === 0 && context.plan.items) {
-		for (const item of context.plan.items) {
-			mergedPRs.push(item.name);
-		}
+	// For failed/partial outcomes, include all attempted items in module_scope
+	// so the Frame captures the full scope of what was attempted
+	let moduleScope: string[];
+	if (mergedPRs.length > 0) {
+		moduleScope = mergedPRs;
+	} else if (context.plan.items && context.plan.items.length > 0) {
+		// Use plan items as the attempted scope (even if none merged)
+		moduleScope = context.plan.items.map(item => item.name);
+	} else {
+		// Fallback: empty scope
+		moduleScope = [];
 	}
 
 	// Calculate duration
@@ -52,10 +58,10 @@ export function emitWeaveCompletionFrame(context: WeaveContext): FrameEmitResult
 	const gatesPassed: string[] = [];
 	const gatesFailed: string[] = [];
 
-	// Build frame input
+	// Build frame input - use moduleScope for full scope, mergedPRs for actual merged items
 	const input: MergeWeaveFrameInput = {
 		runId: context.runId,
-		mergedPRs,
+		mergedPRs: moduleScope,
 		conflictsResolved: 0, // Could be tracked in context.metadata if needed
 		gatesPassed,
 		gatesFailed: gatesFailed.length > 0 ? gatesFailed : undefined,

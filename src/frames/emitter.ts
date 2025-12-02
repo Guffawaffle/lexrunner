@@ -34,20 +34,6 @@ function getUniqueSuffix(): string {
 }
 
 /**
- * Build next actions based on outcome
- */
-function buildNextActions(outcome: FrameOutcome, context: string): string[] {
-	switch (outcome) {
-		case "success":
-			return [`Verify ${context} completion`, "Continue to next workflow step"];
-		case "failure":
-			return [`Review ${context} failure logs`, "Fix issues and retry"];
-		case "partial":
-			return [`Review partial ${context} results`, "Address remaining items"];
-	}
-}
-
-/**
  * Emit a Frame for merge-weave completion
  */
 export function emitMergeWeaveFrame(
@@ -135,7 +121,18 @@ export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
 					? `Partially executed procedure '${input.procedure}' on ${scopeList}`
 					: `Failed to execute procedure '${input.procedure}' on ${scopeList}`;
 
-		const nextActions = [input.nextAction, ...buildNextActions(input.outcome, `executor ${input.procedure}`)];
+		// Build next actions: user-provided action + outcome-based suggestions
+		const nextActions: string[] = [input.nextAction];
+		if (input.outcome === "success") {
+			nextActions.push(`Verify executor ${input.procedure} completion`);
+			nextActions.push("Continue to next workflow step");
+		} else if (input.outcome === "partial") {
+			nextActions.push(`Review partial executor ${input.procedure} results`);
+			nextActions.push("Address remaining items");
+		} else {
+			nextActions.push(`Review executor ${input.procedure} failure logs`);
+			nextActions.push("Fix issues and retry");
+		}
 
 		const frame: ExecutionFrame = {
 			type: "execution",
@@ -190,9 +187,6 @@ export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
 		} else {
 			nextActions.push(`Review ${input.gateName} failure`);
 			nextActions.push("Fix issues and re-run gate");
-			if (input.error) {
-				nextActions.push(`Error: ${input.error}`);
-			}
 		}
 
 		const frame: ExecutionFrame = {

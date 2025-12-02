@@ -528,6 +528,11 @@ function emitGateExecutionFrame(
 		return undefined;
 	}
 
+	// Skip emitting frame for blocked or skipped gates - they didn't actually execute
+	if (result.status === 'blocked' || result.status === 'skipped' || result.status === 'retrying') {
+		return undefined;
+	}
+
 	const outcome = result.status === 'pass' ? 'success' : 'failure';
 	
 	return emitGateFrame({

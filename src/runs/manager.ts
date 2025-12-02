@@ -770,7 +770,8 @@ export class RunManager {
 		}
 
 		const now = new Date().toISOString();
-		const terminalState = outcome === "success" ? "completed" : "failed";
+		// Map outcome to terminal state - partial is considered completed (with partial results)
+		const terminalState = outcome === "failure" ? "failed" : "completed";
 
 		// Calculate duration
 		const startTime = new Date(current.createdAt).getTime();
