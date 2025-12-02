@@ -13,6 +13,8 @@ import { canonicalJSONStringify } from "./util/canonicalJson.js";
 import { ProgressReporter } from "./util/progress.js";
 import { validateGateInput } from "./gates/validator.js";
 import { wrapGateFailure, logGateFailure, type FailureHandlingPayload } from "./runs/failures.js";
+import { emitGateFrame } from "./frames/index.js";
+import type { FrameEmitResult } from "./frames/types.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -513,6 +515,34 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
 }
 
 /**
+ * Emit a Frame for gate execution result (AX-005)
+ */
+function emitGateExecutionFrame(
+	gateName: string,
+	itemName: string,
+	result: GateResult,
+	runId?: string
+): FrameEmitResult | undefined {
+	// Only emit frames if runId is provided
+	if (!runId) {
+		return undefined;
+	}
+
+	const outcome = result.status === 'pass' ? 'success' : 'failure';
+	
+	return emitGateFrame({
+		runId,
+		gateName,
+		itemName,
+		durationMs: result.duration || 0,
+		outcome,
+		exitCode: result.exitCode,
+		artifacts: result.artifacts,
+		error: result.stderr && result.status !== 'pass' ? result.stderr : undefined,
+	});
+}
+
+/**
  * Execute all gates for a specific item with policy-aware execution
  */
 export async function executeItemGates(
@@ -572,6 +602,9 @@ export async function executeItemGates(
 					isFlaky: false,
 				}, options.baseDir);
 			}
+			
+			// Emit Frame for gate execution (AX-005)
+			emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
 			continue;
 		}
 
@@ -589,6 +622,9 @@ export async function executeItemGates(
 				isFlaky,
 			}, options.baseDir);
 		}
+		
+		// Emit Frame for gate execution (AX-005)
+		emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
 	}
 	return results;
 }

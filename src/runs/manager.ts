@@ -38,6 +38,8 @@ import {
 } from "./artifacts.js";
 import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
 import { safeParseStepOutcome, safeParseReceipt } from "../store/run-store.js";
+import { emitProcedureFrame } from "../frames/index.js";
+import type { FrameEmitResult, FrameOutcome } from "../frames/types.js";
 
 /**
  * Default initial state for new runs
@@ -737,6 +739,86 @@ export class RunManager {
 		}
 
 		return listArtifactsImpl(input, this.baseDir);
+	}
+
+	/**
+	 * Complete a run and emit a Frame (AX-005)
+	 *
+	 * Transitions the run to a terminal state and emits an execution Frame
+	 * capturing what was attempted, scope touched, outcome, and next steps.
+	 *
+	 * @param runId - The run identifier
+	 * @param outcome - The outcome of the run (success/failure/partial)
+	 * @param nextActions - Recommended next actions
+	 * @param options - Additional options
+	 * @returns Updated RunState and FrameEmitResult
+	 */
+	async completeRunWithFrame(
+		runId: string,
+		outcome: FrameOutcome,
+		nextActions: string[],
+		options?: {
+			artifacts?: string[];
+			error?: string;
+			planHash?: string;
+		}
+	): Promise<{ runState: RunState; frameResult: FrameEmitResult }> {
+		const current = await this.getRun(runId);
+
+		if (!current) {
+			throw new RunNotFoundError(runId);
+		}
+
+		const now = new Date().toISOString();
+		const terminalState = outcome === "success" ? "completed" : "failed";
+
+		// Calculate duration
+		const startTime = new Date(current.createdAt).getTime();
+		const endTime = Date.now();
+		const durationMs = endTime - startTime;
+
+		// Build module scope from params (if available) or metadata
+		const moduleScope: string[] = [];
+		if (current.params?.prNumbers && Array.isArray(current.params.prNumbers)) {
+			moduleScope.push(...current.params.prNumbers.map(String));
+		} else if (current.params?.scope && Array.isArray(current.params.scope)) {
+			moduleScope.push(...current.params.scope.map(String));
+		} else if (current.task) {
+			moduleScope.push(current.task);
+		} else {
+			moduleScope.push(current.procedure);
+		}
+
+		// Emit procedure Frame (AX-005)
+		const frameResult = emitProcedureFrame({
+			runId,
+			procedure: current.procedure,
+			moduleScope,
+			durationMs,
+			outcome,
+			nextActions,
+			artifacts: options?.artifacts,
+			error: options?.error,
+			planHash: options?.planHash,
+		});
+
+		// Log Frame emission to run log
+		appendToRunLog(
+			runId,
+			"decisions",
+			{
+				type: "frame_emitted",
+				frameId: frameResult.frameId,
+				outcome,
+				ts: now,
+			},
+			this.baseDir
+		);
+
+		// Update run state to terminal
+		const updated = await this.transitionState(runId, terminalState);
+
+		return { runState: updated, frameResult };
 	}
 
 	/**
