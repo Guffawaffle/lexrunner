@@ -5,6 +5,8 @@
 
 import { WeaveState, WeaveEvent, StateTransition, WeaveContext } from './types.js';
 import { ulid } from 'ulid';
+import { emitWeaveCompletionFrame } from './frameHelper.js';
+import type { FrameEmitResult } from '../frames/types.js';
 
 /**
  * Valid state transitions for weave execution
@@ -43,6 +45,8 @@ export const STATE_TRANSITIONS: StateTransition[] = [
 export class WeaveStateMachine {
 	private context: WeaveContext;
 	private transitions: Map<string, StateTransition>;
+	/** Last Frame emit result (for testing/debugging) */
+	private lastFrameResult?: FrameEmitResult;
 
 	constructor(context: WeaveContext) {
 		this.context = context;
@@ -67,6 +71,13 @@ export class WeaveStateMachine {
 	 */
 	getContext(): WeaveContext {
 		return { ...this.context };
+	}
+
+	/**
+	 * Get last Frame emit result
+	 */
+	getLastFrameResult(): FrameEmitResult | undefined {
+		return this.lastFrameResult;
 	}
 
 	/**
@@ -175,6 +186,8 @@ export class WeaveStateMachine {
 		switch (newState) {
 			case WeaveState.COMPLETED:
 				this.context.completedAt = new Date().toISOString();
+				// Emit Frame for successful completion (AX-005)
+				this.lastFrameResult = emitWeaveCompletionFrame(this.context);
 				break;
 			
 			case WeaveState.FAILED:
@@ -186,6 +199,8 @@ export class WeaveStateMachine {
 						batch.completedAt = new Date().toISOString();
 					}
 				}
+				// Emit Frame for failure (AX-005)
+				this.lastFrameResult = emitWeaveCompletionFrame(this.context);
 				break;
 			
 			case WeaveState.MERGING:

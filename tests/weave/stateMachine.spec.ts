@@ -220,6 +220,69 @@ describe('WeaveStateMachine', () => {
 			expect(ctx.completedAt).toBeDefined();
 		});
 
+		it('should emit Frame on completion (AX-005)', () => {
+			const batch: BatchState = {
+				batchNumber: 0,
+				items: ['PR-101', 'PR-102'],
+				state: 'pending'
+			};
+
+			const context = createWeaveContext(
+				{ target: 'main', items: [] },
+				[],
+				'test-hash'
+			);
+			context.batches = [batch];
+
+			const sm = new WeaveStateMachine(context);
+
+			// Navigate to completed
+			sm.transition(WeaveEvent.START);
+			sm.transition(WeaveEvent.PLAN_READY);
+			sm.transition(WeaveEvent.ORDER_COMPUTED);
+			sm.transition(WeaveEvent.BEGIN_MERGE);
+			sm.transition(WeaveEvent.MERGE_SUCCESS);
+			sm.transition(WeaveEvent.ALL_COMPLETE);
+
+			const frameResult = sm.getLastFrameResult();
+			expect(frameResult).toBeDefined();
+			expect(frameResult!.success).toBe(true);
+			expect(frameResult!.frame).toBeDefined();
+			expect(frameResult!.frame!.type).toBe('merge-weave');
+			expect(frameResult!.frame!.outcome).toBe('success');
+		});
+
+		it('should emit Frame on failure (AX-005)', () => {
+			const batch: BatchState = {
+				batchNumber: 0,
+				items: ['PR-101'],
+				state: 'pending'
+			};
+
+			const context = createWeaveContext(
+				{ target: 'main', items: [] },
+				[],
+				'test-hash'
+			);
+			context.batches = [batch];
+
+			const sm = new WeaveStateMachine(context);
+
+			// Navigate to failed
+			sm.transition(WeaveEvent.START);
+			sm.transition(WeaveEvent.PLAN_READY);
+			sm.transition(WeaveEvent.ORDER_COMPUTED);
+			sm.transition(WeaveEvent.BEGIN_MERGE);
+			sm.transition(WeaveEvent.MERGE_FAILED);
+
+			const frameResult = sm.getLastFrameResult();
+			expect(frameResult).toBeDefined();
+			expect(frameResult!.success).toBe(true);
+			expect(frameResult!.frame).toBeDefined();
+			expect(frameResult!.frame!.type).toBe('merge-weave');
+			expect(frameResult!.frame!.outcome).toBe('failure');
+		});
+
 		it('should mark batch as in-progress when merging', () => {
 			const batch: BatchState = {
 				batchNumber: 0,
