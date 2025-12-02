@@ -250,14 +250,20 @@ export class PlanQueryEngine {
  */
 export type ExitWithHandler = (error: unknown) => void;
 
+interface QueryCommandDeps {
+	exitWith: ExitWithHandler;
+	jsonModeActive: () => boolean;
+}
+
 /**
  * Register the query command with the CLI program
  */
-export function registerQueryCommand(program: Command, exitWith: ExitWithHandler): void {
+export function registerQueryCommand(program: Command, deps: QueryCommandDeps): void {
 	program
 		.command("query [file] [query]")
 		.description("Advanced query and analysis of plan")
 		.option("--plan <file>", "Path to plan.json file")
+		.option("--json", "Output JSON format (alias for --format json)")
 		.option("--format <format>", "Output format: json, table, csv", "table")
 		.option("--output <file>", "Output file (default: stdout)")
 		.option("--stats", "Show plan statistics")
@@ -294,7 +300,9 @@ export function registerQueryCommand(program: Command, exitWith: ExitWithHandler
 					throwExit(1);
 				}
 
-				const output = opts.format === 'json'
+				// --json flag or global json mode takes precedence over --format
+				const useJson = opts.json || deps.jsonModeActive() || opts.format === 'json';
+				const output = useJson
 					? canonicalJSONStringify(result)
 					: formatQueryResult(result, opts.format);
 
@@ -307,7 +315,7 @@ export function registerQueryCommand(program: Command, exitWith: ExitWithHandler
 
 				return;
 			} catch (error) {
-				exitWith(error);
+				deps.exitWith(error);
 			}
 		});
 }

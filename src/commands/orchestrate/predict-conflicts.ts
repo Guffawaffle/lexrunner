@@ -15,6 +15,7 @@ interface PredictConflictsOptions {
 	skipMergeTree?: boolean;
 	enableClustering?: boolean;
 	writeWeaveConflicts?: boolean;
+	json?: boolean;
 }
 
 /**
@@ -32,9 +33,10 @@ export function registerPredictConflictsCommand(
 		.option("--skip-merge-tree", "Skip git merge-tree simulation")
 		.option("--enable-clustering", "Enable conflict clustering by file and symbol")
 		.option("--write-weave-conflicts", "Write clustered conflicts to .weave/conflicts.json")
+		.option("--json", "Output JSON format")
 		.action(async (options: PredictConflictsOptions) => {
 			try {
-				const useJson = jsonModeActive();
+				const useJson = options.json || jsonModeActive();
 				
 				// Parse PR numbers
 				if (!options.prs) {
@@ -83,8 +85,8 @@ export function registerPredictConflictsCommand(
 					printHumanReadableReport(report);
 				}
 			} catch (error) {
-				const useJson = jsonModeActive();
-				if (useJson) {
+				const useJsonError = options.json || jsonModeActive();
+				if (useJsonError) {
 					writeJsonOutput({ error: error instanceof Error ? error.message : String(error) });
 				} else {
 					console.error("Error predicting conflicts:", error);
