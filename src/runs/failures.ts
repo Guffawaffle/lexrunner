@@ -8,12 +8,14 @@
  * - Error classification (retryable vs non-retryable)
  * - Recommended actions populated based on error type
  * - All failures logged to failures.ndjson
+ * - AX Level 3 compliance: toAXError() adapter for structured errors
  */
 
 import { z } from "zod";
 import type { GateResult } from "../schema.js";
 import type { NextOption } from "../schemas/runCentric.js";
 import { appendToRunLog, readRunLog } from "./storage.js";
+import { type AXError, createAXError } from "../errors/index.js";
 
 /**
  * Error codes for failure classification
@@ -367,9 +369,10 @@ export function wrapGateFailure(
 	);
 
 	// Build error message
-	const message = exitCode !== undefined
-		? `Gate "${gateName}" failed with exit code ${exitCode}`
-		: `Gate "${gateName}" failed`;
+	const message =
+		exitCode !== undefined
+			? `Gate "${gateName}" failed with exit code ${exitCode}`
+			: `Gate "${gateName}" failed`;
 
 	// Build structured error
 	const error: FailureError = {
@@ -380,7 +383,11 @@ export function wrapGateFailure(
 	};
 
 	// Build recommended actions
-	const recommendedActions = buildRecommendedActions(code, gateName, retryable);
+	const recommendedActions = buildRecommendedActions(
+		code,
+		gateName,
+		retryable
+	);
 
 	// Build failure record schema for documentation
 	const failureRecordSchema = {
@@ -487,4 +494,56 @@ export function toNextOptions(payload: FailureHandlingPayload): NextOption[] {
 		responseSchema: action.responseSchema,
 		riskLevel: action.riskLevel,
 	}));
+}
+
+/**
+ * Convert FailureHandlingPayload to AXError for AX Level 3 compliance.
+ *
+ * Per AX-CONTRACT.md v0.1, Guarantee 2.3: Recoverable Errors
+ * - Structured errors MUST include code, message, and at least one nextAction
+ *
+ * @example
+ * ```typescript
+ * const gateResult = await executeGate(gate, policy, artifactDir);
+ * if (gateResult.status === "fail") {
+ *   const payload = wrapGateFailure(gateResult);
+ *   const axError = failurePayloadToAXError(payload, "PR-123");
+ *   return { error: axError };  // AX-compliant response
+ * }
+ * ```
+ */
+export function failurePayloadToAXError(
+	payload: FailureHandlingPayload,
+	itemName?: string
+): AXError {
+	// Extract nextActions from recommended actions
+	const nextActions = payload.recommendedActions.map(
+		(action) => action.description
+	);
+
+	// Ensure at least one nextAction (AX requirement)
+	if (nextActions.length === 0) {
+		nextActions.push("Review the error details and retry");
+	}
+
+	// Build context from error details
+	const context: Record<string, unknown> = {
+		errorCode: payload.error.code,
+		retryable: payload.error.retryable,
+	};
+
+	if (payload.error.hint) {
+		context.hint = payload.error.hint;
+	}
+
+	if (itemName) {
+		context.item = itemName;
+	}
+
+	return createAXError(
+		payload.error.code,
+		payload.error.message,
+		nextActions,
+		context
+	);
 }
