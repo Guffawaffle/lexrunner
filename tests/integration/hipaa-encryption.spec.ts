@@ -38,6 +38,12 @@ describe('HIPAA encryption finalize (integration)', () => {
 
     const r = spawnSync('node', [DIST_CLI, 'execute', '--audit', 'hipaa-strict', '--audit-dir', tmpEnc, '--dry-run', '--plan', 'examples/sample-plan.json'], { cwd: ROOT, env, encoding: 'utf8' });
 
+    // Debug output on failure
+    if (r.status !== 0) {
+      console.error('STDOUT:', r.stdout);
+      console.error('STDERR:', r.stderr);
+    }
+
     // Expect exit code 0
     expect(r.status).toBe(0);
 
