@@ -1,7 +1,7 @@
 # Verification Instructions for Employment Separation Attestation
 
-**Original Attestation Date:** 2025-11-26  
-**Timestamp Anchoring Date:** 2025-12-01  
+**Original Attestation Date:** 2025-11-26
+**Timestamp Anchoring Date:** 2025-12-01
 **Document:** `lex_employment_separation_2025-11-26.md`
 
 ---
@@ -32,9 +32,9 @@ b4f5b227f0185cc07a6bd04c46ab319a8b2996c29a481eec25013e93221cb6cd
 
 ## 1. Original GPG-Signed Git Commit (Nov 26, 2025)
 
-**Commit:** `763120d606d8c4f4b4d22fcdc98f89139f8968fc`  
-**Date:** Wed Nov 26 07:43:33 2025 CST  
-**GPG Key:** `65C94BA03E88F53D365C36CF7145A1CE635B1902`  
+**Commit:** `763120d606d8c4f4b4d22fcdc98f89139f8968fc`
+**Date:** Wed Nov 26 07:43:33 2025 CST
+**GPG Key:** `65C94BA03E88F53D365C36CF7145A1CE635B1902`
 **Signer:** Guffawaffle <guff@smartergpt.dev>
 
 ### Verification
@@ -51,8 +51,8 @@ git show 763120d:docs/attestation/lex_employment_separation_2025-11-26.md
 
 ## 2. RFC 3161 Timestamp (FreeTSA) - Dec 1, 2025
 
-**File:** `employment_timestamp_response.tsr`  
-**Authority:** FreeTSA (https://freetsa.org)  
+**File:** `employment_timestamp_response.tsr`
+**Authority:** FreeTSA (https://freetsa.org)
 **Timestamp:** Dec 1, 10:59:42 2025 UTC
 
 ### Verification
@@ -76,8 +76,8 @@ openssl ts -reply -in employment_timestamp_response.tsr -text
 
 ## 3. Bitcoin Blockchain Timestamp (OpenTimestamps) - Dec 1, 2025
 
-**File:** `employment_separation_2025-11-26.ots`  
-**Calendars:** OpenTimestamps (alice, bob), Catallaxy, EternityWall  
+**File:** `employment_separation_2025-11-26.ots`
+**Calendars:** OpenTimestamps (alice, bob), Catallaxy, EternityWall
 **Status:** Pending Bitcoin block confirmation (typically 1-24 hours)
 
 ### Verification
