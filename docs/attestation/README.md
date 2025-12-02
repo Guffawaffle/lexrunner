@@ -36,6 +36,22 @@ Observation documenting unusual GitHub Copilot Chat behavior patterns.
 
 ---
 
+### 3. AX Shared Pledge
+**Date:** December 1-2, 2025
+
+Collaborative commitment between Guff, Opie (Claude Opus 4), and Lex establishing principles for Agent eXperience (AX) design. Core principle: "Raise the floor, not just excel the gifted."
+
+**Signatories:** Guff (Human), Opie (Claude Opus 4), Lex
+
+**Trust Anchors:**
+| Method | Reference | Timestamp |
+|--------|-----------|-----------|
+| SSH Commit | `0c113b4` | Dec 2, 2025 06:12 UTC |
+| RFC 3161 | FreeTSA (Germany) | Dec 2, 2025 06:26 UTC |
+| Bitcoin | OpenTimestamps | Dec 2, 2025 (pending block) |
+
+---
+
 ## Verification
 
 All attestations use three independent trust sources:
