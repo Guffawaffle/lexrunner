@@ -117,3 +117,101 @@ export interface ProfileResolveResult {
 		version?: string;
 	};
 }
+
+/**
+ * AX-004 Parity tools - argument schemas
+ */
+
+export const DiscoverArgs = z.object({
+	owner: z.string().optional(),
+	repo: z.string().optional(),
+	state: z.enum(["open", "closed", "all"]).optional(),
+	suggest: z.boolean().optional()
+});
+export type DiscoverArgs = z.infer<typeof DiscoverArgs>;
+
+export const StatusArgs = z.object({
+	planFile: z.string().optional()
+});
+export type StatusArgs = z.infer<typeof StatusArgs>;
+
+export const MergeOrderArgs = z.object({
+	planFile: z.string().optional()
+});
+export type MergeOrderArgs = z.infer<typeof MergeOrderArgs>;
+
+export const ConfigShowArgs = z.object({
+	key: z.string().optional()
+});
+export type ConfigShowArgs = z.infer<typeof ConfigShowArgs>;
+
+/**
+ * AX-004 Parity tools - result types
+ */
+
+export interface DiscoverResult {
+	pullRequests: Array<{
+		number: number;
+		title: string;
+		branch: string;
+		author: string;
+		labels: string[];
+		sha: string;
+	}>;
+	suggestions?: Array<{
+		from: string;
+		to: string;
+		confidence: number;
+		heuristic: string;
+		reason: string;
+	}>;
+	total: number;
+	suggestionsCount?: number;
+	authenticated: boolean;
+	user?: string;
+}
+
+export interface StatusResult {
+	plan: {
+		schemaVersion: string;
+		target: string;
+		itemCount: number;
+		policy?: object;
+	};
+	mergeSummary: {
+		eligible: string[];
+		pending: string[];
+		blocked: string[];
+		failed: string[];
+	};
+}
+
+export interface DoctorResult {
+	hasErrors: boolean;
+	issues: string[];
+	suggestions: string[];
+	nodejs?: { status: string; current: string; expected?: string };
+	configuration?: { hasConfiguration: boolean; missingFiles: string[]; suggestions: string[] };
+	projectType?: string;
+	environmentSuggestions?: string[];
+	github?: { detected: boolean; authenticated?: boolean; user?: string; error?: string };
+	git?: { status: string; isClean?: boolean; currentBranch?: string; error?: string };
+}
+
+export interface MergeOrderResult {
+	levels: string[][];
+	totalItems: number;
+	maxParallelism: number;
+}
+
+export interface ConfigShowResult {
+	config?: {
+		items: unknown[];
+		target: string;
+		version: string;
+	};
+	provenance?: Record<string, string>;
+	sources?: Array<{ exists: boolean; file: string }>;
+	key?: string;
+	value?: unknown;
+}

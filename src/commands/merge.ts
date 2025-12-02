@@ -139,19 +139,16 @@ Examples:
   $ lex-pr merge --skip-preflight               # Skip conflict detection
   $ lex-pr merge --fail-on-preflight-conflict   # Abort if conflicts detected
 
-<<<<<<< HEAD
 State Management:
   • Dry-run shows planned batches and execution order
   • Execute creates weave-lock.json for resume capability
   • Lock file contains hash(plan.json + PR heads) for validation
   • Resume validates lock file and continues from last successful state
-||||||| 2956ff2
-=======
+
 Idempotency:
   • Lock hash computed from plan.json + PR head commits
   • Duplicate runs are skipped unless --force is used
   • Lock hash included in all logs and audit events
->>>>>>> copilot/implement-plan-lock-mechanism
 
 Preflight Conflict Detection:
   • Enabled by default in dry-run mode

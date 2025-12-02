@@ -1105,3 +1105,14 @@ export {
 
 // Run management exports for MCP tools
 export { createRunManager } from "./runs/index.js";
+
+// AX-004: MCP/CLI parity exports
+export { computeMergeOrder } from "./mergeOrder.js";
+export { createGitHubAPI, GitHubAPI } from "./github/api.js";
+export { createGitOperations } from "./git/operations.js";
+export {
+	bootstrapWorkspace,
+	detectProjectType,
+	getEnvironmentSuggestions,
+} from "./core/bootstrap.js";
+export { createFileAnalyzer } from "./planner/fileAnalysis.js";

@@ -704,6 +704,380 @@ const tools = {
 			}
 		},
 	},
+
+	// ─────────────────────────────────────────────────────────────────────────────
+	// MCP/CLI Parity Tools (AX-004)
+	// ─────────────────────────────────────────────────────────────────────────────
+
+	"discover": {
+		description: "Discover open pull requests from GitHub with optional dependency suggestions",
+		inputSchema: {
+			type: "object",
+			properties: {
+				owner: {
+					type: "string",
+					description: "GitHub repository owner",
+				},
+				repo: {
+					type: "string",
+					description: "GitHub repository name",
+				},
+				state: {
+					type: "string",
+					enum: ["open", "closed", "all"],
+					description: "PR state filter (default: open)",
+					default: "open",
+				},
+				suggest: {
+					type: "boolean",
+					description: "Generate dependency suggestions using heuristics",
+					default: false,
+				},
+			},
+		},
+		call: async (args) => {
+			try {
+				const { createGitHubAPI, GitHubAPI } = await import("./dist/cli.js");
+
+				let githubAPI = await createGitHubAPI();
+
+				// Override with arguments if provided
+				if (args.owner && args.repo) {
+					githubAPI = new GitHubAPI({
+						owner: args.owner,
+						repo: args.repo,
+						token: process.env.GITHUB_TOKEN,
+					});
+				}
+
+				if (!githubAPI) {
+					throw new Error(
+						"Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote."
+					);
+				}
+
+				// Check authentication
+				const authStatus = await githubAPI.checkAuth();
+
+				// Fetch pull requests
+				const state = args.state || "open";
+				const pullRequests = await githubAPI.discoverPullRequests(state);
+
+				let result;
+
+				if (args.suggest) {
+					const { createFileAnalyzer } = await import("./dist/cli.js");
+
+					const analyzer = createFileAnalyzer(
+						githubAPI.getOctokit(),
+						githubAPI.config.owner,
+						githubAPI.config.repo
+					);
+					const prs = pullRequests.map((pr) => ({
+						number: pr.number,
+						name: `PR-${pr.number}`,
+						sha: pr.sha,
+					}));
+
+					const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+
+					result = {
+						pullRequests,
+						suggestions,
+						total: pullRequests.length,
+						suggestionsCount: suggestions.length,
+						authenticated: authStatus.authenticated,
+						user: authStatus.user,
+					};
+				} else {
+					result = {
+						pullRequests,
+						total: pullRequests.length,
+						authenticated: authStatus.authenticated,
+						user: authStatus.user,
+					};
+				}
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Pull requests discovered:\n${JSON.stringify(result, null, 2)}`,
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to discover PRs: ${error.message}`);
+			}
+		},
+	},
+
+	"status": {
+		description: "Show current execution status and merge eligibility for a plan",
+		inputSchema: {
+			type: "object",
+			properties: {
+				planFile: {
+					type: "string",
+					description: "Path to plan.json file (default: plan.json)",
+					default: "plan.json",
+				},
+			},
+		},
+		call: async (args) => {
+			try {
+				const planFile = args.planFile || "plan.json";
+
+				if (!existsSync(planFile)) {
+					throw new Error(`Plan file not found: ${planFile}`);
+				}
+
+				const { loadPlan, ExecutionState, MergeEligibilityEvaluator } =
+					await import("./dist/cli.js");
+				const planContent = readFileSync(planFile, "utf-8");
+				const plan = loadPlan(planContent);
+
+				const executionState = new ExecutionState(plan);
+				const evaluator = new MergeEligibilityEvaluator(plan, executionState);
+				const mergeSummary = evaluator.getMergeSummary();
+
+				const result = {
+					plan: {
+						schemaVersion: plan.schemaVersion,
+						target: plan.target,
+						itemCount: plan.items.length,
+						policy: plan.policy,
+					},
+					mergeSummary,
+				};
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Plan status:\n${JSON.stringify(result, null, 2)}`,
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to get status: ${error.message}`);
+			}
+		},
+	},
+
+	"doctor": {
+		description: "Run environment and configuration sanity checks",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		call: async (args) => {
+			try {
+				const { bootstrapWorkspace, detectProjectType, getEnvironmentSuggestions, createGitHubAPI, createGitOperations } =
+					await import("./dist/cli.js");
+
+				const checks = {
+					hasErrors: false,
+					issues: [],
+					suggestions: [],
+				};
+
+				// Node.js version check
+				try {
+					const nvmrcContent = readFileSync(".nvmrc", "utf-8").trim();
+					const currentVersion = process.version.slice(1);
+					const expectedVersion = nvmrcContent;
+
+					if (currentVersion === expectedVersion) {
+						checks.nodejs = { status: "ok", current: process.version, expected: `v${expectedVersion}` };
+					} else {
+						checks.nodejs = { status: "mismatch", current: process.version, expected: `v${expectedVersion}` };
+						checks.hasErrors = true;
+						checks.issues.push(`Node.js version mismatch: ${process.version} vs v${expectedVersion}`);
+					}
+				} catch {
+					checks.nodejs = { status: "no_constraint", current: process.version };
+					checks.suggestions.push("Consider adding .nvmrc file for Node.js version consistency");
+				}
+
+				// Configuration check
+				const bootstrap = bootstrapWorkspace();
+				checks.configuration = {
+					hasConfiguration: bootstrap.hasConfiguration,
+					missingFiles: bootstrap.missingFiles,
+					suggestions: bootstrap.suggestions,
+				};
+
+				// Project type detection
+				checks.projectType = detectProjectType();
+
+				// Environment suggestions
+				checks.environmentSuggestions = getEnvironmentSuggestions();
+
+				// GitHub integration check
+				try {
+					const githubAPI = await createGitHubAPI();
+					if (githubAPI) {
+						const authStatus = await githubAPI.checkAuth();
+						checks.github = {
+							detected: true,
+							authenticated: authStatus.authenticated,
+							user: authStatus.user,
+						};
+					} else {
+						checks.github = { detected: false };
+					}
+				} catch (error) {
+					checks.github = { detected: false, error: error.message };
+				}
+
+				// Git operations check
+				try {
+					const gitOps = createGitOperations();
+					const isClean = await gitOps.isClean();
+					const currentBranch = await gitOps.getCurrentBranch();
+
+					checks.git = {
+						status: "ok",
+						isClean,
+						currentBranch,
+					};
+				} catch (error) {
+					checks.git = {
+						status: "error",
+						error: error.message,
+					};
+					checks.hasErrors = true;
+					checks.issues.push(`Git operations failed: ${error.message}`);
+				}
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Doctor checks:\n${JSON.stringify(checks, null, 2)}`,
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to run doctor: ${error.message}`);
+			}
+		},
+	},
+
+	"merge-order": {
+		description: "Compute dependency levels and merge order using Kahn's algorithm",
+		inputSchema: {
+			type: "object",
+			properties: {
+				planFile: {
+					type: "string",
+					description: "Path to plan.json file (default: plan.json)",
+					default: "plan.json",
+				},
+			},
+		},
+		call: async (args) => {
+			try {
+				const planFile = args.planFile || "plan.json";
+
+				if (!existsSync(planFile)) {
+					throw new Error(`Plan file not found: ${planFile}`);
+				}
+
+				const { loadPlan, computeMergeOrder } = await import("./dist/cli.js");
+				const planContent = readFileSync(planFile, "utf-8");
+				const plan = loadPlan(planContent);
+
+				// Compute merge order using Kahn's algorithm
+				const levels = computeMergeOrder(plan);
+
+				const result = {
+					levels,
+					totalItems: plan.items.length,
+					maxParallelism: Math.max(...levels.map(level => level.length)),
+				};
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Merge order:\n${JSON.stringify(result, null, 2)}`,
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to compute merge order: ${error.message}`);
+			}
+		},
+	},
+
+	"config.show": {
+		description: "Display configuration with precedence chain and provenance",
+		inputSchema: {
+			type: "object",
+			properties: {
+				key: {
+					type: "string",
+					description: "Show specific configuration key",
+				},
+			},
+		},
+		call: async (args) => {
+			try {
+				const { loadInputs } = await import("./dist/cli.js");
+
+				// Load configuration with provenance tracking
+				const config = loadInputs();
+
+				const output = {
+					config: {
+						items: config.items,
+						target: config.target,
+						version: config.version,
+					},
+					provenance: config.provenance || {},
+					sources: config.sources.map((s) => ({
+						exists: s.exists,
+						file: s.file,
+					})),
+				};
+
+				// If specific key requested, extract just that value
+				if (args.key) {
+					const keys = args.key.split(".");
+					let value = output.config;
+					for (const k of keys) {
+						if (value && typeof value === "object" && k in value) {
+							value = value[k];
+						} else {
+							value = undefined;
+							break;
+						}
+					}
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Configuration:\n${JSON.stringify({ key: args.key, value }, null, 2)}`,
+							},
+						],
+					};
+				}
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Configuration:\n${JSON.stringify(output, null, 2)}`,
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to show config: ${error.message}`);
+			}
+		},
+	},
 };
 
 // MCP Protocol handler - JSON-RPC 2.0 over stdio
