@@ -432,3 +432,47 @@ export function writeProtectionError(
 		{ operation }
 	);
 }
+
+// =============================================================================
+// Run Lifecycle Error Adapters
+// =============================================================================
+
+export interface RunNotFoundContext {
+	runId: string;
+}
+
+/**
+ * Create an AXError for run not found errors
+ */
+export function runNotFoundError(ctx: RunNotFoundContext): AXError {
+	return createAXError(
+		ErrorCodes.RUN_NOT_FOUND,
+		`Run not found: ${ctx.runId}`,
+		[
+			"List available runs with: lex-pr runs list",
+			"Check .lexrunner/runs/ directory for artifacts",
+		],
+		{ runId: ctx.runId }
+	);
+}
+
+// =============================================================================
+// Helper for throwing AXErrors
+// =============================================================================
+
+import { AXErrorException } from "@smartergpt/lex/errors";
+
+/**
+ * Throw an AXError as an exception
+ *
+ * @param axError - The AXError to throw
+ * @throws AXErrorException with the AXError data
+ */
+export function throwAXError(axError: AXError): never {
+	throw new AXErrorException(
+		axError.code,
+		axError.message,
+		axError.nextActions,
+		axError.context
+	);
+}

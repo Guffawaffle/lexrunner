@@ -40,6 +40,7 @@ import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
 import { safeParseStepOutcome, safeParseReceipt } from "../store/run-store.js";
 import { emitProcedureFrame, storeFrameResult } from "../frames/index.js";
 import type { FrameEmitResult, FrameOutcome } from "../frames/types.js";
+import { runNotFoundError, throwAXError } from "../errors/index.js";
 
 /**
  * Default initial state for new runs
@@ -238,7 +239,7 @@ export class RunManager {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			throw new Error(`Run not found: ${runId}`);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		// Apply updates
@@ -273,13 +274,13 @@ export class RunManager {
 	 * @param runId - The run identifier
 	 * @param newState - The new state to transition to
 	 * @returns Updated RunState
-	 * @throws Error if run not found
+	 * @throws AXErrorException if run not found
 	 */
 	async transitionState(runId: string, newState: string): Promise<RunState> {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			throw new Error(`Run not found: ${runId}`);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		const now = new Date().toISOString();
@@ -337,7 +338,7 @@ export class RunManager {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			throw new Error(`Run not found: ${runId}`);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		// Add to completed steps if not already present

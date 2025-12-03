@@ -35,6 +35,10 @@ export {
 	profileNotFoundError,
 	configInvalidError,
 	writeProtectionError,
+	// Run lifecycle adapters
+	runNotFoundError,
+	// Helper for throwing AXErrors
+	throwAXError,
 	type GateFailureContext,
 	type MergeConflictContext,
 	type CycleDetectedContext,
@@ -43,6 +47,7 @@ export {
 	type GitOperationContext,
 	type PlanValidationContext,
 	type MCPErrorContext,
+	type RunNotFoundContext,
 } from "./adapters.js";
 
 // =============================================================================
@@ -127,6 +132,16 @@ export const ErrorCodes = {
 	PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
 	/** Write operation blocked by profile protection */
 	WRITE_PROTECTION_ERROR: "WRITE_PROTECTION_ERROR",
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Run lifecycle errors
+	// ─────────────────────────────────────────────────────────────────────────
+	/** Run not found by runId */
+	RUN_NOT_FOUND: "RUN_NOT_FOUND",
+	/** Run is already complete and cannot be modified */
+	RUN_ALREADY_COMPLETE: "RUN_ALREADY_COMPLETE",
+	/** Run state is invalid for the requested operation */
+	RUN_STATE_INVALID: "RUN_STATE_INVALID",
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Resource errors
