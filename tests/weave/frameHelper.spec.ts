@@ -2,11 +2,25 @@
  * Tests for weave Frame helper
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
 import { emitWeaveCompletionFrame, extractMergedPRs, calculateWeaveDuration } from "../../src/weave/frameHelper.js";
 import { WeaveState, type WeaveContext, type BatchState } from "../../src/weave/types.js";
+import { listFrameIds, readFrame } from "../../src/frames/storage.js";
 
 describe("emitWeaveCompletionFrame", () => {
+	let testDir: string;
+
+	beforeEach(async () => {
+		testDir = await mkdtemp(join(tmpdir(), "weave-frame-test-"));
+	});
+
+	afterEach(async () => {
+		await rm(testDir, { recursive: true, force: true });
+	});
+
 	it("should emit successful merge-weave frame", () => {
 		const completedBatch: BatchState = {
 			batchNumber: 0,
@@ -217,5 +231,132 @@ describe("calculateWeaveDuration", () => {
 		// Should be approximately 30 seconds (allowing for small timing differences)
 		expect(duration).toBeGreaterThan(29000);
 		expect(duration).toBeLessThan(32000);
+	});
+});
+
+describe("emitWeaveCompletionFrame with persistence", () => {
+	let testDir: string;
+
+	beforeEach(async () => {
+		testDir = await mkdtemp(join(tmpdir(), "weave-frame-persist-test-"));
+	});
+
+	afterEach(async () => {
+		await rm(testDir, { recursive: true, force: true });
+	});
+
+	it("should persist Frame to disk when persist=true", () => {
+		const batch: BatchState = {
+			batchNumber: 0,
+			items: ["PR-101", "PR-102"],
+			state: "completed",
+			startedAt: "2025-12-01T10:00:00Z",
+			completedAt: "2025-12-01T10:01:00Z",
+		};
+
+		const context: WeaveContext = {
+			runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+			state: WeaveState.COMPLETED,
+			plan: { schemaVersion: "1.0.0", target: "main", items: [] },
+			prHeads: [],
+			batches: [batch],
+			currentBatchIndex: 1,
+			startedAt: "2025-12-01T10:00:00Z",
+			lastUpdatedAt: "2025-12-01T10:01:00Z",
+			completedAt: "2025-12-01T10:01:00Z",
+			successfulMerges: 2,
+			failedMerges: 0,
+			metadata: {
+				planHash: "abc123",
+				targetBranch: "main",
+				dryRun: false,
+			},
+		};
+
+		const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
+
+		expect(result.success).toBe(true);
+		expect(result.frameId).toBeDefined();
+
+		// Verify Frame was persisted
+		const frameIds = listFrameIds(testDir);
+		expect(frameIds).toHaveLength(1);
+
+		const storedFrame = readFrame(frameIds[0], testDir);
+		expect(storedFrame).not.toBeNull();
+		expect(storedFrame!.type).toBe("merge-weave");
+		expect(storedFrame!.outcome).toBe("success");
+		expect(storedFrame!.stored_at).toBeDefined();
+	});
+
+	it("should not persist Frame when persist=false", () => {
+		const batch: BatchState = {
+			batchNumber: 0,
+			items: ["PR-101"],
+			state: "completed",
+		};
+
+		const context: WeaveContext = {
+			runId: "test-no-persist",
+			state: WeaveState.COMPLETED,
+			plan: { schemaVersion: "1.0.0", target: "main", items: [] },
+			prHeads: [],
+			batches: [batch],
+			currentBatchIndex: 1,
+			startedAt: "2025-12-01T10:00:00Z",
+			lastUpdatedAt: "2025-12-01T10:01:00Z",
+			completedAt: "2025-12-01T10:01:00Z",
+			successfulMerges: 1,
+			failedMerges: 0,
+			metadata: {
+				planHash: "test",
+				targetBranch: "main",
+				dryRun: false,
+			},
+		};
+
+		const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: false });
+
+		expect(result.success).toBe(true);
+
+		// Verify Frame was NOT persisted
+		const frameIds = listFrameIds(testDir);
+		expect(frameIds).toHaveLength(0);
+	});
+
+	it("should persist by default (persist option not specified)", () => {
+		const batch: BatchState = {
+			batchNumber: 0,
+			items: ["PR-201"],
+			state: "completed",
+		};
+
+		const context: WeaveContext = {
+			runId: "test-default-persist",
+			state: WeaveState.COMPLETED,
+			plan: { schemaVersion: "1.0.0", target: "main", items: [] },
+			prHeads: [],
+			batches: [batch],
+			currentBatchIndex: 1,
+			startedAt: "2025-12-01T10:00:00Z",
+			lastUpdatedAt: "2025-12-01T10:01:00Z",
+			completedAt: "2025-12-01T10:01:00Z",
+			successfulMerges: 1,
+			failedMerges: 0,
+			metadata: {
+				planHash: "test",
+				targetBranch: "develop",
+				dryRun: false,
+			},
+		};
+
+		// Only provide baseDir, no persist option
+		const result = emitWeaveCompletionFrame(context, { baseDir: testDir });
+
+		expect(result.success).toBe(true);
+
+		// Verify Frame was persisted (default behavior)
+		const frameIds = listFrameIds(testDir);
+		expect(frameIds).toHaveLength(1);
 	});
 });
