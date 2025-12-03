@@ -629,4 +629,98 @@ describe("RunManager", () => {
 			]);
 		});
 	});
+
+	describe("completeRunWithFrame (AX-005)", () => {
+		it("should emit and persist Frame on run completion", async () => {
+			const run = await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave-main",
+				repo: "test/repo",
+				task: "Merge PRs",
+				params: { prNumbers: [101, 102] },
+			});
+
+			const { runState, frameResult } = await manager.completeRunWithFrame(
+				run.runId,
+				"success",
+				["Deploy to staging", "Run e2e tests"]
+			);
+
+			expect(runState.state).toBe("completed");
+			expect(runState.completedAt).toBeDefined();
+			expect(frameResult.success).toBe(true);
+			expect(frameResult.frame).toBeDefined();
+			expect(frameResult.frame!.type).toBe("procedure");
+			expect(frameResult.frame!.outcome).toBe("success");
+			expect(frameResult.frameId).toBeDefined();
+
+			// Verify Frame was logged in decisions
+			const decisions = await manager.getDecisions(run.runId);
+			const frameEmittedDecision = decisions.find(
+				(d) => d.type === "frame_emitted"
+			);
+			expect(frameEmittedDecision).toBeDefined();
+			expect(frameEmittedDecision!.frameId).toBe(frameResult.frameId);
+		});
+
+		it("should emit failure Frame on failed run", async () => {
+			const run = await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave-main",
+				repo: "test/repo",
+			});
+
+			const { runState, frameResult } = await manager.completeRunWithFrame(
+				run.runId,
+				"failure",
+				["Check error logs", "Fix issues and retry"],
+				{ error: "Merge conflict in src/cli.ts" }
+			);
+
+			expect(runState.state).toBe("failed");
+			expect(frameResult.success).toBe(true);
+			expect(frameResult.frame!.outcome).toBe("failure");
+			expect(frameResult.frame!.metadata?.error).toBe("Merge conflict in src/cli.ts");
+		});
+
+		it("should emit partial Frame with partial outcome", async () => {
+			const run = await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave-main",
+				repo: "test/repo",
+				params: { prNumbers: [101, 102, 103] },
+			});
+
+			const { runState, frameResult } = await manager.completeRunWithFrame(
+				run.runId,
+				"partial",
+				["Review partial results", "Retry failed items"]
+			);
+
+			// Partial outcome still transitions to 'completed' (with partial results)
+			expect(runState.state).toBe("completed");
+			expect(frameResult.success).toBe(true);
+			expect(frameResult.frame!.outcome).toBe("partial");
+		});
+
+		it("should include artifacts in Frame metadata", async () => {
+			const run = await manager.createRun({
+				mode: "senior-dev",
+				procedure: "merge-weave-main",
+				repo: "test/repo",
+			});
+
+			const { frameResult } = await manager.completeRunWithFrame(
+				run.runId,
+				"success",
+				["Review artifacts"],
+				{ artifacts: ["/tmp/report.json", "/tmp/logs.txt"] }
+			);
+
+			expect(frameResult.frame!.metadata?.artifacts).toEqual([
+				"/tmp/report.json",
+				"/tmp/logs.txt",
+			]);
+		});
+	});
 });

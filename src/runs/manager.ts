@@ -38,7 +38,7 @@ import {
 } from "./artifacts.js";
 import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
 import { safeParseStepOutcome, safeParseReceipt } from "../store/run-store.js";
-import { emitProcedureFrame } from "../frames/index.js";
+import { emitProcedureFrame, storeFrameResult } from "../frames/index.js";
 import type { FrameEmitResult, FrameOutcome } from "../frames/types.js";
 
 /**
@@ -746,6 +746,7 @@ export class RunManager {
 	 *
 	 * Transitions the run to a terminal state and emits an execution Frame
 	 * capturing what was attempted, scope touched, outcome, and next steps.
+	 * The Frame is persisted to .lexrunner/frames/ for audit trail.
 	 *
 	 * @param runId - The run identifier
 	 * @param outcome - The outcome of the run (success/failure/partial)
@@ -802,6 +803,19 @@ export class RunManager {
 			error: options?.error,
 			planHash: options?.planHash,
 		});
+
+		// Persist Frame to disk (AX-005)
+		if (frameResult.success && frameResult.frame && frameResult.frameId) {
+			try {
+				storeFrameResult(frameResult, this.baseDir);
+			} catch (error) {
+				// Best-effort persistence - don't fail the run if storage fails
+				// Log for debugging but continue
+				if (process.env.DEBUG) {
+					console.error("[run-manager] Failed to persist Frame:", error);
+				}
+			}
+		}
 
 		// Log Frame emission to run log
 		appendToRunLog(

@@ -5,17 +5,31 @@
  * Implements AX-005: Frame emission for merge-weave workflows.
  */
 
-import { emitMergeWeaveFrame } from "../frames/index.js";
+import { emitMergeWeaveFrame, storeFrameResult } from "../frames/index.js";
 import type { MergeWeaveFrameInput, FrameEmitResult, FrameOutcome } from "../frames/types.js";
 import type { WeaveContext } from "./types.js";
 import { WeaveState } from "./types.js";
 
 /**
+ * Options for emitting weave completion Frame
+ */
+export interface EmitWeaveFrameOptions {
+	/** Base directory for Frame storage (defaults to cwd) */
+	baseDir?: string;
+	/** Whether to persist the Frame to disk (defaults to true) */
+	persist?: boolean;
+}
+
+/**
  * Emit a Frame for weave completion
  *
  * Called when weave execution reaches a terminal state (COMPLETED or FAILED).
+ * Optionally persists the Frame to .lexrunner/frames/.
  */
-export function emitWeaveCompletionFrame(context: WeaveContext): FrameEmitResult {
+export function emitWeaveCompletionFrame(
+	context: WeaveContext,
+	options?: EmitWeaveFrameOptions
+): FrameEmitResult {
 	// Determine outcome based on state
 	let outcome: FrameOutcome;
 	if (context.state === WeaveState.COMPLETED) {
@@ -71,7 +85,23 @@ export function emitWeaveCompletionFrame(context: WeaveContext): FrameEmitResult
 		planHash: context.metadata.planHash,
 	};
 
-	return emitMergeWeaveFrame(input);
+	const result = emitMergeWeaveFrame(input);
+
+	// Persist Frame to disk if successful and persistence is enabled (default: true)
+	const shouldPersist = options?.persist !== false;
+	if (shouldPersist && result.success && result.frame && result.frameId) {
+		try {
+			storeFrameResult(result, options?.baseDir);
+		} catch (error) {
+			// Best-effort persistence - don't fail the emit if storage fails
+			// Log for debugging but continue
+			if (process.env.DEBUG) {
+				console.error("[weave-frame] Failed to persist Frame:", error);
+			}
+		}
+	}
+
+	return result;
 }
 
 /**
