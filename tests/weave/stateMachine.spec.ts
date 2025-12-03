@@ -10,6 +10,7 @@ import {
 	STATE_TRANSITIONS
 } from '../../src/weave/stateMachine.js';
 import { WeaveState, WeaveEvent, BatchState } from '../../src/weave/types.js';
+import { isAXError, ErrorCodes } from '../../src/errors/index.js';
 
 describe('WeaveStateMachine', () => {
 	describe('State Transitions', () => {
@@ -115,6 +116,27 @@ describe('WeaveStateMachine', () => {
 			expect(() => {
 				sm.transition(WeaveEvent.MERGE_SUCCESS);
 			}).toThrow(/Invalid transition/);
+		});
+
+		it('should throw AXError with WEAVE_STATE_INVALID code on invalid transition', () => {
+			const context = createWeaveContext(
+				{ target: 'main', items: [] },
+				[],
+				'test-hash'
+			);
+			const sm = new WeaveStateMachine(context);
+
+			try {
+				sm.transition(WeaveEvent.MERGE_SUCCESS);
+				expect.fail('Expected an error to be thrown');
+			} catch (error) {
+				expect(isAXError(error)).toBe(true);
+				const axError = error as { code: string; message: string; nextActions: string[] };
+				expect(axError.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
+				expect(axError.message).toContain('merge_success');
+				expect(axError.message).toContain('idle');
+				expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
+			}
 		});
 
 		it('should support pause and resume', () => {

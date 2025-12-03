@@ -39,6 +39,10 @@ export {
 	runNotFoundError,
 	// Helper for throwing AXErrors
 	throwAXError,
+	// Weave-specific adapters
+	weaveLockConflictError,
+	weaveStateInvalidError,
+	weavePreflightFailedError,
 	type GateFailureContext,
 	type MergeConflictContext,
 	type CycleDetectedContext,
@@ -48,6 +52,9 @@ export {
 	type PlanValidationContext,
 	type MCPErrorContext,
 	type RunNotFoundContext,
+	type WeaveLockConflictContext,
+	type WeaveStateInvalidContext,
+	type WeavePreflightFailedContext,
 } from "./adapters.js";
 
 // =============================================================================
@@ -58,9 +65,9 @@ export {
  * LexRunner error codes for AX compliance.
  *
  * These are stable identifiers that agents can rely on for error handling.
- * 
+ *
  * Format: UPPER_SNAKE_CASE
- * 
+ *
  * @example
  * ```typescript
  * // Check for specific error type
@@ -69,7 +76,7 @@ export {
  *   console.log("Recovery actions:", error.nextActions);
  * }
  * ```
- * 
+ *
  * @see AX-CONTRACT.md v0.1 for full error handling contract
  */
 export const ErrorCodes = {
@@ -122,6 +129,18 @@ export const ErrorCodes = {
 	GIT_OPERATION_FAILED: "GIT_OPERATION_FAILED",
 	/** Git conflict during operation */
 	GIT_CONFLICT: "GIT_CONFLICT",
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Weave-related errors
+	// ─────────────────────────────────────────────────────────────────────────
+	/** Lock file conflict detected (stale or in use) */
+	WEAVE_LOCK_CONFLICT: "WEAVE_LOCK_CONFLICT",
+	/** Invalid state transition in weave state machine */
+	WEAVE_STATE_INVALID: "WEAVE_STATE_INVALID",
+	/** Preflight merge simulation failed */
+	WEAVE_PREFLIGHT_FAILED: "WEAVE_PREFLIGHT_FAILED",
+	/** Merge conflict during weave operation */
+	WEAVE_MERGE_CONFLICT: "WEAVE_MERGE_CONFLICT",
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Configuration errors

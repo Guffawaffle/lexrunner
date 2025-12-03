@@ -6,6 +6,7 @@
 import { execa } from "execa";
 import { Plan } from "../schema.js";
 import { PreflightItemConflict, PreflightResults } from "./types.js";
+import { weavePreflightFailedError } from "../errors/index.js";
 
 /**
  * Detect conflicts for all items in a plan by simulating merges sequentially
@@ -120,11 +121,11 @@ async function simulateItemMerge(
 		};
 	} catch (error) {
 		// If git commands fail, treat as potential conflict
-		throw new Error(
-			`Failed to simulate merge for ${itemBranch}: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		throw weavePreflightFailedError({
+			itemBranch,
+			targetBranch,
+			originalError: error instanceof Error ? error.message : String(error)
+		});
 	}
 }
 

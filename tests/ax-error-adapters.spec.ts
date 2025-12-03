@@ -20,6 +20,10 @@ import {
 	mcpToolError,
 	planNotFoundError,
 	writeProtectionError,
+	// Weave-specific adapters
+	weaveLockConflictError,
+	weaveStateInvalidError,
+	weavePreflightFailedError,
 } from "../src/errors/index.js";
 
 describe("AXError adapters", () => {
@@ -331,6 +335,112 @@ describe("MCP-specific AXError adapters", () => {
 			expect(error.message).toContain("shared profile");
 			expect(error.nextActions.some(a => a.includes("local.init"))).toBe(true);
 			expect(error.context?.operation).toBe("plan.create");
+		});
+	});
+});
+
+describe("Weave-specific AXError adapters", () => {
+	describe("weaveLockConflictError", () => {
+		it("should create valid AXError for lock file conflict", () => {
+			const error = weaveLockConflictError({
+				lockFile: "weave-lock.json",
+				expectedVersion: "1.0.0",
+				actualVersion: "2.0.0",
+				originalError: "Incompatible lock file version"
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
+			expect(error.message).toContain("Incompatible lock file version");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+			expect(error.nextActions.some(a => a.includes("rm"))).toBe(true);
+			expect(error.context?.expectedVersion).toBe("1.0.0");
+			expect(error.context?.actualVersion).toBe("2.0.0");
+		});
+
+		it("should provide default message when originalError not provided", () => {
+			const error = weaveLockConflictError({
+				lockFile: "/path/to/weave-lock.json"
+			});
+
+			expect(error.message).toBe("Lock file conflict detected");
+			expect(error.nextActions.some(a => a.includes("/path/to/weave-lock.json"))).toBe(true);
+		});
+	});
+
+	describe("weaveStateInvalidError", () => {
+		it("should create valid AXError for invalid state transition", () => {
+			const error = weaveStateInvalidError({
+				currentState: "idle",
+				event: "MERGE_SUCCESS",
+				availableEvents: ["START"]
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
+			expect(error.message).toContain("MERGE_SUCCESS");
+			expect(error.message).toContain("idle");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+			expect(error.nextActions.some(a => a.includes("START"))).toBe(true);
+			expect(error.context?.currentState).toBe("idle");
+			expect(error.context?.event).toBe("MERGE_SUCCESS");
+		});
+
+		it("should handle missing availableEvents", () => {
+			const error = weaveStateInvalidError({
+				currentState: "completed",
+				event: "START"
+			});
+
+			expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
+			expect(error.nextActions.some(a => a.includes("reset"))).toBe(true);
+		});
+	});
+
+	describe("weavePreflightFailedError", () => {
+		it("should create valid AXError for preflight failure", () => {
+			const error = weavePreflightFailedError({
+				itemBranch: "feature-branch",
+				targetBranch: "main",
+				originalError: "Branch not found"
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
+			expect(error.message).toContain("feature-branch");
+			expect(error.message).toContain("Branch not found");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+			expect(error.nextActions.some(a => a.includes("feature-branch"))).toBe(true);
+			expect(error.nextActions.some(a => a.includes("main"))).toBe(true);
+			expect(error.context?.itemBranch).toBe("feature-branch");
+			expect(error.context?.targetBranch).toBe("main");
+		});
+
+		it("should handle missing optional fields", () => {
+			const error = weavePreflightFailedError({
+				itemBranch: "some-branch"
+			});
+
+			expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
+			expect(error.message).toContain("some-branch");
+			expect(error.nextActions.some(a => a.includes("git fetch"))).toBe(true);
+		});
+	});
+
+	describe("AXError schema compliance for weave errors", () => {
+		it("should always have at least one nextAction", () => {
+			const errors = [
+				weaveLockConflictError({}),
+				weaveStateInvalidError({ currentState: "test", event: "TEST" }),
+				weavePreflightFailedError({ itemBranch: "test" }),
+			];
+
+			for (const error of errors) {
+				expect(
+					error.nextActions.length,
+					`Error ${error.code} should have at least one nextAction`
+				).toBeGreaterThanOrEqual(1);
+			}
 		});
 	});
 });
