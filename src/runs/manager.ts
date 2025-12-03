@@ -808,8 +808,12 @@ export class RunManager {
 		if (frameResult.success && frameResult.frame && frameResult.frameId) {
 			try {
 				storeFrameResult(frameResult, this.baseDir);
-			} catch {
+			} catch (error) {
 				// Best-effort persistence - don't fail the run if storage fails
+				// Log for debugging but continue
+				if (process.env.DEBUG) {
+					console.error("[run-manager] Failed to persist Frame:", error);
+				}
 			}
 		}
 

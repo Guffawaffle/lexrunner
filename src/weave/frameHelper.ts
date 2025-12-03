@@ -92,8 +92,12 @@ export function emitWeaveCompletionFrame(
 	if (shouldPersist && result.success && result.frame && result.frameId) {
 		try {
 			storeFrameResult(result, options?.baseDir);
-		} catch {
+		} catch (error) {
 			// Best-effort persistence - don't fail the emit if storage fails
+			// Log for debugging but continue
+			if (process.env.DEBUG) {
+				console.error("[weave-frame] Failed to persist Frame:", error);
+			}
 		}
 	}
 
