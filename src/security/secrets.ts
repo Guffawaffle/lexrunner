@@ -8,6 +8,9 @@
  * - Integration with secret management systems
  */
 
+import { securitySecretNotFoundError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
+
 /**
  * Secret metadata
  */
@@ -141,7 +144,11 @@ export class SecretsManager {
 	async requireSecret(id: string): Promise<string> {
 		const secret = await this.getSecret(id);
 		if (!secret) {
-			throw new Error(`Required secret '${id}' not found`);
+			const axError = securitySecretNotFoundError(
+				`Required secret '${id}' not found`,
+				{ secretId: id }
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 		return secret;
 	}

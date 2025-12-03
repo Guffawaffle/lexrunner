@@ -6,6 +6,8 @@
  */
 
 import { Severity, SecurityScanResult, Vulnerability } from './scanning.js';
+import { securitySarifParseError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
 
 /**
  * SARIF severity level mapping
@@ -92,7 +94,11 @@ export function parseSarif(sarifContent: string): SecurityScanResult {
 	try {
 		sarif = JSON.parse(sarifContent);
 	} catch (error) {
-		throw new Error(`Invalid SARIF JSON: ${error instanceof Error ? error.message : String(error)}`);
+		const axError = securitySarifParseError(
+			`Invalid SARIF JSON: ${error instanceof Error ? error.message : String(error)}`,
+			{ parseError: error instanceof Error ? error.message : String(error) }
+		);
+		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 	}
 
 	if (!sarif.runs || sarif.runs.length === 0) {

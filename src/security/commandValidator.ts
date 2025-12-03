@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { securityCommandBlockedError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
 
 export interface CommandWhitelist {
 	version: string;
@@ -129,10 +131,16 @@ export class CommandValidator {
 	private escalateToHuman(): void {
 		console.error(`⏸️  AGENT PAUSED: Hallucination threshold reached (${this.hallucinationCount} attempts)`);
 		// TODO: Create GitHub issue, send notification
-		throw new Error(
-			`Agent paused after ${this.hallucinationCount} hallucinated commands. ` +
-			`Human review required. Resume with: lex-pr resume --plan plan.json`
+		const axError = securityCommandBlockedError(
+			`Agent paused after ${this.hallucinationCount} hallucinated commands. Human review required.`,
+			{
+				command: 'multiple',
+				reason: 'hallucination_threshold',
+				hallucinationCount: this.hallucinationCount,
+				threshold: this.whitelist.policy.hallucination_threshold,
+			}
 		);
+		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 	}
 
 	public resetHallucinationCount(): void {

@@ -585,3 +585,277 @@ export function weavePreflightFailedError(
 		{ ...ctx }
 	);
 }
+
+// =============================================================================
+// Security Error Adapters
+// =============================================================================
+
+export interface SecurityAuthContext {
+	method?: string;
+	user?: string;
+	reason?: string;
+}
+
+/**
+ * Create an AXError for authentication failures
+ */
+export function securityAuthFailedError(
+	message: string,
+	ctx?: SecurityAuthContext
+): AXError {
+	return createAXError(
+		ErrorCodes.SECURITY_AUTH_FAILED,
+		message,
+		[
+			"Check that GITHUB_TOKEN is set and valid",
+			"Verify the token has required permissions",
+			"Try: gh auth status",
+		],
+		{ ...ctx }
+	);
+}
+
+export interface SecurityUnauthorizedContext {
+	user?: string;
+	permission?: string;
+	roles?: string[];
+	level?: number;
+	maxLevel?: number;
+}
+
+/**
+ * Create an AXError for authorization failures
+ */
+export function securityUnauthorizedError(
+	message: string,
+	ctx?: SecurityUnauthorizedContext
+): AXError {
+	const nextActions: string[] = [];
+
+	if (ctx?.permission) {
+		nextActions.push(
+			`Request '${ctx.permission}' permission from an administrator`
+		);
+	}
+
+	if (ctx?.roles && ctx.roles.length > 0) {
+		nextActions.push(`Current roles: ${ctx.roles.join(", ")}`);
+	}
+
+	if (ctx?.level !== undefined && ctx?.maxLevel !== undefined) {
+		nextActions.push(`Maximum allowed level: ${ctx.maxLevel}`);
+	}
+
+	if (nextActions.length === 0) {
+		nextActions.push("Contact an administrator to request access");
+	}
+
+	nextActions.push("Review role definitions in authorization policy");
+
+	return createAXError(
+		ErrorCodes.SECURITY_UNAUTHORIZED,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}
+
+export interface SecurityCommandBlockedContext {
+	command: string;
+	reason:
+		| "not_whitelisted"
+		| "dangerous_args"
+		| "shell_operators"
+		| "too_long"
+		| "hallucination_threshold";
+	hallucinationCount?: number;
+	threshold?: number;
+}
+
+/**
+ * Create an AXError for blocked commands
+ */
+export function securityCommandBlockedError(
+	message: string,
+	ctx: SecurityCommandBlockedContext
+): AXError {
+	const nextActions: string[] = [];
+
+	switch (ctx.reason) {
+		case "not_whitelisted":
+			nextActions.push(
+				"Add command to .smartergpt/allowed-commands.json if legitimate"
+			);
+			nextActions.push("Verify the command is safe and necessary");
+			break;
+		case "dangerous_args":
+			nextActions.push("Remove dangerous arguments from the command");
+			nextActions.push("Review allowed-commands.json deny_args list");
+			break;
+		case "shell_operators":
+			nextActions.push(
+				"Shell operators (|, >, <, &&, ||) are not allowed"
+			);
+			nextActions.push("Split the command into separate operations");
+			break;
+		case "too_long":
+			nextActions.push("Shorten the command to meet the length limit");
+			nextActions.push(
+				"Consider using configuration files for long arguments"
+			);
+			break;
+		case "hallucination_threshold":
+			nextActions.push(
+				`Hallucination threshold (${ctx.threshold}) reached`
+			);
+			nextActions.push("Human review required before resuming");
+			nextActions.push("Resume with: lex-pr resume --plan plan.json");
+			break;
+	}
+
+	return createAXError(
+		ErrorCodes.SECURITY_COMMAND_BLOCKED,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}
+
+export interface SecurityComplianceViolationContext {
+	operation?: string;
+	requirement?: string;
+}
+
+/**
+ * Create an AXError for compliance violations
+ */
+export function securityComplianceViolationError(
+	message: string,
+	ctx?: SecurityComplianceViolationContext
+): AXError {
+	return createAXError(
+		ErrorCodes.SECURITY_COMPLIANCE_VIOLATION,
+		message,
+		[
+			"Review the compliance requirement documentation",
+			"Ensure signing key is configured if required",
+			"Contact security team for guidance",
+		],
+		{ ...ctx }
+	);
+}
+
+export interface SecuritySecretDetectedContext {
+	secretId?: string;
+	location?: string;
+}
+
+/**
+ * Create an AXError for detected secrets
+ */
+export function securitySecretDetectedError(
+	message: string,
+	ctx?: SecuritySecretDetectedContext
+): AXError {
+	return createAXError(
+		ErrorCodes.SECURITY_SECRET_DETECTED,
+		message,
+		[
+			"Remove or rotate the exposed secret immediately",
+			"Use environment variables or a secrets manager instead",
+			"Never commit secrets to source control",
+		],
+		{ ...ctx }
+	);
+}
+
+export interface SecuritySecretNotFoundContext {
+	secretId?: string;
+	source?: string;
+}
+
+/**
+ * Create an AXError for missing required secrets
+ */
+export function securitySecretNotFoundError(
+	message: string,
+	ctx?: SecuritySecretNotFoundContext
+): AXError {
+	const nextActions: string[] = [];
+
+	if (ctx?.secretId) {
+		nextActions.push(`Set the '${ctx.secretId}' secret in your environment or secrets manager`);
+	}
+
+	nextActions.push("Check that required environment variables are configured");
+	nextActions.push("Verify your secrets manager connection if using one");
+	nextActions.push("Review the secrets configuration documentation");
+
+	return createAXError(
+		ErrorCodes.SECURITY_SECRET_NOT_FOUND,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}
+
+export interface SecuritySarifParseErrorContext {
+	parseError?: string;
+}
+
+/**
+ * Create an AXError for SARIF parsing failures
+ */
+export function securitySarifParseError(
+	message: string,
+	ctx?: SecuritySarifParseErrorContext
+): AXError {
+	return createAXError(
+		ErrorCodes.SECURITY_SARIF_PARSE_ERROR,
+		message,
+		[
+			"Verify the SARIF file is valid JSON",
+			"Ensure the file follows SARIF 2.1.0 specification",
+			"Check scanner configuration for correct output format",
+		],
+		{ ...ctx }
+	);
+}
+
+export interface SecurityScanFailedContext {
+	scanner?: string;
+	directory?: string;
+	originalError?: string;
+}
+
+/**
+ * Create an AXError for security scan failures
+ */
+export function securityScanFailedError(
+	message: string,
+	ctx?: SecurityScanFailedContext
+): AXError {
+	const nextActions: string[] = [];
+
+	if (ctx?.scanner === "npm-audit") {
+		nextActions.push("Run 'npm audit' locally to reproduce");
+		nextActions.push("Check if package-lock.json is up to date");
+	} else {
+		nextActions.push(
+			"Verify the scanner is installed and configured correctly"
+		);
+	}
+
+	if (ctx?.directory) {
+		nextActions.push(`Check that directory exists: ${ctx.directory}`);
+	}
+
+	nextActions.push("Review scanner logs for more details");
+
+	return createAXError(
+		ErrorCodes.SECURITY_SCAN_FAILED,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}

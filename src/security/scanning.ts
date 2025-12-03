@@ -8,6 +8,9 @@
  * - Security best practices violations
  */
 
+import { securityScanFailedError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
+
 /**
  * Vulnerability severity levels
  */
@@ -124,7 +127,15 @@ export class NpmAuditScanner implements SecurityScanner {
 			const auditData = JSON.parse(stdout);
 			return this.parseNpmAudit(auditData);
 		} catch (error) {
-			throw new Error(`NPM audit failed: ${error instanceof Error ? error.message : String(error)}`);
+			const axError = securityScanFailedError(
+				`NPM audit failed: ${error instanceof Error ? error.message : String(error)}`,
+				{
+					scanner: 'npm-audit',
+					directory: workingDir,
+					originalError: error instanceof Error ? error.message : String(error),
+				}
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 	}
 

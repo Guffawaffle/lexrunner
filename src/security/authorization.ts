@@ -5,6 +5,8 @@
  */
 
 import { AuthContext } from './authentication.js';
+import { securityUnauthorizedError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
 
 /**
  * Permission types for autopilot operations
@@ -166,10 +168,15 @@ export class AuthorizationService {
 	 */
 	enforce(context: AuthContext, permission: Permission): void {
 		if (!this.hasPermission(context, permission)) {
-			throw new Error(
-				`Access denied: User '${context.user}' does not have '${permission}' permission. ` +
-				`Current roles: ${context.roles.join(', ')}`
+			const axError = securityUnauthorizedError(
+				`Access denied: User '${context.user}' does not have '${permission}' permission`,
+				{
+					user: context.user,
+					permission,
+					roles: context.roles,
+				}
 			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 	}
 
@@ -179,10 +186,16 @@ export class AuthorizationService {
 	enforceAutopilotLevel(context: AuthContext, level: number): void {
 		if (!this.canExecuteAutopilotLevel(context, level)) {
 			const maxLevel = this.getMaxAutopilotLevel(context);
-			throw new Error(
-				`Access denied: User '${context.user}' cannot execute autopilot level ${level}. ` +
-				`Maximum allowed level: ${maxLevel}. Current roles: ${context.roles.join(', ')}`
+			const axError = securityUnauthorizedError(
+				`Access denied: User '${context.user}' cannot execute autopilot level ${level}`,
+				{
+					user: context.user,
+					roles: context.roles,
+					level,
+					maxLevel,
+				}
 			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 	}
 
