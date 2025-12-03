@@ -307,7 +307,7 @@ export interface MCPErrorContext {
 /**
  * Create an AXError for MCP tool failures.
  * This provides structured errors for MCP clients including AI agents.
- * 
+ *
  * @param code - Error code (should be from ErrorCodes for type safety, but string is accepted for extensibility)
  * @param message - Human-readable error message
  * @param ctx - MCP error context containing tool name and optional details
@@ -325,15 +325,23 @@ export function mcpToolError(
 	if (actions.length === 0) {
 		switch (ctx.tool) {
 			case "plan.create":
-				actions.push("Check if configuration files exist in the profile directory");
-				actions.push("Run 'local.init' to create missing configuration");
+				actions.push(
+					"Check if configuration files exist in the profile directory"
+				);
+				actions.push(
+					"Run 'local.init' to create missing configuration"
+				);
 				break;
 			case "gates.run":
-				actions.push("Ensure plan.json exists - run 'plan.create' first");
+				actions.push(
+					"Ensure plan.json exists - run 'plan.create' first"
+				);
 				actions.push("Check gate commands are valid and available");
 				break;
 			case "merge.apply":
-				actions.push("Set ALLOW_MUTATIONS=true to enable merge operations");
+				actions.push(
+					"Set ALLOW_MUTATIONS=true to enable merge operations"
+				);
 				actions.push("Use dryRun=true to preview without mutations");
 				break;
 			case "discover":
@@ -401,7 +409,10 @@ export function profileNotFoundError(profileDir?: string): AXError {
 /**
  * Create an AXError for configuration errors
  */
-export function configInvalidError(message: string, details?: Record<string, unknown>): AXError {
+export function configInvalidError(
+	message: string,
+	details?: Record<string, unknown>
+): AXError {
 	return createAXError(
 		ErrorCodes.CONFIG_INVALID,
 		message,
@@ -474,5 +485,103 @@ export function throwAXError(axError: AXError): never {
 		axError.message,
 		axError.nextActions,
 		axError.context
+	);
+}
+
+// =============================================================================
+// Weave Error Adapters
+// =============================================================================
+
+export interface WeaveLockConflictContext {
+	lockFile?: string;
+	expectedVersion?: string;
+	actualVersion?: string;
+	originalError?: string;
+}
+
+/**
+ * Create an AXError for weave lock file conflicts
+ */
+export function weaveLockConflictError(ctx: WeaveLockConflictContext): AXError {
+	const nextActions: string[] = [];
+
+	if (ctx.lockFile) {
+		nextActions.push(`Remove stale lock with: rm ${ctx.lockFile}`);
+	} else {
+		nextActions.push("Remove stale lock file: rm weave-lock.json");
+	}
+
+	nextActions.push("Wait for other weave operation to complete");
+	nextActions.push("Verify no concurrent weave processes are running");
+
+	return createAXError(
+		ErrorCodes.WEAVE_LOCK_CONFLICT,
+		ctx.originalError || "Lock file conflict detected",
+		nextActions,
+		{ ...ctx }
+	);
+}
+
+export interface WeaveStateInvalidContext {
+	currentState: string;
+	event: string;
+	availableEvents?: string[];
+}
+
+/**
+ * Create an AXError for invalid weave state transitions
+ */
+export function weaveStateInvalidError(ctx: WeaveStateInvalidContext): AXError {
+	const nextActions: string[] = [
+		`Check current weave state: '${ctx.currentState}'`,
+		"Review available transitions for current state",
+	];
+
+	if (ctx.availableEvents && ctx.availableEvents.length > 0) {
+		nextActions.push(
+			`Valid events for current state: ${ctx.availableEvents.join(", ")}`
+		);
+	}
+
+	nextActions.push("Use 'reset' event to return to idle state if stuck");
+
+	return createAXError(
+		ErrorCodes.WEAVE_STATE_INVALID,
+		`Invalid transition: cannot apply event '${ctx.event}' in state '${ctx.currentState}'`,
+		nextActions,
+		{ ...ctx }
+	);
+}
+
+export interface WeavePreflightFailedContext {
+	itemBranch: string;
+	targetBranch?: string;
+	originalError?: string;
+}
+
+/**
+ * Create an AXError for preflight merge simulation failures
+ */
+export function weavePreflightFailedError(
+	ctx: WeavePreflightFailedContext
+): AXError {
+	const nextActions: string[] = [
+		`Verify branch '${ctx.itemBranch}' exists locally or on remote`,
+	];
+
+	if (ctx.targetBranch) {
+		nextActions.push(`Verify target branch '${ctx.targetBranch}' exists`);
+	}
+
+	nextActions.push("Run 'git fetch' to update remote references");
+	nextActions.push("Check git repository status with 'git status'");
+
+	return createAXError(
+		ErrorCodes.WEAVE_PREFLIGHT_FAILED,
+		`Failed to simulate merge for ${ctx.itemBranch}${
+			ctx.originalError ? `: ${ctx.originalError}` : ""
+		}`,
+		nextActions,
+		{ ...ctx }
 	);
 }

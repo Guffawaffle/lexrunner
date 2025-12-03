@@ -8,6 +8,7 @@ import * as path from 'path';
 import { WeaveLockFile, WeaveContext } from './types.js';
 import { canonicalJSONStringify } from '../util/canonicalJson.js';
 import { sha256 } from '../util/hash.js';
+import { weaveLockConflictError, isAXError } from '../errors/index.js';
 
 const LOCK_FILE_SCHEMA_VERSION = '1.0.0';
 const LOCK_FILE_NAME = 'weave-lock.json';
@@ -70,17 +71,24 @@ export function readLockFile(
 		
 		// Validate schema version
 		if (lockFile.schemaVersion !== LOCK_FILE_SCHEMA_VERSION) {
-			throw new Error(
-				`Incompatible lock file version: ${lockFile.schemaVersion} ` +
-				`(expected ${LOCK_FILE_SCHEMA_VERSION})`
-			);
+			throw weaveLockConflictError({
+				lockFile: lockFilePath,
+				expectedVersion: LOCK_FILE_SCHEMA_VERSION,
+				actualVersion: lockFile.schemaVersion,
+				originalError: `Incompatible lock file version: ${lockFile.schemaVersion} (expected ${LOCK_FILE_SCHEMA_VERSION})`
+			});
 		}
 		
 		return lockFile;
 	} catch (error) {
-		throw new Error(
-			`Failed to read lock file: ${error instanceof Error ? error.message : String(error)}`
-		);
+		// Re-throw AXError as-is, wrap other errors
+		if (isAXError(error)) {
+			throw error;
+		}
+		throw weaveLockConflictError({
+			lockFile: lockFilePath,
+			originalError: `Failed to read lock file: ${error instanceof Error ? error.message : String(error)}`
+		});
 	}
 }
 

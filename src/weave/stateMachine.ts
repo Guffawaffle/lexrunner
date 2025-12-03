@@ -7,6 +7,7 @@ import { WeaveState, WeaveEvent, StateTransition, WeaveContext } from './types.j
 import { ulid } from 'ulid';
 import { emitWeaveCompletionFrame } from './frameHelper.js';
 import type { FrameEmitResult } from '../frames/types.js';
+import { weaveStateInvalidError } from '../errors/index.js';
 
 /**
  * Valid state transitions for weave execution
@@ -104,9 +105,11 @@ export class WeaveStateMachine {
 	 */
 	transition(event: WeaveEvent): WeaveState {
 		if (!this.canTransition(event)) {
-			throw new Error(
-				`Invalid transition: cannot apply event '${event}' in state '${this.context.state}'`
-			);
+			throw weaveStateInvalidError({
+				currentState: this.context.state,
+				event,
+				availableEvents: this.getAvailableTransitions()
+			});
 		}
 		
 		const key = this.getTransitionKey(this.context.state, event);

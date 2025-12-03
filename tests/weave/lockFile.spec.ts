@@ -21,6 +21,7 @@ import {
 } from '../../src/weave/lockFile.js';
 import { createWeaveContext } from '../../src/weave/stateMachine.js';
 import { WeaveState } from '../../src/weave/types.js';
+import { isAXError, ErrorCodes, type AXError } from '../../src/errors/index.js';
 
 describe('Lock File Management', () => {
 	let testDir: string;
@@ -132,6 +133,21 @@ describe('Lock File Management', () => {
 			}).toThrow(/Failed to read lock file/);
 		});
 
+		it('should throw AXError with WEAVE_LOCK_CONFLICT on invalid lock file', () => {
+			const invalidPath = path.join(testDir, 'weave-lock.json');
+			fs.writeFileSync(invalidPath, 'invalid json {', 'utf-8');
+
+			try {
+				readLockFile(testDir);
+				expect.fail('Expected an error to be thrown');
+			} catch (error) {
+				expect(isAXError(error)).toBe(true);
+				const axError = error as AXError;
+				expect(axError.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
+				expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
+			}
+		});
+
 		it('should throw error on incompatible schema version', () => {
 			const lockFile = {
 				schemaVersion: '2.0.0',
@@ -149,6 +165,33 @@ describe('Lock File Management', () => {
 			expect(() => {
 				readLockFile(testDir);
 			}).toThrow(/Incompatible lock file version/);
+		});
+
+		it('should throw AXError with version info on incompatible schema', () => {
+			const lockFile = {
+				schemaVersion: '2.0.0',
+				runId: 'test',
+				planHash: 'hash',
+				state: 'idle',
+				context: {},
+				createdAt: '2024-01-01',
+				updatedAt: '2024-01-01'
+			};
+
+			const filePath = path.join(testDir, 'weave-lock.json');
+			fs.writeFileSync(filePath, JSON.stringify(lockFile), 'utf-8');
+
+			try {
+				readLockFile(testDir);
+				expect.fail('Expected an error to be thrown');
+			} catch (error) {
+				expect(isAXError(error)).toBe(true);
+				const axError = error as AXError;
+				expect(axError.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
+				expect(axError.context?.expectedVersion).toBe('1.0.0');
+				expect(axError.context?.actualVersion).toBe('2.0.0');
+				expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
+			}
 		});
 
 		it('should delete lock file', () => {
