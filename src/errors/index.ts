@@ -49,6 +49,7 @@ export {
 	securityCommandBlockedError,
 	securityComplianceViolationError,
 	securitySecretDetectedError,
+	securitySecretNotFoundError,
 	securitySarifParseError,
 	securityScanFailedError,
 	type GateFailureContext,
@@ -68,6 +69,7 @@ export {
 	type SecurityCommandBlockedContext,
 	type SecurityComplianceViolationContext,
 	type SecuritySecretDetectedContext,
+	type SecuritySecretNotFoundContext,
 	type SecuritySarifParseErrorContext,
 	type SecurityScanFailedContext,
 } from "./adapters.js";
@@ -200,6 +202,8 @@ export const ErrorCodes = {
 	SECURITY_COMPLIANCE_VIOLATION: "SECURITY_COMPLIANCE_VIOLATION",
 	/** Secret was detected in content */
 	SECURITY_SECRET_DETECTED: "SECURITY_SECRET_DETECTED",
+	/** Required secret not found */
+	SECURITY_SECRET_NOT_FOUND: "SECURITY_SECRET_NOT_FOUND",
 	/** SARIF parsing failed */
 	SECURITY_SARIF_PARSE_ERROR: "SECURITY_SARIF_PARSE_ERROR",
 	/** Security scan failed */

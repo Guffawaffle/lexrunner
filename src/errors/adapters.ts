@@ -769,6 +769,36 @@ export function securitySecretDetectedError(
 	);
 }
 
+export interface SecuritySecretNotFoundContext {
+	secretId?: string;
+	source?: string;
+}
+
+/**
+ * Create an AXError for missing required secrets
+ */
+export function securitySecretNotFoundError(
+	message: string,
+	ctx?: SecuritySecretNotFoundContext
+): AXError {
+	const nextActions: string[] = [];
+
+	if (ctx?.secretId) {
+		nextActions.push(`Set the '${ctx.secretId}' secret in your environment or secrets manager`);
+	}
+
+	nextActions.push("Check that required environment variables are configured");
+	nextActions.push("Verify your secrets manager connection if using one");
+	nextActions.push("Review the secrets configuration documentation");
+
+	return createAXError(
+		ErrorCodes.SECURITY_SECRET_NOT_FOUND,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}
+
 export interface SecuritySarifParseErrorContext {
 	parseError?: string;
 }
