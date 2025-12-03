@@ -10,7 +10,7 @@ import {
 	STATE_TRANSITIONS
 } from '../../src/weave/stateMachine.js';
 import { WeaveState, WeaveEvent, BatchState } from '../../src/weave/types.js';
-import { isAXError, ErrorCodes } from '../../src/errors/index.js';
+import { isAXError, ErrorCodes, type AXError } from '../../src/errors/index.js';
 
 describe('WeaveStateMachine', () => {
 	describe('State Transitions', () => {
@@ -131,7 +131,7 @@ describe('WeaveStateMachine', () => {
 				expect.fail('Expected an error to be thrown');
 			} catch (error) {
 				expect(isAXError(error)).toBe(true);
-				const axError = error as { code: string; message: string; nextActions: string[] };
+				const axError = error as AXError;
 				expect(axError.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
 				expect(axError.message).toContain('merge_success');
 				expect(axError.message).toContain('idle');

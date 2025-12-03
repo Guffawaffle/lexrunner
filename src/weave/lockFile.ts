@@ -8,7 +8,7 @@ import * as path from 'path';
 import { WeaveLockFile, WeaveContext } from './types.js';
 import { canonicalJSONStringify } from '../util/canonicalJson.js';
 import { sha256 } from '../util/hash.js';
-import { weaveLockConflictError } from '../errors/index.js';
+import { weaveLockConflictError, isAXError } from '../errors/index.js';
 
 const LOCK_FILE_SCHEMA_VERSION = '1.0.0';
 const LOCK_FILE_NAME = 'weave-lock.json';
@@ -82,7 +82,7 @@ export function readLockFile(
 		return lockFile;
 	} catch (error) {
 		// Re-throw AXError as-is, wrap other errors
-		if (error && typeof error === 'object' && 'code' in error) {
+		if (isAXError(error)) {
 			throw error;
 		}
 		throw weaveLockConflictError({

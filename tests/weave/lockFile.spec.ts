@@ -21,7 +21,7 @@ import {
 } from '../../src/weave/lockFile.js';
 import { createWeaveContext } from '../../src/weave/stateMachine.js';
 import { WeaveState } from '../../src/weave/types.js';
-import { isAXError, ErrorCodes } from '../../src/errors/index.js';
+import { isAXError, ErrorCodes, type AXError } from '../../src/errors/index.js';
 
 describe('Lock File Management', () => {
 	let testDir: string;
@@ -142,7 +142,7 @@ describe('Lock File Management', () => {
 				expect.fail('Expected an error to be thrown');
 			} catch (error) {
 				expect(isAXError(error)).toBe(true);
-				const axError = error as { code: string; message: string; nextActions: string[] };
+				const axError = error as AXError;
 				expect(axError.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
 				expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
 			}
@@ -186,7 +186,7 @@ describe('Lock File Management', () => {
 				expect.fail('Expected an error to be thrown');
 			} catch (error) {
 				expect(isAXError(error)).toBe(true);
-				const axError = error as { code: string; context?: Record<string, unknown>; nextActions: string[] };
+				const axError = error as AXError;
 				expect(axError.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
 				expect(axError.context?.expectedVersion).toBe('1.0.0');
 				expect(axError.context?.actualVersion).toBe('2.0.0');
