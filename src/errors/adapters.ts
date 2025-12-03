@@ -455,3 +455,24 @@ export function runNotFoundError(ctx: RunNotFoundContext): AXError {
 		{ runId: ctx.runId }
 	);
 }
+
+// =============================================================================
+// Helper for throwing AXErrors
+// =============================================================================
+
+import { AXErrorException } from "@smartergpt/lex/errors";
+
+/**
+ * Throw an AXError as an exception
+ *
+ * @param axError - The AXError to throw
+ * @throws AXErrorException with the AXError data
+ */
+export function throwAXError(axError: AXError): never {
+	throw new AXErrorException(
+		axError.code,
+		axError.message,
+		axError.nextActions,
+		axError.context
+	);
+}

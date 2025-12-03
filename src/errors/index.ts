@@ -37,6 +37,8 @@ export {
 	writeProtectionError,
 	// Run lifecycle adapters
 	runNotFoundError,
+	// Helper for throwing AXErrors
+	throwAXError,
 	type GateFailureContext,
 	type MergeConflictContext,
 	type CycleDetectedContext,

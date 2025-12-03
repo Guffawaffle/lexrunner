@@ -40,7 +40,7 @@ import type { RunStore, StepOutcome, Receipt } from "../store/run-store.js";
 import { safeParseStepOutcome, safeParseReceipt } from "../store/run-store.js";
 import { emitProcedureFrame, storeFrameResult } from "../frames/index.js";
 import type { FrameEmitResult, FrameOutcome } from "../frames/types.js";
-import { runNotFoundError, AXErrorException } from "../errors/index.js";
+import { runNotFoundError, throwAXError } from "../errors/index.js";
 
 /**
  * Default initial state for new runs
@@ -239,13 +239,7 @@ export class RunManager {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			const axError = runNotFoundError({ runId });
-			throw new AXErrorException(
-				axError.code,
-				axError.message,
-				axError.nextActions,
-				axError.context
-			);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		// Apply updates
@@ -286,13 +280,7 @@ export class RunManager {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			const axError = runNotFoundError({ runId });
-			throw new AXErrorException(
-				axError.code,
-				axError.message,
-				axError.nextActions,
-				axError.context
-			);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		const now = new Date().toISOString();
@@ -350,13 +338,7 @@ export class RunManager {
 		const current = await this.getRun(runId);
 
 		if (!current) {
-			const axError = runNotFoundError({ runId });
-			throw new AXErrorException(
-				axError.code,
-				axError.message,
-				axError.nextActions,
-				axError.context
-			);
+			throwAXError(runNotFoundError({ runId }));
 		}
 
 		// Add to completed steps if not already present
