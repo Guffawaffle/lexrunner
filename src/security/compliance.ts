@@ -11,6 +11,8 @@
 import { createHash, createHmac } from 'crypto';
 import { auditTrail, AuditEntry } from '../monitoring/audit.js';
 import { AuthContext } from './authentication.js';
+import { securityComplianceViolationError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
 
 /**
  * Enhanced audit entry with security features
@@ -245,7 +247,11 @@ export class EnterpriseAuditService {
 	 */
 	private signEntry(entry: SecureAuditEntry): string {
 		if (!this.signingKey) {
-			throw new Error('Signing key not configured');
+			const axError = securityComplianceViolationError(
+				'Signing key not configured',
+				{ operation: 'signEntry', requirement: 'AUDIT_SIGNING_KEY environment variable' }
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 
 		return createHmac('sha256', this.signingKey)

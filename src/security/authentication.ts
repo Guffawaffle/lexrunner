@@ -7,6 +7,9 @@
  * - Token lifecycle management
  */
 
+import { securityAuthFailedError } from "../errors/index.js";
+import { AXErrorException } from "@smartergpt/lex/errors";
+
 export interface AuthContext {
 	/** Authenticated user */
 	user: string;
@@ -39,7 +42,11 @@ export class GitHubTokenAuthProvider implements AuthProvider {
 	constructor(token?: string) {
 		this.token = token || process.env.GITHUB_TOKEN || '';
 		if (!this.token) {
-			throw new Error('GitHub token required for authentication');
+			const axError = securityAuthFailedError(
+				'GitHub token required for authentication',
+				{ method: 'token', reason: 'token_missing' }
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 	}
 
@@ -63,7 +70,11 @@ export class GitHubTokenAuthProvider implements AuthProvider {
 
 			return this.cachedContext;
 		} catch (error) {
-			throw new Error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+			const axError = securityAuthFailedError(
+				`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
+				{ method: 'token', reason: 'api_error' }
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 	}
 

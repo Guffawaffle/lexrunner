@@ -43,6 +43,14 @@ export {
 	weaveLockConflictError,
 	weaveStateInvalidError,
 	weavePreflightFailedError,
+	// Security-specific adapters
+	securityAuthFailedError,
+	securityUnauthorizedError,
+	securityCommandBlockedError,
+	securityComplianceViolationError,
+	securitySecretDetectedError,
+	securitySarifParseError,
+	securityScanFailedError,
 	type GateFailureContext,
 	type MergeConflictContext,
 	type CycleDetectedContext,
@@ -55,6 +63,13 @@ export {
 	type WeaveLockConflictContext,
 	type WeaveStateInvalidContext,
 	type WeavePreflightFailedContext,
+	type SecurityAuthContext,
+	type SecurityUnauthorizedContext,
+	type SecurityCommandBlockedContext,
+	type SecurityComplianceViolationContext,
+	type SecuritySecretDetectedContext,
+	type SecuritySarifParseErrorContext,
+	type SecurityScanFailedContext,
 } from "./adapters.js";
 
 // =============================================================================
@@ -175,6 +190,20 @@ export const ErrorCodes = {
 	SECURITY_POLICY_VIOLATION: "SECURITY_POLICY_VIOLATION",
 	/** Command failed security validation */
 	COMMAND_VALIDATION_FAILED: "COMMAND_VALIDATION_FAILED",
+	/** Authentication failed */
+	SECURITY_AUTH_FAILED: "SECURITY_AUTH_FAILED",
+	/** User is not authorized for operation */
+	SECURITY_UNAUTHORIZED: "SECURITY_UNAUTHORIZED",
+	/** Command is blocked by security policy */
+	SECURITY_COMMAND_BLOCKED: "SECURITY_COMMAND_BLOCKED",
+	/** Operation violates compliance requirements */
+	SECURITY_COMPLIANCE_VIOLATION: "SECURITY_COMPLIANCE_VIOLATION",
+	/** Secret was detected in content */
+	SECURITY_SECRET_DETECTED: "SECURITY_SECRET_DETECTED",
+	/** SARIF parsing failed */
+	SECURITY_SARIF_PARSE_ERROR: "SECURITY_SARIF_PARSE_ERROR",
+	/** Security scan failed */
+	SECURITY_SCAN_FAILED: "SECURITY_SCAN_FAILED",
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Generic errors
