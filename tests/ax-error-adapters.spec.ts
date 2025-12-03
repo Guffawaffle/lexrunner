@@ -16,6 +16,10 @@ import {
 	toAXError,
 	isAXError,
 	ErrorCodes,
+	// MCP-specific adapters
+	mcpToolError,
+	planNotFoundError,
+	writeProtectionError,
 } from "../src/errors/index.js";
 
 describe("AXError adapters", () => {
@@ -232,6 +236,101 @@ describe("AXError adapters", () => {
 			for (const code of codes) {
 				expect(code).toMatch(codePattern);
 			}
+		});
+	});
+});
+
+describe("MCP-specific AXError adapters", () => {
+	describe("mcpToolError", () => {
+		it("should create valid AXError for MCP tool failures", () => {
+			const error = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				"plan.create failed: Config not found",
+				{ tool: "plan.create", operation: "load config" }
+			);
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.INTERNAL_ERROR);
+			expect(error.message).toContain("plan.create");
+			expect(error.context?.tool).toBe("plan.create");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+		});
+
+		it("should add tool-specific suggestions for plan.create", () => {
+			const error = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				"Failed",
+				{ tool: "plan.create" }
+			);
+
+			expect(error.nextActions.some(a => a.includes("local.init"))).toBe(true);
+		});
+
+		it("should add tool-specific suggestions for gates.run", () => {
+			const error = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				"Failed",
+				{ tool: "gates.run" }
+			);
+
+			expect(error.nextActions.some(a => a.includes("plan.create"))).toBe(true);
+		});
+
+		it("should add tool-specific suggestions for merge.apply", () => {
+			const error = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				"Failed",
+				{ tool: "merge.apply" }
+			);
+
+			expect(error.nextActions.some(a => a.includes("ALLOW_MUTATIONS"))).toBe(true);
+		});
+
+		it("should use provided nextActions when given", () => {
+			const customActions = ["Do this first", "Then do this"];
+			const error = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				"Failed",
+				{ tool: "custom.tool" },
+				customActions
+			);
+
+			expect(error.nextActions).toEqual(customActions);
+		});
+	});
+
+	describe("planNotFoundError", () => {
+		it("should create valid AXError for missing plan file", () => {
+			const error = planNotFoundError("custom/path/plan.json");
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+			expect(error.message).toContain("custom/path/plan.json");
+			expect(error.nextActions.some(a => a.includes("plan.create"))).toBe(true);
+		});
+
+		it("should handle undefined plan file path", () => {
+			const error = planNotFoundError();
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+			expect(error.message).toContain("Run plan.create first");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+		});
+	});
+
+	describe("writeProtectionError", () => {
+		it("should create valid AXError for write protection violations", () => {
+			const error = writeProtectionError(
+				"Cannot write to shared profile",
+				"plan.create"
+			);
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.WRITE_PROTECTION_ERROR);
+			expect(error.message).toContain("shared profile");
+			expect(error.nextActions.some(a => a.includes("local.init"))).toBe(true);
+			expect(error.context?.operation).toBe("plan.create");
 		});
 	});
 });

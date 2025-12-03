@@ -54,6 +54,17 @@ import {
 	validateCIEnvironment,
 } from "../util/envUtils.js";
 
+// AXError imports for structured error responses
+import {
+	type AXError,
+	mcpToolError,
+	planNotFoundError,
+	writeProtectionError,
+	githubApiError,
+	toAXError,
+	ErrorCodes,
+} from "../errors/index.js";
+
 import * as fs from "fs";
 import * as path from "path";
 
@@ -90,6 +101,53 @@ import {
 } from "../store/index.js";
 import { ulid } from "ulid";
 import * as crypto from "crypto";
+
+// =============================================================================
+// AXError MCP Helper
+// =============================================================================
+
+/**
+ * Create an McpError with AXError-structured content in the message.
+ * 
+ * Per AX-CONTRACT.md v0.1, Guarantee 2.3: All MCP tool failures should
+ * return structured errors that agents can parse for recovery actions.
+ * 
+ * The error message is JSON-serialized AXError for machine readability,
+ * while remaining compatible with MCP's error format.
+ */
+function throwMcpAXError(
+	mcpErrorCode: ErrorCode,
+	axError: AXError
+): never {
+	// Serialize the AXError as JSON in the message for structured parsing
+	const structuredMessage = JSON.stringify(axError);
+	throw new McpError(mcpErrorCode, structuredMessage);
+}
+
+/**
+ * Create an McpError from a caught error, converting to AXError format.
+ * 
+ * @param mcpErrorCode - The MCP error code to use (e.g., ErrorCode.InternalError)
+ * @param tool - The MCP tool name
+ * @param error - The caught error
+ * @param operation - Optional operation description
+ * @param axErrorCode - Optional AXError code (defaults to INTERNAL_ERROR)
+ */
+function throwMcpToolError(
+	mcpErrorCode: ErrorCode,
+	tool: string,
+	error: unknown,
+	operation?: string,
+	axErrorCode: string = ErrorCodes.INTERNAL_ERROR
+): never {
+	const message = error instanceof Error ? error.message : String(error);
+	const axError = mcpToolError(
+		axErrorCode,
+		`${tool} failed: ${message}`,
+		{ tool, operation }
+	);
+	throwMcpAXError(mcpErrorCode, axError);
+}
 
 /**
  * Options for creating the MCP server.
@@ -843,14 +901,10 @@ async function handlePlanCreate(
 		};
 	} catch (error) {
 		if (error instanceof WriteProtectionError) {
-			throw new McpError(ErrorCode.InvalidRequest, error.message);
+			const axError = writeProtectionError(error.message, "plan.create");
+			throwMcpAXError(ErrorCode.InvalidRequest, axError);
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to create plan: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "plan.create", error, "create plan");
 	}
 }
 
@@ -967,12 +1021,12 @@ async function handleGatesRun(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to run gates: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		// Check for plan not found specifically
+		const message = error instanceof Error ? error.message : String(error);
+		if (message.includes("Plan file not found") || message.includes("No plan found")) {
+			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
+		}
+		throwMcpToolError(ErrorCode.InternalError, "gates.run", error, "run gates");
 	}
 }
 
@@ -1049,12 +1103,11 @@ async function handleMergeApply(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to apply merge: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		const message = error instanceof Error ? error.message : String(error);
+		if (message.includes("No plan found")) {
+			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError());
+		}
+		throwMcpToolError(ErrorCode.InternalError, "merge.apply", error, "apply merge");
 	}
 }
 
@@ -1084,12 +1137,7 @@ async function handleLocalInit(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to initialize local overlay: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "local.init", error, "initialize local overlay");
 	}
 }
 
@@ -1125,12 +1173,7 @@ async function handleProfileResolve(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to resolve profile: ${
-				error instanceof Error ? error.message : String(error)
-			}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "profile.resolve", error, "resolve profile");
 	}
 }
 
@@ -1209,10 +1252,7 @@ async function handleSeniorDevPrepareContext(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to prepare review context: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "senior-dev.prepare-context", error, "prepare review context");
 	}
 }
 
@@ -1233,10 +1273,7 @@ async function handleSeniorDevRecallContext(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to recall context: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "senior-dev.recall-context", error, "recall context");
 	}
 }
 
@@ -1257,10 +1294,7 @@ async function handleSeniorDevCaptureFrame(
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to capture frame: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "senior-dev.capture-frame", error, "capture frame");
 	}
 }
 
@@ -1340,15 +1374,14 @@ async function handleStartRun(
 		};
 	} catch (error) {
 		if (error instanceof Error && error.name === "ZodError") {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				`Invalid startRun parameters: ${error.message}`
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid startRun parameters: ${error.message}`,
+				{ tool: "lexrunner.startRun", operation: "validate parameters" }
 			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to start run: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "lexrunner.startRun", error, "start run");
 	}
 }
 
@@ -1397,21 +1430,23 @@ async function handleGetStatus(
 		};
 	} catch (error) {
 		if (error instanceof RunNotFoundError) {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				error.message
+			const axError = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				error.message,
+				{ tool: "lexrunner.getStatus" },
+				["Check that runId is valid", "List available runs with 'lexrunner.listRuns'"]
 			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
 		if (error instanceof Error && error.name === "ZodError") {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				`Invalid getStatus parameters: ${error.message}`
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid getStatus parameters: ${error.message}`,
+				{ tool: "lexrunner.getStatus", operation: "validate parameters" }
 			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to get status: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "lexrunner.getStatus", error, "get status");
 	}
 }
 
@@ -1460,15 +1495,14 @@ async function handleListRuns(
 		};
 	} catch (error) {
 		if (error instanceof Error && error.name === "ZodError") {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				`Invalid listRuns parameters: ${error.message}`
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid listRuns parameters: ${error.message}`,
+				{ tool: "lexrunner.listRuns", operation: "validate parameters" }
 			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to list runs: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "lexrunner.listRuns", error, "list runs");
 	}
 }
 
@@ -1498,10 +1532,10 @@ async function handleDiscover(args: {
 		}
 
 		if (!githubAPI) {
-			throw new McpError(
-				ErrorCode.InvalidRequest,
-				"Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote."
-			);
+			const axError = githubApiError({
+				message: "Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote."
+			});
+			throwMcpAXError(ErrorCode.InvalidRequest, axError);
 		}
 
 		// Check authentication
@@ -1559,10 +1593,7 @@ async function handleDiscover(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to discover PRs: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "discover", error, "discover PRs");
 	}
 }
 
@@ -1576,10 +1607,7 @@ async function handleStatus(args: {
 		const planFile = args.planFile || "plan.json";
 
 		if (!fs.existsSync(planFile)) {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				`Plan file not found: ${planFile}`
-			);
+			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
 		}
 
 		const planContent = fs.readFileSync(planFile, "utf-8");
@@ -1612,10 +1640,7 @@ async function handleStatus(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to get status: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "status", error, "get status");
 	}
 }
 
@@ -1708,10 +1733,7 @@ async function handleDoctor(): Promise<{ content: [{ type: "text"; text: string 
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to run doctor: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "doctor", error, "run doctor");
 	}
 }
 
@@ -1725,10 +1747,7 @@ async function handleMergeOrder(args: {
 		const planFile = args.planFile || "plan.json";
 
 		if (!fs.existsSync(planFile)) {
-			throw new McpError(
-				ErrorCode.InvalidParams,
-				`Plan file not found: ${planFile}`
-			);
+			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
 		}
 
 		const planContent = fs.readFileSync(planFile, "utf-8");
@@ -1755,10 +1774,7 @@ async function handleMergeOrder(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to compute merge order: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "merge-order", error, "compute merge order");
 	}
 }
 
@@ -1816,10 +1832,7 @@ async function handleConfigShow(args: {
 			],
 		};
 	} catch (error) {
-		throw new McpError(
-			ErrorCode.InternalError,
-			`Failed to show config: ${(error as Error).message}`
-		);
+		throwMcpToolError(ErrorCode.InternalError, "config.show", error, "show config");
 	}
 }
 

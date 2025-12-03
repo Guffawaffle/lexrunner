@@ -293,3 +293,142 @@ export function toAXError(
 		}
 	);
 }
+
+// =============================================================================
+// MCP-Specific Error Adapters
+// =============================================================================
+
+export interface MCPErrorContext {
+	tool: string;
+	operation?: string;
+	details?: Record<string, unknown>;
+}
+
+/**
+ * Create an AXError for MCP tool failures.
+ * This provides structured errors for MCP clients including AI agents.
+ * 
+ * @param code - Error code (should be from ErrorCodes for type safety, but string is accepted for extensibility)
+ * @param message - Human-readable error message
+ * @param ctx - MCP error context containing tool name and optional details
+ * @param nextActions - Optional array of recovery actions; if not provided, tool-specific defaults are used
+ */
+export function mcpToolError(
+	code: string,
+	message: string,
+	ctx: MCPErrorContext,
+	nextActions?: string[]
+): AXError {
+	const actions: string[] = nextActions || [];
+
+	// Add tool-specific recovery suggestions if none provided
+	if (actions.length === 0) {
+		switch (ctx.tool) {
+			case "plan.create":
+				actions.push("Check if configuration files exist in the profile directory");
+				actions.push("Run 'local.init' to create missing configuration");
+				break;
+			case "gates.run":
+				actions.push("Ensure plan.json exists - run 'plan.create' first");
+				actions.push("Check gate commands are valid and available");
+				break;
+			case "merge.apply":
+				actions.push("Set ALLOW_MUTATIONS=true to enable merge operations");
+				actions.push("Use dryRun=true to preview without mutations");
+				break;
+			case "discover":
+				actions.push("Check GITHUB_TOKEN is set and valid");
+				actions.push("Provide owner and repo parameters explicitly");
+				break;
+			case "status":
+				actions.push("Ensure plan.json exists");
+				actions.push("Run 'plan.create' to generate a plan");
+				break;
+			case "merge-order":
+				actions.push("Ensure plan.json exists and is valid");
+				actions.push("Check for dependency cycles in the plan");
+				break;
+			default:
+				actions.push("Review the error details and retry");
+				actions.push("Check MCP server logs for more context");
+		}
+	}
+
+	return createAXError(code, message, actions, {
+		tool: ctx.tool,
+		operation: ctx.operation,
+		...ctx.details,
+	});
+}
+
+/**
+ * Create an AXError for plan not found errors
+ */
+export function planNotFoundError(planFile?: string): AXError {
+	return createAXError(
+		ErrorCodes.PLAN_NOT_FOUND,
+		planFile
+			? `Plan file not found: ${planFile}`
+			: "No plan found. Run plan.create first.",
+		[
+			"Run 'plan.create' to generate a plan",
+			planFile
+				? `Check if ${planFile} exists and is accessible`
+				: "Ensure plan.json exists in the profile runner directory",
+		],
+		{ planFile }
+	);
+}
+
+/**
+ * Create an AXError for profile not found errors
+ */
+export function profileNotFoundError(profileDir?: string): AXError {
+	return createAXError(
+		ErrorCodes.PROFILE_NOT_FOUND,
+		profileDir
+			? `Profile directory not found: ${profileDir}`
+			: "No profile directory found",
+		[
+			"Run 'local.init' to create a local profile",
+			"Set LEX_PR_PROFILE_DIR environment variable",
+			"Ensure .smartergpt/ or .smartergpt.local/ exists",
+		],
+		{ profileDir }
+	);
+}
+
+/**
+ * Create an AXError for configuration errors
+ */
+export function configInvalidError(message: string, details?: Record<string, unknown>): AXError {
+	return createAXError(
+		ErrorCodes.CONFIG_INVALID,
+		message,
+		[
+			"Check configuration file syntax",
+			"Ensure all required fields are present",
+			"Validate against the schema with 'lex-pr schema validate'",
+		],
+		details
+	);
+}
+
+/**
+ * Create an AXError for write protection errors
+ */
+export function writeProtectionError(
+	message: string,
+	operation?: string
+): AXError {
+	return createAXError(
+		ErrorCodes.WRITE_PROTECTION_ERROR,
+		message,
+		[
+			"Use a local overlay profile (.smartergpt.local/) for write operations",
+			"Set role to 'local' or 'ci' in manifest.yaml",
+			"Run 'local.init' to create a writable profile",
+		],
+		{ operation }
+	);
+}
