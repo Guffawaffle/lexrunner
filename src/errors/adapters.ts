@@ -307,6 +307,11 @@ export interface MCPErrorContext {
 /**
  * Create an AXError for MCP tool failures.
  * This provides structured errors for MCP clients including AI agents.
+ * 
+ * @param code - Error code (should be from ErrorCodes for type safety, but string is accepted for extensibility)
+ * @param message - Human-readable error message
+ * @param ctx - MCP error context containing tool name and optional details
+ * @param nextActions - Optional array of recovery actions; if not provided, tool-specific defaults are used
  */
 export function mcpToolError(
 	code: string,

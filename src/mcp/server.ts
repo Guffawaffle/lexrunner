@@ -126,16 +126,23 @@ function throwMcpAXError(
 
 /**
  * Create an McpError from a caught error, converting to AXError format.
+ * 
+ * @param mcpErrorCode - The MCP error code to use (e.g., ErrorCode.InternalError)
+ * @param tool - The MCP tool name
+ * @param error - The caught error
+ * @param operation - Optional operation description
+ * @param axErrorCode - Optional AXError code (defaults to INTERNAL_ERROR)
  */
 function throwMcpToolError(
 	mcpErrorCode: ErrorCode,
 	tool: string,
 	error: unknown,
-	operation?: string
+	operation?: string,
+	axErrorCode: string = ErrorCodes.INTERNAL_ERROR
 ): never {
 	const message = error instanceof Error ? error.message : String(error);
 	const axError = mcpToolError(
-		ErrorCodes.INTERNAL_ERROR,
+		axErrorCode,
 		`${tool} failed: ${message}`,
 		{ tool, operation }
 	);
