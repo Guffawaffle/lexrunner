@@ -44,6 +44,27 @@ Examples:
 - `runner: Add retry/backoff to gate executor`
 - `docs: Document plan schema validation CLI`
 
+## ⚠️ Formatting Drift Prevention
+
+**Common issue:** VS Code auto-formats files on save, creating unstaged changes that get added in a separate commit after push.
+
+**Pre-commit hook** warns you if formatting changes exist but aren't staged:
+
+```
+⚠️  WARNING: Unstaged formatting changes detected
+...
+Options:
+  1. Stage these changes:    git add <files>
+  2. Discard them:           git checkout -- <files>
+  3. Continue anyway:        git commit --no-verify
+```
+
+**To avoid this:**
+- Either include formatting in your commit, or
+- Run `git checkout -- <files>` to discard them before committing
+
+This keeps your commits clean and prevents "formatting commit" noise in history.
+
 ## PR guidelines
 
 Keep PRs small and focused. One PR = one chat/task. Include a "How to verify" section with exact commands and expected outcomes.
