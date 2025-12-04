@@ -2,10 +2,10 @@
  * Discover command - Discover open pull requests from GitHub
  */
 
-import { Command } from 'commander';
-import { createGitHubAPI, GitHubAPI, GitHubAPIError } from '../github/api.js';
-import { canonicalJSONStringify } from '../util/canonicalJson.js';
-import { throwExit } from '../cli/exitHandler.js';
+import { Command } from "commander";
+import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { throwExit } from "../cli/exitHandler.js";
 
 interface DiscoverCommandDeps {
 	jsonModeActive: () => boolean;
@@ -14,10 +14,15 @@ interface DiscoverCommandDeps {
 /**
  * Register the discover command with the CLI program
  */
-export function registerDiscoverCommand(program: Command, deps: DiscoverCommandDeps): void {
+export function registerDiscoverCommand(
+	program: Command,
+	deps: DiscoverCommandDeps
+): void {
 	program
 		.command("discover")
-		.description("Discover open pull requests from GitHub")
+		.description(
+			"Discover open pull requests from GitHub (canonical: lex-pr weave discover)"
+		)
 		.option("--owner <owner>", "GitHub repository owner")
 		.option("--repo <repo>", "GitHub repository name")
 		.option("--state <state>", "PR state filter", "open")
@@ -123,7 +128,9 @@ Common Issues:
 							`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`
 						);
 						if (authStatus.authenticated) {
-							console.log(`✓ Authenticated as: ${authStatus.user}`);
+							console.log(
+								`✓ Authenticated as: ${authStatus.user}`
+							);
 						}
 						console.log("");
 
@@ -142,11 +149,14 @@ Common Issues:
 
 							for (const suggestion of suggestions) {
 								const confidence =
-									(suggestion.confidence * 100).toFixed(0) + "%";
-								const heuristic = suggestion.heuristic || "unknown";
+									(suggestion.confidence * 100).toFixed(0) +
+									"%";
+								const heuristic =
+									suggestion.heuristic || "unknown";
 								const reason =
 									suggestion.reason.length > 50
-										? suggestion.reason.substring(0, 47) + "..."
+										? suggestion.reason.substring(0, 47) +
+										  "..."
 										: suggestion.reason;
 								console.log(
 									`| ${suggestion.from} | ${suggestion.to} | ${confidence} | ${heuristic} | ${reason} |`
@@ -170,7 +180,9 @@ Common Issues:
 							`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`
 						);
 						if (authStatus.authenticated) {
-							console.log(`✓ Authenticated as: ${authStatus.user}`);
+							console.log(
+								`✓ Authenticated as: ${authStatus.user}`
+							);
 						}
 						console.log("");
 

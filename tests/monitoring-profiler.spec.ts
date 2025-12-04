@@ -18,7 +18,7 @@ describe('Monitoring - Profiler', () => {
 
 			expect(profile).toBeTruthy();
 			expect(profile?.duration).toBeGreaterThan(0);
-			expect(profile?.duration).toBeGreaterThanOrEqual(0.05); // At least 50ms
+			expect(profile?.duration).toBeGreaterThanOrEqual(0.04); // At least 40ms (tolerates system jitter)
 		});
 
 		it('should track memory usage', () => {

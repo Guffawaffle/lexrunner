@@ -657,7 +657,9 @@ program
 // Migrate profile command
 program
 	.command("migrate-profile")
-	.description("Migrate profile configuration structure")
+	.description(
+		"Migrate profile configuration structure (canonical: lex-pr workspace migrate)"
+	)
 	.option(
 		"--from-flat",
 		"Migrate from flat structure to runner/ subdirectory"
@@ -965,7 +967,10 @@ program
 	});
 
 // Query command - modular implementation
-registerQueryCommand(program, { exitWith, jsonModeActive: () => jsonModeActive });
+registerQueryCommand(program, {
+	exitWith,
+	jsonModeActive: () => jsonModeActive,
+});
 
 // Retry command
 registerRetryCommand(program, () => jsonModeActive, exitWith);

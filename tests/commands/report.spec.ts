@@ -34,7 +34,7 @@ describe('Report Command', () => {
 		const reportCommand = program.commands.find(cmd => cmd.name() === 'report');
 		expect(reportCommand).toBeDefined();
 		expect(reportCommand?.name()).toBe('report');
-		expect(reportCommand?.description()).toBe('Aggregate gate reports from directory');
+		expect(reportCommand?.description()).toBe('Aggregate gate reports from directory (canonical: lex-pr weave report)');
 		
 		// Check required argument
 		const args = (reportCommand as any)._args;

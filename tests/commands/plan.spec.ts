@@ -29,12 +29,10 @@ describe("Plan Command Module", () => {
 		it("should register the plan command", () => {
 			registerPlanCommand(program, mockDeps);
 			
-			const planCommand = program.commands.find(cmd => cmd.name() === "plan");
-			expect(planCommand).toBeDefined();
-			expect(planCommand?.description()).toBe("Generate plan from configuration sources or GitHub PRs");
-		});
-
-		it("should register all expected options", () => {
+		const planCommand = program.commands.find(cmd => cmd.name() === "plan");
+		expect(planCommand).toBeDefined();
+		expect(planCommand?.description()).toBe("Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)");
+	});		it("should register all expected options", () => {
 			registerPlanCommand(program, mockDeps);
 			
 			const planCommand = program.commands.find(cmd => cmd.name() === "plan");

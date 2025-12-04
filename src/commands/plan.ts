@@ -2,22 +2,36 @@
  * Plan command - Generate plan from configuration sources or GitHub PRs
  */
 
-import { Command } from 'commander';
-import { Plan, loadPlan } from '../schema.js';
-import { computeMergeOrder, CycleError, UnknownDependencyError } from '../mergeOrder.js';
-import { loadInputs, detectGitHubMode } from '../core/inputs.js';
-import { generatePlan, generateEmptyPlan } from '../core/plan.js';
-import { generateSnapshot, generatePlanSummary, generateGitHubSnapshot } from '../core/snapshot.js';
-import { generatePlanFromGitHub } from '../core/githubPlan.js';
-import { createGitHubClient } from '../github/index.js';
-import { canonicalJSONStringify } from '../util/canonicalJson.js';
-import { resolveProfile, validateWriteOperation } from '../config/profileResolver.js';
-import { throwExit } from '../cli/exitHandler.js';
-import { FileAnalyzer } from '../planner/fileAnalysis.js';
-import { scoreDependencies } from '../planner/dependencyScoring.js';
-import { formatSuggestions, type SuggestionFormat } from '../cli/formatSuggestions.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Command } from "commander";
+import { Plan, loadPlan } from "../schema.js";
+import {
+	computeMergeOrder,
+	CycleError,
+	UnknownDependencyError,
+} from "../mergeOrder.js";
+import { loadInputs, detectGitHubMode } from "../core/inputs.js";
+import { generatePlan, generateEmptyPlan } from "../core/plan.js";
+import {
+	generateSnapshot,
+	generatePlanSummary,
+	generateGitHubSnapshot,
+} from "../core/snapshot.js";
+import { generatePlanFromGitHub } from "../core/githubPlan.js";
+import { createGitHubClient } from "../github/index.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import {
+	resolveProfile,
+	validateWriteOperation,
+} from "../config/profileResolver.js";
+import { throwExit } from "../cli/exitHandler.js";
+import { FileAnalyzer } from "../planner/fileAnalysis.js";
+import { scoreDependencies } from "../planner/dependencyScoring.js";
+import {
+	formatSuggestions,
+	type SuggestionFormat,
+} from "../cli/formatSuggestions.js";
+import * as fs from "fs";
+import * as path from "path";
 
 interface PlanCommandDeps {
 	jsonModeActive: () => boolean;
@@ -28,31 +42,82 @@ interface PlanCommandDeps {
 /**
  * Register the plan command
  */
-export function registerPlanCommand(program: Command, deps: PlanCommandDeps): void {
+export function registerPlanCommand(
+	program: Command,
+	deps: PlanCommandDeps
+): void {
 	program
 		.command("plan")
-		.description("Generate plan from configuration sources or GitHub PRs")
-		.option("--out <dir>", "Output directory for artifacts (default: <profile>/runner)")
+		.description(
+			"Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)"
+		)
+		.option(
+			"--out <dir>",
+			"Output directory for artifacts (default: <profile>/runner)"
+		)
 		.option("--json", "Output canonical plan JSON to stdout only")
 		.option("--dry-run", "Validate inputs and show what would be written")
 		.option("--from-github", "Auto-discover PRs from GitHub API")
-		.option("--query <query>", "GitHub search query (e.g., 'is:open label:stack:*')")
+		.option(
+			"--query <query>",
+			"GitHub search query (e.g., 'is:open label:stack:*')"
+		)
 		.option("--labels <labels>", "Filter PRs by comma-separated labels")
 		.option("--include-drafts", "Include draft PRs in the plan")
-		.option("--exclude-prs <numbers>", "Exclude specific PRs by comma-separated PR numbers")
-		.option("--github-token <token>", "GitHub API token (or use GITHUB_TOKEN env var)")
-		.option("--owner <owner>", "GitHub repository owner (auto-detected from git remote)")
-		.option("--repo <repo>", "GitHub repository name (auto-detected from git remote)")
-		.option("--required-gates <gates>", "Comma-separated list of required gates (default: lint,typecheck,test)")
-		.option("--max-workers <n>", "Maximum parallel workers for execution (default: 2)", parseInt)
-		.option("--target <branch>", "Target branch for merging PRs (default: repo default branch)")
-		.option("--validate-cycles", "Enable dependency cycle detection (default: true)")
+		.option(
+			"--exclude-prs <numbers>",
+			"Exclude specific PRs by comma-separated PR numbers"
+		)
+		.option(
+			"--github-token <token>",
+			"GitHub API token (or use GITHUB_TOKEN env var)"
+		)
+		.option(
+			"--owner <owner>",
+			"GitHub repository owner (auto-detected from git remote)"
+		)
+		.option(
+			"--repo <repo>",
+			"GitHub repository name (auto-detected from git remote)"
+		)
+		.option(
+			"--required-gates <gates>",
+			"Comma-separated list of required gates (default: lint,typecheck,test)"
+		)
+		.option(
+			"--max-workers <n>",
+			"Maximum parallel workers for execution (default: 2)",
+			parseInt
+		)
+		.option(
+			"--target <branch>",
+			"Target branch for merging PRs (default: repo default branch)"
+		)
+		.option(
+			"--validate-cycles",
+			"Enable dependency cycle detection (default: true)"
+		)
 		.option("--optimize", "Optimize plan for parallel execution")
-		.option("--suggest-deps", "Output dependency suggestions for review (does not generate plan.json)")
-		.option("--threshold <number>", "Filter suggestions below this score (default: 0.3)", parseFloat)
-		.option("--format <format>", "Output format: table|json|markdown (default: table)")
-		.option("--output <file>", "Write suggestions to file instead of stdout")
-		.addHelpText('after', `
+		.option(
+			"--suggest-deps",
+			"Output dependency suggestions for review (does not generate plan.json)"
+		)
+		.option(
+			"--threshold <number>",
+			"Filter suggestions below this score (default: 0.3)",
+			parseFloat
+		)
+		.option(
+			"--format <format>",
+			"Output format: table|json|markdown (default: table)"
+		)
+		.option(
+			"--output <file>",
+			"Write suggestions to file instead of stdout"
+		)
+		.addHelpText(
+			"after",
+			`
 Examples:
   $ lex-pr plan --from-github --json > plan.json    # Generate plan from GitHub PRs
   $ lex-pr plan --dry-run                           # Preview plan without writing
@@ -67,7 +132,8 @@ Examples:
 Common Issues:
   • GitHub API errors: Set GITHUB_TOKEN environment variable
   • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
-  • Missing configuration: Run 'lex-pr init' to set up workspace`)
+  • Missing configuration: Run 'lex-pr init' to set up workspace`
+		)
 		.action(async (opts) => {
 			const previousJsonMode = deps.jsonModeActive();
 			// jsonModeActive is already set by preAction hook from global --json
@@ -105,15 +171,21 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			if (!opts.query && detection.scopeConfig?.query) {
 				opts.query = detection.scopeConfig.query;
 			}
-			if (!opts.labels && detection.scopeConfig?.labels && detection.scopeConfig.labels.length > 0) {
-				opts.labels = detection.scopeConfig.labels.join(',');
+			if (
+				!opts.labels &&
+				detection.scopeConfig?.labels &&
+				detection.scopeConfig.labels.length > 0
+			) {
+				opts.labels = detection.scopeConfig.labels.join(",");
 			}
 			if (!opts.target && detection.scopeConfig?.target) {
 				opts.target = detection.scopeConfig.target;
 			}
-			
+
 			if (!deps.jsonModeActive()) {
-				console.error('[plan] Auto-detected GitHub mode from scope.yml filters');
+				console.error(
+					"[plan] Auto-detected GitHub mode from scope.yml filters"
+				);
 			}
 		}
 	}
@@ -123,15 +195,20 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 		const client = await createGitHubClient({
 			token: opts.githubToken,
 			owner: opts.owner,
-			repo: opts.repo
+			repo: opts.repo,
 		});
 
 		// Parse labels if provided
-		const labels = opts.labels ? opts.labels.split(',').map((l: string) => l.trim()) : undefined;
+		const labels = opts.labels
+			? opts.labels.split(",").map((l: string) => l.trim())
+			: undefined;
 
 		// Parse excluded PR numbers if provided
 		const excludePRs = opts.excludePrs
-			? opts.excludePrs.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
+			? opts.excludePrs
+					.split(",")
+					.map((n: string) => parseInt(n.trim(), 10))
+					.filter((n: number) => !isNaN(n))
 			: undefined;
 
 		// Handle --suggest-deps mode
@@ -140,17 +217,25 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			const prs = await client.listOpenPRs({
 				state: "open",
 				labels,
-				...(opts.query ? { query: opts.query } : {})
+				...(opts.query ? { query: opts.query } : {}),
 			});
 
 			// Default behavior: include drafts unless explicitly disabled
-			const includeDrafts = opts.includeDrafts === undefined ? true : Boolean(opts.includeDrafts);
-			const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
+			const includeDrafts =
+				opts.includeDrafts === undefined
+					? true
+					: Boolean(opts.includeDrafts);
+			const filteredPRs = includeDrafts
+				? prs
+				: prs.filter((pr) => !pr.draft);
 
 			// Exclude specific PRs if requested
-			const finalPRs = excludePRs && excludePRs.length > 0
-				? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
-				: filteredPRs;
+			const finalPRs =
+				excludePRs && excludePRs.length > 0
+					? filteredPRs.filter(
+							(pr) => !excludePRs.includes(pr.number)
+					  )
+					: filteredPRs;
 
 			if (finalPRs.length === 0) {
 				console.log("No PRs found matching the criteria.");
@@ -159,7 +244,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 
 			// Get detailed information for each PR
 			const prDetails = await Promise.all(
-				finalPRs.map(pr => client.getPRDetails(pr.number))
+				finalPRs.map((pr) => client.getPRDetails(pr.number))
 			);
 
 			// Create file analyzer
@@ -172,11 +257,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			// Score dependencies
 			const threshold = opts.threshold ?? 0.3;
 			const scores = await scoreDependencies(
-				prDetails.map(pr => ({
+				prDetails.map((pr) => ({
 					number: pr.number,
 					name: `PR-${pr.number}`,
 					body: pr.body,
-					sha: pr.head.sha
+					sha: pr.head.sha,
 				})),
 				fileAnalyzer,
 				{ threshold }
@@ -202,7 +287,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 
 		// Parse required gates if provided
 		const requiredGates = opts.requiredGates
-			? opts.requiredGates.split(',').map((g: string) => g.trim())
+			? opts.requiredGates.split(",").map((g: string) => g.trim())
 			: ["lint", "typecheck", "test"];
 
 		// Parse max workers if provided
@@ -217,35 +302,44 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			target: opts.target,
 			policy: {
 				requiredGates,
-				maxWorkers
-			}
+				maxWorkers,
+			},
 		});
 
 		// If JSON mode is requested, keep non-JSON logs on stderr and emit a brief diagnostic
 		if (deps.jsonModeActive()) {
 			// diagnostics to stderr only
 			const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
-			const filterInfo = labels ? ` labels=${labels.join(',')}` : '';
-			const queryInfo = opts.query ? ` query="${opts.query}"` : '';
-			console.error(`[from-github] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length}`);
+			const filterInfo = labels ? ` labels=${labels.join(",")}` : "";
+			const queryInfo = opts.query ? ` query="${opts.query}"` : "";
+			console.error(
+				`[from-github] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length}`
+			);
 		} else {
-			const modeLabel = autoDetectedGitHubMode ? 'Auto-detected and discovered' : 'Auto-discovered';
+			const modeLabel = autoDetectedGitHubMode
+				? "Auto-detected and discovered"
+				: "Auto-discovered";
 			console.log(`✓ ${modeLabel} ${plan.items.length} PRs from GitHub`);
 			if (labels && labels.length > 0) {
-				console.log(`  Filtered by labels: ${labels.join(', ')}`);
+				console.log(`  Filtered by labels: ${labels.join(", ")}`);
 			}
 			if (opts.query) {
 				console.log(`  Using query: ${opts.query}`);
 			}
 			if (plan.items.length === 0) {
 				console.log(`\n⚠️  No PRs found matching the criteria.`);
-				console.log(`    Try adjusting filters or check that PRs exist in the repository.`);
+				console.log(
+					`    Try adjusting filters or check that PRs exist in the repository.`
+				);
 			}
 		}
 	} else {
 		// Traditional mode: load from configuration files
 		inputs = loadInputs();
-		plan = inputs.items.length > 0 ? generatePlan(inputs) : generateEmptyPlan(inputs.target);
+		plan =
+			inputs.items.length > 0
+				? generatePlan(inputs)
+				: generateEmptyPlan(inputs.target);
 	}
 
 	// Validate plan structure
@@ -256,16 +350,22 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 		try {
 			computeMergeOrder(validatedPlan);
 			if (!deps.jsonModeActive()) {
-				console.log(`✓ Dependency validation passed (no cycles detected)`);
+				console.log(
+					`✓ Dependency validation passed (no cycles detected)`
+				);
 			}
 		} catch (error) {
 			if (error instanceof CycleError) {
 				const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
-				console.error(`\n${prefix} Plan validation failed: ${error.message}`);
+				console.error(
+					`\n${prefix} Plan validation failed: ${error.message}`
+				);
 				throwExit(1);
 			} else if (error instanceof UnknownDependencyError) {
 				const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
-				console.error(`\n${prefix} Plan validation failed: ${error.message}`);
+				console.error(
+					`\n${prefix} Plan validation failed: ${error.message}`
+				);
 				throwExit(1);
 			}
 			throw error;
@@ -277,9 +377,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 		// Plan is already optimized by computeMergeOrder - just show info
 		const levels = computeMergeOrder(validatedPlan);
 		if (!deps.jsonModeActive()) {
-			console.log(`✓ Plan optimized for parallel execution: ${levels.length} levels`);
+			console.log(
+				`✓ Plan optimized for parallel execution: ${levels.length} levels`
+			);
 			levels.forEach((level, idx) => {
-				console.log(`  Level ${idx + 1}: ${level.join(', ')}`);
+				console.log(`  Level ${idx + 1}: ${level.join(", ")}`);
 			});
 		}
 	}
@@ -299,8 +401,12 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 
 	if (opts.dryRun) {
 		console.log("Dry run - would generate:");
-		console.log(`📁 ${path.join(outDir, "plan.json")} (${planJSON.length} bytes)`);
-		console.log(`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`);
+		console.log(
+			`📁 ${path.join(outDir, "plan.json")} (${planJSON.length} bytes)`
+		);
+		console.log(
+			`📁 ${path.join(outDir, "snapshot.md")} (${snapshot.length} bytes)`
+		);
 		console.log("");
 		console.log(generatePlanSummary(validatedPlan));
 		return;
@@ -314,7 +420,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 
 	// If output directory is inside the profile, validate write permissions
 	if (absOutDir.startsWith(profilePath)) {
-		validateWriteOperation(profilePath, resolved.manifest.role, "write plan artifacts");
+		validateWriteOperation(
+			profilePath,
+			resolved.manifest.role,
+			"write plan artifacts"
+		);
 	}
 
 	fs.mkdirSync(outDir, { recursive: true });

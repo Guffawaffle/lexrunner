@@ -20,7 +20,7 @@ describe('Doctor Command', () => {
 		const doctorCommand = program.commands.find(cmd => cmd.name() === 'doctor');
 		expect(doctorCommand).toBeDefined();
 		expect(doctorCommand?.name()).toBe('doctor');
-		expect(doctorCommand?.description()).toBe('Environment and config sanity checks');
+		expect(doctorCommand?.description()).toBe('Environment and config sanity checks (canonical: lex-pr workspace doctor)');
 		
 		// Check options
 		const opts = doctorCommand?.options;

@@ -27,17 +27,28 @@ export function registerPredictConflictsCommand(
 ): void {
 	program
 		.command("orchestrate:predict-conflicts")
-		.description("Predict merge conflicts using conflict graphs and MIS computation")
-		.option("--prs <numbers>", "Comma-separated list of PR numbers (e.g., 166,167,168)")
+		.description(
+			"Predict merge conflicts using conflict graphs and MIS computation (canonical: lex-pr weave analyze)"
+		)
+		.option(
+			"--prs <numbers>",
+			"Comma-separated list of PR numbers (e.g., 166,167,168)"
+		)
 		.option("--base <branch>", "Base branch for conflict analysis", "main")
 		.option("--skip-merge-tree", "Skip git merge-tree simulation")
-		.option("--enable-clustering", "Enable conflict clustering by file and symbol")
-		.option("--write-weave-conflicts", "Write clustered conflicts to .weave/conflicts.json")
+		.option(
+			"--enable-clustering",
+			"Enable conflict clustering by file and symbol"
+		)
+		.option(
+			"--write-weave-conflicts",
+			"Write clustered conflicts to .weave/conflicts.json"
+		)
 		.option("--json", "Output JSON format")
 		.action(async (options: PredictConflictsOptions) => {
 			try {
 				const useJson = options.json || jsonModeActive();
-				
+
 				// Parse PR numbers
 				if (!options.prs) {
 					if (useJson) {
@@ -48,13 +59,13 @@ export function registerPredictConflictsCommand(
 					process.exit(1);
 				}
 
-				const prNumbers = options.prs.split(',').map(n => n.trim());
-				
+				const prNumbers = options.prs.split(",").map((n) => n.trim());
+
 				// For now, create mock PR data (in real usage, fetch from GitHub)
-				const prs: PRWithFiles[] = prNumbers.map(num => ({
+				const prs: PRWithFiles[] = prNumbers.map((num) => ({
 					number: parseInt(num),
 					files: [],
-					head: `pr-${num}-head`
+					head: `pr-${num}-head`,
 				}));
 
 				// TODO: Add GitHub API integration to fetch actual file lists
@@ -62,7 +73,7 @@ export function registerPredictConflictsCommand(
 
 				// Create PR heads map
 				const prHeads = new Map<string, string>();
-				prs.forEach(pr => {
+				prs.forEach((pr) => {
 					if (pr.head) {
 						prHeads.set(String(pr.number), pr.head);
 					}
@@ -75,7 +86,7 @@ export function registerPredictConflictsCommand(
 					prHeads: options.skipMergeTree ? undefined : prHeads,
 					skipMergeTreeSimulation: options.skipMergeTree,
 					enableClustering: options.enableClustering,
-					writeWeaveConflicts: options.writeWeaveConflicts
+					writeWeaveConflicts: options.writeWeaveConflicts,
 				});
 
 				// Output
@@ -87,7 +98,12 @@ export function registerPredictConflictsCommand(
 			} catch (error) {
 				const useJsonError = options.json || jsonModeActive();
 				if (useJsonError) {
-					writeJsonOutput({ error: error instanceof Error ? error.message : String(error) });
+					writeJsonOutput({
+						error:
+							error instanceof Error
+								? error.message
+								: String(error),
+					});
 				} else {
 					console.error("Error predicting conflicts:", error);
 				}
@@ -102,15 +118,22 @@ export function registerPredictConflictsCommand(
 function printHumanReadableReport(report: any): void {
 	console.log(chalk.bold("\n🔍 Conflict Analysis\n"));
 	console.log(chalk.bold("=".repeat(60)));
-	
+
 	// Conflict Graph
 	console.log(chalk.bold("\n📊 Conflict Graph:"));
 	if (report.conflictGraph.edges.length === 0) {
-		console.log(chalk.green("  ✓ No conflicts detected - all PRs can merge in parallel"));
+		console.log(
+			chalk.green(
+				"  ✓ No conflicts detected - all PRs can merge in parallel"
+			)
+		);
 	} else {
 		for (const edge of report.conflictGraph.edges) {
 			const files = edge.sharedFiles.slice(0, 3).join(", ");
-			const more = edge.sharedFiles.length > 3 ? ` (+${edge.sharedFiles.length - 3} more)` : "";
+			const more =
+				edge.sharedFiles.length > 3
+					? ` (+${edge.sharedFiles.length - 3} more)`
+					: "";
 			console.log(`  - #${edge.from} ↔ #${edge.to}: ${files}${more}`);
 		}
 	}
@@ -126,16 +149,26 @@ function printHumanReadableReport(report: any): void {
 	// Merge-tree Simulation
 	if (Object.keys(report.mergeTreeSimulation).length > 0) {
 		console.log(chalk.bold("\n🧪 git merge-tree Simulation:"));
-		for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
-			const [pr1, pr2] = pair.split('-');
-			const status = (result as any).status === 'clean' 
-				? chalk.green("✅ Clean merge")
-				: chalk.red("❌ Conflict");
+		for (const [pair, result] of Object.entries(
+			report.mergeTreeSimulation
+		)) {
+			const [pr1, pr2] = pair.split("-");
+			const status =
+				(result as any).status === "clean"
+					? chalk.green("✅ Clean merge")
+					: chalk.red("❌ Conflict");
 			console.log(`  - #${pr1} + #${pr2}: ${status}`);
-			
-			if ((result as any).status === 'conflict' && (result as any).conflicts.length > 0) {
+
+			if (
+				(result as any).status === "conflict" &&
+				(result as any).conflicts.length > 0
+			) {
 				for (const conflict of (result as any).conflicts) {
-					console.log(`    ${chalk.yellow(`↳ ${conflict.file} (${conflict.type})`)}`);
+					console.log(
+						`    ${chalk.yellow(
+							`↳ ${conflict.file} (${conflict.type})`
+						)}`
+					);
 				}
 			}
 		}
@@ -144,51 +177,85 @@ function printHumanReadableReport(report: any): void {
 	// Recommendations
 	console.log(chalk.bold("\n💡 Recommendations:"));
 	if (report.recommendations.safeBatch.length > 0) {
-		const prs = report.recommendations.safeBatch.map((n: string) => `#${n}`).join(", ");
+		const prs = report.recommendations.safeBatch
+			.map((n: string) => `#${n}`)
+			.join(", ");
 		console.log(chalk.green(`  ✓ Safe parallel batch: ${prs}`));
 	}
 	if (report.recommendations.sequential.length > 0) {
-		const prs = report.recommendations.sequential.map((n: string) => `#${n}`).join(", ");
+		const prs = report.recommendations.sequential
+			.map((n: string) => `#${n}`)
+			.join(", ");
 		console.log(chalk.yellow(`  ⚠ Merge sequentially: ${prs}`));
 	}
-	
+
 	// Clustered Conflicts (if available)
 	if (report.clusteredReport) {
 		console.log(chalk.bold("\n🔬 Conflict Clustering Analysis:"));
-		console.log(chalk.gray(`  Analyzed ${report.clusteredReport.summary.totalClusters} conflict cluster(s) across ${report.clusteredReport.summary.fileCount} file(s)`));
-		console.log(chalk.gray(`  Affected ${report.clusteredReport.summary.symbolCount} symbol(s)`));
-		
+		console.log(
+			chalk.gray(
+				`  Analyzed ${report.clusteredReport.summary.totalClusters} conflict cluster(s) across ${report.clusteredReport.summary.fileCount} file(s)`
+			)
+		);
+		console.log(
+			chalk.gray(
+				`  Affected ${report.clusteredReport.summary.symbolCount} symbol(s)`
+			)
+		);
+
 		if (report.clusteredReport.clusters.length > 0) {
 			console.log(chalk.bold("\n  Top Conflict Clusters:"));
-			
+
 			// Show up to 5 clusters
 			const topClusters = report.clusteredReport.clusters.slice(0, 5);
 			for (const cluster of topClusters) {
-				const typeIcon = cluster.conflictType === "rename" ? "🔄" : 
-				                 cluster.conflictType === "whitespace" ? "⎵" :
-				                 cluster.conflictType === "mixed" ? "🔀" : "⚠️";
-				
-				console.log(`  ${typeIcon} ${cluster.file} (${cluster.conflictType})`);
-				console.log(chalk.gray(`    Lines: ${cluster.details.lineRange}`));
-				
+				const typeIcon =
+					cluster.conflictType === "rename"
+						? "🔄"
+						: cluster.conflictType === "whitespace"
+						? "⎵"
+						: cluster.conflictType === "mixed"
+						? "🔀"
+						: "⚠️";
+
+				console.log(
+					`  ${typeIcon} ${cluster.file} (${cluster.conflictType})`
+				);
+				console.log(
+					chalk.gray(`    Lines: ${cluster.details.lineRange}`)
+				);
+
 				if (cluster.symbols.length > 0) {
 					const symbolList = cluster.symbols.slice(0, 3).join(", ");
-					const more = cluster.symbols.length > 3 ? ` (+${cluster.symbols.length - 3} more)` : "";
-					console.log(chalk.gray(`    Symbols: ${symbolList}${more}`));
+					const more =
+						cluster.symbols.length > 3
+							? ` (+${cluster.symbols.length - 3} more)`
+							: "";
+					console.log(
+						chalk.gray(`    Symbols: ${symbolList}${more}`)
+					);
 				}
 			}
-			
+
 			if (report.clusteredReport.clusters.length > 5) {
-				console.log(chalk.gray(`  ... and ${report.clusteredReport.clusters.length - 5} more cluster(s)`));
+				console.log(
+					chalk.gray(
+						`  ... and ${
+							report.clusteredReport.clusters.length - 5
+						} more cluster(s)`
+					)
+				);
 			}
 		}
-		
+
 		// Show conflict type breakdown
 		console.log(chalk.bold("\n  Conflict Type Breakdown:"));
-		for (const [type, count] of Object.entries(report.clusteredReport.summary.conflictTypes)) {
+		for (const [type, count] of Object.entries(
+			report.clusteredReport.summary.conflictTypes
+		)) {
 			console.log(`    - ${type}: ${count}`);
 		}
 	}
-	
+
 	console.log();
 }
