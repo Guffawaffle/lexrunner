@@ -295,6 +295,10 @@ We explicitly state:
 
 > Altruism is not required; non-abuse and mutual benefit are sufficient.
 
+> Honesty lowers environmental hostility for both humans and models.
+
+This last point is architectural, not moral: honest uncertainty lets agents admit doubt instead of faking confidence, honest limitations prevent encoding wishful thinking as spec, and honest failure modes give us places to hook telemetry and tests.
+
 This is a rare and healthy philosophical grounding.
 
 ---
