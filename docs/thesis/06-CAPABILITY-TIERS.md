@@ -160,7 +160,7 @@ interface TaskClassification {
 function classifyTask(task: Task): TaskClassification {
   const factors: string[] = [];
   let score = 50; // Start at mid-tier
-  
+
   // Reasoning complexity
   if (task.requiresArchitectureDecision) {
     score += 30;
@@ -170,7 +170,7 @@ function classifyTask(task: Task): TaskClassification {
     score += 20;
     factors.push('ambiguous_requirements');
   }
-  
+
   // Implementation complexity
   if (task.touchesMultipleModules) {
     score += 15;
@@ -180,7 +180,7 @@ function classifyTask(task: Task): TaskClassification {
     score -= 10;
     factors.push('existing_patterns');
   }
-  
+
   // Mechanical indicators
   if (task.isFormatting) {
     score -= 40;
@@ -194,13 +194,13 @@ function classifyTask(task: Task): TaskClassification {
     score -= 30;
     factors.push('boilerplate');
   }
-  
+
   // Determine tier
   let tier: 'senior' | 'mid' | 'junior';
   if (score >= 70) tier = 'senior';
   else if (score >= 30) tier = 'mid';
   else tier = 'junior';
-  
+
   return {
     task: task.description,
     recommendedTier: tier,
@@ -237,12 +237,12 @@ overrides:
   - pattern: "security/**"
     tier: "senior"
     reason: "Security code requires full reasoning"
-    
+
   # Always use junior for generated files
   - pattern: "generated/**"
     tier: "junior"
     reason: "Generated files are mechanical"
-    
+
   # Default to mid for tests
   - pattern: "test/**"
     tier: "mid"
@@ -271,20 +271,20 @@ constraints:
       rule: "Consider at least 2 alternatives for major decisions"
     - id: "assess-risk"
       rule: "Assess and document risk for non-trivial changes"
-      
+
 permissions:
   can:
     - "make_architecture_decisions"
     - "define_interfaces"
     - "set_patterns"
     - "approve_designs"
-    
+
 uncertainty:
   thresholds:
     continue: 0.6  # Senior can proceed with more uncertainty
     flag_review: 0.4
     escalate: 0.2
-    
+
 escalation:
   triggers:
     - condition: "decision_impact > high"
@@ -309,25 +309,25 @@ constraints:
       rule: "Add tests for new functionality"
     - id: "check-types"
       rule: "Ensure TypeScript compiles without errors"
-      
+
 permissions:
   can:
     - "implement_features"
     - "refactor_code"
     - "write_tests"
     - "update_documentation"
-    
+
   cannot:
     - "change_architecture"
     - "modify_interfaces"
     - "define_new_patterns"
-    
+
 uncertainty:
   thresholds:
     continue: 0.7
     flag_review: 0.5
     escalate: 0.3
-    
+
 escalation:
   triggers:
     - condition: "requires_architecture_decision"
@@ -352,26 +352,26 @@ constraints:
       rule: "Do not modify business logic"
     - id: "reversible"
       rule: "All changes must be easily reversible"
-      
+
 permissions:
   can:
     - "format_code"
     - "fix_lint_errors"
     - "update_imports"
     - "rename_variables"  # Local scope only
-    
+
   cannot:
     - "add_new_code"
     - "modify_logic"
     - "change_structure"
     - "add_dependencies"
-    
+
 uncertainty:
   thresholds:
     continue: 0.9  # Junior needs high confidence
     flag_review: 0.7
     escalate: 0.5  # Lower threshold = faster escalation
-    
+
 escalation:
   triggers:
     - condition: "requires_judgment"
@@ -406,7 +406,7 @@ async function escalateToHigherTier(
     reason: event.reason,
     state: event.preservedState
   });
-  
+
   // Prepare context for higher tier
   const handoff = {
     originalTask: event.context.task,
@@ -414,7 +414,7 @@ async function escalateToHigherTier(
     blockingIssue: event.reason,
     recommendedApproach: event.context.suggestions
   };
-  
+
   // Route to appropriate model
   await routeToTier(event.to, handoff);
 }
@@ -445,7 +445,7 @@ async function delegateToLowerTier(
       'if_confidence_low'
     ]
   };
-  
+
   // Create delegation receipt
   await createReceipt({
     action: 'tier_delegation',
@@ -454,7 +454,7 @@ async function delegateToLowerTier(
     task: event.subtask.description,
     constraints: event.constraints
   });
-  
+
   // Route to lower tier
   await routeToTier(event.to, delegation);
 }
@@ -507,7 +507,7 @@ const MODEL_CONFIGS: ModelConfig[] = [
 
 function selectModel(tier: Tier): ModelConfig {
   const configs = MODEL_CONFIGS.filter(c => c.tier === tier);
-  
+
   // Could add more sophisticated selection (load balancing, cost optimization)
   return configs[0];
 }
@@ -521,16 +521,16 @@ function selectModel(tier: Tier): ModelConfig {
 async function executeTask(task: Task): Promise<TaskResult> {
   // Classify task
   const classification = classifyTask(task);
-  
+
   // Select model
   const model = selectModel(classification.recommendedTier);
-  
+
   // Load tier-specific rules
   const rules = await loadRulesForTier(classification.recommendedTier);
-  
+
   // Execute with tier-appropriate governance
   const result = await executeWithModel(task, model, rules);
-  
+
   // Check for escalation triggers
   if (result.needsEscalation) {
     return await escalateToHigherTier({
@@ -541,7 +541,7 @@ async function executeTask(task: Task): Promise<TaskResult> {
       preservedState: result.state
     });
   }
-  
+
   // Create completion receipt
   await createReceipt({
     action: 'task_completed',
@@ -550,7 +550,7 @@ async function executeTask(task: Task): Promise<TaskResult> {
     tokens_used: result.tokensUsed,
     cost: result.tokensUsed / 1000 * model.costPer1KTokens
   });
-  
+
   return result;
 }
 ```
@@ -578,22 +578,22 @@ class CostTracker {
     escalations: 0,
     delegations: 0
   };
-  
+
   recordUsage(tier: Tier, model: string, tokens: number, cost: number): void {
     this.metrics.byTier[tier] += cost;
     this.metrics.byModel[model] = (this.metrics.byModel[model] || 0) + cost;
     this.metrics.total += cost;
     this.metrics.tokensByTier[tier] += tokens;
   }
-  
+
   recordEscalation(): void {
     this.metrics.escalations++;
   }
-  
+
   recordDelegation(): void {
     this.metrics.delegations++;
   }
-  
+
   getReport(): string {
     return `
 ## Cost Report

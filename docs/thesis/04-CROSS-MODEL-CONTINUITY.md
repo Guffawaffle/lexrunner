@@ -160,12 +160,12 @@ terms:
     definition: "ESM module with .js extension"
     not: "CommonJS require, Python module"
     example: "src/auth/index.js"
-    
+
   frame:
     definition: "Episodic memory unit in Lex"
     schema: "canon/schemas/frame.schema.json"
     not: "Stack frame, window frame"
-    
+
   gate:
     definition: "Verification step in merge pyramid"
     examples: ["lint", "typecheck", "test"]
@@ -182,12 +182,12 @@ expectations:
     typescript: "Follow tsconfig.json settings"
     imports: "Use .js extensions for ESM"
     naming: "camelCase for functions, PascalCase for types"
-    
+
   workflow:
     commits: "Imperative mood, signed-off"
     tests: "Required before merge"
     review: "Required for changes to canon/"
-    
+
   boundaries:
     no_modify: ["CONTRACT.md", "*.schema.json"]
     require_approval: ["migrations/", "canon/"]
@@ -211,7 +211,7 @@ roles:
     uncertainty:
       max: 0.3
       escalate_to: human
-      
+
   junior-dev:
     can:
       - lint
@@ -245,7 +245,7 @@ receipts:
     outputs:
       - "docs/design/auth-flow.md"
       - ".lex/decisions/auth-approach.yaml"
-    
+
   - id: "rcpt-002"
     model: "claude-sonnet"
     action: "implement_auth_flow"
@@ -254,7 +254,7 @@ receipts:
     outputs:
       - "src/auth/flow.ts"
       - "src/auth/flow.test.ts"
-    
+
   - id: "rcpt-003"
     model: "claude-haiku"
     action: "verify_auth_flow"
@@ -302,14 +302,14 @@ async function loadRecentContext(): Promise<Receipt[]> {
 async function verifyHandoff(governance: Governance, receipts: Receipt[]): Promise<boolean> {
   // Generate understanding summary
   const summary = await generateSummary(governance, receipts);
-  
+
   // Verify key concepts
   const checks = [
     verifyVocabulary(summary, governance.vocabulary),
     verifyConstraints(summary, governance.contracts),
     verifyReceipts(summary, receipts)
   ];
-  
+
   return checks.every(c => c.passed);
 }
 ```
@@ -342,7 +342,7 @@ Complex Design Task
 ├── GPT-4o/Claude Opus (Senior)
 │   └── Architecture decisions, trade-off analysis
 │
-├── Claude Sonnet/GPT-4 (Mid)  
+├── Claude Sonnet/GPT-4 (Mid)
 │   └── Implementation, refactoring
 │
 └── Claude Haiku/GPT-3.5 (Junior)

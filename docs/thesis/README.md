@@ -14,6 +14,16 @@ These documents are intentionally detailed and implementation-focused. They are 
 
 ---
 
+## Start Here
+
+📘 **[00-EVOLUTION-NOTES.md](./00-EVOLUTION-NOTES.md)** — The crystallized synthesis
+
+This is the formal "lock-in" of lessons learned — the continuity scaffold that allows future work (by any model) to inherit the conceptual universe without rediscovering it from scratch.
+
+Read this first for the "why." Read the detailed documents for the "how."
+
+---
+
 ## Core Thesis
 
 > **Governance, contracts, and shared language reduce the delta between models and make handoffs cheaper.**
@@ -22,12 +32,19 @@ This is not capability amplification. It is **coordination cost compression**.
 
 The value lives in the abstract structure — not in any particular model, provider, or implementation.
 
+### The Fundamental Insight
+
+> Machine performance degrades in proportion to environment hostility, NOT model capacity.
+
+If you progressively de-hostilize the environment, models can behave like reliable collaborators — regardless of which model is driving.
+
 ---
 
 ## Document Index
 
 | Document | Purpose |
 |----------|---------|
+| [00-EVOLUTION-NOTES.md](./00-EVOLUTION-NOTES.md) | **Start here** — Crystallized synthesis and core commitments |
 | [01-CORE-THESIS.md](./01-CORE-THESIS.md) | The foundational argument: why governance matters more than model strength |
 | [02-TURN-COST.md](./02-TURN-COST.md) | Formal definition of Turn and Turn Cost as optimization targets |
 | [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md) | How to encode productive failure without enabling sloppiness |

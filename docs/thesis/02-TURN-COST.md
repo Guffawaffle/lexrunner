@@ -173,14 +173,14 @@ interface TurnCostMetrics {
   turnCount: number;
   totalDuration: number;
   modelInferenceTime: number;
-  
+
   // Component breakdown
   latencyMs: number;
   contextResetTokens: number;
   promptRenegotiationTurns: number;
   tokenBloatEstimate: number;
   attentionSwitchEvents: number;
-  
+
   // Derived
   tokensPerTurn: number;
   effectiveTurnCost: number; // weighted sum of components
@@ -209,7 +209,7 @@ function computeTurnCost(metrics: TurnCostMetrics): number {
     tokenBloat: 0.1,
     attentionSwitch: 0.15
   };
-  
+
   return (
     weights.latency * normalize(metrics.latencyMs) +
     weights.contextReset * normalize(metrics.contextResetTokens) +
@@ -228,7 +228,7 @@ function computeTurnCost(metrics: TurnCostMetrics): number {
 
 Without governance:
 ```
-Turn 1: "I'm working on the auth system. We use OAuth2 with PKCE. 
+Turn 1: "I'm working on the auth system. We use OAuth2 with PKCE.
         The token store is in Redis. The API is REST-style..."
         [500 tokens of context]
 ```
@@ -277,7 +277,7 @@ Turn 1: Agent: "I've completed the following changes:
         - Modified auth.ts (added login function)
         - Updated routes.ts (added /login route)
         - Created login.test.ts (unit tests)
-        
+
         The login function works by taking a username and password,
         validating them against the database, generating a JWT token,
         and storing the session in Redis..."
@@ -327,15 +327,15 @@ esobench_turn_cost:
     - name: context_efficiency
       description: "How well does the agent use existing context?"
       measurement: tokens_required_for_context_restoration
-    
+
     - name: instruction_clarity
       description: "How few clarification turns are needed?"
       measurement: renegotiation_turn_count
-    
+
     - name: output_efficiency
       description: "How concise is the agent's output?"
       measurement: output_tokens_vs_minimal_tokens
-    
+
     - name: handoff_cost
       description: "How expensive is switching models mid-task?"
       measurement: context_reset_after_switch
@@ -355,16 +355,16 @@ interface TurnEvent {
   sessionId: string;
   timestamp: Date;
   modelId: string;
-  
+
   // Timing
   startTime: number;
   endTime: number;
-  
+
   // Tokens
   inputTokens: number;
   outputTokens: number;
   contextTokens: number;
-  
+
   // Classification
   isRenegotiation: boolean;
   isContextReset: boolean;
@@ -373,11 +373,11 @@ interface TurnEvent {
 
 class TurnCostCollector {
   private events: TurnEvent[] = [];
-  
+
   recordTurn(event: TurnEvent): void {
     this.events.push(event);
   }
-  
+
   computeSessionMetrics(): TurnCostMetrics {
     // Aggregate events into session-level metrics
   }
@@ -392,7 +392,7 @@ const turnCostGate: Gate = {
   name: "turn-cost",
   run: async (context) => {
     const metrics = context.turnCostCollector.computeSessionMetrics();
-    
+
     if (metrics.effectiveTurnCost > context.policy.turnCostThreshold) {
       return {
         status: "warn",
@@ -400,7 +400,7 @@ const turnCostGate: Gate = {
         data: metrics
       };
     }
-    
+
     return { status: "pass", data: metrics };
   }
 };

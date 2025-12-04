@@ -131,7 +131,7 @@ Without explicit failure handling, this data is lost.
 
 permission_to_fail:
   enabled: true
-  
+
   uncertainty:
     allowed: true
     max_uncertainty_per_task: 0.3  # If >30% uncertain, escalate
@@ -142,7 +142,7 @@ permission_to_fail:
         reason: string
         alternatives: string[]
         reversibility: "full" | "partial" | "none"
-    
+
   discipline:
     on_uncertainty:
       - action: "flag_for_review"
@@ -151,7 +151,7 @@ permission_to_fail:
         threshold: 0.5  # Below 50% confidence
       - action: "escalate"
         threshold: 0.3  # Below 30% confidence
-    
+
     on_failure:
       required:
         - create_receipt
@@ -197,7 +197,7 @@ const permissionToFailGate: Gate = {
   run: async (context) => {
     const uncertainties = findUncertaintyMarkers(context.changes);
     const failures = findFailureReceipts(context.changes);
-    
+
     // Check uncertainty discipline
     for (const u of uncertainties) {
       if (u.confidence < context.policy.escalationThreshold) {
@@ -208,7 +208,7 @@ const permissionToFailGate: Gate = {
           };
         }
       }
-      
+
       if (u.reversibility !== "full") {
         if (!hasReviewFlag(context, u)) {
           return {
@@ -218,7 +218,7 @@ const permissionToFailGate: Gate = {
         }
       }
     }
-    
+
     // Check failure discipline
     for (const f of failures) {
       if (!f.state.preserved) {
@@ -227,7 +227,7 @@ const permissionToFailGate: Gate = {
           message: `Failure ${f.failureId} did not preserve state`
         };
       }
-      
+
       if (!f.recovery.proposed) {
         return {
           status: "fail",
@@ -235,7 +235,7 @@ const permissionToFailGate: Gate = {
         };
       }
     }
-    
+
     return { status: "pass", data: { uncertainties, failures } };
   }
 };
@@ -391,11 +391,11 @@ interface RevertibleChange {
 
 async function autoRevert(failure: FailureReceipt): Promise<void> {
   const change = await findRevertibleChange(failure);
-  
+
   if (!change) {
     throw new Error(`Cannot auto-revert: no revertible change found`);
   }
-  
+
   // Create reversion receipt
   await createReceipt({
     action: "auto_revert",
@@ -404,10 +404,10 @@ async function autoRevert(failure: FailureReceipt): Promise<void> {
     revert_commit: change.revertCommit,
     state_preserved_at: change.preservedState
   });
-  
+
   // Execute reversion
   await git.revert(change.revertCommit);
-  
+
   // Notify
   await notify({
     type: "auto_revert",
@@ -428,7 +428,7 @@ levels:
       - create_receipt
       - log_incident
     timeout: 5m
-    
+
   - name: "peer_agent"
     trigger: "self_heal failed or unknown failure"
     actions:
@@ -436,7 +436,7 @@ levels:
       - request_peer_review
       - await_guidance
     timeout: 15m
-    
+
   - name: "human"
     trigger: "peer review inconclusive or timeout"
     actions:

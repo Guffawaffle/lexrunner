@@ -93,29 +93,29 @@ export const TelemetryEventSchema = z.object({
   eventId: z.string(),
   eventType: z.string(),
   timestamp: z.date(),
-  
+
   // Context
   sessionId: z.string(),
   workspaceId: z.string(),
   taskId: z.string().optional(),
-  
+
   // Actor
   model: z.string().optional(),
   tier: z.enum(['senior', 'mid', 'junior']).optional(),
-  
+
   // Timing
   durationMs: z.number().optional(),
-  
+
   // Tokens
   inputTokens: z.number().optional(),
   outputTokens: z.number().optional(),
-  
+
   // Cost
   estimatedCost: z.number().optional(),
-  
+
   // Classification
   tags: z.array(z.string()).optional(),
-  
+
   // Arbitrary data
   data: z.record(z.unknown()).optional()
 });
@@ -132,31 +132,31 @@ export const EventTypes = {
   TURN_START: 'turn.start',
   TURN_END: 'turn.end',
   TURN_RENEGOTIATION: 'turn.renegotiation',
-  
+
   // Model events
   MODEL_REQUEST: 'model.request',
   MODEL_RESPONSE: 'model.response',
   MODEL_ERROR: 'model.error',
-  
+
   // Governance events
   COMPLIANCE_CHECK: 'governance.compliance_check',
   CONSTRAINT_VIOLATION: 'governance.constraint_violation',
   UNCERTAINTY_EXPRESSED: 'governance.uncertainty',
-  
+
   // Tier events
   TIER_ESCALATION: 'tier.escalation',
   TIER_DELEGATION: 'tier.delegation',
-  
+
   // Receipt events
   RECEIPT_CREATED: 'receipt.created',
   RECEIPT_FAILED: 'receipt.failed',
-  
+
   // Gate events
   GATE_START: 'gate.start',
   GATE_PASS: 'gate.pass',
   GATE_FAIL: 'gate.fail',
   GATE_WARN: 'gate.warn',
-  
+
   // Session events
   SESSION_START: 'session.start',
   SESSION_END: 'session.end'
@@ -182,44 +182,44 @@ export class TelemetryCollector {
   private buffer: TelemetryEvent[] = [];
   private config: CollectorConfig;
   private flushTimer: NodeJS.Timer | null = null;
-  
+
   constructor(config: CollectorConfig) {
     this.config = config;
     this.startFlushTimer();
   }
-  
+
   emit(event: Omit<TelemetryEvent, 'eventId' | 'timestamp'>): void {
     const fullEvent: TelemetryEvent = {
       ...event,
       eventId: generateEventId(),
       timestamp: new Date()
     };
-    
+
     this.buffer.push(fullEvent);
-    
+
     if (this.buffer.length >= this.config.maxBatchSize) {
       this.flush();
     }
   }
-  
+
   async flush(): Promise<void> {
     if (this.buffer.length === 0) return;
-    
+
     const events = [...this.buffer];
     this.buffer = [];
-    
+
     await Promise.all(
       this.config.stores.map(store => store.write(events))
     );
   }
-  
+
   private startFlushTimer(): void {
     this.flushTimer = setInterval(
       () => this.flush(),
       this.config.flushInterval
     );
   }
-  
+
   stop(): void {
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
@@ -236,19 +236,19 @@ export class TelemetryCollector {
 
 export class FileTelemetryStore implements TelemetryStore {
   private baseDir: string;
-  
+
   constructor(baseDir: string) {
     this.baseDir = baseDir;
   }
-  
+
   async write(events: TelemetryEvent[]): Promise<void> {
     const date = new Date().toISOString().split('T')[0];
     const dir = join(this.baseDir, date);
     await mkdir(dir, { recursive: true });
-    
+
     const filename = `events-${Date.now()}.ndjson`;
     const content = events.map(e => JSON.stringify(e)).join('\n');
-    
+
     await writeFile(join(dir, filename), content);
   }
 }
@@ -258,20 +258,20 @@ export class FileTelemetryStore implements TelemetryStore {
 export class MemoryTelemetryStore implements TelemetryStore {
   private events: TelemetryEvent[] = [];
   private maxEvents: number;
-  
+
   constructor(maxEvents = 10000) {
     this.maxEvents = maxEvents;
   }
-  
+
   async write(events: TelemetryEvent[]): Promise<void> {
     this.events.push(...events);
-    
+
     // Trim old events
     if (this.events.length > this.maxEvents) {
       this.events = this.events.slice(-this.maxEvents);
     }
   }
-  
+
   query(filter: EventFilter): TelemetryEvent[] {
     return this.events.filter(e => matchesFilter(e, filter));
   }
@@ -289,27 +289,27 @@ export class MemoryTelemetryStore implements TelemetryStore {
 
 export class TurnCostAggregator {
   private metrics: Map<string, TurnCostMetrics> = new Map();
-  
+
   process(events: TelemetryEvent[]): void {
     for (const event of events) {
       if (!event.sessionId) continue;
-      
+
       let metrics = this.metrics.get(event.sessionId);
       if (!metrics) {
         metrics = createEmptyMetrics(event.sessionId);
         this.metrics.set(event.sessionId, metrics);
       }
-      
+
       switch (event.eventType) {
         case EventTypes.TURN_END:
           metrics.turnCount++;
           metrics.totalDurationMs += event.durationMs ?? 0;
           break;
-          
+
         case EventTypes.TURN_RENEGOTIATION:
           metrics.renegotiationTurns++;
           break;
-          
+
         case EventTypes.MODEL_RESPONSE:
           if (event.inputTokens) {
             metrics.totalInputTokens += event.inputTokens;
@@ -321,11 +321,11 @@ export class TurnCostAggregator {
       }
     }
   }
-  
+
   getMetrics(sessionId: string): TurnCostMetrics | null {
     return this.metrics.get(sessionId) ?? null;
   }
-  
+
   getAllMetrics(): TurnCostMetrics[] {
     return Array.from(this.metrics.values());
   }
@@ -342,7 +342,7 @@ export class EconomicAggregator {
   private costByModel: Map<string, number> = new Map();
   private escalationCount = 0;
   private delegationCount = 0;
-  
+
   process(events: TelemetryEvent[]): void {
     for (const event of events) {
       switch (event.eventType) {
@@ -355,21 +355,21 @@ export class EconomicAggregator {
             this.costByModel.set(event.model, current + event.estimatedCost);
           }
           break;
-          
+
         case EventTypes.TIER_ESCALATION:
           this.escalationCount++;
           break;
-          
+
         case EventTypes.TIER_DELEGATION:
           this.delegationCount++;
           break;
       }
     }
   }
-  
+
   getReport(): EconomicReport {
     const totalCost = Object.values(this.costByTier).reduce((a, b) => a + b, 0);
-    
+
     return {
       totalCost,
       costByTier: this.costByTier,
@@ -399,28 +399,28 @@ export interface SessionReport {
   sessionId: string;
   startTime: Date;
   endTime: Date | null;
-  
+
   // Turn metrics
   turns: {
     total: number;
     renegotiations: number;
     renegotiationRate: number;
   };
-  
+
   // Cost metrics
   cost: {
     total: number;
     byTier: Record<Tier, number>;
     tokensUsed: number;
   };
-  
+
   // Quality metrics
   quality: {
     complianceViolations: number;
     gateFailures: number;
     uncertaintyExpressions: number;
   };
-  
+
   // Tier metrics
   tiers: {
     escalations: number;
@@ -434,11 +434,11 @@ export function generateSessionReport(
   sessionId: string
 ): SessionReport {
   const sessionEvents = events.filter(e => e.sessionId === sessionId);
-  
+
   // Find session bounds
   const startEvent = sessionEvents.find(e => e.eventType === EventTypes.SESSION_START);
   const endEvent = sessionEvents.find(e => e.eventType === EventTypes.SESSION_END);
-  
+
   // Count events by type
   const turnEnds = sessionEvents.filter(e => e.eventType === EventTypes.TURN_END);
   const renegotiations = sessionEvents.filter(e => e.eventType === EventTypes.TURN_RENEGOTIATION);
@@ -447,47 +447,47 @@ export function generateSessionReport(
   const uncertainties = sessionEvents.filter(e => e.eventType === EventTypes.UNCERTAINTY_EXPRESSED);
   const escalations = sessionEvents.filter(e => e.eventType === EventTypes.TIER_ESCALATION);
   const delegations = sessionEvents.filter(e => e.eventType === EventTypes.TIER_DELEGATION);
-  
+
   // Calculate costs
   const modelResponses = sessionEvents.filter(e => e.eventType === EventTypes.MODEL_RESPONSE);
   const totalCost = modelResponses.reduce((sum, e) => sum + (e.estimatedCost ?? 0), 0);
   const totalTokens = modelResponses.reduce(
-    (sum, e) => sum + (e.inputTokens ?? 0) + (e.outputTokens ?? 0), 
+    (sum, e) => sum + (e.inputTokens ?? 0) + (e.outputTokens ?? 0),
     0
   );
-  
+
   // Tier distribution
   const tierCounts: Record<Tier, number> = { senior: 0, mid: 0, junior: 0 };
   for (const e of modelResponses) {
     if (e.tier) tierCounts[e.tier]++;
   }
   const totalTierCounts = Object.values(tierCounts).reduce((a, b) => a + b, 0);
-  
+
   return {
     sessionId,
     startTime: startEvent?.timestamp ?? new Date(),
     endTime: endEvent?.timestamp ?? null,
-    
+
     turns: {
       total: turnEnds.length,
       renegotiations: renegotiations.length,
-      renegotiationRate: turnEnds.length > 0 
-        ? renegotiations.length / turnEnds.length 
+      renegotiationRate: turnEnds.length > 0
+        ? renegotiations.length / turnEnds.length
         : 0
     },
-    
+
     cost: {
       total: totalCost,
       byTier: calculateCostByTier(modelResponses),
       tokensUsed: totalTokens
     },
-    
+
     quality: {
       complianceViolations: violations.length,
       gateFailures: gateFailures.length,
       uncertaintyExpressions: uncertainties.length
     },
-    
+
     tiers: {
       escalations: escalations.length,
       delegations: delegations.length,
@@ -509,7 +509,7 @@ export function generateSessionReport(
 export function formatPRReport(report: SessionReport): string {
   const renegoEmoji = report.turns.renegotiationRate > 0.15 ? '⚠️' : '✅';
   const costEmoji = report.cost.total > 1.0 ? '⚠️' : '✅';
-  
+
   return `
 ## Agent Session Report
 
@@ -569,19 +569,19 @@ export function registerDashboardCommand(program: Command): void {
       const store = new MemoryTelemetryStore();
       const turnCostAggregator = new TurnCostAggregator();
       const economicAggregator = new EconomicAggregator();
-      
+
       const refresh = async () => {
         console.clear();
-        
+
         const events = store.query({});
         turnCostAggregator.process(events);
         economicAggregator.process(events);
-        
+
         console.log('═══════════════════════════════════════════');
         console.log('               AGENT DASHBOARD              ');
         console.log('═══════════════════════════════════════════');
         console.log();
-        
+
         // Turn Cost section
         const turnMetrics = turnCostAggregator.getAllMetrics();
         console.log('📊 TURN COST');
@@ -590,7 +590,7 @@ export function registerDashboardCommand(program: Command): void {
           console.log(`  ${m.sessionId.slice(0, 12)}  Turns: ${m.turnCount}  Renego: ${m.renegotiationTurns}`);
         }
         console.log();
-        
+
         // Economic section
         const economic = economicAggregator.getReport();
         console.log('💰 ECONOMICS');
@@ -600,11 +600,11 @@ export function registerDashboardCommand(program: Command): void {
         console.log(`  Mid: ${(economic.tierDistribution.mid * 100).toFixed(1)}%`);
         console.log(`  Junior: ${(economic.tierDistribution.junior * 100).toFixed(1)}%`);
         console.log();
-        
+
         console.log('═══════════════════════════════════════════');
         console.log(`  Last updated: ${new Date().toISOString()}`);
       };
-      
+
       await refresh();
       setInterval(refresh, parseInt(options.refresh));
     });
@@ -632,10 +632,10 @@ export const ALERT_DEFINITIONS: AlertDefinition[] = [
   {
     id: 'high_renegotiation_rate',
     name: 'High Renegotiation Rate',
-    condition: (m: TurnCostMetrics) => 
+    condition: (m: TurnCostMetrics) =>
       m.turnCount > 3 && (m.renegotiationTurns / m.turnCount) > 0.25,
     severity: 'warning',
-    message: (m) => 
+    message: (m) =>
       `Session ${m.sessionId} has ${((m.renegotiationTurns / m.turnCount) * 100).toFixed(1)}% renegotiation rate`
   },
   {
@@ -648,7 +648,7 @@ export const ALERT_DEFINITIONS: AlertDefinition[] = [
   {
     id: 'compliance_violation',
     name: 'Compliance Violation',
-    condition: (e: TelemetryEvent) => 
+    condition: (e: TelemetryEvent) =>
       e.eventType === EventTypes.CONSTRAINT_VIOLATION,
     severity: 'error',
     message: (e) => `Constraint violation in session ${e.sessionId}`
@@ -656,10 +656,10 @@ export const ALERT_DEFINITIONS: AlertDefinition[] = [
   {
     id: 'excessive_escalation',
     name: 'Excessive Escalation',
-    condition: (m: { escalations: number; tasks: number }) => 
+    condition: (m: { escalations: number; tasks: number }) =>
       m.tasks > 0 && (m.escalations / m.tasks) > 0.3,
     severity: 'warning',
-    message: (m) => 
+    message: (m) =>
       `Escalation rate ${((m.escalations / m.tasks) * 100).toFixed(1)}% exceeds 30%`
   }
 ];
@@ -682,14 +682,14 @@ export interface Alert {
 export class AlertEvaluator {
   private alerts: Alert[] = [];
   private definitions: AlertDefinition[];
-  
+
   constructor(definitions: AlertDefinition[] = ALERT_DEFINITIONS) {
     this.definitions = definitions;
   }
-  
+
   evaluate(metrics: Record<string, any>): Alert[] {
     const newAlerts: Alert[] = [];
-    
+
     for (const def of this.definitions) {
       if (def.condition(metrics)) {
         const alert: Alert = {
@@ -700,19 +700,19 @@ export class AlertEvaluator {
           message: def.message(metrics),
           acknowledged: false
         };
-        
+
         newAlerts.push(alert);
         this.alerts.push(alert);
       }
     }
-    
+
     return newAlerts;
   }
-  
+
   getActiveAlerts(): Alert[] {
     return this.alerts.filter(a => !a.acknowledged);
   }
-  
+
   acknowledge(alertId: string): void {
     const alert = this.alerts.find(a => a.alertId === alertId);
     if (alert) {

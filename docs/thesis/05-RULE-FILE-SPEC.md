@@ -20,7 +20,7 @@ This approach has fundamental problems:
 # Yesterday's prompt
 "Always use TypeScript strict mode"
 
-# Today's prompt  
+# Today's prompt
 "Use TypeScript with strict mode disabled for legacy compatibility"
 ```
 
@@ -93,20 +93,20 @@ constraints:
     - id: "use-strict"
       rule: "Enable TypeScript strict mode"
       check: "tsconfig.json#compilerOptions.strict === true"
-      
+
     - id: "signed-commits"
       rule: "Sign all commits with GPG"
       check: "git log --show-signature | grep 'Good signature'"
-      
+
     - id: "test-coverage"
       rule: "Maintain >80% test coverage for new code"
       check: "coverage/lcov.info | extract_coverage >= 80"
-      
+
   must_not:
     - id: "no-any"
       rule: "Do not use 'any' type"
       check: "!grep -r 'any' src/**/*.ts"
-      
+
     - id: "no-force-push"
       rule: "Never force push to protected branches"
       check: "git reflog | !contains 'force'"
@@ -121,7 +121,7 @@ permissions:
     - "modify_files: src/**/*.ts, test/**/*.ts"
     - "run_commands: npm test, npm run lint, npm run build"
     - "create_branches: feature/*, fix/*, refactor/*"
-    
+
   cannot:
     - "modify_files: canon/**, CONTRACT.md, *.schema.json"
     - "delete_branches: main, develop"
@@ -139,12 +139,12 @@ uncertainty:
       ⚠️ UNCERTAIN: {reason}
       Confidence: {confidence}
       Alternatives: {alternatives}
-      
+
   thresholds:
     continue: 0.7        # Above 70%: proceed normally
     flag_review: 0.5     # 50-70%: flag for human review
     escalate: 0.3        # Below 30%: escalate immediately
-    
+
   on_uncertainty:
     - action: "create_reversible_change"
       condition: "confidence < 0.7"
@@ -163,11 +163,11 @@ receipts:
     - "file_deletion"
     - "configuration_change"
     - "dependency_update"
-    
+
   format:
     type: "yaml"
     location: ".lex/receipts/{date}/{session_id}/"
-    
+
   schema:
     action: "string"
     timestamp: "iso8601"
@@ -185,20 +185,20 @@ gates:
     - name: "lint"
       command: "npm run lint"
       required: true
-      
+
     - name: "typecheck"
       command: "npm run typecheck"
       required: true
-      
+
     - name: "test"
       command: "npm test"
       required: true
-      
+
   before_push:
     - name: "full-test"
       command: "npm run test:all"
       required: true
-      
+
     - name: "security"
       command: "npm audit"
       required: false
@@ -212,17 +212,17 @@ escalation:
   triggers:
     - condition: "uncertainty.confidence < 0.3"
       action: "escalate_to_human"
-      
+
     - condition: "gate.failed && gate.required"
       action: "block_and_notify"
-      
+
     - condition: "receipt.type == 'failure'"
       action: "preserve_state_and_escalate"
-      
+
   contacts:
     human: "@maintainers"
     senior_agent: "role:senior-dev"
-    
+
   timeout:
     agent_escalation: "15m"
     human_escalation: "4h"
@@ -306,8 +306,8 @@ rules:
       "properties": {
         "name": { "type": "string", "maxLength": 64 },
         "version": { "type": "string" },
-        "scope": { 
-          "type": "array", 
+        "scope": {
+          "type": "array",
           "items": { "type": "string" }
         },
         "description": { "type": "string", "maxLength": 256 }
@@ -411,16 +411,16 @@ export type RuleFile = z.infer<typeof RuleFileSchema>;
 ```typescript
 async function loadRules(context: AgentContext): Promise<RuleFile[]> {
   const ruleFiles: RuleFile[] = [];
-  
+
   // Load base rules (always)
   ruleFiles.push(await loadRuleFile('.lex/rules/base.rules.yaml'));
-  
+
   // Load role-specific rules
   const roleFile = `.lex/rules/${context.role}.rules.yaml`;
   if (await exists(roleFile)) {
     ruleFiles.push(await loadRuleFile(roleFile));
   }
-  
+
   // Load language-specific rules
   for (const lang of context.languages) {
     const langFile = `.lex/rules/${lang}.rules.yaml`;
@@ -428,13 +428,13 @@ async function loadRules(context: AgentContext): Promise<RuleFile[]> {
       ruleFiles.push(await loadRuleFile(langFile));
     }
   }
-  
+
   // Validate size constraint
   const totalSize = ruleFiles.reduce((sum, rf) => sum + rf.size, 0);
   if (totalSize > 4096) {
     console.warn(`Rule files exceed 4KB (${totalSize} bytes)`);
   }
-  
+
   return ruleFiles;
 }
 ```
@@ -450,34 +450,34 @@ function mergeRules(ruleFiles: RuleFile[]): MergedRules {
     gates: { before_commit: [], before_push: [] },
     escalation: null
   };
-  
+
   for (const rf of ruleFiles) {
     // Constraints: union (all rules apply)
     merged.constraints.must.push(...(rf.constraints?.must || []));
     merged.constraints.must_not.push(...(rf.constraints?.must_not || []));
-    
+
     // Permissions: intersection (most restrictive wins)
     merged.permissions.can = intersect(
-      merged.permissions.can, 
+      merged.permissions.can,
       rf.permissions?.can || []
     );
     merged.permissions.cannot.push(...(rf.permissions?.cannot || []));
-    
+
     // Uncertainty: last wins (most specific)
     if (rf.uncertainty) {
       merged.uncertainty = rf.uncertainty;
     }
-    
+
     // Gates: union (all gates run)
     merged.gates.before_commit.push(...(rf.gates?.before_commit || []));
     merged.gates.before_push.push(...(rf.gates?.before_push || []));
-    
+
     // Escalation: last wins
     if (rf.escalation) {
       merged.escalation = rf.escalation;
     }
   }
-  
+
   return merged;
 }
 ```
@@ -497,7 +497,7 @@ async function checkCompliance(
 ): Promise<ComplianceResult> {
   const violations: Violation[] = [];
   const warnings: Warning[] = [];
-  
+
   // Check constraints
   for (const must of rules.constraints.must) {
     if (must.check) {
@@ -511,7 +511,7 @@ async function checkCompliance(
       }
     }
   }
-  
+
   for (const mustNot of rules.constraints.must_not) {
     if (mustNot.check) {
       const violated = await runCheck(mustNot.check, changes);
@@ -524,7 +524,7 @@ async function checkCompliance(
       }
     }
   }
-  
+
   // Check permissions
   for (const change of changes) {
     if (!matchesPattern(change.file, rules.permissions.can)) {
@@ -540,7 +540,7 @@ async function checkCompliance(
       });
     }
   }
-  
+
   return {
     passed: violations.length === 0,
     violations,
@@ -561,19 +561,19 @@ describe('Rule File Validation', () => {
     const ruleFile = loadRuleFile('fixtures/valid-rule.yaml');
     expect(() => RuleFileSchema.parse(ruleFile)).not.toThrow();
   });
-  
+
   test('rejects oversized rule files', () => {
     const ruleFile = loadRuleFile('fixtures/too-large.yaml');
     expect(ruleFile.size).toBeGreaterThan(4096);
     expect(() => validateSize(ruleFile)).toThrow('exceeds 4KB');
   });
-  
+
   test('constraint checks work', async () => {
     const rules = loadRuleFile('fixtures/typescript-rules.yaml');
     const changes = [
       { file: 'src/index.ts', content: 'const x: any = 1;' }
     ];
-    
+
     const result = await checkCompliance(changes, rules);
     expect(result.passed).toBe(false);
     expect(result.violations).toContainEqual(
@@ -591,9 +591,9 @@ describe('Rule File Integration', () => {
     const base = loadRuleFile('.lex/rules/base.rules.yaml');
     const senior = loadRuleFile('.lex/rules/senior-dev.rules.yaml');
     const ts = loadRuleFile('.lex/rules/typescript.rules.yaml');
-    
+
     const merged = mergeRules([base, senior, ts]);
-    
+
     // Constraints from all files should be present
     expect(merged.constraints.must).toContainEqual(
       expect.objectContaining({ id: 'signed-commits' }) // from base
@@ -601,19 +601,19 @@ describe('Rule File Integration', () => {
     expect(merged.constraints.must).toContainEqual(
       expect.objectContaining({ id: 'use-strict' }) // from ts
     );
-    
+
     // Permissions should be intersection
     expect(merged.permissions.cannot).toContain(
       'modify_files: CONTRACT.md'
     );
   });
-  
+
   test('compliance gate blocks invalid changes', async () => {
     const rules = await loadRulesForContext(seniorDevContext);
     const changes = [
       { file: 'CONTRACT.md', type: 'modify', content: 'changed' }
     ];
-    
+
     const result = await checkCompliance(changes, rules);
     expect(result.passed).toBe(false);
     expect(result.violations[0].type).toBe('forbidden_modification');
@@ -644,7 +644,7 @@ constraints:
       rule: "Use conventional commit format"
     - id: "no-secrets"
       rule: "Never commit secrets or credentials"
-      
+
   must_not:
     - id: "no-force-push"
       rule: "Never force push to protected branches"
@@ -655,7 +655,7 @@ permissions:
   cannot:
     - "modify_files: .github/**, CONTRACT.md"
     - "run_commands: rm -rf, git push --force"
-    
+
 gates:
   before_commit:
     - name: "lint"
@@ -680,7 +680,7 @@ permissions:
     - "modify_files: src/**/*.ts, test/**/*.ts, docs/**/*.md"
     - "create_branches: feature/*, fix/*, refactor/*"
     - "run_commands: npm *, git *"
-    
+
   cannot:
     - "modify_files: canon/**, migrations/**"
     - "merge_to: main"
@@ -690,7 +690,7 @@ uncertainty:
     continue: 0.7
     flag_review: 0.5
     escalate: 0.3
-    
+
   on_uncertainty:
     - action: "add_test_coverage"
       condition: "confidence < 0.7"
