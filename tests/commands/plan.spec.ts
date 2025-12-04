@@ -11,11 +11,15 @@ describe("Plan Command Module", () => {
 	let program: Command;
 	let jsonModeValue: boolean;
 	let exitWithCalled: unknown;
-	
+
 	const mockDeps = {
 		jsonModeActive: () => jsonModeValue,
-		setJsonMode: (active: boolean) => { jsonModeValue = active; },
-		exitWith: (e: unknown) => { exitWithCalled = e; }
+		setJsonMode: (active: boolean) => {
+			jsonModeValue = active;
+		},
+		exitWith: (e: unknown) => {
+			exitWithCalled = e;
+		},
 	};
 
 	beforeEach(() => {
@@ -28,23 +32,31 @@ describe("Plan Command Module", () => {
 	describe("Command Registration", () => {
 		it("should register the plan command", () => {
 			registerPlanCommand(program, mockDeps);
-			
-		const planCommand = program.commands.find(cmd => cmd.name() === "plan");
-		expect(planCommand).toBeDefined();
-		expect(planCommand?.description()).toBe("Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)");
-	});		it("should register all expected options", () => {
-			registerPlanCommand(program, mockDeps);
-			
-			const planCommand = program.commands.find(cmd => cmd.name() === "plan");
+
+			const planCommand = program.commands.find(
+				(cmd) => cmd.name() === "plan"
+			);
 			expect(planCommand).toBeDefined();
-			
-			const optionNames = planCommand?.options.map(opt => opt.long) ?? [];
-			
+			expect(planCommand?.description()).toBe(
+				"Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)"
+			);
+		});
+		it("should register all expected options", () => {
+			registerPlanCommand(program, mockDeps);
+
+			const planCommand = program.commands.find(
+				(cmd) => cmd.name() === "plan"
+			);
+			expect(planCommand).toBeDefined();
+
+			const optionNames =
+				planCommand?.options.map((opt) => opt.long) ?? [];
+
 			// Core options
 			expect(optionNames).toContain("--out");
 			expect(optionNames).toContain("--json");
 			expect(optionNames).toContain("--dry-run");
-			
+
 			// GitHub mode options
 			expect(optionNames).toContain("--from-github");
 			expect(optionNames).toContain("--query");
@@ -54,16 +66,16 @@ describe("Plan Command Module", () => {
 			expect(optionNames).toContain("--github-token");
 			expect(optionNames).toContain("--owner");
 			expect(optionNames).toContain("--repo");
-			
+
 			// Policy options
 			expect(optionNames).toContain("--required-gates");
 			expect(optionNames).toContain("--max-workers");
 			expect(optionNames).toContain("--target");
-			
+
 			// Validation options
 			expect(optionNames).toContain("--validate-cycles");
 			expect(optionNames).toContain("--optimize");
-			
+
 			// Dependency suggestion options
 			expect(optionNames).toContain("--suggest-deps");
 			expect(optionNames).toContain("--threshold");
@@ -73,10 +85,12 @@ describe("Plan Command Module", () => {
 
 		it("should have help text with options", () => {
 			registerPlanCommand(program, mockDeps);
-			
-			const planCommand = program.commands.find(cmd => cmd.name() === "plan");
+
+			const planCommand = program.commands.find(
+				(cmd) => cmd.name() === "plan"
+			);
 			const helpText = planCommand?.helpInformation() ?? "";
-			
+
 			// Check for key options in help text
 			expect(helpText).toContain("--from-github");
 			expect(helpText).toContain("--dry-run");
@@ -88,12 +102,12 @@ describe("Plan Command Module", () => {
 	describe("JSON Mode Handling", () => {
 		it("should restore previous JSON mode after execution", () => {
 			registerPlanCommand(program, mockDeps);
-			
+
 			// Set initial JSON mode to true
 			jsonModeValue = true;
-			
+
 			expect(mockDeps.jsonModeActive()).toBe(true);
-			
+
 			// The command should restore it after execution
 			// (This is verified by the finally block in the action handler)
 		});
@@ -102,17 +116,17 @@ describe("Plan Command Module", () => {
 	describe("Command Integration", () => {
 		it("should be registered alongside other commands in a program", () => {
 			const testProgram = new Command();
-			
+
 			// Register multiple commands like in cli.ts
 			registerPlanCommand(testProgram, mockDeps);
-			
-			testProgram
-				.command("other-command")
-				.description("Another command");
-			
+
+			testProgram.command("other-command").description("Another command");
+
 			expect(testProgram.commands).toHaveLength(2);
-			expect(testProgram.commands.map(c => c.name())).toContain("plan");
-			expect(testProgram.commands.map(c => c.name())).toContain("other-command");
+			expect(testProgram.commands.map((c) => c.name())).toContain("plan");
+			expect(testProgram.commands.map((c) => c.name())).toContain(
+				"other-command"
+			);
 		});
 	});
 });
