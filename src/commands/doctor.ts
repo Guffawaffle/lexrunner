@@ -16,13 +16,14 @@ import { createGitOperations } from "../git/operations.js";
 import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
 import { initColorControl } from "../util/colorControl.js";
+import { runEnvironmentQualityCheck, formatHostilityReport } from "../hostility/index.js";
 import * as fs from "fs";
 import * as path from "path";
 
 /**
  * Perform all doctor checks and return results
  */
-async function performDoctorChecks(): Promise<any> {
+async function performDoctorChecks(includeEnvironmentQuality: boolean = false): Promise<any> {
 	const checks: any = {
 		hasErrors: false,
 		issues: [],
@@ -129,6 +130,11 @@ async function performDoctorChecks(): Promise<any> {
 		);
 	}
 
+	// Environment quality check (hostility scoring) if requested
+	if (includeEnvironmentQuality) {
+		checks.environmentQuality = runEnvironmentQualityCheck();
+	}
+
 	return checks;
 }
 
@@ -149,6 +155,7 @@ export function registerDoctorCommand(
 			"Create minimal workspace configuration if missing"
 		)
 		.option("--json", "Output JSON format")
+		.option("--environment-quality", "Run environmental hostility scoring")
 		.action(async (opts) => {
 			let hasErrors = false;
 			const issues: string[] = [];
@@ -163,9 +170,22 @@ export function registerDoctorCommand(
 				initColorControl({ jsonMode: true });
 
 				// JSON mode for programmatic use
-				const result = await performDoctorChecks();
+				const result = await performDoctorChecks(opts.environmentQuality);
 				writeJsonOutput(result);
 				if (result.hasErrors) {
+					throwExit(1);
+				}
+				return;
+			}
+
+			// If only environment quality is requested, show that report
+			if (opts.environmentQuality) {
+				const score = runEnvironmentQualityCheck();
+				console.log(formatHostilityReport(score));
+				console.log("");
+				
+				// Exit with error if hostility is high
+				if (score.status === "high") {
 					throwExit(1);
 				}
 				return;
