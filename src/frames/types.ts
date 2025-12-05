@@ -41,9 +41,47 @@ export const ExecutionFrameMetadataSchema = z.object({
 	run_id: z.string().optional(),
 	/** Plan hash for idempotency */
 	plan_hash: z.string().optional(),
+	/** Turn Cost tracking data */
+	turn_cost: z
+		.object({
+			/** Turn Cost components */
+			components: z.object({
+				latencyMs: z.number(),
+				contextResetTokens: z.number(),
+				renegotiationCount: z.number(),
+				tokenBloat: z.number(),
+				attentionSwitchCount: z.number(),
+			}),
+			/** Weighted score */
+			weightedScore: z.number(),
+			/** Number of events recorded */
+			eventCount: z.number(),
+			/** Prior run score for comparison */
+			priorRunScore: z.number().optional(),
+			/** Improvement percentage */
+			improvement: z.string().optional(),
+		})
+		.optional(),
+	/** Tier metrics for governance (Claim 3.4) */
+	tier_metrics: z
+		.object({
+			totalTasks: z.number(),
+			byTier: z.object({
+				senior: z.number(),
+				mid: z.number(),
+				junior: z.number(),
+			}),
+			escalations: z.number(),
+			mismatches: z.number(),
+			tierMatchRate: z.number(),
+			escalationRate: z.number(),
+		})
+		.optional(),
 });
 
-export type ExecutionFrameMetadata = z.infer<typeof ExecutionFrameMetadataSchema>;
+export type ExecutionFrameMetadata = z.infer<
+	typeof ExecutionFrameMetadataSchema
+>;
 
 /**
  * Execution Frame schema
@@ -95,6 +133,20 @@ export interface MergeWeaveFrameInput {
 	error?: string;
 	/** Plan hash for idempotency */
 	planHash?: string;
+	/** Turn Cost tracking data */
+	turnCost?: {
+		components: {
+			latencyMs: number;
+			contextResetTokens: number;
+			renegotiationCount: number;
+			tokenBloat: number;
+			attentionSwitchCount: number;
+		};
+		weightedScore: number;
+		eventCount: number;
+		priorRunScore?: number;
+		improvement?: string;
+	};
 }
 
 /**
@@ -165,7 +217,9 @@ export function validateExecutionFrame(frame: unknown): ExecutionFrame {
 /**
  * Safely validate an execution frame
  */
-export function safeValidateExecutionFrame(frame: unknown):
+export function safeValidateExecutionFrame(
+	frame: unknown
+):
 	| { success: true; data: ExecutionFrame }
 	| { success: false; error: z.ZodError } {
 	const result = ExecutionFrameSchema.safeParse(frame);

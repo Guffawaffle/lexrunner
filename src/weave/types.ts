@@ -3,6 +3,7 @@
  */
 
 import { Plan } from '../schema.js';
+import type { TurnCostSummary } from '../metrics/turncost.js';
 
 /**
  * Weave execution states
@@ -137,6 +138,8 @@ export interface WeaveContext {
 		/** Dry run mode */
 		dryRun: boolean;
 	};
+	/** Turn Cost tracking summary (when enabled) */
+	turnCost?: TurnCostSummary;
 }
 
 /**

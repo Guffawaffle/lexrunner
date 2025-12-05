@@ -68,6 +68,9 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 
+// Hostility scoring imports
+import { runEnvironmentQualityCheck } from "../hostility/index.js";
+
 // Senior Dev executor imports
 import {
 	prepareReviewContext,
@@ -634,10 +637,16 @@ function createServer(options?: McpServerOptions): Server {
 				{
 					name: "doctor",
 					description:
-						"Run environment and configuration sanity checks",
+						"Run environment and configuration sanity checks with optional hostility scoring",
 					inputSchema: {
 						type: "object",
-						properties: {},
+						properties: {
+							environmentQuality: {
+								type: "boolean",
+								description: "Include environmental hostility scoring in the check",
+								default: false,
+							},
+						},
 					},
 				},
 				{
@@ -733,7 +742,7 @@ function createServer(options?: McpServerOptions): Server {
 				return await handleStatus(args as { planFile?: string });
 
 			case "doctor":
-				return await handleDoctor();
+				return await handleDoctor(args as { environmentQuality?: boolean });
 
 			case "merge-order":
 				return await handleMergeOrder(args as { planFile?: string });
@@ -1647,7 +1656,9 @@ async function handleStatus(args: {
 /**
  * Handle doctor tool - Environment and configuration sanity checks
  */
-async function handleDoctor(): Promise<{ content: [{ type: "text"; text: string }] }> {
+async function handleDoctor(args: {
+	environmentQuality?: boolean;
+}): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
 		const checks: Record<string, unknown> = {
 			hasErrors: false,
@@ -1722,6 +1733,11 @@ async function handleDoctor(): Promise<{ content: [{ type: "text"; text: string 
 			};
 			checks.hasErrors = true;
 			(checks.issues as string[]).push(`Git operations failed: ${(error as Error).message}`);
+		}
+
+		// Environment quality check (hostility scoring) if requested
+		if (args.environmentQuality) {
+			checks.environmentQuality = runEnvironmentQualityCheck();
 		}
 
 		return {

@@ -85,6 +85,7 @@ export function emitMergeWeaveFrame(
 				run_id: input.runId,
 				plan_hash: input.planHash,
 				error: input.error,
+				turn_cost: input.turnCost,
 			},
 		};
 

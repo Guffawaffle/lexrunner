@@ -359,4 +359,59 @@ describe("emitWeaveCompletionFrame with persistence", () => {
 		const frameIds = listFrameIds(testDir);
 		expect(frameIds).toHaveLength(1);
 	});
+
+	it("should include Turn Cost data in persisted Frame", () => {
+		const batch: BatchState = {
+			batchNumber: 0,
+			items: ["PR-301", "PR-302"],
+			state: "completed",
+		};
+
+		const context: WeaveContext = {
+			runId: "test-turncost-persist",
+			state: WeaveState.COMPLETED,
+			plan: { schemaVersion: "1.0.0", target: "main", items: [] },
+			prHeads: [],
+			batches: [batch],
+			currentBatchIndex: 1,
+			startedAt: "2025-12-01T10:00:00Z",
+			lastUpdatedAt: "2025-12-01T10:01:00Z",
+			completedAt: "2025-12-01T10:01:00Z",
+			successfulMerges: 2,
+			failedMerges: 0,
+			metadata: {
+				planHash: "test-turncost",
+				targetBranch: "main",
+				dryRun: false,
+			},
+			turnCost: {
+				components: {
+					latencyMs: 12500,
+					contextResetTokens: 0,
+					renegotiationCount: 1,
+					tokenBloat: 2400,
+					attentionSwitchCount: 0,
+				},
+				weightedScore: 3.2,
+				eventCount: 4,
+				priorRunScore: 5.8,
+				improvement: "-45%",
+			},
+		};
+
+		const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
+
+		expect(result.success).toBe(true);
+
+		// Verify Frame was persisted with Turn Cost
+		const frameIds = listFrameIds(testDir);
+		expect(frameIds).toHaveLength(1);
+
+		const storedFrame = readFrame(frameIds[0], testDir);
+		expect(storedFrame).not.toBeNull();
+		expect(storedFrame!.metadata?.turn_cost).toBeDefined();
+		expect(storedFrame!.metadata?.turn_cost?.weightedScore).toBe(3.2);
+		expect(storedFrame!.metadata?.turn_cost?.improvement).toBe("-45%");
+		expect(storedFrame!.metadata?.turn_cost?.components.latencyMs).toBe(12500);
+	});
 });
