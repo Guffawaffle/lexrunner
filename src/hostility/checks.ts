@@ -9,6 +9,54 @@ import * as fs from "fs";
 import * as path from "path";
 import { createComponent, HostilityComponent } from "./score.js";
 
+// =============================================================================
+// Scoring Constants
+// =============================================================================
+// These constants define the baseline scores and adjustments for each component.
+// Lower scores are better (less hostile). The goal is to reach 0 (fully de-hostilized).
+
+/** Baseline score when partial requirements are met */
+const SCORE_PARTIAL_BASELINE = 0.5;
+
+/** Score reduction for having scope/intent files */
+const SCORE_SCOPE_FILES_REDUCTION = 0.2;
+
+/** Score reduction for having a valid plan */
+const SCORE_VALID_PLAN_REDUCTION = 0.2;
+
+/** Score reduction for frame emission being enabled */
+const SCORE_FRAME_EMISSION_REDUCTION = 0.3;
+
+/** Score reduction for having receipt directories */
+const SCORE_RECEIPT_DIR_REDUCTION = 0.1;
+
+/** Score reduction for having gates configuration */
+const SCORE_GATES_CONFIG_REDUCTION = 0.2;
+
+/** Score reduction for git availability (rollback capability) */
+const SCORE_GIT_AVAILABLE_REDUCTION = 0.15;
+
+/** Score reduction for having retry configuration */
+const SCORE_RETRY_CONFIG_REDUCTION = 0.1;
+
+/** Baseline score for state coherence */
+const SCORE_STATE_BASELINE = 0.3;
+
+/** Score reduction for expected state directories */
+const SCORE_EXPECTED_STATE_REDUCTION = 0.2;
+
+/** Score increase for unexpected/fragmented state */
+const SCORE_FRAGMENTED_STATE_PENALTY = 0.3;
+
+/** Score reduction for having continuity documentation */
+const SCORE_CONTINUITY_DOC_REDUCTION = 0.25;
+
+/** Score reduction for having session state */
+const SCORE_SESSION_STATE_REDUCTION = 0.1;
+
+/** Score reduction for having intent.md */
+const SCORE_INTENT_REDUCTION = 0.1;
+
 /**
  * Options for running hostility checks
  */
@@ -96,10 +144,10 @@ export function checkRequirementExplicitness(options: CheckOptions = {}): Hostil
 		}
 	}
 
-	// Scoring: 0.5 baseline, reduced by found files and valid plan
-	let score = 0.5;
-	if (found.length > 0) score -= 0.2;
-	if (planValid) score -= 0.2;
+	// Scoring: baseline, reduced by found files and valid plan
+	let score = SCORE_PARTIAL_BASELINE;
+	if (found.length > 0) score -= SCORE_SCOPE_FILES_REDUCTION;
+	if (planValid) score -= SCORE_VALID_PLAN_REDUCTION;
 
 	const details = planValid
 		? `Plan validated with ${planItemCount} items, ${found.length} scope files found`
@@ -173,9 +221,9 @@ export function checkReceiptCompleteness(options: CheckOptions = {}): HostilityC
 	const hasReceiptDir = receiptDirs.some((d) => fs.existsSync(d));
 
 	// Scoring: low if frame emission enabled AND receipt dir exists
-	let score = 0.5;
-	if (hasEmitFrames) score -= 0.3;
-	if (hasReceiptDir) score -= 0.1;
+	let score = SCORE_PARTIAL_BASELINE;
+	if (hasEmitFrames) score -= SCORE_FRAME_EMISSION_REDUCTION;
+	if (hasReceiptDir) score -= SCORE_RECEIPT_DIR_REDUCTION;
 
 	const details = hasEmitFrames
 		? hasReceiptDir
@@ -239,10 +287,10 @@ export function checkErrorRecoverability(options: CheckOptions = {}): HostilityC
 	}
 
 	// Scoring
-	let score = 0.5;
-	if (hasGates) score -= 0.2;
-	if (gitClean) score -= 0.15;
-	if (hasRetryConfig) score -= 0.1;
+	let score = SCORE_PARTIAL_BASELINE;
+	if (hasGates) score -= SCORE_GATES_CONFIG_REDUCTION;
+	if (gitClean) score -= SCORE_GIT_AVAILABLE_REDUCTION;
+	if (hasRetryConfig) score -= SCORE_RETRY_CONFIG_REDUCTION;
 
 	const details = hasGates
 		? "Gates configured for structured error handling"
@@ -282,9 +330,9 @@ export function checkStateCoherence(options: CheckOptions = {}): HostilityCompon
 	const foundUnexpected = unexpectedDirs.filter((d) => fs.existsSync(path.join(cwd, d)));
 
 	// Scoring: penalize fragmented state, reward consolidated state
-	let score = 0.3; // baseline
-	if (foundExpected.length > 0) score -= 0.2;
-	if (foundUnexpected.length > 0) score += 0.3;
+	let score = SCORE_STATE_BASELINE;
+	if (foundExpected.length > 0) score -= SCORE_EXPECTED_STATE_REDUCTION;
+	if (foundUnexpected.length > 0) score += SCORE_FRAGMENTED_STATE_PENALTY;
 
 	const details = foundUnexpected.length > 0
 		? `State found in non-standard locations: ${foundUnexpected.join(", ")}`
@@ -332,10 +380,10 @@ export function checkModelContinuity(options: CheckOptions = {}): HostilityCompo
 		fs.existsSync(path.join(profileDir, "runner", "intent.md"));
 
 	// Scoring
-	let score = 0.5;
-	if (hasContinuityDocs) score -= 0.25;
-	if (hasSessionState) score -= 0.1;
-	if (hasIntent) score -= 0.1;
+	let score = SCORE_PARTIAL_BASELINE;
+	if (hasContinuityDocs) score -= SCORE_CONTINUITY_DOC_REDUCTION;
+	if (hasSessionState) score -= SCORE_SESSION_STATE_REDUCTION;
+	if (hasIntent) score -= SCORE_INTENT_REDUCTION;
 
 	const details = hasContinuityDocs
 		? "Continuity protocol documented"
