@@ -4,17 +4,55 @@
  * Converts existing LexRunner error types to AX-compliant format
  * with appropriate nextActions for agent recovery.
  *
+ * Extends with governance fields for Disciplined Failure pattern:
+ * - reversibility: How reversible is the action/error?
+ * - confidence: Agent confidence before action
+ * - rollbackPath: Instructions for rollback
+ *
  * @module errors/adapters
+ * @see docs/DISCIPLINED_FAILURE.md
  */
 
 import { createAXError, type AXError } from "@smartergpt/lex/errors";
 import { ErrorCodes } from "./index.js";
+import type {
+	GovernanceContext,
+	ReversibilityLevel,
+	ConfidenceLevel,
+} from "../receipts/schema.js";
+
+// =============================================================================
+// Governance Context Support
+// =============================================================================
+
+/**
+ * Base governance fields that can be added to any error context
+ *
+ * @see docs/DISCIPLINED_FAILURE.md
+ */
+export interface WithGovernance {
+	/** How reversible is this action/error condition? */
+	reversibility?: ReversibilityLevel;
+	/** Rollback instructions (human-readable) */
+	rollbackPath?: string;
+	/** Actual command to execute for rollback */
+	rollbackCommand?: string;
+	/** Agent confidence before the action was taken */
+	confidence?: ConfidenceLevel;
+	/** Source uncertainties that may have contributed */
+	uncertaintyNotes?: string[];
+}
+
+/**
+ * Re-export GovernanceContext for external use
+ */
+export type { GovernanceContext };
 
 // =============================================================================
 // Gate Error Adapters
 // =============================================================================
 
-export interface GateFailureContext {
+export interface GateFailureContext extends WithGovernance {
 	gate: string;
 	item?: string;
 	pr?: number;
@@ -24,6 +62,9 @@ export interface GateFailureContext {
 
 /**
  * Create an AXError for a gate failure
+ *
+ * Gate failures are typically reversible since gates don't mutate state.
+ * If no reversibility is specified, defaults to 'reversible'.
  */
 export function gateFailedError(ctx: GateFailureContext): AXError {
 	const nextActions: string[] = [];
@@ -58,7 +99,11 @@ export function gateFailedError(ctx: GateFailureContext): AXError {
 		ErrorCodes.GATE_FAILED,
 		`Gate '${ctx.gate}'${ctx.item ? ` failed for ${ctx.item}` : " failed"}`,
 		nextActions,
-		{ ...ctx }
+		{
+			...ctx,
+			// Default gates to reversible since they don't mutate state
+			reversibility: ctx.reversibility ?? "reversible",
+		}
 	);
 }
 
@@ -66,7 +111,7 @@ export function gateFailedError(ctx: GateFailureContext): AXError {
 // Merge Error Adapters
 // =============================================================================
 
-export interface MergeConflictContext {
+export interface MergeConflictContext extends WithGovernance {
 	item?: string;
 	pr?: number;
 	files?: string[];
@@ -75,6 +120,8 @@ export interface MergeConflictContext {
 
 /**
  * Create an AXError for a merge conflict
+ *
+ * Merge conflicts are typically reversible via git merge --abort or reset.
  */
 export function mergeConflictError(ctx: MergeConflictContext): AXError {
 	const nextActions: string[] = [
@@ -97,7 +144,12 @@ export function mergeConflictError(ctx: MergeConflictContext): AXError {
 		ErrorCodes.MERGE_CONFLICT,
 		`Merge conflict${ctx.item ? ` for ${ctx.item}` : ""}`,
 		nextActions,
-		{ ...ctx }
+		{
+			...ctx,
+			// Merges are reversible via git reset or merge --abort
+			reversibility: ctx.reversibility ?? "reversible",
+			rollbackPath: ctx.rollbackPath ?? "git merge --abort or git reset --hard HEAD~1",
+		}
 	);
 }
 
@@ -492,7 +544,7 @@ export function throwAXError(axError: AXError): never {
 // Weave Error Adapters
 // =============================================================================
 
-export interface WeaveLockConflictContext {
+export interface WeaveLockConflictContext extends WithGovernance {
 	lockFile?: string;
 	expectedVersion?: string;
 	actualVersion?: string;
@@ -501,10 +553,13 @@ export interface WeaveLockConflictContext {
 
 /**
  * Create an AXError for weave lock file conflicts
+ *
+ * Lock conflicts are reversible by removing the stale lock file.
  */
 export function weaveLockConflictError(ctx: WeaveLockConflictContext): AXError {
 	const nextActions: string[] = [];
 
+	const lockFilePath = ctx.lockFile || "weave-lock.json";
 	if (ctx.lockFile) {
 		nextActions.push(`Remove stale lock with: rm ${ctx.lockFile}`);
 	} else {
@@ -518,11 +573,15 @@ export function weaveLockConflictError(ctx: WeaveLockConflictContext): AXError {
 		ErrorCodes.WEAVE_LOCK_CONFLICT,
 		ctx.originalError || "Lock file conflict detected",
 		nextActions,
-		{ ...ctx }
+		{
+			...ctx,
+			reversibility: ctx.reversibility ?? "reversible",
+			rollbackPath: ctx.rollbackPath ?? `rm ${lockFilePath}`,
+		}
 	);
 }
 
-export interface WeaveStateInvalidContext {
+export interface WeaveStateInvalidContext extends WithGovernance {
 	currentState: string;
 	event: string;
 	availableEvents?: string[];
@@ -530,6 +589,8 @@ export interface WeaveStateInvalidContext {
 
 /**
  * Create an AXError for invalid weave state transitions
+ *
+ * State errors are reversible by using the 'reset' event.
  */
 export function weaveStateInvalidError(ctx: WeaveStateInvalidContext): AXError {
 	const nextActions: string[] = [
@@ -549,11 +610,15 @@ export function weaveStateInvalidError(ctx: WeaveStateInvalidContext): AXError {
 		ErrorCodes.WEAVE_STATE_INVALID,
 		`Invalid transition: cannot apply event '${ctx.event}' in state '${ctx.currentState}'`,
 		nextActions,
-		{ ...ctx }
+		{
+			...ctx,
+			reversibility: ctx.reversibility ?? "reversible",
+			rollbackPath: ctx.rollbackPath ?? "Apply 'reset' event to return to idle state",
+		}
 	);
 }
 
-export interface WeavePreflightFailedContext {
+export interface WeavePreflightFailedContext extends WithGovernance {
 	itemBranch: string;
 	targetBranch?: string;
 	originalError?: string;
@@ -561,6 +626,8 @@ export interface WeavePreflightFailedContext {
 
 /**
  * Create an AXError for preflight merge simulation failures
+ *
+ * Preflight failures are reversible - no state was actually changed.
  */
 export function weavePreflightFailedError(
 	ctx: WeavePreflightFailedContext
@@ -582,7 +649,11 @@ export function weavePreflightFailedError(
 			ctx.originalError ? `: ${ctx.originalError}` : ""
 		}`,
 		nextActions,
-		{ ...ctx }
+		{
+			...ctx,
+			// Preflight doesn't change state, so always reversible
+			reversibility: ctx.reversibility ?? "reversible",
+		}
 	);
 }
 

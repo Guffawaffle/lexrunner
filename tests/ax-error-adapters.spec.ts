@@ -366,6 +366,15 @@ describe("Weave-specific AXError adapters", () => {
 			expect(error.message).toBe("Lock file conflict detected");
 			expect(error.nextActions.some(a => a.includes("/path/to/weave-lock.json"))).toBe(true);
 		});
+
+		it("should include default reversibility and rollbackPath", () => {
+			const error = weaveLockConflictError({
+				lockFile: "weave-lock.json",
+			});
+
+			expect(error.context?.reversibility).toBe("reversible");
+			expect(error.context?.rollbackPath).toBe("rm weave-lock.json");
+		});
 	});
 
 	describe("weaveStateInvalidError", () => {
@@ -394,6 +403,16 @@ describe("Weave-specific AXError adapters", () => {
 
 			expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
 			expect(error.nextActions.some(a => a.includes("reset"))).toBe(true);
+		});
+
+		it("should include default reversibility and rollbackPath", () => {
+			const error = weaveStateInvalidError({
+				currentState: "failed",
+				event: "START"
+			});
+
+			expect(error.context?.reversibility).toBe("reversible");
+			expect(error.context?.rollbackPath).toContain("reset");
 		});
 	});
 
@@ -425,6 +444,14 @@ describe("Weave-specific AXError adapters", () => {
 			expect(error.message).toContain("some-branch");
 			expect(error.nextActions.some(a => a.includes("git fetch"))).toBe(true);
 		});
+
+		it("should include default reversibility", () => {
+			const error = weavePreflightFailedError({
+				itemBranch: "test-branch"
+			});
+
+			expect(error.context?.reversibility).toBe("reversible");
+		});
 	});
 
 	describe("AXError schema compliance for weave errors", () => {
@@ -441,6 +468,58 @@ describe("Weave-specific AXError adapters", () => {
 					`Error ${error.code} should have at least one nextAction`
 				).toBeGreaterThanOrEqual(1);
 			}
+		});
+	});
+});
+
+describe("Governance fields in AXError adapters", () => {
+	describe("gateFailedError with governance", () => {
+		it("should include default reversibility for gates", () => {
+			const error = gateFailedError({
+				gate: "test",
+				item: "PR-123"
+			});
+
+			expect(error.context?.reversibility).toBe("reversible");
+		});
+
+		it("should respect custom reversibility", () => {
+			const error = gateFailedError({
+				gate: "deploy",
+				item: "PR-456",
+				reversibility: "irreversible",
+				confidence: "low",
+				rollbackPath: "Manual rollback required"
+			});
+
+			expect(error.context?.reversibility).toBe("irreversible");
+			expect(error.context?.confidence).toBe("low");
+			expect(error.context?.rollbackPath).toBe("Manual rollback required");
+		});
+	});
+
+	describe("mergeConflictError with governance", () => {
+		it("should include default rollbackPath for merge conflicts", () => {
+			const error = mergeConflictError({
+				item: "PR-123",
+				files: ["src/cli.ts"]
+			});
+
+			expect(error.context?.reversibility).toBe("reversible");
+			expect(error.context?.rollbackPath).toContain("git");
+		});
+
+		it("should respect custom governance fields", () => {
+			const error = mergeConflictError({
+				item: "PR-789",
+				reversibility: "partially-reversible",
+				confidence: "medium",
+				uncertaintyNotes: ["Complex merge history"]
+			});
+
+			expect(error.context?.reversibility).toBe("partially-reversible");
+			expect(error.context?.confidence).toBe("medium");
+			expect(error.context?.uncertaintyNotes).toEqual(["Complex merge history"]);
 		});
 	});
 });
