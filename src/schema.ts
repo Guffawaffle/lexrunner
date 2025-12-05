@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TierAssignment } from "./tiers/schema.js";
 
 /**
  * Schema v1 for plan.json - the single frozen runtime input
@@ -191,7 +192,9 @@ export type Gate = z.infer<typeof Gate>;
 export const PlanItem = z.object({
 	name: z.string(),
 	deps: z.string().array().default([]), // Dependency references by item name
-	gates: z.array(Gate).default([])
+	gates: z.array(Gate).default([]),
+	// Tier routing for governance (optional - added during plan generation or execution)
+	tier: TierAssignment.optional()
 }).strict();
 export type PlanItem = z.infer<typeof PlanItem>;
 

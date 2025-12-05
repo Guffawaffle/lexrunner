@@ -41,6 +41,19 @@ export const ExecutionFrameMetadataSchema = z.object({
 	run_id: z.string().optional(),
 	/** Plan hash for idempotency */
 	plan_hash: z.string().optional(),
+	/** Tier metrics for governance (Claim 3.4) */
+	tier_metrics: z.object({
+		totalTasks: z.number(),
+		byTier: z.object({
+			senior: z.number(),
+			mid: z.number(),
+			junior: z.number(),
+		}),
+		escalations: z.number(),
+		mismatches: z.number(),
+		tierMatchRate: z.number(),
+		escalationRate: z.number(),
+	}).optional(),
 });
 
 export type ExecutionFrameMetadata = z.infer<typeof ExecutionFrameMetadataSchema>;
