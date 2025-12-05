@@ -19,11 +19,11 @@ export const DEFAULT_TURN_COST_WEIGHTS = {
 	/** Weight for latency (λ) - normalized to seconds */
 	lambda: 0.1,
 	/** Weight for context reset tokens (γ) */
-	gamma: 0.2,
+	gamma: 0.1,
 	/** Weight for renegotiation count (ρ) */
 	rho: 0.3,
 	/** Weight for token bloat (τ) */
-	tau: 0.1,
+	tau: 0.2,
 	/** Weight for attention switch count (α) */
 	alpha: 0.3,
 } as const;

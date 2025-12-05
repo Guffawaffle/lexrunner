@@ -506,7 +506,9 @@ Common Issues:
 					const turnCostTracker = opts.trackTurncost
 						? new MergeWeaveTurnCost()
 						: null;
-					const executeStartTime = performance.now();
+					// Note: performance.now() is available in Node.js >= 8.5.0,
+					// and this project requires Node.js >= 20 (package.json)
+					const executeStartTime = turnCostTracker ? performance.now() : 0;
 
 					// Execute weave
 					const result = await gitOps.executeWeave(
