@@ -52,6 +52,10 @@ export {
 	securitySecretNotFoundError,
 	securitySarifParseError,
 	securityScanFailedError,
+	// Governance support (Disciplined Failure Pattern)
+	type WithGovernance,
+	type GovernanceContext,
+	// Context types
 	type GateFailureContext,
 	type MergeConflictContext,
 	type CycleDetectedContext,
