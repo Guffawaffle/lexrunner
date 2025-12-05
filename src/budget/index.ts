@@ -31,6 +31,10 @@ export {
 	type TierBudgetAllocation,
 	// Tier allocations
 	TIER_BUDGET_ALLOCATIONS,
+	// Time constants
+	ONE_MINUTE_MS,
+	THREE_MINUTES_MS,
+	TEN_MINUTES_MS,
 	// Helper functions
 	createBudgetField,
 	createUnifiedBudget,
@@ -46,5 +50,7 @@ export {
 	UnifiedBudgetExceededError,
 	createBudgetManager,
 	getTierAllocation,
+	silentReceiptLogger,
+	defaultReceiptLogger,
 	type SpendRequest,
 } from "./manager.js";

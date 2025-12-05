@@ -38,6 +38,13 @@ function getOrCreateBudgetManager(): UnifiedBudgetManager {
 }
 
 /**
+ * Reset the global budget manager (primarily for testing)
+ */
+function resetGlobalBudgetManager(): void {
+	globalBudgetManager = null;
+}
+
+/**
  * Get or create a session budget
  */
 function getOrCreateSessionBudget(
@@ -60,9 +67,7 @@ function formatBudgetDisplay(budget: UnifiedBudget): string {
 		field: { limit: number; used: number; remaining: number },
 		unit: string = ""
 	): string => {
-		const percent = budget[name as keyof UnifiedBudget]
-			? ((field.used / field.limit) * 100).toFixed(1)
-			: "0.0";
+		const percent = ((field.used / field.limit) * 100).toFixed(1);
 		const bar = createProgressBar(field.used, field.limit);
 		const status =
 			field.remaining <= 0
@@ -328,4 +333,4 @@ function parseTier(tierStr: string): CapabilityTier {
 /**
  * Export for testing
  */
-export { getOrCreateBudgetManager, DEFAULT_SESSION_ID };
+export { getOrCreateBudgetManager, resetGlobalBudgetManager, DEFAULT_SESSION_ID };

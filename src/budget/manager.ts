@@ -69,6 +69,20 @@ export interface SpendRequest {
 // =============================================================================
 
 /**
+ * No-op logger for silent operation (useful in testing)
+ */
+export const silentReceiptLogger = (_receipt: BudgetExhaustedReceipt): void => {
+	// Intentionally silent
+};
+
+/**
+ * Default JSON logger for console output
+ */
+export const defaultReceiptLogger = (receipt: BudgetExhaustedReceipt): void => {
+	console.log(JSON.stringify({ event: "budget_exhausted", ...receipt }));
+};
+
+/**
  * Unified Budget Manager
  *
  * Manages hierarchical budgets and enforces limits at key points:
@@ -85,9 +99,7 @@ export class UnifiedBudgetManager {
 			receiptLogger?: (receipt: BudgetExhaustedReceipt) => void;
 		} = {}
 	) {
-		this.receiptLogger = options.receiptLogger ?? ((receipt) => {
-			console.log(JSON.stringify({ event: "budget_exhausted", ...receipt }));
-		});
+		this.receiptLogger = options.receiptLogger ?? defaultReceiptLogger;
 	}
 
 	// =========================================================================

@@ -111,6 +111,13 @@ export type UnifiedBudget = z.infer<typeof UnifiedBudgetSchema>;
 // =============================================================================
 
 /**
+ * Time constants in milliseconds for better readability
+ */
+export const ONE_MINUTE_MS = 60_000;
+export const THREE_MINUTES_MS = 180_000;
+export const TEN_MINUTES_MS = 600_000;
+
+/**
  * Default budget allocation configuration
  */
 export interface TierBudgetAllocation {
@@ -137,19 +144,19 @@ export const TIER_BUDGET_ALLOCATIONS: Record<CapabilityTier, TierBudgetAllocatio
 	junior: {
 		tokens: 2000,
 		turns: 3,
-		time: 60000,      // 1 minute
+		time: ONE_MINUTE_MS,
 		escalations: 1,
 	},
 	mid: {
 		tokens: 5000,
 		turns: 5,
-		time: 180000,     // 3 minutes
+		time: THREE_MINUTES_MS,
 		escalations: 2,
 	},
 	senior: {
 		tokens: 15000,
 		turns: 10,
-		time: 600000,     // 10 minutes
+		time: TEN_MINUTES_MS,
 		escalations: 3,
 	},
 };
