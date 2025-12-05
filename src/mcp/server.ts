@@ -54,6 +54,12 @@ import {
 	validateCIEnvironment,
 } from "../util/envUtils.js";
 
+// Governance metrics imports
+import {
+	getGlobalMetricsCollector,
+	METRIC_DEFINITIONS,
+} from "../metrics/export.js";
+
 // AXError imports for structured error responses
 import {
 	type AXError,
@@ -678,6 +684,29 @@ function createServer(options?: McpServerOptions): Server {
 						},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// Governance Metrics Tools (Wave 3)
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "metrics",
+					description:
+						"Get current governance metrics snapshot for observability dashboards",
+					inputSchema: {
+						type: "object",
+						properties: {
+							filter: {
+								type: "string",
+								description: "Filter metrics by name pattern (e.g., 'turn_cost', 'tier')",
+							},
+							format: {
+								type: "string",
+								enum: ["json", "prometheus"],
+								description: "Output format (default: json)",
+								default: "json",
+							},
+						},
+					},
+				},
 			],
 		};
 	});
@@ -749,6 +778,10 @@ function createServer(options?: McpServerOptions): Server {
 
 			case "config.show":
 				return await handleConfigShow(args as { key?: string });
+
+			// Governance metrics tool (Wave 3)
+			case "metrics":
+				return await handleMetrics(args as { filter?: string; format?: string });
 
 			default:
 				throw new McpError(
@@ -1849,6 +1882,42 @@ async function handleConfigShow(args: {
 		};
 	} catch (error) {
 		throwMcpToolError(ErrorCode.InternalError, "config.show", error, "show config");
+	}
+}
+
+/**
+ * Handle metrics tool - Get governance metrics snapshot
+ */
+async function handleMetrics(args: {
+	filter?: string;
+	format?: string;
+}): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		const collector = getGlobalMetricsCollector();
+
+		// Get snapshot, optionally filtered
+		const snapshot = args.filter
+			? collector.getMetricsByName(args.filter)
+			: collector.getSnapshot();
+
+		// Format output
+		let output: string;
+		if (args.format === "prometheus") {
+			output = collector.exportPrometheus();
+		} else {
+			output = JSON.stringify(snapshot, null, 2);
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: output,
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(ErrorCode.InternalError, "metrics", error, "get metrics");
 	}
 }
 

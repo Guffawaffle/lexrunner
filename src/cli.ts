@@ -72,6 +72,7 @@ import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
 import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { registerSeniorDevCommand } from "./commands/seniorDev.js";
+import { registerMetricsCommand } from "./commands/metrics.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -995,6 +996,9 @@ registerAuditCommands(program);
 
 // Create project command
 registerCreateProjectCommand(program);
+
+// Metrics command for governance observability
+registerMetricsCommand(program, { jsonModeActive: () => jsonModeActive });
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {
