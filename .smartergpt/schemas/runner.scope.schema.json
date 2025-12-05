@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/runner.scope.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/runner.scope.schema.json",
 	"title": "Runner Scope Configuration",
 	"description": "Configuration for runner execution scope and boundaries",
 	"type": "object",

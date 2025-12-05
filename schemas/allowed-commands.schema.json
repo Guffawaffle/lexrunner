@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/allowed-commands.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/allowed-commands.schema.json",
 	"title": "Command Whitelist",
 	"description": "Whitelist configuration for allowed commands in gate execution",
 	"type": "object",

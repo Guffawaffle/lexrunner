@@ -141,7 +141,7 @@ export const BehaviorRuleSchema = z.object({
 
 **Key Features:**
 
-- **Schema $id**: `https://github.com/Guffawaffle/lex-pr-runner/schemas/behavior-rule.schema.json`
+- **Schema $id**: `https://github.com/Guffawaffle/LexRunner/schemas/behavior-rule.schema.json`
 - **Scope Filtering**: Rules can be scoped to specific environments, projects, or agent families
 - **Priority Ordering**: Rules with higher priority values take precedence
 - **Strict Validation**: No additional properties allowed

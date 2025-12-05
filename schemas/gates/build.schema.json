@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/build.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates/build.schema.json",
   "title": "Build Gate Input Schema",
   "description": "Input contract for build gate execution",
   "type": "object",

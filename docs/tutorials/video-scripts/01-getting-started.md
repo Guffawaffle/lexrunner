@@ -220,7 +220,7 @@ Successfully merged 2 PRs
 - ✓ Executed quality gates
 - ✓ Merged PRs automatically
 
-> "For more advanced features like dependency management and CI/CD integration, check out the documentation at github.com/Guffawaffle/lex-pr-runner."
+> "For more advanced features like dependency management and CI/CD integration, check out the documentation at github.com/Guffawaffle/LexRunner."
 
 **[End screen with links]**
 - 📚 Documentation

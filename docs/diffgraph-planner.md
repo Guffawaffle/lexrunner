@@ -554,7 +554,7 @@ diff plan1.json plan2.json
 # Pin specific commit SHAs in plan (not yet supported - file a feature request)
 ```
 
-**Report:** This is a critical bug - please [file an issue](https://github.com/Guffawaffle/lex-pr-runner/issues/new/choose) with:
+**Report:** This is a critical bug - please [file an issue](https://github.com/Guffawaffle/LexRunner/issues/new/choose) with:
 - Commands run
 - Diff of the two plans
 - Environment details (OS, Node version, lex-pr version)
@@ -1139,6 +1139,6 @@ PR-101 → PR-100 (0.95 confidence, shared files)
 
 ## Feedback and Support
 
-- **Issues:** [GitHub Issues](https://github.com/Guffawaffle/lex-pr-runner/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/Guffawaffle/lex-pr-runner/discussions)
-- **Epic:** [#75 - Diffgraph Planner & Dependency Auto-Discovery](https://github.com/Guffawaffle/lex-pr-runner/issues/75)
+- **Issues:** [GitHub Issues](https://github.com/Guffawaffle/LexRunner/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/Guffawaffle/LexRunner/discussions)
+- **Epic:** [#75 - Diffgraph Planner & Dependency Auto-Discovery](https://github.com/Guffawaffle/LexRunner/issues/75)

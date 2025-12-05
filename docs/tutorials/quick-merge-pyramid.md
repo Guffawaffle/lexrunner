@@ -346,4 +346,4 @@ feat/auth   feat/api
 - [Quickstart Guide](../quickstart.md) - Initial setup and configuration
 - [CLI Reference](../cli.md) - Complete command documentation
 - [Architecture Overview](../architecture.md) - System design and concepts
-- [Issue #134](https://github.com/Guffawaffle/lex-pr-runner/issues/134) - Contributor onboarding and adoption tracking
+- [Issue #134](https://github.com/Guffawaffle/LexRunner/issues/134) - Contributor onboarding and adoption tracking

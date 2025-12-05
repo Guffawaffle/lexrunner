@@ -112,7 +112,7 @@
 ## Execution Complete ✅
 
 ### Integration PR Created
-- **URL**: https://github.com/Guffawaffle/lex-pr-runner/pull/72
+- **URL**: https://github.com/Guffawaffle/LexRunner/pull/72
 - **Title**: Integration PR: Merge-Weave PR-70 + PR-71
 - **Status**: Ready for review and merge
 

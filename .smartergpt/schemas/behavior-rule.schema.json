@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/behavior-rule.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/behavior-rule.schema.json",
 	"title": "Behavior Rule Configuration",
 	"description": "Configuration for behavioral rules that provide guidance and policy enforcement for AI agents in the LexRunner ecosystem",
 	"type": "object",
