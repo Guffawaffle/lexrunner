@@ -28,7 +28,7 @@ import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
 import { generatePlanFromGitHub } from "../core/githubPlan.js";
 import { createGitHubClient } from "../github/index.js";
-import { createGitHubAPI, GitHubAPI } from "../github/api.js";
+import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
 import { bootstrapWorkspace, detectProjectType, getEnvironmentSuggestions } from "../core/bootstrap.js";
 import {
@@ -1601,6 +1601,14 @@ async function handleDiscover(args: {
 	} catch (error) {
 		if (error instanceof McpError) {
 			throw error;
+		}
+		// Handle GitHub API errors specifically with status code context
+		if (error instanceof GitHubAPIError) {
+			const axError = githubApiError({
+				status: error.status,
+				message: error.message,
+			});
+			throwMcpAXError(ErrorCode.InternalError, axError);
 		}
 		throwMcpToolError(ErrorCode.InternalError, "discover", error, "discover PRs");
 	}
