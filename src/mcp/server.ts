@@ -71,6 +71,15 @@ import * as path from "path";
 // Hostility scoring imports
 import { runEnvironmentQualityCheck } from "../hostility/index.js";
 
+// Governance integration imports
+import {
+	buildGovernanceStatus,
+	governanceStatusToJSON,
+} from "../governance/index.js";
+
+// Tier metrics imports
+import { suggestTiersForPlan, calculateTierMetrics } from "../tiers/index.js";
+
 // Senior Dev executor imports
 import {
 	prepareReviewContext,
@@ -1627,6 +1636,20 @@ async function handleStatus(args: {
 		const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 		const mergeSummary = evaluator.getMergeSummary();
 
+		// Calculate tier metrics from plan items
+		const tierAssignments = suggestTiersForPlan(plan.items);
+		const tierMetrics = calculateTierMetrics(tierAssignments);
+
+		// Run environment quality check for hostility score
+		const hostilityScore = runEnvironmentQualityCheck();
+
+		// Build governance status
+		const governanceStatus = buildGovernanceStatus(
+			tierMetrics,
+			undefined, // Turn cost tracked during actual runs
+			hostilityScore
+		);
+
 		const result = {
 			plan: {
 				schemaVersion: plan.schemaVersion,
@@ -1635,6 +1658,7 @@ async function handleStatus(args: {
 				policy: plan.policy,
 			},
 			mergeSummary,
+			governance: governanceStatusToJSON(governanceStatus),
 		};
 
 		return {

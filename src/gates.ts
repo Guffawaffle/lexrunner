@@ -15,6 +15,8 @@ import { validateGateInput } from "./gates/validator.js";
 import { wrapGateFailure, logGateFailure, type FailureHandlingPayload } from "./runs/failures.js";
 import { emitGateFrame } from "./frames/index.js";
 import type { FrameEmitResult } from "./frames/types.js";
+import { emitGateReceipt } from "./weave/receiptHelper.js";
+import type { ActionReceipt } from "./receipts/schema.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -515,7 +517,11 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
 }
 
 /**
- * Emit a Frame for gate execution result (AX-005)
+ * Emit Frame and Receipt for gate execution result (AX-005 + Wave 3)
+ * 
+ * This function emits both:
+ * 1. A Frame for Lex memory (existing behavior)
+ * 2. An ActionReceipt for disciplined failure pattern (Wave 3 requirement)
  */
 function emitGateExecutionFrame(
 	gateName: string,
@@ -523,27 +529,46 @@ function emitGateExecutionFrame(
 	result: GateResult,
 	runId?: string
 ): FrameEmitResult | undefined {
-	// Only emit frames if runId is provided
-	if (!runId) {
-		return undefined;
-	}
-
 	// Skip emitting frame for blocked or skipped gates - they didn't actually execute
 	if (result.status === 'blocked' || result.status === 'skipped' || result.status === 'retrying') {
 		return undefined;
 	}
 
-	const outcome = result.status === 'pass' ? 'success' : 'failure';
+	const passed = result.status === 'pass';
+	const duration = result.duration || 0;
+	const outcome = passed ? 'success' : 'failure';
+
+	// Emit ActionReceipt for disciplined failure pattern (Wave 3)
+	// Receipt is always emitted for completed gates, regardless of runId
+	emitGateReceipt(
+		gateName,
+		itemName,
+		passed,
+		duration,
+		runId,
+		{ log: true, json: true },
+		// Include detailed context for failure receipts
+		!passed ? {
+			error: result.stderr,
+			exitCode: result.exitCode,
+			artifacts: result.artifacts,
+		} : undefined
+	);
 	
+	// Only emit Frame if runId is provided
+	if (!runId) {
+		return undefined;
+	}
+
 	return emitGateFrame({
 		runId,
 		gateName,
 		itemName,
-		durationMs: result.duration || 0,
+		durationMs: duration,
 		outcome,
 		exitCode: result.exitCode,
 		artifacts: result.artifacts,
-		error: result.stderr && result.status !== 'pass' ? result.stderr : undefined,
+		error: result.stderr && !passed ? result.stderr : undefined,
 	});
 }
 

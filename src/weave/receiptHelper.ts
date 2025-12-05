@@ -204,7 +204,24 @@ export function emitWeaveUncertaintyMarker(
 // =============================================================================
 
 /**
+ * Additional context for gate receipts
+ */
+export interface GateReceiptContext {
+	/** Error message if gate failed */
+	error?: string;
+	/** Exit code of the gate command */
+	exitCode?: number;
+	/** Artifacts collected from gate execution */
+	artifacts?: string[];
+}
+
+/**
  * Emit a receipt for gate execution
+ *
+ * Implements Wave 3 acceptance criteria: "Receipt Emission from Gates"
+ * - Every gate should emit a receipt on completion
+ * - Receipts should include: gate name, duration, outcome, context
+ * - Failed gates should emit detailed failure receipts
  *
  * @param gateName - Name of the gate
  * @param itemName - Name of the item being gated
@@ -212,6 +229,7 @@ export function emitWeaveUncertaintyMarker(
  * @param duration - Gate execution duration in ms
  * @param runId - Optional run ID for correlation
  * @param options - Emission options
+ * @param context - Optional additional context for the receipt
  * @returns The emitted ActionReceipt
  */
 export function emitGateReceipt(
@@ -220,13 +238,14 @@ export function emitGateReceipt(
 	passed: boolean,
 	duration: number,
 	runId?: string,
-	options: EmitOptions = {}
+	options: EmitOptions = {},
+	context?: GateReceiptContext
 ): ActionReceipt {
 	if (passed) {
 		return emitActionReceipt(
 			{
 				action: `execute gate: ${gateName} for ${itemName}`,
-				rationale: "Gate execution required by plan policy",
+				rationale: `Gate execution completed successfully in ${duration}ms`,
 				confidence: "high",
 				reversibility: "reversible", // Gates don't mutate state
 				outcome: "success",
@@ -237,6 +256,15 @@ export function emitGateReceipt(
 			options
 		);
 	} else {
+		// Build detailed failure receipt with context
+		const uncertaintyNotes: string[] = [];
+		if (context?.error) {
+			uncertaintyNotes.push(`Error: ${context.error.slice(0, 200)}${context.error.length > 200 ? '...' : ''}`);
+		}
+		if (context?.exitCode !== undefined && context.exitCode !== 0) {
+			uncertaintyNotes.push(`Exit code: ${context.exitCode}`);
+		}
+
 		return emitFailureReceipt(
 			{
 				action: `execute gate: ${gateName} for ${itemName}`,
@@ -245,6 +273,7 @@ export function emitGateReceipt(
 				reversibility: "reversible", // Gates don't mutate state
 				phase: "verify",
 				runId,
+				uncertaintyNotes: uncertaintyNotes.length > 0 ? uncertaintyNotes : undefined,
 				nextActions: [
 					`Fix ${gateName} failures`,
 					`Re-run gate: lex-pr gates run --gate ${gateName}`,
