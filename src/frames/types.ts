@@ -41,6 +41,27 @@ export const ExecutionFrameMetadataSchema = z.object({
 	run_id: z.string().optional(),
 	/** Plan hash for idempotency */
 	plan_hash: z.string().optional(),
+	/** Turn Cost tracking data */
+	turn_cost: z
+		.object({
+			/** Turn Cost components */
+			components: z.object({
+				latencyMs: z.number(),
+				contextResetTokens: z.number(),
+				renegotiationCount: z.number(),
+				tokenBloat: z.number(),
+				attentionSwitchCount: z.number(),
+			}),
+			/** Weighted score */
+			weightedScore: z.number(),
+			/** Number of events recorded */
+			eventCount: z.number(),
+			/** Prior run score for comparison */
+			priorRunScore: z.number().optional(),
+			/** Improvement percentage */
+			improvement: z.string().optional(),
+		})
+		.optional(),
 });
 
 export type ExecutionFrameMetadata = z.infer<typeof ExecutionFrameMetadataSchema>;
@@ -95,6 +116,20 @@ export interface MergeWeaveFrameInput {
 	error?: string;
 	/** Plan hash for idempotency */
 	planHash?: string;
+	/** Turn Cost tracking data */
+	turnCost?: {
+		components: {
+			latencyMs: number;
+			contextResetTokens: number;
+			renegotiationCount: number;
+			tokenBloat: number;
+			attentionSwitchCount: number;
+		};
+		weightedScore: number;
+		eventCount: number;
+		priorRunScore?: number;
+		improvement?: string;
+	};
 }
 
 /**

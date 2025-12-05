@@ -117,6 +117,43 @@ describe("emitMergeWeaveFrame", () => {
 
 		expect(result1.frameId).not.toBe(result2.frameId);
 	});
+
+	it("should include Turn Cost data when provided", () => {
+		const input: MergeWeaveFrameInput = {
+			runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+			mergedPRs: ["PR-101", "PR-102"],
+			conflictsResolved: 2,
+			gatesPassed: ["lint", "test"],
+			durationMs: 30000,
+			outcome: "success",
+			targetBranch: "main",
+			turnCost: {
+				components: {
+					latencyMs: 15000,
+					contextResetTokens: 0,
+					renegotiationCount: 2,
+					tokenBloat: 500,
+					attentionSwitchCount: 1,
+				},
+				weightedScore: 3.25,
+				eventCount: 6,
+				priorRunScore: 5.8,
+				improvement: "-44%",
+			},
+		};
+
+		const result = emitMergeWeaveFrame(input);
+
+		expect(result.success).toBe(true);
+		expect(result.frame).toBeDefined();
+
+		const frame = result.frame!;
+		expect(frame.metadata?.turn_cost).toBeDefined();
+		expect(frame.metadata?.turn_cost?.components.latencyMs).toBe(15000);
+		expect(frame.metadata?.turn_cost?.components.renegotiationCount).toBe(2);
+		expect(frame.metadata?.turn_cost?.weightedScore).toBe(3.25);
+		expect(frame.metadata?.turn_cost?.improvement).toBe("-44%");
+	});
 });
 
 describe("emitExecutorFrame", () => {
