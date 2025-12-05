@@ -107,7 +107,9 @@ export class GitHubAPI {
 						const classified = classifyError(error, 'Fetching pull requests');
 						console.error(formatErrorForUser(classified));
 						// Extract status from octokit error if available
-						const status = (error as any)?.status;
+						const status = error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+							? (error as { status: number }).status
+							: undefined;
 						throw new GitHubAPIError(`Failed to fetch pull requests: ${error instanceof Error ? error.message : String(error)}`, status);
 					}
 				});
