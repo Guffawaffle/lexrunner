@@ -72,6 +72,7 @@ import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
 import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { registerSeniorDevCommand } from "./commands/seniorDev.js";
+import { registerBudgetCommand } from "./commands/budget.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -456,6 +457,9 @@ registerIdeaCommand(program);
 
 // Senior Dev executor commands
 registerSeniorDevCommand(program, () => jsonModeActive);
+
+// Budget command - governance budget management
+registerBudgetCommand(program, () => jsonModeActive);
 
 // Init command - Interactive workspace setup
 program
