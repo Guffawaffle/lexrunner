@@ -237,13 +237,15 @@ export class GovernanceMetricsCollector {
 	}
 
 	/**
-	 * Get metrics filtered by name pattern
+	 * Get metrics filtered by name pattern.
+	 * The pattern is matched against metric category keywords (turn_cost, tier, failure, budget).
+	 * This allows flexible filtering like "turn" to match turnCost metrics.
 	 */
 	getMetricsByName(pattern: string): MetricsSnapshot {
 		const snapshot = this.getSnapshot();
 		const regex = new RegExp(pattern, "i");
 
-		// Filter metrics based on pattern
+		// Filter metrics based on pattern matching against category keywords
 		const filteredMetrics: MetricsSnapshot["metrics"] = {
 			turnCost: null,
 			tierDistribution: null,
@@ -251,15 +253,19 @@ export class GovernanceMetricsCollector {
 			budgetRemaining: null,
 		};
 
+		// Match turn_cost or turnCost patterns
 		if (regex.test("turn_cost") || regex.test("turnCost")) {
 			filteredMetrics.turnCost = snapshot.metrics.turnCost;
 		}
+		// Match tier or distribution patterns
 		if (regex.test("tier") || regex.test("distribution")) {
 			filteredMetrics.tierDistribution = snapshot.metrics.tierDistribution;
 		}
+		// Match failure or rate patterns
 		if (regex.test("failure") || regex.test("rate")) {
 			filteredMetrics.failureRate = snapshot.metrics.failureRate;
 		}
+		// Match budget or remaining patterns
 		if (regex.test("budget") || regex.test("remaining")) {
 			filteredMetrics.budgetRemaining = snapshot.metrics.budgetRemaining;
 		}
