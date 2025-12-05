@@ -16,14 +16,19 @@ import { createGitOperations } from "../git/operations.js";
 import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
 import { initColorControl } from "../util/colorControl.js";
-import { runEnvironmentQualityCheck, formatHostilityReport } from "../hostility/index.js";
+import {
+	runEnvironmentQualityCheck,
+	formatHostilityReport,
+} from "../hostility/index.js";
 import * as fs from "fs";
 import * as path from "path";
 
 /**
  * Perform all doctor checks and return results
  */
-async function performDoctorChecks(includeEnvironmentQuality: boolean = false): Promise<any> {
+async function performDoctorChecks(
+	includeEnvironmentQuality: boolean = false
+): Promise<any> {
 	const checks: any = {
 		hasErrors: false,
 		issues: [],
@@ -170,7 +175,9 @@ export function registerDoctorCommand(
 				initColorControl({ jsonMode: true });
 
 				// JSON mode for programmatic use
-				const result = await performDoctorChecks(opts.environmentQuality);
+				const result = await performDoctorChecks(
+					opts.environmentQuality
+				);
 				writeJsonOutput(result);
 				if (result.hasErrors) {
 					throwExit(1);
@@ -183,7 +190,7 @@ export function registerDoctorCommand(
 				const score = runEnvironmentQualityCheck();
 				console.log(formatHostilityReport(score));
 				console.log("");
-				
+
 				// Exit with error if hostility is high
 				if (score.status === "high") {
 					throwExit(1);

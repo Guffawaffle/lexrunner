@@ -62,9 +62,26 @@ export const ExecutionFrameMetadataSchema = z.object({
 			improvement: z.string().optional(),
 		})
 		.optional(),
+	/** Tier metrics for governance (Claim 3.4) */
+	tier_metrics: z
+		.object({
+			totalTasks: z.number(),
+			byTier: z.object({
+				senior: z.number(),
+				mid: z.number(),
+				junior: z.number(),
+			}),
+			escalations: z.number(),
+			mismatches: z.number(),
+			tierMatchRate: z.number(),
+			escalationRate: z.number(),
+		})
+		.optional(),
 });
 
-export type ExecutionFrameMetadata = z.infer<typeof ExecutionFrameMetadataSchema>;
+export type ExecutionFrameMetadata = z.infer<
+	typeof ExecutionFrameMetadataSchema
+>;
 
 /**
  * Execution Frame schema
@@ -200,7 +217,9 @@ export function validateExecutionFrame(frame: unknown): ExecutionFrame {
 /**
  * Safely validate an execution frame
  */
-export function safeValidateExecutionFrame(frame: unknown):
+export function safeValidateExecutionFrame(
+	frame: unknown
+):
 	| { success: true; data: ExecutionFrame }
 	| { success: false; error: z.ZodError } {
 	const result = ExecutionFrameSchema.safeParse(frame);

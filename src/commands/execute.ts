@@ -17,6 +17,13 @@ import { sha256 } from '../util/hash.js';
 import { getStatusIcon, formatStatusTable } from '../cli/formatters.js';
 import { BudgetTracker, BudgetExceededError } from '../budget/index.js';
 import { purgeCache } from '../cli/runnerLifecycle.js';
+import {
+	parseTierOverrides,
+	suggestTiersForPlan,
+	calculateTierMetrics,
+	formatTierMetrics,
+	tierMetricsToJSON,
+} from '../tiers/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -116,6 +123,11 @@ export function registerExecuteCommand(program: Command, deps: ExecuteCommandDep
 			"100"
 		)
 		.option("--audit-sarif", "Generate SARIF output for vulnerability findings")
+		.option(
+			"--tier-override <overrides>",
+			"Override tier for specific items (format: item=tier, comma-separated)"
+		)
+		.option("--show-tiers", "Show suggested and actual tiers for plan items")
 		.addHelpText(
 			"after",
 			`
@@ -189,6 +201,30 @@ Common Issues:
 				const planContent = fs.readFileSync(planFile, "utf-8");
 				const plan = loadPlan(planContent);
 				const timeoutMs = parseInt(opts.timeout);
+
+				// Parse tier overrides from CLI
+				const tierOverrides = opts.tierOverride 
+					? parseTierOverrides(opts.tierOverride) 
+					: [];
+
+				// Calculate tier assignments for all plan items
+				const tierAssignments = suggestTiersForPlan(plan.items, tierOverrides);
+				const tierMetrics = calculateTierMetrics(tierAssignments);
+
+				// Show tier information if --show-tiers is specified
+				if (opts.showTiers && !(opts.json || deps.jsonModeActive())) {
+					console.log("\n🏷️  Capability Tier Assignments");
+					console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+					for (const [itemName, assignment] of tierAssignments) {
+						const actual = assignment.actual || assignment.suggested;
+						const marker = assignment.mismatch ? " (overridden)" : "";
+						const escalatedMarker = assignment.escalated ? " ⬆️" : "";
+						console.log(`  ${itemName}: ${actual}${marker}${escalatedMarker}`);
+					}
+					console.log("");
+					console.log(formatTierMetrics(tierMetrics));
+					console.log("");
+				}
 
 				// Record initial prompt (plan loading)
 				try {
@@ -300,6 +336,17 @@ Common Issues:
 
 				if (opts.dryRun) {
 					if (opts.json || deps.jsonModeActive()) {
+						const tierAssignmentEntries = Object.fromEntries(
+							Array.from(tierAssignments.entries()).map(([name, assignment]) => [
+								name,
+								{
+									suggested: assignment.suggested,
+									actual: assignment.actual,
+									escalated: assignment.escalated,
+									mismatch: assignment.mismatch,
+								},
+							])
+						);
 						const output = {
 							dryRun: true,
 							plan: {
@@ -320,6 +367,10 @@ Common Issues:
 											).length,
 									  }
 									: undefined,
+							},
+							tiers: {
+								assignments: tierAssignmentEntries,
+								metrics: tierMetricsToJSON(tierMetrics),
 							},
 							budget: budgetTracker.formatJSON(),
 						};
@@ -409,7 +460,18 @@ Common Issues:
 				const mergeSummary = evaluator.getMergeSummary();
 
 				if (opts.json || deps.jsonModeActive()) {
-					// Output JSON results
+					// Output JSON results with tier information
+					const tierAssignmentEntries = Object.fromEntries(
+						Array.from(tierAssignments.entries()).map(([name, assignment]) => [
+							name,
+							{
+								suggested: assignment.suggested,
+								actual: assignment.actual,
+								escalated: assignment.escalated,
+								mismatch: assignment.mismatch,
+							},
+						])
+					);
 					const output = {
 						plan: {
 							schemaVersion: plan.schemaVersion,
@@ -420,6 +482,10 @@ Common Issues:
 							results: Object.fromEntries(results),
 							mergeSummary,
 							artifactDir: opts.artifactDir,
+						},
+						tiers: {
+							assignments: tierAssignmentEntries,
+							metrics: tierMetricsToJSON(tierMetrics),
 						},
 						budget: budgetTracker.formatJSON(),
 					};
