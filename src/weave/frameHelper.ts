@@ -83,6 +83,7 @@ export function emitWeaveCompletionFrame(
 		outcome,
 		targetBranch: context.metadata.targetBranch,
 		planHash: context.metadata.planHash,
+		turnCost: context.turnCost,
 	};
 
 	const result = emitMergeWeaveFrame(input);

@@ -44,6 +44,7 @@ import {
 	serializeWeaveLock,
 	WeaveLock,
 } from "../schema/weaveLock.js";
+import { MergeWeaveTurnCost } from "../metrics/turncost.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -123,6 +124,10 @@ export function registerMergeCommand(
 			"--fail-on-preflight-conflict",
 			"Exit with error if preflight conflict detection finds conflicts"
 		)
+		.option(
+			"--track-turncost",
+			"Track Turn Cost metrics during execution (coordination overhead)"
+		)
 		.addHelpText(
 			"after",
 			`
@@ -138,6 +143,7 @@ Examples:
   $ lex-pr merge --items pr-123,pr-456 --execute # Merge specific items
   $ lex-pr merge --skip-preflight               # Skip conflict detection
   $ lex-pr merge --fail-on-preflight-conflict   # Abort if conflicts detected
+  $ lex-pr merge --execute --track-turncost     # Track coordination overhead
 
 State Management:
   • Dry-run shows planned batches and execution order
@@ -155,6 +161,12 @@ Preflight Conflict Detection:
   • Uses git merge-tree to simulate merges without modifying working tree
   • Detects conflicts early for each item before execution
   • Use --skip-preflight to disable or --fail-on-preflight-conflict to abort
+
+Turn Cost Tracking:
+  • Measures coordination overhead during merge-weave operations
+  • Components: Latency (L), Renegotiation (R), Token Bloat (T), Attention (A)
+  • Weighted score: λL + γC + ρR + τT + αA
+  • Use --track-turncost to enable metrics collection
 
 Common Issues:
   • Merge conflicts: Review conflicts and resolve manually, then re-run
@@ -490,12 +502,42 @@ Common Issues:
 					// Compute merge order
 					const levels = computeMergeOrder(plan);
 
+					// Initialize Turn Cost tracker if enabled
+					const turnCostTracker = opts.trackTurncost
+						? new MergeWeaveTurnCost()
+						: null;
+					// Note: performance.now() is available in Node.js >= 8.5.0,
+					// and this project requires Node.js >= 20 (package.json)
+					const executeStartTime = turnCostTracker ? performance.now() : 0;
+
 					// Execute weave
 					const result = await gitOps.executeWeave(
 						plan,
 						levels,
 						progressReporter
 					);
+
+					// Record Turn Cost metrics
+					if (turnCostTracker) {
+						// Record total execution latency
+						turnCostTracker.recordLatency(
+							performance.now() - executeStartTime,
+							"total_execution"
+						);
+
+						// Record renegotiations (conflicts that need resolution)
+						for (const op of result.operations) {
+							if (op.conflicts && op.conflicts.length > 0) {
+								turnCostTracker.recordRenegotiation(
+									`conflict in ${op.item.name}: ${op.conflicts.length} file(s)`,
+									op.item.name
+								);
+							}
+						}
+
+						// Attach Turn Cost to context for frame emission
+						context.turnCost = turnCostTracker.toJSON();
+					}
 
 					// Update lock file status based on result
 					const finalLockData: WeaveLock = {
@@ -511,26 +553,29 @@ Common Issues:
 					);
 
 					if (opts.json || jsonModeActive()) {
-						console.log(
-							canonicalJSONStringify({
-								mode: "execute",
-								status: "completed",
-								lockHash: lockHashShort,
-								result: {
-									successful: result.successful,
-									failed: result.failed,
-									conflicts: result.conflicts,
-									totalOperations: result.totalOperations,
-								},
-								operations: result.operations.map((op) => ({
-									item: op.item.name,
-									success: op.success,
-									conflicts: op.conflicts,
-									message: op.message,
-									sha: op.sha,
-								})),
-							})
-						);
+						const output: Record<string, any> = {
+							mode: "execute",
+							status: "completed",
+							lockHash: lockHashShort,
+							result: {
+								successful: result.successful,
+								failed: result.failed,
+								conflicts: result.conflicts,
+								totalOperations: result.totalOperations,
+							},
+							operations: result.operations.map((op) => ({
+								item: op.item.name,
+								success: op.success,
+								conflicts: op.conflicts,
+								message: op.message,
+								sha: op.sha,
+							})),
+						};
+						// Include Turn Cost in JSON output if tracked
+						if (turnCostTracker) {
+							output.turnCost = turnCostTracker.toJSON();
+						}
+						console.log(canonicalJSONStringify(output));
 					} else {
 						console.log("");
 						console.log("## Execution Results");
@@ -572,6 +617,30 @@ Common Issues:
 										console.log(`  - ${file}`);
 									}
 								}
+							}
+						}
+
+						// Display Turn Cost summary if tracked
+						if (turnCostTracker) {
+							const turnCostSummary = turnCostTracker.toJSON();
+							console.log("");
+							console.log("### Turn Cost");
+							console.log(
+								`- **Weighted Score**: ${turnCostSummary.weightedScore.toFixed(2)}`
+							);
+							console.log(
+								`- **Latency**: ${(turnCostSummary.components.latencyMs / 1000).toFixed(2)}s`
+							);
+							console.log(
+								`- **Renegotiations**: ${turnCostSummary.components.renegotiationCount}`
+							);
+							console.log(
+								`- **Attention Switches**: ${turnCostSummary.components.attentionSwitchCount}`
+							);
+							if (turnCostSummary.improvement) {
+								console.log(
+									`- **vs Prior Run**: ${turnCostSummary.improvement}`
+								);
 							}
 						}
 
