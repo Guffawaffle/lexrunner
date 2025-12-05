@@ -31,6 +31,10 @@ describe('Doctor Command', () => {
 		const jsonOption = opts?.find(opt => opt.long === '--json');
 		expect(jsonOption).toBeDefined();
 		expect(jsonOption?.description).toBe('Output JSON format');
+		
+		const environmentQualityOption = opts?.find(opt => opt.long === '--environment-quality');
+		expect(environmentQualityOption).toBeDefined();
+		expect(environmentQualityOption?.description).toBe('Run environmental hostility scoring');
 	});
 
 	it('should have no required arguments', () => {
