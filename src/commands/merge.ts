@@ -45,6 +45,16 @@ import {
 	WeaveLock,
 } from "../schema/weaveLock.js";
 import { MergeWeaveTurnCost } from "../metrics/turncost.js";
+import {
+	getLexSonaConfig,
+	isLexSonaEnabled,
+	deriveShadowConstraints,
+	createGovernanceComparisonLog,
+	writeGovernanceLog,
+	formatGovernanceLog,
+	type LexSonaWorkflowContext,
+	type RunnerGovernanceSignals,
+} from "../lexsona/index.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -508,7 +518,66 @@ Common Issues:
 						: null;
 					// Note: performance.now() is available in Node.js >= 8.5.0,
 					// and this project requires Node.js >= 20 (package.json)
-					const executeStartTime = turnCostTracker ? performance.now() : 0;
+					const executeStartTime = turnCostTracker
+						? performance.now()
+						: 0;
+
+					// === LexSona Shadow Governance (Version Contract v0.1) ===
+					const lexsonaConfig = getLexSonaConfig();
+					if (isLexSonaEnabled(lexsonaConfig)) {
+						const workflowContext: LexSonaWorkflowContext = {
+							workflowId: "merge-weave",
+							stepKind: "execute",
+							repo: plan.target,
+							branch: currentBranch,
+							hints: {
+								task: "merge-pyramid-execution",
+								itemCount: plan.items.length,
+								batchCount: context.batches.length,
+							},
+						};
+
+						// Derive shadow constraints (no enforcement)
+						const shadowResult = await deriveShadowConstraints(
+							workflowContext,
+							lexsonaConfig
+						);
+
+						// Collect runner governance signals for comparison
+						// Aggregate gates from all plan items
+						const allGates = plan.items.flatMap((item) =>
+							item.gates.map((g) => g.name)
+						);
+						const uniqueGates = [...new Set(allGates)];
+						const runnerSignals: RunnerGovernanceSignals = {
+							gatesRequired: uniqueGates,
+							mergeEligible: true, // We got here, so eligible
+						};
+
+						// Log governance comparison
+						const governanceLog = createGovernanceComparisonLog(
+							workflowContext,
+							shadowResult,
+							runnerSignals,
+							lexsonaConfig.mode
+						);
+						const logPath = writeGovernanceLog(governanceLog);
+
+						if (!(opts.json || jsonModeActive())) {
+							console.log(
+								`🧠 LexSona shadow governance logged: ${logPath}`
+							);
+							if (
+								shadowResult.success &&
+								shadowResult.constraintSet
+							) {
+								console.log(
+									`   Persona: ${shadowResult.personaId} | Constraints: ${shadowResult.constraintSet.constraintCount}`
+								);
+							}
+							console.log("");
+						}
+					}
 
 					// Execute weave
 					const result = await gitOps.executeWeave(
@@ -611,8 +680,13 @@ Common Issues:
 							console.log("");
 							console.log("### Conflicted Files");
 							for (const operation of result.operations) {
-								if (operation.conflicts && operation.conflicts.length > 0) {
-									console.log(`\n**${operation.item.name}**:`);
+								if (
+									operation.conflicts &&
+									operation.conflicts.length > 0
+								) {
+									console.log(
+										`\n**${operation.item.name}**:`
+									);
 									for (const file of operation.conflicts) {
 										console.log(`  - ${file}`);
 									}
@@ -626,10 +700,14 @@ Common Issues:
 							console.log("");
 							console.log("### Turn Cost");
 							console.log(
-								`- **Weighted Score**: ${turnCostSummary.weightedScore.toFixed(2)}`
+								`- **Weighted Score**: ${turnCostSummary.weightedScore.toFixed(
+									2
+								)}`
 							);
 							console.log(
-								`- **Latency**: ${(turnCostSummary.components.latencyMs / 1000).toFixed(2)}s`
+								`- **Latency**: ${(
+									turnCostSummary.components.latencyMs / 1000
+								).toFixed(2)}s`
 							);
 							console.log(
 								`- **Renegotiations**: ${turnCostSummary.components.renegotiationCount}`
