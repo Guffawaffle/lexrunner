@@ -141,7 +141,7 @@ export function wslToWindowsPath(wslPath: string): string {
 	}
 
 	const drive = match[1].toUpperCase();
-	const restPath = (match[2] || "").replace(/\//g, "\\");
+	const restPath = (match[2] || "\\").replace(/\//g, "\\");
 	return `${drive}:${restPath}`;
 }
 

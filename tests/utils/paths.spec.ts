@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { normalizePath, isSafeArtifactPath, validateOutputPath } from '../../src/utils/paths.js';
+import { 
+	normalizePath, 
+	isSafeArtifactPath, 
+	validateOutputPath,
+	wslToWindowsPath,
+	windowsToWSLPath
+} from '../../src/utils/paths.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -178,5 +184,49 @@ describe('paths: validateOutputPath', () => {
 	it('should throw for artifacts/PR-* paths', async () => {
 		await expect(validateOutputPath('artifacts/PR-456/spec.json'))
 			.rejects.toThrow('SAFETY VIOLATION');
+	});
+});
+
+describe('wslToWindowsPath', () => {
+	it('converts WSL path to Windows path', () => {
+		expect(wslToWindowsPath('/mnt/c/Users/alice')).toBe('C:\\Users\\alice');
+		expect(wslToWindowsPath('/mnt/d/projects')).toBe('D:\\projects');
+	});
+
+	it('handles paths without rest', () => {
+		expect(wslToWindowsPath('/mnt/c')).toBe('C:\\');
+	});
+	
+	it('returns unchanged if not WSL path', () => {
+		expect(wslToWindowsPath('/home/user/file.txt')).toBe('/home/user/file.txt');
+	});
+});
+
+describe('windowsToWSLPath', () => {
+	it('converts Windows path to WSL path', () => {
+		expect(windowsToWSLPath('C:\\Users\\alice')).toBe('/mnt/c/Users/alice');
+		expect(windowsToWSLPath('D:\\projects')).toBe('/mnt/d/projects');
+	});
+	
+	it('handles paths without rest', () => {
+		expect(windowsToWSLPath('C:')).toBe('/mnt/c');
+	});
+	
+	it('returns unchanged if not Windows path', () => {
+		expect(windowsToWSLPath('/home/user/file.txt')).toBe('/home/user/file.txt');
+	});
+});
+
+describe('WSL bidirectional conversion', () => {
+	it('roundtrip conversion works', () => {
+		const winPath = 'C:\\Users\\alice\\project';
+		const wslPath = '/mnt/c/Users/alice/project';
+		
+		expect(windowsToWSLPath(winPath)).toBe(wslPath);
+		expect(wslToWindowsPath(wslPath)).toBe(winPath);
+		
+		// Roundtrip
+		expect(wslToWindowsPath(windowsToWSLPath(winPath))).toBe(winPath);
+		expect(windowsToWSLPath(wslToWindowsPath(wslPath))).toBe(wslPath);
 	});
 });
