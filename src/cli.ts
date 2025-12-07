@@ -47,6 +47,8 @@ import { registerStatusCommand } from "./commands/status.js";
 import { registerReportCommand } from "./commands/report.js";
 import { registerRetryCommand } from "./commands/retry.js";
 import { registerGateReportCommand } from "./commands/gateReport.js";
+import { registerGovernanceReportCommand } from "./commands/governanceReport.js";
+import { registerGovernanceCleanupCommand } from "./commands/governanceCleanup.js";
 import { registerSecurityCommands } from "./cli-security.js";
 import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
@@ -295,6 +297,12 @@ Examples:
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
 
+Governance (LexSona Shadow Mode):
+	$ lex-pr governance:report              Analyze shadow governance logs
+	$ lex-pr governance:report --format markdown --disagreements-only
+	$ lex-pr governance:report --since 2025-12-01 --persona quality-first_engineering
+	$ lex-pr governance:cleanup             Clean up old governance logs
+
 Power User Commands:
 	$ lex-pr view plan.json                 Interactive plan viewer
 	$ lex-pr query plan.json --stats        Plan statistics and analysis
@@ -314,6 +322,12 @@ Workflow:
 
 // Gate report validation command - modular implementation
 registerGateReportCommand(program);
+
+// Governance report command (QOL-004) - modular implementation
+registerGovernanceReportCommand(program);
+
+// Governance cleanup command (QOL-002) - modular implementation
+registerGovernanceCleanupCommand(program);
 
 // Plan generation command - modular implementation
 registerPlanCommand(program, {

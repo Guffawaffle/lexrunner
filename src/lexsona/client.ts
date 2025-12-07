@@ -9,6 +9,7 @@
  */
 
 import { ulid } from "ulid";
+import chalk from "chalk";
 import type {
 	LexSonaMode,
 	LexSonaEnvConfig,
@@ -16,6 +17,16 @@ import type {
 	LexSonaShadowResult,
 	LexSonaConstraintSnapshot,
 } from "./types.js";
+import type { RunnerGovernanceSignals } from "./logger.js";
+
+// Debug logging helper (QOL-006)
+const DEBUG_ENABLED = process.env.LEXSONA_DEBUG === "1";
+
+function debugLog(...args: unknown[]): void {
+	if (DEBUG_ENABLED) {
+		console.error("[lexsona:debug]", ...args);
+	}
+}
 
 // Dynamic import to handle cases where LexSona isn't installed
 let LexSonaModule: typeof import("@smartergpt/lexsona") | null = null;
@@ -97,7 +108,7 @@ function toConstraintSnapshot(constraintSet: {
 }
 
 /**
- * Call LexSona to derive constraints for a workflow context
+ * Call LexSona to derive constraints for a workflow context (QOL-006: Debug mode)
  *
  * This is the main entry point for shadow governance.
  * Returns a result even on failure (for logging purposes).
@@ -109,8 +120,13 @@ export async function deriveShadowConstraints(
 	const cfg = config ?? getLexSonaConfig();
 	const derivedAt = new Date().toISOString();
 
+	debugLog("deriveShadowConstraints() called");
+	debugLog("  Context:", JSON.stringify(context, null, 2));
+	debugLog("  Config:", JSON.stringify(cfg, null, 2));
+
 	// If disabled, return early
 	if (!isLexSonaEnabled(cfg)) {
+		debugLog("LexSona disabled (mode=off or no persona)");
 		return {
 			success: false,
 			personaId: cfg.personaId,
@@ -121,9 +137,12 @@ export async function deriveShadowConstraints(
 		};
 	}
 
+	debugLog("Loading LexSona module...");
+
 	// Try to load LexSona
 	const lexsona = await getLexSonaModule();
 	if (!lexsona) {
+		debugLog("LexSona module not available");
 		return {
 			success: false,
 			personaId: cfg.personaId,
@@ -134,13 +153,23 @@ export async function deriveShadowConstraints(
 		};
 	}
 
+	debugLog("LexSona module loaded successfully");
+
 	try {
+		debugLog(`Connecting to LexSona with persona: ${cfg.personaId}`);
+		debugLog(
+			`  Lex DB: ${process.env.LEX_DB_PATH ?? "(none - offline mode)"}`
+		);
+		debugLog(`  Domain: ${context.workflowId}`);
+
 		// Create LexSona instance via static factory
 		const instance = await lexsona.LexSona.connect({
 			lexDb: process.env.LEX_DB_PATH,
 			persona: cfg.personaId!,
 			domain: context.workflowId,
 		});
+
+		debugLog("LexSona instance created");
 
 		// Build derive context from workflow context
 		const deriveContext: import("@smartergpt/lexsona").DeriveContext = {
@@ -149,11 +178,40 @@ export async function deriveShadowConstraints(
 			taskType: context.hints?.task as string | undefined,
 		};
 
+		debugLog("Deriving constraints with context:", deriveContext);
+
 		// Derive constraints
 		const constraintSet = await instance.deriveConstraints(deriveContext);
 
+		debugLog("Constraints derived successfully");
+		debugLog(`  Total constraints: ${constraintSet.constraints.length}`);
+		debugLog(
+			`  Rules considered: ${constraintSet.metadata.rulesConsidered}`
+		);
+		debugLog(`  Rules filtered: ${constraintSet.metadata.rulesFiltered}`);
+		debugLog(
+			`  Confidence threshold: ${constraintSet.metadata.confidenceThreshold}`
+		);
+		debugLog(`  Offline mode: ${constraintSet.metadata.offlineMode}`);
+
+		// Log each constraint
+		if (constraintSet.constraints.length > 0) {
+			debugLog("Constraints:");
+			for (const c of constraintSet.constraints) {
+				debugLog(
+					`  - [${c.severity}] ${c.text} (confidence: ${(
+						c.confidence * 100
+					).toFixed(0)}%)`
+				);
+			}
+		} else {
+			debugLog("No constraints derived");
+		}
+
 		// Convert to snapshot
 		const snapshot = toConstraintSnapshot(constraintSet);
+
+		debugLog("Final snapshot:", JSON.stringify(snapshot, null, 2));
 
 		return {
 			success: true,
@@ -167,8 +225,14 @@ export async function deriveShadowConstraints(
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
 
+		debugLog("Error during derivation:", errorMessage);
+		debugLog("Stack:", error instanceof Error ? error.stack : "(no stack)");
+
 		// Check for PersonaRequiresMemoryError
 		const isMemoryError = errorMessage.includes("requires_memory");
+		if (isMemoryError) {
+			debugLog("Detected PersonaRequiresMemoryError");
+		}
 
 		return {
 			success: false,
@@ -186,4 +250,100 @@ export async function deriveShadowConstraints(
  */
 export function generateGovernanceLogId(): string {
 	return `gov-${ulid()}`;
+}
+
+/**
+ * Format a shadow governance result as a console summary
+ *
+ * Returns a colored string showing:
+ * - Persona ID
+ * - Constraint count
+ * - Agreement/disagreement with runner
+ * - Top constraints (if any)
+ */
+export function formatShadowGovernanceSummary(
+	shadowResult: LexSonaShadowResult,
+	runnerSignals: RunnerGovernanceSignals,
+	opts: { noColor?: boolean } = {}
+): string {
+	const lines: string[] = [];
+
+	if (!shadowResult.success) {
+		const prefix = opts.noColor
+			? "[LexSona shadow]"
+			: chalk.yellow("[LexSona shadow]");
+		lines.push(
+			`${prefix} ${shadowResult.personaId ?? "unknown"}: ERROR - ${
+				shadowResult.error
+			}`
+		);
+		return lines.join("\n");
+	}
+
+	const constraintCount = shadowResult.constraintSet?.constraintCount ?? 0;
+	const runnerEligible = runnerSignals.mergeEligible ?? false;
+	const lexsonaBlocking = constraintCount > 0;
+
+	// Determine agreement status
+	let statusText: string;
+	let statusColor: (text: string) => string;
+	if (runnerEligible && !lexsonaBlocking) {
+		statusText = "AGREES";
+		statusColor = opts.noColor ? (t) => t : chalk.green;
+	} else if (runnerEligible && lexsonaBlocking) {
+		statusText = "WOULD BLOCK";
+		statusColor = opts.noColor ? (t) => t : chalk.yellow;
+	} else if (!runnerEligible && lexsonaBlocking) {
+		statusText = "AGREES (both block)";
+		statusColor = opts.noColor ? (t) => t : chalk.green;
+	} else {
+		statusText = "DISAGREES (runner blocks, LexSona allows)";
+		statusColor = opts.noColor ? (t) => t : chalk.cyan;
+	}
+
+	// Main status line
+	const prefix = opts.noColor
+		? "[LexSona shadow]"
+		: chalk.blue("[LexSona shadow]");
+	const persona = shadowResult.personaId ?? "unknown";
+	const runnerStatus = runnerEligible ? "allow" : "block";
+
+	lines.push(
+		`${prefix} ${persona}: ${constraintCount} constraints, ${statusColor(
+			statusText
+		)} (runner: ${runnerStatus})`
+	);
+
+	// Show top constraints if any
+	if (constraintCount > 0 && shadowResult.constraintSet) {
+		const topConstraints = shadowResult.constraintSet.topConstraints.slice(
+			0,
+			3
+		);
+		for (const constraint of topConstraints) {
+			const confStr = (constraint.confidence * 100).toFixed(0);
+			lines.push(
+				`  - "${constraint.description.slice(
+					0,
+					60
+				)}" (confidence: ${confStr}%)`
+			);
+		}
+		if (constraintCount > 3) {
+			lines.push(`  ... and ${constraintCount - 3} more`);
+		}
+	}
+
+	// Show offline mode warning if applicable
+	if (
+		shadowResult.offlineMode &&
+		shadowResult.constraintSet?.metadata.offlineMode
+	) {
+		const warning = opts.noColor
+			? "(offline mode - no Lex DB)"
+			: chalk.dim("(offline mode - no Lex DB)");
+		lines.push(`  ${warning}`);
+	}
+
+	return lines.join("\n");
 }

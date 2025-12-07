@@ -93,9 +93,16 @@ export interface LexSonaConstraintSnapshot {
 }
 
 /**
- * Governance comparison log entry
+ * Governance comparison log entry (QOL-005: Schema v1.0.0)
+ *
+ * Schema versioning policy:
+ * - Patch (1.0.x): Additive optional fields, docs only
+ * - Minor (1.x.0): Additive required fields with safe defaults
+ * - Major (x.0.0): Breaking changes to structure
  */
 export interface GovernanceComparisonLog {
+	/** Schema version (SemVer) */
+	schemaVersion: string;
 	/** Unique log ID */
 	id: string;
 	/** Timestamp */
@@ -116,9 +123,10 @@ export interface GovernanceComparisonLog {
 }
 
 /**
- * Zod schema for validation
+ * Zod schema for validation (QOL-005: Schema v1.0.0)
  */
 export const GovernanceComparisonLogSchema = z.object({
+	schemaVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
 	id: z.string(),
 	timestamp: z.string(),
 	context: z.object({

@@ -1,8 +1,8 @@
 # QOL-001: Add Filtering & Formatting to Governance Log Analysis
 
-**Status**: Open  
-**Priority**: Medium  
-**Effort**: 2-3 hours  
+**Status**: Open
+**Priority**: Medium
+**Effort**: 2-3 hours
 **Category**: DX (Developer Experience)
 
 ## Context

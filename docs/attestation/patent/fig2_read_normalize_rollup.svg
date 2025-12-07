@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
+  <style>
+    .title { font: 700 18px/1.2 'Segoe UI', Roboto, sans-serif; }
+    .box { fill:#fff; stroke:#2b6cb0; stroke-width:2; rx:8; }
+    .subbox { fill:#f7fafc; stroke:#cbd5e0; stroke-width:1; rx:6; }
+    .text { font: 13px/1.2 'Segoe UI', Roboto, sans-serif; fill:#1a202c }
+    .note { font: 12px/1.1 'Segoe UI', Roboto, sans-serif; fill:#4a5568 }
+    .arrow { stroke:#2d3748; stroke-width:2; fill:none; marker-end:url(#arr); }
+  </style>
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2d3748" />
+    </marker>
+  </defs>
+
+  <g transform="translate(20,8)">
+    <text class="title" x="0" y="18">FIG 2 — Read / Normalize / Uncertainty Roll‑Up Path</text>
+
+    <!-- Top row: Start read -->
+    <g transform="translate(0,40)">
+      <rect class="box" x="0" y="0" width="170" height="56"/>
+      <text class="text" x="12" y="34">Start: governance logs dir</text>
+
+      <rect class="box" x="220" y="0" width="160" height="56"/>
+      <text class="text" x="236" y="26">Enumerate JSON files</text>
+
+      <rect class="box" x="420" y="0" width="220" height="56"/>
+      <text class="text" x="436" y="22">For each file: parse JSON</text>
+
+      <path class="arrow" d="M170 28 L220 28" />
+      <path class="arrow" d="M380 28 L420 28" />
+
+      <!-- decision block: has schemaVersion? -->
+      <rect class="subbox" x="690" y="-8" width="320" height="92"/>
+      <text class="text" x="704" y="14">schemaVersion present?</text>
+      <text class="note" x="704" y="36">Yes -> strict validation path</text>
+      <text class="note" x="704" y="56">No -> deterministic normalization (legacy)</text>
+
+      <path class="arrow" d="M640 28 L690 28" />
+
+    </g>
+
+    <!-- Left: strict path -->
+    <g transform="translate(0,140)">
+      <rect class="box" x="420" y="80" width="220" height="56"/>
+      <text class="text" x="448" y="112">Validate against schema</text>
+      <path class="arrow" d="M680 112 L730 112" />
+
+      <rect class="box" x="760" y="80" width="220" height="56"/>
+      <text class="text" x="776" y="110">Include in results set (strict)</text>
+    </g>
+
+    <!-- Right: normalize path -->
+    <g transform="translate(0,320)">
+      <rect class="box" x="420" y="80" width="320" height="56"/>
+      <text class="text" x="438" y="112">normalizeLog(rawJson, filename)</text>
+      <text class="note" x="438" y="130">deterministic inference: id -> mode -> lexsona -> runner -> context</text>
+
+      <rect class="box" x="760" y="80" width="180" height="56"/>
+      <text class="text" x="776" y="112">validate normalized object</text>
+
+      <path class="arrow" d="M740 112 L760 112" />
+
+      <rect class="box" x="420" y="160" width="520" height="56"/>
+      <text class="text" x="438" y="192">if valid: add to results with {wasLegacy: true, normalizationWarnings: [...]}</text>
+
+      <path class="arrow" d="M740 136 L740 160" />
+    </g>
+
+    <!-- aggregate / roll-up -->
+    <g transform="translate(0,520)">
+      <rect class="box" x="160" y="0" width="560" height="76"/>
+      <text class="text" x="180" y="32">Aggregate validated logs (strict + normalized) -> computeUncertaintySummary(logs)</text>
+      <text class="note" x="180" y="54">offlineCount, failedCount, confidenceCeilingCount, noPersonaCount, hasUncertainty</text>
+
+      <path class="arrow" d="M420 236 L420 520" />
+      <path class="arrow" d="M850 136 L850 236" />
+
+    </g>
+
+    <!-- output -->
+    <g transform="translate(0,620)">
+      <rect class="box" x="160" y="96" width="560" height="56"/>
+      <text class="text" x="180" y="132">Render Report (text | json | table | markdown)</text>
+      <text class="note" x="180" y="150">If --accept-legacy supplied, include normalization warnings and wasLegacy flags</text>
+    </g>
+
+    <!-- small footnotes -->
+    <text class="note" x="12" y="560">Notes: The deterministic normalization order and the provenance flags are central to accurate uncertainty roll-ups and reproducible analytics across historical data.</text>
+  </g>
+</svg>

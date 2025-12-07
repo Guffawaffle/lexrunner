@@ -1,8 +1,8 @@
 # QOL-006: Add Verbose Debug Mode for LexSona Integration
 
-**Status**: Open  
-**Priority**: Low  
-**Effort**: 2-3 hours  
+**Status**: Open
+**Priority**: Low
+**Effort**: 2-3 hours
 **Category**: Debugging
 
 ## Context

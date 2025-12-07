@@ -6,22 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+- Governance wrapper delegation tests: validates `scripts/analyze-governance-logs.mjs` correctly delegates to CLI
+
 ### Changed
 - LexSona rule injection now enabled by default with environment variable configuration
 - Updated `loadLexSonaRules()` API to use `RuleInjectionConfig` object instead of boolean parameter
 - Removed legacy runner/ location fallback for config files in bootstrap
 
-### Removed
-- `src/cli-old.ts` dead code (old CLI implementation, was already excluded from build)
-- Deprecated `migrateGateReport` alias (use `normalizeGateReport` instead)
-
-### Added
-- New LexSona rule injection helpers: `getRuleInjectionConfig()`, `injectRulesIntoPrompt()`
-- Environment variable configuration for rule injection: `LEX_RULES_ENABLED`, `LEX_RULES_SOURCE`, `LEX_RULES_PATH`
-
 ### Documentation
 - Updated LexSona rules documentation with v0.5.0 API changes
 - Documented remaining compatibility shims with removal timeline (v2.0.0)
+- Updated QOL-COMPLETION-REPORT.md with governance consolidation reality check:
+  - `governance:report` is the canonical analysis command
+  - `scripts/analyze-governance-logs.mjs` is a backwards-compatibility wrapper
+  - Schema versioning is semver-based with legacy normalization via `--accept-legacy`
+  - Dedicated `--quiet-shadow` flag is deferred (use global `--quiet`)
+
+### Removed
+- `src/cli-old.ts` dead code (old CLI implementation, was already excluded from build)
+- Deprecated `migrateGateReport` alias (use `normalizeGateReport` instead)
 
 ## [0.5.0] - 2025-11-27
 

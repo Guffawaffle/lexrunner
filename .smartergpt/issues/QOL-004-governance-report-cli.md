@@ -1,8 +1,8 @@
 # QOL-004: Add `lex-pr governance:report` CLI Command
 
-**Status**: Open  
-**Priority**: Medium  
-**Effort**: 3-4 hours  
+**Status**: Open
+**Priority**: Medium
+**Effort**: 3-4 hours
 **Category**: Integration
 
 ## Context

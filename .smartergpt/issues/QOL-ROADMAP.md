@@ -1,6 +1,6 @@
 # LexSona Shadow Governance: QoL Roadmap
 
-**Generated**: 2025-12-07  
+**Generated**: 2025-12-07
 **Context**: Post-dogfooding feedback from initial shadow mode integration (Version Contract v0.1)
 
 ## Summary
@@ -18,7 +18,7 @@ After smoke-testing the LexSona shadow governance integration, we identified 6 q
 - **QOL-001**: Analysis Script Filtering & Formatting — Essential for analyzing real logs
   - Effort: 2-3h
   - Impact: Enables useful log exploration
-  
+
 - **QOL-004**: `lex-pr governance:report` CLI — Integrate analysis into main CLI
   - Effort: 3-4h
   - Impact: Makes reports discoverable and professional
@@ -27,11 +27,11 @@ After smoke-testing the LexSona shadow governance integration, we identified 6 q
 - **QOL-002**: Log Retention & Cleanup — Prevents unbounded disk growth
   - Effort: 2-4h
   - Impact: Operational hygiene
-  
+
 - **QOL-005**: Schema Versioning — Future-proofs log format
   - Effort: 1-2h
   - Impact: Safe evolution path
-  
+
 - **QOL-006**: Debug Verbose Mode — Troubleshooting support
   - Effort: 2-3h
   - Impact: Easier debugging when things go wrong

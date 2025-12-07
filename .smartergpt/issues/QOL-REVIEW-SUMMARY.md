@@ -1,7 +1,7 @@
 # QoL Review Summary — LexSona Shadow Governance
 
-**Date**: 2025-12-07  
-**Reviewers**: Senior Dev (analysis) + Eager PM (tickets)  
+**Date**: 2025-12-07
+**Reviewers**: Senior Dev (analysis) + Eager PM (tickets)
 **Context**: Post-dogfooding of Version Contract v0.1 shadow mode integration
 
 ---
@@ -90,7 +90,7 @@ Execute all 6 tickets sequentially (~20h total) if you want a complete, producti
 ## Senior Dev Notes
 
 > These aren't critical bugs—the shadow mode works. But without QOL-003 (console feedback), users won't notice LexSona running at all. That defeats the purpose of shadow mode: **learning from disagreements**.
-> 
+>
 > Start with console feedback. If you see interesting disagreements, the other tickets (filtering, CLI integration, debug mode) become much more valuable. If you see 100% agreement, maybe you don't need them yet.
 
 ---
@@ -98,10 +98,10 @@ Execute all 6 tickets sequentially (~20h total) if you want a complete, producti
 ## Eager PM Notes
 
 > Tickets are sized for independent implementation. QOL-003 is the forcing function—it'll tell us if LexSona is actually providing useful signals. The rest are polish that makes the tooling feel professional.
-> 
+>
 > If you want to ship this to other teams, do Wave 1 + Wave 2 (QOL-003, QOL-001, QOL-004) for a complete CLI experience. If it's just for internal dogfooding, QOL-003 alone is probably enough for the next phase.
 
 ---
 
-**Status**: Ready for decision on implementation order  
+**Status**: Ready for decision on implementation order
 **Commit**: 81a91ac (all tickets + roadmap)

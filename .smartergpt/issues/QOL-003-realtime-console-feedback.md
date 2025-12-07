@@ -1,8 +1,8 @@
 # QOL-003: Add Real-time Console Feedback for Shadow Mode
 
-**Status**: Open  
-**Priority**: High  
-**Effort**: 1-2 hours  
+**Status**: Open
+**Priority**: High
+**Effort**: 1-2 hours
 **Category**: DX (Developer Experience)
 
 ## Context

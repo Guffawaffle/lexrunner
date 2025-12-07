@@ -1,8 +1,8 @@
 # QOL-005: Add Schema Versioning to Governance Logs
 
-**Status**: Open  
-**Priority**: Low  
-**Effort**: 1-2 hours  
+**Status**: Open
+**Priority**: Low
+**Effort**: 1-2 hours
 **Category**: Future-proofing
 
 ## Context

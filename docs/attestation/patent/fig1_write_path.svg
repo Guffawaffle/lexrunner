@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+  <style>
+    .title { font: 600 18px/1.2 'Segoe UI', Roboto, sans-serif; }
+    .box { fill:#fff; stroke:#2b6cb0; stroke-width:2; rx:8; }
+    .note { font: 12px/1.2 'Segoe UI', Roboto, sans-serif; fill:#2d3748 }
+    .arrow { stroke:#2d3748; stroke-width:2; fill:none; marker-end:url(#arrowhead); }
+    .text { font: 13px/1.2 'Segoe UI', Roboto, sans-serif; fill:#1a202c }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2d3748" />
+    </marker>
+  </defs>
+
+  <g transform="translate(20,8)">
+    <text class="title" x="0" y="18">FIG 1 — Write Path: Shadow Governance Log Generation</text>
+
+    <!-- nodes -->
+    <g transform="translate(0,36)">
+      <rect class="box" x="0" y="0" width="170" height="56"/>
+      <text class="text" x="12" y="22">Automated Workflow</text>
+      <text class="text" x="12" y="40">(merge / pipeline)</text>
+
+      <rect class="box" x="230" y="0" width="190" height="56"/>
+      <text class="text" x="248" y="22">LexSona</text>
+      <text class="text" x="248" y="40">deriveShadowConstraints()</text>
+
+      <rect class="box" x="510" y="0" width="220" height="56"/>
+      <text class="text" x="530" y="22">createGovernanceComparisonLog()</text>
+      <text class="text" x="530" y="40">(schemaVersion=1.0.0)</text>
+
+      <rect class="box" x="0" y="120" width="280" height="56"/>
+      <text class="text" x="12" y="142">applyRetentionPolicy()</text>
+      <text class="note" x="12" y="158">(maxAgeDays, maxSizeMB — optional)</text>
+
+      <rect class="box" x="340" y="120" width="240" height="56"/>
+      <text class="text" x="360" y="142">writeGovernanceLog()</text>
+      <text class="text" x="360" y="160">(.smartergpt/runner/governance-logs/)</text>
+
+      <rect class="box" x="620" y="120" width="200" height="56"/>
+      <text class="text" x="640" y="142">Stored Governance Logs</text>
+      <text class="note" x="640" y="160">(JSON files, schemaVersion present)</text>
+
+      <!-- arrows -->
+      <path class="arrow" d="M170 28 L230 28" />
+      <path class="arrow" d="M420 28 L510 28" />
+      <path class="arrow" d="M730 56 L730 120" />
+      <path class="arrow" d="M110 84 L110 120" />
+      <path class="arrow" d="M450 84 L450 120" />
+
+      <!-- small notes -->
+      <text class="note" x="200" y="95">AI derivation -> constraint snapshot</text>
+      <text class="note" x="470" y="95">Compose record, validate before write</text>
+    </g>
+
+  </g>
+</svg>

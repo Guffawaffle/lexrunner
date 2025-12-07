@@ -49,6 +49,7 @@ import {
 	getLexSonaConfig,
 	isLexSonaEnabled,
 	deriveShadowConstraints,
+	formatShadowGovernanceSummary,
 	createGovernanceComparisonLog,
 	writeGovernanceLog,
 	formatGovernanceLog,
@@ -561,25 +562,25 @@ Common Issues:
 							runnerSignals,
 							lexsonaConfig.mode
 						);
-						const logPath = writeGovernanceLog(governanceLog);
+						const logPath = await writeGovernanceLog(governanceLog);
 
+						// Show real-time console feedback (QOL-003)
 						if (!(opts.json || jsonModeActive())) {
-							console.log(
-								`🧠 LexSona shadow governance logged: ${logPath}`
+							const summary = formatShadowGovernanceSummary(
+								shadowResult,
+								runnerSignals,
+								{ noColor: opts.noColor }
 							);
-							if (
-								shadowResult.success &&
-								shadowResult.constraintSet
-							) {
-								console.log(
-									`   Persona: ${shadowResult.personaId} | Constraints: ${shadowResult.constraintSet.constraintCount}`
-								);
-							}
+							console.log(summary);
+							console.log(
+								`   Logged to: ${logPath.replace(
+									process.cwd(),
+									"."
+								)}`
+							);
 							console.log("");
 						}
-					}
-
-					// Execute weave
+					} // Execute weave
 					const result = await gitOps.executeWeave(
 						plan,
 						levels,

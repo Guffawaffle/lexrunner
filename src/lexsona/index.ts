@@ -30,6 +30,7 @@ export {
 	getLexSonaConfig,
 	isLexSonaEnabled,
 	deriveShadowConstraints,
+	formatShadowGovernanceSummary,
 	generateGovernanceLogId,
 } from "./client.js";
 

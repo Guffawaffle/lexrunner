@@ -10,9 +10,11 @@ import {
 	getLexSonaConfig,
 	isLexSonaEnabled,
 	deriveShadowConstraints,
+	formatShadowGovernanceSummary,
 	createGovernanceComparisonLog,
 	type LexSonaWorkflowContext,
 	type LexSonaShadowResult,
+	type RunnerGovernanceSignals,
 } from "../src/lexsona/index.js";
 
 describe("LexSona Integration", () => {
@@ -178,6 +180,7 @@ describe("LexSona Integration", () => {
 				"shadow"
 			);
 
+			expect(log.schemaVersion).toBe("1.0.0");
 			expect(log.id).toMatch(/^gov-/);
 			expect(log.timestamp).toBeDefined();
 			expect(log.context.workflowId).toBe("merge-weave");
@@ -188,6 +191,147 @@ describe("LexSona Integration", () => {
 				"test",
 			]);
 			expect(log.mode).toBe("shadow");
+		});
+	});
+
+	describe("formatShadowGovernanceSummary (QOL-003)", () => {
+		it("formats successful result with agreement", () => {
+			const shadowResult: LexSonaShadowResult = {
+				success: true,
+				personaId: "quality-first_engineering",
+				constraintSet: {
+					constraintCount: 0,
+					topConstraints: [],
+					principleCount: 2,
+					metadata: {
+						rulesConsidered: 10,
+						rulesFiltered: 5,
+						confidenceThreshold: 0.3,
+						offlineMode: false,
+					},
+				},
+				offlineMode: false,
+				derivedAt: new Date().toISOString(),
+			};
+
+			const runnerSignals: RunnerGovernanceSignals = {
+				mergeEligible: true,
+			};
+
+			const summary = formatShadowGovernanceSummary(
+				shadowResult,
+				runnerSignals,
+				{ noColor: true }
+			);
+
+			expect(summary).toContain("quality-first_engineering");
+			expect(summary).toContain("0 constraints");
+			expect(summary).toContain("AGREES");
+			expect(summary).toContain("runner: allow");
+		});
+
+		it("formats result with disagreement (LexSona blocks)", () => {
+			const shadowResult: LexSonaShadowResult = {
+				success: true,
+				personaId: "quality-first_engineering",
+				constraintSet: {
+					constraintCount: 3,
+					topConstraints: [
+						{
+							id: "rule-1",
+							description: "Run full test suite before merge",
+							severity: "must",
+							confidence: 0.85,
+						},
+						{
+							id: "rule-2",
+							description: "Verify no TODOs in diff",
+							severity: "should",
+							confidence: 0.72,
+						},
+					],
+					principleCount: 2,
+					metadata: {
+						rulesConsidered: 10,
+						rulesFiltered: 7,
+						confidenceThreshold: 0.3,
+						offlineMode: false,
+					},
+				},
+				offlineMode: false,
+				derivedAt: new Date().toISOString(),
+			};
+
+			const runnerSignals: RunnerGovernanceSignals = {
+				mergeEligible: true,
+			};
+
+			const summary = formatShadowGovernanceSummary(
+				shadowResult,
+				runnerSignals,
+				{ noColor: true }
+			);
+
+			expect(summary).toContain("3 constraints");
+			expect(summary).toContain("WOULD BLOCK");
+			expect(summary).toContain("Run full test suite before merge");
+			expect(summary).toContain("85%");
+		});
+
+		it("shows offline mode warning", () => {
+			const shadowResult: LexSonaShadowResult = {
+				success: true,
+				personaId: "quality-first_engineering",
+				constraintSet: {
+					constraintCount: 0,
+					topConstraints: [],
+					principleCount: 0,
+					metadata: {
+						rulesConsidered: 0,
+						rulesFiltered: 0,
+						confidenceThreshold: 0.3,
+						offlineMode: true,
+					},
+				},
+				offlineMode: true,
+				derivedAt: new Date().toISOString(),
+			};
+
+			const runnerSignals: RunnerGovernanceSignals = {
+				mergeEligible: true,
+			};
+
+			const summary = formatShadowGovernanceSummary(
+				shadowResult,
+				runnerSignals,
+				{ noColor: true }
+			);
+
+			expect(summary).toContain("offline mode - no Lex DB");
+		});
+
+		it("formats error result", () => {
+			const shadowResult: LexSonaShadowResult = {
+				success: false,
+				personaId: "quality-first_engineering",
+				constraintSet: null,
+				error: "LexSona module not available",
+				offlineMode: true,
+				derivedAt: new Date().toISOString(),
+			};
+
+			const runnerSignals: RunnerGovernanceSignals = {
+				mergeEligible: true,
+			};
+
+			const summary = formatShadowGovernanceSummary(
+				shadowResult,
+				runnerSignals,
+				{ noColor: true }
+			);
+
+			expect(summary).toContain("ERROR");
+			expect(summary).toContain("LexSona module not available");
 		});
 	});
 });
