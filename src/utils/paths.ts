@@ -6,14 +6,45 @@
 
 import * as path from "path";
 import * as fs from "fs/promises";
+import * as os from "os";
 
 /**
- * Normalize path for cross-platform comparison
- *
- * @param inputPath - Path to normalize
- * @returns Normalized path with forward slashes
+ * Normalize path for current platform
+ * 
+ * - Converts backslashes to forward slashes on POSIX
+ * - Resolves relative paths to absolute
+ * - Expands ~ to home directory
+ * 
+ * @param inputPath - Raw path
+ * @returns - Normalized absolute path
  */
 export function normalizePath(inputPath: string): string {
+	let normalized = inputPath;
+	
+	// Expand ~ to home directory
+	if (normalized.startsWith('~')) {
+		normalized = path.join(os.homedir(), normalized.slice(1));
+	}
+	
+	// Resolve to absolute path
+	normalized = path.resolve(normalized);
+	
+	// Convert to forward slashes on POSIX (consistent with Git)
+	if (process.platform !== 'win32') {
+		normalized = normalized.replace(/\\/g, '/');
+	}
+	
+	return normalized;
+}
+
+/**
+ * Normalize path for cross-platform comparison (internal helper)
+ * Just converts slashes without resolving paths
+ * 
+ * @param inputPath - Path to normalize
+ * @returns Path with forward slashes
+ */
+function normalizePathForComparison(inputPath: string): string {
 	return inputPath.replace(/\\/g, "/");
 }
 
@@ -31,7 +62,7 @@ export function normalizePath(inputPath: string): string {
  * @throws Error if path is in a blocked PR artifact directory
  */
 export function isSafeArtifactPath(inputPath: string): boolean {
-	const normalized = normalizePath(inputPath).toLowerCase();
+	const normalized = normalizePathForComparison(inputPath).toLowerCase();
 
 	// Allowed patterns
 	const allowedPatterns = [

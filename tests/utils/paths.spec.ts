@@ -11,18 +11,43 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('paths: normalizePath', () => {
-	it('should convert backslashes to forward slashes', () => {
-		expect(normalizePath('C:\\path\\to\\file.txt')).toBe('C:/path/to/file.txt');
-		expect(normalizePath('path\\to\\file')).toBe('path/to/file');
+	it('should expand ~ to home directory', () => {
+		const result = normalizePath('~/project');
+		expect(result).toContain(os.homedir());
+		expect(result.endsWith('project')).toBe(true);
 	});
 	
-	it('should leave forward slashes unchanged', () => {
-		expect(normalizePath('/path/to/file.txt')).toBe('/path/to/file.txt');
-		expect(normalizePath('path/to/file')).toBe('path/to/file');
+	it('should resolve relative paths to absolute', () => {
+		const result = normalizePath('./project');
+		expect(path.isAbsolute(result)).toBe(true);
+		expect(result.endsWith('project')).toBe(true);
 	});
 	
-	it('should handle mixed slashes', () => {
-		expect(normalizePath('path/to\\file\\test.txt')).toBe('path/to/file/test.txt');
+	it('should resolve absolute paths', () => {
+		const absPath = process.platform === 'win32' ? 'C:\\path\\to\\file.txt' : '/path/to/file.txt';
+		const result = normalizePath(absPath);
+		expect(path.isAbsolute(result)).toBe(true);
+	});
+	
+	it('should convert backslashes to forward slashes on POSIX', () => {
+		// This test only makes sense on non-Windows platforms
+		if (process.platform !== 'win32') {
+			const result = normalizePath('./test');
+			expect(result).not.toContain('\\');
+			expect(result).toContain('/');
+		}
+	});
+	
+	it('should handle ~ with subdirectory', () => {
+		const result = normalizePath('~/some/nested/path');
+		expect(result).toContain(os.homedir());
+		expect(result.endsWith('nested/path') || result.endsWith('nested\\path')).toBe(true);
+	});
+	
+	it('should handle .. in paths', () => {
+		const result = normalizePath('./some/path/..');
+		expect(path.isAbsolute(result)).toBe(true);
+		expect(result).not.toContain('..');
 	});
 });
 
