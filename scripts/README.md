@@ -2,7 +2,57 @@
 
 This directory contains utility scripts for lex-pr-runner development and adoption tracking.
 
-## Dogfood Merge-Weave Workflow
+## Merge-Weave Workflows
+
+### merge-weave.sh
+
+A lightweight, parameterized shell script for merging multiple PRs into an umbrella/integration branch with validation gates. This is a standalone utility that doesn't require the full lex-pr-runner setup.
+
+**Quick Start:**
+
+```bash
+# Merge PRs 13, 14, 17, 19 into umbrella
+./scripts/merge-weave.sh --prs "13,14,17,19" --verbose
+
+# Dry run to see what would happen
+./scripts/merge-weave.sh --prs "13,14,17,19" --dry-run
+
+# Use custom umbrella branch name
+./scripts/merge-weave.sh --prs "1,2,3" --umbrella "integration/my-feature"
+
+# Work in different repository directory
+./scripts/merge-weave.sh --repo-dir /path/to/repo --prs "5,6,7"
+
+# Show help
+./scripts/merge-weave.sh --help
+```
+
+**Options:**
+
+- `--repo-dir DIR` - Repository directory (default: current dir)
+- `--target BRANCH` - Target branch for umbrella (default: main)
+- `--umbrella NAME` - Umbrella branch name (default: integration/umbrella-YYYYMMDD)
+- `--prs "1,2,3"` - Comma-separated PR numbers to merge (required)
+- `--dry-run` - Show what would be done without making changes
+- `--verbose` - Show detailed output
+- `--help` - Show help message
+
+**Features:**
+
+- PR branch discovery via `gh pr view`
+- Sequential merge with `--no-ff` (preserves PR history)
+- Validation gates: lint, typecheck, tests
+- Stops on first conflict (no auto-resolution)
+- Proper exit codes (0=success, 1=error, 2=invalid args, 3=conflict, 4=gate failure)
+- Colored output for better readability
+
+**Exit Codes:**
+
+- `0` - Success
+- `1` - General error
+- `2` - Invalid arguments
+- `3` - Merge conflict detected
+- `4` - Gate validation failed
 
 ### dogfood-merge-weave.sh
 
