@@ -105,18 +105,34 @@ parse_args() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --repo-dir)
+        if [ -z "$2" ] || [[ "$2" == --* ]]; then
+          log_error "Option --repo-dir requires a value"
+          exit 2
+        fi
         REPO_DIR="$2"
         shift 2
         ;;
       --target)
+        if [ -z "$2" ] || [[ "$2" == --* ]]; then
+          log_error "Option --target requires a value"
+          exit 2
+        fi
         TARGET_BRANCH="$2"
         shift 2
         ;;
       --umbrella)
+        if [ -z "$2" ] || [[ "$2" == --* ]]; then
+          log_error "Option --umbrella requires a value"
+          exit 2
+        fi
         UMBRELLA_BRANCH="$2"
         shift 2
         ;;
       --prs)
+        if [ -z "$2" ] || [[ "$2" == --* ]]; then
+          log_error "Option --prs requires a value"
+          exit 2
+        fi
         PR_LIST="$2"
         shift 2
         ;;
@@ -212,7 +228,19 @@ verify_pr_branches() {
   > "$mapping_file"
 
   for pr_num in "${pr_numbers[@]}"; do
+    # Validate PR number is numeric
+    if ! [[ "$pr_num" =~ ^[0-9]+$ ]]; then
+      log_error "Invalid PR number: $pr_num (must be numeric)"
+      exit 2
+    fi
+    
     branch_name=$(fetch_pr_branch "$pr_num")
+    
+    # Validate branch name follows git conventions (basic check)
+    if ! [[ "$branch_name" =~ ^[a-zA-Z0-9/_-]+$ ]]; then
+      log_error "Invalid branch name: $branch_name"
+      exit 1
+    fi
     
     if [ "$DRY_RUN" = true ]; then
       log_info "[DRY-RUN] PR-$pr_num → $branch_name (not verified)"
@@ -220,7 +248,7 @@ verify_pr_branches() {
       if git show-ref --quiet refs/remotes/origin/"$branch_name"; then
         log_success "PR-$pr_num → $branch_name"
         # Count commits ahead of target
-        ahead=$(git rev-list --count "$TARGET_BRANCH".."$branch_name" 2>/dev/null || echo "0")
+        ahead=$(git rev-list --count origin/"$TARGET_BRANCH".."$branch_name" 2>/dev/null || echo "0")
         log_verbose "  Commits ahead of $TARGET_BRANCH: $ahead"
       else
         log_error "PR-$pr_num branch NOT FOUND: $branch_name"
@@ -240,18 +268,18 @@ create_umbrella_branch() {
   echo "" >&2
 
   if [ "$DRY_RUN" = true ]; then
-    log_info "[DRY-RUN] Would create branch: $UMBRELLA_BRANCH from $TARGET_BRANCH"
+    log_info "[DRY-RUN] Would create branch: $UMBRELLA_BRANCH from origin/$TARGET_BRANCH"
     return 0
   fi
 
   # Check if branch already exists
   if git show-ref --quiet refs/heads/"$UMBRELLA_BRANCH"; then
-    log_warning "Umbrella branch already exists, resetting to $TARGET_BRANCH"
+    log_warning "Umbrella branch already exists, resetting to origin/$TARGET_BRANCH"
     git checkout "$UMBRELLA_BRANCH"
-    git reset --hard "$TARGET_BRANCH"
+    git reset --hard origin/"$TARGET_BRANCH"
   else
-    log_info "Creating new branch: $UMBRELLA_BRANCH from $TARGET_BRANCH"
-    git checkout -b "$UMBRELLA_BRANCH" "$TARGET_BRANCH"
+    log_info "Creating new branch: $UMBRELLA_BRANCH from origin/$TARGET_BRANCH"
+    git checkout -b "$UMBRELLA_BRANCH" origin/"$TARGET_BRANCH"
   fi
   
   log_success "Umbrella branch ready: $UMBRELLA_BRANCH"
@@ -425,8 +453,12 @@ main() {
   # Check prerequisites
   check_gh_cli
 
-  # Create temporary file for PR branch mapping
-  local pr_mapping_file="/tmp/merge-weave-$$-mapping.txt"
+  # Create secure temporary file for PR branch mapping
+  local pr_mapping_file
+  pr_mapping_file=$(mktemp) || {
+    log_error "Failed to create temporary file"
+    exit 1
+  }
 
   # Verify all PR branches exist
   verify_pr_branches "$pr_mapping_file" "${PR_NUMBERS[@]}"
