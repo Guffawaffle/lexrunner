@@ -237,7 +237,9 @@ verify_pr_branches() {
     branch_name=$(fetch_pr_branch "$pr_num")
     
     # Validate branch name follows git conventions (basic check)
-    if ! [[ "$branch_name" =~ ^[a-zA-Z0-9/_-]+$ ]]; then
+    # Git branch names can contain alphanumeric, dash, underscore, slash, and dots
+    # but cannot contain special chars like ~, ^, :, ?, *, [, \, or whitespace
+    if ! [[ "$branch_name" =~ ^[a-zA-Z0-9._/-]+$ ]] || [[ "$branch_name" =~ \.\. ]]; then
       log_error "Invalid branch name: $branch_name"
       exit 1
     fi
@@ -247,8 +249,8 @@ verify_pr_branches() {
     else
       if git show-ref --quiet refs/remotes/origin/"$branch_name"; then
         log_success "PR-$pr_num → $branch_name"
-        # Count commits ahead of target
-        ahead=$(git rev-list --count origin/"$TARGET_BRANCH".."$branch_name" 2>/dev/null || echo "0")
+        # Count commits ahead of target (using origin/ for both refs)
+        ahead=$(git rev-list --count origin/"$TARGET_BRANCH"..origin/"$branch_name" 2>/dev/null || echo "0")
         log_verbose "  Commits ahead of $TARGET_BRANCH: $ahead"
       else
         log_error "PR-$pr_num branch NOT FOUND: $branch_name"
@@ -320,8 +322,10 @@ merge_prs() {
       merge_successes=$((merge_successes + 1))
     else
       # Get first line of PR commit message for merge commit
-      commit_msg=$(git log -1 --pretty=%B origin/"$branch_name" | head -1)
+      # Sanitize commit message to prevent command injection
+      commit_msg=$(git log -1 --pretty=%B origin/"$branch_name" | head -1 | tr -d '\n\r' | sed 's/["`$\\]//g')
       
+      # Use git merge with properly quoted message
       if git merge --no-ff -m "Merge PR-$pr_num: $commit_msg" origin/"$branch_name" 2>&1 | head -10; then
         log_success "Merged PR-$pr_num"
         merge_successes=$((merge_successes + 1))
