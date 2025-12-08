@@ -1,47 +1,45 @@
 {
 	"name": "lex-pr-runner",
 	"version": "0.5.0",
-	"private": true,
-	"type": "module",
-	"engines": {
-		"node": ">=20 <23"
-	},
-	"packageManager": "npm@10.0.0",
-	"auditSchemaVersion": "1.0.0",
-	"bin": {
-		"lex-pr": "dist/cli.js",
-		"lex-pr-runner-mcp": "./mcp-server.mjs"
-	},
-	"types": "dist/cli.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/cli.d.ts",
+		"types": "dist/cli.d.ts",
+		"exports": {
+			".": {
+				"types": "./dist/cli.d.ts",
+				"import": "./dist/cli.js",
+				"require": "./dist/cli.cjs"
+			},
+			"./audit-sdk": {
+				"types": "./dist/sdk/index.d.ts",
+				"import": "./dist/sdk/index.js"
+			},
+			"./schemas/runner-stack": {
+				"types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
+				"import": "./.smartergpt/schemas/runner.stack.schema.js"
+			},
+			"./schemas/runner-scope": {
+				"types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
+				"import": "./.smartergpt/schemas/runner.scope.schema.js"
+			},
+			"./schemas/execution-plan-v1": {
+				"types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
+				"import": "./.smartergpt/schemas/execution-plan-v1.js"
+			},
+			"./schemas/gates": {
+				"types": "./.smartergpt/schemas/gates.schema.d.ts",
+				"import": "./.smartergpt/schemas/gates.schema.js"
+			},
+			"./schemas/behavior-rule": {
+				"types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
+				"import": "./.smartergpt/schemas/behavior-rule.schema.js"
+			}
+		},
 			"import": "./dist/cli.js",
 			"require": "./dist/cli.cjs"
 		},
 		"./audit-sdk": {
 			"types": "./dist/sdk/index.d.ts",
 			"import": "./dist/sdk/index.js"
-		},
-		"./schemas/runner-stack": {
-			"types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
-			"import": "./.smartergpt/schemas/runner.stack.schema.js"
-		},
-		"./schemas/runner-scope": {
-			"types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
-			"import": "./.smartergpt/schemas/runner.scope.schema.js"
-		},
-		"./schemas/execution-plan-v1": {
-			"types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
-			"import": "./.smartergpt/schemas/execution-plan-v1.js"
-		},
-		"./schemas/gates": {
-			"types": "./.smartergpt/schemas/gates.schema.d.ts",
-			"import": "./.smartergpt/schemas/gates.schema.js"
-		},
-		"./schemas/behavior-rule": {
-			"types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
-			"import": "./.smartergpt/schemas/behavior-rule.schema.js"
+>>>>>>> pr-276
 		}
 	},
 	"scripts": {
