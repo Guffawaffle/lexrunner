@@ -15,18 +15,19 @@ describe("path utilities", () => {
 			expect(result).toContain("src/utils/test.ts");
 		});
 
-		it("should preserve relative paths", () => {
+		it("should resolve relative paths to absolute", () => {
 			const result = normalizePath("./test.ts");
 
-			// normalizePath only converts separators, doesn't resolve paths
-			expect(result).toBe("./test.ts");
+			// normalizePath now resolves to absolute paths
+			expect(path.isAbsolute(result)).toBe(true);
+			expect(result.endsWith("test.ts")).toBe(true);
 		});
 
 		it("should handle absolute paths", () => {
 			const absPath = "/home/user/project/test.ts";
 			const result = normalizePath(absPath);
 
-			expect(result).toBe("/home/user/project/test.ts");
+			expect(path.isAbsolute(result)).toBe(true);
 		});
 	});
 
