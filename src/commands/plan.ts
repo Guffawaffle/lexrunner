@@ -30,6 +30,11 @@ import {
 	formatSuggestions,
 	type SuggestionFormat,
 } from "../cli/formatSuggestions.js";
+import {
+	parseTierOverrides,
+	calculateTierMetrics,
+	formatTierMetrics,
+} from "../tiers/index.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -115,6 +120,11 @@ export function registerPlanCommand(
 			"--output <file>",
 			"Write suggestions to file instead of stdout"
 		)
+		.option(
+			"--tier-override <overrides>",
+			"Override tier for specific items (format: item=tier, comma-separated)"
+		)
+		.option("--show-tiers", "Show suggested tiers for plan items")
 		.addHelpText(
 			"after",
 			`
@@ -160,6 +170,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 	let plan: Plan;
 	let inputs: any = null;
 	let autoDetectedGitHubMode = false;
+
+	// Parse tier overrides from CLI
+	const tierOverrides = opts.tierOverride 
+		? parseTierOverrides(opts.tierOverride) 
+		: undefined;
 
 	// Auto-detect GitHub mode from scope.yml if --from-github not explicitly set
 	if (!opts.fromGithub) {
@@ -304,6 +319,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 				requiredGates,
 				maxWorkers,
 			},
+			tierOverrides,
 		});
 
 		// If JSON mode is requested, keep non-JSON logs on stderr and emit a brief diagnostic
@@ -338,7 +354,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 		inputs = loadInputs();
 		plan =
 			inputs.items.length > 0
-				? generatePlan(inputs)
+				? generatePlan(inputs, { tierOverrides })
 				: generateEmptyPlan(inputs.target);
 	}
 
@@ -383,6 +399,33 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
 			levels.forEach((level, idx) => {
 				console.log(`  Level ${idx + 1}: ${level.join(", ")}`);
 			});
+		}
+	}
+
+	// Show tier information if requested
+	if (opts.showTiers && validatedPlan.items.length > 0 && !deps.jsonModeActive()) {
+		// Collect tier assignments from plan items
+		const tierAssignments = new Map();
+		for (const item of validatedPlan.items) {
+			if (item.tier) {
+				tierAssignments.set(item.name, item.tier);
+			}
+		}
+
+		if (tierAssignments.size > 0) {
+			const tierMetrics = calculateTierMetrics(tierAssignments);
+			
+			console.log("\n🏷️  Capability Tier Assignments");
+			console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+			for (const [itemName, assignment] of tierAssignments) {
+				const actual = assignment.actual || assignment.suggested;
+				const marker = assignment.mismatch ? " (overridden)" : "";
+				const escalatedMarker = assignment.escalated ? " ⬆️" : "";
+				console.log(`  ${itemName}: ${actual}${marker}${escalatedMarker}`);
+			}
+			console.log("");
+			console.log(formatTierMetrics(tierMetrics));
+			console.log("");
 		}
 	}
 

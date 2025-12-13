@@ -147,6 +147,19 @@ export interface MergeWeaveFrameInput {
 		priorRunScore?: number;
 		improvement?: string;
 	};
+	/** Tier metrics for governance (Claim 3.4) */
+	tierMetrics?: {
+		totalTasks: number;
+		byTier: {
+			senior: number;
+			mid: number;
+			junior: number;
+		};
+		escalations: number;
+		mismatches: number;
+		tierMatchRate: number;
+		escalationRate: number;
+	};
 }
 
 /**

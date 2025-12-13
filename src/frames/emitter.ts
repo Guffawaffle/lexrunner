@@ -86,6 +86,7 @@ export function emitMergeWeaveFrame(
 				plan_hash: input.planHash,
 				error: input.error,
 				turn_cost: input.turnCost,
+				tier_metrics: input.tierMetrics,
 			},
 		};
 

@@ -579,6 +579,102 @@ Each gate result file must follow the JSON schema with stable keys:
 - Multiple output formats (JSON, Markdown)
 - Exit code 0 if all gates pass, 1 if any fail
 
+## Turn Cost Tracking
+
+LexRunner implements **Turn Cost** tracking to measure coordination overhead during merge-weave and gate execution operations. Turn Cost quantifies the "friction" in automation workflows beyond simple token counts.
+
+### Formula
+
+```
+Turn Cost = λL + γC + ρR + τT + αA
+```
+
+Where:
+- **L (Latency)**: API response time, gate execution time, merge time
+- **C (Context Reset)**: Tokens required to rebuild context (N/A for deterministic runner)
+- **R (Renegotiation)**: Conflict resolution retries, clarification turns
+- **T (Token Bloat)**: Excess tokens used beyond expected budget
+- **A (Attention Switch)**: Human interventions, manual conflict resolutions
+
+Default weights: `λ=0.1, γ=0.1, ρ=0.3, τ=0.2, α=0.3`
+
+### Usage
+
+**Execute Command:**
+```bash
+# Enable Turn Cost tracking during gate execution
+lex-pr execute plan.json --track-turncost
+
+# JSON output includes Turn Cost summary
+lex-pr execute plan.json --track-turncost --json
+```
+
+**Merge Command:**
+```bash
+# Track Turn Cost during merge-weave operations
+lex-pr merge --execute --track-turncost
+
+# Dry run with conflict detection and Turn Cost preview
+lex-pr merge --track-turncost
+```
+
+### Output Format
+
+**Human-readable:**
+```
+=== Turn Cost ===
+Weighted Score: 3.20
+Latency: 12.50s
+Renegotiations: 1
+Attention Switches: 0
+vs Prior Run: -45%
+```
+
+**JSON:**
+```json
+{
+  "turnCost": {
+    "components": {
+      "latencyMs": 12500,
+      "contextResetTokens": 0,
+      "renegotiationCount": 1,
+      "tokenBloat": 2400,
+      "attentionSwitchCount": 0
+    },
+    "weightedScore": 3.2,
+    "eventCount": 4,
+    "priorRunScore": 5.8,
+    "improvement": "-45%"
+  }
+}
+```
+
+### What Gets Tracked
+
+| Operation | Latency | Renegotiation | Attention Switch |
+|-----------|---------|---------------|------------------|
+| Gate execution | ✅ Per-gate timing | ✅ Gate retries | ❌ (future) |
+| Merge operations | ✅ Total merge time | ✅ Conflict retries | ❌ (future) |
+| Conflict resolution | ✅ Resolution time | ✅ Retry attempts | ✅ Manual fixes |
+
+### Business Value
+
+From the coordination cost compression thesis:
+
+> "Token costs are linear; Turn costs compound through cascading misunderstandings."
+
+Turn Cost tracking enables:
+- **Measuring actual coordination overhead** (not just API costs)
+- **Identifying high-friction workflows** that need optimization
+- **Optimizing for human attention** (the scarcest resource)
+- **Comparing automation efficiency** across runs
+
+### Related
+
+- Issue [#376](https://github.com/Guffawaffle/LexRunner/issues/376): Token Optimization Epic
+- Issue [#330](https://github.com/Guffawaffle/LexRunner/issues/330): Frames & Metrics
+- Issue [#327](https://github.com/Guffawaffle/LexRunner/issues/327): Budget Guards
+
 ## Configuration
 
 ### Profile Resolution

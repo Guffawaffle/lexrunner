@@ -24,6 +24,7 @@ import {
 	formatTierMetrics,
 	tierMetricsToJSON,
 } from '../tiers/index.js';
+import { createTurnCostTracker } from '../metrics/turncost.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -128,6 +129,10 @@ export function registerExecuteCommand(program: Command, deps: ExecuteCommandDep
 			"Override tier for specific items (format: item=tier, comma-separated)"
 		)
 		.option("--show-tiers", "Show suggested and actual tiers for plan items")
+		.option(
+			"--track-turncost",
+			"Track Turn Cost metrics during execution (coordination overhead)"
+		)
 		.addHelpText(
 			"after",
 			`
@@ -444,6 +449,11 @@ Common Issues:
 				// Capture repository root at the start for stable gate execution
 				const repoRoot = process.cwd();
 
+				// Initialize Turn Cost tracker if enabled
+				const turnCostTracker = opts.trackTurncost
+					? createTurnCostTracker()
+					: undefined;
+
 				// Execute gates with policy
 				await executeGatesWithPolicy(
 					plan,
@@ -452,7 +462,10 @@ Common Issues:
 					timeoutMs,
 					progressReporter,
 					skipValidation,
-					repoRoot
+					repoRoot,
+					{
+						turnCostTracker,
+					}
 				);
 
 				// Get final results
@@ -488,6 +501,7 @@ Common Issues:
 							metrics: tierMetricsToJSON(tierMetrics),
 						},
 						budget: budgetTracker.formatJSON(),
+						...(turnCostTracker && { turnCost: turnCostTracker.toJSON() }),
 					};
 					writeJsonOutput(output);
 				} else if (opts.statusTable) {
@@ -534,6 +548,31 @@ Common Issues:
 							mergeSummary.failed.length
 						} - [${mergeSummary.failed.join(", ")}]`
 					);
+
+					// Print Turn Cost summary if tracked
+					if (turnCostTracker) {
+						const turnCostSummary = turnCostTracker.toJSON();
+						console.log("\n=== Turn Cost ===");
+						console.log(
+							`Weighted Score: ${turnCostSummary.weightedScore.toFixed(2)}`
+						);
+						console.log(
+							`Latency: ${(
+								turnCostSummary.components.latencyMs / 1000
+							).toFixed(2)}s`
+						);
+						console.log(
+							`Renegotiations: ${turnCostSummary.components.renegotiationCount}`
+						);
+						console.log(
+							`Attention Switches: ${turnCostSummary.components.attentionSwitchCount}`
+						);
+						if (turnCostSummary.improvement) {
+							console.log(
+								`vs Prior Run: ${turnCostSummary.improvement}`
+							);
+						}
+					}
 
 					// Print budget summary
 					console.log(budgetTracker.formatHuman());
