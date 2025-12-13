@@ -468,10 +468,11 @@ export async function governanceReport(opts: ReportOptions): Promise<void> {
 			0
 		);
 		if (legacyCount > 0) {
-			console.log(
+			const warn = opts.format === "json" ? console.error : console.log;
+			warn(
 				`⚠️  Included ${legacyCount} legacy log(s) with ${normalizationWarningCount} normalization warning(s).`
 			);
-			console.log(
+			warn(
 				"   Legacy logs may have incomplete data. Consider re-running with current schema.\n"
 			);
 		}
@@ -480,6 +481,10 @@ export async function governanceReport(opts: ReportOptions): Promise<void> {
 	}
 
 	if (allLogs.length === 0) {
+		if (opts.format === "json") {
+			console.log("[]");
+			return;
+		}
 		if (opts.acceptLegacy) {
 			console.log(
 				"No governance logs found (even with legacy inclusion)."
@@ -496,6 +501,10 @@ export async function governanceReport(opts: ReportOptions): Promise<void> {
 	const logs = filterLogs(allLogs, opts);
 
 	if (logs.length === 0) {
+		if (opts.format === "json") {
+			console.log("[]");
+			return;
+		}
 		console.log("No logs match the specified filters.");
 		return;
 	}

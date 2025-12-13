@@ -288,34 +288,34 @@ print_section "Step 1: Plan Generation"
 
 if [ "$FROM_GITHUB" = true ]; then
     print_step "🔍 Discovering PRs from GitHub..."
-    
+
     DISCOVER_OPTS="--owner $GITHUB_OWNER --repo $GITHUB_REPO"
     [ -n "$GITHUB_BASE" ] && DISCOVER_OPTS="$DISCOVER_OPTS --base $GITHUB_BASE"
     [ -n "$GITHUB_LABELS" ] && DISCOVER_OPTS="$DISCOVER_OPTS --labels $GITHUB_LABELS"
     [ -n "$GITHUB_QUERY" ] && DISCOVER_OPTS="$DISCOVER_OPTS --query $GITHUB_QUERY"
-    
+
     PLAN_FILE="$ARTIFACTS_DIR/plan.json"
-    
+
     if [ "$VERBOSE" = true ]; then
         $LEX_PR_CMD discover $DISCOVER_OPTS --output "$PLAN_FILE"
     else
         $LEX_PR_CMD discover $DISCOVER_OPTS --output "$PLAN_FILE" 2>&1 | tail -10
     fi
-    
+
     if [ ! -f "$PLAN_FILE" ]; then
         print_error "Failed to generate plan from GitHub"
         exit 1
     fi
-    
+
     print_success "Plan generated: $PLAN_FILE"
 else
     print_step "📄 Validating plan file..."
-    
+
     if [ ! -f "$PLAN_FILE" ]; then
         print_error "Plan file not found: $PLAN_FILE"
         exit 1
     fi
-    
+
     # Validate plan schema (optional - continue even if validation fails)
     if $LEX_PR_CMD schema validate "$PLAN_FILE" > /dev/null 2>&1; then
         print_success "Plan file validated: $PLAN_FILE"
@@ -331,11 +331,11 @@ if command -v jq &> /dev/null; then
     PR_COUNT=$(jq -r '.nodes | length' "$PLAN_FILE" 2>/dev/null || echo "unknown")
     INTEGRATION_BRANCH_FROM_PLAN=$(jq -r '.integrationBranch // "auto-generated"' "$PLAN_FILE" 2>/dev/null)
     TARGET_BRANCH=$(jq -r '.targetBranch // .target // "main"' "$PLAN_FILE" 2>/dev/null)
-    
+
     echo "  PRs/Nodes:      $PR_COUNT"
     echo "  Target Branch:  $TARGET_BRANCH"
     echo "  Integration:    $INTEGRATION_BRANCH_FROM_PLAN"
-    
+
     # Override integration branch if specified
     [ -n "$INTEGRATION_BRANCH" ] && echo "  Override:       $INTEGRATION_BRANCH"
 else
@@ -347,6 +347,12 @@ fi
 print_section "Step 2: Gate Validation"
 
 print_step "🧪 Running local gates..."
+
+# In DRY-RUN mode, avoid executing repo-specific gates.
+# This keeps the script safe, fast, and deterministic for previews/tests.
+if [ "$DRY_RUN" = true ]; then
+    print_info "DRY-RUN: Skipping local gate execution"
+else
 
 # Check if npm scripts exist
 if [ -f "package.json" ]; then
@@ -360,7 +366,7 @@ if [ -f "package.json" ]; then
         fi
         print_success "Lint gate passed"
     fi
-    
+
     if grep -q '"typecheck"' package.json; then
         echo ""
         echo "Running typecheck gate..."
@@ -371,7 +377,7 @@ if [ -f "package.json" ]; then
         fi
         print_success "Typecheck gate passed"
     fi
-    
+
     if grep -q '"test"' package.json && [ "$EXECUTE" = true ]; then
         echo ""
         echo "Running test gate..."
@@ -384,6 +390,8 @@ if [ -f "package.json" ]; then
     fi
 else
     print_warning "No package.json found, skipping npm-based gates"
+fi
+
 fi
 
 print_section "Step 3: Merge Analysis"
@@ -406,24 +414,24 @@ print_section "Step 4: Merge Execution"
 
 if [ "$EXECUTE" = true ]; then
     print_step "🚀 Executing merge pyramid..."
-    
+
     MERGE_OPTS="--plan $PLAN_FILE --execute"
     [ -n "$INTEGRATION_BRANCH" ] && MERGE_OPTS="$MERGE_OPTS --branch-prefix $INTEGRATION_BRANCH"
     [ "$CLEANUP" = true ] && MERGE_OPTS="$MERGE_OPTS --cleanup"
-    
+
     MERGE_RESULTS_FILE="$ARTIFACTS_DIR/merge-results.json"
-    
+
     if [ "$VERBOSE" = true ]; then
         $LEX_PR_CMD merge $MERGE_OPTS --json | tee "$MERGE_RESULTS_FILE"
     else
         $LEX_PR_CMD merge $MERGE_OPTS --json > "$MERGE_RESULTS_FILE" 2>&1
     fi
-    
+
     MERGE_EXIT_CODE=$?
-    
+
     if [ $MERGE_EXIT_CODE -eq 0 ]; then
         print_success "Merge pyramid execution completed successfully"
-        
+
         # Show summary
         if command -v jq &> /dev/null && [ -f "$MERGE_RESULTS_FILE" ]; then
             echo ""
@@ -437,32 +445,32 @@ if [ "$EXECUTE" = true ]; then
     fi
 else
     print_step "🔍 Dry-run: Previewing merge operations..."
-    
+
     MERGE_OPTS="--plan $PLAN_FILE --dry-run"
     [ -n "$INTEGRATION_BRANCH" ] && MERGE_OPTS="$MERGE_OPTS --branch-prefix $INTEGRATION_BRANCH"
-    
+
     DRY_RUN_FILE="$ARTIFACTS_DIR/dry-run.json"
-    
+
     # Run merge command and capture exit code, but don't fail if it errors in dry-run
     if [ "$VERBOSE" = true ]; then
         $LEX_PR_CMD merge $MERGE_OPTS --json | tee "$DRY_RUN_FILE" || true
     else
         $LEX_PR_CMD merge $MERGE_OPTS --json > "$DRY_RUN_FILE" 2>&1 || true
     fi
-    
+
     # Check if the dry-run file contains an error
     if [ -f "$DRY_RUN_FILE" ] && grep -qi "error" "$DRY_RUN_FILE" 2>/dev/null; then
         print_warning "Dry-run completed with warnings/errors (continuing)"
     else
         print_success "Dry-run completed"
     fi
-    
+
     if command -v jq &> /dev/null && [ -f "$DRY_RUN_FILE" ]; then
         echo ""
         echo "Preview:"
         jq '.' "$DRY_RUN_FILE" 2>/dev/null || cat "$DRY_RUN_FILE"
     fi
-    
+
     echo ""
     print_info "This was a dry-run. Use --execute to perform actual merge operations."
 fi
