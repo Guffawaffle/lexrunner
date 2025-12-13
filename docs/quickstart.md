@@ -503,4 +503,12 @@ You've completed the quickstart guide. You should now be able to:
 - ✅ Merge PRs safely
 - ✅ Use advanced CLI features for power users
 
+## Next Steps
+
+- **[Merge-Weave Quickstart](./merge-weave-quickstart.md)** - Detailed guide for merge-weave operations with plan files
+- **[CLI Reference](./cli.md)** - Complete command reference
+- **[Advanced CLI Features](./advanced-cli.md)** - Power user features
+- **[Autopilot Levels](./autopilot-levels.md)** - Automation levels 0-4
+- **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
+
 Need help? Check the full documentation in the `docs/` directory or run `lex-pr --help`.
