@@ -10,7 +10,7 @@ To retrieve the most recent session state memory in a new chat, use this query w
 Tool: mcp_lexbrain_thought_get
 
 Parameters:
-  repo: Guffawaffle/lex-pr-runner
+  repo: Guffawaffle/LexRunner
   kind: note
   inputs_hash: session-2025-11-01-epic75-and-phase3
 
@@ -32,7 +32,7 @@ Complete session state including:
 **Tell the new chat copilot:**
 
 > "Please retrieve the Phase 3 merge-weave context using mcp_lexbrain_thought_get with:
->   - repo: Guffawaffle/lex-pr-runner
+>   - repo: Guffawaffle/LexRunner
 >   - kind: note
 >   - inputs_hash: session-2025-11-01-epic75-and-phase3
 > Don't specify a commit parameter - let it search broadly."

@@ -15,7 +15,7 @@ export interface DependencyScore {
 	score: number;         // [0.0, 1.0]
 	reason: string;        // "explicit-footer" | "shared-files" | "directory-proximity" | "test-overlap"
 	evidence: {
-		explicit?: string[]; // ["Depends-on: Guffawaffle/lex-pr-runner#456"]
+		explicit?: string[]; // ["Depends-on: Guffawaffle/LexRunner#456"]
 		files?: string[];    // ["src/foo.ts", "src/bar.ts"]
 		confidence?: number; // Original heuristic confidence
 	};

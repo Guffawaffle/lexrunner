@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/idea.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/idea.schema.json",
 	"title": "Idea Schema v1",
 	"description": "Schema for captured ideas in the LexRunner front-end capture pipeline",
 	"type": "object",

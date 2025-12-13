@@ -216,15 +216,15 @@ Help others by sharing:
 
 ### Downloads
 
-- **[Latest Release](https://github.com/Guffawaffle/lex-pr-runner/releases/latest)**
+- **[Latest Release](https://github.com/Guffawaffle/LexRunner/releases/latest)**
 - **[Example Configurations](../../examples/)**
 - **[Sample Fixtures](../../fixtures/)**
 
 ### External Links
 
-- **[GitHub Repository](https://github.com/Guffawaffle/lex-pr-runner)**
-- **[Issue Tracker](https://github.com/Guffawaffle/lex-pr-runner/issues)**
-- **[Discussions](https://github.com/Guffawaffle/lex-pr-runner/discussions)**
+- **[GitHub Repository](https://github.com/Guffawaffle/LexRunner)**
+- **[Issue Tracker](https://github.com/Guffawaffle/LexRunner/issues)**
+- **[Discussions](https://github.com/Guffawaffle/LexRunner/discussions)**
 - **[npm Package](https://www.npmjs.com/package/lex-pr-runner)**
 
 ## 📝 Document Index

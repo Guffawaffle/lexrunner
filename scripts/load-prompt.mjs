@@ -14,7 +14,7 @@
  *   npx tsx scripts/load-prompt.mjs --name=remember.md
  *   LEX_PROMPTS_DIR=/custom/path npx tsx scripts/load-prompt.mjs --name=idea.md
  * 
- * @see Guffawaffle/lex-pr-runner#371 (R-LOADER)
+ * @see Guffawaffle/LexRunner#371 (R-LOADER)
  */
 
 import { resolvePromptsDir, loadPrompt } from '../src/config/promptsResolver.js';

@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/execution-plan.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/execution-plan.schema.json",
 	"title": "Execution Plan Schema v1",
 	"description": "Detailed execution plan for implementing a feature across repositories",
 	"type": "object",

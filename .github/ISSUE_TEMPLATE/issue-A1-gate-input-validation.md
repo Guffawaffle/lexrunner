@@ -40,7 +40,7 @@ async function executeGate(gate: string, item: PlanItem) {
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/lint.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates/lint.schema.json",
   "title": "Lint Gate Input Schema",
   "description": "Input contract for lint gate execution",
   "type": "object",

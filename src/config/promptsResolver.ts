@@ -2,7 +2,7 @@
  * Prompts directory resolution with 5-level precedence chain
  * Implements: LEX_PROMPTS_DIR (env) → .smartergpt.local/prompts → .smartergpt/prompts → @smartergpt/lex/prompts → @smartergpt/lex/canon/prompts
  * 
- * @see Guffawaffle/lex-pr-runner#371 (R-LOADER)
+ * @see Guffawaffle/LexRunner#371 (R-LOADER)
  */
 
 import * as fs from "fs";

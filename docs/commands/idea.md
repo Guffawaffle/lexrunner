@@ -85,7 +85,7 @@ Generated JSON documents conform to the Feature Spec v0 schema:
   ],
   "technicalContext": "Uses CSS variables for theming",
   "constraints": "Must work in all supported browsers",
-  "repo": "Guffawaffle/lex-pr-runner",
+  "repo": "Guffawaffle/LexRunner",
   "createdAt": "2025-11-09T21:26:56.362Z"
 }
 ```

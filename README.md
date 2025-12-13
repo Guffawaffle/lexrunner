@@ -21,7 +21,7 @@
 |--------|---------------------|--------------|
 | **Purpose** | Enterprise merge-weave orchestration CLI | Atlas/Memory/Policy core frameworks |
 | **License** | Proprietary | MIT (open source) |
-| **Repo** | `Guffawaffle/lex-pr-runner` | `Guffawaffle/lex` |
+| **Repo** | `Guffawaffle/LexRunner` | `Guffawaffle/lex` |
 | **Audience** | Teams running automated fanout/merge workflows | Developers building on frames/policy primitives |
 
 👉 **Choose Lex if:** You need frames, policy scanning, or atlas functionality independently.

@@ -144,7 +144,7 @@ Example custom gate schema:
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/custom-check.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates/custom-check.schema.json",
   "title": "Custom Check Gate Input Schema",
   "description": "Input contract for custom check gate",
   "type": "object",

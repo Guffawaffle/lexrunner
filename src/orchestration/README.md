@@ -363,7 +363,7 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 ## References
 
 - [Conflict Predictor Documentation](../../docs/conflict-predictor.md)
-- [Issue #175](https://github.com/Guffawaffle/lex-pr-runner/issues/175)
+- [Issue #175](https://github.com/Guffawaffle/LexRunner/issues/175)
 - Graph Theory: Maximal Independent Set
 - Git internals: merge-tree command
 

@@ -127,7 +127,7 @@ npx tsx scripts/metrics-template.ts > metrics.json
 - Deterministic output with canonical JSON key ordering
 - Badge-ready URLs for README
 - Placeholder values for tracking adoption metrics
-- See [Issue #134](https://github.com/Guffawaffle/lex-pr-runner/issues/134) for adoption tracking initiative
+- See [Issue #134](https://github.com/Guffawaffle/LexRunner/issues/134) for adoption tracking initiative
 
 ## Schema Generation
 

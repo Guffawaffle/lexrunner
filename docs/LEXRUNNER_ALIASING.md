@@ -434,7 +434,7 @@ console.log('✓ Module IDs validated:', result.canonical);
 - [Alias System README](../src/shared/aliases/README.md) — Implementation details
 - [Alias Migration Guide](../src/shared/aliases/MIGRATION_GUIDE.md) — Handling renames
 - [Module ID Validation](../src/shared/module_ids/README.md) — THE CRITICAL RULE
-- [LexRunner Repo](https://github.com/Guffawaffle/lex-pr-runner) — Orchestration layer
+- [LexRunner Repo](https://github.com/Guffawaffle/LexRunner) — Orchestration layer
 
 ## Summary
 

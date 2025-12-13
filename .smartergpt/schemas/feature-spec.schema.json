@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/feature-spec.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/feature-spec.schema.json",
 	"title": "Feature Spec Schema v1",
 	"description": "Feature specification generated from captured ideas",
 	"type": "object",

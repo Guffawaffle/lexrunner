@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/security-scan.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates/security-scan.schema.json",
   "title": "Security Scan Gate Input Schema",
   "description": "Input contract for security scan gate execution",
   "type": "object",
