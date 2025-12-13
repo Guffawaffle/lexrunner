@@ -462,6 +462,11 @@ lex-pr execute --plan plan.json
 
 ### Documentation
 
+**Getting Started:**
+- [Quickstart Guide](docs/quickstart.md) - Get up and running in 5 minutes
+- [Merge-Weave Quickstart](docs/merge-weave-quickstart.md) - End-to-end merge-weave walkthrough with examples
+
+**Reference:**
 - **[Environment Variables](docs/environment-variables.md)** - environment configuration, CI safety, and aliasing
 - **[Profile Resolution](docs/profile-resolution.md)** - profile precedence and configuration
 - **[Complete Guide](docs/diffgraph-planner.md)** - full feature documentation
