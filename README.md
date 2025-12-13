@@ -797,6 +797,43 @@ process.chdir(testDir);
 
 This keeps tests isolated and prevents intermittent failures when running the full test suite.
 
+## Performance Benchmarks
+
+The project includes a comprehensive performance regression test suite to track critical operation performance over time.
+
+### Running Benchmarks
+
+```bash
+# Run all benchmarks
+npm run benchmark
+
+# Run specific benchmark
+npm run benchmark -- core/topologicalSort.bench.ts
+
+# Compare against baseline (CI mode)
+npm run benchmark:ci
+
+# Update baseline metrics (after performance improvements)
+npm run benchmark:baseline
+```
+
+### What's Measured
+
+- **Core Algorithms**: Topological sort, plan parsing, dependency resolution (10-500 nodes)
+- **I/O Operations**: File operations, git operations
+- **End-to-End Workflows**: Complete plan generation and execution pipelines
+
+### CI Integration
+
+Benchmarks run automatically on PRs via GitHub Actions. The workflow:
+1. Executes all benchmarks
+2. Compares results against committed baseline
+3. Posts performance report as PR comment
+4. **Fails PR if >20% performance regression detected**
+5. **Warns if 10-20% slower**
+
+See `tests/benchmarks/README.md` for detailed documentation.
+
 ## Notes
 
 - Deterministic > clever. Outputs are sorted for stable diffs.
