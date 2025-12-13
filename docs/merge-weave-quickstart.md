@@ -30,6 +30,8 @@ Create a `plan.json` file with 2-3 branches. **Important**: Branch names must ma
 
 ### Minimal Example (Schema v1)
 
+> **💡 Tip**: Store this plan in `.smartergpt.local/runner/plan.json` (gitignored) or `/tmp/plan.json` to avoid working tree conflicts.
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -131,8 +133,7 @@ lex-pr execute --plan ./plan.json --artifact-dir ./artifacts --json
   "status": "completed",
   "plan": {
     "items": 3,
-    "requiredGates": ["lint", "typecheck"],
-    "optionalGates": []
+    "requiredGates": ["lint", "typecheck"]
   },
   "results": {
     "successful": 3,
@@ -177,8 +178,7 @@ lex-pr execute --plan ./plan.json --artifact-dir ./artifacts --json
   "status": "failed",
   "plan": {
     "items": 3,
-    "requiredGates": ["lint", "typecheck"],
-    "optionalGates": []
+    "requiredGates": ["lint", "typecheck"]
   },
   "results": {
     "successful": 2,
@@ -706,15 +706,17 @@ jobs:
       
       - name: Dry-run merge-weave
         run: |
+          set -e
           lex-pr merge --plan ./plan.json --json --fail-on-preflight-conflict > dry-run.json
           cat dry-run.json | jq .
       
       - name: Check for conflicts
         run: |
-          CONFLICTS=$(cat dry-run.json | jq -r '.preflight.conflictsDetected')
+          set -e
+          CONFLICTS=$(jq -r '.preflight.conflictsDetected' dry-run.json)
           if [ "$CONFLICTS" -gt 0 ]; then
             echo "❌ Preflight detected $CONFLICTS potential conflicts"
-            cat dry-run.json | jq '.preflight.items[] | select(.conflicts | length > 0)'
+            jq '.preflight.items[] | select(.conflicts | length > 0)' dry-run.json
             exit 1
           fi
           echo "✅ No conflicts detected"
