@@ -17,6 +17,8 @@ import { emitGateFrame } from "./frames/index.js";
 import type { FrameEmitResult } from "./frames/types.js";
 import { emitGateReceipt } from "./weave/receiptHelper.js";
 import type { ActionReceipt } from "./receipts/schema.js";
+import { runEnvironmentQualityCheck } from "./hostility/index.js";
+import { calculateHostilityAdjustedTimeout, logTimeoutAdjustment } from "./governance/timeoutAdjustment.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -690,6 +692,18 @@ export async function executeGatesWithPolicy(
 ): Promise<void> {
 	// Capture repository root once at the start of execution
 	const workingDir = repoRoot || process.cwd();
+
+	// Wave 3 Governance: Hostility → Gate Timeout Adjustment
+	// Best-effort: if the environment check fails, fall back to the provided timeout.
+	let effectiveTimeoutMs = timeoutMs;
+	try {
+		const hostilityScore = runEnvironmentQualityCheck({ cwd: workingDir });
+		const adjustment = calculateHostilityAdjustedTimeout(timeoutMs, hostilityScore);
+		logTimeoutAdjustment(adjustment, "all_gates");
+		effectiveTimeoutMs = adjustment.adjustedTimeoutMs;
+	} catch {
+		// Ignore hostility scoring errors to avoid blocking gate execution.
+	}
 	const policy = plan.policy || {
 		requiredGates: [],
 		optionalGates: [],
@@ -749,7 +763,7 @@ export async function executeGatesWithPolicy(
 			}
 
 			const item = plan.items.find(i => i.name === node)!;
-			const promise = executeItemGates(item, policy, executionState, artifactDir, timeoutMs, skipValidation, workingDir, options)
+			const promise = executeItemGates(item, policy, executionState, artifactDir, effectiveTimeoutMs, skipValidation, workingDir, options)
 				.then(() => {
 					executing.delete(node);
 					completedNodes.add(node);
