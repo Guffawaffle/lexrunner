@@ -733,7 +733,7 @@ jobs:
 ## Reference Links
 
 - **Example Plan**: [`merge-weave-plan.json`](../merge-weave-plan.json) - Real-world plan file from this repository
-- **Plan Schema**: [Plan Schema Documentation](./schemas.md#execution-plan-schema) - Full schema reference for plan.json
+- **Plan Schema**: [Plan Schema Documentation](./schemas.md#plan-schema-srcschemats) - Full schema reference for plan.json
 - **State Machine**: [Merge-Weave State Machine](./merge-weave-state-machine.md) - Execution state transitions and resume capability
 - **Advanced CLI**: [Advanced CLI Features](./advanced-cli.md) - Advanced merge-weave options and automation
 - **Autopilot Levels**: [Autopilot Levels](./autopilot-levels.md) - Automated PR creation and management
