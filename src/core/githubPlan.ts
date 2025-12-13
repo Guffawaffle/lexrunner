@@ -7,6 +7,8 @@ import { Plan, PlanItem, Gate } from "../schema.js";
 import { GitHubClient, PullRequestDetails } from "../github/index.js";
 import { stableSort } from "../util/canonicalJson.js";
 import { createFileAnalyzer, FileAnalysisResult } from "../planner/index.js";
+import { createTierAssignment } from "../tiers/suggest.js";
+import type { TierOverride } from "../tiers/schema.js";
 
 export interface GitHubPlanOptions {
 	query?: string; // GitHub search query
@@ -18,6 +20,7 @@ export interface GitHubPlanOptions {
 		requiredGates?: string[];
 		maxWorkers?: number;
 	};
+	tierOverrides?: TierOverride[]; // Tier overrides for plan items
 }
 
 /**
@@ -134,11 +137,16 @@ function transformPRToPlanItem(pr: PullRequestDetails, options: GitHubPlanOption
 	// Generate gates from PR metadata
 	const gates = generateGatesFromPR(pr, options);
 
-	return {
+	const planItem: PlanItem = {
 		name,
 		deps: stableSort(deps),
 		gates
 	};
+
+	// Add tier assignment
+	planItem.tier = createTierAssignment(planItem, options.tierOverrides);
+
+	return planItem;
 }
 
 /**
