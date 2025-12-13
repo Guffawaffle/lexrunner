@@ -316,7 +316,7 @@ npm run check:release-drift
 
 ### Catch-Up Release (One-Time)
 
-As of 2025-11-27, tag v0.5.0 exists but no GitHub release. To create:
+If `npm run check:release-drift` reports that tag v0.5.0 exists but no GitHub release, create it:
 
 ```bash
 gh release create v0.5.0 \
