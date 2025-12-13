@@ -6,12 +6,13 @@
 import { describe, bench, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import * as yaml from 'yaml';
 import { generateGraph } from '../utils/graphGenerator.js';
 import type { Plan } from '../../../src/schema.js';
 
 describe('File Operations Performance', () => {
-  const tmpDir = '/tmp/lex-pr-runner-bench-files';
+  const tmpDir = path.join(os.tmpdir(), 'lex-pr-runner-bench-files');
   
   beforeAll(() => {
     // Create temp directory

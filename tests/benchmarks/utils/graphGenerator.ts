@@ -56,6 +56,7 @@ function generateLinearGraph(nodes: number): Plan {
 
 /**
  * Generate diamond-like pattern with multiple layers
+ * Uses a pyramid distribution where base layers have more nodes than top layers
  */
 function generateDiamondGraph(nodes: number): Plan {
   const items: PlanItem[] = [];
@@ -76,8 +77,9 @@ function generateDiamondGraph(nodes: number): Plan {
       // Dependencies: connect to previous layer items
       let deps: string[] = [];
       if (layer > 0) {
-        // Find items from previous layer to depend on
-        const prevLayerStart = nodeIndex - actualItems - Math.max(1, Math.ceil((nodes / layers) * (layers - layer + 1) / layers));
+        // Calculate start position of previous layer
+        // This determines which nodes from the previous layer this node depends on
+        const prevLayerStart = calculatePreviousLayerStart(layer, layers, nodes, nodeIndex, actualItems);
         const depsCount = Math.min(2, nodeIndex); // Max 2 dependencies per node
         
         for (let d = 0; d < depsCount && prevLayerStart + d >= 0 && prevLayerStart + d < nodeIndex; d++) {
@@ -100,6 +102,20 @@ function generateDiamondGraph(nodes: number): Plan {
     target: 'main',
     items
   };
+}
+
+/**
+ * Calculate the starting index of the previous layer for dependency connections
+ * Ensures nodes in upper layers connect to nodes in the layer below them
+ */
+function calculatePreviousLayerStart(
+  layer: number,
+  layers: number,
+  nodes: number,
+  nodeIndex: number,
+  actualItems: number
+): number {
+  return nodeIndex - actualItems - Math.max(1, Math.ceil((nodes / layers) * (layers - layer + 1) / layers));
 }
 
 /**

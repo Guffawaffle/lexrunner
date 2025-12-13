@@ -10,6 +10,15 @@ import { computeMergeOrder } from '../../../src/mergeOrder.js';
 import type { InputConfig } from '../../../src/core/inputs.js';
 import { generateGraph } from '../utils/graphGenerator.js';
 
+/**
+ * Create index map from plan items for efficient dependency lookup
+ */
+function createIndexMap(items: Array<{ name: string }>): Map<string, number> {
+  const map = new Map<string, number>();
+  items.forEach((item, idx) => map.set(item.name, idx));
+  return map;
+}
+
 describe('End-to-End Workflow Performance', () => {
   describe('Complete plan generation workflow', () => {
     const smallGraph = generateGraph({ nodes: 10, pattern: 'complex' });
@@ -18,15 +27,13 @@ describe('End-to-End Workflow Performance', () => {
 
     // Small workflow
     bench('small workflow (10 items): input → plan → validate → topo sort', () => {
+      const indexMap = createIndexMap(smallGraph.items);
       const input: InputConfig = {
         target: 'main',
         items: smallGraph.items.map((item, idx) => ({
           id: `pr-${idx}`,
           branch: item.name,
-          deps: item.deps.map(dep => {
-            const depIdx = smallGraph.items.findIndex(i => i.name === dep);
-            return `pr-${depIdx}`;
-          }),
+          deps: item.deps.map(dep => `pr-${indexMap.get(dep)}`),
           gates: [
             { name: 'lint', run: 'npm run lint', env: {} },
             { name: 'test', run: 'npm test', env: {} }
@@ -41,15 +48,13 @@ describe('End-to-End Workflow Performance', () => {
 
     // Medium workflow
     bench('medium workflow (30 items): input → plan → validate → topo sort', () => {
+      const indexMap = createIndexMap(mediumGraph.items);
       const input: InputConfig = {
         target: 'main',
         items: mediumGraph.items.map((item, idx) => ({
           id: `pr-${idx}`,
           branch: item.name,
-          deps: item.deps.map(dep => {
-            const depIdx = mediumGraph.items.findIndex(i => i.name === dep);
-            return `pr-${depIdx}`;
-          }),
+          deps: item.deps.map(dep => `pr-${indexMap.get(dep)}`),
           gates: [
             { name: 'lint', run: 'npm run lint', env: {} },
             { name: 'test', run: 'npm test', env: {} }
@@ -64,15 +69,13 @@ describe('End-to-End Workflow Performance', () => {
 
     // Large workflow
     bench('large workflow (75 items): input → plan → validate → topo sort', () => {
+      const indexMap = createIndexMap(largeGraph.items);
       const input: InputConfig = {
         target: 'main',
         items: largeGraph.items.map((item, idx) => ({
           id: `pr-${idx}`,
           branch: item.name,
-          deps: item.deps.map(dep => {
-            const depIdx = largeGraph.items.findIndex(i => i.name === dep);
-            return `pr-${depIdx}`;
-          }),
+          deps: item.deps.map(dep => `pr-${indexMap.get(dep)}`),
           gates: [
             { name: 'lint', run: 'npm run lint', env: {} },
             { name: 'test', run: 'npm test', env: {} },

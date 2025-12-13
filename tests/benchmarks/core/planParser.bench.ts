@@ -9,6 +9,15 @@ import { validatePlan } from '../../../src/planner/validation.js';
 import type { InputConfig } from '../../../src/core/inputs.js';
 import { generateGraph } from '../utils/graphGenerator.js';
 
+/**
+ * Create index map from plan items for efficient dependency lookup
+ */
+function createIndexMap(items: Array<{ name: string }>): Map<string, number> {
+  const map = new Map<string, number>();
+  items.forEach((item, idx) => map.set(item.name, idx));
+  return map;
+}
+
 describe('Plan Parsing Performance', () => {
   // Small plans (5-10 items)
   describe('Small plans (5-10 items)', () => {
@@ -41,15 +50,13 @@ describe('Plan Parsing Performance', () => {
   // Medium plans (20-30 items)
   describe('Medium plans (20-30 items)', () => {
     const mediumGraph = generateGraph({ nodes: 25, pattern: 'complex' });
+    const indexMap = createIndexMap(mediumGraph.items);
     const mediumInput: InputConfig = {
       target: 'main',
       items: mediumGraph.items.map((item, idx) => ({
         id: `pr-${idx}`,
         branch: item.name,
-        deps: item.deps.map(dep => {
-          const depIdx = mediumGraph.items.findIndex(i => i.name === dep);
-          return `pr-${depIdx}`;
-        }),
+        deps: item.deps.map(dep => `pr-${indexMap.get(dep)}`),
         gates: [
           { name: 'lint', run: 'npm run lint', env: {} },
           { name: 'test', run: 'npm test', env: {} }
@@ -75,15 +82,13 @@ describe('Plan Parsing Performance', () => {
   // Large plans (50-100 items)
   describe('Large plans (50-100 items)', () => {
     const largeGraph = generateGraph({ nodes: 75, pattern: 'complex' });
+    const indexMap = createIndexMap(largeGraph.items);
     const largeInput: InputConfig = {
       target: 'main',
       items: largeGraph.items.map((item, idx) => ({
         id: `pr-${idx}`,
         branch: item.name,
-        deps: item.deps.map(dep => {
-          const depIdx = largeGraph.items.findIndex(i => i.name === dep);
-          return `pr-${depIdx}`;
-        }),
+        deps: item.deps.map(dep => `pr-${indexMap.get(dep)}`),
         gates: [
           { name: 'lint', run: 'npm run lint', env: {} },
           { name: 'test', run: 'npm test', env: {} },

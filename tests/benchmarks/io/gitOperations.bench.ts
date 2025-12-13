@@ -7,9 +7,10 @@ import { describe, bench, beforeAll, afterAll } from 'vitest';
 import { execa } from 'execa';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 describe('Git Operations Performance', () => {
-  const tmpDir = '/tmp/lex-pr-runner-bench-git';
+  const tmpDir = path.join(os.tmpdir(), 'lex-pr-runner-bench-git');
   const repoPath = path.join(tmpDir, 'test-repo');
 
   beforeAll(async () => {
