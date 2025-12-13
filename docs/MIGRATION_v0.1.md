@@ -1,8 +1,12 @@
 # Migration Guide: Upgrading to v0.1
 
-**Target Audience:** LexRunner users upgrading from pre-release versions to v0.1.0  
-**Release Date:** November 6, 2025  
+**Target Audience:** LexRunner users upgrading from pre-release versions to v0.1.0
+**Release Date:** November 6, 2025
 **Status:** Stable
+
+> **Scope note (Doc Lockdown):** This guide describes **v0.1.x behavior**.
+> - In v0.1, Frame emission (when enabled) writes JSON files under `.lexrunner/frames/`.
+> - A future **v2** design may store Frames in **Lex** instead of local files; if/when that ships, this doc will be versioned accordingly.
 
 ---
 
@@ -456,12 +460,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-      
+
       - name: Run merge-weave with Frame emission
         env:
           LEX_PR_EMIT_FRAMES: true  # Enable frames
@@ -471,7 +475,7 @@ jobs:
           lex-pr plan --from-github
           lex-pr execute plan.json
           lex-pr merge plan.json --execute
-      
+
       - name: Upload Frame artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -484,11 +488,11 @@ jobs:
 ```groovy
 pipeline {
   agent any
-  
+
   environment {
     LEX_PR_EMIT_FRAMES = 'true'
   }
-  
+
   stages {
     stage('Merge') {
       steps {
@@ -497,7 +501,7 @@ pipeline {
         sh 'lex-pr merge plan.json --execute'
       }
     }
-    
+
     stage('Archive Frames') {
       steps {
         archiveArtifacts artifacts: '.lexrunner/frames/*.json'
@@ -571,6 +575,6 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
 
 ---
 
-**Document Version:** 1.0.0  
-**Last Updated:** 2025-11-06  
+**Document Version:** 1.0.0
+**Last Updated:** 2025-11-06
 **Maintainers:** LexRunner Team

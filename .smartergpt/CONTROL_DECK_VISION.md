@@ -53,7 +53,7 @@ LexRunner, in this metaphor, is the **helm system** — it doesn't command, it *
 
 ## What LexRunner Could Become
 
-### Near-Term Reality (v0.6.0, Q1 2025)
+### Near-Term Reality (v0.6.0)
 
 These are **already in motion** or blocked only by execution:
 
@@ -73,7 +73,7 @@ These are **already in motion** or blocked only by execution:
    - Gates & rollback, frames & metrics
    - **Status:** Subtasks defined (#328-332), ready to execute
 
-### Medium-Term Aspirations (v0.7+, Q2 2025)
+### Medium-Term Aspirations (v0.7+)
 
 4. **Single-Issue Runner Mode** (#390)
    - Autonomous: issue → plan → execute → PR
