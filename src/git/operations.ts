@@ -8,6 +8,7 @@ import { Plan, PlanItem } from "../schema.js";
 import { metrics, METRICS } from "../monitoring/metrics.js";
 import { profiler } from "../monitoring/profiler.js";
 import { ProgressReporter } from "../util/progress.js";
+import { emitActionReceipt, emitFailureReceipt } from "../receipts/emit.js";
 
 export interface MergeOperation {
 	item: PlanItem;
@@ -144,6 +145,10 @@ export class GitOperations {
 			const { item, strategy } = operation;
 			const branchName = item.name; // Assuming item.name is the branch name
 
+			// Capture current HEAD for rollback path
+			const premergeLog = await this.git.log(['-1']);
+			const previousHead = premergeLog.latest?.hash || 'HEAD';
+
 			// Check if branch exists
 			const branches = await this.git.branch(['-a']);
 			const branchExists = branches.all.some(branch =>
@@ -227,6 +232,25 @@ export class GitOperations {
 					message += ` (${mergeError.message})`;
 				}
 
+				// Emit failure receipt for merge conflict (Disciplined Failure Pattern)
+				emitFailureReceipt({
+					action: `merge ${branchName} to ${operation.targetBranch}`,
+					rationale: message,
+					confidence: 'high',
+					reversibility: 'reversible',
+					rollbackPath: 'Abort merge and reset to previous state',
+					rollbackCommand: `git merge --abort || git reset --hard ${previousHead}`,
+					uncertaintyNotes: conflictedFiles.length > 0 ? [`Conflicted files: ${conflictedFiles.join(', ')}`] : undefined,
+					nextActions: [
+						'Resolve conflicts manually',
+						'Rebase branch and retry merge',
+						`Rollback: git reset --hard ${previousHead}`,
+					],
+					escalationRequired: true,
+					escalationReason: 'Merge conflict requires manual resolution',
+					phase: 'apply',
+				}, { log: false }); // Don't log to avoid cluttering output
+
 				return {
 					success: false,
 					item,
@@ -241,6 +265,18 @@ export class GitOperations {
 
 			profiler.end(operationId, { item: operation.item.name, status: 'success' });
 			metrics.incrementCounter(METRICS.MERGE_SUCCESS_TOTAL, { strategy: operation.strategy });
+
+			// Emit ActionReceipt for successful merge (Disciplined Failure Pattern)
+			emitActionReceipt({
+				action: `merge ${branchName} to ${operation.targetBranch}`,
+				rationale: `Branch merged successfully using ${strategy} strategy`,
+				confidence: 'high',
+				reversibility: 'reversible',
+				rollbackPath: `Reset to previous state`,
+				rollbackCommand: `git reset --hard ${previousHead}`,
+				outcome: 'success',
+				phase: 'apply',
+			}, { log: false }); // Don't log to avoid cluttering output
 
 			return {
 				success: true,
@@ -260,12 +296,33 @@ export class GitOperations {
 			} catch {
 				// Ignore errors getting conflict files
 			}
+
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			
+			// Emit failure receipt for exception (Disciplined Failure Pattern)
+			emitFailureReceipt({
+				action: `merge ${operation.item.name} to ${operation.targetBranch}`,
+				rationale: `Merge operation failed with exception: ${errorMessage}`,
+				confidence: 'high',
+				reversibility: 'reversible',
+				rollbackPath: 'Reset to previous state',
+				rollbackCommand: 'git reset --hard HEAD~1',
+				uncertaintyNotes: conflictedFiles.length > 0 ? [`Conflicted files: ${conflictedFiles.join(', ')}`] : undefined,
+				nextActions: [
+					'Check git status for repository state',
+					'Review error details and retry',
+					'Rollback: git reset --hard HEAD~1',
+				],
+				escalationRequired: true,
+				escalationReason: 'Merge operation failed with exception',
+				phase: 'apply',
+			}, { log: false }); // Don't log to avoid cluttering output
 			
 			return {
 				success: false,
 				item: operation.item,
 				conflicts: conflictedFiles.length > 0 ? conflictedFiles : undefined,
-				message: `Merge operation failed: ${error instanceof Error ? error.message : String(error)}`,
+				message: `Merge operation failed: ${errorMessage}`,
 			};
 		}
 	}
@@ -350,6 +407,31 @@ export class GitOperations {
 					break;
 				}
 			}
+
+			// Emit completion receipt for weave execution (Disciplined Failure Pattern)
+			const outcome = failed === 0 ? 'success' : (successful > 0 ? 'partial' : 'failure');
+			emitActionReceipt({
+				action: `weave execution: ${successful} merged, ${failed} failed`,
+				rationale: outcome === 'success' 
+					? 'All items merged successfully' 
+					: outcome === 'partial'
+						? 'Some items merged, some failed'
+						: 'Weave execution failed',
+				confidence: 'high',
+				reversibility: successful > 0 ? 'partially-reversible' : 'reversible',
+				rollbackPath: successful > 0
+					? 'Manual review required to revert merged changes'
+					: 'No changes made, no rollback needed',
+				outcome,
+				phase: 'complete',
+				nextActions: outcome === 'failure'
+					? ['Review failure details', 'Resolve issues and retry']
+					: outcome === 'partial'
+						? ['Review partial results', 'Retry failed items']
+						: ['Weave complete - ready for verification'],
+				escalationRequired: outcome !== 'success',
+				escalationReason: outcome !== 'success' ? 'Weave execution did not fully succeed' : undefined,
+			}, { log: false }); // Don't log to avoid cluttering output
 
 			return {
 				operations: results,
