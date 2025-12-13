@@ -32,6 +32,21 @@ describe('GitHub API Integration', () => {
       expect(error.message).toBe('Test error message');
       expect(error.name).toBe('GitHubAPIError');
     });
+
+    it('should capture HTTP status code when provided', () => {
+      const error404 = new GitHubAPIError('Not Found', 404);
+      
+      expect(error404).toBeInstanceOf(Error);
+      expect(error404).toBeInstanceOf(GitHubAPIError);
+      expect(error404.message).toBe('Not Found');
+      expect(error404.status).toBe(404);
+    });
+
+    it('should handle errors without status code', () => {
+      const errorNoStatus = new GitHubAPIError('Network error');
+      
+      expect(errorNoStatus.status).toBeUndefined();
+    });
   });
 
   describe('Repository detection logic', () => {

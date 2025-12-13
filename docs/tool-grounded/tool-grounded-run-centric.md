@@ -94,7 +94,7 @@ LexRunner exposes a small, flat MCP surface.
 - **Args (conceptual):**
   - `mode: string` – persona mode (`"senior-dev"`, `"eager-pm"`, etc.).
   - `procedure: string` – procedure id (`"merge-weave-main"`, `"pr-review"`, ...).
-  - `repo: string` – repository identifier (e.g., `"Guffawaffle/lex-pr-runner"`).
+  - `repo: string` – repository identifier (e.g., `"Guffawaffle/LexRunner"`).
   - `task?: string` – human-readable task description.
   - `params?: object` – procedure-specific parameters (PR numbers, branch names, etc.).
 - **Returns:** `{ runId: string, initialStatus: StatusResponse }` (optional convenience).
@@ -379,7 +379,7 @@ There is no need for the LLM to invent workflow steps; the procedure does that. 
 1. User invokes a command (example):
 
    ```text
-   /lex-runner mode=senior-dev procedure=pr-review repo=Guffawaffle/lex-pr-runner task="Review PR #324"
+   /lex-runner mode=senior-dev procedure=pr-review repo=Guffawaffle/LexRunner task="Review PR #324"
    ```
 
 2. Copilot calls `lexrunner.startRun(...)` with these parameters.

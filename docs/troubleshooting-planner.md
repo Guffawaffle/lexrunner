@@ -490,7 +490,7 @@ If other fields differ:
    diff plan1.json plan2.json >> bug-report.txt
    ```
 
-2. **File an issue:** [GitHub Issues](https://github.com/Guffawaffle/lex-pr-runner/issues/new)
+2. **File an issue:** [GitHub Issues](https://github.com/Guffawaffle/LexRunner/issues/new)
    - Title: "Non-deterministic plan generation"
    - Include: Commands run, diff output, environment details
    - Label: `bug`, `determinism`
@@ -845,8 +845,8 @@ lex-pr plan --from-github --use-cache --output plan.json
 
 If you encounter an issue not covered here:
 
-1. **Check existing issues:** [GitHub Issues](https://github.com/Guffawaffle/lex-pr-runner/issues)
-2. **Search discussions:** [GitHub Discussions](https://github.com/Guffawaffle/lex-pr-runner/discussions)
+1. **Check existing issues:** [GitHub Issues](https://github.com/Guffawaffle/LexRunner/issues)
+2. **Search discussions:** [GitHub Discussions](https://github.com/Guffawaffle/LexRunner/discussions)
 3. **File a new issue:** Include:
    - Commands run
    - Error messages (full output)

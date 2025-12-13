@@ -197,6 +197,12 @@ describe("Weave Receipt Helper", () => {
 			expect(receipt.escalationRequired).toBe(false);
 		});
 
+		it("should include duration in success rationale", () => {
+			const receipt = emitGateReceipt("lint", "PR-123", true, 1500, "run-123", { log: false });
+
+			expect(receipt.rationale).toContain("1500ms");
+		});
+
 		it("should emit failure receipt for failing gate", () => {
 			const receipt = emitGateReceipt("test", "PR-456", false, 5000, "run-456", { log: false });
 
@@ -212,6 +218,42 @@ describe("Weave Receipt Helper", () => {
 
 			expect(receipt.runId).toBeUndefined();
 			expect(receipt.action).toContain("build");
+		});
+
+		it("should include error context in failure receipt", () => {
+			const receipt = emitGateReceipt(
+				"test",
+				"PR-456",
+				false,
+				5000,
+				"run-456",
+				{ log: false },
+				{ error: "ENOENT: no such file or directory", exitCode: 1 }
+			);
+
+			expect(receipt.outcome).toBe("failure");
+			expect(receipt.uncertaintyNotes).toBeDefined();
+			expect(receipt.uncertaintyNotes?.some(n => n.includes("ENOENT"))).toBe(true);
+			expect(receipt.uncertaintyNotes?.some(n => n.includes("Exit code: 1"))).toBe(true);
+		});
+
+		it("should truncate long error messages in context", () => {
+			const longError = "x".repeat(300);
+			const receipt = emitGateReceipt(
+				"test",
+				"PR-456",
+				false,
+				5000,
+				"run-456",
+				{ log: false },
+				{ error: longError }
+			);
+
+			expect(receipt.uncertaintyNotes).toBeDefined();
+			const errorNote = receipt.uncertaintyNotes?.find(n => n.includes("Error:"));
+			expect(errorNote).toBeDefined();
+			expect(errorNote!.length).toBeLessThan(250); // Should be truncated
+			expect(errorNote).toContain("...");
 		});
 	});
 });

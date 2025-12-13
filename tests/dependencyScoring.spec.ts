@@ -90,7 +90,7 @@ describe("Dependency Scoring", () => {
 				{
 					number: 101,
 					name: "PR-101",
-					body: "Depends-on: Guffawaffle/lex-pr-runner#99",
+					body: "Depends-on: Guffawaffle/LexRunner#99",
 					sha: "abc123"
 				}
 			];

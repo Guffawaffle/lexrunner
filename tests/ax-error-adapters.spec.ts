@@ -146,6 +146,18 @@ describe("AXError adapters", () => {
 			expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
 			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
 		});
+
+		it("should handle 404 not found errors", () => {
+			const error = githubApiError({
+				status: 404,
+				message: "Failed to fetch pull requests: Not Found",
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
+			expect(error.context?.status).toBe(404);
+			expect(error.message).toContain("Not Found");
+		});
 	});
 
 	describe("gitOperationError", () => {

@@ -326,7 +326,7 @@ describe("CLI --suggest-deps", () => {
 					score: 1.0,
 					reason: "explicit-footer",
 					evidence: {
-						explicit: ["Depends-on: #101", "Depends-on: Guffawaffle/lex-pr-runner#101"]
+						explicit: ["Depends-on: #101", "Depends-on: Guffawaffle/LexRunner#101"]
 					}
 				}
 			];

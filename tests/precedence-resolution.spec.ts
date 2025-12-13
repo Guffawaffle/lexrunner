@@ -7,8 +7,8 @@
  * 3. .smartergpt/prompts (tracked canon)
  * 4. @smartergpt/lex package (fallback defaults)
  *
- * @see Guffawaffle/lex-pr-runner#370 (canon consume)
- * @see Guffawaffle/lex-pr-runner#371 (loader precedence)
+ * @see Guffawaffle/LexRunner#370 (canon consume)
+ * @see Guffawaffle/LexRunner#371 (loader precedence)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

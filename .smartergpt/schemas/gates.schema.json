@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates.schema.json",
 	"title": "Safety Gates Configuration",
 	"description": "Configuration for safety gates and validation rules",
 	"type": "object",

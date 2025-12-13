@@ -124,11 +124,11 @@ The GitHub Actions release workflow will automatically:
 - Publish to npm (if configured)
 - Create GitHub release
 
-Monitor the workflow at: `https://github.com/Guffawaffle/lex-pr-runner/actions`
+Monitor the workflow at: `https://github.com/Guffawaffle/LexRunner/actions`
 
 #### 7. Create GitHub Release (Optional)
 
-Navigate to: `https://github.com/Guffawaffle/lex-pr-runner/releases/new`
+Navigate to: `https://github.com/Guffawaffle/LexRunner/releases/new`
 
 1. Select the tag: `vX.Y.Z`
 2. Title: `Release X.Y.Z`
@@ -296,4 +296,4 @@ If the calculated version already exists:
 
 ## Related Issues
 
-- [#132 Release & Distribution Pipeline](https://github.com/Guffawaffle/lex-pr-runner/issues/132)
+- [#132 Release & Distribution Pipeline](https://github.com/Guffawaffle/LexRunner/issues/132)

@@ -28,7 +28,7 @@ import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
 import { generatePlanFromGitHub } from "../core/githubPlan.js";
 import { createGitHubClient } from "../github/index.js";
-import { createGitHubAPI, GitHubAPI } from "../github/api.js";
+import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
 import { bootstrapWorkspace, detectProjectType, getEnvironmentSuggestions } from "../core/bootstrap.js";
 import {
@@ -54,6 +54,12 @@ import {
 	validateCIEnvironment,
 } from "../util/envUtils.js";
 
+// Governance metrics imports
+import {
+	getGlobalMetricsCollector,
+	METRIC_DEFINITIONS,
+} from "../metrics/export.js";
+
 // AXError imports for structured error responses
 import {
 	type AXError,
@@ -70,6 +76,15 @@ import * as path from "path";
 
 // Hostility scoring imports
 import { runEnvironmentQualityCheck } from "../hostility/index.js";
+
+// Governance integration imports
+import {
+	buildGovernanceStatus,
+	governanceStatusToJSON,
+} from "../governance/index.js";
+
+// Tier metrics imports
+import { suggestTiersForPlan, calculateTierMetrics } from "../tiers/index.js";
 
 // Senior Dev executor imports
 import {
@@ -678,6 +693,29 @@ function createServer(options?: McpServerOptions): Server {
 						},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// Governance Metrics Tools (Wave 3)
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "metrics",
+					description:
+						"Get current governance metrics snapshot for observability dashboards",
+					inputSchema: {
+						type: "object",
+						properties: {
+							filter: {
+								type: "string",
+								description: "Filter metrics by name pattern (e.g., 'turn_cost', 'tier')",
+							},
+							format: {
+								type: "string",
+								enum: ["json", "prometheus"],
+								description: "Output format (default: json)",
+								default: "json",
+							},
+						},
+					},
+				},
 			],
 		};
 	});
@@ -749,6 +787,10 @@ function createServer(options?: McpServerOptions): Server {
 
 			case "config.show":
 				return await handleConfigShow(args as { key?: string });
+
+			// Governance metrics tool (Wave 3)
+			case "metrics":
+				return await handleMetrics(args as { filter?: string; format?: string });
 
 			default:
 				throw new McpError(
@@ -1602,6 +1644,14 @@ async function handleDiscover(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
+		// Handle GitHub API errors specifically with status code context
+		if (error instanceof GitHubAPIError) {
+			const axError = githubApiError({
+				status: error.status,
+				message: error.message,
+			});
+			throwMcpAXError(ErrorCode.InternalError, axError);
+		}
 		throwMcpToolError(ErrorCode.InternalError, "discover", error, "discover PRs");
 	}
 }
@@ -1627,6 +1677,20 @@ async function handleStatus(args: {
 		const evaluator = new MergeEligibilityEvaluator(plan, executionState);
 		const mergeSummary = evaluator.getMergeSummary();
 
+		// Calculate tier metrics from plan items
+		const tierAssignments = suggestTiersForPlan(plan.items);
+		const tierMetrics = calculateTierMetrics(tierAssignments);
+
+		// Run environment quality check for hostility score
+		const hostilityScore = runEnvironmentQualityCheck();
+
+		// Build governance status
+		const governanceStatus = buildGovernanceStatus(
+			tierMetrics,
+			undefined, // Turn cost tracked during actual runs
+			hostilityScore
+		);
+
 		const result = {
 			plan: {
 				schemaVersion: plan.schemaVersion,
@@ -1635,6 +1699,7 @@ async function handleStatus(args: {
 				policy: plan.policy,
 			},
 			mergeSummary,
+			governance: governanceStatusToJSON(governanceStatus),
 		};
 
 		return {
@@ -1849,6 +1914,42 @@ async function handleConfigShow(args: {
 		};
 	} catch (error) {
 		throwMcpToolError(ErrorCode.InternalError, "config.show", error, "show config");
+	}
+}
+
+/**
+ * Handle metrics tool - Get governance metrics snapshot
+ */
+async function handleMetrics(args: {
+	filter?: string;
+	format?: string;
+}): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		const collector = getGlobalMetricsCollector();
+
+		// Get snapshot, optionally filtered
+		const snapshot = args.filter
+			? collector.getMetricsByName(args.filter)
+			: collector.getSnapshot();
+
+		// Format output
+		let output: string;
+		if (args.format === "prometheus") {
+			output = collector.exportPrometheus();
+		} else {
+			output = JSON.stringify(snapshot, null, 2);
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: output,
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(ErrorCode.InternalError, "metrics", error, "get metrics");
 	}
 }
 

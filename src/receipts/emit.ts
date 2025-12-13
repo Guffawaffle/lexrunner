@@ -79,7 +79,7 @@ export interface EmitOptions {
 	/** Whether to emit as structured JSON (default: true when logging) */
 	json?: boolean;
 
-	/** Custom logger function (default: console.log) */
+	/** Custom logger function (default: console.error) */
 	logger?: (message: string) => void;
 }
 
@@ -130,7 +130,8 @@ export function emitActionReceipt(
 	params: EmitReceiptParams,
 	options: EmitOptions = {}
 ): ActionReceipt {
-	const { log = true, json = true, logger = console.log } = options;
+	// Default to stderr to avoid corrupting stdout in JSON-output mode.
+	const { log = true, json = true, logger = console.error } = options;
 
 	// Build the receipt object
 	const receipt: ActionReceipt = {
@@ -147,7 +148,8 @@ export function emitActionReceipt(
 
 	// Add optional fields if provided
 	if (params.rollbackPath) receipt.rollbackPath = params.rollbackPath;
-	if (params.rollbackCommand) receipt.rollbackCommand = params.rollbackCommand;
+	if (params.rollbackCommand)
+		receipt.rollbackCommand = params.rollbackCommand;
 	if (params.nextActions) receipt.nextActions = params.nextActions;
 	if (params.phase) receipt.phase = params.phase;
 	if (params.runId) receipt.runId = params.runId;
@@ -297,7 +299,9 @@ export function emitUncertaintyMarker(
 	// Log if requested
 	if (log) {
 		if (json) {
-			logger(JSON.stringify({ event: "uncertainty_marker", ...validated }));
+			logger(
+				JSON.stringify({ event: "uncertainty_marker", ...validated })
+			);
 		} else {
 			const status = validated.proceedingAnyway
 				? "PROCEEDING"
@@ -353,8 +357,7 @@ export function buildGovernanceContext(params: {
 	if (params.rollbackPath) ctx.rollbackPath = params.rollbackPath;
 	if (params.rollbackCommand) ctx.rollbackCommand = params.rollbackCommand;
 	if (params.confidence) ctx.confidence = params.confidence;
-	if (params.uncertaintyNotes)
-		ctx.uncertaintyNotes = params.uncertaintyNotes;
+	if (params.uncertaintyNotes) ctx.uncertaintyNotes = params.uncertaintyNotes;
 
 	return ctx;
 }

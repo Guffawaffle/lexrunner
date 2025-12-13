@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/edit-plan.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/edit-plan.schema.json",
   "title": "Edit Plan Schema",
   "description": "Declares intended scope of code edits for validation",
   "type": "object",

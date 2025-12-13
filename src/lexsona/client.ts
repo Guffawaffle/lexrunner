@@ -29,19 +29,73 @@ function debugLog(...args: unknown[]): void {
 }
 
 // Dynamic import to handle cases where LexSona isn't installed
-let LexSonaModule: typeof import("@smartergpt/lexsona") | null = null;
+// NOTE: LexSona is an optional dependency. CI/typecheck must succeed even when
+// '@smartergpt/lexsona' is not installed.
+//
+// To avoid TS2307 in environments without LexSona, do NOT reference it in type
+// positions (e.g. `typeof import(...)`) and avoid literal-module-specifier
+// dynamic imports (e.g. `import("@smartergpt/lexsona")`).
+//
+// Instead, define the minimal shape we need and load the module via a runtime
+// string variable.
+type LexSonaDeriveContext = {
+	/** Workflow / domain identifier */
+	domain: string;
+	/** Module / step identifier (LexSona convention) */
+	module_id: string;
+	/** Optional task type hint */
+	taskType?: string;
+};
+
+type LexSonaConstraintSet = {
+	personaId: string;
+	principles: Array<{ id: string; description: string }>;
+	constraints: Array<{
+		rule_id: string;
+		text: string;
+		severity: string;
+		confidence: number;
+		category: string;
+	}>;
+	metadata: {
+		rulesConsidered: number;
+		rulesFiltered: number;
+		confidenceThreshold: number;
+		offlineMode: boolean;
+		confidenceCeiling?: number;
+	};
+};
+
+type LexSonaInstance = {
+	deriveConstraints: (
+		ctx: LexSonaDeriveContext
+	) => Promise<LexSonaConstraintSet>;
+};
+
+type LexSonaModuleLike = {
+	LexSona: {
+		connect: (opts: {
+			lexDb?: string;
+			persona: string;
+			domain: string;
+		}) => Promise<LexSonaInstance>;
+	};
+};
+
+let LexSonaModule: LexSonaModuleLike | null = null;
 
 /**
  * Lazily load LexSona module
  */
-async function getLexSonaModule(): Promise<
-	typeof import("@smartergpt/lexsona") | null
-> {
+async function getLexSonaModule(): Promise<LexSonaModuleLike | null> {
 	if (LexSonaModule !== null) {
 		return LexSonaModule;
 	}
 	try {
-		LexSonaModule = await import("@smartergpt/lexsona");
+		const moduleName = "@smartergpt/lexsona";
+		LexSonaModule = (await import(
+			moduleName
+		)) as unknown as LexSonaModuleLike;
 		return LexSonaModule;
 	} catch {
 		return null;
@@ -172,7 +226,7 @@ export async function deriveShadowConstraints(
 		debugLog("LexSona instance created");
 
 		// Build derive context from workflow context
-		const deriveContext: import("@smartergpt/lexsona").DeriveContext = {
+		const deriveContext: LexSonaDeriveContext = {
 			domain: context.workflowId,
 			module_id: context.stepKind,
 			taskType: context.hints?.task as string | undefined,

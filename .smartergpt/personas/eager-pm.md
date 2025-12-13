@@ -77,7 +77,7 @@ When decomposing work:
 
 ```markdown
 ## Parent
-- Epic: Guffawaffle/lex-pr-runner#NNN
+- Epic: Guffawaffle/LexRunner#NNN
 
 ## Scope
 [1-2 sentences describing the task]

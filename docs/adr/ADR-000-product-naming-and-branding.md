@@ -23,7 +23,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 | Product | Brand | Repo | License | Notes |
 |---------|-------|------|---------|-------|
-| **LexRunner** | `LexRunner` | `Guffawaffle/lex-pr-runner` | Proprietary | Paid product; merge-weave orchestration CLI |
+| **LexRunner** | `LexRunner` | `Guffawaffle/LexRunner` | Proprietary | Paid product; merge-weave orchestration CLI |
 | **Lex** | `Lex` | `Guffawaffle/lex` | MIT | OSS core; frames, memory, policy, atlas |
 
 ### CLI Name
@@ -34,7 +34,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### Repository Names
 
-- `Guffawaffle/lex-pr-runner` → Stays as-is (branding via README + docs).
+- `Guffawaffle/LexRunner` → Renamed from `lex-pr-runner` to align with branding.
 - `Guffawaffle/lex` → Stays as-is (MIT badge + README).
 
 ### Release Tag Prefix
@@ -102,7 +102,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 ## References
 
-- `Guffawaffle/lex-pr-runner` (https://github.com/Guffawaffle/lex-pr-runner)
+- `Guffawaffle/LexRunner` (https://github.com/Guffawaffle/LexRunner)
 - `Guffawaffle/lex` (https://github.com/Guffawaffle/lex)
 - `docs/TERMS.md` (canonical terminology)
 - `.smartergpt/intent.md` (workspace profile example)

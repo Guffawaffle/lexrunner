@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/gates/coverage.schema.json",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates/coverage.schema.json",
   "title": "Coverage Gate Input Schema",
   "description": "Input contract for coverage gate execution",
   "type": "object",

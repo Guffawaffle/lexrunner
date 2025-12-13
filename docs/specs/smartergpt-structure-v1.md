@@ -516,7 +516,7 @@ const scopePath = path.join(profilePath, "scope.yml");
 
 ```bash
 # Clone repository
-git clone https://github.com/Guffawaffle/lex-pr-runner.git
+git clone https://github.com/Guffawaffle/LexRunner.git
 cd lex-pr-runner
 
 # Initialize local overlay

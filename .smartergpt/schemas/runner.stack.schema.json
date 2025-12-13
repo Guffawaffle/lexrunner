@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/lex-pr-runner/schemas/runner.stack.schema.json",
+	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/runner.stack.schema.json",
 	"title": "Runner Stack Configuration",
 	"description": "Configuration for the runner execution stack",
 	"type": "object",
