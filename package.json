@@ -62,6 +62,8 @@
 		"benchmark": "vitest bench -c vitest.benchmark.config.ts",
 		"benchmark:baseline": "echo 'Update baseline manually after running benchmarks and reviewing results'",
 		"benchmark:ci": "tsx scripts/benchmark-ci.ts",
+		"benchmark:smoke": "tsx scripts/benchmark-ci.ts --mode=smoke",
+		"benchmark:compare": "tsx scripts/benchmark-ci.ts --mode=compare",
 		"release:prepare": "tsx scripts/release-prepare.ts",
 		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
 		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
