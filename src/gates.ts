@@ -19,6 +19,7 @@ import { emitGateReceipt } from "./weave/receiptHelper.js";
 import type { ActionReceipt } from "./receipts/schema.js";
 import { runEnvironmentQualityCheck } from "./hostility/index.js";
 import { calculateHostilityAdjustedTimeout, logTimeoutAdjustment } from "./governance/timeoutAdjustment.js";
+import type { MergeWeaveTurnCost } from "./metrics/turncost.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -34,7 +35,8 @@ export async function executeGate(
 	timeoutMs: number = 30000,
 	itemName?: string,
 	skipValidation: boolean = false,
-	repoRoot?: string
+	repoRoot?: string,
+	turnCostTracker?: MergeWeaveTurnCost
 ): Promise<GateResult> {
 	// Validate gate input before execution (unless explicitly skipped)
 	if (!skipValidation && gate.input) {
@@ -73,6 +75,11 @@ export async function executeGate(
 		lastResult = result;
 		totalDuration += result.duration || 0;
 
+		// Track gate latency in Turn Cost if tracker is provided
+		if (turnCostTracker && result.duration) {
+			turnCostTracker.recordLatency(result.duration, itemName || gate.name);
+		}
+
 		// Track attempt metadata for flake report
 		const attemptRecord: AttemptRecord = {
 			attempt,
@@ -105,6 +112,14 @@ export async function executeGate(
 				return result;
 			} else if (classified.type === ErrorType.Transient && attempt < retryConfig.maxAttempts) {
 				console.warn(`⚠️  Gate '${gate.name}' failed with transient error - will retry`);
+				
+				// Track renegotiation (retry) in Turn Cost
+				if (turnCostTracker) {
+					turnCostTracker.recordRenegotiation(
+						`Gate '${gate.name}' retry due to transient error`,
+						itemName
+					);
+				}
 			}
 		}
 
@@ -588,6 +603,7 @@ export async function executeItemGates(
 	options?: {
 		runId?: string;
 		baseDir?: string;
+		turnCostTracker?: MergeWeaveTurnCost;
 	}
 ): Promise<GateResult[]> {
 	if (!item.gates || item.gates.length === 0) {
@@ -640,7 +656,7 @@ export async function executeItemGates(
 			continue;
 		}
 
-		const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation, repoRoot);
+		const result = await executeGate(gate, policy, itemArtifactDir, timeoutMs, item.name, skipValidation, repoRoot, options?.turnCostTracker);
 		results.push(result);
 
 		// Update execution state
@@ -688,6 +704,7 @@ export async function executeGatesWithPolicy(
 	options?: {
 		runId?: string;
 		baseDir?: string;
+		turnCostTracker?: MergeWeaveTurnCost;
 	}
 ): Promise<void> {
 	// Capture repository root once at the start of execution
