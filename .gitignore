@@ -47,6 +47,9 @@ out*.json
 # Runtime artifacts - .lexrunner moved to .smartergpt/runner for 0.5.0+
 .lexrunner/
 
+# Benchmark results (runtime)
+tests/benchmarks/results/
+
 # Generated plan artifacts (runtime)
 snapshot.md
 plan-*.json

@@ -1,0 +1,127 @@
+[
+  {
+    "name": "linear dependency chain",
+    "suite": "Topological Sort Performance > 10 nodes",
+    "meanTime": 0.5
+  },
+  {
+    "name": "diamond pattern",
+    "suite": "Topological Sort Performance > 10 nodes",
+    "meanTime": 0.5
+  },
+  {
+    "name": "fully parallel",
+    "suite": "Topological Sort Performance > 10 nodes",
+    "meanTime": 0.4
+  },
+  {
+    "name": "complex mixed",
+    "suite": "Topological Sort Performance > 10 nodes",
+    "meanTime": 0.6
+  },
+  {
+    "name": "linear dependency chain",
+    "suite": "Topological Sort Performance > 50 nodes",
+    "meanTime": 1.5
+  },
+  {
+    "name": "diamond pattern",
+    "suite": "Topological Sort Performance > 50 nodes",
+    "meanTime": 1.8
+  },
+  {
+    "name": "fully parallel",
+    "suite": "Topological Sort Performance > 50 nodes",
+    "meanTime": 1.2
+  },
+  {
+    "name": "complex mixed",
+    "suite": "Topological Sort Performance > 50 nodes",
+    "meanTime": 2.0
+  },
+  {
+    "name": "linear dependency chain",
+    "suite": "Topological Sort Performance > 100 nodes",
+    "meanTime": 3.0
+  },
+  {
+    "name": "diamond pattern",
+    "suite": "Topological Sort Performance > 100 nodes",
+    "meanTime": 3.5
+  },
+  {
+    "name": "fully parallel",
+    "suite": "Topological Sort Performance > 100 nodes",
+    "meanTime": 2.5
+  },
+  {
+    "name": "complex mixed",
+    "suite": "Topological Sort Performance > 100 nodes",
+    "meanTime": 4.0
+  },
+  {
+    "name": "linear dependency chain",
+    "suite": "Topological Sort Performance > 500 nodes",
+    "meanTime": 30.0
+  },
+  {
+    "name": "diamond pattern",
+    "suite": "Topological Sort Performance > 500 nodes",
+    "meanTime": 35.0
+  },
+  {
+    "name": "fully parallel",
+    "suite": "Topological Sort Performance > 500 nodes",
+    "meanTime": 25.0
+  },
+  {
+    "name": "complex mixed",
+    "suite": "Topological Sort Performance > 500 nodes",
+    "meanTime": 45.0
+  },
+  {
+    "name": "generate plan from input",
+    "suite": "Plan Parsing Performance > Small plans (5-10 items)",
+    "meanTime": 1.0
+  },
+  {
+    "name": "validate small plan",
+    "suite": "Plan Parsing Performance > Small plans (5-10 items)",
+    "meanTime": 0.5
+  },
+  {
+    "name": "generate and validate",
+    "suite": "Plan Parsing Performance > Small plans (5-10 items)",
+    "meanTime": 1.5
+  },
+  {
+    "name": "generate plan from input",
+    "suite": "Plan Parsing Performance > Medium plans (20-30 items)",
+    "meanTime": 3.0
+  },
+  {
+    "name": "validate medium plan",
+    "suite": "Plan Parsing Performance > Medium plans (20-30 items)",
+    "meanTime": 1.5
+  },
+  {
+    "name": "generate and validate",
+    "suite": "Plan Parsing Performance > Medium plans (20-30 items)",
+    "meanTime": 4.5
+  },
+  {
+    "name": "generate plan from input",
+    "suite": "Plan Parsing Performance > Large plans (50-100 items)",
+    "meanTime": 8.0
+  },
+  {
+    "name": "validate large plan",
+    "suite": "Plan Parsing Performance > Large plans (50-100 items)",
+    "meanTime": 4.0
+  },
+  {
+    "name": "generate and validate",
+    "suite": "Plan Parsing Performance > Large plans (50-100 items)",
+    "meanTime": 12.0
+  }
+]
