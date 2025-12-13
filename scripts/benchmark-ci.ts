@@ -147,7 +147,7 @@ async function main() {
 	// Run benchmarks
 	try {
 		execSync(
-			`npm run benchmark -- --run --outputJson=${RAW_RESULTS_PATH}`,
+			`npm run benchmark -- --run --outputJson ${RAW_RESULTS_PATH}`,
 			{
 				stdio: "inherit",
 			}
