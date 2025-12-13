@@ -141,13 +141,16 @@ export class GitOperations {
 		const operationId = `merge_${operation.item.name}`;
 		profiler.start(operationId, { item: operation.item.name, strategy: operation.strategy });
 
+		// Capture current HEAD for rollback path (declared outside try for catch block access)
+		let previousHead = 'HEAD';
+
 		try {
 			const { item, strategy } = operation;
 			const branchName = item.name; // Assuming item.name is the branch name
 
-			// Capture current HEAD for rollback path
+			// Get actual commit hash for rollback
 			const premergeLog = await this.git.log(['-1']);
-			const previousHead = premergeLog.latest?.hash || 'HEAD';
+			previousHead = premergeLog.latest?.hash || 'HEAD';
 
 			// Check if branch exists
 			const branches = await this.git.branch(['-a']);
@@ -306,12 +309,12 @@ export class GitOperations {
 				confidence: 'high',
 				reversibility: 'reversible',
 				rollbackPath: 'Reset to previous state',
-				rollbackCommand: 'git reset --hard HEAD~1',
+				rollbackCommand: `git reset --hard ${previousHead}`,
 				uncertaintyNotes: conflictedFiles.length > 0 ? [`Conflicted files: ${conflictedFiles.join(', ')}`] : undefined,
 				nextActions: [
 					'Check git status for repository state',
 					'Review error details and retry',
-					'Rollback: git reset --hard HEAD~1',
+					`Rollback: git reset --hard ${previousHead}`,
 				],
 				escalationRequired: true,
 				escalationReason: 'Merge operation failed with exception',
@@ -410,6 +413,12 @@ export class GitOperations {
 
 			// Emit completion receipt for weave execution (Disciplined Failure Pattern)
 			const outcome = failed === 0 ? 'success' : (successful > 0 ? 'partial' : 'failure');
+			const hasPartialSuccess = successful > 0;
+			const reversibility = hasPartialSuccess ? 'partially-reversible' : 'reversible';
+			const rollbackPath = hasPartialSuccess
+				? 'Manual review required to revert merged changes'
+				: 'No changes made, no rollback needed';
+			
 			emitActionReceipt({
 				action: `weave execution: ${successful} merged, ${failed} failed`,
 				rationale: outcome === 'success' 
@@ -418,10 +427,8 @@ export class GitOperations {
 						? 'Some items merged, some failed'
 						: 'Weave execution failed',
 				confidence: 'high',
-				reversibility: successful > 0 ? 'partially-reversible' : 'reversible',
-				rollbackPath: successful > 0
-					? 'Manual review required to revert merged changes'
-					: 'No changes made, no rollback needed',
+				reversibility,
+				rollbackPath,
 				outcome,
 				phase: 'complete',
 				nextActions: outcome === 'failure'
