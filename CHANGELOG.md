@@ -79,20 +79,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [0.1.0] - 2025-11-06
 
+**First Stable Release** — Establishes product branding and Frame emission foundation.
+
 ### Added
+
+#### Product Branding
 - **ADR-000:** Product Naming & Branding decision (LexRunner proprietary vs Lex MIT OSS).
 - README branding and badge updates for LexRunner identity.
 - Release workflow on `lexrunner-v*` tag pattern for deterministic versioning.
 - Architecture Decision Record (ADR) directory and index in `docs/adr/`.
+- Clear separation between LexRunner (proprietary) and Lex (MIT OSS core).
+
+#### Frame Emission System
+- Frame emitter utilities in `src/frames/emitter.ts` for workflow execution tracking.
+- Frame storage to `.lexrunner/frames/` directory with atomic writes.
+- Frame types: merge-weave, gate, executor, and procedure frames.
+- Frame validation schema with outcome tracking (success, partial, failure).
+- Optional Frame emission controlled via `LEX_PR_EMIT_FRAMES` environment variable (default: `false`).
+- Audit trail capabilities for workflow history and debugging.
+
+#### Documentation
+- Migration guide for v0.1 (`docs/MIGRATION_v0.1.md`) with:
+  - Frame emission enablement instructions
+  - Before/after examples
+  - Troubleshooting section
+  - CI/CD integration examples
+- ADR-000 documenting product naming and release tag conventions.
+- Lex (MIT OSS) cross-reference in README.
+- Badges for licensing clarity (Proprietary + Powered by Lex).
+- "Branding & Licensing" section with link to ADR-000.
+- Link to module aliasing documentation for future Lex integration.
 
 ### Changed
 - README header now prominently displays "LexRunner — Merge-Weave & Fanout CLI (`lex-pr`)".
 - Release workflow condition updated to trigger on `lexrunner-v*.*.*` tags (not legacy `v*` format).
+- Product name standardized to "LexRunner" in all documentation.
 
-### Documentation
-- Added Lex (MIT OSS) cross-reference in README.
-- Added badges for licensing clarity (Proprietary + Powered by Lex).
-- Added "Branding & Licensing" section with link to ADR-000.
+### Fixed
+- N/A (first stable release)
+
+### Breaking Changes
+- **None** — All changes are additive and maintain backward compatibility.
+
+### Deprecated
+- **None** — This is the initial stable release.
+
+### Security
+- Frame storage uses atomic file writes (temp file + rename) to prevent corruption.
+- Frame validation ensures data integrity before storage.
+
+### Migration Notes
+
+**From Pre-Release:**
+1. No breaking changes; all existing workflows continue to work.
+2. Frame emission is **disabled by default**; opt-in via `export LEX_PR_EMIT_FRAMES=true`.
+3. Release tags now use `lexrunner-v*` format; old `v*` tags deprecated.
+4. Update documentation references to use "LexRunner" (product) and "Lex" (OSS core) appropriately.
+
+See [Migration Guide](docs/MIGRATION_v0.1.md) for complete upgrade instructions.
+
+### Known Limitations
+- Frame emission to Lex memory API not yet implemented (planned for v0.2+).
+- Module aliasing for Frames not yet available (planned for v0.2+).
+- Frame query/recall tools not yet implemented (planned for future releases).
+
+### Related Issues
+- Epic E: Paid-vs-free split, CI gates, and release notes
+- LPR-010: Sub E.3: Migration guide and release notes for v0.1
 
 ---
 
