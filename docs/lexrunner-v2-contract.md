@@ -5,6 +5,9 @@
 > **Date:** 2025-12-08
 > **Version:** Draft 0.1
 
+> **Scope note (Doc Lockdown):** This document is **forward-looking** (v2 design).
+> For the currently shipped v0.1 behavior (including local Frame emission details), see [`docs/MIGRATION_v0.1.md`](./MIGRATION_v0.1.md).
+
 ---
 
 ## 1. Purpose
@@ -32,7 +35,7 @@ Runner v2 is **stateless between runs**. All persistent state lives in Lex.
 
 | Input | Source | Description |
 |-------|--------|-------------|
-| **Plan** | `plan.json` or generated | The DAG of items to execute (Schema v2) |
+| **Plan** | `plan.json` or generated | The DAG of items to execute (**Schema v2 (draft)**). |
 | **Lex connection** | `LEX_DB_PATH` or API | Memory store for Frames, Receipts, Recall |
 
 ### 2.2 Optional Inputs
@@ -42,7 +45,7 @@ Runner v2 is **stateless between runs**. All persistent state lives in Lex.
 | CLI flags | `argv` | — | `--json`, `--dry-run`, `--profile-dir`, etc. |
 | LexSona persona | `LEXSONA_PERSONA` | none | Active persona for constraint derivation |
 | Environment | `process.env` | — | `GITHUB_TOKEN`, `ALLOW_MUTATIONS`, etc. |
-| Config files | `.smartergpt/` | discovery | `stack.yml`, `gates.yml`, `scope.yml` |
+| Config files | `--profile-dir` | `.smartergpt.local/` | Workspace profile inputs (e.g., `stack.yml`, `gates.yml`, `scope.yml`). **Note:** `.smartergpt/` is a portable example profile in this repo; it is not a required runtime input. |
 
 ### 2.3 Input Precedence
 
@@ -216,8 +219,10 @@ Constraints evolve through LexSona, not Runner:
 lexsona rules learn "Always run typecheck before test"
 
 # Derive constraints for current context
-lexsona constraints derive --domain lex-pr-runner
+lexsona constraints derive --project lex-pr-runner
 ```
+
+> **Note:** `domain` is a deprecated input alias that is only consulted when `project` is absent. When present, it is preserved under `extensions.<namespace>.domain` and is not used for matching.
 
 Runner consumes constraints; it does not define them.
 

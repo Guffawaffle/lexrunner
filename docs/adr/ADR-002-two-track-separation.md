@@ -69,7 +69,7 @@ Ignored directories:
 ### Negative
 
 - **Two directories to understand** — Learning curve
-- **No default workspace** — Users must set up `.smartergpt/`
+- **No default writable workspace** — Users must initialize/provide a profile (typically `.smartergpt.local/`; `.smartergpt/` is a tracked example)
 
 ---
 

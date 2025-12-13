@@ -30,6 +30,9 @@ Create a `plan.json` file with 2-3 branches. **Important**: Branch names must ma
 
 ### Minimal Example (Schema v1)
 
+> **Doc Lockdown note:** This quickstart uses **Plan Schema v1** (the stable, documented format in current releases).
+> A separate forward-looking document may describe **Schema v2**; treat any v2 mentions as draft until the CLI and docs are versioned together.
+
 > **💡 Tip**: Store this plan in `.smartergpt.local/runner/plan.json` (gitignored) or `/tmp/plan.json` to avoid working tree conflicts.
 
 ```json
@@ -481,7 +484,7 @@ lex-pr merge --plan ./plan.json --execute --json
 2. **Check git status**:
    ```bash
    git status
-   
+
    # Example output showing dirty tree:
    # On branch main
    # Changes not staged for commit:
@@ -494,13 +497,13 @@ lex-pr merge --plan ./plan.json --execute --json
    # Option 1: Commit changes
    git add .
    git commit -m "WIP: Changes before merge-weave"
-   
+
    # Option 2: Stash changes
    git stash push -m "Before merge-weave"
-   
+
    # Run merge-weave
    lex-pr merge --plan ./plan.json --execute
-   
+
    # Option 3: Restore stash after completion
    git stash pop
    ```
@@ -527,7 +530,7 @@ lex-pr merge --plan ./plan.json --execute --json
 1. **Check conflict status**:
    ```bash
    git status
-   
+
    # Example output:
    # On branch integration/wave-1
    # You have unmerged paths.
@@ -542,7 +545,7 @@ lex-pr merge --plan ./plan.json --execute --json
 2. **View conflicted files**:
    ```bash
    git diff --name-only --diff-filter=U
-   
+
    # Output:
    # src/components/Header.tsx
    # src/styles/main.css
@@ -553,10 +556,10 @@ lex-pr merge --plan ./plan.json --execute --json
    # Edit files to resolve conflicts
    vim src/components/Header.tsx
    vim src/styles/main.css
-   
+
    # Mark as resolved
    git add src/components/Header.tsx src/styles/main.css
-   
+
    # Complete merge
    git commit -m "Merge feature/ui with conflict resolution"
    ```
@@ -565,10 +568,10 @@ lex-pr merge --plan ./plan.json --execute --json
    ```bash
    # Abort current merge
    git merge --abort
-   
+
    # Delete integration branch
    git branch -D integration/wave-1
-   
+
    # Remove lock file
    rm weave-lock.json
    ```
@@ -584,7 +587,7 @@ lex-pr merge --plan ./plan.json --execute --json
 1. **List remote branches**:
    ```bash
    git branch -r | grep feature
-   
+
    # Example output:
    # origin/feature/auth
    # origin/feature/api-endpoints  # Note: not 'feature/api'
@@ -630,7 +633,7 @@ lex-pr merge --plan ./plan.json --execute --json
 3. **Check if previous execution completed**:
    ```bash
    cat weave-lock.json
-   
+
    # Example:
    # {
    #   "lockHash": "abc123de",
@@ -696,20 +699,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Need full history for branch checks
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Install lex-pr-runner
         run: npm install -g lex-pr-runner
-      
+
       - name: Dry-run merge-weave
         run: |
           set -e
           lex-pr merge --plan ./plan.json --json --fail-on-preflight-conflict > dry-run.json
           jq . dry-run.json
-      
+
       - name: Check for conflicts
         run: |
           set -e
@@ -720,7 +723,7 @@ jobs:
             exit 1
           fi
           echo "✅ No conflicts detected"
-      
+
       - name: Upload dry-run results
         uses: actions/upload-artifact@v4
         with:
