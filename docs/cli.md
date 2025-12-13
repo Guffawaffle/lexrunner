@@ -3,6 +3,7 @@
 Complete reference for the lex-pr-runner command-line interface, including all subcommands, options, and JSON output schemas.
 
 > **📖 See Also**:
+> - [Merge-Weave Quickstart](./merge-weave-quickstart.md) - End-to-end guide for merge-weave operations
 > - [Autopilot Levels](./autopilot-levels.md) - Comprehensive guide to automation levels 0-4
 > - [Advanced CLI Features](./advanced-cli.md) - Power user tools and interactive modes
 > - [Command Creation Guide](./command-creation-guide.md) - How to add new commands to the CLI
@@ -1217,6 +1218,174 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
 - `0`: All gates passed successfully
 - `1`: System error during execution
 - `2`: One or more gates failed
+
+---
+
+### `merge`
+
+Execute merge pyramid with git operations. Supports dry-run preview, conflict detection, and resumable execution.
+
+```bash
+lex-pr merge [options]
+
+Options:
+  --plan <file>                      Path to plan.json file (default: "plan.json")
+  --dry-run                          Show what would be merged without executing (default: true)
+  --execute                          Actually perform merge operations
+  --resume [runId]                   Resume execution from weave-lock.json (optional: specific run ID)
+  --cleanup                          Clean up integration branches after execution
+  --force                            Force execution even if same lock hash exists
+  --json                             Output JSON format
+  --batch                            Enable batch mode for multiple items
+  --filter <query>                   Filter items using query language
+  --levels <levels>                  Comma-separated list of levels to merge
+  --items <items>                    Comma-separated list of items to merge
+  --max-level <level>                Maximum autopilot level (0-4) (default: "0")
+  --open-pr                          Open pull requests for integration branches (Level 3+)
+  --close-superseded                 Close superseded PRs after integration (Level 4)
+  --comment-template <path>          Path to PR comment template (Level 2+)
+  --branch-prefix <prefix>           Prefix for integration branch names (default: "integration/")
+  --skip-preflight                   Skip preflight conflict detection in dry-run mode
+  --fail-on-preflight-conflict       Exit with error if preflight conflict detection finds conflicts
+  --track-turncost                   Track Turn Cost metrics during execution (coordination overhead)
+  -h, --help                         Display help for command
+```
+
+> **📖 Quick Start**: See [Merge-Weave Quickstart](./merge-weave-quickstart.md) for an end-to-end walkthrough with examples.
+> 
+> **📖 Autopilot Levels**: See [Autopilot Levels](./autopilot-levels.md) for details on automation levels 0-4.
+
+#### Basic Examples
+
+```bash
+# Dry-run: preview merge operations (default)
+lex-pr merge
+
+# Dry-run with explicit flag
+lex-pr merge --plan ./plan.json --dry-run --json
+
+# Execute merge pyramid
+lex-pr merge --execute
+
+# Execute and clean up integration branches
+lex-pr merge --execute --cleanup
+
+# Resume from previous execution
+lex-pr merge --resume
+
+# Force execution even if already executed
+lex-pr merge --execute --force
+```
+
+#### Batch Operations
+
+```bash
+# Merge specific items only
+lex-pr merge --batch --items "pr-123,pr-456" --execute
+
+# Merge specific dependency levels
+lex-pr merge --batch --levels "1,2" --execute
+
+# Merge items matching a query
+lex-pr merge --batch --filter "level eq 1" --execute
+```
+
+#### Conflict Detection
+
+```bash
+# Skip preflight conflict detection
+lex-pr merge --skip-preflight
+
+# Fail if conflicts detected in dry-run
+lex-pr merge --fail-on-preflight-conflict
+
+# Execute even if conflicts detected
+lex-pr merge --execute  # Will pause on conflicts for manual resolution
+```
+
+#### State Management
+
+The merge command uses a lock file (`weave-lock.json`) for idempotency and resumability:
+
+- **Lock Hash**: Computed from `plan.json` + PR head commits
+- **Idempotency**: Duplicate runs with same lock hash are skipped (use `--force` to override)
+- **Resume**: Failed executions can be resumed with `--resume`
+
+**Lock File Example:**
+```json
+{
+  "lockHash": "abc123de",
+  "planHash": "def456gh",
+  "prHeads": [
+    { "name": "feature/auth", "sha": "a1b2c3d4" },
+    { "name": "feature/api", "sha": "e5f6g7h8" }
+  ],
+  "timestamp": "2024-12-13T02:00:00Z",
+  "status": "completed"
+}
+```
+
+#### Preflight Conflict Detection
+
+Enabled by default in dry-run mode. Uses `git merge-tree` to simulate merges without modifying the working tree.
+
+**Benefits:**
+- Detects conflicts early before actual merge execution
+- No working tree modifications
+- Fast simulation of merge operations
+
+**Example Dry-Run Output with Conflicts:**
+```json
+{
+  "mode": "dry-run",
+  "lockHash": "abc123de",
+  "preflight": {
+    "enabled": true,
+    "conflictsDetected": 2,
+    "items": [
+      {
+        "id": "feature-ui",
+        "branch": "feature/ui",
+        "conflicts": ["src/components/Header.tsx", "src/styles/main.css"]
+      }
+    ]
+  },
+  "warnings": [
+    "feature-ui has 2 potential conflicts. Review and resolve before executing."
+  ]
+}
+```
+
+#### Turn Cost Tracking
+
+Track coordination overhead during merge-weave operations:
+
+```bash
+lex-pr merge --execute --track-turncost
+```
+
+**Components:**
+- **Latency (L)**: Total execution time
+- **Renegotiation (R)**: Conflicts requiring manual resolution
+- **Token Bloat (T)**: Token usage overhead (future)
+- **Attention (A)**: Context switches during execution
+
+**Weighted Score**: `λL + γC + ρR + τT + αA`
+
+See [Governance Metrics](./governance-metrics.md) for details on Turn Cost calculation.
+
+#### Exit Codes
+
+- `0`: Success (merge completed or dry-run successful)
+- `1`: Merge failed or conflicts detected (with `--fail-on-preflight-conflict`)
+- `2`: Configuration or validation error
+
+#### See Also
+
+- [Merge-Weave Quickstart](./merge-weave-quickstart.md) - Complete walkthrough with troubleshooting
+- [Merge-Weave State Machine](./merge-weave-state-machine.md) - Execution state transitions
+- [Advanced CLI Features](./advanced-cli.md) - Advanced merge-weave options
+- [Autopilot Levels](./autopilot-levels.md) - Automated PR creation and management
 
 ---
 
