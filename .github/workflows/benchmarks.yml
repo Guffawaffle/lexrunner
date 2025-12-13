@@ -1,0 +1,83 @@
+name: Performance Benchmarks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: 'Update baseline metrics'
+        required: false
+        default: 'false'
+
+jobs:
+  benchmark:
+    name: Run Performance Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run benchmarks
+        id: benchmark
+        run: |
+          if [ "${{ github.event.inputs.update_baseline }}" = "true" ]; then
+            npm run benchmark:baseline
+          else
+            npm run benchmark:ci || echo "BENCHMARK_FAILED=true" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            tests/benchmarks/results/*.md
+            tests/benchmarks/results/*.json
+          retention-days: 30
+
+      - name: Comment PR with benchmark results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const markdownPath = path.join(process.cwd(), 'tests/benchmarks/results/latest.md');
+            
+            if (fs.existsSync(markdownPath)) {
+              const report = fs.readFileSync(markdownPath, 'utf-8');
+              
+              const comment = `## 📊 Performance Benchmark Results\n\n${report}\n\n---\n*Benchmarks run on commit ${context.sha.substring(0, 7)}*`;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Fail if regressions detected
+        if: env.BENCHMARK_FAILED == 'true'
+        run: |
+          echo "::error::Performance regressions detected!"
+          exit 1
