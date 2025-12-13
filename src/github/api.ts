@@ -106,7 +106,11 @@ export class GitHubAPI {
 					} catch (error) {
 						const classified = classifyError(error, 'Fetching pull requests');
 						console.error(formatErrorForUser(classified));
-						throw new GitHubAPIError(`Failed to fetch pull requests: ${error instanceof Error ? error.message : String(error)}`);
+						// Extract status from octokit error if available
+						const status = error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+							? (error as { status: number }).status
+							: undefined;
+						throw new GitHubAPIError(`Failed to fetch pull requests: ${error instanceof Error ? error.message : String(error)}`, status);
 					}
 				});
 			},
@@ -239,9 +243,12 @@ export class GitHubAPI {
 }
 
 export class GitHubAPIError extends Error {
-	constructor(message: string) {
+	public readonly status?: number;
+
+	constructor(message: string, status?: number) {
 		super(message);
 		this.name = "GitHubAPIError";
+		this.status = status;
 	}
 }
 
