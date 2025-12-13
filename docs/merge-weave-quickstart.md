@@ -708,7 +708,7 @@ jobs:
         run: |
           set -e
           lex-pr merge --plan ./plan.json --json --fail-on-preflight-conflict > dry-run.json
-          cat dry-run.json | jq .
+          jq . dry-run.json
       
       - name: Check for conflicts
         run: |
