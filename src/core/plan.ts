@@ -7,14 +7,18 @@ import { Plan, PlanItem, Gate } from "../schema.js";
 import { InputConfig, InputItem, InputGate } from "./inputs.js";
 import { stableSort } from "../util/canonicalJson.js";
 import { UnknownDependencyError } from "../mergeOrder.js";
+import { createTierAssignment } from "../tiers/suggest.js";
+import type { TierOverride } from "../tiers/schema.js";
 
 /**
  * Generate normalized plan from input configuration
  * Ensures deterministic output with stable ordering
  */
-export function generatePlan(inputs: InputConfig): Plan {
+export function generatePlan(inputs: InputConfig, options?: { tierOverrides?: TierOverride[] }): Plan {
 	// Convert input items to plan items with normalization
-	const planItems: PlanItem[] = inputs.items.map(transformInputToPlanItem);
+	const planItems: PlanItem[] = inputs.items.map(item => 
+		transformInputToPlanItem(item, options?.tierOverrides)
+	);
 
 	// Sort items by name for deterministic ordering
 	planItems.sort((a, b) => a.name.localeCompare(b.name));
@@ -33,12 +37,17 @@ export function generatePlan(inputs: InputConfig): Plan {
 /**
  * Transform input item to plan item with normalization
  */
-function transformInputToPlanItem(inputItem: InputItem): PlanItem {
-	return {
+function transformInputToPlanItem(inputItem: InputItem, tierOverrides?: TierOverride[]): PlanItem {
+	const planItem: PlanItem = {
 		name: inputItem.name || inputItem.id || inputItem.branch || `item-${inputItem.id}`,
 		deps: stableSort(inputItem.deps || []),
 		gates: inputItem.gates?.map(transformInputGate) || []
 	};
+
+	// Add tier assignment
+	planItem.tier = createTierAssignment(planItem, tierOverrides);
+
+	return planItem;
 }
 
 /**
