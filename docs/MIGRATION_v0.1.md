@@ -536,7 +536,7 @@ pipeline {
 
 ### Issues or Questions?
 
-1. **Check existing documentation:** See [docs/](../docs/) directory
+1. **Check existing documentation:** See [docs/](./) directory
 2. **Search issues:** [GitHub Issues](https://github.com/Guffawaffle/LexRunner/issues)
 3. **File a bug report:** [New Issue](https://github.com/Guffawaffle/LexRunner/issues/new)
 
@@ -571,5 +571,6 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
 
 ---
 
-**Last Updated:** 2025-12-13  
+**Document Version:** 1.0.0  
+**Last Updated:** 2025-11-06  
 **Maintainers:** LexRunner Team
