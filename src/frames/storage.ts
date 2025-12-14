@@ -16,6 +16,11 @@ const DEFAULT_FRAMES_DIR = ".lexrunner/frames";
 
 /**
  * Get the frames directory path
+ * 
+ * @example
+ * ```typescript
+ * const framesDir = getFramesDir(); // ".lexrunner/frames"
+ * ```
  */
 export function getFramesDir(baseDir: string = process.cwd()): string {
 	return path.join(baseDir, DEFAULT_FRAMES_DIR);
@@ -23,6 +28,12 @@ export function getFramesDir(baseDir: string = process.cwd()): string {
 
 /**
  * Ensure the frames directory exists
+ * Creates the directory if it doesn't exist.
+ * 
+ * @example
+ * ```typescript
+ * const framesDir = ensureFramesDir(); // Creates .lexrunner/frames if needed
+ * ```
  */
 export function ensureFramesDir(baseDir: string = process.cwd()): string {
 	const framesDir = getFramesDir(baseDir);
@@ -34,6 +45,7 @@ export function ensureFramesDir(baseDir: string = process.cwd()): string {
 
 /**
  * Get the path for a Frame file
+ * @internal
  */
 export function getFramePath(frameId: string, baseDir: string = process.cwd()): string {
 	const framesDir = getFramesDir(baseDir);
@@ -43,10 +55,20 @@ export function getFramePath(frameId: string, baseDir: string = process.cwd()): 
 /**
  * Store a Frame to disk
  *
+ * Atomically writes the frame to the frames directory.
+ * Adds a `stored_at` timestamp to the frame metadata.
+ *
  * @param frame - The Frame to store
  * @param frameId - Unique identifier for the Frame (typically the reference_point)
  * @param baseDir - Base directory (defaults to cwd)
  * @returns Path to the stored Frame file
+ * 
+ * @example
+ * ```typescript
+ * const frame: ExecutionFrame = { ... };
+ * const path = storeFrame(frame, "merge-weave-2025-12-14-abc123");
+ * // Stored at: .lexrunner/frames/merge-weave-2025-12-14-abc123.json
+ * ```
  */
 export function storeFrame(
 	frame: ExecutionFrame,
