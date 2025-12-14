@@ -89,19 +89,14 @@ export async function fingerprintFile(filePath: string): Promise<string> {
   const content = await fs.readFile(filePath, 'utf-8');
   const ext = path.extname(filePath).toLowerCase();
   
-  let data: Record<string, unknown>;
-  
   if (ext === '.json') {
-    data = JSON.parse(content);
+    const data = JSON.parse(content);
+    return generateFingerprint(data);
   } else if (ext === '.yaml' || ext === '.yml') {
-    data = yaml.parse(content);
-  } else if (ext === '.ts' || ext === '.js') {
-    // For TS/JS files, hash the raw content
-    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+    const data = yaml.parse(content);
+    return generateFingerprint(data);
   } else {
-    // Fallback: hash raw content for unknown types
+    // For TS/JS files and unknown types, hash the raw content
     return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
   }
-  
-  return generateFingerprint(data);
 }

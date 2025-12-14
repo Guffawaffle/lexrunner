@@ -2,7 +2,7 @@
  * Tests for fingerprint utilities
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { 
   generateFingerprint, 
   extractFingerprint, 
@@ -14,6 +14,10 @@ import {
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import crypto from 'crypto';
+
+// Use crypto random for unique test directory
+const TEST_DIR = path.join(os.tmpdir(), `fingerprint-test-${crypto.randomBytes(8).toString('hex')}`);
 
 describe('generateFingerprint', () => {
   it('generates deterministic hash', () => {
@@ -173,23 +177,25 @@ describe('verifyFingerprint', () => {
 });
 
 describe('fingerprintFile', () => {
-  const tmpDir = path.join(os.tmpdir(), 'fingerprint-test-' + Date.now());
+  beforeAll(async () => {
+    await fs.mkdir(TEST_DIR, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await fs.rm(TEST_DIR, { recursive: true, force: true });
+  });
 
   it('handles JSON files', async () => {
-    await fs.mkdir(tmpDir, { recursive: true });
-    const testFile = path.join(tmpDir, 'test.json');
+    const testFile = path.join(TEST_DIR, 'test.json');
     const data = { title: 'Test', description: 'Desc' };
     await fs.writeFile(testFile, JSON.stringify(data, null, 2));
     
     const fp = await fingerprintFile(testFile);
     expect(fp).toBe(generateFingerprint(data));
-    
-    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('handles YAML files', async () => {
-    await fs.mkdir(tmpDir, { recursive: true });
-    const testFile = path.join(tmpDir, 'test.yaml');
+    const testFile = path.join(TEST_DIR, 'test.yaml');
     const content = 'title: Test\ndescription: Desc\n';
     await fs.writeFile(testFile, content);
     
@@ -199,13 +205,10 @@ describe('fingerprintFile', () => {
     // Should be deterministic
     const fp2 = await fingerprintFile(testFile);
     expect(fp).toBe(fp2);
-    
-    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('handles TypeScript files', async () => {
-    await fs.mkdir(tmpDir, { recursive: true });
-    const testFile = path.join(tmpDir, 'test.ts');
+    const testFile = path.join(TEST_DIR, 'test.ts');
     const content = 'export const test = "value";\n';
     await fs.writeFile(testFile, content);
     
@@ -215,14 +218,11 @@ describe('fingerprintFile', () => {
     // Should be deterministic
     const fp2 = await fingerprintFile(testFile);
     expect(fp).toBe(fp2);
-    
-    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('produces same fingerprint for same JSON content', async () => {
-    await fs.mkdir(tmpDir, { recursive: true });
-    const testFile1 = path.join(tmpDir, 'test1.json');
-    const testFile2 = path.join(tmpDir, 'test2.json');
+    const testFile1 = path.join(TEST_DIR, 'test1.json');
+    const testFile2 = path.join(TEST_DIR, 'test2.json');
     const data = { a: 1, b: 2 };
     
     await fs.writeFile(testFile1, JSON.stringify(data, null, 2));
@@ -231,14 +231,11 @@ describe('fingerprintFile', () => {
     const fp1 = await fingerprintFile(testFile1);
     const fp2 = await fingerprintFile(testFile2);
     expect(fp1).toBe(fp2); // Same because we parse JSON
-    
-    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('produces different fingerprints for different TS content', async () => {
-    await fs.mkdir(tmpDir, { recursive: true });
-    const testFile1 = path.join(tmpDir, 'test1.ts');
-    const testFile2 = path.join(tmpDir, 'test2.ts');
+    const testFile1 = path.join(TEST_DIR, 'test1.ts');
+    const testFile2 = path.join(TEST_DIR, 'test2.ts');
     
     await fs.writeFile(testFile1, 'const a = 1;');
     await fs.writeFile(testFile2, 'const b = 2;');
@@ -246,7 +243,5 @@ describe('fingerprintFile', () => {
     const fp1 = await fingerprintFile(testFile1);
     const fp2 = await fingerprintFile(testFile2);
     expect(fp1).not.toBe(fp2);
-    
-    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 });
