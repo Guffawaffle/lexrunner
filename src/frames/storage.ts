@@ -47,7 +47,7 @@ export function ensureFramesDir(baseDir: string = process.cwd()): string {
  * Get the path for a Frame file
  * @internal
  */
-export function getFramePath(frameId: string, baseDir: string = process.cwd()): string {
+function getFramePath(frameId: string, baseDir: string = process.cwd()): string {
 	const framesDir = getFramesDir(baseDir);
 	return path.join(framesDir, `${frameId}.json`);
 }

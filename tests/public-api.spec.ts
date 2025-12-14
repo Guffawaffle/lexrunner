@@ -149,7 +149,6 @@ describe("Public API - No Internal Leaks", () => {
 		const expectedExports = [
 			"getFramesDir",
 			"ensureFramesDir",
-			"getFramePath",
 			"storeFrame",
 			"storeFrameResult",
 			"readFrame",
@@ -161,6 +160,9 @@ describe("Public API - No Internal Leaks", () => {
 		for (const expected of expectedExports) {
 			expect(exportedKeys).toContain(expected);
 		}
+
+		// Internal function should NOT be exported
+		expect(exportedKeys).not.toContain("getFramePath");
 	});
 });
 

@@ -77,12 +77,12 @@ import {
 } from "@smartergpt/lex/errors";
 
 // Create and throw errors
-const error = createAXError({
-  code: "MERGE_CONFLICT",
-  message: "Failed to merge PRs",
-  severity: "error",
-  context: { prs: ["#123", "#124"] },
-});
+const error = createAXError(
+  "MERGE_CONFLICT",
+  "Failed to merge PRs",
+  ["Review conflicts", "Retry merge"],
+  { prs: ["#123", "#124"] }
+);
 
 throw new AXErrorException(error);
 ```

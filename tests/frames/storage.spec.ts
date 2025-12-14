@@ -16,7 +16,6 @@ import {
 	deleteFrame,
 	getFramesDir,
 	ensureFramesDir,
-	getFramePath,
 } from "../../src/frames/storage.js";
 import type { ExecutionFrame, FrameEmitResult } from "../../src/frames/types.js";
 
@@ -48,13 +47,6 @@ describe("Frame Storage", () => {
 			ensureFramesDir(testDir);
 			const framesDir = ensureFramesDir(testDir);
 			expect(existsSync(framesDir)).toBe(true);
-		});
-	});
-
-	describe("getFramePath", () => {
-		it("should return correct frame file path", () => {
-			const framePath = getFramePath("test-frame-id", testDir);
-			expect(framePath).toBe(join(testDir, ".lexrunner/frames/test-frame-id.json"));
 		});
 	});
 
