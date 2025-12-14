@@ -1,16 +1,21 @@
 # Lex Public API Documentation
 
-This document defines the **public API surface** for Lex when consumed by LexRunner. It specifies which modules are exported, their import paths, and the versioning policy.
+This document defines the **public API surface** for Lex when consumed by LexRunner, and also documents LexRunner's own public exports for external consumers.
+
+## Two-Level API Surface
+
+1. **Lex → LexRunner**: How LexRunner imports from `@smartergpt/lex`
+2. **LexRunner → External**: How external tools can import from `lex-pr-runner`
 
 ## Design Principles
 
-1. **Minimal Surface**: Only export what LexRunner needs to integrate with Lex
+1. **Minimal Surface**: Only export what is needed for integration
 2. **Stable Contracts**: Public exports follow semantic versioning
 3. **Internal Protection**: Mark internal-only code with `@internal` JSDoc tags
 4. **Type Safety**: All public exports include TypeScript definitions
 5. **Zero Duplication**: LexRunner uses Lex's implementations, not duplicates
 
-## Exported Modules
+## Part 1: Lex Modules Consumed by LexRunner
 
 | Module | Export Path | Purpose | Status |
 |--------|-------------|---------|--------|
@@ -141,6 +146,59 @@ import { resolveModuleId, resolveAlias } from "@smartergpt/lex/aliases";
 
 // Resolve module IDs
 const canonical = await resolveModuleId("src/cli", policy);
+```
+
+## Part 2: LexRunner's Public Exports
+
+LexRunner also exports its own modules for external consumption (e.g., by other tools or plugins).
+
+### Exported Modules
+
+| Module | Export Path | Purpose | Status |
+|--------|-------------|---------|--------|
+| **Frames** | `lex-pr-runner/frames` | Execution frame types and utilities | ✅ Available |
+| **Errors** | `lex-pr-runner/errors` | AXError adapters and LexRunner errors | ✅ Available |
+| **Audit SDK** | `lex-pr-runner/audit-sdk` | Audit and compliance SDK | ✅ Available |
+
+### Import Examples for LexRunner Exports
+
+```typescript
+// Import frames module from LexRunner
+import {
+  emitMergeWeaveFrame,
+  emitExecutorFrame,
+  emitGateFrame,
+  storeFrame,
+  type ExecutionFrame,
+} from "lex-pr-runner/frames";
+
+// Use LexRunner's frame emitters
+const result = emitMergeWeaveFrame({
+  runId: "run-123",
+  mergedPRs: ["#123", "#124"],
+  conflictsResolved: 2,
+  gatesPassed: ["lint", "test"],
+  durationMs: 45000,
+  outcome: "success",
+  targetBranch: "main",
+});
+
+// Store the frame
+if (result.success && result.frame && result.frameId) {
+  storeFrame(result.frame, result.frameId);
+}
+```
+
+```typescript
+// Import errors from LexRunner
+import { createAXError, AXErrorException } from "lex-pr-runner/errors";
+
+// Create LexRunner-compatible errors
+const error = createAXError(
+  "MERGE_FAILED",
+  "Failed to merge PRs",
+  ["Review conflicts", "Retry merge"]
+);
 ```
 
 ## LexRunner Integration Points
