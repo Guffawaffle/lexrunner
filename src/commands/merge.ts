@@ -139,6 +139,20 @@ export function registerMergeCommand(
 			"--track-turncost",
 			"Track Turn Cost metrics during execution (coordination overhead)"
 		)
+		.option(
+			"--resolve-policy <policy>",
+			"Conflict resolution policy: minimal-hunk (default), ours, theirs",
+			"minimal-hunk"
+		)
+		.option(
+			"--ai-assist <mode>",
+			"AI assistance mode: auto (default), none, required",
+			"auto"
+		)
+		.option(
+			"--emit-frames",
+			"Emit execution frames for observability and debugging"
+		)
 		.addHelpText(
 			"after",
 			`
@@ -155,6 +169,9 @@ Examples:
   $ lex-pr merge --skip-preflight               # Skip conflict detection
   $ lex-pr merge --fail-on-preflight-conflict   # Abort if conflicts detected
   $ lex-pr merge --execute --track-turncost     # Track coordination overhead
+  $ lex-pr merge --execute --resolve-policy ours    # Use "ours" conflict resolution
+  $ lex-pr merge --execute --ai-assist required     # Require AI assistance for conflicts
+  $ lex-pr merge --execute --emit-frames            # Enable frame emission
 
 State Management:
   • Dry-run shows planned batches and execution order
@@ -166,6 +183,16 @@ Idempotency:
   • Lock hash computed from plan.json + PR head commits
   • Duplicate runs are skipped unless --force is used
   • Lock hash included in all logs and audit events
+
+Conflict Resolution Policies:
+  • minimal-hunk (default): AI-powered minimal edit resolution with precise conflict boundaries
+  • ours: Accept all changes from current branch (opt-in, use with caution)
+  • theirs: Accept all changes from incoming branch (opt-in, use with caution)
+
+AI Assistance Modes:
+  • auto (default): Use AI assistance when available and beneficial
+  • none: Disable AI assistance entirely (manual resolution required)
+  • required: Fail if AI assistance is not available for conflicts
 
 Preflight Conflict Detection:
   • Enabled by default in dry-run mode
@@ -179,6 +206,11 @@ Turn Cost Tracking:
   • Weighted score: λL + γC + ρR + τT + αA
   • Use --track-turncost to enable metrics collection
 
+Frame Emission:
+  • Enable with --emit-frames to output execution frames
+  • Frames capture state transitions for debugging and observability
+  • Useful for integration with monitoring tools and dashboards
+
 Common Issues:
   • Merge conflicts: Review conflicts and resolve manually, then re-run
   • Dirty working directory: Commit or stash changes before merging
@@ -188,6 +220,24 @@ Common Issues:
 		.action(async (opts) => {
 			let auditEmitter: AuditEmitter | null = null;
 			try {
+				// Validate --resolve-policy flag
+				const validResolvePolicies = ["minimal-hunk", "ours", "theirs"];
+				if (opts.resolvePolicy && !validResolvePolicies.includes(opts.resolvePolicy)) {
+					console.error(
+						`Invalid --resolve-policy: ${opts.resolvePolicy}. Must be one of: ${validResolvePolicies.join(", ")}`
+					);
+					throwExit(2);
+				}
+
+				// Validate --ai-assist flag
+				const validAiAssistModes = ["auto", "none", "required"];
+				if (opts.aiAssist && !validAiAssistModes.includes(opts.aiAssist)) {
+					console.error(
+						`Invalid --ai-assist: ${opts.aiAssist}. Must be one of: ${validAiAssistModes.join(", ")}`
+					);
+					throwExit(2);
+				}
+
 				// Parse and validate autopilot configuration
 				let autopilotConfig;
 				try {

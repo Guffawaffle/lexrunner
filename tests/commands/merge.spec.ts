@@ -52,6 +52,9 @@ describe('Merge Command', () => {
 			expect(options).toContain('--close-superseded');
 			expect(options).toContain('--comment-template');
 			expect(options).toContain('--branch-prefix');
+			expect(options).toContain('--resolve-policy');
+			expect(options).toContain('--ai-assist');
+			expect(options).toContain('--emit-frames');
 		});
 
 		it('should have correct default values', () => {
@@ -69,6 +72,12 @@ describe('Merge Command', () => {
 
 			const branchPrefixOption = mergeCommand?.options.find(opt => opt.long === '--branch-prefix');
 			expect(branchPrefixOption?.defaultValue).toBe('integration/');
+
+			const resolvePolicyOption = mergeCommand?.options.find(opt => opt.long === '--resolve-policy');
+			expect(resolvePolicyOption?.defaultValue).toBe('minimal-hunk');
+
+			const aiAssistOption = mergeCommand?.options.find(opt => opt.long === '--ai-assist');
+			expect(aiAssistOption?.defaultValue).toBe('auto');
 		});
 
 		it('should include help text with examples', () => {
@@ -114,6 +123,24 @@ describe('Merge Command', () => {
 			expect(helpText).toContain('--close-superseded');
 			expect(helpText).toContain('--comment-template');
 			expect(helpText).toContain('--branch-prefix');
+		});
+
+		it('should document new merge-weave flags', () => {
+			const commands = program.commands;
+			const mergeCommand = commands.find(cmd => cmd.name() === 'merge');
+
+			const helpText = mergeCommand?.helpInformation() ?? '';
+			
+			// New flags for merge-weave execute
+			expect(helpText).toContain('--resolve-policy');
+			expect(helpText).toContain('minimal-hunk');
+			expect(helpText).toContain('ours');
+			expect(helpText).toContain('theirs');
+			expect(helpText).toContain('--ai-assist');
+			expect(helpText).toContain('auto');
+			expect(helpText).toContain('none');
+			expect(helpText).toContain('required');
+			expect(helpText).toContain('--emit-frames');
 		});
 	});
 
