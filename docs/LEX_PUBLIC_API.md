@@ -193,11 +193,20 @@ if (result.success && result.frame && result.frameId) {
 // Import errors from LexRunner
 import { createAXError, AXErrorException } from "lex-pr-runner/errors";
 
-// Create LexRunner-compatible errors
+// Create LexRunner-compatible errors (context is optional)
 const error = createAXError(
   "MERGE_FAILED",
   "Failed to merge PRs",
   ["Review conflicts", "Retry merge"]
+  // Optional 4th parameter: context object
+);
+
+// With context (for additional metadata)
+const errorWithContext = createAXError(
+  "MERGE_FAILED",
+  "Failed to merge PRs",
+  ["Review conflicts", "Retry merge"],
+  { prs: ["#123", "#124"], branch: "main" }
 );
 ```
 
