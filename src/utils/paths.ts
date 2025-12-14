@@ -125,6 +125,35 @@ export function isWSLPath(inputPath: string): boolean {
 }
 
 /**
+ * Detect if running in WSL environment
+ * 
+ * Checks:
+ * - WSL_DISTRO_NAME environment variable
+ * - /proc/version contains "microsoft" or "WSL"
+ * 
+ * @returns true if running in WSL
+ */
+export async function isWSLEnvironment(): Promise<boolean> {
+	// Check environment variable first (fastest)
+	if (process.env.WSL_DISTRO_NAME || process.env.WSLENV) {
+		return true;
+	}
+	
+	// Check /proc/version on Linux-like systems
+	if (process.platform === 'linux') {
+		try {
+			const procVersion = await fs.readFile('/proc/version', 'utf-8');
+			return /microsoft|WSL/i.test(procVersion);
+		} catch {
+			// /proc/version doesn't exist or can't be read
+			return false;
+		}
+	}
+	
+	return false;
+}
+
+/**
  * Convert WSL path to Windows path
  *
  * @param wslPath - WSL path (e.g., /mnt/c/Users/...)

@@ -3,7 +3,17 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { generateFingerprint, extractFingerprint, injectFingerprint } from '../../src/utils/fingerprint';
+import { 
+  generateFingerprint, 
+  extractFingerprint, 
+  injectFingerprint,
+  fingerprint,
+  verifyFingerprint,
+  fingerprintFile
+} from '../../src/utils/fingerprint';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 describe('generateFingerprint', () => {
   it('generates deterministic hash', () => {
@@ -118,5 +128,125 @@ describe('injectFingerprint', () => {
     const injected = injectFingerprint(body, fingerprint);
     const extracted = extractFingerprint(injected);
     expect(extracted).toBe(fingerprint);
+  });
+});
+
+describe('fingerprint', () => {
+  it('is an alias for generateFingerprint', () => {
+    const data = { title: 'Test', description: 'Desc' };
+    expect(fingerprint(data)).toBe(generateFingerprint(data));
+  });
+
+  it('produces deterministic results', () => {
+    const data = { a: 1, b: 2, c: 3 };
+    const fp1 = fingerprint(data);
+    const fp2 = fingerprint(data);
+    expect(fp1).toBe(fp2);
+  });
+});
+
+describe('verifyFingerprint', () => {
+  it('returns true for matching fingerprint', () => {
+    const data = { title: 'Test', description: 'Desc' };
+    const fp = generateFingerprint(data);
+    expect(verifyFingerprint(data, fp)).toBe(true);
+  });
+
+  it('returns false for non-matching fingerprint', () => {
+    const data = { title: 'Test', description: 'Desc' };
+    expect(verifyFingerprint(data, 'invalid')).toBe(false);
+  });
+
+  it('returns false when data changes', () => {
+    const data1 = { title: 'Test1' };
+    const data2 = { title: 'Test2' };
+    const fp1 = generateFingerprint(data1);
+    expect(verifyFingerprint(data2, fp1)).toBe(false);
+  });
+
+  it('is order-independent for object keys', () => {
+    const data1 = { a: 1, b: 2, c: 3 };
+    const data2 = { c: 3, a: 1, b: 2 };
+    const fp1 = generateFingerprint(data1);
+    expect(verifyFingerprint(data2, fp1)).toBe(true);
+  });
+});
+
+describe('fingerprintFile', () => {
+  const tmpDir = path.join(os.tmpdir(), 'fingerprint-test-' + Date.now());
+
+  it('handles JSON files', async () => {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const testFile = path.join(tmpDir, 'test.json');
+    const data = { title: 'Test', description: 'Desc' };
+    await fs.writeFile(testFile, JSON.stringify(data, null, 2));
+    
+    const fp = await fingerprintFile(testFile);
+    expect(fp).toBe(generateFingerprint(data));
+    
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('handles YAML files', async () => {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const testFile = path.join(tmpDir, 'test.yaml');
+    const content = 'title: Test\ndescription: Desc\n';
+    await fs.writeFile(testFile, content);
+    
+    const fp = await fingerprintFile(testFile);
+    expect(fp).toMatch(/^[a-f0-9]{16}$/);
+    
+    // Should be deterministic
+    const fp2 = await fingerprintFile(testFile);
+    expect(fp).toBe(fp2);
+    
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('handles TypeScript files', async () => {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const testFile = path.join(tmpDir, 'test.ts');
+    const content = 'export const test = "value";\n';
+    await fs.writeFile(testFile, content);
+    
+    const fp = await fingerprintFile(testFile);
+    expect(fp).toMatch(/^[a-f0-9]{16}$/);
+    
+    // Should be deterministic
+    const fp2 = await fingerprintFile(testFile);
+    expect(fp).toBe(fp2);
+    
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('produces same fingerprint for same JSON content', async () => {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const testFile1 = path.join(tmpDir, 'test1.json');
+    const testFile2 = path.join(tmpDir, 'test2.json');
+    const data = { a: 1, b: 2 };
+    
+    await fs.writeFile(testFile1, JSON.stringify(data, null, 2));
+    await fs.writeFile(testFile2, JSON.stringify(data, null, 4)); // Different formatting
+    
+    const fp1 = await fingerprintFile(testFile1);
+    const fp2 = await fingerprintFile(testFile2);
+    expect(fp1).toBe(fp2); // Same because we parse JSON
+    
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('produces different fingerprints for different TS content', async () => {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const testFile1 = path.join(tmpDir, 'test1.ts');
+    const testFile2 = path.join(tmpDir, 'test2.ts');
+    
+    await fs.writeFile(testFile1, 'const a = 1;');
+    await fs.writeFile(testFile2, 'const b = 2;');
+    
+    const fp1 = await fingerprintFile(testFile1);
+    const fp2 = await fingerprintFile(testFile2);
+    expect(fp1).not.toBe(fp2);
+    
+    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 });

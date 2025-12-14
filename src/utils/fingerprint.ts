@@ -3,6 +3,9 @@
  */
 
 import crypto from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import yaml from 'yaml';
 
 /**
  * Generate deterministic fingerprint from spec content
@@ -51,4 +54,54 @@ export function extractFingerprint(body: string): string | null {
  */
 export function injectFingerprint(body: string, fingerprint: string): string {
   return `<!-- lex-pr-idea-fingerprint: ${fingerprint} -->\n\n${body}`;
+}
+
+/**
+ * Generate deterministic SHA-256 fingerprint (alias for generateFingerprint)
+ * 
+ * @param data - Object to fingerprint
+ * @returns - Hex string hash (SHA-256)
+ */
+export function fingerprint(data: Record<string, unknown>): string {
+  return generateFingerprint(data);
+}
+
+/**
+ * Verify fingerprint matches expected hash
+ * 
+ * @param data - Object to fingerprint
+ * @param expectedFingerprint - Expected hash
+ * @returns - true if fingerprint matches
+ */
+export function verifyFingerprint(data: Record<string, unknown>, expectedFingerprint: string): boolean {
+  const actual = generateFingerprint(data);
+  return actual === expectedFingerprint;
+}
+
+/**
+ * Generate fingerprint from file content
+ * Supports TS, JSON, YAML file types
+ * 
+ * @param filePath - Path to file
+ * @returns - Hex string hash (SHA-256)
+ */
+export async function fingerprintFile(filePath: string): Promise<string> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const ext = path.extname(filePath).toLowerCase();
+  
+  let data: Record<string, unknown>;
+  
+  if (ext === '.json') {
+    data = JSON.parse(content);
+  } else if (ext === '.yaml' || ext === '.yml') {
+    data = yaml.parse(content);
+  } else if (ext === '.ts' || ext === '.js') {
+    // For TS/JS files, hash the raw content
+    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+  } else {
+    // Fallback: hash raw content for unknown types
+    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+  }
+  
+  return generateFingerprint(data);
 }
