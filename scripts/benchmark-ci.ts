@@ -144,12 +144,6 @@ async function main() {
 		fs.mkdirSync(RESULTS_DIR, { recursive: true });
 	}
 
-	// Ensure temp directory exists for raw results
-	const tempDir = path.dirname(RAW_RESULTS_PATH);
-	if (!fs.existsSync(tempDir)) {
-		fs.mkdirSync(tempDir, { recursive: true });
-	}
-
 	// Run benchmarks
 	try {
 		execSync(
@@ -199,7 +193,7 @@ async function main() {
 		console.error(
 			`\nFile location: ${RAW_RESULTS_PATH}`
 		);
-		console.error(`\nParse error: ${error}`);
+		console.error(`\nParse error: ${error instanceof Error ? error.message : String(error)}`);
 		console.error(
 			"\nTo debug locally, run: npm run benchmark -- --run"
 		);
