@@ -102,9 +102,9 @@ export type PersonaDuties = z.infer<typeof PersonaDutiesSchema>;
  * @example
  * ```typescript
  * import { parsePersona } from './persona.js';
- * import yaml from 'js-yaml';
+ * import { parse as parseYaml } from 'yaml';
  *
- * const frontmatter = yaml.load(yamlString);
+ * const frontmatter = parseYaml(yamlString);
  * const persona = parsePersona(frontmatter);
  * console.log(persona.name); // "Senior Dev"
  * ```

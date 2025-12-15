@@ -4,9 +4,11 @@ import { parse as parseYaml } from 'yaml';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const PERSONA_DIR = path.join(__dirname, '../../.smartergpt/personas');
+
 describe('Persona Integration', () => {
 	it('validates the example persona file', () => {
-		const examplePath = path.join(__dirname, '../../.smartergpt/personas/example.md');
+		const examplePath = path.join(PERSONA_DIR, 'example.md');
 		const content = fs.readFileSync(examplePath, 'utf-8');
 
 		// Extract frontmatter between --- markers
@@ -36,7 +38,7 @@ describe('Persona Integration', () => {
 	});
 
 	it('parses the example persona without throwing', () => {
-		const examplePath = path.join(__dirname, '../../.smartergpt/personas/example.md');
+		const examplePath = path.join(PERSONA_DIR, 'example.md');
 		const content = fs.readFileSync(examplePath, 'utf-8');
 
 		const parts = content.split('---\n');
@@ -50,8 +52,8 @@ describe('Persona Integration', () => {
 
 	it('demonstrates production persona structure', () => {
 		// Check that production personas exist
-		const seniorDevPath = path.join(__dirname, '../../.smartergpt/personas/senior-dev.md');
-		const eagerPmPath = path.join(__dirname, '../../.smartergpt/personas/eager-pm.md');
+		const seniorDevPath = path.join(PERSONA_DIR, 'senior-dev.md');
+		const eagerPmPath = path.join(PERSONA_DIR, 'eager-pm.md');
 
 		expect(fs.existsSync(seniorDevPath)).toBe(true);
 		expect(fs.existsSync(eagerPmPath)).toBe(true);
