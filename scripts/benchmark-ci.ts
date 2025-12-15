@@ -154,22 +154,60 @@ async function main() {
 		);
 	} catch (error) {
 		console.error("❌ Benchmark execution failed");
+		console.error(
+			"\nTo debug locally, run: npm run benchmark -- --run"
+		);
 		process.exit(1);
 	}
 
 	// Load current results
 	if (!fs.existsSync(RAW_RESULTS_PATH)) {
 		console.error("❌ Benchmark results not found");
+		console.error(
+			`\nExpected results at: ${RAW_RESULTS_PATH}`
+		);
+		console.error(
+			"\nTo debug locally, run: npm run benchmark -- --run"
+		);
 		process.exit(1);
 	}
 
-	const currentRaw = JSON.parse(fs.readFileSync(RAW_RESULTS_PATH, "utf-8"));
+	// Check if file is empty
+	const rawContent = fs.readFileSync(RAW_RESULTS_PATH, "utf-8");
+	if (!rawContent || rawContent.trim().length === 0) {
+		console.error("❌ Benchmark results file is empty");
+		console.error(
+			`\nFile location: ${RAW_RESULTS_PATH}`
+		);
+		console.error(
+			"\nTo debug locally, run: npm run benchmark -- --run"
+		);
+		process.exit(1);
+	}
+
+	let currentRaw;
+	try {
+		currentRaw = JSON.parse(rawContent);
+	} catch (error) {
+		console.error("❌ Failed to parse benchmark results as JSON");
+		console.error(
+			`\nFile location: ${RAW_RESULTS_PATH}`
+		);
+		console.error(`\nParse error: ${error instanceof Error ? error.message : String(error)}`);
+		console.error(
+			"\nTo debug locally, run: npm run benchmark -- --run"
+		);
+		process.exit(1);
+	}
 
 	// Parse Vitest benchmark results format
 	const current: BenchmarkResult[] = parseBenchmarkResults(currentRaw);
 
 	if (current.length === 0) {
 		console.warn("⚠️ No benchmark results produced");
+		console.warn(
+			"\nTo debug locally, run: npm run benchmark -- --run"
+		);
 		process.exit(0);
 	}
 
@@ -259,11 +297,15 @@ function parseBenchmarkResults(raw: any): BenchmarkResult[] {
 					group?.fullName || group?.name || ""
 				);
 				for (const bench of group?.benchmarks || []) {
-					const samples = Array.isArray(bench?.samples)
-						? bench.samples.length
-						: typeof bench?.df === "number"
-						? bench.df
-						: 0;
+					// Prefer sampleCount, fall back to df, then samples array length
+					const samples =
+						typeof bench?.sampleCount === "number"
+							? bench.sampleCount
+							: typeof bench?.df === "number"
+							? bench.df
+							: Array.isArray(bench?.samples)
+							? bench.samples.length
+							: 0;
 
 					results.push({
 						name: bench?.name || "Unknown",

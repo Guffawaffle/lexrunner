@@ -20,6 +20,7 @@ import { validateExecutionFrame } from "./types.js";
 
 /**
  * Generate a timestamp string for reference points
+ * @internal
  */
 function getTimestampForRef(): string {
 	const now = new Date();
@@ -28,6 +29,7 @@ function getTimestampForRef(): string {
 
 /**
  * Generate a short unique suffix for reference points
+ * @internal
  */
 function getUniqueSuffix(): string {
 	return ulid().slice(-6).toLowerCase();
@@ -35,6 +37,19 @@ function getUniqueSuffix(): string {
 
 /**
  * Emit a Frame for merge-weave completion
+ * 
+ * @example
+ * ```typescript
+ * const result = emitMergeWeaveFrame({
+ *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+ *   mergedPRs: ["#123", "#124"],
+ *   conflictsResolved: 2,
+ *   gatesPassed: ["lint", "typecheck"],
+ *   durationMs: 45000,
+ *   outcome: "success",
+ *   targetBranch: "main"
+ * });
+ * ```
  */
 export function emitMergeWeaveFrame(
 	input: MergeWeaveFrameInput
@@ -108,6 +123,18 @@ export function emitMergeWeaveFrame(
 
 /**
  * Emit a Frame for executor run completion
+ * 
+ * @example
+ * ```typescript
+ * const result = emitExecutorFrame({
+ *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+ *   procedure: "deploy-staging",
+ *   moduleScope: ["src/api", "src/web"],
+ *   durationMs: 120000,
+ *   outcome: "success",
+ *   nextAction: "Verify deployment"
+ * });
+ * ```
  */
 export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
 	try {
@@ -170,6 +197,18 @@ export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
 
 /**
  * Emit a Frame for gate execution
+ * 
+ * @example
+ * ```typescript
+ * const result = emitGateFrame({
+ *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+ *   gateName: "lint",
+ *   itemName: "PR-123",
+ *   durationMs: 5000,
+ *   outcome: "success",
+ *   exitCode: 0
+ * });
+ * ```
  */
 export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
 	try {
@@ -226,6 +265,18 @@ export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
 
 /**
  * Emit a Frame for procedure execution
+ * 
+ * @example
+ * ```typescript
+ * const result = emitProcedureFrame({
+ *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
+ *   procedure: "release-prepare",
+ *   moduleScope: ["v1.0.0"],
+ *   durationMs: 30000,
+ *   outcome: "success",
+ *   nextActions: ["Tag release", "Push to registry"]
+ * });
+ * ```
  */
 export function emitProcedureFrame(input: {
 	runId: string;
