@@ -76,6 +76,7 @@ import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { registerSeniorDevCommand } from "./commands/seniorDev.js";
 import { registerBudgetCommand } from "./commands/budget.js";
 import { registerMetricsCommand } from "./commands/metrics.js";
+import { registerTokenReportCommand } from "./commands/tokenReport.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -1017,6 +1018,9 @@ registerCreateProjectCommand(program);
 
 // Metrics command for governance observability
 registerMetricsCommand(program, { jsonModeActive: () => jsonModeActive });
+
+// Token usage tracking and reporting
+registerTokenReportCommand(program, { jsonModeActive: () => jsonModeActive });
 
 export async function main(argv: string[] = process.argv): Promise<void> {
 	try {

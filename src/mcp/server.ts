@@ -109,6 +109,9 @@ import {
 	GetStatusInput,
 	GetStatusInputSchema,
 	RunNotFoundError,
+	SubmitDecisionInput,
+	SubmitDecisionInputSchema,
+	submitDecision,
 } from "../runs/index.js";
 
 // RunStore imports
@@ -602,6 +605,32 @@ function createServer(options?: McpServerOptions): Server {
 						},
 					},
 				},
+				{
+					name: "lexrunner.submitDecision",
+					description:
+						"Submit an LLM decision for a pending action in a run",
+					inputSchema: {
+						type: "object",
+						properties: {
+							runId: {
+								type: "string",
+								description: "Unique run identifier",
+							},
+							action: {
+								type: "string",
+								description: "Action to submit (must match a nextOptions[x].action)",
+							},
+							response: {
+								description: "Response data (validated against nextOptions[x].responseSchema)",
+							},
+							rationale: {
+								type: "string",
+								description: "Optional rationale for audit trail",
+							},
+						},
+						required: ["runId", "action", "response"],
+					},
+				},
 				// ─────────────────────────────────────────────────────────────────
 				// MCP/CLI Parity Tools (AX-004)
 				// ─────────────────────────────────────────────────────────────────
@@ -771,6 +800,9 @@ function createServer(options?: McpServerOptions): Server {
 
 			case "lexrunner.listRuns":
 				return await handleListRuns(args as unknown as ListRunsInput, runStore);
+
+			case "lexrunner.submitDecision":
+				return await handleSubmitDecision(args as unknown as SubmitDecisionInput);
 
 			// MCP/CLI Parity tools (AX-004)
 			case "discover":
@@ -1554,6 +1586,42 @@ async function handleListRuns(
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
 		throwMcpToolError(ErrorCode.InternalError, "lexrunner.listRuns", error, "list runs");
+	}
+}
+
+/**
+ * Handle lexrunner.submitDecision tool
+ *
+ * Validates and submits an LLM decision for a pending action in a run.
+ */
+async function handleSubmitDecision(
+	args: SubmitDecisionInput
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate input
+		const validated = SubmitDecisionInputSchema.parse(args);
+
+		// Submit the decision (uses process.cwd() as baseDir)
+		const result = submitDecision(validated);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid submitDecision parameters: ${error.message}`,
+				{ tool: "lexrunner.submitDecision", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(ErrorCode.InternalError, "lexrunner.submitDecision", error, "submit decision");
 	}
 }
 
