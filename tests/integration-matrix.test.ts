@@ -12,7 +12,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('Integration Matrix Test', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-integration-matrix');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-integration-matrix');
 
 	beforeEach(() => {
 		// Clean test directory

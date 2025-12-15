@@ -225,7 +225,7 @@ Error: Not a git repository or no origin remote configured. Use --repo flag to s
 
 ## Integration with Workflow
 
-The idea command fits into the broader lex-pr-runner workflow:
+The idea command fits into the broader lexrunner workflow:
 
 1. **Ideate**: `lex-pr idea` - Capture feature ideas as GitHub Issues
 2. **Discover**: `lex-pr discover` - Find open PRs matching scope

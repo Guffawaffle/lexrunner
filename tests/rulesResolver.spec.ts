@@ -43,7 +43,7 @@ describe("LexSona Rules Resolver", () => {
 		it("should handle scope parameter", async () => {
 			const scope = {
 				environment: "development",
-				project: "lex-pr-runner",
+				project: "lexrunner",
 				agentFamily: "copilot"
 			};
 			const rules = await loadLexSonaRules(scope, { enabled: false });

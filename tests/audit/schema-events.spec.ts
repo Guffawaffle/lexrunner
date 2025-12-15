@@ -73,7 +73,7 @@ describe('Audit Event Schema (Phase 3A)', () => {
 			session_id: 'session-123',
 			run_id: 'run-456',
 			tool: {
-				name: 'lex-pr-runner',
+				name: 'lexrunner',
 				version: '0.1.0'
 			},
 			actor: {
@@ -236,7 +236,7 @@ describe('Audit Event Schema (Phase 3A)', () => {
 			level: 'info',
 			session_id: 'session-123',
 			run_id: 'run-456',
-			tool: { name: 'lex-pr-runner', version: '0.1.0' },
+			tool: { name: 'lexrunner', version: '0.1.0' },
 			actor: { type: 'cli' },
 			repo: {}
 		};
@@ -345,7 +345,7 @@ describe('Audit Event Schema (Phase 3A)', () => {
 			level: 'info',
 			session_id: 'session-123',
 			run_id: 'run-456',
-			tool: { name: 'lex-pr-runner', version: '0.1.0' },
+			tool: { name: 'lexrunner', version: '0.1.0' },
 			actor: { type: 'cli' },
 			repo: {},
 			payload: { item: 123, gate: 'test', duration_ms: 1000, status: 'pass' }
@@ -382,7 +382,7 @@ describe('Audit Event Schema (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: {
@@ -403,7 +403,7 @@ describe('Audit Event Schema (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: {

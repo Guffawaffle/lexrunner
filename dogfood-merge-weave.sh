@@ -5,7 +5,7 @@
 
 set -e
 
-REPO_DIR="/srv/lex-mcp/lex-pr-runner"
+REPO_DIR="/srv/lex-mcp/lexrunner"
 cd "$REPO_DIR"
 
 echo "═════════════════════════════════════════════════════════════════"

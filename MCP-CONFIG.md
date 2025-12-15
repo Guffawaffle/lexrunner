@@ -1,4 +1,4 @@
-# MCP Configuration for lex-pr-runner
+# MCP Configuration for lexrunner
 
 ## Configuration Entry
 
@@ -7,15 +7,15 @@ Add this to your MCP configuration file (e.g., `mcp.json` or Claude Desktop conf
 ```json
 {
   "mcpServers": {
-    "lex-pr-runner": {
+    "lexrunner": {
       "command": "wsl",
       "args": [
         "--",
-        "/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh"
+        "/home/guff/lexrunner/lexrunner-launcher.sh"
       ],
       "env": {
-        "LEX_PR_PROFILE_DIR": "/home/guff/lex-pr-runner/.smartergpt",
-        "LEX_PR_WORKSPACE": "/home/guff/lex-pr-runner",
+        "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
+        "LEX_PR_WORKSPACE": "/home/guff/lexrunner",
         "ALLOW_MUTATIONS": "false"
       }
     }
@@ -36,18 +36,18 @@ For alignment with other lex-* services, you can install to `/srv/lex-mcp`:
 
 ```bash
 # Create installation directory
-sudo mkdir -p /srv/lex-mcp/lex-pr-runner
-sudo chown $USER:$USER /srv/lex-mcp/lex-pr-runner
+sudo mkdir -p /srv/lex-mcp/lexrunner
+sudo chown $USER:$USER /srv/lex-mcp/lexrunner
 
-# Copy files (run from lex-pr-runner repo root)
-cp -r dist/ /srv/lex-mcp/lex-pr-runner/
-cp mcp-server.mjs /srv/lex-mcp/lex-pr-runner/
-cp lex-pr-runner-launcher.sh /srv/lex-mcp/lex-pr-runner/
-cp package.json /srv/lex-mcp/lex-pr-runner/
-cp -r node_modules/ /srv/lex-mcp/lex-pr-runner/
+# Copy files (run from lexrunner repo root)
+cp -r dist/ /srv/lex-mcp/lexrunner/
+cp mcp-server.mjs /srv/lex-mcp/lexrunner/
+cp lexrunner-launcher.sh /srv/lex-mcp/lexrunner/
+cp package.json /srv/lex-mcp/lexrunner/
+cp -r node_modules/ /srv/lex-mcp/lexrunner/
 
 # Update MCP config to use production path
-# Change launcher path to: /srv/lex-mcp/lex-pr-runner/lex-pr-runner-launcher.sh
+# Change launcher path to: /srv/lex-mcp/lexrunner/lexrunner-launcher.sh
 ```
 
 ## Alignment with lex-brain and lex-map
@@ -78,14 +78,14 @@ This MCP server configuration follows the same pattern as lex-brain and lex-map:
 }
 ```
 
-### lex-pr-runner
+### lexrunner
 ```json
-"lex-pr-runner": {
+"lexrunner": {
   "command": "wsl",
-  "args": ["--", "/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh"],
+  "args": ["--", "/home/guff/lexrunner/lexrunner-launcher.sh"],
   "env": {
-    "LEX_PR_PROFILE_DIR": "/home/guff/lex-pr-runner/.smartergpt",
-    "LEX_PR_WORKSPACE": "/home/guff/lex-pr-runner"
+    "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
+    "LEX_PR_WORKSPACE": "/home/guff/lexrunner"
   }
 }
 ```
@@ -103,21 +103,21 @@ Test the MCP server directly:
 
 ```bash
 # Development mode (using tsx)
-cd /home/guff/lex-pr-runner
+cd /home/guff/lexrunner
 npm run mcp
 
 # Production mode (using built files)
-node /home/guff/lex-pr-runner/mcp-server.mjs
+node /home/guff/lexrunner/mcp-server.mjs
 
 # Via launcher script
-bash /home/guff/lex-pr-runner/lex-pr-runner-launcher.sh
+bash /home/guff/lexrunner/lexrunner-launcher.sh
 ```
 
 The server should output:
 ```
-[lex-pr-runner] Starting MCP server
-[lex-pr-runner] Profile: /home/guff/lex-pr-runner/.smartergpt
-[lex-pr-runner] Workspace: /home/guff/lex-pr-runner
-[lex-pr-runner] Mutations: disabled (read-only)
-[lex-pr-runner] MCP server loaded successfully
+[lexrunner] Starting MCP server
+[lexrunner] Profile: /home/guff/lexrunner/.smartergpt
+[lexrunner] Workspace: /home/guff/lexrunner
+[lexrunner] Mutations: disabled (read-only)
+[lexrunner] MCP server loaded successfully
 ```

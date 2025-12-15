@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('Query Command Tests', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-query-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-query-test');
 	const cliPath = path.resolve(__dirname, '../..', 'dist', 'cli.js');
 
 	const samplePlan = {

@@ -236,7 +236,7 @@ describe('Audit Signing Integration', () => {
 			signer: `kms:${keyArn}`,
 			sessionId: 'fixed-session-id',
 			runId: 'fixed-run-id',
-			tool: { name: 'lex-pr-runner', version: '1.0.0' }
+			tool: { name: 'lexrunner', version: '1.0.0' }
 		});
 
 		await emitter.emit('gate_finished', { 

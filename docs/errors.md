@@ -1,6 +1,6 @@
 # Error Taxonomy
 
-This document defines the standardized error codes, exit codes, and error handling patterns for lex-pr-runner CLI and MCP server.
+This document defines the standardized error codes, exit codes, and error handling patterns for lexrunner CLI and MCP server.
 
 ## CLI Exit Code Policy
 

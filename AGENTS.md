@@ -1,11 +1,11 @@
-# AGENTS.md — lex-pr-runner
+# AGENTS.md — lexrunner
 
 > **North Star**
 > **Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks.
 > Compute dependency order, run gates locally, and merge cleanly.**
 
 This document orients all agents (human and automated) toward the same purpose and defines the
-non‑negotiable operating rules for **lex-pr-runner**. It is intentionally **non task‑specific** and
+non‑negotiable operating rules for **lexrunner**. It is intentionally **non task‑specific** and
 should remain stable even as implementation details evolve.
 
 ---
@@ -340,7 +340,7 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 1. **Open Issues** with crisp acceptance criteria.
 2. **Implement** in **small PRs**; add `Depends-on:` footers if needed.
 3. **Generate plan:** Run your plan generator to emit `plan.json`.
-4. **Dry run locally:** `lex-pr-runner --plan plan.json --dry-run`
+4. **Dry run locally:** `lexrunner --plan plan.json --dry-run`
 5. **Run gates:** Same CLI locally and in CI; confirm artifacts appear under `<nodeId>/<gateName>/`.
 6. **Merge pyramid:** Runner computes topo order, merges eligible nodes.
 7. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).

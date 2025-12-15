@@ -1,4 +1,4 @@
-# Contributing to lex-pr-runner
+# Contributing to lexrunner
 
 Thanks for your interest in contributing! This project builds a deterministic CLI that fans out work across many PRs, computes a merge pyramid, runs gates uniformly, and merges cleanly.
 
@@ -197,7 +197,7 @@ See [CLI Conventions](./docs/cli.md#cli-conventions) for detailed patterns and e
 
 ## Adding New Commands
 
-The lex-pr-runner CLI uses a **modular command architecture** where each command lives in its own module. This makes the codebase maintainable and testable.
+The lexrunner CLI uses a **modular command architecture** where each command lives in its own module. This makes the codebase maintainable and testable.
 
 ### Quick Start
 
@@ -326,4 +326,4 @@ gh release create v0.5.0 \
 ```
 
 ---
-Thank you for helping improve lex-pr-runner! 💙
+Thank you for helping improve lexrunner! 💙

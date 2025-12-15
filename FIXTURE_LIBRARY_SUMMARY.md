@@ -1,7 +1,7 @@
 # Shared Test Fixture Library - Implementation Summary
 
 ## Overview
-Successfully implemented a comprehensive shared test fixture library for lex-pr-runner to eliminate test duplication and accelerate test development.
+Successfully implemented a comprehensive shared test fixture library for lexrunner to eliminate test duplication and accelerate test development.
 
 ## What Was Built
 

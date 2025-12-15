@@ -55,7 +55,7 @@ Key capabilities:
 - Dist autodetect: built `dist/mcp/server.js` → fallback `tsx src/mcp/server.ts`
 - Deterministic sorted keys + SHA-256 hash guard (skip rewrite if unchanged)
 - Optional read-only workspace variant (`--workspace-out`)
-- Prefix isolation (`--prefix`, default `lex-pr-runner`)
+- Prefix isolation (`--prefix`, default `lexrunner`)
 
 ### Quick Use
 
@@ -67,8 +67,8 @@ npm run build
 python3 scripts/gen_mcp_servers.py \
   -r /srv -r /home/guff \
   --recursive \
-  --include '^(smartergpt|lex-serve|lex-pr-runner)$' \
-  --mutate lex-pr-runner \
+  --include '^(smartergpt|lex-serve|lexrunner)$' \
+  --mutate lexrunner \
   --workspace-out servers.workspace.json
 
 # Or use the convenience npm script (uses defaults)
@@ -80,9 +80,9 @@ python3 scripts/gen_mcp_servers.py \
 ```jsonc
 {
   "mcpServers": {
-    "lex-pr-runner-smartergpt": {
+    "lexrunner-smartergpt": {
       "command": "node",
-      "args": ["/home/guff/lex-pr-runner/dist/mcp/server.js"],
+      "args": ["/home/guff/lexrunner/dist/mcp/server.js"],
       "env": {
         "ALLOW_MUTATIONS": "false",
         "LEX_PR_PROFILE_DIR": "/srv/sites/smartergpt/.smartergpt"
@@ -139,16 +139,16 @@ Use `npm run cli -- doctor` to verify your environment meets all requirements.
 
 ```bash
 # Install globally
-npm install -g lex-pr-runner
+npm install -g lexrunner
 
 # Or install in your project
-npm install --save-dev lex-pr-runner
+npm install --save-dev lexrunner
 ```
 
 After installation, you'll see a reminder to initialize your workspace:
 
 ```
-📦 lex-pr-runner installed! Run "npx lex-pr init" to set up your workspace.
+📦 lexrunner installed! Run "npx lex-pr init" to set up your workspace.
 ```
 
 ### For New Users
@@ -407,7 +407,7 @@ Quick links:
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
-- **Migration Guide**: docs/migration-guide.md — migrating to lex-pr-runner
+- **Migration Guide**: docs/migration-guide.md — migrating to lexrunner
 - **FAQ**: FAQ.md — quick answers to common questions
 - **Video Tutorials**: docs/tutorials/ — step-by-step video guides
 - **Workflows**: docs/workflows/ — examples for different team sizes
@@ -796,7 +796,7 @@ cmp .artifacts1/plan.json .artifacts2/plan.json  # Should be identical
 When running tests the suite may run files in parallel. Some tests temporarily change the process working directory (for example to exercise CLI behaviors) and create/remove temp directories. To avoid race conditions and `getcwd()` failures we use a per-test-file temporary directory naming pattern (based on the test filename) so parallel test files don't collide when they change `process.cwd()` or remove temporary folders. If you add new tests that change directory, follow the same pattern:
 
 ```ts
-const testDir = path.join(os.tmpdir(), `lex-pr-runner-determinism-test-${path.basename(__filename)}`);
+const testDir = path.join(os.tmpdir(), `lexrunner-determinism-test-${path.basename(__filename)}`);
 process.chdir(testDir);
 ```
 
@@ -855,7 +855,7 @@ npm run build
 npm run generate:mcp-servers
 
 # Customize (recursive, filters, policy-file, mutate allow-list)
-python3 scripts/gen_mcp_servers.py      -r /srv -r /home/guff --recursive      --include '^(smartergpt|lex-serve|lex-pr-runner)$'      --policy-file mutate-policy.json      --mutate lex-pr-runner      -o servers.json --workspace-out servers.workspace.json
+python3 scripts/gen_mcp_servers.py      -r /srv -r /home/guff --recursive      --include '^(smartergpt|lex-serve|lexrunner)$'      --policy-file mutate-policy.json      --mutate lexrunner      -o servers.json --workspace-out servers.workspace.json
 ```
 
 ### MCP Section Notes

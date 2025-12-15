@@ -1,6 +1,6 @@
 # Video Tutorial Scripts
 
-This directory contains scripts and resources for creating video tutorials about lex-pr-runner.
+This directory contains scripts and resources for creating video tutorials about lexrunner.
 
 ## Quick Start Tutorial
 
@@ -9,7 +9,7 @@ This directory contains scripts and resources for creating video tutorials about
 - Dependency management and merge order
 - Gate execution and verification
 - Common patterns and best practices
-- **Start here** for a practical introduction to lex-pr-runner!
+- **Start here** for a practical introduction to lexrunner!
 
 ## Available Scripts
 
@@ -127,7 +127,7 @@ gh pr create --title "Add authentication" --body "Base feature" --label "ready"
 gh pr create --title "Add API endpoints" --body "Depends-On: #1" --label "ready"
 gh pr create --title "Add dashboard" --body "Depends-On: #2" --label "ready"
 
-# Initialize lex-pr-runner
+# Initialize lexrunner
 lex-pr init
 ```
 
@@ -144,10 +144,10 @@ For each video, provide:
 ## Publishing
 
 ### YouTube
-- Title format: "lex-pr-runner: [Topic] - [Duration]"
+- Title format: "lexrunner: [Topic] - [Duration]"
 - Description: Link to docs, timestamps, resources
 - Tags: git, automation, pr, merge, ci-cd, devops
-- Playlist: "lex-pr-runner Tutorials"
+- Playlist: "lexrunner Tutorials"
 
 ### Documentation Site
 - Embed videos in relevant docs pages

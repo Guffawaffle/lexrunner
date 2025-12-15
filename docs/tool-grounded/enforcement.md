@@ -1,6 +1,6 @@
 # Tool-Grounded Mode Enforcement
 
-This document describes the enforcement rules for tool-grounded modes in lex-pr-runner.
+This document describes the enforcement rules for tool-grounded modes in lexrunner.
 
 ## Overview
 

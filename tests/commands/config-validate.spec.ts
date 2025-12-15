@@ -12,7 +12,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('config validate command', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-config-validate-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-config-validate-test');
 	const cliPath = path.resolve(__dirname, '../..', 'dist', 'cli.js');
 	const originalCwd = process.cwd();
 	let testProfileDir: string;

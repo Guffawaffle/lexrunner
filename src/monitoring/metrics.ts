@@ -212,7 +212,7 @@ export class MetricsCollector {
 export const metrics = new MetricsCollector();
 
 /**
- * Key metrics for lex-pr-runner operations
+ * Key metrics for lexrunner operations
  */
 export const METRICS = {
 	// Execution metrics

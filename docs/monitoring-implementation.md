@@ -214,7 +214,7 @@ All monitoring tests pass with comprehensive coverage:
 ## 🚀 Ready for Production
 
 The monitoring module is production-ready and provides:
-- Complete observability of lex-pr-runner operations
+- Complete observability of lexrunner operations
 - Real-time metrics for SLOs/SLAs
 - Comprehensive audit trail for compliance
 - Health monitoring for reliability

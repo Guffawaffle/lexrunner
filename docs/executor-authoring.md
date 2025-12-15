@@ -1,10 +1,10 @@
 # Executor Authoring Guide
 
-This guide explains how to create new executors for lex-pr-runner, from initial prototype to canonical implementation.
+This guide explains how to create new executors for lexrunner, from initial prototype to canonical implementation.
 
 > **Audience:** Developers creating new executors. Level: intermediate.
 >
-> **Prerequisites:** Familiarity with TypeScript, YAML, and the lex-pr-runner architecture.
+> **Prerequisites:** Familiarity with TypeScript, YAML, and the lexrunner architecture.
 
 ## Overview
 
@@ -14,7 +14,7 @@ An **executor** is a small, named, versioned unit that:
 - Binds to a particular **guardrail profile** (scope, tool, epistemic, style, audit)
 - Follows the **Jordan-mode protocol** (prep → stochastic → receipt)
 
-Executors are the operational units that perform specific tasks within the lex-pr-runner ecosystem.
+Executors are the operational units that perform specific tasks within the lexrunner ecosystem.
 
 ## Quick Start
 

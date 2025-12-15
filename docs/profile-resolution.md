@@ -5,7 +5,7 @@
 
 ## Overview
 
-Profile resolution is the mechanism by which `lex-pr-runner` locates and selects the correct profile directory for execution. A **profile** contains configuration files (`intent.md`, `scope.yml`, `deps.yml`, `gates.yml`, etc.) that define how the runner operates.
+Profile resolution is the mechanism by which `lexrunner` locates and selects the correct profile directory for execution. A **profile** contains configuration files (`intent.md`, `scope.yml`, `deps.yml`, `gates.yml`, etc.) that define how the runner operates.
 
 The resolution system supports multiple environments and use cases through a clear **precedence chain**.
 
@@ -85,11 +85,11 @@ Each profile has a `role` defined in `profile.yml`:
 
 ```bash
 # Initialize local overlay (one-time)
-lex-pr-runner init-local
+lexrunner init-local
 
 # Normal workflow - automatically uses .smartergpt.local/
-lex-pr-runner plan --from-github "is:open label:ready"
-lex-pr-runner gates run
+lexrunner plan --from-github "is:open label:ready"
+lexrunner gates run
 ```
 
 **Result:**
@@ -116,7 +116,7 @@ steps:
       echo "role: local" > /tmp/ci-profile/profile.yml
 
   - name: Run gates
-    run: lex-pr-runner gates run
+    run: lexrunner gates run
 ```
 
 **Result:**
@@ -126,11 +126,11 @@ steps:
 
 ### Multi-Repository Setup
 
-**Scenario:** Developing lex-pr-runner itself, want separate profiles for testing.
+**Scenario:** Developing lexrunner itself, want separate profiles for testing.
 
 ```bash
 # Override profile for testing
-lex-pr-runner plan --profile-dir /path/to/test-profile
+lexrunner plan --profile-dir /path/to/test-profile
 ```
 
 **Result:**
@@ -140,18 +140,18 @@ lex-pr-runner plan --profile-dir /path/to/test-profile
 
 ### MCP Server Context
 
-**Scenario:** Using lex-pr-runner as an MCP server, need environment-based configuration.
+**Scenario:** Using lexrunner as an MCP server, need environment-based configuration.
 
 ```bash
 # Start MCP server with custom profile
 export LEX_PR_PROFILE_DIR=/workspace/.smartergpt.local
-lex-pr-runner mcp
+lexrunner mcp
 
 # Or in MCP client configuration
 {
   "mcpServers": {
-    "lex-pr-runner": {
-      "command": "lex-pr-runner",
+    "lexrunner": {
+      "command": "lexrunner",
       "args": ["mcp"],
       "env": {
         "LEX_PR_PROFILE_DIR": "/workspace/.smartergpt.local"
@@ -210,10 +210,10 @@ cp -r .smartergpt .smartergpt.local
 **After:**
 ```bash
 # Automated local overlay
-lex-pr-runner init-local
+lexrunner init-local
 
 # Runner automatically uses .smartergpt.local/
-lex-pr-runner plan
+lexrunner plan
 ```
 
 ## API Reference
@@ -222,13 +222,13 @@ lex-pr-runner plan
 
 ```bash
 # Resolve and display current profile
-lex-pr-runner doctor  # Shows profile info
+lexrunner doctor  # Shows profile info
 
 # Override profile directory
-lex-pr-runner plan --profile-dir /custom/path
+lexrunner plan --profile-dir /custom/path
 
 # Initialize local overlay
-lex-pr-runner init-local [--force]
+lexrunner init-local [--force]
 ```
 
 ### TypeScript
@@ -289,13 +289,13 @@ See [Use Cases - MCP Server Context](#mcp-server-context) above.
 **Solution:**
 ```bash
 # Check current resolution
-lex-pr-runner doctor
+lexrunner doctor
 
 # Initialize local overlay
-lex-pr-runner init-local
+lexrunner init-local
 
 # Or use explicit override
-lex-pr-runner plan --profile-dir .smartergpt
+lexrunner plan --profile-dir .smartergpt
 ```
 
 ### "Write operation failed: role=example is read-only"
@@ -305,7 +305,7 @@ lex-pr-runner plan --profile-dir .smartergpt
 **Solution:**
 ```bash
 # Initialize local overlay for development
-lex-pr-runner init-local
+lexrunner init-local
 
 # Or update profile.yml in custom profile
 echo "role: development" > /path/to/profile/profile.yml
@@ -318,7 +318,7 @@ echo "role: development" > /path/to/profile/profile.yml
 **Diagnosis:**
 ```bash
 # Check precedence chain
-lex-pr-runner doctor  # Shows resolved path and source
+lexrunner doctor  # Shows resolved path and source
 
 # Check environment
 echo $LEX_PR_PROFILE_DIR
@@ -359,7 +359,7 @@ projectType: typescript  # Auto-detected by init-local
 ```bash
 # Clone repository
 git clone https://github.com/Guffawaffle/LexRunner.git
-cd lex-pr-runner
+cd lexrunner
 
 # Initialize local overlay
 npm run cli -- init-local
@@ -386,10 +386,10 @@ echo "role: local" > /tmp/profile-a/profile.yml
 echo "role: local" > /tmp/profile-b/profile.yml
 
 # Test with profile A
-lex-pr-runner plan --profile-dir /tmp/profile-a
+lexrunner plan --profile-dir /tmp/profile-a
 
 # Test with profile B
-lex-pr-runner plan --profile-dir /tmp/profile-b
+lexrunner plan --profile-dir /tmp/profile-b
 ```
 
 ### Example 3: CI Pipeline

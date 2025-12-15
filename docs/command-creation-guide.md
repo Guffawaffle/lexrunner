@@ -1,10 +1,10 @@
 # Command Creation Guide
 
-This guide shows how to create new commands in the modular lex-pr-runner CLI architecture.
+This guide shows how to create new commands in the modular lexrunner CLI architecture.
 
 ## Overview
 
-The lex-pr-runner CLI uses a **modular command architecture** where:
+The lexrunner CLI uses a **modular command architecture** where:
 - Each command lives in its own module under `src/commands/`
 - Commands are registered in `src/cli.ts` using a standard pattern
 - Shared utilities are in `src/cli/` (output, flags, exit handling)

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * MCP server adapter for lex-pr-runner
+ * MCP server adapter for lexrunner
  * Exposes read-only tools for plan creation, gate execution, and merge operations
  */
 
@@ -199,7 +199,7 @@ function createServer(options?: McpServerOptions): Server {
 	const runStore = options?.runStore ?? createRunStore();
 	const server = new Server(
 		{
-			name: "lex-pr-runner",
+			name: "lexrunner",
 			version: "0.1.0",
 		},
 		{
@@ -1291,7 +1291,7 @@ async function main() {
 	await server.connect(transport);
 
 	// Log to stderr so it doesn't interfere with MCP protocol
-	console.error("MCP server started for lex-pr-runner");
+	console.error("MCP server started for lexrunner");
 
 	// Keep the process alive by setting up event handlers
 	// The event loop will keep running while the stdio transport is active

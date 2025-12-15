@@ -1,6 +1,6 @@
 # Runner Logging, Locks, and Cache
 
-This document describes the logging, locking, and cache management features for lex-pr-runner.
+This document describes the logging, locking, and cache management features for lexrunner.
 
 ## NDJSON File Logging
 
@@ -214,7 +214,7 @@ npm test -- tests/runner-lifecycle-integration.spec.ts
 
 ## Directory Structure
 
-After running lex-pr-runner, your profile will have this structure:
+After running lexrunner, your profile will have this structure:
 
 ```
 .smartergpt.local/

@@ -1,7 +1,7 @@
-# lex-pr-runner — Canonical Terms
+# lexrunner — Canonical Terms
 
 ## Project & Components
-- **lex-pr-runner (project/repo)**: The repository you're reading.
+- **lexrunner (project/repo)**: The repository you're reading.
 - **Runner CLI (core runner)**: TypeScript command-line app under `src/**`. Shorthand: "the runner".
 - **MCP server (adapter)**: Optional read-only adapter at `src/mcp/server.ts`. Shorthand: "lex-pr MCP".
 - **Workspace profile**: Portable example profile under `.smartergpt/**`. Not the app; it's inputs the runner consumes.

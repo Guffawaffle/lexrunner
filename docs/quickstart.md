@@ -1,6 +1,6 @@
 # Quickstart Guide
 
-Get started with lex-pr-runner in less than 5 minutes! This guide will walk you through setting up your workspace and completing your first successful merge.
+Get started with lexrunner in less than 5 minutes! This guide will walk you through setting up your workspace and completing your first successful merge.
 
 ## Prerequisites
 
@@ -8,16 +8,16 @@ Get started with lex-pr-runner in less than 5 minutes! This guide will walk you 
 - **Git**: Properly configured with `user.name` and `user.email`
 - **GitHub**: Repository access and optional personal access token
 
-## Step 1: Install lex-pr-runner
+## Step 1: Install lexrunner
 
 ```bash
-npm install -g lex-pr-runner
+npm install -g lexrunner
 ```
 
 Or use it directly in your project:
 
 ```bash
-npm install --save-dev lex-pr-runner
+npm install --save-dev lexrunner
 ```
 
 ## Step 2: Initialize Your Workspace

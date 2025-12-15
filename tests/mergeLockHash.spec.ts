@@ -6,7 +6,7 @@ import * as os from 'os';
 import { parseWeaveLock } from '../src/schema/weaveLock.js';
 
 describe('merge command lock hash integration', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-lock-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-lock-test');
 	const repoRoot = path.resolve(__dirname, '..');
 
 	beforeEach(() => {

@@ -105,9 +105,9 @@ body:
     attributes:
       label: Cross-Repo Links
       description: |
-        If this Epic touches both lex-pr-runner and lex repos, list related issues/PRs.
+        If this Epic touches both lexrunner and lex repos, list related issues/PRs.
       placeholder: |
-        - lex-pr-runner: #XXX (implementation)
+        - lexrunner: #XXX (implementation)
         - lex: #YYY (API changes)
     validations:
       required: false

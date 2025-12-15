@@ -1,8 +1,8 @@
-# FAQ — lex-pr-runner
+# FAQ — lexrunner
 
 Quick answers to common questions. See `docs/README.md` for the full documentation index.
 
-## What is lex-pr-runner?
+## What is lexrunner?
 
 A deterministic CLI that fans out tasks as many PRs, computes a merge pyramid (dependency order), runs gates uniformly (lint/type/test/etc.), and merges cleanly.
 

@@ -4,7 +4,7 @@
  * Provides procedures for different workflow types (merge-weave, PR review,
  * sprint planning). Procedures are config-driven state machines loaded from YAML.
  *
- * @internal This module is internal to lex-pr-runner. The procedure format and
+ * @internal This module is internal to lexrunner. The procedure format and
  * API may change between minor versions. External consumers should not depend
  * on the procedure system directly.
  */

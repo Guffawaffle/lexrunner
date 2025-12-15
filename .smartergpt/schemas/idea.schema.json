@@ -58,7 +58,7 @@
 		},
 		"repo": {
 			"type": "string",
-			"description": "Target repository name (e.g., 'lex', 'lex-pr-runner')"
+			"description": "Target repository name (e.g., 'lex', 'lexrunner')"
 		},
 		"context": {
 			"type": "object",

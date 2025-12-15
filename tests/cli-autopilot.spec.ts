@@ -13,7 +13,7 @@ describe('CLI autopilot command', () => {
 	let planFile: string;
 
 	beforeEach(() => {
-		testDir = path.join(os.tmpdir(), `lex-pr-runner-cli-autopilot-${Date.now()}`);
+		testDir = path.join(os.tmpdir(), `lexrunner-cli-autopilot-${Date.now()}`);
 		fs.mkdirSync(testDir, { recursive: true });
 
 		// Create test plan

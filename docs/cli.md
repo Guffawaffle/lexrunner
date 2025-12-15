@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete reference for the lex-pr-runner command-line interface, including all subcommands, options, and JSON output schemas.
+Complete reference for the lexrunner command-line interface, including all subcommands, options, and JSON output schemas.
 
 > **📖 See Also**:
 > - [Merge-Weave Quickstart](./merge-weave-quickstart.md) - End-to-end guide for merge-weave operations
@@ -10,7 +10,7 @@ Complete reference for the lex-pr-runner command-line interface, including all s
 
 ## Architecture
 
-The lex-pr-runner CLI uses a **modular command architecture** that provides:
+The lexrunner CLI uses a **modular command architecture** that provides:
 
 - **Maintainability**: Each command lives in its own module under `src/commands/`
 - **Testability**: Business logic separated from CLI registration
@@ -216,7 +216,7 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 ### `init`
 
-Initialize lex-pr-runner workspace with interactive setup wizard.
+Initialize lexrunner workspace with interactive setup wizard.
 
 ```bash
 lex-pr init [options]

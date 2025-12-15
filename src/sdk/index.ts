@@ -2,7 +2,7 @@
  * Audit SDK for third-party consumption (Phase 3A)
  *
  * @packageDocumentation
- * This SDK enables third-party tools to consume lex-pr-runner audit outputs.
+ * This SDK enables third-party tools to consume lexrunner audit outputs.
  *
  * ## Features
  * - Parse and validate audit events (NDJSON format)

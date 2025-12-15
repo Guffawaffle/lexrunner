@@ -10,7 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 // Ensure the temp directory is unique per test file
-const testDir = path.join(os.tmpdir(), `lex-pr-runner-determinism-test-${path.basename(__filename)}`);
+const testDir = path.join(os.tmpdir(), `lexrunner-determinism-test-${path.basename(__filename)}`);
 
 // Create and switch into the directory
 fs.mkdirSync(testDir, { recursive: true });

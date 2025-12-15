@@ -1,6 +1,6 @@
 # Production Monitoring Examples
 
-This file demonstrates the complete monitoring capabilities of lex-pr-runner.
+This file demonstrates the complete monitoring capabilities of lexrunner.
 
 ## Example 1: Structured Logging with Correlation IDs
 
@@ -401,7 +401,7 @@ app.get('/metrics', (req, res) => {
 2. **Configure Prometheus scraping:**
 ```yaml
 scrape_configs:
-  - job_name: 'lex-pr-runner'
+  - job_name: 'lexrunner'
     scrape_interval: 15s
     static_configs:
       - targets: ['localhost:3000']
@@ -423,7 +423,7 @@ lex-pr --log-format json merge plan.json --execute > logs.jsonl
 ```
 input {
   file {
-    path => "/var/log/lex-pr-runner/*.jsonl"
+    path => "/var/log/lexrunner/*.jsonl"
     codec => "json"
   }
 }
@@ -439,7 +439,7 @@ filter {
 output {
   elasticsearch {
     hosts => ["localhost:9200"]
-    index => "lex-pr-runner-%{+YYYY.MM.dd}"
+    index => "lexrunner-%{+YYYY.MM.dd}"
   }
 }
 ```

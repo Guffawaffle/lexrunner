@@ -1,6 +1,6 @@
 # Test Fixtures Library
 
-Shared, reusable test fixtures for lex-pr-runner tests. This library provides deterministic, realistic scenarios for plan generation, gate execution, and merge operations.
+Shared, reusable test fixtures for lexrunner tests. This library provides deterministic, realistic scenarios for plan generation, gate execution, and merge operations.
 
 ## Purpose
 

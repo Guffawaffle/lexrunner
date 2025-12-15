@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document specifies the canonical directory structure for lex-pr-runner profiles, including configuration file placement, working directories, prompts resolution, and write protection rules.
+This document specifies the canonical directory structure for lexrunner profiles, including configuration file placement, working directories, prompts resolution, and write protection rules.
 
 ## Table of Contents
 
@@ -517,7 +517,7 @@ const scopePath = path.join(profilePath, "scope.yml");
 ```bash
 # Clone repository
 git clone https://github.com/Guffawaffle/LexRunner.git
-cd lex-pr-runner
+cd lexrunner
 
 # Initialize local overlay
 npm run cli -- init-local

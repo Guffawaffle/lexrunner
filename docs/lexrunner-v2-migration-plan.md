@@ -16,7 +16,7 @@ Create v2 as a **sibling package** within the same monorepo, allowing both to co
 lex-mcp/
   lex/                    # Lex (memory, policy)
   lexsona/                # LexSona (constraints)
-  lex-pr-runner/          # v1 (frozen)
+  lexrunner/          # v1 (frozen)
   lex-runner/             # v2 (new)
 ```
 
@@ -31,7 +31,7 @@ lex-mcp/
 Less preferred, but viable if monorepo restructuring is too heavy:
 
 ```
-lex-pr-runner/
+lexrunner/
   src/           # v1 (frozen, eventually deprecated)
   src-v2/        # v2 (new implementation)
   package.json   # Exports both

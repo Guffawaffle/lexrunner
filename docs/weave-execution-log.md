@@ -127,7 +127,7 @@
 
 ## Meta-Recursive Success 🎯
 
-**We successfully dogfooded lex-pr-runner's own weave process!**
+**We successfully dogfooded lexrunner's own weave process!**
 
 This execution demonstrates that:
 1. The GitHub plan generation works correctly

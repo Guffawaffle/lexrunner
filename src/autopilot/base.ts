@@ -114,8 +114,8 @@ export class AutopilotLevel0 extends AutopilotBase {
 			...recommendations.map((r, i) => `  ${i + 1}. ${r}`),
 			"",
 			"💡 Next Steps:",
-			"  • Run: lex-pr-runner autopilot <plan> --level 1",
-			"  • Or: lex-pr-runner weave <plan> --max-level 1 --dry-run",
+			"  • Run: lexrunner autopilot <plan> --level 1",
+			"  • Or: lexrunner weave <plan> --max-level 1 --dry-run",
 			"  • Review integration strategy before proceeding to higher levels"
 		].join("\n");
 

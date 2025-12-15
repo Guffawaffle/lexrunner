@@ -481,7 +481,7 @@ registerBudgetCommand(program, () => jsonModeActive);
 program
 	.command("init")
 	.description(
-		"Initialize lex-pr-runner workspace with interactive setup wizard"
+		"Initialize lexrunner workspace with interactive setup wizard"
 	)
 	.option("--force", "Overwrite existing configuration files")
 	.option(

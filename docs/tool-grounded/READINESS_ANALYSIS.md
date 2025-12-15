@@ -483,4 +483,4 @@ Based on this analysis, here's the recommended sequencing:
 
 ---
 
-*This analysis was produced by analyzing the lex-pr-runner codebase against the tool-grounded-run-centric.md specification, with the understanding that this is a foundational shift in how LLMs interact with orchestration infrastructure.*
+*This analysis was produced by analyzing the lexrunner codebase against the tool-grounded-run-centric.md specification, with the understanding that this is a foundational shift in how LLMs interact with orchestration infrastructure.*

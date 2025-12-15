@@ -57,7 +57,7 @@ import { loadLexSonaRules, formatRulesForPrompt } from './config/rulesResolver.j
 // Load rules with scope filtering
 const rules = await loadLexSonaRules({
   environment: 'development',
-  project: 'lex-pr-runner',
+  project: 'lexrunner',
   agentFamily: 'copilot'
 });
 
@@ -82,7 +82,7 @@ import { injectRulesIntoPrompt } from './config/rulesResolver.js';
 
 const basePrompt = "You are a helpful assistant.";
 const promptWithRules = await injectRulesIntoPrompt(basePrompt, {
-  project: 'lex-pr-runner',
+  project: 'lexrunner',
   agentFamily: 'copilot'
 });
 ```

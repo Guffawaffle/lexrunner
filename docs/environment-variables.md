@@ -5,7 +5,7 @@
 
 ## Overview
 
-lex-pr-runner supports environment variables for configuration and includes special safety mechanisms for CI/CD environments. This document covers:
+lexrunner supports environment variables for configuration and includes special safety mechanisms for CI/CD environments. This document covers:
 
 - Environment variable reference
 - Environment variable aliasing (backward compatibility)
@@ -63,7 +63,7 @@ lex-pr merge plan.json --dry-run
 ```bash
 # MCP server respects ALLOW_MUTATIONS
 export ALLOW_MUTATIONS=true
-lex-pr-runner-mcp
+lexrunner-mcp
 ```
 
 ### Git Runtime Control
@@ -149,7 +149,7 @@ env:
 
 ## Environment Variable Aliasing
 
-For backward compatibility, lex-pr-runner supports deprecated `LEXRUNNER_*` prefixes.
+For backward compatibility, lexrunner supports deprecated `LEXRUNNER_*` prefixes.
 
 ### Supported Aliases
 
@@ -465,7 +465,7 @@ The MCP server respects all environment variables and CI safety mechanisms.
 # Terminal 1: Start MCP server
 export LEX_PR_PROFILE_DIR=/workspace/.smartergpt.local
 export ALLOW_MUTATIONS=false  # Read-only by default
-lex-pr-runner-mcp
+lexrunner-mcp
 ```
 
 ### MCP with CI Role
@@ -478,7 +478,7 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 
 # Start MCP server (CI safety enforced)
 export LEX_PR_PROFILE_DIR=/tmp/ci-profile
-lex-pr-runner-mcp
+lexrunner-mcp
 ```
 
 **MCP Tool Behavior:**
@@ -576,8 +576,8 @@ jobs:
           version: 1.0.0
           EOF
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Generate Plan
         run: lex-pr plan --from-github --json > plan.json

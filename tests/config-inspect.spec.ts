@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('config:inspect Command Tests', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-config-inspect-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-config-inspect-test');
 	const cliPath = path.resolve(__dirname, '..', 'dist', 'cli.js');
 
 	beforeEach((context) => {

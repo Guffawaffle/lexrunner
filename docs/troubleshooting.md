@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Common issues, solutions, and debugging techniques for lex-pr-runner.
+Common issues, solutions, and debugging techniques for lexrunner.
 
 ## Quick Diagnostics
 
@@ -29,13 +29,13 @@ This validates:
 
 ```bash
 # Option 1: Install globally
-npm install -g lex-pr-runner
+npm install -g lexrunner
 
 # Option 2: Use npx
-npx lex-pr-runner init
+npx lexrunner init
 
 # Option 3: Use local installation
-npm install --save-dev lex-pr-runner
+npm install --save-dev lexrunner
 npx lex-pr init
 
 # Option 4: Add to package.json scripts
@@ -47,7 +47,7 @@ npx lex-pr init
 npm run lex-pr -- init
 ```
 
-#### Issue: `Error: Cannot find module 'lex-pr-runner'`
+#### Issue: `Error: Cannot find module 'lexrunner'`
 
 **Cause:** Dependencies not installed.
 
@@ -650,7 +650,7 @@ top  # Check CPU/memory while running
 lex-pr doctor
 
 # Output shows:
-# lex-pr-runner using profile: /path/to/profile (role: local)
+# lexrunner using profile: /path/to/profile (role: local)
 
 # Verify files exist
 ls -la .smartergpt.local/

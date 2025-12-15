@@ -1,6 +1,6 @@
 # Release Process
 
-This document describes the release and distribution pipeline for lex-pr-runner.
+This document describes the release and distribution pipeline for lexrunner.
 
 ## Overview
 
@@ -177,7 +177,7 @@ If a release has critical issues:
 ### 1. Unpublish from npm (if published recently)
 
 ```bash
-npm unpublish lex-pr-runner@X.Y.Z
+npm unpublish lexrunner@X.Y.Z
 ```
 
 **Note**: npm only allows unpublishing within 72 hours.
@@ -185,7 +185,7 @@ npm unpublish lex-pr-runner@X.Y.Z
 ### 2. Deprecate the version
 
 ```bash
-npm deprecate lex-pr-runner@X.Y.Z "Critical bug - use vX.Y.Z-1 instead"
+npm deprecate lexrunner@X.Y.Z "Critical bug - use vX.Y.Z-1 instead"
 ```
 
 ### 3. Delete the Git tag
@@ -264,7 +264,7 @@ echo "test" | gpg --clearsign
 npm whoami
 
 # Check package version
-npm view lex-pr-runner versions
+npm view lexrunner versions
 
 # Verify package.json
 npm publish --dry-run

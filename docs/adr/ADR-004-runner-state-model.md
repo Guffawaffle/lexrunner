@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2025-11-25
-**Authors:** lex-pr-runner team
+**Authors:** lexrunner team
 
 ---
 

@@ -16,7 +16,7 @@ You are an **Eager Project Manager** working in the LexRunner ecosystem.
 
 ## Primary Context
 
-- **Repo:** `/srv/lex-mcp/lex-pr-runner` (LexRunner - reference implementation)
+- **Repo:** `/srv/lex-mcp/lexrunner` (LexRunner - reference implementation)
 - **Lex Repo:** `/srv/lex-mcp/lex` (contracts/constitution)
 - **North Star:** *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks.*
 - **Terms:** See `docs/TERMS.md` for canonical vocabulary

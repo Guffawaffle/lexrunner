@@ -1,6 +1,6 @@
-# Migration Guide: From Manual Merge to lex-pr-runner
+# Migration Guide: From Manual Merge to lexrunner
 
-This guide helps teams migrate from manual PR merge processes to automated merge pyramids with lex-pr-runner.
+This guide helps teams migrate from manual PR merge processes to automated merge pyramids with lexrunner.
 
 ## Why Migrate?
 
@@ -21,7 +21,7 @@ This guide helps teams migrate from manual PR merge processes to automated merge
 - Team members blocked waiting for merges
 - Integration issues discovered late
 
-### Benefits of lex-pr-runner
+### Benefits of lexrunner
 
 **Automated:**
 - Discovers PRs automatically
@@ -46,11 +46,11 @@ Start with manual oversight, gradually increase automation.
 
 #### Phase 1: Discovery & Planning (Week 1)
 
-**Goal:** Use lex-pr-runner for visibility only.
+**Goal:** Use lexrunner for visibility only.
 
 ```bash
 # Install
-npm install -g lex-pr-runner
+npm install -g lexrunner
 
 # Initialize workspace
 lex-pr init
@@ -128,7 +128,7 @@ For teams ready to adopt immediately.
 
 #### Prerequisites
 
-- [ ] All team members trained on lex-pr-runner
+- [ ] All team members trained on lexrunner
 - [ ] Quality gates defined and tested
 - [ ] Rollback procedures documented
 - [ ] Emergency manual merge process available
@@ -139,7 +139,7 @@ For teams ready to adopt immediately.
 # 1. Final manual merge of existing PRs
 # (Clean slate)
 
-# 2. Initialize lex-pr-runner
+# 2. Initialize lexrunner
 lex-pr init
 
 # 3. Configure workspace
@@ -149,7 +149,7 @@ lex-pr init
 # (See CI/CD integration examples)
 
 # 5. Announce to team
-# All new PRs use lex-pr-runner
+# All new PRs use lexrunner
 
 # 6. First automated run
 lex-pr plan --from-github
@@ -159,9 +159,9 @@ lex-pr merge plan.json --execute
 
 ## From Manual to Automated: Mapping
 
-### Manual Process → lex-pr-runner Commands
+### Manual Process → lexrunner Commands
 
-| Manual Step | lex-pr-runner Equivalent |
+| Manual Step | lexrunner Equivalent |
 |-------------|--------------------------|
 | List open PRs | `lex-pr discover` |
 | Check PR dependencies | `lex-pr plan --from-github` |
@@ -190,7 +190,7 @@ lex-pr merge plan.json --execute
 5. Manually merges #123
 6. Hopes no conflicts
 
-**After (lex-pr-runner):**
+**After (lexrunner):**
 
 ```yaml
 # In PR #123 body:
@@ -296,7 +296,7 @@ lex-pr merge plan.json --execute
 4. Wait for CI
 5. Repeat 3 more times (30+ minutes)
 
-**After (lex-pr-runner):**
+**After (lexrunner):**
 
 ```markdown
 <!-- In each PR body -->
@@ -339,8 +339,8 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Run merge automation
         env:
@@ -363,7 +363,7 @@ pipeline {
   stages {
     stage('Install') {
       steps {
-        sh 'npm install -g lex-pr-runner'
+        sh 'npm install -g lexrunner'
       }
     }
     
@@ -396,7 +396,7 @@ Add to `.gitlab-ci.yml`:
 merge-automation:
   stage: merge
   script:
-    - npm install -g lex-pr-runner
+    - npm install -g lexrunner
     - lex-pr init --non-interactive
     - lex-pr plan --from-github
     - lex-pr execute plan.json
@@ -409,7 +409,7 @@ merge-automation:
 
 ### Onboarding Checklist
 
-- [ ] Install lex-pr-runner
+- [ ] Install lexrunner
 - [ ] Complete quickstart guide
 - [ ] Understand dependency syntax
 - [ ] Know how to check merge status

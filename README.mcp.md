@@ -1,6 +1,6 @@
-# MCP Server for lex-pr-runner
+# MCP Server for lexrunner
 
-The Model Context Protocol (MCP) server for lex-pr-runner provides read-only tools for plan creation, gate execution, and merge operations.
+The Model Context Protocol (MCP) server for lexrunner provides read-only tools for plan creation, gate execution, and merge operations.
 
 **Architecture:** This server is aligned with LexBrain and LexMap MCP implementations, using direct stdio JSON-RPC 2.0 protocol handling for consistency and maintainability across the Lex ecosystem.
 
@@ -14,9 +14,9 @@ See [MCP-CONFIG.md](./MCP-CONFIG.md) for complete configuration details and alig
 ```json
 {
   "mcpServers": {
-    "lex-pr-runner": {
+    "lexrunner": {
       "command": "node",
-      "args": ["/srv/lex-mcp/lex-pr-runner/mcp-server.mjs"],
+      "args": ["/srv/lex-mcp/lexrunner/mcp-server.mjs"],
       "env": {
         "LEX_PR_PROFILE_DIR": "/path/to/.smartergpt"
       }
@@ -35,7 +35,7 @@ npm run mcp
 node mcp-server.mjs
 
 # Via launcher script (for specific environments)
-bash lex-pr-runner-launcher.sh
+bash lexrunner-launcher.sh
 ```
 
 The server communicates via stdio using the MCP JSON-RPC 2.0 protocol, aligned with LexBrain and LexMap.
@@ -150,7 +150,7 @@ The tool will:
     "requiredGates": ["lint", "test", "security"],
     "maxWorkers": 4,
     "target": "develop",
-    "outDir": "/tmp/lex-pr-runner-plan"
+    "outDir": "/tmp/lexrunner-plan"
   }
 }
 ```
@@ -282,7 +282,7 @@ The server provides clear error messages for:
 const client = new Client({
   command: "npm",
   args: ["run", "mcp"],
-  cwd: "/path/to/lex-pr-runner"
+  cwd: "/path/to/lexrunner"
 });
 
 // Create a plan from configuration files (traditional mode)
@@ -297,7 +297,7 @@ const githubPlanResult = await client.callTool("plan.create", {
   excludePRs: [100, 200],
   requiredGates: ["lint", "test", "security"],
   maxWorkers: 4,
-  outDir: "/tmp/lex-pr-runner-plan"
+  outDir: "/tmp/lexrunner-plan"
 });
 
 // Run gates on internal plan

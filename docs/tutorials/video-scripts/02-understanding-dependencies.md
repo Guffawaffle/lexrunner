@@ -2,7 +2,7 @@
 
 **Duration:** 8 minutes  
 **Target Audience:** Developers working with PR stacks  
-**Prerequisites:** Basic lex-pr-runner knowledge (Getting Started video)
+**Prerequisites:** Basic lexrunner knowledge (Getting Started video)
 
 ## Setup
 
@@ -17,7 +17,7 @@
 
 **[Screen: Title slide with dependency graph visualization]**
 
-> "Welcome back! In this video, you'll learn how to manage PR dependencies with lex-pr-runner. We'll cover dependency syntax, merge order computation, and how to handle complex PR stacks."
+> "Welcome back! In this video, you'll learn how to manage PR dependencies with lexrunner. We'll cover dependency syntax, merge order computation, and how to handle complex PR stacks."
 
 **[Screen: Show outline]**
 - Dependency syntax
@@ -35,7 +35,7 @@
 
 **[Animation: Show PRs being merged sequentially with waiting time]**
 
-> "With lex-pr-runner, you declare dependencies once, and the tool handles the merge order automatically. Same 4 PRs, merged in 5 minutes."
+> "With lexrunner, you declare dependencies once, and the tool handles the merge order automatically. Same 4 PRs, merged in 5 minutes."
 
 **[Animation: Show automatic dependency resolution and parallel execution]**
 
@@ -123,7 +123,7 @@ $ gh pr create \
 
 **[Screen: Terminal]**
 
-> "Now let's see how lex-pr-runner computes the merge order."
+> "Now let's see how lexrunner computes the merge order."
 
 ```bash
 $ lex-pr plan --from-github
@@ -172,7 +172,7 @@ Depends-On: #103
 
 **[Animation: Show dependency graph with diamond shape]**
 
-> "lex-pr-runner handles this automatically. It waits for both #102 and #103 to merge before merging #105."
+> "lexrunner handles this automatically. It waits for both #102 and #103 to merge before merging #105."
 
 ```bash
 $ lex-pr merge-order plan.json
@@ -351,6 +351,6 @@ Create gist with:
 ### Sample Repository
 Provide fork-able repo with:
 - Example PR stack
-- Configured lex-pr-runner
+- Configured lexrunner
 - Sample gates
 - README with exercises

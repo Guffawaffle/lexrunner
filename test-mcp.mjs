@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-console.log("Testing lex-pr-runner MCP server...\n");
+console.log("Testing lexrunner MCP server...\n");
 
 const serverPath = resolve(__dirname, "mcp-server.mjs");
 const server = spawn("node", [serverPath], {

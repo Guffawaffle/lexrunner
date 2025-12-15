@@ -84,7 +84,7 @@ describe('Audit Schema', () => {
 			session_id: 'session-123',
 			run_id: 'run-456',
 			tool: {
-				name: 'lex-pr-runner',
+				name: 'lexrunner',
 				version: '0.1.0'
 			},
 			actor: {
@@ -264,7 +264,7 @@ describe('Audit Emitter', () => {
 			const content = fs.readFileSync(outputPath, 'utf-8');
 			const event = JSON.parse(content);
 
-			expect(event.tool.name).toBe('lex-pr-runner');
+			expect(event.tool.name).toBe('lexrunner');
 			expect(event.tool.version).toBeDefined();
 		});
 

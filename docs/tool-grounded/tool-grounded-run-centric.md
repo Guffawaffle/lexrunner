@@ -1,7 +1,7 @@
 # Tool-Grounded, Run-Centric Orchestration (LexRunner v0.6.0+ Draft)
 
 **Status:** Draft design (0.1.0)
-**Intended home:** `lex-pr-runner/docs/tool-grounded/tool-grounded-run-centric.md`
+**Intended home:** `lexrunner/docs/tool-grounded/tool-grounded-run-centric.md`
 **Authors:**
 - Joseph Gustavson ("Guffawaffle")
 - Lex (GPT-5.1 Thinking, design partner)

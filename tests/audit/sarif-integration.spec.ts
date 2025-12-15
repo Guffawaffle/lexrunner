@@ -192,7 +192,7 @@ describe('SARIF Integration', () => {
 			const run = sarif.runs[0];
 			expect(run.tool).toBeDefined();
 			expect(run.tool.driver).toBeDefined();
-			expect(run.tool.driver.name).toBe('lex-pr-runner');
+			expect(run.tool.driver.name).toBe('lexrunner');
 			expect(run.tool.driver.version).toBeDefined();
 			expect(run.tool.driver.rules).toBeInstanceOf(Array);
 			expect(run.results).toBeInstanceOf(Array);

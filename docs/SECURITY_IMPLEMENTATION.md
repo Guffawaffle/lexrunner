@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation adds comprehensive enterprise-grade security and compliance features to lex-pr-runner, enabling production deployment in regulated environments.
+This implementation adds comprehensive enterprise-grade security and compliance features to lexrunner, enabling production deployment in regulated environments.
 
 ## Implemented Features
 

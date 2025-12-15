@@ -1,7 +1,7 @@
 {
   "dashboard": {
     "title": "Lex-PR Runner - Production Monitoring",
-    "tags": ["lex-pr-runner", "production", "monitoring"],
+    "tags": ["lexrunner", "production", "monitoring"],
     "timezone": "browser",
     "panels": [
       {

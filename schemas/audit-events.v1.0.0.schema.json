@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://smartergpt.dev/schemas/audit-events/v1.0.0.json",
-  "title": "lex-pr-runner Audit Events",
+  "title": "lexrunner Audit Events",
   "description": "Schema for audit event logging with versioning and backward compatibility",
   "version": "1.0.0",
   "type": "object",
@@ -68,7 +68,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Name of the tool (e.g., 'lex-pr-runner')"
+          "description": "Name of the tool (e.g., 'lexrunner')"
         },
         "version": {
           "type": "string",

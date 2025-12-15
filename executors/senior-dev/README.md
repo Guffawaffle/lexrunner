@@ -33,7 +33,7 @@ import {
   prepareReviewContext,
   recallSeniorDevContext,
   captureSeniorDevFrame,
-} from "@lex-pr-runner/executors/seniorDev";
+} from "@lexrunner/executors/seniorDev";
 ```
 
 ### `prepareReviewContext(input)`

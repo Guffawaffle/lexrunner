@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('CLI JSON Output Tests', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-cli-json-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-cli-json-test');
 	const cliPath = path.resolve(__dirname, '..', 'dist', 'cli.js');
 
 	beforeEach((context) => {

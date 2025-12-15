@@ -1,5 +1,5 @@
 /**
- * Execution state management for the lex-pr-runner
+ * Execution state management for the lexrunner
  * Handles status tracking, propagation, and merge eligibility
  * Includes error diagnostics and recovery tracking
  */

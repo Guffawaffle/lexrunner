@@ -1,6 +1,6 @@
 # Error Recovery Configuration Examples
 
-This directory contains example configurations demonstrating error recovery patterns in lex-pr-runner.
+This directory contains example configurations demonstrating error recovery patterns in lexrunner.
 
 ## Example 1: Basic Retry Configuration
 

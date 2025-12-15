@@ -23,7 +23,7 @@ You're on a **large team (10+ developers)** working on a feature with **15 open 
 
 ## Prerequisites
 
-- lex-pr-runner installed
+- lexrunner installed
 - GitHub repository with 10+ open PRs
 - GitHub token set: `export GITHUB_TOKEN=your_token_here`
 - Completed [Tutorial 1-4](./01-simple-stack.md)

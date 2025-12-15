@@ -6,7 +6,7 @@ import * as os from 'os';
 import { skipIfCliNotBuilt } from './helpers/cli';
 
 describe('CLI Color and JSON Output Control', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-color-control-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-color-control-test');
 	const cliPath = path.resolve(__dirname, '..', 'dist', 'cli.js');
 
 	beforeEach((context) => {

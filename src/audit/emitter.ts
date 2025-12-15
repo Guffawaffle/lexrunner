@@ -78,7 +78,7 @@ export class AuditEmitter {
 
 		// Tool info (with optional override for testing)
 		this.tool = options.tool || {
-			name: 'lex-pr-runner',
+			name: 'lexrunner',
 			version: process.env.npm_package_version || '0.1.0'
 		};
 

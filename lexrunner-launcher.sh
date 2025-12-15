@@ -1,5 +1,5 @@
 #!/bin/bash
-# lex-pr-runner MCP Launcher for WSL
+# lexrunner MCP Launcher for WSL
 # This script ensures node is available by sourcing nvm
 
 # Source nvm if it exists
@@ -9,4 +9,4 @@ if [ -f "$HOME/.nvm/nvm.sh" ]; then
 fi
 
 # Execute the MCP server from the production location
-exec node /srv/lex-mcp/lex-pr-runner/mcp-server.mjs
+exec node /srv/lex-mcp/lexrunner/mcp-server.mjs

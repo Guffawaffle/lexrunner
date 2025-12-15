@@ -2,7 +2,7 @@
 
 **Canonical Structure:** `lex-pr <category> <action> [--flags...]`
 
-This document defines the stable vocabulary for lex-pr-runner commands.
+This document defines the stable vocabulary for lexrunner commands.
 
 ---
 

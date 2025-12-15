@@ -1,5 +1,5 @@
 /**
- * Merge eligibility and decision logic for lex-pr-runner
+ * Merge eligibility and decision logic for lexrunner
  * Implements policy-based merge decisions, short-circuiting, and manual overrides
  */
 

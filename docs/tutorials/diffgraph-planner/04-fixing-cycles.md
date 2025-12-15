@@ -32,7 +32,7 @@ PR-100 ──► PR-101 ──► PR-102 ──► PR-103
 
 ## Prerequisites
 
-- lex-pr-runner installed
+- lexrunner installed
 - Basic understanding of dependency graphs
 - Completed [Tutorial 1: Simple Stack](./01-simple-stack.md)
 

@@ -231,9 +231,9 @@ Events are transformed into Lex Frames using the following mapping:
   "planHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "prList": ["#123", "#124", "#125"],
   "modulesTouched": [
-    "lex-pr-runner/src/cli",
-    "lex-pr-runner/src/gates",
-    "lex-pr-runner/src/frames"
+    "lexrunner/src/cli",
+    "lexrunner/src/gates",
+    "lexrunner/src/frames"
   ],
   "batchSize": 3,
   "totalPRs": 10,

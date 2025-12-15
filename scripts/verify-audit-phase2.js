@@ -55,7 +55,7 @@ async function main() {
 		dir: tmpDir,
 		sessionId: '01JB123456789',
 		runId: '01JB987654321',
-		tool: { name: 'lex-pr-runner', version: '0.1.0' },
+		tool: { name: 'lexrunner', version: '0.1.0' },
 	});
 
 	// Emit gate events matching issue example

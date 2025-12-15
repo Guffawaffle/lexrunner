@@ -176,8 +176,8 @@ jobs:
         with:
           node-version: 20
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Run security scan with audit
         run: |
@@ -204,9 +204,9 @@ jobs:
     {
       "tool": {
         "driver": {
-          "name": "lex-pr-runner",
+          "name": "lexrunner",
           "version": "0.1.0",
-          "informationUri": "https://smartergpt.dev/lex-pr-runner",
+          "informationUri": "https://smartergpt.dev/lexrunner",
           "rules": [
             {
               "id": "CVE-2024-1234",

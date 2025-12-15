@@ -14,7 +14,7 @@ describe('AutopilotLevel0', () => {
 	let context: AutopilotContext;
 
 	beforeEach(() => {
-		testDir = path.join(os.tmpdir(), `lex-pr-runner-autopilot-test-${Date.now()}`);
+		testDir = path.join(os.tmpdir(), `lexrunner-autopilot-test-${Date.now()}`);
 		fs.mkdirSync(testDir, { recursive: true });
 
 		const plan: Plan = {
@@ -81,7 +81,7 @@ describe('AutopilotLevel1', () => {
 	let context: AutopilotContext;
 
 	beforeEach(() => {
-		testDir = path.join(os.tmpdir(), `lex-pr-runner-autopilot-test-${Date.now()}`);
+		testDir = path.join(os.tmpdir(), `lexrunner-autopilot-test-${Date.now()}`);
 		fs.mkdirSync(testDir, { recursive: true });
 
 		const plan: Plan = {

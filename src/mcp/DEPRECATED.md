@@ -2,7 +2,7 @@
  * DEPRECATED: This file is no longer used.
  *
  * The MCP server has been migrated to align with LexBrain and LexMap architecture.
- * See: /srv/lex-mcp/lex-pr-runner/mcp-server.mjs
+ * See: /srv/lex-mcp/lexrunner/mcp-server.mjs
  *
  * Migration Date: 2025-11-02
  *

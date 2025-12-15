@@ -19,7 +19,7 @@ const describeIfGitEnabled =
 	process.env.LEX_GIT_MODE === "live" ? describe : describe.skip;
 
 describeIfGitEnabled("deterministic build and format", () => {
-	const testDir = path.join(os.tmpdir(), "lex-pr-runner-build-test");
+	const testDir = path.join(os.tmpdir(), "lexrunner-build-test");
 
 	beforeEach(() => {
 		// Clean test directory

@@ -99,7 +99,7 @@ export interface BudgetRemainingMetrics {
 }
 
 /**
- * Metric definitions for lex-pr-runner governance
+ * Metric definitions for lexrunner governance
  */
 export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
 	lex_turn_cost_total: {

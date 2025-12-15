@@ -4,7 +4,7 @@
  * Validates procedure definitions at load time to ensure
  * they are well-formed and complete.
  *
- * @internal This module is internal to lex-pr-runner and should not be
+ * @internal This module is internal to lexrunner and should not be
  * imported directly by external consumers. The procedure format may
  * change between minor versions.
  */

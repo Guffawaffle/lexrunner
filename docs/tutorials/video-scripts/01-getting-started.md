@@ -1,4 +1,4 @@
-# Video Script: Getting Started with lex-pr-runner
+# Video Script: Getting Started with lexrunner
 
 **Duration:** 5 minutes  
 **Target Audience:** New users  
@@ -15,12 +15,12 @@
 
 ### Introduction (0:00 - 0:30)
 
-**[Screen: lex-pr-runner logo]**
+**[Screen: lexrunner logo]**
 
-> "Hi! Welcome to lex-pr-runner. In this 5-minute video, you'll learn how to automate your PR merge workflow. We'll go from installation to your first successful automated merge."
+> "Hi! Welcome to lexrunner. In this 5-minute video, you'll learn how to automate your PR merge workflow. We'll go from installation to your first successful automated merge."
 
 **[Screen: Show 3 bullet points]**
-- Install lex-pr-runner
+- Install lexrunner
 - Set up your workspace
 - Merge PRs automatically
 
@@ -30,20 +30,20 @@
 
 **[Screen: Terminal]**
 
-> "First, let's install lex-pr-runner. It's a Node.js package, so you'll need Node 20 or later."
+> "First, let's install lexrunner. It's a Node.js package, so you'll need Node 20 or later."
 
 ```bash
 $ node --version
 v20.18.0
 
-$ npm install -g lex-pr-runner
+$ npm install -g lexrunner
 [installation output]
 
 $ lex-pr --version
 0.1.0
 ```
 
-> "Great! lex-pr-runner is now installed globally."
+> "Great! lexrunner is now installed globally."
 
 ---
 
@@ -68,7 +68,7 @@ $ lex-pr init
 ✓ Workspace initialized in .smartergpt.local/
 ```
 
-> "Perfect! lex-pr-runner created configuration files in .smartergpt.local."
+> "Perfect! lexrunner created configuration files in .smartergpt.local."
 
 **[Screen: Show file tree]**
 
@@ -104,7 +104,7 @@ Found 2 pull requests:
 | #2    | Add feature B    | feature-b   | bob      | ready  |
 ```
 
-> "lex-pr-runner found 2 PRs ready to merge."
+> "lexrunner found 2 PRs ready to merge."
 
 ---
 
@@ -213,7 +213,7 @@ Successfully merged 2 PRs
 > "Congratulations! You've successfully:"
 
 **[Show checklist]**
-- ✓ Installed lex-pr-runner
+- ✓ Installed lexrunner
 - ✓ Initialized your workspace
 - ✓ Discovered PRs
 - ✓ Generated a merge plan
@@ -242,7 +242,7 @@ Successfully merged 2 PRs
 > "It's optional but recommended for private repositories and higher API rate limits."
 
 **Q: What if I have merge conflicts?**
-> "lex-pr-runner will detect conflicts and guide you through resolution. See the Troubleshooting guide."
+> "lexrunner will detect conflicts and guide you through resolution. See the Troubleshooting guide."
 
 **Q: Can I use this with GitLab?**
 > "Currently GitHub only, but GitLab support is planned."
@@ -273,7 +273,7 @@ Provide full captions for accessibility:
 
 ## Assets Needed
 
-- lex-pr-runner logo (PNG, transparent)
+- lexrunner logo (PNG, transparent)
 - Demo repository setup script
 - Sample configuration files
 - Terminal color scheme preset

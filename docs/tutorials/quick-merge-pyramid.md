@@ -1,6 +1,6 @@
 # Quick Tutorial: Merge Pyramid Workflow
 
-This tutorial walks you through the complete lex-pr-runner workflow: **discover → plan → execute → merge**. You'll learn how to manage multiple PRs as a cohesive merge pyramid.
+This tutorial walks you through the complete lexrunner workflow: **discover → plan → execute → merge**. You'll learn how to manage multiple PRs as a cohesive merge pyramid.
 
 **Time to complete:** ~10 minutes
 

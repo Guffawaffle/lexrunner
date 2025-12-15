@@ -10,7 +10,7 @@ import { execSync } from 'child_process';
 describe('bulletproof determinism', () => {
 	// Use a per-test-file temp directory to avoid collisions when Vitest runs tests
 	// in parallel. Using the filename ensures uniqueness across test files.
-	const testDir = path.join(os.tmpdir(), `lex-pr-runner-determinism-test-${path.basename(__filename)}`);
+	const testDir = path.join(os.tmpdir(), `lexrunner-determinism-test-${path.basename(__filename)}`);
 
 	beforeEach(() => {
 		// Clean test directory

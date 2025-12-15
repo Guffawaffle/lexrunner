@@ -3,7 +3,7 @@
 ---
 
 ## Context
-You will plan and execute a **merge-weave** into a single umbrella branch and PR using **lex-pr-runner CLI** for the merge-weave primitives. For **git/GitHub** operations, prefer **MCP tools first**, falling back to `gh` CLI, then REST outlines if needed.
+You will plan and execute a **merge-weave** into a single umbrella branch and PR using **lexrunner CLI** for the merge-weave primitives. For **git/GitHub** operations, prefer **MCP tools first**, falling back to `gh` CLI, then REST outlines if needed.
 
 - **Discover** open PRs from GitHub; `lex-pr discover` outputs JSON.
 - **Plan:** `lex-pr plan --from-github` generates plan.json with dependency suggestions.

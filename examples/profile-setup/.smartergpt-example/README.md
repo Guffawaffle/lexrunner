@@ -40,10 +40,10 @@ All configuration files are at the **profile root**, not in a subdirectory.
 ```yaml
 # Optional for tracked profile (defaults to role: example)
 role: example
-name: lex-pr-runner
+name: lexrunner
 version: 1.0.0
 projectType: typescript
-description: Example tracked profile for lex-pr-runner
+description: Example tracked profile for lexrunner
 ```
 
 ### intent.md

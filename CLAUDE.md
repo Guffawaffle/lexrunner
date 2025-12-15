@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**lex-pr-runner** is a TypeScript CLI tool for parallel PR workflows with dependency management and quality gates. The tagline: *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.*
+**lexrunner** is a TypeScript CLI tool for parallel PR workflows with dependency management and quality gates. The tagline: *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.*
 
 **Tech Stack**: TypeScript, ESM modules, Node.js 20+, Commander.js, Vitest
 
@@ -116,7 +116,7 @@ Tests use Vitest with per-test isolation:
 
 **Test isolation pattern**:
 ```typescript
-const testDir = path.join(os.tmpdir(), `lex-pr-runner-${path.basename(__filename)}`);
+const testDir = path.join(os.tmpdir(), `lexrunner-${path.basename(__filename)}`);
 process.chdir(testDir);
 ```
 
@@ -316,7 +316,7 @@ Production workflow uses `.smartergpt/` tracked profile.
 
 4. **Test isolation**: Use per-file temp directories to avoid parallel test conflicts
    ```typescript
-   const testDir = path.join(os.tmpdir(), `lex-pr-runner-test-${path.basename(__filename)}`);
+   const testDir = path.join(os.tmpdir(), `lexrunner-test-${path.basename(__filename)}`);
    ```
 
 5. **Commander error handling**: Use `exitOverride` and custom error handling
@@ -426,7 +426,7 @@ Key docs to reference:
 
 ## Canonical Terms (from docs/TERMS.md)
 
-- **lex-pr-runner**: The repository/project
+- **lexrunner**: The repository/project
 - **Runner CLI**: TypeScript CLI app (`src/**`)
 - **MCP server**: Optional adapter (`src/mcp/server.ts`)
 - **Workspace profile**: Example config (`.smartergpt/**`)

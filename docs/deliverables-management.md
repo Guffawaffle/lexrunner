@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Deliverables Management System provides comprehensive artifact tracking, versioning, cleanup, and CI/CD integration for autopilot operations in lex-pr-runner.
+The Deliverables Management System provides comprehensive artifact tracking, versioning, cleanup, and CI/CD integration for autopilot operations in lexrunner.
 
 ## Key Features
 
@@ -305,7 +305,7 @@ curl -X POST https://monitoring.example.com/api/autopilot \
 ### TypeScript/JavaScript
 
 ```typescript
-import { DeliverablesManager } from 'lex-pr-runner/autopilot';
+import { DeliverablesManager } from 'lexrunner/autopilot';
 
 const manager = new DeliverablesManager('/path/to/.smartergpt');
 

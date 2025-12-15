@@ -258,7 +258,7 @@ describe('Profile Resolver', () => {
 			resolveProfile(profileDir, tempDir);
 
 			expect(consoleSpy).toHaveBeenCalledWith(
-				`lex-pr-runner profile: using profile: ${profileDir} (role: test-role)`
+				`lexrunner profile: using profile: ${profileDir} (role: test-role)`
 			);
 		});
 
@@ -269,7 +269,7 @@ describe('Profile Resolver', () => {
 			resolveProfile(undefined, tempDir);
 
 			expect(consoleSpy).toHaveBeenCalledWith(
-				`lex-pr-runner profile: using profile: ${trackedDir} (role: example)`
+				`lexrunner profile: using profile: ${trackedDir} (role: example)`
 			);
 		});
 
@@ -299,7 +299,7 @@ describe('Profile Resolver', () => {
 			// Verify the message starts with the expected prefix
 			const calls = consoleSpy.mock.calls;
 			expect(calls.length).toBe(1);
-			expect(calls[0][0]).toMatch(/^lex-pr-runner profile: /);
+			expect(calls[0][0]).toMatch(/^lexrunner profile: /);
 		});
 	});
 
@@ -397,7 +397,7 @@ describe('Profile Resolver', () => {
 		it('should log messages with consistent prefix to stderr', () => {
 			logProfileMessage('test message');
 
-			expect(consoleSpy).toHaveBeenCalledWith('lex-pr-runner profile: test message');
+			expect(consoleSpy).toHaveBeenCalledWith('lexrunner profile: test message');
 		});
 
 		it('should write to stderr not stdout', () => {

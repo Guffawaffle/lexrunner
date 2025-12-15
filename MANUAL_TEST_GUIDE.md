@@ -4,7 +4,7 @@ This document provides manual testing steps to verify the fix for the empty plan
 
 ## Issue Summary
 
-**Original Problem:** When calling `mcp_lex-pr-runner_plan_create` without `fromGithub: true`, the tool would return an empty `plan.json` even when `.smartergpt/scope.yml` contained GitHub discovery filters like `include_labels: ["ready-merge"]`.
+**Original Problem:** When calling `mcp_lexrunner_plan_create` without `fromGithub: true`, the tool would return an empty `plan.json` even when `.smartergpt/scope.yml` contained GitHub discovery filters like `include_labels: ["ready-merge"]`.
 
 **Root Cause:** The tool read scope.yml but didn't use the filters to discover PRs from GitHub.
 
@@ -70,7 +70,7 @@ Same as Test Case 1, plus start MCP server:
 ```bash
 LEX_PR_PROFILE_DIR=/path/to/test-repo/.smartergpt \
 ALLOW_MUTATIONS=true \
-node /path/to/lex-pr-runner/mcp-server.mjs
+node /path/to/lexrunner/mcp-server.mjs
 ```
 
 ### Execute MCP Call

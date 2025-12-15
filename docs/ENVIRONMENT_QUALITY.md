@@ -1,6 +1,6 @@
 # Environment Quality: Hostility Scoring
 
-This document describes the Environmental Hostility Scoring system implemented in lex-pr-runner, based on the Environmental De-hostilization concept from the coordination cost compression thesis.
+This document describes the Environmental Hostility Scoring system implemented in lexrunner, based on the Environmental De-hostilization concept from the coordination cost compression thesis.
 
 ## Overview
 

@@ -31,7 +31,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -51,9 +51,9 @@ describe('SARIF Adapter', () => {
 			expect(report.runs).toHaveLength(1);
 			
 			const run = report.runs[0];
-			expect(run.tool.driver.name).toBe('lex-pr-runner');
+			expect(run.tool.driver.name).toBe('lexrunner');
 			expect(run.tool.driver.version).toBe('0.1.0');
-			expect(run.tool.driver.informationUri).toBe('https://smartergpt.dev/lex-pr-runner');
+			expect(run.tool.driver.informationUri).toBe('https://smartergpt.dev/lexrunner');
 			expect(run.tool.driver.rules).toHaveLength(1);
 			expect(run.results).toHaveLength(1);
 		});
@@ -75,7 +75,7 @@ describe('SARIF Adapter', () => {
 						level: 'warn',
 						session_id: 'test-session',
 						run_id: 'test-run',
-						tool: { name: 'lex-pr-runner', version: '0.1.0' },
+						tool: { name: 'lexrunner', version: '0.1.0' },
 						actor: { type: 'cli' },
 						repo: {},
 						payload: {
@@ -103,7 +103,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -120,7 +120,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -137,7 +137,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -171,7 +171,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -202,7 +202,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -228,7 +228,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -254,7 +254,7 @@ describe('SARIF Adapter', () => {
 					level: 'info',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -279,7 +279,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -333,9 +333,9 @@ describe('SARIF Adapter', () => {
 					{
 						tool: {
 							driver: {
-								name: 'lex-pr-runner',
+								name: 'lexrunner',
 								version: '0.1.0',
-								informationUri: 'https://smartergpt.dev/lex-pr-runner',
+								informationUri: 'https://smartergpt.dev/lexrunner',
 								rules: []
 							}
 						},
@@ -364,9 +364,9 @@ describe('SARIF Adapter', () => {
 					{
 						tool: {
 							driver: {
-								name: 'lex-pr-runner',
+								name: 'lexrunner',
 								version: '0.1.0',
-								informationUri: 'https://smartergpt.dev/lex-pr-runner',
+								informationUri: 'https://smartergpt.dev/lexrunner',
 								rules: []
 							}
 						},
@@ -389,9 +389,9 @@ describe('SARIF Adapter', () => {
 					{
 						tool: {
 							driver: {
-								name: 'lex-pr-runner',
+								name: 'lexrunner',
 								version: '0.1.0',
-								informationUri: 'https://smartergpt.dev/lex-pr-runner',
+								informationUri: 'https://smartergpt.dev/lexrunner',
 								rules: []
 							}
 						},
@@ -419,7 +419,7 @@ describe('SARIF Adapter', () => {
 					level: 'warn',
 					session_id: 'test-session',
 					run_id: 'test-run',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: {
@@ -442,7 +442,7 @@ describe('SARIF Adapter', () => {
 			
 			const scanResult = parseSarif(content);
 			expect(scanResult.vulnerabilities.length).toBeGreaterThan(0);
-			expect(scanResult.scanner).toBe('lex-pr-runner');
+			expect(scanResult.scanner).toBe('lexrunner');
 		});
 	});
 });

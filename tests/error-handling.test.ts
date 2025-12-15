@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('error handling and validation', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-error-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-error-test');
 
 	beforeEach(() => {
 		// Clean test directory

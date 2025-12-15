@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains minimal examples demonstrating lex-pr-runner usage.
+This directory contains minimal examples demonstrating lexrunner usage.
 
 ## Files
 

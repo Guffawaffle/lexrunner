@@ -25,7 +25,7 @@ export * from './workflows/endToEnd.bench.js';
  */
 export const BENCHMARK_INFO = {
   version: '1.0.0',
-  description: 'Performance regression test suite for lex-pr-runner',
+  description: 'Performance regression test suite for lexrunner',
   categories: [
     'core',      // Core algorithms
     'io',        // I/O operations

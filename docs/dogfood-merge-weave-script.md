@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `scripts/dogfood-merge-weave.sh` script provides a parameterized, repo-agnostic wrapper around `lex-pr-runner` commands for executing merge-weave workflows. It automates the complete workflow from plan generation to merge execution and reporting.
+The `scripts/dogfood-merge-weave.sh` script provides a parameterized, repo-agnostic wrapper around `lexrunner` commands for executing merge-weave workflows. It automates the complete workflow from plan generation to merge execution and reporting.
 
 ## Features
 
@@ -16,7 +16,7 @@ The `scripts/dogfood-merge-weave.sh` script provides a parameterized, repo-agnos
 
 The script is located at `scripts/dogfood-merge-weave.sh` and requires:
 - Bash shell
-- `lex-pr-runner` CLI (installed globally or via npm)
+- `lexrunner` CLI (installed globally or via npm)
 - `jq` (optional, for enhanced plan summaries)
 
 ## Usage
@@ -183,7 +183,7 @@ The script can be used in CI/CD pipelines:
 
 ### Script fails with "lex-pr command not found"
 
-The script automatically falls back to `npm run cli` if `lex-pr` is not in PATH. Ensure you're running from the repository root or install `lex-pr-runner` globally.
+The script automatically falls back to `npm run cli` if `lex-pr` is not in PATH. Ensure you're running from the repository root or install `lexrunner` globally.
 
 ### Schema validation failures
 
@@ -203,7 +203,7 @@ chmod +x scripts/dogfood-merge-weave.sh
 ## Related Documentation
 
 - [Merge Weave Usage Guide](../MERGE_WEAVE_USAGE_GUIDE.md)
-- [lex-pr-runner README](../README.md)
+- [lexrunner README](../README.md)
 - [Plan Schema Documentation](../schemas/)
 
 ## Contributing
