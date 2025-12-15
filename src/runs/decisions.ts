@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import type { NextOption, StatusResponse } from "../schemas/runCentric.js";
+import { StatusResponseSchema } from "../schemas/runCentric.js";
 import { readRunState, appendToRunLog, writeRunState, readRunLog } from "./storage.js";
 import { buildStatusResponse } from "./statusBuilder.js";
 import { RunNotFoundError } from "./types.js";
@@ -49,7 +50,7 @@ export const SubmitDecisionOutputSchema = z.object({
 	/** Whether the decision was accepted */
 	accepted: z.boolean(),
 	/** Updated status after accepting the decision */
-	updatedStatus: z.any(), // StatusResponse type from runCentric
+	updatedStatus: StatusResponseSchema,
 	/** Error information if rejected */
 	error: z.object({
 		/** Error code from DecisionErrorCodes */
@@ -208,6 +209,9 @@ function validateResponseSchema(
 /**
  * Apply state transition based on the submitted action
  *
+ * NOTE: This implements a simplified state machine for decision-driven transitions.
+ * For more complex state machines, consider extracting to a shared state machine module.
+ *
  * @param currentState - Current run state
  * @param action - Action being submitted
  * @returns New state after applying the action
@@ -266,9 +270,19 @@ export function submitDecision(
 	// Read current run state
 	const runState = readRunState(runId, baseDir);
 	if (!runState) {
+		// Build an empty status response for nonexistent run
+		const dummyStatus: StatusResponse = {
+			runId,
+			state: "failed",
+			mode: "unknown",
+			procedure: "unknown",
+			summary: "Run not found",
+			nextOptions: [],
+		};
+		
 		return {
 			accepted: false,
-			updatedStatus: null,
+			updatedStatus: dummyStatus,
 			error: {
 				code: DecisionErrorCodes.INVALID_STATE,
 				message: `Run not found: ${runId}`,
@@ -379,6 +393,10 @@ export function submitDecision(
 /**
  * Read all decision log entries for a run
  *
+ * NOTE: Uses `as unknown as` to bridge from generic Record to specific type.
+ * The NDJSON log format doesn't provide runtime type guarantees, so this is
+ * acceptable as long as we control the write path (which we do via appendToRunLog).
+ *
  * @param runId - Run identifier
  * @param baseDir - Base directory for run storage
  * @returns Array of decision log entries
@@ -389,6 +407,7 @@ export function getDecisions(
 ): DecisionLogEntry[] {
 	try {
 		const entries = readRunLog(runId, "decisions", baseDir);
+		// Safe cast since we control the write path through submitDecision
 		return entries as unknown as DecisionLogEntry[];
 	} catch {
 		// Return empty array if log doesn't exist yet
