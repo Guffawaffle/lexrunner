@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# gen_mcp_servers.py — Enhanced multi‑repo MCP servers.json generator for lex‑pr‑runner
+# gen_mcp_servers.py — Enhanced multi‑repo MCP servers.json generator for lexrunner
 # Features:
 # - Recursive or shallow repo discovery under one or more roots
 # - Include / exclude regex filters on repo basename
@@ -21,10 +21,10 @@ from typing import Dict, Any, List, Optional
 import hashlib
 
 DEFAULT_ROOTS = ["/srv", "/home/guff"]
-DEFAULT_PREFIX = "lex-pr-runner-"
+DEFAULT_PREFIX = "lexrunner-"
 # Default built dist artifact and TS fallback for development
-DEFAULT_DIST = "/home/guff/lex-pr-runner/dist/mcp/server.js"
-DEFAULT_TS = "/home/guff/lex-pr-runner/src/mcp/server.ts"
+DEFAULT_DIST = "/home/guff/lexrunner/dist/mcp/server.js"
+DEFAULT_TS = "/home/guff/lexrunner/src/mcp/server.ts"
 
 RESERVED_ENV = {"ALLOW_MUTATIONS", "LEX_PR_PROFILE_DIR"}
 
@@ -110,7 +110,7 @@ def compute_hash(obj: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate MCP servers.json for lex-pr-runner across multiple repos.")
+    ap = argparse.ArgumentParser(description="Generate MCP servers.json for lexrunner across multiple repos.")
     ap.add_argument("-r", "--root", action="append", dest="roots", default=None,
                     help="Root(s) to scan for git repos (default: %s)" % DEFAULT_ROOTS)
     ap.add_argument("--recursive", action="store_true", help="Recurse into subdirectories for repos")
