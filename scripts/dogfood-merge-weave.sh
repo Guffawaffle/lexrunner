@@ -3,7 +3,7 @@
 # Generic Dogfood Merge-Weave Script
 # A parameterized, repo-agnostic script for executing merge-weave workflows
 #
-# This script wraps lex-pr-runner commands to provide a reusable workflow for:
+# This script wraps lexrunner commands to provide a reusable workflow for:
 # - Discovering PRs from GitHub (or using a plan file)
 # - Running gates locally
 # - Executing merge pyramid
@@ -255,7 +255,7 @@ if ! command -v lex-pr &> /dev/null; then
         print_info "Using npm run cli for lex-pr commands"
     else
         print_error "lex-pr command not found and no npm cli script available"
-        print_info "Please install lex-pr-runner or run from the repository root"
+        print_info "Please install lexrunner or run from the repository root"
         exit 1
     fi
 else

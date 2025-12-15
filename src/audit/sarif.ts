@@ -185,9 +185,9 @@ export async function generateSARIF(
 			{
 				tool: {
 					driver: {
-						name: 'lex-pr-runner',
+						name: 'lexrunner',
 						version: toolVersion,
-						informationUri: 'https://smartergpt.dev/lex-pr-runner',
+						informationUri: 'https://smartergpt.dev/lexrunner',
 						rules
 					}
 				},

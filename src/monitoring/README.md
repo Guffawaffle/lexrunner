@@ -1,6 +1,6 @@
 # Monitoring Module
 
-Production-ready observability and metrics for lex-pr-runner.
+Production-ready observability and metrics for lexrunner.
 
 ## Features
 

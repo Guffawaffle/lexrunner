@@ -37,12 +37,12 @@ The Audit SDK provides **two distinct APIs**:
 
 # Consumer SDK (Phase 3A)
 
-> **New in Phase 3A:** Third-party tools can now consume lex-pr-runner audit outputs with full TypeScript support, schema validation, and query capabilities.
+> **New in Phase 3A:** Third-party tools can now consume lexrunner audit outputs with full TypeScript support, schema validation, and query capabilities.
 
 ## Installation (Consumer SDK)
 
 ```bash
-npm install lex-pr-runner
+npm install lexrunner
 ```
 
 Then import the consumer SDK from the source (until published as separate package):
@@ -55,14 +55,14 @@ import {
   validateAuditManifest,
   EventQuery,
   type AuditEvent
-} from 'lex-pr-runner/src/sdk/index.js';
+} from 'lexrunner/src/sdk/index.js';
 ```
 
 Or use the types and parsers directly:
 
 ```typescript
-import { parseAuditEvent, type AuditEvent } from 'lex-pr-runner/src/audit/schema/events.js';
-import { parseAuditManifest } from 'lex-pr-runner/src/audit/schema/manifest.js';
+import { parseAuditEvent, type AuditEvent } from 'lexrunner/src/audit/schema/events.js';
+import { parseAuditManifest } from 'lexrunner/src/audit/schema/manifest.js';
 ```
 
 ## Quick Start (Consumer SDK)
@@ -70,7 +70,7 @@ import { parseAuditManifest } from 'lex-pr-runner/src/audit/schema/manifest.js';
 ### Example 1: Read and Filter Events
 
 ```typescript
-import { readAuditNDJSON, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSON, filterEvents } from 'lexrunner/src/sdk/index.js';
 
 // Read all events from audit output
 for await (const event of readAuditNDJSON('./audit.ndjson')) {
@@ -83,7 +83,7 @@ for await (const event of readAuditNDJSON('./audit.ndjson')) {
 ### Example 2: Load into Memory and Query
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, EventQuery } from 'lexrunner/src/sdk/index.js';
 
 // Load all events into memory
 const events = await readAuditNDJSONSync('./audit.ndjson');
@@ -101,7 +101,7 @@ console.log(`Found ${failedGates.length} failed gates`);
 ### Example 3: Compute Statistics
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, computeStatistics } from 'lexrunner/src/sdk/index.js';
 
 const events = await readAuditNDJSONSync('./audit.ndjson');
 const stats = computeStatistics(events);
@@ -115,7 +115,7 @@ console.log(`Time range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
 ### Example 4: Validate Manifest
 
 ```typescript
-import { validateAuditManifest } from 'lex-pr-runner/src/sdk/index.js';
+import { validateAuditManifest } from 'lexrunner/src/sdk/index.js';
 import * as fs from 'fs';
 
 const manifestData = JSON.parse(fs.readFileSync('./audit-manifest.json', 'utf8'));
@@ -311,7 +311,7 @@ console.log(`Gate pass rate: ${stats.gateStats.passed / stats.gateStats.total * 
 ### Example 1: CI/CD Integration - Report Failed Gates
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
 
 async function reportFailedGates() {
   const events = await readAuditNDJSONSync('./audit.ndjson');
@@ -338,7 +338,7 @@ reportFailedGates();
 ### Example 2: Generate HTML Report
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, computeStatistics, filterEvents } from 'lexrunner/src/sdk/index.js';
 import * as fs from 'fs';
 
 async function generateReport() {
@@ -381,7 +381,7 @@ generateReport();
 ### Example 3: SIEM Integration - Export to JSON
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
 import * as fs from 'fs';
 
 async function exportToSIEM() {
@@ -396,7 +396,7 @@ async function exportToSIEM() {
   const siemEvents = criticalEvents.map(event => ({
     timestamp: event.ts,
     severity: event.level,
-    source: 'lex-pr-runner',
+    source: 'lexrunner',
     event_type: event.event,
     session_id: event.session_id,
     details: event.payload
@@ -412,7 +412,7 @@ exportToSIEM();
 ### Example 4: Compliance Dashboard - Aggregate Metrics
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery, computeStatistics } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, EventQuery, computeStatistics } from 'lexrunner/src/sdk/index.js';
 
 async function complianceDashboard() {
   const events = await readAuditNDJSONSync('./audit.ndjson');
@@ -455,7 +455,7 @@ complianceDashboard();
 ### Example 5: Filter by Time Range
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
 
 async function eventsInTimeRange() {
   const events = await readAuditNDJSONSync('./audit.ndjson');
@@ -476,7 +476,7 @@ eventsInTimeRange();
 ### Example 6: Type-Safe Event Handling
 
 ```typescript
-import { readAuditNDJSONSync, type GateFinishedEvent } from 'lex-pr-runner/src/sdk/index.js';
+import { readAuditNDJSONSync, type GateFinishedEvent } from 'lexrunner/src/sdk/index.js';
 
 async function analyzeGatePerformance() {
   const events = await readAuditNDJSONSync('./audit.ndjson');
@@ -515,17 +515,17 @@ analyzeGatePerformance();
 
 ## Installation
 
-The Audit SDK is included in the `lex-pr-runner` package:
+The Audit SDK is included in the `lexrunner` package:
 
 ```bash
-# Already available if you have lex-pr-runner installed
-npm install lex-pr-runner
+# Already available if you have lexrunner installed
+npm install lexrunner
 ```
 
 Or import directly from the source:
 
 ```typescript
-import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
+import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 ```
 
 ---
@@ -536,7 +536,7 @@ import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
+import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 
 const audit = initAuditSDK('my-gate');
 
@@ -807,7 +807,7 @@ finally:
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
+import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 import { execSync } from 'child_process';
 
 const audit = initAuditSDK('vuln');
@@ -855,7 +855,7 @@ scanVulnerabilities(process.argv[2] || 'package.json');
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
+import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 import { execSync } from 'child_process';
 
 const audit = initAuditSDK('test');
@@ -912,7 +912,7 @@ runTests();
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lex-pr-runner/src/audit/sdk';
+import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 import { execSync } from 'child_process';
 
 const audit = initAuditSDK('lint');
@@ -1048,7 +1048,7 @@ import {
   AuditSDK, 
   VulnFoundPayload,
   TestResultPayload 
-} from 'lex-pr-runner/src/audit/sdk';
+} from 'lexrunner/src/audit/sdk';
 
 const audit: AuditSDK = initAuditSDK('my-gate');
 
@@ -1071,7 +1071,7 @@ await audit.emit<VulnFoundPayload>('vuln_found', vulnPayload, 'warn');
 The SDK may be published as a separate package in the future:
 
 ```bash
-npm install @lex-pr-runner/audit-sdk
+npm install @lexrunner/audit-sdk
 ```
 
 This would enable:

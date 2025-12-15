@@ -48,7 +48,7 @@
 					},
 					"repo": {
 						"type": "string",
-						"enum": ["lex", "lex-pr-runner"],
+						"enum": ["lex", "lexrunner"],
 						"description": "Target repository"
 					},
 					"labels": {

@@ -1,6 +1,6 @@
 # Front-End Capture Pipeline
 
-This guide explains the front-end capture pipeline for lex-pr-runner, which enables rapid idea-to-project workflows using GitHub Issues (no PRs).
+This guide explains the front-end capture pipeline for lexrunner, which enables rapid idea-to-project workflows using GitHub Issues (no PRs).
 
 ## Overview
 

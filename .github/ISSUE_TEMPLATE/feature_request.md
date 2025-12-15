@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for lex-pr-runner
+about: Suggest an idea for lexrunner
 labels: enhancement
 ---
 

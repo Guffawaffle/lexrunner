@@ -1,10 +1,10 @@
-# lex-pr-runner Documentation
+# lexrunner Documentation
 
-Complete documentation for lex-pr-runner - automated PR merge workflows with dependency management.
+Complete documentation for lexrunner - automated PR merge workflows with dependency management.
 
 ## 🚀 Getting Started
 
-New to lex-pr-runner? Start here:
+New to lexrunner? Start here:
 
 1. **[Quickstart Guide](./quickstart.md)** (5 minutes)
    - Installation and setup
@@ -180,7 +180,7 @@ See [Error Taxonomy](./errors.md) for details.
 
 ### Common Tasks
 
-- **[First Time Setup](./quickstart.md#step-1-install-lex-pr-runner)** - Install and initialize
+- **[First Time Setup](./quickstart.md#step-1-install-lexrunner)** - Install and initialize
 - **[Create a PR Stack](./workflows/small-team.md#scenario-3-pr-stack)** - Dependent PRs
 - **[Configure Quality Gates](./workflows/small-team.md#3-configure-quality-gates)** - Add checks
 - **[Set Up CI/CD](./integrations/README.md#github-actions)** - Automation
@@ -225,7 +225,7 @@ Help others by sharing:
 - **[GitHub Repository](https://github.com/Guffawaffle/LexRunner)**
 - **[Issue Tracker](https://github.com/Guffawaffle/LexRunner/issues)**
 - **[Discussions](https://github.com/Guffawaffle/LexRunner/discussions)**
-- **[npm Package](https://www.npmjs.com/package/lex-pr-runner)**
+- **[npm Package](https://www.npmjs.com/package/lexrunner)**
 
 ## 📝 Document Index
 
@@ -273,4 +273,4 @@ grep -r "Issue:" docs/troubleshooting.md
 
 **Last Updated:** 2024
 **Version:** 0.1.0
-**Maintainers:** lex-pr-runner team
+**Maintainers:** lexrunner team

@@ -23,7 +23,7 @@ describe('Audit Integration - End to End', () => {
 				dir: tmpDir,
 				sessionId: '01JB123456789',
 				runId: '01JB987654321',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 			});
 
 			// Emit gate events for multiple PRs
@@ -112,7 +112,7 @@ describe('Audit Integration - End to End', () => {
 			expect(firstEvent).toHaveProperty('session_id', '01JB123456789');
 			expect(firstEvent).toHaveProperty('run_id', '01JB987654321');
 			expect(firstEvent).toHaveProperty('tool');
-			expect(firstEvent.tool).toEqual({ name: 'lex-pr-runner', version: '0.1.0' });
+			expect(firstEvent.tool).toEqual({ name: 'lexrunner', version: '0.1.0' });
 
 			// Verify context is included (soc2 profile includes git and ci)
 			expect(firstEvent).toHaveProperty('context');

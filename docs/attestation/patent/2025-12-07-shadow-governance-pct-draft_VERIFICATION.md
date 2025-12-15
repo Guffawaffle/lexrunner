@@ -40,7 +40,7 @@ You can independently verify this timestamp proof using:
 
 ## Document Summary
 
-This is a **provisional-quality patent draft** for the fail-forward shadow governance telemetry system implemented in lex-pr-runner.
+This is a **provisional-quality patent draft** for the fail-forward shadow governance telemetry system implemented in lexrunner.
 
 **Key Inventive Elements:**
 1. Schema-versioned governance telemetry with semantic versioning

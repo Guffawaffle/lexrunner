@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# bootstrap-lex-pr-runner.sh
+# bootstrap-lexrunner.sh
 # Scaffolds a new repo for the Lex-PR Runner (CLI + MCP adapter) with .smartergpt layout.
 # Safe writer, idempotent-ish, SSH-first remotes, and tabs in editors by default.
 #
 # Usage:
-#   bash bootstrap-lex-pr-runner.sh --dir lex-pr-runner [--remote git@github.com:you/lex-pr-runner.git] [--no-gh]
-#   bash bootstrap-lex-pr-runner.sh --help
+#   bash bootstrap-lexrunner.sh --dir lexrunner [--remote git@github.com:you/lexrunner.git] [--no-gh]
+#   bash bootstrap-lexrunner.sh --help
 #
 set -Eeuo pipefail
 
@@ -17,8 +17,8 @@ note() { printf "%s•%s %s\n" "${c_dim}" "${c_reset}" "$*"; }
 die() { printf "✖ %s\n" "$*" >&2; exit 1; }
 
 # ---- defaults ----
-DIR="lex-pr-runner"
-NAME="lex-pr-runner"
+DIR="lexrunner"
+NAME="lexrunner"
 REMOTE=""
 USE_GH=1           # 1 = try to create remote via gh if REMOTE empty; 0 = do not
 PRIVATE=1          # default private if gh creates
@@ -371,7 +371,7 @@ if [[ ${INIT_COMMIT} -eq 1 ]]; then
   if git diff --cached --quiet; then
     note "Nothing to commit."
   else
-    git commit -m "Init lex-pr-runner scaffold" >/dev/null || true
+    git commit -m "Init lexrunner scaffold" >/dev/null || true
     note "Committed initial scaffold."
   fi
 fi

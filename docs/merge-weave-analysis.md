@@ -1,7 +1,7 @@
 # Meta-Recursive Merge-Weave Analysis & Improvement Opportunities
 
 **Date**: 2025-10-01
-**Process**: Successfully integrated PR-70 + PR-71 using lex-pr-runner's own methodology
+**Process**: Successfully integrated PR-70 + PR-71 using lexrunner's own methodology
 **Outcome**: ✅ COMPLETE - Integration PR #72 created and ready for merge
 
 ---
@@ -351,7 +351,7 @@ This ensures **continuous validation** and **real-world testing** of each capabi
 4. ✅ **Documented the complete process for replication**
 5. ✅ **Provided a roadmap for automation implementation**
 
-**The lex-pr-runner project now has:**
+**The lexrunner project now has:**
 - Validated merge-weave methodology ✅
 - Real-world conflict resolution examples ✅
 - Clear implementation priorities ✅

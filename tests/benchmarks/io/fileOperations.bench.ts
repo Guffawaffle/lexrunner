@@ -12,7 +12,7 @@ import { generateGraph } from '../utils/graphGenerator.js';
 import type { Plan } from '../../../src/schema.js';
 
 describe('File Operations Performance', () => {
-  const tmpDir = path.join(os.tmpdir(), 'lex-pr-runner-bench-files');
+  const tmpDir = path.join(os.tmpdir(), 'lexrunner-bench-files');
   
   beforeAll(() => {
     // Create temp directory

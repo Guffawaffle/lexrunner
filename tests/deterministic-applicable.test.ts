@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('deterministic plan generation', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-test');
 
 	beforeEach(() => {
 		// Clean test directory

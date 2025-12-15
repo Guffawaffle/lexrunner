@@ -1,6 +1,6 @@
 # Schema Documentation
 
-This document outlines the schema architecture for lex-pr-runner, establishing the single source of truth and generation workflow.
+This document outlines the schema architecture for lexrunner, establishing the single source of truth and generation workflow.
 
 ## Schema Architecture
 
@@ -173,7 +173,7 @@ export const BehaviorRuleSchema = z.object({
 }
 ```
 
-**Export Path:** `lex-pr-runner/schemas/behavior-rule`
+**Export Path:** `lexrunner/schemas/behavior-rule`
 
 ## Schema Versioning
 

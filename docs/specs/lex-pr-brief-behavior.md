@@ -151,7 +151,7 @@ $ lex-pr brief "merge-weave PRs 463-467, keep tokens low"
 Merge PRs #463-467 to main, resolve conflicts, verify gates locally.
 
 ## Scope
-- Repos: lex-pr-runner
+- Repos: lexrunner
 - Branch: main
 - PRs: #463, #464, #465, #466, #467
 - Files likely touched: src/runs/*.ts, src/procedures/*.ts, docs/*.md
@@ -160,8 +160,8 @@ Merge PRs #463-467 to main, resolve conflicts, verify gates locally.
 - Budget: minimize token usage
 
 ## Context Files (read if needed)
-- /srv/lex-mcp/lex-pr-runner/src/store/CONTRACT.md
-- /srv/lex-mcp/lex-pr-runner/AGENTS.md
+- /srv/lex-mcp/lexrunner/src/store/CONTRACT.md
+- /srv/lex-mcp/lexrunner/AGENTS.md
 
 ## Prior Decisions
 (none recalled)
@@ -181,14 +181,14 @@ $ lex-pr brief --json --prs 463,464,465
   "title": "Merge PRs 463, 464, 465",
   "objective": "Merge PRs #463, #464, #465 to main",
   "scope": {
-    "repos": ["lex-pr-runner"],
+    "repos": ["lexrunner"],
     "branch": "main",
     "prs": [463, 464, 465],
     "filesLikelyTouched": ["src/runs/*.ts"]
   },
   "constraints": [],
   "contextFiles": [
-    "/srv/lex-mcp/lex-pr-runner/AGENTS.md"
+    "/srv/lex-mcp/lexrunner/AGENTS.md"
   ],
   "priorDecisions": [],
   "exitCriteria": [

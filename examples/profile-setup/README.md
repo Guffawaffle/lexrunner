@@ -1,6 +1,6 @@
 # Profile Setup Examples
 
-Complete examples for setting up lex-pr-runner profiles with tracked and local configurations.
+Complete examples for setting up lexrunner profiles with tracked and local configurations.
 
 ## Overview
 
@@ -47,7 +47,7 @@ EOF
 # Update .gitignore
 cat >> .gitignore << 'EOF'
 
-# lex-pr-runner local profile
+# lexrunner local profile
 .smartergpt.local/
 .smartergpt/runner/
 .smartergpt/cache/
@@ -271,7 +271,7 @@ See [.gitignore.template](./.gitignore.template) for a complete template.
 **Essential entries:**
 
 ```gitignore
-# lex-pr-runner local profile
+# lexrunner local profile
 .smartergpt.local/
 
 # Working directories (even in tracked profile)
@@ -389,8 +389,8 @@ git clone https://github.com/org/lex.git
 cd lex
 
 # LexRunner repo (prompts consumer)
-git clone https://github.com/org/lex-pr-runner.git
-cd lex-pr-runner
+git clone https://github.com/org/lexrunner.git
+cd lexrunner
 
 # Use Lex prompts
 export LEX_PROMPTS_DIR=../lex/.smartergpt/prompts

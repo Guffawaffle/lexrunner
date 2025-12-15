@@ -27,7 +27,7 @@ PR-100 → PR-101 → PR-102
 
 ## Prerequisites
 
-- lex-pr-runner installed (`npm install -g lex-pr-runner`)
+- lexrunner installed (`npm install -g lexrunner`)
 - GitHub repository with 3 open PRs
 - GitHub token set: `export GITHUB_TOKEN=your_token_here`
 - Basic understanding of Git and GitHub PRs

@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('Git Operations Performance', () => {
-  const tmpDir = path.join(os.tmpdir(), 'lex-pr-runner-bench-git');
+  const tmpDir = path.join(os.tmpdir(), 'lexrunner-bench-git');
   const repoPath = path.join(tmpDir, 'test-repo');
 
   beforeAll(async () => {

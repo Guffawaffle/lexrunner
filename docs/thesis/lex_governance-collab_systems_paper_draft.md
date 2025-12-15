@@ -911,7 +911,7 @@ Joseph Gustavson takes responsibility for:
 
 The AI collaborators cannot take legal or academic responsibility for the content. Their contributions are acknowledged as substantial but instrumentally authored.
 
-**Conflict of interest:** The author is developing open-source tooling (Lex, lex-pr-runner) based on the architecture described. This may create bias toward favorable interpretation of results.
+**Conflict of interest:** The author is developing open-source tooling (Lex, lexrunner) based on the architecture described. This may create bias toward favorable interpretation of results.
 
 **Data availability:** The contracts file (Appendix A) is fully reproduced. Raw logs from the case study will be made available upon reasonable request, subject to redaction of proprietary code.
 

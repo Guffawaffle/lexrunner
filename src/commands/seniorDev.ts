@@ -284,7 +284,7 @@ function printPrepareContextResult(
 	console.log();
 	console.log(`3. AFTER REVIEW (Phase 4: Frame Capture):`);
 	console.log(
-		`   Run: lex-pr-runner senior-dev capture-frame ${result.pr_number} <module> <summary> <next>`
+		`   Run: lexrunner senior-dev capture-frame ${result.pr_number} <module> <summary> <next>`
 	);
 	console.log();
 }

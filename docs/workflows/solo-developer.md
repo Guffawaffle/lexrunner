@@ -10,9 +10,9 @@ Streamlined workflow for individual developers working on personal or side proje
 - **Complexity:** Moderate feature dependencies
 - **Automation Goal:** Save time on repetitive tasks
 
-## Why Use lex-pr-runner Solo?
+## Why Use lexrunner Solo?
 
-Even as a solo developer, lex-pr-runner helps:
+Even as a solo developer, lexrunner helps:
 - **Save time** - Automate repetitive merge tasks
 - **Track dependencies** - Manage PR stacks easily
 - **Ensure quality** - Run gates before merge
@@ -23,7 +23,7 @@ Even as a solo developer, lex-pr-runner helps:
 ### 1. Install
 
 ```bash
-npm install -g lex-pr-runner
+npm install -g lexrunner
 ```
 
 ### 2. Initialize in Your Project
@@ -66,7 +66,7 @@ Common scenario: You have 3 related features to build.
 2. Create PR 2, wait for CI, merge
 3. Create PR 3, wait for CI, merge
 
-**With lex-pr-runner (5 minutes):**
+**With lexrunner (5 minutes):**
 
 ```bash
 # Create all PRs first
@@ -248,7 +248,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm install -g lex-pr-runner
+          npm install -g lexrunner
           lex-pr plan --from-github
           lex-pr execute plan.json
           lex-pr merge plan.json --execute

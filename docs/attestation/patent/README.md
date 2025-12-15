@@ -34,7 +34,7 @@ While this notarization **does not replace** a formal USPTO patent filing, it pr
 
 ### Quick Verification
 ```bash
-cd /srv/lex-mcp/lex-pr-runner/docs/attestation/patent
+cd /srv/lex-mcp/lexrunner/docs/attestation/patent
 
 # Verify document hash
 sha256sum 2025-12-07-shadow-governance-pct-draft.md

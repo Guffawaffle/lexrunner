@@ -6,7 +6,7 @@ This checklist provides comprehensive manual testing steps for the front-end cap
 
 - [ ] GITHUB_TOKEN environment variable set (`export GITHUB_TOKEN=ghp_...`)
 - [ ] Test repository available (e.g., `Guffawaffle/test-repo`)
-- [ ] lex-pr-runner built: `npm run build`
+- [ ] lexrunner built: `npm run build`
 - [ ] Confirm `dist/cli.js` exists
 
 ## Test Environment Setup
@@ -16,7 +16,7 @@ This checklist provides comprehensive manual testing steps for the front-end cap
 export GITHUB_TOKEN=ghp_your_token_here
 
 # Build the project
-cd /path/to/lex-pr-runner
+cd /path/to/lexrunner
 npm run build
 
 # Verify build succeeded

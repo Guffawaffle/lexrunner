@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides practical examples for integrating lex-pr-runner's deliverables management system with various CI/CD platforms and monitoring tools.
+This guide provides practical examples for integrating lexrunner's deliverables management system with various CI/CD platforms and monitoring tools.
 
 ## Quick Start
 
@@ -45,8 +45,8 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Generate Plan from GitHub
         run: lex-pr plan --from-github > plan.json
@@ -184,7 +184,7 @@ pipeline {
     stages {
         stage('Setup') {
             steps {
-                sh 'npm install -g lex-pr-runner'
+                sh 'npm install -g lexrunner'
             }
         }
         
@@ -250,8 +250,8 @@ jobs:
       - checkout
       
       - run:
-          name: Install lex-pr-runner
-          command: npm install -g lex-pr-runner
+          name: Install lexrunner
+          command: npm install -g lexrunner
       
       - run:
           name: Generate Plan

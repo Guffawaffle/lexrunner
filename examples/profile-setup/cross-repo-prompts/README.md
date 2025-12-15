@@ -1,6 +1,6 @@
 # Cross-Repository Prompts Guide
 
-Complete guide for sharing prompts across multiple repositories with lex-pr-runner.
+Complete guide for sharing prompts across multiple repositories with lexrunner.
 
 ## Overview
 
@@ -62,7 +62,7 @@ jobs:
       - name: Checkout LexRunner
         uses: actions/checkout@v3
         with:
-          path: lex-pr-runner
+          path: lexrunner
 
       - name: Checkout Lex (for prompts)
         uses: actions/checkout@v3
@@ -71,7 +71,7 @@ jobs:
           path: lex
 
       - name: Generate plan
-        working-directory: lex-pr-runner
+        working-directory: lexrunner
         run: npm run cli -- plan --from-github "is:open label:ready"
         # Uses LEX_PROMPTS_DIR automatically
 ```
@@ -106,7 +106,7 @@ projects/
 │       └── prompts/          # Source prompts
 │           ├── create-project.md
 │           └── idea.md
-└── lex-pr-runner/
+└── lexrunner/
     └── .smartergpt.local/
         └── prompts/          # Symlink -> ../../lex/.smartergpt/prompts
 ```
@@ -189,7 +189,7 @@ mv .smartergpt.local/prompts.new .smartergpt.local/prompts
 **Setup:**
 ```bash
 # Development (symlink)
-cd lex-pr-runner/.smartergpt.local
+cd lexrunner/.smartergpt.local
 ln -s ../../lex/.smartergpt/prompts prompts
 
 # CI/CD (environment variable)
@@ -219,7 +219,7 @@ cp .smartergpt/prompts/* /tmp/test-prompts/
 vim /tmp/test-prompts/create-project.md
 
 # Test in multiple repos
-cd lex-pr-runner
+cd lexrunner
 export LEX_PROMPTS_DIR=/tmp/test-prompts
 lex-pr plan --from-github
 
@@ -342,7 +342,7 @@ version: 1.0.0
 ```markdown
 # Weekly Report - 2025-11-13
 
-**Repository:** /srv/lex-pr-runner
+**Repository:** /srv/lexrunner
 **Branch:** feature/new-feature
 **Commit:** cc2ff2c8a1b2c3d4e5f6...
 

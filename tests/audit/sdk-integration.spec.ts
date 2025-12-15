@@ -42,7 +42,7 @@ describe('Audit SDK (Phase 3A)', () => {
 			level: 'info',
 			session_id: 'session-123',
 			run_id: 'run-456',
-			tool: { name: 'lex-pr-runner', version: '0.1.0' },
+			tool: { name: 'lexrunner', version: '0.1.0' },
 			actor: { type: 'cli' },
 			repo: {},
 			payload: { item: 123, gate: 'lint', duration_ms: 1000, status: 'pass' }
@@ -82,7 +82,7 @@ describe('Audit SDK (Phase 3A)', () => {
 					level: 'info',
 					session_id: 'session-123',
 					run_id: 'run-456',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: { item: 123, gate: 'lint' }
@@ -94,7 +94,7 @@ describe('Audit SDK (Phase 3A)', () => {
 					level: 'info',
 					session_id: 'session-123',
 					run_id: 'run-456',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: { item: 123, gate: 'lint', duration_ms: 1000, status: 'pass' }
@@ -145,7 +145,7 @@ describe('Audit SDK (Phase 3A)', () => {
 					level: 'info',
 					session_id: 'session-123',
 					run_id: 'run-456',
-					tool: { name: 'lex-pr-runner', version: '0.1.0' },
+					tool: { name: 'lexrunner', version: '0.1.0' },
 					actor: { type: 'cli' },
 					repo: {},
 					payload: { argv: ['lex-pr', 'run'], cwd: '/home/user' }
@@ -285,7 +285,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, gate: 'lint' }
@@ -297,7 +297,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, gate: 'lint', duration_ms: 1000, status: 'pass' }
@@ -309,7 +309,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'warn',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 456, gate: 'test', duration_ms: 2000, status: 'fail' }
@@ -370,7 +370,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, gate: 'lint', duration_ms: 1000, status: 'pass' }
@@ -382,7 +382,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'error',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 456, gate: 'test', duration_ms: 2000, status: 'fail' }
@@ -444,7 +444,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, gate: 'lint' }
@@ -456,7 +456,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, gate: 'lint', duration_ms: 1000, status: 'pass' }
@@ -468,7 +468,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'warn',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 456, gate: 'test', duration_ms: 2000, status: 'fail' }
@@ -480,7 +480,7 @@ describe('Audit SDK (Phase 3A)', () => {
 				level: 'info',
 				session_id: 'session-123',
 				run_id: 'run-456',
-				tool: { name: 'lex-pr-runner', version: '0.1.0' },
+				tool: { name: 'lexrunner', version: '0.1.0' },
 				actor: { type: 'cli' },
 				repo: {},
 				payload: { item: 123, status: 'success', commit: 'abc123' }

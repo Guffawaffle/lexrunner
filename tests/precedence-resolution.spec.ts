@@ -627,7 +627,7 @@ This prompt comes from an external repository.
 		it("should handle scope parameter for rules filtering", async () => {
 			const scope = {
 				environment: "production",
-				project: "lex-pr-runner",
+				project: "lexrunner",
 				agentFamily: "copilot",
 			};
 

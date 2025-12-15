@@ -6,7 +6,7 @@ This guide provides an end-to-end walkthrough for executing merge-weave operatio
 
 - **Clean working tree**: Your repository must have no uncommitted changes
 - **Remote branches**: All branches in your plan must exist as remote branches
-- **Node.js 20+**: Required for running lex-pr-runner
+- **Node.js 20+**: Required for running lexrunner
 - **Plan file location**: Store plan files outside your working tree (e.g., `/tmp/plan.json` or `.smartergpt.local/runner/plan.json`) to avoid dirty status
 
 ## Quick Reference
@@ -704,8 +704,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
 
       - name: Dry-run merge-weave
         run: |

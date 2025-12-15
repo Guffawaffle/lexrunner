@@ -1,6 +1,6 @@
 # Governance Metrics and Observability
 
-This document describes the governance metrics export functionality in lex-pr-runner (Wave 3).
+This document describes the governance metrics export functionality in lexrunner (Wave 3).
 
 ## Overview
 
@@ -183,7 +183,7 @@ import {
   createMetricsCollector,
   getGlobalMetricsCollector,
   resetGlobalMetricsCollector,
-} from 'lex-pr-runner/metrics';
+} from 'lexrunner/metrics';
 
 // Create a new collector
 const collector = createMetricsCollector('my-session-id');

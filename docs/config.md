@@ -1,6 +1,6 @@
 # Configuration Management
 
-Complete guide to lex-pr-runner configuration layering, inspection, and precedence rules.
+Complete guide to lexrunner configuration layering, inspection, and precedence rules.
 
 > **📖 See Also**: 
 > - [Profile Resolution](./profile-resolution.md) - Profile directory resolution and management
@@ -8,7 +8,7 @@ Complete guide to lex-pr-runner configuration layering, inspection, and preceden
 
 ## Overview
 
-The lex-pr-runner uses a layered configuration system that allows you to:
+The lexrunner uses a layered configuration system that allows you to:
 - Define configuration in multiple files with clear precedence rules
 - Inspect merged configuration with provenance tracking
 - Understand which file sets each configuration value

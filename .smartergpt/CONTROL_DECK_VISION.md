@@ -215,5 +215,5 @@ The goal is a stable, well-tested 0.6.0 that earns the "Control Deck" name.
 *Document created: 2025-11-28*
 *Author: Copilot (Claude Opus 4.5) during site refresh session*
 *Reviewed by: [pending human review]*
-*Based on: Fresh clone of lex-pr-runner v0.5.0*
+*Based on: Fresh clone of lexrunner v0.5.0*
 

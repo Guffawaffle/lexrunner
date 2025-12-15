@@ -1,6 +1,6 @@
 # Prompts Configuration
 
-Complete guide to prompts directory resolution, precedence rules, and token expansion in lex-pr-runner.
+Complete guide to prompts directory resolution, precedence rules, and token expansion in lexrunner.
 
 > **📖 See Also**: 
 > - [Profile Resolution](./profile-resolution.md) - Profile directory resolution
@@ -8,7 +8,7 @@ Complete guide to prompts directory resolution, precedence rules, and token expa
 
 ## Overview
 
-The lex-pr-runner supports flexible prompt loading with a precedence chain that allows:
+The lexrunner supports flexible prompt loading with a precedence chain that allows:
 - Cross-repository prompt sharing (e.g., using Lex prompts from LexRunner)
 - Local prompt customization without modifying tracked files
 - Tracked canonical prompts in the repository
@@ -77,8 +77,8 @@ LexRunner now integrates with the `@smartergpt/lex` npm package to provide canon
 **Example: Using package prompts**
 
 ```bash
-# Install lex-pr-runner (includes @smartergpt/lex)
-npm install lex-pr-runner
+# Install lexrunner (includes @smartergpt/lex)
+npm install lexrunner
 
 # Prompts are automatically available - no setup needed
 lex-pr plan --from-github
@@ -192,8 +192,8 @@ Please review changes in the following files:
 ```markdown
 # Code Review Prompt
 
-Repository: /home/user/projects/lex-pr-runner
-Workspace: /home/user/projects/lex-pr-runner
+Repository: /home/user/projects/lexrunner
+Workspace: /home/user/projects/lexrunner
 
 Please review changes in the following files:
 ...

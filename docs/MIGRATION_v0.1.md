@@ -52,7 +52,7 @@ If you installed from a pre-release version, update your installation:
 
 ```bash
 # Via npm (if previously installed)
-npm update -g lex-pr-runner
+npm update -g lexrunner
 
 # Or via git
 cd /path/to/LexRunner
@@ -74,7 +74,7 @@ lex-pr --version
 If your team documentation references the project, update terminology:
 
 **Before:**
-- "lex-pr-runner" (ambiguous)
+- "lexrunner" (ambiguous)
 - "runner" (generic)
 
 **After:**
@@ -251,7 +251,7 @@ ls .lexrunner/frames/
 ### Example 2: Product Naming
 
 **Before v0.1:**
-- Project referred to as "lex-pr-runner" (inconsistent)
+- Project referred to as "lexrunner" (inconsistent)
 - Unclear distinction from Lex OSS core
 
 **After v0.1:**
@@ -336,20 +336,20 @@ lex-pr merge plan.json --execute
 ### Issue: "Product Name Changed" Confusion
 
 **Symptom:**
-- Confused about "LexRunner" vs "lex-pr-runner" vs "Lex"
+- Confused about "LexRunner" vs "lexrunner" vs "Lex"
 
 **Clarification:**
 
 | Term | Meaning |
 |------|---------|
 | **LexRunner** | Product name (proprietary paid product) |
-| **lex-pr-runner** | Repository name (unchanged) |
+| **lexrunner** | Repository name (unchanged) |
 | **lex-pr** | CLI command (unchanged) |
 | **Lex** | OSS core library (MIT license, separate repo) |
 
 **What stays the same:**
 - CLI command: `lex-pr`
-- npm package name: `lex-pr-runner`
+- npm package name: `lexrunner`
 - Repository URL: `Guffawaffle/LexRunner`
 
 **What changed:**
@@ -471,7 +471,7 @@ jobs:
           LEX_PR_EMIT_FRAMES: true  # Enable frames
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm install -g lex-pr-runner
+          npm install -g lexrunner
           lex-pr plan --from-github
           lex-pr execute plan.json
           lex-pr merge plan.json --execute

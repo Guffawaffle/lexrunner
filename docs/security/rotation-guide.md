@@ -1,6 +1,6 @@
 # Secret Rotation Guide
 
-This guide provides patterns, best practices, and recommended cadences for rotating secrets in lex-pr-runner.
+This guide provides patterns, best practices, and recommended cadences for rotating secrets in lexrunner.
 
 ## Overview
 
@@ -173,7 +173,7 @@ Store secrets in your CI/CD platform's secure storage:
 #!/bin/bash
 # /etc/cron.weekly/check-secret-rotation
 
-cd /path/to/lex-pr-runner
+cd /path/to/lexrunner
 lex-pr security check-rotation GITHUB_TOKEN API_KEY --format json > /tmp/rotation-check.json
 
 if [ $? -eq 1 ]; then

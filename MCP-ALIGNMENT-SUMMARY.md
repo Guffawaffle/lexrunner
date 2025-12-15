@@ -5,7 +5,7 @@
 
 ## Objective
 
-Align lex-pr-runner's MCP server implementation with LexBrain and LexMap's architecture to ensure consistency across the Lex ecosystem and make bug fixes easier to apply uniformly.
+Align lexrunner's MCP server implementation with LexBrain and LexMap's architecture to ensure consistency across the Lex ecosystem and make bug fixes easier to apply uniformly.
 
 ## What Was Done
 
@@ -74,7 +74,7 @@ export {
 
 ### 1. Created `mcp-server.mjs` (Root Entry Point)
 - **Purpose**: Standalone MCP server entry point that mirrors lex-brain and lex-map structure
-- **Location**: `/home/guff/lex-pr-runner/mcp-server.mjs`
+- **Location**: `/home/guff/lexrunner/mcp-server.mjs`
 - **Features**:
   - Reads environment variables for configuration
   - Logs startup information to stderr
@@ -87,16 +87,16 @@ export {
 - `LEX_PR_WORKSPACE`: Workspace root (default: current directory)
 - `ALLOW_MUTATIONS`: Enable write operations (default: `false`)
 
-### 2. Created `lex-pr-runner-launcher.sh` (WSL Launcher)
+### 2. Created `lexrunner-launcher.sh` (WSL Launcher)
 - **Purpose**: Ensures Node.js is available via nvm before starting the MCP server
-- **Location**: `/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh`
+- **Location**: `/home/guff/lexrunner/lexrunner-launcher.sh`
 - **Features**:
   - Sources nvm if available
-  - Supports both development path (`/home/guff/lex-pr-runner`) and production path (`/srv/lex-mcp/lex-pr-runner`)
+  - Supports both development path (`/home/guff/lexrunner`) and production path (`/srv/lex-mcp/lexrunner`)
   - Executable bash script
 
 ### 3. Updated `package.json`
-- **Added bin entry**: `"lex-pr-runner-mcp": "./mcp-server.mjs"`
+- **Added bin entry**: `"lexrunner-mcp": "./mcp-server.mjs"`
 - Aligns with lex-brain (`lexbrain-mcp`) and lex-map (`lexmap-mcp`)
 
 ### 4. Created `MCP-CONFIG.md` (Configuration Guide)
@@ -116,11 +116,11 @@ export {
 
 All three lex-* services now follow the same pattern:
 
-| Aspect | lex-brain | lex-map | lex-pr-runner |
+| Aspect | lex-brain | lex-map | lexrunner |
 |--------|-----------|---------|---------------|
-| **Launcher Script** | `lexbrain-launcher.sh` | `lexmap-launcher.sh` | `lex-pr-runner-launcher.sh` |
+| **Launcher Script** | `lexbrain-launcher.sh` | `lexmap-launcher.sh` | `lexrunner-launcher.sh` |
 | **MCP Entry Point** | `mcp-server.mjs` | `mcp-server.mjs` | `mcp-server.mjs` |
-| **Bin Name** | `lexbrain-mcp` | `lexmap-mcp` | `lex-pr-runner-mcp` |
+| **Bin Name** | `lexbrain-mcp` | `lexmap-mcp` | `lexrunner-mcp` |
 | **Config Method** | Environment variables | Environment variables | Environment variables |
 | **Protocol** | MCP stdio | MCP stdio | MCP stdio |
 | **Node Setup** | nvm sourcing | nvm sourcing | nvm sourcing |
@@ -130,15 +130,15 @@ All three lex-* services now follow the same pattern:
 ```json
 {
   "mcpServers": {
-    "lex-pr-runner": {
+    "lexrunner": {
       "command": "wsl",
       "args": [
         "--",
-        "/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh"
+        "/home/guff/lexrunner/lexrunner-launcher.sh"
       ],
       "env": {
-        "LEX_PR_PROFILE_DIR": "/home/guff/lex-pr-runner/.smartergpt",
-        "LEX_PR_WORKSPACE": "/home/guff/lex-pr-runner",
+        "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
+        "LEX_PR_WORKSPACE": "/home/guff/lexrunner",
         "ALLOW_MUTATIONS": "false"
       }
     }
@@ -153,29 +153,29 @@ This matches the pattern used for lex-brain and lex-map exactly.
 ✅ **Direct MCP server execution**:
 ```bash
 $ node mcp-server.mjs
-[lex-pr-runner] Starting MCP server
-[lex-pr-runner] Profile: /home/guff/lex-pr-runner/.smartergpt
-[lex-pr-runner] Workspace: /home/guff/lex-pr-runner
-[lex-pr-runner] Mutations: disabled (read-only)
-[lex-pr-runner] MCP server loaded successfully
+[lexrunner] Starting MCP server
+[lexrunner] Profile: /home/guff/lexrunner/.smartergpt
+[lexrunner] Workspace: /home/guff/lexrunner
+[lexrunner] Mutations: disabled (read-only)
+[lexrunner] MCP server loaded successfully
 ```
 
 ✅ **Launcher script execution**:
 ```bash
-$ bash lex-pr-runner-launcher.sh
-[lex-pr-runner] Starting MCP server
-[lex-pr-runner] Profile: /home/guff/lex-pr-runner/.smartergpt
-[lex-pr-runner] Workspace: /home/guff/lex-pr-runner
-[lex-pr-runner] Mutations: disabled (read-only)
-[lex-pr-runner] MCP server loaded successfully
+$ bash lexrunner-launcher.sh
+[lexrunner] Starting MCP server
+[lexrunner] Profile: /home/guff/lexrunner/.smartergpt
+[lexrunner] Workspace: /home/guff/lexrunner
+[lexrunner] Mutations: disabled (read-only)
+[lexrunner] MCP server loaded successfully
 ```
 
 ## Files Modified/Created
 
 - ✅ **NEW**: `mcp-server.mjs` - Root MCP entry point
-- ✅ **NEW**: `lex-pr-runner-launcher.sh` - WSL launcher script
+- ✅ **NEW**: `lexrunner-launcher.sh` - WSL launcher script
 - ✅ **NEW**: `MCP-CONFIG.md` - Configuration documentation
-- ✅ **MODIFIED**: `package.json` - Added bin entry for `lex-pr-runner-mcp`
+- ✅ **MODIFIED**: `package.json` - Added bin entry for `lexrunner-mcp`
 - ✅ **MODIFIED**: `README.mcp.md` - Updated with configuration examples
 
 ## Benefits
@@ -192,14 +192,14 @@ $ bash lex-pr-runner-launcher.sh
 If you want to install to production location:
 
 ```bash
-sudo mkdir -p /srv/lex-mcp/lex-pr-runner
-sudo chown $USER:$USER /srv/lex-mcp/lex-pr-runner
-cd /home/guff/lex-pr-runner
-cp -r dist/ mcp-server.mjs lex-pr-runner-launcher.sh package.json node_modules/ \
-  /srv/lex-mcp/lex-pr-runner/
+sudo mkdir -p /srv/lex-mcp/lexrunner
+sudo chown $USER:$USER /srv/lex-mcp/lexrunner
+cd /home/guff/lexrunner
+cp -r dist/ mcp-server.mjs lexrunner-launcher.sh package.json node_modules/ \
+  /srv/lex-mcp/lexrunner/
 ```
 
-Then update mcp.json launcher path to `/srv/lex-mcp/lex-pr-runner/lex-pr-runner-launcher.sh`.
+Then update mcp.json launcher path to `/srv/lex-mcp/lexrunner/lexrunner-launcher.sh`.
 
 ## Compliance
 

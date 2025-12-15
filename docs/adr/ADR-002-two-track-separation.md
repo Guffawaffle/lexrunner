@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2025-11-25
-**Authors:** lex-pr-runner team
+**Authors:** lexrunner team
 
 ---
 
@@ -61,7 +61,7 @@ Ignored directories:
 
 ### Positive
 
-- **Repos can adopt lex-pr-runner** without inheriting personal workspace
+- **Repos can adopt lexrunner** without inheriting personal workspace
 - **Workspace travels across repos** without changing the runner
 - **Clean distribution** — npm package contains only code
 - **Portable profiles** — Users can share profiles as templates

@@ -276,7 +276,7 @@ docker run \
   -v $(pwd)/artifacts:/app/artifacts \
   -e MAX_WORKERS=16 \
   -e MAX_MEMORY_MB=8192 \
-  lex-pr-runner:latest \
+  lexrunner:latest \
   /app/plan.json \
   --execute \
   --artifact-dir /app/artifacts

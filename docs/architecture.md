@@ -2,7 +2,7 @@
 
 ## Design Philosophy
 
-lex-pr-runner is built on three core principles:
+lexrunner is built on three core principles:
 
 ### 1. **Determinism First**
 - Same inputs → identical outputs (byte-for-byte)
@@ -24,7 +24,7 @@ lex-pr-runner is built on three core principles:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    lex-pr-runner                        │
+│                    lexrunner                        │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  ┌──────────────┐         ┌──────────────┐            │

@@ -25,7 +25,7 @@ You have **25 open PRs** for a major refactoring project:
 
 ## Prerequisites
 
-- lex-pr-runner installed
+- lexrunner installed
 - GitHub repository with 20+ open PRs
 - GitHub token set: `export GITHUB_TOKEN=your_token_here`
 - Completed [Tutorial 1](./01-simple-stack.md) and [Tutorial 2](./02-diamond-pattern.md)

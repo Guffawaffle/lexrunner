@@ -192,7 +192,7 @@ for team in "${TEAMS[@]}"; do
       cd "$REPO_DIR" && git pull && cd -
     fi
     
-    # Run lex-pr-runner
+    # Run lexrunner
     cd "$REPO_DIR"
     
     # Use team-specific profile
@@ -295,7 +295,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          npm install -g lex-pr-runner
+          npm install -g lexrunner
           npm install -g yq
       
       - name: Run orchestration

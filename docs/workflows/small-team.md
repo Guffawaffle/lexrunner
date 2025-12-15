@@ -30,13 +30,13 @@ Developer → Create PR → Label "ready"
 
 ```bash
 # One-time setup (team lead)
-npm install -g lex-pr-runner
+npm install -g lexrunner
 cd your-repo
 lex-pr init
 
 # Commit configuration
 git add .smartergpt.local/
-git commit -m "Add lex-pr-runner configuration"
+git commit -m "Add lexrunner configuration"
 git push
 ```
 
@@ -248,8 +248,8 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Discover and plan
         env:

@@ -310,7 +310,7 @@ Advantages
 - Ensures backwards compatibility via a robust wrapper that preserves exit semantics and stdout purity
 
 Examples of Implementation Code Mapping (for review)
-- readGovernanceLogs(), readGovernanceLogsWithLegacy(), createGovernanceComparisonLog(), writeGovernanceLog(), applyRetentionPolicy(), formatGovernanceLog(), formatShadowGovernanceSummary(), deriveShadowConstraints(), governanceReport(), and scripts/analyze-governance-logs.mjs are representative functional units in an embodiment in the lex-pr-runner project.
+- readGovernanceLogs(), readGovernanceLogsWithLegacy(), createGovernanceComparisonLog(), writeGovernanceLog(), applyRetentionPolicy(), formatGovernanceLog(), formatShadowGovernanceSummary(), deriveShadowConstraints(), governanceReport(), and scripts/analyze-governance-logs.mjs are representative functional units in an embodiment in the lexrunner project.
 
 Legal and Filing Notes
 - The above disclosure is a provisional-quality draft intended to capture inventive concepts for counsel. Before filing a PCT or national stage application, perform a formal prior art search and work with patent counsel to refine claim scope and claim dependency trees.

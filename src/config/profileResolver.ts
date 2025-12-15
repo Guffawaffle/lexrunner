@@ -124,7 +124,7 @@ export function logProfileMessage(message: string): void {
 		return;
 	}
 	// Use stderr to avoid interfering with JSON output to stdout
-	console.error(`lex-pr-runner profile: ${message}`);
+	console.error(`lexrunner profile: ${message}`);
 }
 
 /**

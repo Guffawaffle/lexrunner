@@ -1,6 +1,6 @@
 # Error Recovery and Resilience Patterns
 
-This document describes the error recovery and resilience patterns implemented in lex-pr-runner.
+This document describes the error recovery and resilience patterns implemented in lexrunner.
 
 ## Overview
 

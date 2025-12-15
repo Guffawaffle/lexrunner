@@ -271,7 +271,7 @@ describe('Audit Emitter', () => {
 			expect(event.session_id).toBeDefined();
 			expect(event.run_id).toBeDefined();
 			expect(event.tool).toBeDefined();
-			expect(event.tool.name).toBe('lex-pr-runner');
+			expect(event.tool.name).toBe('lexrunner');
 			expect(event.tool.version).toBeDefined();
 			expect(event.actor).toBeDefined();
 			expect(event.actor.type).toMatch(/^(cli|mcp|ci)$/);

@@ -2,7 +2,7 @@
  * Run-Centric Schemas for Tool-Grounded Interactions
  *
  * This module defines the canonical Zod schemas for StatusResponse and NextOption,
- * which structure all tool-grounded interactions in the lex-pr-runner system.
+ * which structure all tool-grounded interactions in the lexrunner system.
  *
  * Key invariants:
  * - `nextOptions` is the ONLY canonical source of allowed next actions

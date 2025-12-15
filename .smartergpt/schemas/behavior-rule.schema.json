@@ -95,7 +95,7 @@
 					"content": "All new code must include tests. Aim for at least 80% line coverage and 70% branch coverage.",
 					"scope": {
 						"agentFamily": "copilot",
-						"project": "lex-pr-runner"
+						"project": "lexrunner"
 					},
 					"priority": 50
 				}

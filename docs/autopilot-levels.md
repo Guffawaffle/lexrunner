@@ -1,6 +1,6 @@
 # Autopilot Levels
 
-The lex-pr-runner supports graduated automation levels (0-4) for merge-weave execution, allowing teams to incrementally adopt automation while maintaining safety and control.
+The lexrunner supports graduated automation levels (0-4) for merge-weave execution, allowing teams to incrementally adopt automation while maintaining safety and control.
 
 ## Overview
 

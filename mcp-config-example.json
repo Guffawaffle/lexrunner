@@ -1,14 +1,14 @@
 {
   "mcpServers": {
-    "lex-pr-runner": {
+    "lexrunner": {
       "command": "wsl",
       "args": [
         "--",
-        "/home/guff/lex-pr-runner/lex-pr-runner-launcher.sh"
+        "/home/guff/lexrunner/lexrunner-launcher.sh"
       ],
       "env": {
-        "LEX_PR_PROFILE_DIR": "/home/guff/lex-pr-runner/.smartergpt",
-        "LEX_PR_WORKSPACE": "/home/guff/lex-pr-runner",
+        "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
+        "LEX_PR_WORKSPACE": "/home/guff/lexrunner",
         "ALLOW_MUTATIONS": "false"
       }
     }

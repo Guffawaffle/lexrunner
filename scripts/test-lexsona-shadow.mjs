@@ -34,7 +34,7 @@ async function main() {
 	const context = {
 		workflowId: "merge-weave",
 		stepKind: "execute",
-		repo: "lex-pr-runner",
+		repo: "lexrunner",
 		branch: "main",
 		hints: {
 			task: "smoke-test",

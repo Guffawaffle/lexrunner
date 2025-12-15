@@ -8,7 +8,7 @@
 
 ## Context
 
-The lex-pr-runner project serves two audiences with distinct personas:
+The lexrunner project serves two audiences with distinct personas:
 
 1. **Paid Product (Proprietary):** Enterprise teams using the merge-weave CLI and merge pyramid orchestration.
 2. **Open Source Core (MIT):** Community developers building on architectural policy, frames, and episodic memory.
@@ -34,7 +34,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### Repository Names
 
-- `Guffawaffle/LexRunner` → Renamed from `lex-pr-runner` to align with branding.
+- `Guffawaffle/LexRunner` → Renamed from `lexrunner` to align with branding.
 - `Guffawaffle/lex` → Stays as-is (MIT badge + README).
 
 ### Release Tag Prefix
@@ -59,7 +59,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### Immediate (Phase 1)
 
-1. Update `lex-pr-runner/README.md` with LexRunner branding.
+1. Update `lexrunner/README.md` with LexRunner branding.
 2. Update `lex/README.md` with Lex (MIT) branding and cross-reference.
 3. Add badges: "Proprietary • Paid" (LexRunner), "MIT • OSS" (Lex).
 4. Create `.github/workflows/release.yml` trigger on `lexrunner-v*` tags.
@@ -96,7 +96,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 1. **Rename the CLI to `lexrunner-pr`:** Rejected; breaks backward compatibility and adds verbosity.
 2. **Rename repos to `lexrunner` and `lex-core`:** Rejected; GitHub repos stable; branding works via docs.
-3. **Merge Lex into lex-pr-runner:** Rejected; compromises MIT license and OSS adoption story.
+3. **Merge Lex into lexrunner:** Rejected; compromises MIT license and OSS adoption story.
 
 ---
 

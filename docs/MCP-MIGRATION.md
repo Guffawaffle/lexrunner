@@ -6,7 +6,7 @@
 
 ## Overview
 
-The lex-pr-runner MCP server has been migrated from an SDK-based implementation to align with the architectural patterns used in LexBrain and LexMap. This ensures consistency across all three projects and makes bug fixes easier to apply uniformly.
+The lexrunner MCP server has been migrated from an SDK-based implementation to align with the architectural patterns used in LexBrain and LexMap. This ensures consistency across all three projects and makes bug fixes easier to apply uniformly.
 
 ## What Changed
 
@@ -119,7 +119,7 @@ process.stdin.on("data", async (chunk) => {
 // Direct error handling with JSON-RPC codes
 ```
 
-### lex-pr-runner Pattern (Now Aligned)
+### lexrunner Pattern (Now Aligned)
 
 ```javascript
 // NOW USES SAME PATTERN
@@ -139,10 +139,10 @@ Created `test-mcp.mjs` to verify:
 
 ```bash
 $ node test-mcp.mjs
-Testing lex-pr-runner MCP server...
+Testing lexrunner MCP server...
 
-[lex-pr-runner] Starting MCP server
-[lex-pr-runner] Core module loaded successfully
+[lexrunner] Starting MCP server
+[lexrunner] Core module loaded successfully
 
 ← Response: {
   "jsonrpc": "2.0",
@@ -150,7 +150,7 @@ Testing lex-pr-runner MCP server...
   "result": {
     "protocolVersion": "2024-11-05",
     "serverInfo": {
-      "name": "lex-pr-runner",
+      "name": "lexrunner",
       "version": "0.1.0"
     }
   }
@@ -248,4 +248,4 @@ LEX_PR_PROFILE_DIR=/custom/path ALLOW_MUTATIONS=true npm run mcp
 ✅ **No breaking changes**
 ✅ **Testing verified**
 
-The lex-pr-runner MCP server now follows the same simple, maintainable pattern as LexBrain and LexMap, making the entire Lex ecosystem more consistent and easier to maintain.
+The lexrunner MCP server now follows the same simple, maintainable pattern as LexBrain and LexMap, making the entire Lex ecosystem more consistent and easier to maintain.

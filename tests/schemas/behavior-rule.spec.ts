@@ -187,7 +187,7 @@ describe("Behavior Rule Schema", () => {
 						content: "Scoped content",
 						scope: {
 							environment: "production",
-							project: "lex-pr-runner",
+							project: "lexrunner",
 							agentFamily: "copilot"
 						}
 					}
@@ -197,7 +197,7 @@ describe("Behavior Rule Schema", () => {
 			const result = BehaviorRuleSchema.parse(config);
 			const scope = result.rules![0].scope;
 			expect(scope?.environment).toBe("production");
-			expect(scope?.project).toBe("lex-pr-runner");
+			expect(scope?.project).toBe("lexrunner");
 			expect(scope?.agentFamily).toBe("copilot");
 		});
 
@@ -350,7 +350,7 @@ describe("Behavior Rule Schema", () => {
 							"All new code must include tests. Aim for at least 80% line coverage and 70% branch coverage.",
 						scope: {
 							agentFamily: "copilot",
-							project: "lex-pr-runner"
+							project: "lexrunner"
 						},
 						priority: 50
 					}
@@ -360,7 +360,7 @@ describe("Behavior Rule Schema", () => {
 			const result = BehaviorRuleSchema.parse(example2);
 			expect(result.rules).toHaveLength(2);
 			expect(result.rules![0].priority).toBe(100);
-			expect(result.rules![1].scope?.project).toBe("lex-pr-runner");
+			expect(result.rules![1].scope?.project).toBe("lexrunner");
 		});
 	});
 });

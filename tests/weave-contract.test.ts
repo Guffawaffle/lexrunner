@@ -13,7 +13,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('Weave Contract Verification', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-weave-contract');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-weave-contract');
 	const repoRoot = path.resolve(__dirname, '..');
 
 	beforeEach((context) => {

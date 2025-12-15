@@ -219,7 +219,7 @@ Constraints evolve through LexSona, not Runner:
 lexsona rules learn "Always run typecheck before test"
 
 # Derive constraints for current context
-lexsona constraints derive --project lex-pr-runner
+lexsona constraints derive --project lexrunner
 ```
 
 > **Note:** `domain` is a deprecated input alias that is only consulted when `project` is absent. When present, it is preserved under `extensions.<namespace>.domain` and is not used for matching.
@@ -376,7 +376,7 @@ Before implementation begins, clarification requested on:
    - Or must we provide compat shims?
 
 3. **CLI name:**
-   - Keep `lex-pr` / `lex-pr-runner`?
+   - Keep `lex-pr` / `lexrunner`?
    - Or rename to `lexrun` / `lex run`?
 
 4. **MCP server fate:**

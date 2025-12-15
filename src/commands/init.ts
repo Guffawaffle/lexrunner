@@ -1,5 +1,5 @@
 /**
- * Interactive initialization command for setting up lex-pr-runner workspace
+ * Interactive initialization command for setting up lexrunner workspace
  */
 
 import * as readline from "readline";
@@ -70,7 +70,7 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 
 	// Interactive setup
 	if (!options.nonInteractive) {
-		console.log("Welcome to lex-pr-runner setup! 🚀\n");
+		console.log("Welcome to lexrunner setup! 🚀\n");
 		console.log("This wizard will help you configure your workspace.\n");
 
 		// GitHub token setup

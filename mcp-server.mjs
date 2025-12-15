@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * lex-pr-runner MCP Server
+ * lexrunner MCP Server
  *
  * A Model Context Protocol (MCP) server for merge pyramid orchestration.
  * Speaks MCP over stdio, aligned with LexBrain and LexMap architecture.
  *
  * Usage:
- *   lex-pr-runner-mcp
- *   npx -y /srv/lex-mcp/lex-pr-runner
+ *   lexrunner-mcp
+ *   npx -y /srv/lex-mcp/lexrunner
  *
  * Environment variables:
  *   LEX_PR_PROFILE_DIR   - Path to profile directory (default: auto-resolve)
@@ -26,9 +26,9 @@ const config = {
 	allowMutations: process.env.ALLOW_MUTATIONS === "true",
 };
 
-console.error(`[lex-pr-runner] Starting MCP server`);
+console.error(`[lexrunner] Starting MCP server`);
 console.error(
-	`[lex-pr-runner] Mutations: ${
+	`[lexrunner] Mutations: ${
 		config.allowMutations ? "ENABLED" : "disabled (read-only)"
 	}`
 );
@@ -37,13 +37,13 @@ console.error(
 let core;
 try {
 	core = await import("./dist/cli.js");
-	console.error(`[lex-pr-runner] Core module loaded successfully`);
+	console.error(`[lexrunner] Core module loaded successfully`);
 } catch (err) {
 	console.error(
-		`[lex-pr-runner] ERROR: Failed to load core module: ${err.message}`
+		`[lexrunner] ERROR: Failed to load core module: ${err.message}`
 	);
 	console.error(
-		`[lex-pr-runner] Hint: Run 'npm run build' to compile TypeScript sources`
+		`[lexrunner] Hint: Run 'npm run build' to compile TypeScript sources`
 	);
 	process.exit(1);
 }
@@ -1096,7 +1096,7 @@ async function handleRequest(request) {
 						tools: {},
 					},
 					serverInfo: {
-						name: "lex-pr-runner",
+						name: "lexrunner",
 						version: "0.1.0",
 					},
 				},
@@ -1215,23 +1215,23 @@ process.stdin.on("data", async (chunk) => {
 });
 
 process.stdin.on("end", () => {
-	console.error("[lex-pr-runner] Shutting down...");
+	console.error("[lexrunner] Shutting down...");
 	process.exit(0);
 });
 
 // Graceful shutdown
 process.on("SIGINT", () => {
-	console.error("[lex-pr-runner] Shutting down...");
+	console.error("[lexrunner] Shutting down...");
 	process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-	console.error("[lex-pr-runner] Shutting down...");
+	console.error("[lexrunner] Shutting down...");
 	process.exit(0);
 });
 
 process.on("uncaughtException", (error) => {
-	console.error(`[lex-pr-runner] Uncaught exception: ${error.message}`);
+	console.error(`[lexrunner] Uncaught exception: ${error.message}`);
 	console.error(error.stack);
 	process.exit(1);
 });

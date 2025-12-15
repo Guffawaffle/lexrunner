@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sample Repository Creation Script for Testing lex-pr-runner
+# Sample Repository Creation Script for Testing lexrunner
 # This script creates a minimal test repository with example PRs and dependencies
 
 set -e
@@ -80,7 +80,7 @@ EOF
 cat > README.md <<'EOF'
 # Sample Test Repository
 
-This is a sample repository for testing lex-pr-runner.
+This is a sample repository for testing lexrunner.
 
 ## Features
 - Feature A: Core functionality

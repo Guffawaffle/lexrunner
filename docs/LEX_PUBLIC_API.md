@@ -5,7 +5,7 @@ This document defines the **public API surface** for Lex when consumed by LexRun
 ## Two-Level API Surface
 
 1. **Lex → LexRunner**: How LexRunner imports from `@smartergpt/lex`
-2. **LexRunner → External**: How external tools can import from `lex-pr-runner`
+2. **LexRunner → External**: How external tools can import from `lexrunner`
 
 ## Design Principles
 
@@ -134,7 +134,7 @@ const allFrames = await listFrames();
 import { createLogger } from "@smartergpt/lex/logger";
 
 // Create structured logger
-const logger = createLogger({ name: "lex-pr-runner" });
+const logger = createLogger({ name: "lexrunner" });
 logger.info("Starting merge-weave operation");
 ```
 
@@ -156,9 +156,9 @@ LexRunner also exports its own modules for external consumption (e.g., by other 
 
 | Module | Export Path | Purpose | Status |
 |--------|-------------|---------|--------|
-| **Frames** | `lex-pr-runner/frames` | Execution frame types and utilities | ✅ Available |
-| **Errors** | `lex-pr-runner/errors` | AXError adapters and LexRunner errors | ✅ Available |
-| **Audit SDK** | `lex-pr-runner/audit-sdk` | Audit and compliance SDK | ✅ Available |
+| **Frames** | `lexrunner/frames` | Execution frame types and utilities | ✅ Available |
+| **Errors** | `lexrunner/errors` | AXError adapters and LexRunner errors | ✅ Available |
+| **Audit SDK** | `lexrunner/audit-sdk` | Audit and compliance SDK | ✅ Available |
 
 ### Import Examples for LexRunner Exports
 
@@ -170,7 +170,7 @@ import {
   emitGateFrame,
   storeFrame,
   type ExecutionFrame,
-} from "lex-pr-runner/frames";
+} from "lexrunner/frames";
 
 // Use LexRunner's frame emitters
 const result = emitMergeWeaveFrame({
@@ -191,7 +191,7 @@ if (result.success && result.frame && result.frameId) {
 
 ```typescript
 // Import errors from LexRunner
-import { createAXError, AXErrorException } from "lex-pr-runner/errors";
+import { createAXError, AXErrorException } from "lexrunner/errors";
 
 // Create LexRunner-compatible errors (context is optional)
 const error = createAXError(

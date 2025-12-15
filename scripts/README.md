@@ -1,12 +1,12 @@
-# lex-pr-runner Scripts
+# lexrunner Scripts
 
-This directory contains utility scripts for lex-pr-runner development and adoption tracking.
+This directory contains utility scripts for lexrunner development and adoption tracking.
 
 ## Merge-Weave Workflows
 
 ### merge-weave.sh
 
-A lightweight, parameterized shell script for merging multiple PRs into an umbrella/integration branch with validation gates. This is a standalone utility that doesn't require the full lex-pr-runner setup.
+A lightweight, parameterized shell script for merging multiple PRs into an umbrella/integration branch with validation gates. This is a standalone utility that doesn't require the full lexrunner setup.
 
 **Quick Start:**
 
@@ -89,7 +89,7 @@ A parameterized, repo-agnostic script for executing merge-weave workflows. This 
 
 ### metrics-template.ts
 
-Generate adoption metrics template with deterministic output for tracking lex-pr-runner usage.
+Generate adoption metrics template with deterministic output for tracking lexrunner usage.
 
 **Usage:**
 
@@ -188,7 +188,7 @@ feature-b ← bugfix/critical ← feature-d
 
 ### Expected Merge Order
 
-When processed by lex-pr-runner, the expected merge order is:
+When processed by lexrunner, the expected merge order is:
 
 1. **Level 1**: `feature-a`, `feature-b` (independent, can merge in parallel)
 2. **Level 2**: `feature-c`, `bugfix/critical` (depend on Level 1)
@@ -196,13 +196,13 @@ When processed by lex-pr-runner, the expected merge order is:
 
 ### Testing Workflow
 
-After creating the sample repository, follow these steps to test lex-pr-runner:
+After creating the sample repository, follow these steps to test lexrunner:
 
 ```bash
 # 1. Navigate to the sample repo
 cd /tmp/lex-pr-test-repo
 
-# 2. Initialize lex-pr-runner workspace
+# 2. Initialize lexrunner workspace
 lex-pr init --non-interactive
 
 # 3. Verify environment
@@ -275,7 +275,7 @@ Each branch has a properly formatted commit message with:
 - Clear description
 - Dependency declaration using `Depends-On:` syntax
 
-This demonstrates how lex-pr-runner parses dependency information from commit messages.
+This demonstrates how lexrunner parses dependency information from commit messages.
 
 ### Cleanup
 

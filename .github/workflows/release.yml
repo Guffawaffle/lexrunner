@@ -94,7 +94,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install lex-pr-runner@canary" >> $GITHUB_STEP_SUMMARY
+          echo "npm install lexrunner@canary" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> ⚠️ Canary releases are for testing only. Use stable releases for production." >> $GITHUB_STEP_SUMMARY
@@ -208,7 +208,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install lex-pr-runner@${TAG_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "npm install lexrunner@${TAG_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY

@@ -137,7 +137,7 @@ Every event is wrapped in a consistent envelope:
   "session_id": "01JB123456789",
   "run_id": "01JB987654321",
   "tool": {
-    "name": "lex-pr-runner",
+    "name": "lexrunner",
     "version": "0.1.0"
   },
   "actor": {
@@ -235,8 +235,8 @@ Newline-delimited JSON event stream. Each line is a complete event envelope.
 
 **Example:**
 ```json
-{"schema_version":"0.1.0","event":"gate_started","ts":"2025-11-02T14:30:22Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lex-pr-runner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint"}}
-{"schema_version":"0.1.0","event":"gate_finished","ts":"2025-11-02T14:30:28Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lex-pr-runner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint","exit_code":0,"duration_ms":6200,"status":"pass"}}
+{"schema_version":"0.1.0","event":"gate_started","ts":"2025-11-02T14:30:22Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lexrunner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint"}}
+{"schema_version":"0.1.0","event":"gate_finished","ts":"2025-11-02T14:30:28Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lexrunner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint","exit_code":0,"duration_ms":6200,"status":"pass"}}
 ```
 
 **Processing:**
@@ -555,7 +555,7 @@ const emitter = await initAuditEmitter({
   dir: '/tmp/audit',
   sessionId: 'test-session-123',
   runId: 'test-run-456',
-  tool: { name: 'lex-pr-runner', version: '0.1.0' }
+  tool: { name: 'lexrunner', version: '0.1.0' }
 });
 ```
 

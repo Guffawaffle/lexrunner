@@ -2,7 +2,7 @@
 /**
  * Generate adoption metrics template with deterministic output
  * 
- * Emits JSON placeholders for tracking lex-pr-runner adoption and badge-ready values
+ * Emits JSON placeholders for tracking lexrunner adoption and badge-ready values
  */
 
 import { canonicalJSONStringify } from '../src/util/canonicalJson.js';

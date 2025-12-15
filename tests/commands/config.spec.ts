@@ -56,7 +56,7 @@ describe('Config Command', () => {
 });
 
 describe('config show command (CLI integration)', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-config-test');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-config-test');
 	const cliPath = path.resolve(__dirname, '../..', 'dist', 'cli.js');
 	const originalCwd = process.cwd();
 

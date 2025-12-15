@@ -4,7 +4,7 @@ Gates are quality checks that must pass before code can be merged. This document
 
 ## Overview
 
-Gates in lex-pr-runner execute commands to verify code quality, run tests, perform security scans, and more. Each gate can have:
+Gates in lexrunner execute commands to verify code quality, run tests, perform security scans, and more. Each gate can have:
 - A command to execute (`run`)
 - Environment variables (`env`)
 - Input validation schema (`input`)

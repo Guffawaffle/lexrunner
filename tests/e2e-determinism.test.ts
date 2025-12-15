@@ -14,7 +14,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('E2E Determinism Harness', () => {
-	const testDir = path.join(os.tmpdir(), 'lex-pr-runner-e2e-determinism');
+	const testDir = path.join(os.tmpdir(), 'lexrunner-e2e-determinism');
 	const repoRoot = path.resolve(__dirname, '..');
 
 	beforeEach((context) => {
@@ -122,7 +122,7 @@ items:
 			const workflow1 = await runCompleteWorkflow();
 
 			// Create new directory and run same workflow
-			const testDir2 = path.join(os.tmpdir(), 'lex-pr-runner-e2e-determinism-2');
+			const testDir2 = path.join(os.tmpdir(), 'lexrunner-e2e-determinism-2');
 			fs.mkdirSync(testDir2, { recursive: true });
 			const originalDir = process.cwd();
 

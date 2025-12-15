@@ -6,7 +6,7 @@
 > 3. Receipts document the decision chain
 > 4. Recovery path is proposed or escalation triggered
 
-This document describes the Disciplined Failure pattern implemented in lex-pr-runner, extending the AXError pattern with governance fields for reversibility, confidence, and action receipts.
+This document describes the Disciplined Failure pattern implemented in lexrunner, extending the AXError pattern with governance fields for reversibility, confidence, and action receipts.
 
 ## Overview
 

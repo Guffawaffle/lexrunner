@@ -165,7 +165,7 @@ Once `feat/lex-mcp-alignment` is merged to main:
 
 ## Dogfooding Verification
 
-✅ **Used lex-pr-runner's own methodology:**
+✅ **Used lexrunner's own methodology:**
 - Created `merge-weave-plan.json` describing integrations
 - Merged in topological order (dependencies respected)
 - Used MCP launcher script for health checks (dogfooding!)
@@ -223,7 +223,7 @@ npm run typecheck
 npm test
 
 # Test MCP server
-bash lex-pr-runner-launcher.sh <<< '{"jsonrpc":"2.0","id":1,"method":"initialize",...}'
+bash lexrunner-launcher.sh <<< '{"jsonrpc":"2.0","id":1,"method":"initialize",...}'
 
 # Test CLI commands still work
 node dist/cli.js plan --help

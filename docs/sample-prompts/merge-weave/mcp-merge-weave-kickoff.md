@@ -4,7 +4,7 @@
 
 ## Context
 You will plan and execute a **merge-weave** into a single umbrella branch and PR using **MCP tools**:
-- **Discover** open PRs from GitHub and build a dependency-aware plan using lex-pr-runner.
+- **Discover** open PRs from GitHub and build a dependency-aware plan using lexrunner.
 - Create **`merge-weave-{uuid}`** umbrella branch from the default branch.
 - **Fold** designated PR branches into the umbrella branch **in topological order**, running gates after each fold.
 - Maintain one **umbrella PR → default branch**, keeping its body updated with a checklist of folded PRs and **"Closes #issue"** lines for linked issues.
@@ -16,7 +16,7 @@ You will plan and execute a **merge-weave** into a single umbrella branch and PR
 **Schema path (fixed):** `schema/plan.schema.json` — `lex-pr schema validate` uses this
 **Safety:** No force-push, no history rewrites. Use `git revert` for safe undos.
 
-> **MCP Preference:** Use MCP tools for git/GitHub ops (`mcp:git.*`, `mcp:github.*`). For lex-pr-runner commands, wrap via `mcp:tool.run name="lex-pr" args=[...]`. Fallback to `gh` CLI, then shell, then REST.
+> **MCP Preference:** Use MCP tools for git/GitHub ops (`mcp:git.*`, `mcp:github.*`). For lexrunner commands, wrap via `mcp:tool.run name="lex-pr" args=[...]`. Fallback to `gh` CLI, then shell, then REST.
 >
 > **Key insight:** `lex-pr` CLI is responsible for discovering PRs, generating plans, computing order, and running gates (it manages its own artifact collection internally). **You orchestrate the flow and capture lex-pr's JSON outputs to your session dir.** The two artifact spaces don't conflict—lex-pr writes gate logs/coverage to `.smartergpt.local/artifacts/`, you capture MCP tool outputs (JSON) to `.smartergpt.local/deliverables/_session/`.
 

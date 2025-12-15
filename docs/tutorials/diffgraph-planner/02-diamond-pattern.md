@@ -32,7 +32,7 @@ You have 3 open PRs forming a diamond pattern:
 
 ## Prerequisites
 
-- lex-pr-runner installed
+- lexrunner installed
 - GitHub repository with 3 open PRs
 - GitHub token set: `export GITHUB_TOKEN=your_token_here`
 - Completed [Tutorial 1: Simple Stack](./01-simple-stack.md)

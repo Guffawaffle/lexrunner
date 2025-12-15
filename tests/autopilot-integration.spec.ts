@@ -16,7 +16,7 @@ describe('Autopilot Integration Tests', () => {
 	let context: AutopilotContext;
 
 	beforeEach(() => {
-		testDir = path.join(os.tmpdir(), `lex-pr-runner-autopilot-integration-${Date.now()}`);
+		testDir = path.join(os.tmpdir(), `lexrunner-autopilot-integration-${Date.now()}`);
 		fs.mkdirSync(testDir, { recursive: true });
 	});
 

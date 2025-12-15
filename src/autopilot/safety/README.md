@@ -1,6 +1,6 @@
 # Safety Framework
 
-The Safety Framework provides comprehensive safety mechanisms for autopilot operations in lex-pr-runner.
+The Safety Framework provides comprehensive safety mechanisms for autopilot operations in lexrunner.
 
 ## Features
 

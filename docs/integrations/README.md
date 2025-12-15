@@ -54,8 +54,8 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Initialize workspace
         env:
@@ -125,8 +125,8 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install lex-pr-runner
-        run: npm install -g lex-pr-runner
+      - name: Install lexrunner
+        run: npm install -g lexrunner
       
       - name: Configure for environment
         run: |
@@ -169,7 +169,7 @@ discover:
   stage: discover
   image: node:20
   before_script:
-    - npm install -g lex-pr-runner
+    - npm install -g lexrunner
   script:
     - lex-pr discover --json > discovered-prs.json
   artifacts:
@@ -181,7 +181,7 @@ plan:
   stage: plan
   image: node:20
   before_script:
-    - npm install -g lex-pr-runner
+    - npm install -g lexrunner
   script:
     - lex-pr plan --from-github --out artifacts/
   artifacts:
@@ -193,7 +193,7 @@ execute:
   stage: execute
   image: node:20
   before_script:
-    - npm install -g lex-pr-runner
+    - npm install -g lexrunner
   script:
     - lex-pr execute artifacts/plan.json
   artifacts:
@@ -206,7 +206,7 @@ merge:
   stage: merge
   image: node:20
   before_script:
-    - npm install -g lex-pr-runner
+    - npm install -g lexrunner
   script:
     - lex-pr merge artifacts/plan.json --execute
   when: on_success
@@ -236,7 +236,7 @@ pipeline {
   stages {
     stage('Setup') {
       steps {
-        sh 'npm install -g lex-pr-runner'
+        sh 'npm install -g lexrunner'
         sh 'lex-pr init --non-interactive'
       }
     }
@@ -340,8 +340,8 @@ jobs:
       - checkout
       
       - run:
-          name: Install lex-pr-runner
-          command: npm install -g lex-pr-runner
+          name: Install lexrunner
+          command: npm install -g lexrunner
       
       - run:
           name: Initialize workspace
@@ -408,8 +408,8 @@ steps:
     displayName: 'Install Node.js'
   
   - script: |
-      npm install -g lex-pr-runner
-    displayName: 'Install lex-pr-runner'
+      npm install -g lexrunner
+    displayName: 'Install lexrunner'
   
   - script: |
       lex-pr init --non-interactive
@@ -459,8 +459,8 @@ steps:
 ```dockerfile
 FROM node:20-alpine
 
-# Install lex-pr-runner
-RUN npm install -g lex-pr-runner
+# Install lexrunner
+RUN npm install -g lexrunner
 
 # Set working directory
 WORKDIR /workspace
@@ -476,13 +476,13 @@ ENTRYPOINT ["lex-pr"]
 
 ```bash
 # Build image
-docker build -t lex-pr-runner .
+docker build -t lexrunner .
 
 # Run automation
 docker run --rm \
   -v $(pwd):/workspace \
   -e GITHUB_TOKEN=$GITHUB_TOKEN \
-  lex-pr-runner plan --from-github
+  lexrunner plan --from-github
 ```
 
 ## Best Practices

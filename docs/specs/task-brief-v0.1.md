@@ -74,8 +74,8 @@ A Task Brief is a structured prompt format that reduces token usage and improves
 - **Content:** Absolute paths to files the LLM should read if needed
 - **Purpose:** Replace prose descriptions with file references
 - **Examples:**
-  - `/srv/lex-mcp/lex-pr-runner/src/store/CONTRACT.md`
-  - `/srv/lex-mcp/lex-pr-runner/AGENTS.md`
+  - `/srv/lex-mcp/lexrunner/src/store/CONTRACT.md`
+  - `/srv/lex-mcp/lexrunner/AGENTS.md`
 
 ### Prior Decisions
 - **Required:** No (but critical for multi-session work)
@@ -149,7 +149,7 @@ and timestamps should be ISO 8601 format...
 ### ✅ Path reference
 ```markdown
 ## Context Files
-- /srv/lex-mcp/lex-pr-runner/src/store/CONTRACT.md
+- /srv/lex-mcp/lexrunner/src/store/CONTRACT.md
 ```
 
 ## Example: Complete Task Brief
@@ -161,7 +161,7 @@ and timestamps should be ISO 8601 format...
 Merge PRs #463-467 to main, resolve conflicts, verify gates locally, push.
 
 ## Scope
-- Repos: lex-pr-runner
+- Repos: lexrunner
 - Branch: main
 - PRs: #463, #464, #465, #466, #467
 - Files likely touched: src/runs/*.ts, src/cli.ts, src/procedures/*.ts
@@ -172,9 +172,9 @@ Merge PRs #463-467 to main, resolve conflicts, verify gates locally, push.
 - Governance: no new fan-outs
 
 ## Context Files (read if needed)
-- /srv/lex-mcp/lex-pr-runner/src/store/CONTRACT.md
-- /srv/lex-mcp/lex-pr-runner/AGENTS.md
-- /srv/lex-mcp/lex-pr-runner/docs/executor-authoring.md
+- /srv/lex-mcp/lexrunner/src/store/CONTRACT.md
+- /srv/lex-mcp/lexrunner/AGENTS.md
+- /srv/lex-mcp/lexrunner/docs/executor-authoring.md
 
 ## Prior Decisions
 - FailureHandlingPayload: use #463 implementation

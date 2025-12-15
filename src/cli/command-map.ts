@@ -1,7 +1,7 @@
 /**
  * CLI Command Mapping - Current to Canonical Forms
  *
- * This file maps existing lex-pr-runner commands to their canonical
+ * This file maps existing lexrunner commands to their canonical
  * category-action form per docs/CLI_VERBS.md.
  *
  * Use this as the authoritative source when:
@@ -28,7 +28,7 @@ export interface CommandMapping {
 }
 
 /**
- * Complete mapping of all lex-pr-runner commands
+ * Complete mapping of all lexrunner commands
  */
 export const COMMAND_MAPPINGS: CommandMapping[] = [
 	// =========================================================================

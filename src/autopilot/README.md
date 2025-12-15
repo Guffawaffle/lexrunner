@@ -1,6 +1,6 @@
 # Autopilot Module
 
-This module provides the automation level system for lex-pr-runner's merge-weave execution.
+This module provides the automation level system for lexrunner's merge-weave execution.
 
 ## Overview
 
