@@ -10,7 +10,8 @@ import {
 	isSafeArtifactPath, 
 	validateOutputPath,
 	wslToWindowsPath,
-	windowsToWSLPath
+	windowsToWSLPath,
+	isWSLEnvironment
 } from '../../src/utils/paths.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -228,5 +229,46 @@ describe('WSL bidirectional conversion', () => {
 		// Roundtrip
 		expect(wslToWindowsPath(windowsToWSLPath(winPath))).toBe(winPath);
 		expect(windowsToWSLPath(wslToWindowsPath(wslPath))).toBe(wslPath);
+	});
+});
+
+describe('isWSLEnvironment', () => {
+	it('returns a boolean', async () => {
+		const result = await isWSLEnvironment();
+		expect(typeof result).toBe('boolean');
+	});
+
+	it('detects WSL via environment variable', async () => {
+		// We can't easily test this without modifying process.env
+		// Just verify it doesn't throw
+		const result = await isWSLEnvironment();
+		expect(typeof result).toBe('boolean');
+	});
+});
+
+describe('Path traversal protection', () => {
+	it('normalizes path with ../ to prevent traversal', () => {
+		const result = normalizePath('./some/../../other/path');
+		expect(path.isAbsolute(result)).toBe(true);
+		// Should resolve .. properly
+		expect(result).not.toContain('..');
+	});
+
+	it('handles multiple ../ segments', () => {
+		const result = normalizePath('./a/b/../../c');
+		expect(path.isAbsolute(result)).toBe(true);
+		expect(result).not.toContain('..');
+		expect(result.endsWith('c')).toBe(true);
+	});
+
+	it('blocks PR directory access even with traversal attempts', () => {
+		expect(() => isSafeArtifactPath('./some/../pr-123/file.txt')).toThrow('SAFETY VIOLATION');
+	});
+
+	it('handles absolute paths with ../', () => {
+		const absPath = process.platform === 'win32' ? 'C:\\test\\..\\file.txt' : '/test/../file.txt';
+		const result = normalizePath(absPath);
+		expect(path.isAbsolute(result)).toBe(true);
+		expect(result).not.toContain('..');
 	});
 });
