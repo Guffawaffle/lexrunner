@@ -44,5 +44,4 @@ export {
 	deleteFrame,
 	getFramesDir,
 	ensureFramesDir,
-	getFramePath,
 } from "./storage.js";

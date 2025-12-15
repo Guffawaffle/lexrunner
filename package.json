@@ -23,6 +23,14 @@
 			"types": "./dist/sdk/index.d.ts",
 			"import": "./dist/sdk/index.js"
 		},
+		"./frames": {
+			"types": "./dist/frames/index.d.ts",
+			"import": "./dist/frames/index.js"
+		},
+		"./errors": {
+			"types": "./dist/errors/index.d.ts",
+			"import": "./dist/errors/index.js"
+		},
 		"./schemas/runner-stack": {
 			"types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
 			"import": "./.smartergpt/schemas/runner.stack.schema.js"
