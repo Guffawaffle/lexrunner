@@ -112,6 +112,22 @@ PR-B (feature)   ─┘
 4. Merge in order, running gates
 5. Leave final merge to human
 
+## PR Conventions (for PM work)
+
+- **One PR = One chat.** Keep scope tight and acceptance criteria explicit
+- Add a **"How to verify"** section (exact commands + expected outcomes)
+- **Commit style**: imperative mood ("Add…", "Fix…", "Update…") with optional prefixes (`runner:`, `mcp:`, `schema:`, `tests:`, `ci:`, `docs:`, `workspace:`)
+- Prefer **plan + tests first** when requested (it's common here)
+
+## Tasks to Prioritize
+
+When planning work:
+- Focus on clear acceptance criteria and decomposition
+- Create small, independently reviewable units of work
+- Define explicit dependencies between tasks
+- Ensure gates are defined for each work item
+- Avoid broad/ambiguous scope or anything requiring secrets/credentials
+
 ---
 
 *— Written by Lex, Signed by Joe*

@@ -90,13 +90,67 @@ new code
 })
 ```
 
-## Merge-Weave Protocol
+## PR Conventions
 
-When resolving conflicts:
-1. Read the conflict with `read_file`
-2. Resolve with `replace_string_in_file` (include full conflict markers)
-3. Verify with `get_errors`
-4. Never use `git checkout --theirs/--ours` followed by sed
+- **One PR = One chat.** Keep scope tight and acceptance criteria explicit
+- Add a **"How to verify"** section (exact commands + expected outcomes)
+- **Commit style**: imperative mood ("Add…", "Fix…", "Update…") with optional prefixes (`runner:`, `mcp:`, `schema:`, `tests:`, `ci:`, `docs:`, `workspace:`)
+- Prefer **plan + tests first** when requested (it's common here)
+
+## Execution Rules (Cost Management)
+
+- **NEVER stop mid-task to ask questions** - complete the full workflow when intent is clear
+- **NO todo management for straightforward operations** - just execute directly
+- **Complete merge-weave workflows**: discover real PRs → merge to integration → merge to main → close PRs → cleanup
+- **Use real data**: `gh pr list` not fake plans when user asks for "all open PRs"
+- **Finish completely**: don't declare success until the full contract is fulfilled
+
+## Tasks to Prioritize
+
+- CI hygiene, docs, small refactors, test coverage, schema changes, CLI ergonomics, non-critical bug fixes
+- Avoid broad/ambiguous migrations, cross-repo designs, or anything requiring secrets or production credentials
+
+## Coding Guidelines
+
+- Outputs and ordering must be **stable/deterministic** (no random, time-dependent ordering; sort explicitly)
+- Keep runtime deps minimal. Dev/test deps OK when justified in the PR
+- Never commit secrets or auth tokens. Do not modify branch protections
+
+## Merge-Weave Operations
+
+When user requests merge-weave on "all open PRs":
+1. `gh pr list --state open` to get real PRs (not fake plans)
+2. Execute merge-weave with conflict resolution
+3. Merge integration branch to main
+4. Close successfully merged PRs with cleanup
+5. Push changes to remote
+6. **NEVER** stop to ask questions - complete the full workflow
+
+### Umbrella Branch Pattern (When Blocked)
+
+**It is OK to merge-weave into an umbrella/integration branch when individual PRs are blocked by branch protection.**
+
+The umbrella branch pattern:
+1. Create integration branch: `git checkout -b integration/wave-N`
+2. Merge all PRs into umbrella branch (resolve conflicts here)
+3. Run full local CI: `npm run lint && npm run typecheck && npm test`
+4. **Only the final PR from umbrella → main requires approval**
+5. The umbrella is just building foundation to do a single gate and push to main in CI
+
+**Key insight:** Individual PR blocks don't matter during weave—we're building a verified bundle.
+
+## Detailed File Editing Rules
+
+See `docs/legacy/copilot-instructions-full.md` for comprehensive examples including:
+- Conflict resolution protocol (with examples)
+- Known anti-patterns case studies
+- Common lex-pr-runner editing scenarios
+- Post-conflict validation checklist
+
+**Quick reference:**
+- Use `replace_string_in_file` for ALL edits with 3-5 lines context
+- Read conflicts first, resolve precisely, then verify
+- Never use sed/awk/perl/echo/heredocs for editing
 
 ---
 
