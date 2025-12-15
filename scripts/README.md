@@ -54,6 +54,65 @@ A lightweight, parameterized shell script for merging multiple PRs into an umbre
 - `3` - Merge conflict detected
 - `4` - Gate validation failed
 
+### merge-weave-wrapper.sh (Recommended for Other Repos)
+
+**NEW**: A simplified wrapper for the `lex-pr merge` CLI command that provides an easy-to-use interface for common merge-weave operations. This is the **recommended script** for adopting merge-weave in other Lex ecosystem repositories (lex, lexsona, etc.).
+
+**Documentation:** [docs/MERGE_WEAVE_SETUP.md](../docs/MERGE_WEAVE_SETUP.md)
+
+**Quick Start:**
+
+```bash
+# Discover PRs from GitHub
+./scripts/merge-weave-wrapper.sh discover --labels ready-to-merge
+
+# Preview merge operations
+./scripts/merge-weave-wrapper.sh preview
+
+# Execute merge with cleanup
+./scripts/merge-weave-wrapper.sh execute --cleanup
+
+# Resume after failure
+./scripts/merge-weave-wrapper.sh resume
+
+# Show help
+./scripts/merge-weave-wrapper.sh help
+```
+
+**Features:**
+- Simple command-based interface (discover, preview, execute, resume)
+- Auto-detects GitHub owner/repo from git remote
+- Wraps `lex-pr` CLI for full feature access
+- Supports conflict resolution policies
+- Tracks coordination metrics with `--track-metrics`
+- Environment variable configuration
+
+**Commands:**
+
+- `discover` - Find PRs from GitHub using labels and generate plan.json
+- `preview` - Dry-run to show what will be merged
+- `execute` - Perform actual merge operations with optional cleanup
+- `resume` - Resume from failed execution using weave-lock.json
+- `help` - Show detailed usage information
+
+**Environment Variables:**
+
+- `MERGE_WEAVE_PLAN` - Plan file path (default: plan.json)
+- `MERGE_WEAVE_BRANCH_PREFIX` - Integration branch prefix (default: integration/)
+- `GITHUB_OWNER` - Repository owner (auto-detected if not set)
+- `GITHUB_REPO` - Repository name (auto-detected if not set)
+
+**Copy to Other Repos:**
+
+This script is designed to be copied to other Lex ecosystem repositories:
+
+```bash
+# In your repo
+mkdir -p scripts
+cp /path/to/LexRunner/scripts/merge-weave-wrapper.sh scripts/
+chmod +x scripts/merge-weave-wrapper.sh
+```
+
 ### dogfood-merge-weave.sh
 
 A parameterized, repo-agnostic script for executing merge-weave workflows. This script automates the complete workflow from plan generation to merge execution and reporting.
