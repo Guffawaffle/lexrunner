@@ -236,7 +236,7 @@ program
 	.description(
 		"Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly"
 	)
-	.version(`0.1.0 (audit-schema-version: ${AUDIT_SCHEMA_VERSION})`)
+	.version(`LexRunner 0.5.0 (lex-pr)`)
 	.option("--no-color", "Disable ANSI color codes in output")
 	.option(
 		"--audit-profile <profile>",
