@@ -535,3 +535,87 @@ describe("Governance fields in AXError adapters", () => {
 		});
 	});
 });
+
+describe("MCP AXError Integration", () => {
+	describe("MCP error helpers", () => {
+		it("should format errors consistently for MCP tools", () => {
+			const error = mcpToolError(
+				ErrorCodes.PLAN_NOT_FOUND,
+				"Plan file not found: plan.json",
+				{ tool: "gates.run", operation: "load plan" }
+			);
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+			expect(error.message).toContain("plan.json");
+			expect(error.context?.tool).toBe("gates.run");
+			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+		});
+
+		it("should provide tool-specific nextActions for common tools", () => {
+			const planCreateError = mcpToolError(
+				ErrorCodes.CONFIG_INVALID,
+				"Failed",
+				{ tool: "plan.create" }
+			);
+			expect(planCreateError.nextActions.some(a => a.includes("local.init"))).toBe(true);
+
+			const gatesRunError = mcpToolError(
+				ErrorCodes.GATE_FAILED,
+				"Failed",
+				{ tool: "gates.run" }
+			);
+			expect(gatesRunError.nextActions.some(a => a.includes("plan.create"))).toBe(true);
+		});
+	});
+
+	describe("Plan validation errors", () => {
+		it("should convert cycle detection to AXError", () => {
+			const cycle = ["PR-1", "PR-2", "PR-3", "PR-1"];
+			const error = cycleDetectedError({ cycle });
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.PLAN_CYCLE_DETECTED);
+			expect(error.message).toContain("cycle");
+			expect(error.nextActions.some(a => a.includes("dependencies"))).toBe(true);
+		});
+
+		it("should convert unknown dependency to AXError", () => {
+			const error = unknownDependencyError({
+				item: "PR-100",
+				dependency: "PR-999",
+				availableItems: ["PR-1", "PR-2"]
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.UNKNOWN_DEPENDENCY);
+			expect(error.message).toContain("PR-100");
+			expect(error.message).toContain("PR-999");
+			expect(error.nextActions.some(a => a.includes("Available items"))).toBe(true);
+		});
+	});
+
+	describe("GitHub API errors", () => {
+		it("should handle authentication failures with proper nextActions", () => {
+			const error = githubApiError({
+				status: 401,
+				message: "Bad credentials"
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.GITHUB_AUTH_ERROR);
+			expect(error.nextActions.some(a => a.includes("GITHUB_TOKEN"))).toBe(true);
+		});
+
+		it("should handle rate limiting with retry guidance", () => {
+			const error = githubApiError({
+				status: 429,
+				retryAfter: 60
+			});
+
+			expect(isAXError(error)).toBe(true);
+			expect(error.code).toBe(ErrorCodes.GITHUB_RATE_LIMIT);
+			expect(error.nextActions.some(a => a.includes("60 seconds"))).toBe(true);
+		});
+	});
+});
