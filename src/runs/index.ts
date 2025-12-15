@@ -113,3 +113,18 @@ export type {
 	ArtifactDescriptor,
 	ListArtifactsOutput,
 } from "./artifacts.js";
+
+// Decisions - LR-062
+export {
+	DecisionErrorCodes,
+	SubmitDecisionInputSchema,
+	SubmitDecisionOutputSchema,
+	submitDecision,
+	getDecisions,
+} from "./decisions.js";
+
+export type {
+	SubmitDecisionInput,
+	SubmitDecisionOutput,
+	DecisionLogEntry,
+} from "./decisions.js";
