@@ -178,6 +178,34 @@ npx lex-pr merge plan.json
 
 See [docs/quickstart.md](docs/quickstart.md) for a complete 5-minute onboarding guide.
 
+### Using Merge-Weave in Other Lex Ecosystem Repos
+
+LexRunner's merge-weave functionality can be used in any Lex ecosystem repository (lex, lexsona, etc.):
+
+```bash
+# Quick start for adopting repos
+curl -fsSL https://raw.githubusercontent.com/Guffawaffle/LexRunner/main/scripts/quick-start-merge-weave.sh | bash
+
+# Or manually:
+# 1. Install LexRunner
+npm install --save-dev github:Guffawaffle/LexRunner
+
+# 2. Discover PRs and generate plan
+npx lex-pr discover --owner YOUR_ORG --repo YOUR_REPO --labels ready-to-merge --output plan.json
+
+# 3. Preview merge operations
+npx lex-pr merge --plan plan.json --dry-run
+
+# 4. Execute merge
+npx lex-pr merge --plan plan.json --execute --cleanup
+```
+
+**Complete Setup Guide:** See [docs/MERGE_WEAVE_SETUP.md](docs/MERGE_WEAVE_SETUP.md) for detailed installation instructions, configuration examples, and troubleshooting.
+
+**Convenience Scripts:**
+- [`scripts/merge-weave-wrapper.sh`](scripts/merge-weave-wrapper.sh) - Simple wrapper for common operations
+- [`scripts/quick-start-merge-weave.sh`](scripts/quick-start-merge-weave.sh) - Automated setup for new repos
+
 ## Front-End Capture Pipeline
 
 The front-end capture pipeline enables rapid idea-to-project workflows using GitHub Issues (no PRs).
