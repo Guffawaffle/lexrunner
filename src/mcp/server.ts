@@ -22,7 +22,7 @@ import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { executeGatesWithPolicy } from "../gates.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
-import { computeMergeOrder } from "../mergeOrder.js";
+import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { loadPlan, validatePlan } from "../schema.js";
 import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
@@ -69,6 +69,8 @@ import {
 	githubApiError,
 	toAXError,
 	ErrorCodes,
+	cycleDetectedError,
+	unknownDependencyError,
 } from "../errors/index.js";
 
 import * as fs from "fs";
@@ -960,9 +962,12 @@ async function handlePlanCreate(
 		} else {
 			// In traditional mode, inputs is guaranteed to be set
 			if (!inputs) {
-				throw new Error(
-					"Internal error: inputs not loaded in traditional mode"
+				const axError = mcpToolError(
+					ErrorCodes.INTERNAL_ERROR,
+					"Internal error: inputs not loaded in traditional mode",
+					{ tool: "plan.create", operation: "generate snapshot" }
 				);
+				throwMcpAXError(ErrorCode.InternalError, axError);
 			}
 			snapshot = generateSnapshot(plan, inputs);
 		}
@@ -1007,7 +1012,7 @@ async function handleGatesRun(
 		if (args.planFile) {
 			// Validate that the plan file exists
 			if (!fs.existsSync(args.planFile)) {
-				throw new Error(`Plan file not found: ${args.planFile}`);
+				throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
 			}
 
 			planPath = args.planFile;
@@ -1023,9 +1028,7 @@ async function handleGatesRun(
 			// Load plan from resolved profile directory
 			planPath = path.join(resolved.path, "runner", "plan.json");
 			if (!fs.existsSync(planPath)) {
-				throw new Error(
-					"No plan found. Run plan.create first or provide planFile parameter."
-				);
+				throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
 			}
 
 			outDirBase = path.join(resolved.path, "runner");
@@ -1035,11 +1038,12 @@ async function handleGatesRun(
 		try {
 			planContent = fs.readFileSync(planPath, "utf-8");
 		} catch (error) {
-			throw new Error(
-				`Failed to read plan file ${planPath}: ${
-					error instanceof Error ? error.message : String(error)
-				}`
+			const axError = mcpToolError(
+				ErrorCodes.PLAN_NOT_FOUND,
+				`Failed to read plan file ${planPath}`,
+				{ tool: "gates.run", operation: "read plan file" }
 			);
+			throwMcpAXError(ErrorCode.InternalError, axError);
 		}
 
 		const plan = loadPlan(planContent);
@@ -1152,7 +1156,7 @@ async function handleMergeApply(
 		// Load plan and execution state
 		const planPath = path.join(resolved.path, "runner", "plan.json");
 		if (!fs.existsSync(planPath)) {
-			throw new Error("No plan found. Run plan.create first.");
+			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
 		}
 
 		const planContent = fs.readFileSync(planPath, "utf-8");
@@ -1922,6 +1926,23 @@ async function handleMergeOrder(args: {
 	} catch (error) {
 		if (error instanceof McpError) {
 			throw error;
+		}
+		// Handle specific plan validation errors with appropriate AXError adapters
+		if (error instanceof CycleError) {
+			// Extract cycle information from error message if available
+			const cycleMatch = error.message.match(/involving: (.+)/);
+			const cycle = cycleMatch ? cycleMatch[1].split(', ') : [];
+			const axError = cycleDetectedError({ cycle });
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		if (error instanceof UnknownDependencyError) {
+			// Extract dependency information from error message
+			const depMatch = error.message.match(/unknown dependency '(.+)' for item '(.+)'/);
+			if (depMatch) {
+				const [, dependency, item] = depMatch;
+				const axError = unknownDependencyError({ item, dependency });
+				throwMcpAXError(ErrorCode.InvalidParams, axError);
+			}
 		}
 		throwMcpToolError(ErrorCode.InternalError, "merge-order", error, "compute merge order");
 	}
