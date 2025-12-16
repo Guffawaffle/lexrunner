@@ -22,7 +22,11 @@ import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { executeGatesWithPolicy } from "../gates.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
-import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
+import {
+	computeMergeOrder,
+	CycleError,
+	UnknownDependencyError,
+} from "../mergeOrder.js";
 import { loadPlan, validatePlan } from "../schema.js";
 import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
@@ -30,7 +34,11 @@ import { generatePlanFromGitHub } from "../core/githubPlan.js";
 import { createGitHubClient } from "../github/index.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
-import { bootstrapWorkspace, detectProjectType, getEnvironmentSuggestions } from "../core/bootstrap.js";
+import {
+	bootstrapWorkspace,
+	detectProjectType,
+	getEnvironmentSuggestions,
+} from "../core/bootstrap.js";
 import {
 	getMCPEnvironment,
 	PlanCreateArgs,
@@ -129,7 +137,10 @@ import { ulid } from "ulid";
 import * as crypto from "crypto";
 
 // Workflow guidance imports
-import { createWorkflowGuide, type WorkflowPhase } from "./workflow/state-machine.js";
+import {
+	createWorkflowGuide,
+	type WorkflowPhase,
+} from "./workflow/state-machine.js";
 import type { WorkflowGuide } from "./types/guided-response.js";
 
 // =============================================================================
@@ -138,17 +149,14 @@ import type { WorkflowGuide } from "./types/guided-response.js";
 
 /**
  * Create an McpError with AXError-structured content in the message.
- * 
+ *
  * Per AX-CONTRACT.md v0.1, Guarantee 2.3: All MCP tool failures should
  * return structured errors that agents can parse for recovery actions.
- * 
+ *
  * The error message is JSON-serialized AXError for machine readability,
  * while remaining compatible with MCP's error format.
  */
-function throwMcpAXError(
-	mcpErrorCode: ErrorCode,
-	axError: AXError
-): never {
+function throwMcpAXError(mcpErrorCode: ErrorCode, axError: AXError): never {
 	// Serialize the AXError as JSON in the message for structured parsing
 	const structuredMessage = JSON.stringify(axError);
 	throw new McpError(mcpErrorCode, structuredMessage);
@@ -156,7 +164,7 @@ function throwMcpAXError(
 
 /**
  * Create an McpError from a caught error, converting to AXError format.
- * 
+ *
  * @param mcpErrorCode - The MCP error code to use (e.g., ErrorCode.InternalError)
  * @param tool - The MCP tool name
  * @param error - The caught error
@@ -171,11 +179,10 @@ function throwMcpToolError(
 	axErrorCode: string = ErrorCodes.INTERNAL_ERROR
 ): never {
 	const message = error instanceof Error ? error.message : String(error);
-	const axError = mcpToolError(
-		axErrorCode,
-		`${tool} failed: ${message}`,
-		{ tool, operation }
-	);
+	const axError = mcpToolError(axErrorCode, `${tool} failed: ${message}`, {
+		tool,
+		operation,
+	});
 	throwMcpAXError(mcpErrorCode, axError);
 }
 
@@ -196,7 +203,9 @@ export interface McpServerOptions {
 const ListRunsInputSchema = z.object({
 	limit: z.number().int().positive().optional(),
 	offset: z.number().int().nonnegative().optional(),
-	state: z.enum(["pending", "running", "completed", "failed", "aborted"]).optional(),
+	state: z
+		.enum(["pending", "running", "completed", "failed", "aborted"])
+		.optional(),
 });
 type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
 
@@ -223,7 +232,7 @@ function createServer(options?: McpServerOptions): Server {
 		return {
 			tools: [
 				{
-					name: "plan.create",
+					name: "mcp_lexrunner_plan_create",
 					description:
 						"Create a plan from configuration files or auto-discover from GitHub PRs",
 					inputSchema: {
@@ -306,7 +315,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "gates.run",
+					name: "mcp_lexrunner_gate_run",
 					description: "Execute gates for plan items",
 					inputSchema: {
 						type: "object",
@@ -333,7 +342,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "merge.apply",
+					name: "mcp_lexrunner_weave_apply",
 					description:
 						"Apply merge operations (requires ALLOW_MUTATIONS=true)",
 					inputSchema: {
@@ -349,7 +358,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "local.init",
+					name: "mcp_lexrunner_workspace_init",
 					description:
 						"Initialize local overlay directory with auto-detected project configuration",
 					inputSchema: {
@@ -365,7 +374,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "profile.resolve",
+					name: "mcp_lexrunner_workspace_resolve",
 					description:
 						"Resolve profile directory using precedence chain (--profile-dir → LEX_PR_PROFILE_DIR → .smartergpt.local/ → .smartergpt/)",
 					inputSchema: {
@@ -380,7 +389,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "health",
+					name: "mcp_lexrunner_core_health",
 					description:
 						"Get health status of the system with optional metrics",
 					inputSchema: {
@@ -399,7 +408,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Senior Dev Executor Tools
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "senior-dev.prepare-context",
+					name: "mcp_lexrunner_executor_prepare_context",
 					description:
 						"Phase 1: Gather deterministic artifacts for code review (lint, typecheck, tests, diff, PR metadata)",
 					inputSchema: {
@@ -440,7 +449,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "senior-dev.recall-context",
+					name: "mcp_lexrunner_executor_recall_context",
 					description:
 						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns)",
 					inputSchema: {
@@ -468,7 +477,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "senior-dev.capture-frame",
+					name: "mcp_lexrunner_executor_capture_frame",
 					description:
 						"Phase 4: Capture review session as a Frame in Lex memory (the receipt)",
 					inputSchema: {
@@ -531,7 +540,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "senior-dev.modes",
+					name: "mcp_lexrunner_executor_modes",
 					description:
 						"List available executor modes (triage, deep_review, pattern_mining, mentorship)",
 					inputSchema: {
@@ -543,7 +552,7 @@ function createServer(options?: McpServerOptions): Server {
 				// LexRunner Run Management Tools
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "lexrunner.startRun",
+					name: "mcp_lexrunner_run_start",
 					description:
 						"Start a new LexRunner procedure run and return a runId",
 					inputSchema: {
@@ -577,7 +586,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "lexrunner.getStatus",
+					name: "mcp_lexrunner_run_status",
 					description:
 						"Get current run state, summary, and next available actions",
 					inputSchema: {
@@ -592,7 +601,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "lexrunner.listRuns",
+					name: "mcp_lexrunner_run_list",
 					description:
 						"List runs from the store with optional filtering",
 					inputSchema: {
@@ -604,18 +613,25 @@ function createServer(options?: McpServerOptions): Server {
 							},
 							offset: {
 								type: "number",
-								description: "Number of runs to skip (for pagination)",
+								description:
+									"Number of runs to skip (for pagination)",
 							},
 							state: {
 								type: "string",
-								enum: ["pending", "running", "completed", "failed", "aborted"],
+								enum: [
+									"pending",
+									"running",
+									"completed",
+									"failed",
+									"aborted",
+								],
 								description: "Filter by run state",
 							},
 						},
 					},
 				},
 				{
-					name: "lexrunner.submitDecision",
+					name: "mcp_lexrunner_run_decision",
 					description:
 						"Submit an LLM decision for a pending action in a run",
 					inputSchema: {
@@ -627,14 +643,17 @@ function createServer(options?: McpServerOptions): Server {
 							},
 							action: {
 								type: "string",
-								description: "Action to submit (must match a nextOptions[x].action)",
+								description:
+									"Action to submit (must match a nextOptions[x].action)",
 							},
 							response: {
-								description: "Response data (validated against nextOptions[x].responseSchema)",
+								description:
+									"Response data (validated against nextOptions[x].responseSchema)",
 							},
 							rationale: {
 								type: "string",
-								description: "Optional rationale for audit trail",
+								description:
+									"Optional rationale for audit trail",
 							},
 						},
 						required: ["runId", "action", "response"],
@@ -644,7 +663,7 @@ function createServer(options?: McpServerOptions): Server {
 				// MCP/CLI Parity Tools (AX-004)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "discover",
+					name: "mcp_lexrunner_weave_discover",
 					description:
 						"Discover open pull requests from GitHub with optional dependency suggestions",
 					inputSchema: {
@@ -666,14 +685,15 @@ function createServer(options?: McpServerOptions): Server {
 							},
 							suggest: {
 								type: "boolean",
-								description: "Generate dependency suggestions using heuristics",
+								description:
+									"Generate dependency suggestions using heuristics",
 								default: false,
 							},
 						},
 					},
 				},
 				{
-					name: "status",
+					name: "mcp_lexrunner_weave_status",
 					description:
 						"Show current execution status and merge eligibility for a plan",
 					inputSchema: {
@@ -681,14 +701,15 @@ function createServer(options?: McpServerOptions): Server {
 						properties: {
 							planFile: {
 								type: "string",
-								description: "Path to plan.json file (default: plan.json)",
+								description:
+									"Path to plan.json file (default: plan.json)",
 								default: "plan.json",
 							},
 						},
 					},
 				},
 				{
-					name: "doctor",
+					name: "mcp_lexrunner_workspace_doctor",
 					description:
 						"Run environment and configuration sanity checks with optional hostility scoring",
 					inputSchema: {
@@ -696,14 +717,15 @@ function createServer(options?: McpServerOptions): Server {
 						properties: {
 							environmentQuality: {
 								type: "boolean",
-								description: "Include environmental hostility scoring in the check",
+								description:
+									"Include environmental hostility scoring in the check",
 								default: false,
 							},
 						},
 					},
 				},
 				{
-					name: "merge-order",
+					name: "mcp_lexrunner_weave_order",
 					description:
 						"Compute dependency levels and merge order using Kahn's algorithm",
 					inputSchema: {
@@ -711,14 +733,15 @@ function createServer(options?: McpServerOptions): Server {
 						properties: {
 							planFile: {
 								type: "string",
-								description: "Path to plan.json file (default: plan.json)",
+								description:
+									"Path to plan.json file (default: plan.json)",
 								default: "plan.json",
 							},
 						},
 					},
 				},
 				{
-					name: "config.show",
+					name: "mcp_lexrunner_core_config",
 					description:
 						"Display configuration with precedence chain and provenance",
 					inputSchema: {
@@ -735,7 +758,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Workflow Guidance Tools (LPR-037)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "workflow.guide",
+					name: "mcp_lexrunner_core_guide",
 					description:
 						"Get context-aware workflow guidance for the current phase. " +
 						"Provides next steps, common issues, and recommendations.",
@@ -752,7 +775,8 @@ function createServer(options?: McpServerOptions): Server {
 									"post-merge",
 									"error-recovery",
 								],
-								description: "Current workflow phase to get guidance for",
+								description:
+									"Current workflow phase to get guidance for",
 							},
 						},
 						required: ["phase"],
@@ -762,7 +786,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Governance Metrics Tools (Wave 3)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "metrics",
+					name: "mcp_lexrunner_core_metrics",
 					description:
 						"Get current governance metrics snapshot for observability dashboards",
 					inputSchema: {
@@ -770,7 +794,8 @@ function createServer(options?: McpServerOptions): Server {
 						properties: {
 							filter: {
 								type: "string",
-								description: "Filter metrics by name pattern (e.g., 'turn_cost', 'tier')",
+								description:
+									"Filter metrics by name pattern (e.g., 'turn_cost', 'tier')",
 							},
 							format: {
 								type: "string",
@@ -790,79 +815,124 @@ function createServer(options?: McpServerOptions): Server {
 		const { name, arguments: args } = request.params;
 
 		switch (name) {
-			case "plan.create":
+			// Plan tools
+			case "mcp_lexrunner_plan_create":
+			case "plan.create": // Deprecated alias
 				return await handlePlanCreate(args as PlanCreateArgs);
 
-			case "gates.run":
+			// Gate tools
+			case "mcp_lexrunner_gate_run":
+			case "gates.run": // Deprecated alias
 				return await handleGatesRun(args as GatesRunArgs);
 
-			case "merge.apply":
+			// Weave tools
+			case "mcp_lexrunner_weave_apply":
+			case "merge.apply": // Deprecated alias
 				return await handleMergeApply(args as MergeApplyArgs);
 
-			case "local.init":
+			case "mcp_lexrunner_weave_discover":
+			case "discover": // Deprecated alias
+				return await handleDiscover(
+					args as {
+						owner?: string;
+						repo?: string;
+						state?: string;
+						suggest?: boolean;
+					}
+				);
+
+			case "mcp_lexrunner_weave_status":
+			case "status": // Deprecated alias
+				return await handleStatus(args as { planFile?: string });
+
+			case "mcp_lexrunner_weave_order":
+			case "merge-order": // Deprecated alias
+				return await handleMergeOrder(args as { planFile?: string });
+
+			// Workspace tools
+			case "mcp_lexrunner_workspace_init":
+			case "local.init": // Deprecated alias
 				return await handleLocalInit(args as InitLocalArgs);
 
-			case "profile.resolve":
+			case "mcp_lexrunner_workspace_resolve":
+			case "profile.resolve": // Deprecated alias
 				return await handleProfileResolve(args as ProfileResolveArgs);
 
-			case "health":
+			case "mcp_lexrunner_workspace_doctor":
+			case "doctor": // Deprecated alias
+				return await handleDoctor(
+					args as { environmentQuality?: boolean }
+				);
+
+			// Core tools
+			case "mcp_lexrunner_core_health":
+			case "health": // Deprecated alias
 				return await handleHealth(args as { includeMetrics?: boolean });
 
-			// Senior Dev executor tools
-			case "senior-dev.prepare-context":
+			case "mcp_lexrunner_core_config":
+			case "config.show": // Deprecated alias
+				return await handleConfigShow(args as { key?: string });
+
+			case "mcp_lexrunner_core_guide":
+			case "workflow.guide": // Deprecated alias
+				return await handleWorkflowGuide(args as WorkflowGuideArgs);
+
+			case "mcp_lexrunner_core_metrics":
+			case "metrics": // Deprecated alias
+				return await handleMetrics(
+					args as { filter?: string; format?: string }
+				);
+
+			// Executor tools (Senior Dev)
+			case "mcp_lexrunner_executor_prepare_context":
+			case "senior-dev.prepare-context": // Deprecated alias
 				return await handleSeniorDevPrepareContext(
 					args as unknown as PrepareContextInput
 				);
 
-			case "senior-dev.recall-context":
+			case "mcp_lexrunner_executor_recall_context":
+			case "senior-dev.recall-context": // Deprecated alias
 				return await handleSeniorDevRecallContext(
 					args as unknown as RecallContextInput
 				);
 
-			case "senior-dev.capture-frame":
+			case "mcp_lexrunner_executor_capture_frame":
+			case "senior-dev.capture-frame": // Deprecated alias
 				return await handleSeniorDevCaptureFrame(
 					args as unknown as CaptureFrameInput
 				);
 
-			case "senior-dev.modes":
+			case "mcp_lexrunner_executor_modes":
+			case "senior-dev.modes": // Deprecated alias
 				return await handleSeniorDevModes();
 
-			// LexRunner run management tools
-			case "lexrunner.startRun":
-				return await handleStartRun(args as unknown as StartRunInput, runStore);
+			// Run management tools
+			case "mcp_lexrunner_run_start":
+			case "lexrunner.startRun": // Deprecated alias
+				return await handleStartRun(
+					args as unknown as StartRunInput,
+					runStore
+				);
 
-			case "lexrunner.getStatus":
-				return await handleGetStatus(args as unknown as GetStatusInput, runStore);
+			case "mcp_lexrunner_run_status":
+			case "lexrunner.getStatus": // Deprecated alias
+				return await handleGetStatus(
+					args as unknown as GetStatusInput,
+					runStore
+				);
 
-			case "lexrunner.listRuns":
-				return await handleListRuns(args as unknown as ListRunsInput, runStore);
+			case "mcp_lexrunner_run_list":
+			case "lexrunner.listRuns": // Deprecated alias
+				return await handleListRuns(
+					args as unknown as ListRunsInput,
+					runStore
+				);
 
-			case "lexrunner.submitDecision":
-				return await handleSubmitDecision(args as unknown as SubmitDecisionInput);
-
-			// MCP/CLI Parity tools (AX-004)
-			case "discover":
-				return await handleDiscover(args as { owner?: string; repo?: string; state?: string; suggest?: boolean });
-
-			case "status":
-				return await handleStatus(args as { planFile?: string });
-
-			case "doctor":
-				return await handleDoctor(args as { environmentQuality?: boolean });
-
-			case "merge-order":
-				return await handleMergeOrder(args as { planFile?: string });
-
-			case "config.show":
-				return await handleConfigShow(args as { key?: string });
-
-			// Governance metrics tool (Wave 3)
-			case "metrics":
-				return await handleMetrics(args as { filter?: string; format?: string });
-
-			// Workflow guidance tool (LPR-037)
-			case "workflow.guide":
-				return await handleWorkflowGuide(args as WorkflowGuideArgs);
+			case "mcp_lexrunner_run_decision":
+			case "lexrunner.submitDecision": // Deprecated alias
+				return await handleSubmitDecision(
+					args as unknown as SubmitDecisionInput
+				);
 
 			default:
 				throw new McpError(
@@ -1030,7 +1100,12 @@ async function handlePlanCreate(
 			const axError = writeProtectionError(error.message, "plan.create");
 			throwMcpAXError(ErrorCode.InvalidRequest, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "plan.create", error, "create plan");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"plan.create",
+			error,
+			"create plan"
+		);
 	}
 }
 
@@ -1050,7 +1125,10 @@ async function handleGatesRun(
 		if (args.planFile) {
 			// Validate that the plan file exists
 			if (!fs.existsSync(args.planFile)) {
-				throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
+				throwMcpAXError(
+					ErrorCode.InvalidParams,
+					planNotFoundError(args.planFile)
+				);
 			}
 
 			planPath = args.planFile;
@@ -1066,7 +1144,10 @@ async function handleGatesRun(
 			// Load plan from resolved profile directory
 			planPath = path.join(resolved.path, "runner", "plan.json");
 			if (!fs.existsSync(planPath)) {
-				throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
+				throwMcpAXError(
+					ErrorCode.InvalidParams,
+					planNotFoundError(planPath)
+				);
 			}
 
 			outDirBase = path.join(resolved.path, "runner");
@@ -1148,10 +1229,21 @@ async function handleGatesRun(
 	} catch (error) {
 		// Check for plan not found specifically
 		const message = error instanceof Error ? error.message : String(error);
-		if (message.includes("Plan file not found") || message.includes("No plan found")) {
-			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
+		if (
+			message.includes("Plan file not found") ||
+			message.includes("No plan found")
+		) {
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(args.planFile)
+			);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "gates.run", error, "run gates");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"gates.run",
+			error,
+			"run gates"
+		);
 	}
 }
 
@@ -1194,7 +1286,10 @@ async function handleMergeApply(
 		// Load plan and execution state
 		const planPath = path.join(resolved.path, "runner", "plan.json");
 		if (!fs.existsSync(planPath)) {
-			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(planPath)
+			);
 		}
 
 		const planContent = fs.readFileSync(planPath, "utf-8");
@@ -1232,7 +1327,12 @@ async function handleMergeApply(
 		if (message.includes("No plan found")) {
 			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError());
 		}
-		throwMcpToolError(ErrorCode.InternalError, "merge.apply", error, "apply merge");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"merge.apply",
+			error,
+			"apply merge"
+		);
 	}
 }
 
@@ -1262,7 +1362,12 @@ async function handleLocalInit(
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "local.init", error, "initialize local overlay");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"local.init",
+			error,
+			"initialize local overlay"
+		);
 	}
 }
 
@@ -1298,7 +1403,12 @@ async function handleProfileResolve(
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "profile.resolve", error, "resolve profile");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"profile.resolve",
+			error,
+			"resolve profile"
+		);
 	}
 }
 
@@ -1377,7 +1487,12 @@ async function handleSeniorDevPrepareContext(
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "senior-dev.prepare-context", error, "prepare review context");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"senior-dev.prepare-context",
+			error,
+			"prepare review context"
+		);
 	}
 }
 
@@ -1398,7 +1513,12 @@ async function handleSeniorDevRecallContext(
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "senior-dev.recall-context", error, "recall context");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"senior-dev.recall-context",
+			error,
+			"recall context"
+		);
 	}
 }
 
@@ -1419,7 +1539,12 @@ async function handleSeniorDevCaptureFrame(
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "senior-dev.capture-frame", error, "capture frame");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"senior-dev.capture-frame",
+			error,
+			"capture frame"
+		);
 	}
 }
 
@@ -1453,7 +1578,10 @@ function generatePlanHash(input: StartRunInput): string {
 		repo: input.repo,
 		params: input.params,
 	});
-	return "sha256:" + crypto.createHash("sha256").update(hashContent).digest("hex");
+	return (
+		"sha256:" +
+		crypto.createHash("sha256").update(hashContent).digest("hex")
+	);
 }
 
 /**
@@ -1506,7 +1634,12 @@ async function handleStartRun(
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "lexrunner.startRun", error, "start run");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"lexrunner.startRun",
+			error,
+			"start run"
+		);
 	}
 }
 
@@ -1559,7 +1692,10 @@ async function handleGetStatus(
 				ErrorCodes.INTERNAL_ERROR,
 				error.message,
 				{ tool: "lexrunner.getStatus" },
-				["Check that runId is valid", "List available runs with 'lexrunner.listRuns'"]
+				[
+					"Check that runId is valid",
+					"List available runs with 'lexrunner.listRuns'",
+				]
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
@@ -1567,11 +1703,19 @@ async function handleGetStatus(
 			const axError = mcpToolError(
 				ErrorCodes.INVALID_INPUT,
 				`Invalid getStatus parameters: ${error.message}`,
-				{ tool: "lexrunner.getStatus", operation: "validate parameters" }
+				{
+					tool: "lexrunner.getStatus",
+					operation: "validate parameters",
+				}
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "lexrunner.getStatus", error, "get status");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"lexrunner.getStatus",
+			error,
+			"get status"
+		);
 	}
 }
 
@@ -1627,7 +1771,12 @@ async function handleListRuns(
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "lexrunner.listRuns", error, "list runs");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"lexrunner.listRuns",
+			error,
+			"list runs"
+		);
 	}
 }
 
@@ -1659,11 +1808,19 @@ async function handleSubmitDecision(
 			const axError = mcpToolError(
 				ErrorCodes.INVALID_INPUT,
 				`Invalid submitDecision parameters: ${error.message}`,
-				{ tool: "lexrunner.submitDecision", operation: "validate parameters" }
+				{
+					tool: "lexrunner.submitDecision",
+					operation: "validate parameters",
+				}
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "lexrunner.submitDecision", error, "submit decision");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"lexrunner.submitDecision",
+			error,
+			"submit decision"
+		);
 	}
 }
 
@@ -1694,7 +1851,8 @@ async function handleDiscover(args: {
 
 		if (!githubAPI) {
 			const axError = githubApiError({
-				message: "Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote."
+				message:
+					"Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote.",
 			});
 			throwMcpAXError(ErrorCode.InvalidRequest, axError);
 		}
@@ -1710,20 +1868,25 @@ async function handleDiscover(args: {
 
 		if (args.suggest) {
 			// Generate dependency suggestions using heuristics
-			const { createFileAnalyzer } = await import("../planner/fileAnalysis.js");
+			const { createFileAnalyzer } = await import(
+				"../planner/fileAnalysis.js"
+			);
 
 			const analyzer = createFileAnalyzer(
 				githubAPI.getOctokit(),
 				githubAPI.config.owner,
 				githubAPI.config.repo
 			);
-			const prs = pullRequests.map((pr: { number: number; sha: string }) => ({
-				number: pr.number,
-				name: `PR-${pr.number}`,
-				sha: pr.sha,
-			}));
+			const prs = pullRequests.map(
+				(pr: { number: number; sha: string }) => ({
+					number: pr.number,
+					name: `PR-${pr.number}`,
+					sha: pr.sha,
+				})
+			);
 
-			const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+			const suggestions =
+				await analyzer.suggestDependenciesWithHeuristics(prs);
 
 			result = {
 				pullRequests,
@@ -1762,7 +1925,12 @@ async function handleDiscover(args: {
 			});
 			throwMcpAXError(ErrorCode.InternalError, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "discover", error, "discover PRs");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"discover",
+			error,
+			"discover PRs"
+		);
 	}
 }
 
@@ -1776,7 +1944,10 @@ async function handleStatus(args: {
 		const planFile = args.planFile || "plan.json";
 
 		if (!fs.existsSync(planFile)) {
-			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(planFile)
+			);
 		}
 
 		const planContent = fs.readFileSync(planFile, "utf-8");
@@ -1824,7 +1995,12 @@ async function handleStatus(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
-		throwMcpToolError(ErrorCode.InternalError, "status", error, "get status");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"status",
+			error,
+			"get status"
+		);
 	}
 }
 
@@ -1848,15 +2024,30 @@ async function handleDoctor(args: {
 			const expectedVersion = nvmrcContent;
 
 			if (currentVersion === expectedVersion) {
-				checks.nodejs = { status: "ok", current: process.version, expected: `v${expectedVersion}` };
+				checks.nodejs = {
+					status: "ok",
+					current: process.version,
+					expected: `v${expectedVersion}`,
+				};
 			} else {
-				checks.nodejs = { status: "mismatch", current: process.version, expected: `v${expectedVersion}` };
+				checks.nodejs = {
+					status: "mismatch",
+					current: process.version,
+					expected: `v${expectedVersion}`,
+				};
 				checks.hasErrors = true;
-				(checks.issues as string[]).push(`Node.js version mismatch: ${process.version} vs v${expectedVersion}`);
+				(checks.issues as string[]).push(
+					`Node.js version mismatch: ${process.version} vs v${expectedVersion}`
+				);
 			}
 		} catch {
-			checks.nodejs = { status: "no_constraint", current: process.version };
-			(checks.suggestions as string[]).push("Consider adding .nvmrc file for Node.js version consistency");
+			checks.nodejs = {
+				status: "no_constraint",
+				current: process.version,
+			};
+			(checks.suggestions as string[]).push(
+				"Consider adding .nvmrc file for Node.js version consistency"
+			);
 		}
 
 		// Configuration check
@@ -1887,7 +2078,10 @@ async function handleDoctor(args: {
 				checks.github = { detected: false };
 			}
 		} catch (error) {
-			checks.github = { detected: false, error: (error as Error).message };
+			checks.github = {
+				detected: false,
+				error: (error as Error).message,
+			};
 		}
 
 		// Git operations check
@@ -1907,7 +2101,9 @@ async function handleDoctor(args: {
 				error: (error as Error).message,
 			};
 			checks.hasErrors = true;
-			(checks.issues as string[]).push(`Git operations failed: ${(error as Error).message}`);
+			(checks.issues as string[]).push(
+				`Git operations failed: ${(error as Error).message}`
+			);
 		}
 
 		// Environment quality check (hostility scoring) if requested
@@ -1924,7 +2120,12 @@ async function handleDoctor(args: {
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "doctor", error, "run doctor");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"doctor",
+			error,
+			"run doctor"
+		);
 	}
 }
 
@@ -1938,7 +2139,10 @@ async function handleMergeOrder(args: {
 		const planFile = args.planFile || "plan.json";
 
 		if (!fs.existsSync(planFile)) {
-			throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(planFile)
+			);
 		}
 
 		const planContent = fs.readFileSync(planFile, "utf-8");
@@ -1950,7 +2154,7 @@ async function handleMergeOrder(args: {
 		const result = {
 			levels,
 			totalItems: plan.items.length,
-			maxParallelism: Math.max(...levels.map(level => level.length)),
+			maxParallelism: Math.max(...levels.map((level) => level.length)),
 		};
 
 		return {
@@ -1970,7 +2174,12 @@ async function handleMergeOrder(args: {
 			const axError = error.toAXError();
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
-		throwMcpToolError(ErrorCode.InternalError, "merge-order", error, "compute merge order");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"merge-order",
+			error,
+			"compute merge order"
+		);
 	}
 }
 
@@ -2028,7 +2237,12 @@ async function handleConfigShow(args: {
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "config.show", error, "show config");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"config.show",
+			error,
+			"show config"
+		);
 	}
 }
 
@@ -2064,7 +2278,12 @@ async function handleMetrics(args: {
 			],
 		};
 	} catch (error) {
-		throwMcpToolError(ErrorCode.InternalError, "metrics", error, "get metrics");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"metrics",
+			error,
+			"get metrics"
+		);
 	}
 }
 
@@ -2089,7 +2308,9 @@ async function handleWorkflowGuide(
 		if (!validPhases.includes(phase)) {
 			throw new McpError(
 				ErrorCode.InvalidParams,
-				`Invalid workflow phase: ${args.phase}. Valid phases: ${validPhases.join(", ")}`
+				`Invalid workflow phase: ${
+					args.phase
+				}. Valid phases: ${validPhases.join(", ")}`
 			);
 		}
 
@@ -2108,7 +2329,12 @@ async function handleWorkflowGuide(
 		if (error instanceof McpError) {
 			throw error;
 		}
-		throwMcpToolError(ErrorCode.InternalError, "workflow.guide", error, "get workflow guide");
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"workflow.guide",
+			error,
+			"get workflow guide"
+		);
 	}
 }
 

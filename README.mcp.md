@@ -4,6 +4,27 @@ The Model Context Protocol (MCP) server for lexrunner provides read-only tools f
 
 **Architecture:** This server is aligned with LexBrain and LexMap MCP implementations, using direct stdio JSON-RPC 2.0 protocol handling for consistency and maintainability across the Lex ecosystem.
 
+## Tool Naming Convention
+
+Per [Lex NAMING_CONVENTIONS.md](https://github.com/Guffawaffle/lex/blob/main/docs/NAMING_CONVENTIONS.md), all MCP tools follow the pattern:
+
+```
+mcp_lexrunner_{category}_{action}
+```
+
+**Categories:**
+| Category | Purpose |
+|----------|---------|
+| `plan` | Plan creation and validation |
+| `gate` | CI/gate execution |
+| `weave` | Merge-weave orchestration |
+| `workspace` | Local workspace management |
+| `run` | Run lifecycle management |
+| `executor` | Executor tools (Senior Dev, etc.) |
+| `core` | Cross-cutting utilities |
+
+**Deprecated Aliases:** Old tool names (e.g., `plan.create`, `discover`) still work but are deprecated. Use canonical names for new integrations.
+
 ## Quick Start
 
 ### Configuration
@@ -64,9 +85,11 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ## Available Tools
 
-### plan.create
+### mcp_lexrunner_plan_create
 
 Creates a plan from configuration files or auto-discovers from GitHub PRs.
+
+> **Deprecated alias:** `plan.create`
 
 **Parameters:**
 - `json` (boolean, optional): Output plan as JSON to stdout
@@ -96,7 +119,7 @@ Creates a plan from configuration files or auto-discovers from GitHub PRs.
 **Example - Traditional Mode (from configuration files):**
 ```json
 {
-  "name": "plan.create",
+  "name": "mcp_lexrunner_plan_create",
   "arguments": {
     "json": true,
     "outDir": ".smartergpt/runner"
@@ -123,10 +146,10 @@ defaults:
 pin_commits: false
 ```
 
-Then call `plan.create` without any parameters - it will auto-detect and use GitHub mode:
+Then call `mcp_lexrunner_plan_create` without any parameters - it will auto-detect and use GitHub mode:
 ```json
 {
-  "name": "plan.create",
+  "name": "mcp_lexrunner_plan_create",
   "arguments": {}
 }
 ```
@@ -135,14 +158,14 @@ The tool will:
 1. Detect that scope.yml has GitHub filters
 2. Automatically enable GitHub mode
 3. Use filters from scope.yml (`query`, `labels`, `target`)
-4. Log to stderr: `[mcp:plan.create] Auto-detected GitHub mode from scope.yml filters`
+4. Log to stderr: `[mcp:mcp_lexrunner_plan_create] Auto-detected GitHub mode from scope.yml filters`
 5. Discover PRs matching the filters
 6. Generate plan.json with discovered PRs
 
 **Example - GitHub Auto-Discovery Mode (explicit):**
 ```json
 {
-  "name": "plan.create",
+  "name": "mcp_lexrunner_plan_create",
   "arguments": {
     "fromGithub": true,
     "labels": ["feature", "bugfix"],
@@ -158,7 +181,7 @@ The tool will:
 **Example - Complex GitHub Query:**
 ```json
 {
-  "name": "plan.create",
+  "name": "mcp_lexrunner_plan_create",
   "arguments": {
     "fromGithub": true,
     "query": "is:open label:stack:* -label:wip",
@@ -170,9 +193,11 @@ The tool will:
 }
 ```
 
-### gates.run
+### mcp_lexrunner_gate_run
 
-Executes gates for plan items. Can work with either an internal plan (created via `plan.create`) or an external plan file.
+Executes gates for plan items. Can work with either an internal plan (created via `mcp_lexrunner_plan_create`) or an external plan file.
+
+> **Deprecated alias:** `gates.run`
 
 **Parameters:**
 - `planFile` (string, optional): Path to external plan.json file. If not provided, uses internal state from the profile directory.
@@ -202,7 +227,7 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 **Example (using internal plan):**
 ```json
 {
-  "name": "gates.run",
+  "name": "mcp_lexrunner_gate_run",
   "arguments": {
     "onlyItem": "api-endpoints",
     "outDir": ".smartergpt/runner/gates"
@@ -213,7 +238,7 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 **Example (using external plan):**
 ```json
 {
-  "name": "gates.run",
+  "name": "mcp_lexrunner_gate_run",
   "arguments": {
     "planFile": "/tmp/batch5-plan.json",
     "outDir": "/tmp/gate-results"
@@ -222,13 +247,15 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 ```
 
 **Use Cases:**
-- **Internal state**: Run gates on a plan created via `plan.create` (default behavior)
+- **Internal state**: Run gates on a plan created via `mcp_lexrunner_plan_create` (default behavior)
 - **External orchestration**: Run gates on programmatically-created or externally-managed plan files
 - **Parallel workflows**: Execute gates on multiple independent plans in parallel merge-weave operations
 
-### merge.apply
+### mcp_lexrunner_weave_apply
 
 Applies merge operations with environment-based gating.
+
+> **Deprecated alias:** `merge.apply`
 
 **Parameters:**
 - `dryRun` (boolean, optional): Simulate merge without making changes (default: `true`)
@@ -244,7 +271,7 @@ Applies merge operations with environment-based gating.
 **Example:**
 ```json
 {
-  "name": "merge.apply",
+  "name": "mcp_lexrunner_weave_apply",
   "arguments": {
     "dryRun": true
   }
@@ -256,7 +283,7 @@ Applies merge operations with environment-based gating.
 ### Read-Only by Default
 
 The MCP server is read-only by default:
-- `merge.apply` requires `ALLOW_MUTATIONS=true` for actual merging
+- `mcp_lexrunner_weave_apply` requires `ALLOW_MUTATIONS=true` for actual merging
 - All operations default to safe, non-destructive behavior
 - Dry-run mode is available for testing merge eligibility
 
@@ -269,7 +296,7 @@ Destructive operations are gated by environment variables:
 ### Error Handling
 
 The server provides clear error messages for:
-- Missing plan files (run `plan.create` first)
+- Missing plan files (run `mcp_lexrunner_plan_create` first)
 - Invalid parameters (validated using Zod schemas)
 - Environment restrictions (mutations blocked when disabled)
 
@@ -286,12 +313,12 @@ const client = new Client({
 });
 
 // Create a plan from configuration files (traditional mode)
-const planResult = await client.callTool("plan.create", {
+const planResult = await client.callTool("mcp_lexrunner_plan_create", {
   outDir: ".smartergpt/runner"
 });
 
 // Create a plan from GitHub PRs (auto-discovery mode)
-const githubPlanResult = await client.callTool("plan.create", {
+const githubPlanResult = await client.callTool("mcp_lexrunner_plan_create", {
   fromGithub: true,
   labels: ["feature", "priority:high"],
   excludePRs: [100, 200],
@@ -301,18 +328,18 @@ const githubPlanResult = await client.callTool("plan.create", {
 });
 
 // Run gates on internal plan
-const gatesResult = await client.callTool("gates.run", {
+const gatesResult = await client.callTool("mcp_lexrunner_gate_run", {
   outDir: ".smartergpt/runner/gates"
 });
 
 // Or run gates on external plan file
-const externalGatesResult = await client.callTool("gates.run", {
+const externalGatesResult = await client.callTool("mcp_lexrunner_gate_run", {
   planFile: "/tmp/merge-batch/plan.json",
   outDir: "/tmp/merge-batch/gates"
 });
 
 // Check merge eligibility (dry run)
-const mergeResult = await client.callTool("merge.apply", {
+const mergeResult = await client.callTool("mcp_lexrunner_weave_apply", {
   dryRun: true
 });
 ```
@@ -339,7 +366,7 @@ const externalPlan = {
 fs.writeFileSync("/tmp/batch1-plan.json", JSON.stringify(externalPlan));
 
 // Execute gates on external plan
-const result = await client.callTool("gates.run", {
+const result = await client.callTool("mcp_lexrunner_gate_run", {
   planFile: "/tmp/batch1-plan.json",
   outDir: "/tmp/batch1-gates"
 });
@@ -361,8 +388,8 @@ LEX_PROFILE_DIR=/my/project/.config npm run mcp
 ## Workflow
 
 1. **Setup**: Configure your project in `LEX_PROFILE_DIR` (default: `.smartergpt/`)
-2. **Plan**: Use `plan.create` to generate execution plan
-3. **Execute**: Use `gates.run` to run gates and collect results
-4. **Merge**: Use `merge.apply` to check eligibility or perform merges
+2. **Plan**: Use `mcp_lexrunner_plan_create` to generate execution plan
+3. **Execute**: Use `mcp_lexrunner_gate_run` to run gates and collect results
+4. **Merge**: Use `mcp_lexrunner_weave_apply` to check eligibility or perform merges
 
 The MCP server maintains the same deterministic behavior as the CLI, ensuring consistent results across different interfaces.
