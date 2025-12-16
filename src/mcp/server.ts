@@ -43,6 +43,7 @@ import {
 	MergeApplyResult,
 	InitLocalResult,
 	ProfileResolveResult,
+	WorkflowGuideArgs,
 } from "./types.js";
 import {
 	resolveProfile,
@@ -124,6 +125,10 @@ import {
 } from "../store/index.js";
 import { ulid } from "ulid";
 import * as crypto from "crypto";
+
+// Workflow guidance imports
+import { createWorkflowGuide, type WorkflowPhase } from "./workflow/state-machine.js";
+import type { WorkflowGuide } from "./types/guided-response.js";
 
 // =============================================================================
 // AXError MCP Helper
@@ -725,6 +730,33 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				// ─────────────────────────────────────────────────────────────────
+				// Workflow Guidance Tools (LPR-037)
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "workflow.guide",
+					description:
+						"Get context-aware workflow guidance for the current phase. " +
+						"Provides next steps, common issues, and recommendations.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							phase: {
+								type: "string",
+								enum: [
+									"initial",
+									"post-plan-creation",
+									"post-gates-run",
+									"pre-merge",
+									"post-merge",
+									"error-recovery",
+								],
+								description: "Current workflow phase to get guidance for",
+							},
+						},
+						required: ["phase"],
+					},
+				},
+				// ─────────────────────────────────────────────────────────────────
 				// Governance Metrics Tools (Wave 3)
 				// ─────────────────────────────────────────────────────────────────
 				{
@@ -825,6 +857,10 @@ function createServer(options?: McpServerOptions): Server {
 			// Governance metrics tool (Wave 3)
 			case "metrics":
 				return await handleMetrics(args as { filter?: string; format?: string });
+
+			// Workflow guidance tool (LPR-037)
+			case "workflow.guide":
+				return await handleWorkflowGuide(args as WorkflowGuideArgs);
 
 			default:
 				throw new McpError(
@@ -2039,6 +2075,50 @@ async function handleMetrics(args: {
 		};
 	} catch (error) {
 		throwMcpToolError(ErrorCode.InternalError, "metrics", error, "get metrics");
+	}
+}
+
+/**
+ * Handle workflow.guide tool - Get context-aware workflow guidance
+ */
+async function handleWorkflowGuide(
+	args: WorkflowGuideArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate phase is a valid WorkflowPhase
+		const validPhases: WorkflowPhase[] = [
+			"initial",
+			"post-plan-creation",
+			"post-gates-run",
+			"pre-merge",
+			"post-merge",
+			"error-recovery",
+		];
+
+		const phase = args.phase as WorkflowPhase;
+		if (!validPhases.includes(phase)) {
+			throw new McpError(
+				ErrorCode.InvalidParams,
+				`Invalid workflow phase: ${args.phase}. Valid phases: ${validPhases.join(", ")}`
+			);
+		}
+
+		// Create workflow guide for the requested phase
+		const guide: WorkflowGuide = createWorkflowGuide(phase);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(guide, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof McpError) {
+			throw error;
+		}
+		throwMcpToolError(ErrorCode.InternalError, "workflow.guide", error, "get workflow guide");
 	}
 }
 
