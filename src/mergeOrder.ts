@@ -2,21 +2,37 @@ import { Plan, PlanItem } from "./schema.js";
 import { OperationCache } from "./performance.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
 import { validatePlan, ValidationError as PlanValidationError } from "./planner/validation.js";
+import { 
+	AXErrorException,
+	cycleDetectedError,
+	unknownDependencyError,
+	type AXError,
+} from "./errors/index.js";
 
 /**
  * Merge order computation using Kahn's algorithm with deterministic tie-breaking
  */
 
-export class CycleError extends Error {
-	constructor(message: string) {
-		super(message);
+/**
+ * CycleError - thrown when a dependency cycle is detected
+ * Now extends AXErrorException to provide structured error with nextActions
+ */
+export class CycleError extends AXErrorException {
+	constructor(cycle: string[]) {
+		const axError = cycleDetectedError({ cycle });
+		super(axError.code, axError.message, axError.nextActions, axError.context);
 		this.name = "CycleError";
 	}
 }
 
-export class UnknownDependencyError extends Error {
-	constructor(message: string) {
-		super(message);
+/**
+ * UnknownDependencyError - thrown when a dependency reference doesn't exist
+ * Now extends AXErrorException to provide structured error with nextActions
+ */
+export class UnknownDependencyError extends AXErrorException {
+	constructor(item: string, dependency: string, availableItems?: string[]) {
+		const axError = unknownDependencyError({ item, dependency, availableItems });
+		super(axError.code, axError.message, axError.nextActions, axError.context);
 		this.name = "UnknownDependencyError";
 	}
 }
@@ -53,21 +69,23 @@ export function computeMergeOrder(plan: Plan): string[][] {
 	// Validate the plan first to provide better error messages
 	const validationResult = validatePlan(plan);
 	
-	// Check for validation errors and throw appropriate exceptions
+	// Check for validation errors and throw appropriate AXError exceptions
 	if (!validationResult.valid) {
 		for (const error of validationResult.errors) {
 			if (error.type === "cycle") {
-				// Throw enhanced cycle error with full details
-				const message = `${error.message}\n\n${error.suggestion}`;
-				throw new CycleError(message);
+				// Extract cycle path from error details
+				const cyclePath = error.details.cyclePath || [];
+				throw new CycleError(cyclePath);
 			} else if (error.type === "invalid-ref") {
-				// Throw enhanced unknown dependency error
-				const message = `${error.message}\n\nSuggestion: ${error.suggestion}`;
-				throw new UnknownDependencyError(message);
+				// Extract item and dependency info from error details
+				const invalidRef = error.details.invalidRef || "unknown";
+				const itemName = error.details.itemName || "unknown";
+				const availableItems = plan.items.map(i => i.name);
+				throw new UnknownDependencyError(itemName, invalidRef, availableItems);
 			} else if (error.type === "self-dependency") {
 				// Throw as cycle error (self-dependency is a special case of cycle)
-				const message = `${error.message}\n\nSuggestion: ${error.suggestion}`;
-				throw new CycleError(message);
+				const itemName = error.details.itemName || "unknown";
+				throw new CycleError([itemName, itemName]);
 			}
 		}
 	}
@@ -90,7 +108,8 @@ export function computeMergeOrder(plan: Plan): string[][] {
 	for (const item of items) {
 		for (const depName of item.deps) {
 			if (!itemNameSet.has(depName)) {
-				throw new UnknownDependencyError(`unknown dependency '${depName}' for item '${item.name}'`);
+				const availableItems = Array.from(itemNameSet);
+				throw new UnknownDependencyError(item.name, depName, availableItems);
 			}
 			children.get(depName)!.push(item.name);
 			inDegree.set(item.name, inDegree.get(item.name)! + 1);
@@ -131,7 +150,11 @@ export function computeMergeOrder(plan: Plan): string[][] {
 		const cycleNodes = Array.from(inDegree.entries())
 			.filter(([, degree]) => degree > 0)
 			.map(([name]) => name);
-		throw new CycleError(`dependency cycle detected involving: ${cycleNodes.join(', ')}`);
+		
+		// Create a simple cycle representation for the error
+		const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
+		
+		throw new CycleError(cycle);
 	}
 
 	// Cache the result

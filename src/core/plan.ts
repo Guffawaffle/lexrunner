@@ -80,11 +80,12 @@ function sortEnvRecord(env: Record<string, string>): Record<string, string> {
  */
 function validateDependencies(items: PlanItem[]): void {
 	const itemNames = new Set(items.map(item => item.name));
+	const availableItems = Array.from(itemNames);
 
 	for (const item of items) {
 		for (const dep of item.deps) {
 			if (!itemNames.has(dep)) {
-				throw new UnknownDependencyError(`Unknown dependency '${dep}' for item '${item.name}'`);
+				throw new UnknownDependencyError(item.name, dep, availableItems);
 			}
 		}
 	}
