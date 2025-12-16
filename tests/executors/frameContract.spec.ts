@@ -214,9 +214,13 @@ describe("enforceFrameEmission", () => {
 			endTime: "2025-12-16T10:01:00.000Z",
 		};
 
+		expect(() => enforceFrameEmission(context, output)).toThrow(
+			FrameContractViolationError
+		);
+
+		// Verify error properties
 		try {
 			enforceFrameEmission(context, output);
-			expect.fail("Should have thrown");
 		} catch (error) {
 			expect(error).toBeInstanceOf(FrameContractViolationError);
 			const err = error as FrameContractViolationError;
