@@ -85,7 +85,8 @@ function checkPackageJson() {
 	const hasLexDevDep = packageJson.devDependencies && packageJson.devDependencies['@smartergpt/lex'];
 	
 	if (hasLexDep) {
-		success(`Lex dependency found: @smartergpt/lex@${packageJson.dependencies['@smartergpt/lex']}`);
+		const version = packageJson.dependencies?.['@smartergpt/lex'] || 'unknown';
+		success(`Lex dependency found: @smartergpt/lex@${version}`);
 	} else if (hasLexDevDep) {
 		warn('Lex is in devDependencies but should be in dependencies');
 	} else {
@@ -143,27 +144,6 @@ function checkNoLexSourceCopied() {
 		const lexLicensePattern = /@license.*@smartergpt\/lex|This file is part of.*Lex/i;
 		if (lexLicensePattern.test(content)) {
 			violations.push(`${relativePath}: Contains Lex license claim`);
-		}
-		
-		// 3. Check for package name in file (but allow imports)
-		// This is tricky - we want to allow: import { X } from '@smartergpt/lex'
-		// But not allow: copied wholesale from @smartergpt/lex
-		const lines = content.split('\n');
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i].trim();
-			// Skip import statements
-			if (line.startsWith('import ') && line.includes('@smartergpt/lex')) {
-				continue;
-			}
-			// Skip comments mentioning Lex in documentation context
-			if (line.startsWith('*') || line.startsWith('//')) {
-				// Allow documentation references to Lex
-				if (line.includes('@smartergpt/lex') && 
-				    (line.includes('export') || line.includes('import') || 
-				     line.includes('should be replaced') || line.includes('publishes'))) {
-					continue;
-				}
-			}
 		}
 	}
 	
