@@ -27,6 +27,11 @@ export function registerReportCommand(
 		.option("--json", "Output JSON format (alias for --out json)")
 		.option("--out <format>", "Output format: 'json' or 'md'", "json")
 		.action((dir: string, opts) => {
+			// Show deprecation warning if called as top-level command
+			if (program.name() === "lex-pr" && !opts.json && !deps.jsonModeActive()) {
+				console.warn("⚠️  'report' is deprecated. Use: lex-pr weave report");
+			}
+			
 			try {
 				const report = readGateDir(dir);
 

@@ -30,6 +30,11 @@ export function registerMergeOrderCommand(
 		.argument("[file]", "Path to plan.json file (alternative to --plan)")
 		.option("--json", "Output JSON format")
 		.action((file: string | undefined, opts) => {
+			// Show deprecation warning if called as top-level command
+			if (program.name() === "lex-pr" && !opts.json && !jsonModeActive()) {
+				console.warn("⚠️  'merge-order' is deprecated. Use: lex-pr weave order");
+			}
+			
 			const planFile = opts.plan || file;
 			if (!planFile) {
 				console.error("Error: plan file is required (use --plan <file> or provide as argument)");

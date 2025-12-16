@@ -150,6 +150,11 @@ Common Issues:
   • Permission errors: Ensure artifact directory is writable`
 		)
 		.action(async (file: string | undefined, opts) => {
+			// Show deprecation warning if called as top-level command
+			if (program.name() === "lex-pr" && !opts.json && !deps.jsonModeActive()) {
+				console.warn("⚠️  'execute' is deprecated. Use: lex-pr gate run");
+			}
+			
 			const planFile = opts.plan || file || "plan.json";
 			let auditEmitter: AuditEmitter | null = null;
 

@@ -332,15 +332,6 @@ registerGovernanceReportCommand(program);
 // Governance cleanup command (QOL-002) - modular implementation
 registerGovernanceCleanupCommand(program);
 
-// Plan generation command - modular implementation
-registerPlanCommand(program, {
-	jsonModeActive: () => jsonModeActive,
-	setJsonMode: (active: boolean) => {
-		jsonModeActive = active;
-	},
-	exitWith,
-});
-
 // Config inspect command
 program
 	.command("config:inspect")
@@ -405,22 +396,6 @@ program
 		}
 	});
 
-// Plan review command - Interactive plan validation and editing
-// Plan review command - modularized in Phase 2
-registerPlanReviewCommand(program, {
-	exitWith,
-	getProgramOpts: () => program.opts(),
-});
-
-// Merge order command - modular implementation
-registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
-
-// Plan diff command - modular implementation
-registerPlanDiffCommand(program, {
-	jsonModeActive: () => jsonModeActive,
-	exitWith,
-});
-
 // Autopilot command - modular implementation
 registerAutopilotCommand(program, {
 	jsonModeActive: () => jsonModeActive,
@@ -430,27 +405,116 @@ registerAutopilotCommand(program, {
 	finalizeAuditGuard,
 });
 
-// Execute plan command (replaces gate command)
-// Execute command - modularized in Phase 2
-registerExecuteCommand(program, {
+// ============================================================================
+// Category-Action Pattern (ALN-003 Phase 2)
+// ============================================================================
+
+// Weave category - Merge-weave orchestration
+const weaveCmd = program
+	.command("weave")
+	.description("Merge-weave orchestration");
+
+registerDiscoverCommand(weaveCmd, { jsonModeActive: () => jsonModeActive });
+registerPlanCommand(weaveCmd, {
+	jsonModeActive: () => jsonModeActive,
+	setJsonMode: (active: boolean) => {
+		jsonModeActive = active;
+	},
+	exitWith,
+});
+registerStatusCommand(weaveCmd, () => jsonModeActive);
+registerReportCommand(weaveCmd, { jsonModeActive: () => jsonModeActive });
+registerMergeOrderCommand(weaveCmd, () => jsonModeActive, exitWith);
+
+// Workspace category - Local workspace management
+const workspaceCmd = program
+	.command("workspace")
+	.description("Workspace and profile configuration");
+
+registerDoctorCommand(workspaceCmd, () => jsonModeActive);
+
+// Fanout category - Worker/issue distribution
+const fanoutCmd = program
+	.command("fanout")
+	.description("Worker and issue distribution for parallel work");
+
+registerAnalyzeIssuesCommand(fanoutCmd, () => jsonModeActive);
+registerAssignBatchCommand(fanoutCmd);
+
+// Gate category - Quality checks
+const gateCmd = program.command("gate").description("Quality gate execution");
+
+registerExecuteCommand(gateCmd, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith,
 	getProgramOpts: () => program.opts(),
 });
 
-// Status command - modularized in Phase 2.5
-registerStatusCommand(program, () => jsonModeActive);
+// ============================================================================
+// Legacy Commands (Deprecated - ALN-003 Phase 2)
+// ============================================================================
+// These are simple deprecated aliases registered on the main program.
+// They show deprecation warnings and are kept for backward compatibility.
+// The actual implementations live in the category commands above.
+
+// Note: We re-register the same functions which will create new command instances.
+// This is necessary because Commander doesn't allow sharing command instances.
+
+// Create a temporary program to register legacy commands
+// Legacy commands - these delegate to category implementations
+const legacyProgram = program;
+
+// Legacy: discover -> weave discover
+registerDiscoverCommand(legacyProgram, { jsonModeActive: () => jsonModeActive });
+
+// Legacy: plan -> weave plan  
+registerPlanCommand(legacyProgram, {
+	jsonModeActive: () => jsonModeActive,
+	setJsonMode: (active: boolean) => {
+		jsonModeActive = active;
+	},
+	exitWith,
+});
+
+// Legacy: status -> weave status
+registerStatusCommand(legacyProgram, () => jsonModeActive);
+
+// Legacy: report -> weave report
+registerReportCommand(legacyProgram, { jsonModeActive: () => jsonModeActive });
+
+// Legacy: merge-order -> weave order
+registerMergeOrderCommand(legacyProgram, () => jsonModeActive, exitWith);
+
+// Legacy: execute -> gate run
+registerExecuteCommand(legacyProgram, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith,
+	getProgramOpts: () => program.opts(),
+});
+
+// Legacy: doctor -> workspace doctor
+registerDoctorCommand(legacyProgram, () => jsonModeActive);
+
+// ============================================================================
+// Other Commands (Not Part of Category-Action Pattern)
+// ============================================================================
+
+// Plan review command - Interactive plan validation and editing
+registerPlanReviewCommand(program, {
+	exitWith,
+	getProgramOpts: () => program.opts(),
+});
+
+// Plan diff command - Compare two plans
+registerPlanDiffCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith,
+});
 
 // Schema command - modularized in Phase 3.3
 registerSchemaCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 });
-
-// Report command - modularized in Phase 3.4
-registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
-
-// Discover command - modularized in Phase 2
-registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Merge command - Execute merge pyramid with git operations
 registerMergeCommand(
@@ -458,9 +522,6 @@ registerMergeCommand(
 	() => jsonModeActive,
 	() => program.opts()
 );
-
-// Doctor command - modularized in Phase 4.4
-registerDoctorCommand(program, () => jsonModeActive);
 
 // Config command - configuration inspection and debugging
 registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });
@@ -1002,13 +1063,19 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
 
-// Orchestration commands
+// ============================================================================
+// Legacy Orchestration Commands (Deprecated - ALN-003 Phase 2)
+// ============================================================================
+// orchestrate:analyze-issues -> fanout analyze
 registerAnalyzeIssuesCommand(program, () => jsonModeActive);
+// orchestrate:assign-batch -> fanout assign
+registerAssignBatchCommand(program);
+
+// Keep other orchestrate commands that don't have category equivalents yet
 registerPlanBatchCommand(program, () => jsonModeActive);
 registerPinToolchainCommand(program);
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
-registerAssignBatchCommand(program);
 
 // Audit operations command
 registerAuditCommands(program);
