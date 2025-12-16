@@ -6,13 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+---
+
+## [0.6.0] - 2025-12-16
+
+### ⚠️ BREAKING CHANGE: MCP Tool Names
+
+**VS Code automatically adds `mcp_{servername}_` prefix to all tool names.** Our previous naming included redundant prefixes, causing tools to appear as `mcp_lexrunner_lexrunner_plan_create` instead of `mcp_lexrunner_plan_create`.
+
+This release removes the namespace prefix from tool definitions to match the GitHub MCP pattern.
+
+#### Migration Guide
+
+| v0.5.x Tool Name | v0.6.x Tool Name | VS Code Display |
+|------------------|------------------|-----------------|
+| `lexrunner_plan_create` | `plan_create` | `mcp_lexrunner_plan_create` |
+| `lexrunner_gate_run` | `gates_run` | `mcp_lexrunner_gates_run` |
+| `lexrunner_weave_apply` | `merge_apply` | `mcp_lexrunner_merge_apply` |
+| `lexrunner_weave_discover` | `discover` | `mcp_lexrunner_discover` |
+| `lexrunner_weave_status` | `weave_status` | `mcp_lexrunner_weave_status` |
+| `lexrunner_weave_order` | `merge_order` | `mcp_lexrunner_merge_order` |
+| `lexrunner_workspace_init` | `local_init` | `mcp_lexrunner_local_init` |
+| `lexrunner_workspace_resolve` | `profile_resolve` | `mcp_lexrunner_profile_resolve` |
+| `lexrunner_workspace_doctor` | `doctor` | `mcp_lexrunner_doctor` |
+| `lexrunner_core_health` | `health` | `mcp_lexrunner_health` |
+| `lexrunner_core_config` | `config_show` | `mcp_lexrunner_config_show` |
+| `lexrunner_core_guide` | `workflow_guide` | `mcp_lexrunner_workflow_guide` |
+| `lexrunner_core_metrics` | `metrics` | `mcp_lexrunner_metrics` |
+| `lexrunner_executor_*` | `executor_*` | `mcp_lexrunner_executor_*` |
+| `lexrunner_run_start` | `start_run` | `mcp_lexrunner_start_run` |
+| `lexrunner_run_status` | `get_status` | `mcp_lexrunner_get_status` |
+| `lexrunner_run_list` | `list_artifacts` | `mcp_lexrunner_list_artifacts` |
+| `lexrunner_run_decision` | `run_decision` | `mcp_lexrunner_run_decision` |
+
+**Backwards Compatibility:** Old `lexrunner_*` names are preserved as deprecated aliases and will continue to work. They will be removed in v1.0.0.
+
 ### Added
 - Governance wrapper delegation tests: validates `scripts/analyze-governance-logs.mjs` correctly delegates to CLI
 
 ### Changed
+- MCP tool names no longer include namespace prefix (GitHub MCP pattern)
 - LexSona rule injection now enabled by default with environment variable configuration
 - Updated `loadLexSonaRules()` API to use `RuleInjectionConfig` object instead of boolean parameter
 - Removed legacy runner/ location fallback for config files in bootstrap
+
+### Fixed
+- Tools now display correctly in VS Code as `mcp_lexrunner_{action}` instead of `mcp_lexrunner_lexrunner_{action}`
 
 ### Documentation
 - Updated LexSona rules documentation with v0.5.0 API changes
@@ -26,6 +67,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Removed
 - `src/cli-old.ts` dead code (old CLI implementation, was already excluded from build)
 - Deprecated `migrateGateReport` alias (use `normalizeGateReport` instead)
+
+---
 
 ## [0.5.0] - 2025-11-27
 
