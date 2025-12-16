@@ -19,6 +19,35 @@ import type {
 } from "../types/guardrails.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Logger Interface
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Logger interface for guardrail warnings and notifications
+ */
+export interface GuardrailLogger {
+	warn(message: string, context?: Record<string, unknown>): void;
+}
+
+/**
+ * Default console logger
+ */
+export const defaultGuardrailLogger: GuardrailLogger = {
+	warn(message: string, _context?: Record<string, unknown>): void {
+		console.warn(message);
+	},
+};
+
+/**
+ * Silent logger for testing or when warnings should be suppressed
+ */
+export const silentGuardrailLogger: GuardrailLogger = {
+	warn(_message: string, _context?: Record<string, unknown>): void {
+		// Intentionally silent
+	},
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GuardrailViolation Error Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -127,6 +156,21 @@ export const DEFAULT_ENFORCEMENT_CONFIG: GuardrailEnforcementConfig = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Helper function to check if an access pattern permits the requested access type.
+ * Write access patterns allow both read and write.
+ * Read access patterns only allow read.
+ */
+function isAccessPermitted(
+	patternAccess: "read" | "write",
+	requestedAccess: "read" | "write"
+): boolean {
+	return (
+		patternAccess === requestedAccess ||
+		(patternAccess === "write" && requestedAccess === "read")
+	);
+}
+
+/**
  * Check if a file path is allowed under scope guardrails
  *
  * @throws {ScopeViolation} if access is denied
@@ -144,7 +188,7 @@ export function enforceFileAccess(
 	for (const pattern of deny) {
 		if (
 			minimatch(filePath, pattern.path) &&
-			(pattern.access === accessType || pattern.access === "write")
+			isAccessPermitted(pattern.access, accessType)
 		) {
 			throw new ScopeViolation(
 				`File access denied: ${accessType} access to "${filePath}" is prohibited`,
@@ -162,8 +206,7 @@ export function enforceFileAccess(
 		const allowed = allow.some(
 			(pattern) =>
 				minimatch(filePath, pattern.path) &&
-				(pattern.access === accessType ||
-					(pattern.access === "write" && accessType === "read"))
+				isAccessPermitted(pattern.access, accessType)
 		);
 
 		if (!allowed) {
@@ -297,7 +340,8 @@ const toolTracker = new ToolInvocationTracker();
 export function enforceToolInvocation(
 	tool: G_tool | undefined,
 	toolName: string,
-	args: string[] = []
+	args: string[] = [],
+	logger: GuardrailLogger = defaultGuardrailLogger
 ): void {
 	if (!tool) return;
 
@@ -394,10 +438,9 @@ export function enforceToolInvocation(
 	);
 
 	if (needsConfirmation) {
-		// In a real implementation, this would prompt for confirmation
-		// For now, we just log a warning
-		console.warn(
-			`[GUARDRAIL] Tool "${fullCommand}" requires confirmation before execution`
+		logger.warn(
+			`[GUARDRAIL] Tool "${fullCommand}" requires confirmation before execution`,
+			{ toolName, args, fullCommand }
 		);
 	}
 
@@ -424,7 +467,8 @@ export function resetToolTracker(): void {
 export function enforceUncertaintyThreshold(
 	epist: G_epist | undefined,
 	confidenceLevel: number,
-	context: string
+	context: string,
+	logger: GuardrailLogger = defaultGuardrailLogger
 ): void {
 	if (!epist?.uncertaintyHandling) return;
 
@@ -451,7 +495,7 @@ export function enforceUncertaintyThreshold(
 					details
 				);
 			case "warn":
-				console.warn(`[GUARDRAIL] ${message}`);
+				logger.warn(`[GUARDRAIL] ${message}`, details);
 				break;
 			case "continue":
 				// No action needed
@@ -689,7 +733,8 @@ export function checkSensitiveFields(
 export class GuardrailEnforcer {
 	constructor(
 		private profile: GuardrailProfile | undefined,
-		private config: GuardrailEnforcementConfig = DEFAULT_ENFORCEMENT_CONFIG
+		private config: GuardrailEnforcementConfig = DEFAULT_ENFORCEMENT_CONFIG,
+		private logger: GuardrailLogger = defaultGuardrailLogger
 	) {}
 
 	/**
@@ -721,7 +766,7 @@ export class GuardrailEnforcer {
 	 */
 	enforceToolInvocation(toolName: string, args: string[] = []): void {
 		if (!this.config.tool || !this.profile?.tool) return;
-		enforceToolInvocation(this.profile.tool, toolName, args);
+		enforceToolInvocation(this.profile.tool, toolName, args, this.logger);
 	}
 
 	/**
@@ -735,7 +780,8 @@ export class GuardrailEnforcer {
 		enforceUncertaintyThreshold(
 			this.profile.epist,
 			confidenceLevel,
-			context
+			context,
+			this.logger
 		);
 	}
 
@@ -837,10 +883,12 @@ export class GuardrailEnforcer {
  */
 export function createGuardrailEnforcer(
 	profile: GuardrailProfile | undefined,
-	config?: GuardrailEnforcementConfig
+	config?: GuardrailEnforcementConfig,
+	logger?: GuardrailLogger
 ): GuardrailEnforcer {
 	return new GuardrailEnforcer(
 		profile,
-		config ?? DEFAULT_ENFORCEMENT_CONFIG
+		config ?? DEFAULT_ENFORCEMENT_CONFIG,
+		logger ?? defaultGuardrailLogger
 	);
 }

@@ -9,6 +9,7 @@ import {
 	AuditViolation,
 	resetToolTracker,
 	DEFAULT_ENFORCEMENT_CONFIG,
+	silentGuardrailLogger,
 } from "../../src/executors/guardrailEnforcement.js";
 import type { GuardrailProfile } from "../../src/types/guardrails.js";
 
@@ -525,7 +526,7 @@ describe("Guardrail Enforcement Runtime", () => {
 				},
 			};
 
-			const enforcer = createGuardrailEnforcer(profile);
+			const enforcer = createGuardrailEnforcer(profile, undefined, silentGuardrailLogger);
 
 			// Should warn but not throw
 			expect(() =>
