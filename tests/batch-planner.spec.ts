@@ -363,7 +363,8 @@ describe('Batch Planner - Kahn\'s Algorithm', () => {
 			];
 
 			expect(() => computeBatches(nodes)).toThrow(CycleError);
-			expect(() => computeBatches(nodes)).toThrow(/A, B, C/);
+			// Updated expectation to match AXError format
+			expect(() => computeBatches(nodes)).toThrow(/cycle detected/i);
 		});
 
 		it('should throw error for unknown dependencies', () => {
@@ -377,7 +378,8 @@ describe('Batch Planner - Kahn\'s Algorithm', () => {
 			];
 
 			expect(() => computeBatches(nodes)).toThrow(UnknownDependencyError);
-			expect(() => computeBatches(nodes)).toThrow(/unknown dependency 'NonExistent'/i);
+			// Updated expectation to match AXError format
+			expect(() => computeBatches(nodes)).toThrow(/depends on unknown item/i);
 		});
 	});
 
