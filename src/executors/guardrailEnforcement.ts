@@ -33,8 +33,12 @@ export interface GuardrailLogger {
  * Default console logger
  */
 export const defaultGuardrailLogger: GuardrailLogger = {
-	warn(message: string, _context?: Record<string, unknown>): void {
-		console.warn(message);
+	warn(message: string, context?: Record<string, unknown>): void {
+		if (context && Object.keys(context).length > 0) {
+			console.warn(message, context);
+		} else {
+			console.warn(message);
+		}
 	},
 };
 

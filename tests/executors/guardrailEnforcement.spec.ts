@@ -526,7 +526,11 @@ describe("Guardrail Enforcement Runtime", () => {
 				},
 			};
 
-			const enforcer = createGuardrailEnforcer(profile, undefined, silentGuardrailLogger);
+			const enforcer = createGuardrailEnforcer(
+				profile,
+				DEFAULT_ENFORCEMENT_CONFIG,
+				silentGuardrailLogger
+			);
 
 			// Should warn but not throw
 			expect(() =>
