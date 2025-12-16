@@ -232,7 +232,7 @@ function createServer(options?: McpServerOptions): Server {
 		return {
 			tools: [
 				{
-					name: "mcp_lexrunner_plan_create",
+					name: "lexrunner_plan_create",
 					description:
 						"Create a plan from configuration files or auto-discover from GitHub PRs",
 					inputSchema: {
@@ -315,7 +315,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_gate_run",
+					name: "lexrunner_gate_run",
 					description: "Execute gates for plan items",
 					inputSchema: {
 						type: "object",
@@ -342,7 +342,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_weave_apply",
+					name: "lexrunner_weave_apply",
 					description:
 						"Apply merge operations (requires ALLOW_MUTATIONS=true)",
 					inputSchema: {
@@ -358,7 +358,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_workspace_init",
+					name: "lexrunner_workspace_init",
 					description:
 						"Initialize local overlay directory with auto-detected project configuration",
 					inputSchema: {
@@ -374,7 +374,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_workspace_resolve",
+					name: "lexrunner_workspace_resolve",
 					description:
 						"Resolve profile directory using precedence chain (--profile-dir → LEX_PR_PROFILE_DIR → .smartergpt.local/ → .smartergpt/)",
 					inputSchema: {
@@ -389,7 +389,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_core_health",
+					name: "lexrunner_core_health",
 					description:
 						"Get health status of the system with optional metrics",
 					inputSchema: {
@@ -408,7 +408,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Senior Dev Executor Tools
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "mcp_lexrunner_executor_prepare_context",
+					name: "lexrunner_executor_prepare_context",
 					description:
 						"Phase 1: Gather deterministic artifacts for code review (lint, typecheck, tests, diff, PR metadata)",
 					inputSchema: {
@@ -449,7 +449,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_executor_recall_context",
+					name: "lexrunner_executor_recall_context",
 					description:
 						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns)",
 					inputSchema: {
@@ -477,7 +477,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_executor_capture_frame",
+					name: "lexrunner_executor_capture_frame",
 					description:
 						"Phase 4: Capture review session as a Frame in Lex memory (the receipt)",
 					inputSchema: {
@@ -540,7 +540,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_executor_modes",
+					name: "lexrunner_executor_modes",
 					description:
 						"List available executor modes (triage, deep_review, pattern_mining, mentorship)",
 					inputSchema: {
@@ -552,7 +552,7 @@ function createServer(options?: McpServerOptions): Server {
 				// LexRunner Run Management Tools
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "mcp_lexrunner_run_start",
+					name: "lexrunner_run_start",
 					description:
 						"Start a new LexRunner procedure run and return a runId",
 					inputSchema: {
@@ -586,7 +586,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_run_status",
+					name: "lexrunner_run_status",
 					description:
 						"Get current run state, summary, and next available actions",
 					inputSchema: {
@@ -601,7 +601,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_run_list",
+					name: "lexrunner_run_list",
 					description:
 						"List runs from the store with optional filtering",
 					inputSchema: {
@@ -631,7 +631,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_run_decision",
+					name: "lexrunner_run_decision",
 					description:
 						"Submit an LLM decision for a pending action in a run",
 					inputSchema: {
@@ -663,7 +663,7 @@ function createServer(options?: McpServerOptions): Server {
 				// MCP/CLI Parity Tools (AX-004)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "mcp_lexrunner_weave_discover",
+					name: "lexrunner_weave_discover",
 					description:
 						"Discover open pull requests from GitHub with optional dependency suggestions",
 					inputSchema: {
@@ -693,7 +693,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_weave_status",
+					name: "lexrunner_weave_status",
 					description:
 						"Show current execution status and merge eligibility for a plan",
 					inputSchema: {
@@ -709,7 +709,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_workspace_doctor",
+					name: "lexrunner_workspace_doctor",
 					description:
 						"Run environment and configuration sanity checks with optional hostility scoring",
 					inputSchema: {
@@ -725,7 +725,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_weave_order",
+					name: "lexrunner_weave_order",
 					description:
 						"Compute dependency levels and merge order using Kahn's algorithm",
 					inputSchema: {
@@ -741,7 +741,7 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
-					name: "mcp_lexrunner_core_config",
+					name: "lexrunner_core_config",
 					description:
 						"Display configuration with precedence chain and provenance",
 					inputSchema: {
@@ -758,7 +758,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Workflow Guidance Tools (LPR-037)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "mcp_lexrunner_core_guide",
+					name: "lexrunner_core_guide",
 					description:
 						"Get context-aware workflow guidance for the current phase. " +
 						"Provides next steps, common issues, and recommendations.",
@@ -786,7 +786,7 @@ function createServer(options?: McpServerOptions): Server {
 				// Governance Metrics Tools (Wave 3)
 				// ─────────────────────────────────────────────────────────────────
 				{
-					name: "mcp_lexrunner_core_metrics",
+					name: "lexrunner_core_metrics",
 					description:
 						"Get current governance metrics snapshot for observability dashboards",
 					inputSchema: {
@@ -816,21 +816,21 @@ function createServer(options?: McpServerOptions): Server {
 
 		switch (name) {
 			// Plan tools
-			case "mcp_lexrunner_plan_create":
+			case "lexrunner_plan_create":
 			case "plan.create": // Deprecated alias
 				return await handlePlanCreate(args as PlanCreateArgs);
 
 			// Gate tools
-			case "mcp_lexrunner_gate_run":
+			case "lexrunner_gate_run":
 			case "gates.run": // Deprecated alias
 				return await handleGatesRun(args as GatesRunArgs);
 
 			// Weave tools
-			case "mcp_lexrunner_weave_apply":
+			case "lexrunner_weave_apply":
 			case "merge.apply": // Deprecated alias
 				return await handleMergeApply(args as MergeApplyArgs);
 
-			case "mcp_lexrunner_weave_discover":
+			case "lexrunner_weave_discover":
 			case "discover": // Deprecated alias
 				return await handleDiscover(
 					args as {
@@ -841,94 +841,94 @@ function createServer(options?: McpServerOptions): Server {
 					}
 				);
 
-			case "mcp_lexrunner_weave_status":
+			case "lexrunner_weave_status":
 			case "status": // Deprecated alias
 				return await handleStatus(args as { planFile?: string });
 
-			case "mcp_lexrunner_weave_order":
+			case "lexrunner_weave_order":
 			case "merge-order": // Deprecated alias
 				return await handleMergeOrder(args as { planFile?: string });
 
 			// Workspace tools
-			case "mcp_lexrunner_workspace_init":
+			case "lexrunner_workspace_init":
 			case "local.init": // Deprecated alias
 				return await handleLocalInit(args as InitLocalArgs);
 
-			case "mcp_lexrunner_workspace_resolve":
+			case "lexrunner_workspace_resolve":
 			case "profile.resolve": // Deprecated alias
 				return await handleProfileResolve(args as ProfileResolveArgs);
 
-			case "mcp_lexrunner_workspace_doctor":
+			case "lexrunner_workspace_doctor":
 			case "doctor": // Deprecated alias
 				return await handleDoctor(
 					args as { environmentQuality?: boolean }
 				);
 
 			// Core tools
-			case "mcp_lexrunner_core_health":
+			case "lexrunner_core_health":
 			case "health": // Deprecated alias
 				return await handleHealth(args as { includeMetrics?: boolean });
 
-			case "mcp_lexrunner_core_config":
+			case "lexrunner_core_config":
 			case "config.show": // Deprecated alias
 				return await handleConfigShow(args as { key?: string });
 
-			case "mcp_lexrunner_core_guide":
+			case "lexrunner_core_guide":
 			case "workflow.guide": // Deprecated alias
 				return await handleWorkflowGuide(args as WorkflowGuideArgs);
 
-			case "mcp_lexrunner_core_metrics":
+			case "lexrunner_core_metrics":
 			case "metrics": // Deprecated alias
 				return await handleMetrics(
 					args as { filter?: string; format?: string }
 				);
 
 			// Executor tools (Senior Dev)
-			case "mcp_lexrunner_executor_prepare_context":
+			case "lexrunner_executor_prepare_context":
 			case "senior-dev.prepare-context": // Deprecated alias
 				return await handleSeniorDevPrepareContext(
 					args as unknown as PrepareContextInput
 				);
 
-			case "mcp_lexrunner_executor_recall_context":
+			case "lexrunner_executor_recall_context":
 			case "senior-dev.recall-context": // Deprecated alias
 				return await handleSeniorDevRecallContext(
 					args as unknown as RecallContextInput
 				);
 
-			case "mcp_lexrunner_executor_capture_frame":
+			case "lexrunner_executor_capture_frame":
 			case "senior-dev.capture-frame": // Deprecated alias
 				return await handleSeniorDevCaptureFrame(
 					args as unknown as CaptureFrameInput
 				);
 
-			case "mcp_lexrunner_executor_modes":
+			case "lexrunner_executor_modes":
 			case "senior-dev.modes": // Deprecated alias
 				return await handleSeniorDevModes();
 
 			// Run management tools
-			case "mcp_lexrunner_run_start":
+			case "lexrunner_run_start":
 			case "lexrunner.startRun": // Deprecated alias
 				return await handleStartRun(
 					args as unknown as StartRunInput,
 					runStore
 				);
 
-			case "mcp_lexrunner_run_status":
+			case "lexrunner_run_status":
 			case "lexrunner.getStatus": // Deprecated alias
 				return await handleGetStatus(
 					args as unknown as GetStatusInput,
 					runStore
 				);
 
-			case "mcp_lexrunner_run_list":
+			case "lexrunner_run_list":
 			case "lexrunner.listRuns": // Deprecated alias
 				return await handleListRuns(
 					args as unknown as ListRunsInput,
 					runStore
 				);
 
-			case "mcp_lexrunner_run_decision":
+			case "lexrunner_run_decision":
 			case "lexrunner.submitDecision": // Deprecated alias
 				return await handleSubmitDecision(
 					args as unknown as SubmitDecisionInput
