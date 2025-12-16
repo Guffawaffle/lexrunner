@@ -145,6 +145,18 @@ export const ConfigShowArgs = z.object({
 });
 export type ConfigShowArgs = z.infer<typeof ConfigShowArgs>;
 
+export const WorkflowGuideArgs = z.object({
+	phase: z.enum([
+		"initial",
+		"post-plan-creation",
+		"post-gates-run",
+		"pre-merge",
+		"post-merge",
+		"error-recovery"
+	])
+});
+export type WorkflowGuideArgs = z.infer<typeof WorkflowGuideArgs>;
+
 /**
  * AX-004 Parity tools - result types
  */

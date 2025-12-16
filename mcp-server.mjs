@@ -1078,6 +1078,45 @@ const tools = {
 			}
 		},
 	},
+
+	"workflow.guide": {
+		description: "Get context-aware workflow guidance for the current phase. Provides next steps, common issues, and recommendations.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				phase: {
+					type: "string",
+					enum: [
+						"initial",
+						"post-plan-creation",
+						"post-gates-run",
+						"pre-merge",
+						"post-merge",
+						"error-recovery",
+					],
+					description: "Current workflow phase to get guidance for",
+				},
+			},
+			required: ["phase"],
+		},
+		call: async (args) => {
+			try {
+				const { createWorkflowGuide } = await import("./dist/cli.js");
+				const guide = createWorkflowGuide(args.phase);
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify(guide, null, 2),
+						},
+					],
+				};
+			} catch (error) {
+				throw new Error(`Failed to get workflow guide: ${error.message}`);
+			}
+		},
+	},
 };
 
 // MCP Protocol handler - JSON-RPC 2.0 over stdio
