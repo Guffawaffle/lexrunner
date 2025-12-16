@@ -148,32 +148,39 @@ npm install --save-dev lexrunner
 After installation, you'll see a reminder to initialize your workspace:
 
 ```
-📦 lexrunner installed! Run "npx lex-pr init" to set up your workspace.
+📦 lexrunner installed! Run "npx lex-pr workspace init" to set up your workspace.
 ```
 
 ### For New Users
 
 ```bash
-# 1. Initialize workspace (creates .smartergpt.local/ with v1 structure)
-npx lex-pr init
+# 1. Initialize workspace (canonical form - creates .smartergpt.local/ with v1 structure)
+npx lex-pr workspace init
 
-# 2. Verify environment
-npx lex-pr doctor
+# 2. Verify environment (canonical form)
+npx lex-pr workspace doctor
 
-# 3. Discover PRs
-npx lex-pr discover
+# 3. Discover PRs (canonical form)
+npx lex-pr weave discover
 
-# 4. Generate plan
-npx lex-pr plan --from-github
+# 4. Generate plan (canonical form)
+npx lex-pr weave plan --from-github
 
 # 5. Review plan interactively
 npx lex-pr plan-review plan.json
 
-# 6. Execute gates
-npx lex-pr execute plan.json
+# 6. Execute gates (canonical form)
+npx lex-pr gate run plan.json
 
 # 7. Merge PRs
 npx lex-pr merge plan.json
+
+# Legacy commands (deprecated but still supported with warnings):
+# npx lex-pr init                  → npx lex-pr workspace init
+# npx lex-pr doctor                → npx lex-pr workspace doctor
+# npx lex-pr discover              → npx lex-pr weave discover
+# npx lex-pr plan                  → npx lex-pr weave plan
+# npx lex-pr execute               → npx lex-pr gate run
 ```
 
 See [docs/quickstart.md](docs/quickstart.md) for a complete 5-minute onboarding guide.
@@ -190,8 +197,8 @@ curl -fsSL https://raw.githubusercontent.com/Guffawaffle/LexRunner/main/scripts/
 # 1. Install LexRunner
 npm install --save-dev github:Guffawaffle/LexRunner
 
-# 2. Discover PRs and generate plan
-npx lex-pr discover --owner YOUR_ORG --repo YOUR_REPO --labels ready-to-merge --output plan.json
+# 2. Discover PRs and generate plan (canonical form)
+npx lex-pr weave discover --owner YOUR_ORG --repo YOUR_REPO --labels ready-to-merge --output plan.json
 
 # 3. Preview merge operations
 npx lex-pr merge --plan plan.json --dry-run
@@ -470,14 +477,14 @@ The diffgraph planner automatically discovers dependencies between PRs and compu
 ### Quick Example
 
 ```bash
-# Generate plan from GitHub PRs with auto-discovery
-lex-pr plan --from-github --output plan.json
+# Generate plan from GitHub PRs with auto-discovery (canonical form)
+lex-pr weave plan --from-github --output plan.json
 
-# Review suggested dependencies
-lex-pr plan --suggest-deps --threshold=0.7
+# Review suggested dependencies (canonical form)
+lex-pr weave plan --suggest-deps --threshold=0.7
 
-# Execute in dependency order
-lex-pr execute --plan plan.json
+# Execute in dependency order (canonical form)
+lex-pr gate run --plan plan.json
 ```
 
 ### Key Features
@@ -537,15 +544,20 @@ npm run cli -- plan --out ./my-artifacts
 ### Other Commands
 
 ```bash
-# Environment and config sanity checks
-npm run cli -- doctor
+# Environment and config sanity checks (canonical form)
+npm run cli -- workspace doctor
 
-# Gate report aggregation
-npm run cli -- report <directory> [--out json|md]
+# Gate report aggregation (canonical form)
+npm run cli -- weave report <directory> [--out json|md]
 
-# Orchestration: Batch planning with Kahn's algorithm
-npm run cli -- orchestrate:plan-batch --issues 156,157,160
-npm run cli -- orchestrate:plan-batch --input analysis.json --json
+# Orchestration: Issue analysis and batch assignment (canonical forms)
+npm run cli -- fanout analyze --issues 156,157,160
+npm run cli -- fanout assign --input analysis.json --json
+
+# Legacy forms (deprecated):
+# npm run cli -- doctor              → npm run cli -- workspace doctor
+# npm run cli -- report              → npm run cli -- weave report
+# npm run cli -- orchestrate:*       → npm run cli -- fanout *
 
 # Python CLI (legacy)
 lex-pr schema validate plan.json
@@ -554,14 +566,18 @@ lex-pr merge-order plan.json --json
 
 ### Orchestration Commands
 
-The `orchestrate:plan-batch` command generates deterministic batch plans using Kahn's algorithm:
+The `fanout` category commands generate deterministic batch plans using Kahn's algorithm:
 
 ```bash
-# From explicit issue list
-lex-pr orchestrate:plan-batch --issues 156,157,160,161,164
+# Canonical form: Analyze issues for fanout
+lex-pr fanout analyze --issues 156,157,160,161,164
 
-# From issue analyzer output
-lex-pr orchestrate:plan-batch --input analysis.json --json > batch-plan.json
+# Canonical form: Assign issues to workers
+lex-pr fanout assign --input analysis.json --json > batch-plan.json
+
+# Legacy forms (deprecated, show warnings):
+# lex-pr orchestrate:analyze-issues  → lex-pr fanout analyze
+# lex-pr orchestrate:assign-batch    → lex-pr fanout assign
 ```
 
 **Features:**
