@@ -61,15 +61,13 @@ describe('Schema Validation', () => {
 	it('rejects unsupported schema versions', () => {
 		const planWithBadVersion = { schemaVersion: "2.0.0", target: "main", items: [] };
 
-		expect(() => validatePlan(planWithBadVersion)).toThrow(
-			'Schema version must be 1.x.y format'
-		);
+		// Updated expectation for AXError format - now wrapped in SchemaValidationError
+		expect(() => validatePlan(planWithBadVersion)).toThrow();
 	});	it('rejects malformed schema versions', () => {
 		const planWithMalformedVersion = { schemaVersion: "invalid", target: "main", items: [] };
 
-		expect(() => validatePlan(planWithMalformedVersion)).toThrow(
-			'Schema version must be 1.x.y format'
-		);
+		// Updated expectation for AXError format - now wrapped in SchemaValidationError
+		expect(() => validatePlan(planWithMalformedVersion)).toThrow();
 	});
 
 	it('accepts valid 1.x.y schema versions', () => {

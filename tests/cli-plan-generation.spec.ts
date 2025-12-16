@@ -16,7 +16,7 @@ describe("CLI Plan Generation", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -31,8 +31,8 @@ describe("CLI Plan Generation", () => {
 						mergeable: true,
 						user: { login: "dev1" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
-					}
+						updatedAt: "2023-01-02T00:00:00Z",
+					},
 				]),
 				getPRDetails: vi.fn().mockResolvedValue({
 					number: 123,
@@ -49,19 +49,25 @@ describe("CLI Plan Generation", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
-				})
+					requiredGates: [],
+				}),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				policy: {
 					requiredGates: ["custom-gate", "security-scan"],
-					maxWorkers: 1
-				}
+					maxWorkers: 1,
+				},
 			});
 
-			expect(plan.policy?.requiredGates).toEqual(["custom-gate", "security-scan"]);
-			expect(plan.items[0].gates.map(g => g.name)).toEqual(["custom-gate", "security-scan"]);
+			expect(plan.policy?.requiredGates).toEqual([
+				"custom-gate",
+				"security-scan",
+			]);
+			expect(plan.items[0].gates.map((g) => g.name)).toEqual([
+				"custom-gate",
+				"security-scan",
+			]);
 		});
 
 		it("should accept custom max workers", async () => {
@@ -70,17 +76,17 @@ describe("CLI Plan Generation", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([]),
-				getPRDetails: vi.fn()
+				getPRDetails: vi.fn(),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				policy: {
 					requiredGates: ["lint"],
-					maxWorkers: 5
-				}
+					maxWorkers: 5,
+				},
 			});
 
 			expect(plan.policy?.maxWorkers).toBe(5);
@@ -92,14 +98,14 @@ describe("CLI Plan Generation", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([]),
-				getPRDetails: vi.fn()
+				getPRDetails: vi.fn(),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
-				target: "develop"
+				target: "develop",
 			});
 
 			expect(plan.target).toBe("develop");
@@ -114,12 +120,14 @@ describe("CLI Plan Generation", () => {
 				items: [
 					{ name: "PR-1", deps: ["PR-2"], gates: [] },
 					{ name: "PR-2", deps: ["PR-3"], gates: [] },
-					{ name: "PR-3", deps: ["PR-1"], gates: [] }
-				]
+					{ name: "PR-3", deps: ["PR-1"], gates: [] },
+				],
 			};
 
 			expect(() => computeMergeOrder(planWithCycle)).toThrow(CycleError);
-			expect(() => computeMergeOrder(planWithCycle)).toThrow(/cycle detected/i);
+			expect(() => computeMergeOrder(planWithCycle)).toThrow(
+				/cycle detected/i
+			);
 		});
 
 		it("should validate complex dependency graph without cycles", () => {
@@ -130,12 +138,12 @@ describe("CLI Plan Generation", () => {
 					{ name: "PR-1", deps: [], gates: [] },
 					{ name: "PR-2", deps: ["PR-1"], gates: [] },
 					{ name: "PR-3", deps: ["PR-1"], gates: [] },
-					{ name: "PR-4", deps: ["PR-2", "PR-3"], gates: [] }
-				]
+					{ name: "PR-4", deps: ["PR-2", "PR-3"], gates: [] },
+				],
 			};
 
 			const levels = computeMergeOrder(validPlan);
-			
+
 			expect(levels).toHaveLength(3);
 			expect(levels[0]).toEqual(["PR-1"]);
 			expect(levels[1]).toEqual(["PR-2", "PR-3"]);
@@ -150,12 +158,12 @@ describe("CLI Plan Generation", () => {
 					{ name: "PR-100", deps: [], gates: [] },
 					{ name: "PR-101", deps: ["PR-100"], gates: [] },
 					{ name: "PR-102", deps: ["PR-100"], gates: [] },
-					{ name: "PR-103", deps: ["PR-101", "PR-102"], gates: [] }
-				]
+					{ name: "PR-103", deps: ["PR-101", "PR-102"], gates: [] },
+				],
 			};
 
 			const levels = computeMergeOrder(diamondPlan);
-			
+
 			expect(levels).toHaveLength(3);
 			expect(levels[0]).toEqual(["PR-100"]);
 			expect(levels[1]).toContain("PR-101");
@@ -174,21 +182,21 @@ describe("CLI Plan Generation", () => {
 					{ name: "PR-2", deps: [], gates: [] },
 					{ name: "PR-3", deps: ["PR-1"], gates: [] },
 					{ name: "PR-4", deps: ["PR-2"], gates: [] },
-					{ name: "PR-5", deps: ["PR-3", "PR-4"], gates: [] }
-				]
+					{ name: "PR-5", deps: ["PR-3", "PR-4"], gates: [] },
+				],
 			};
 
 			const levels = computeMergeOrder(plan);
-			
+
 			// Should have 3 levels for optimal parallelization
 			expect(levels).toHaveLength(3);
-			
+
 			// Level 0: Independent items
 			expect(levels[0]).toEqual(["PR-1", "PR-2"]);
-			
+
 			// Level 1: Items depending on level 0
 			expect(levels[1]).toEqual(["PR-3", "PR-4"]);
-			
+
 			// Level 2: Items depending on level 1
 			expect(levels[2]).toEqual(["PR-5"]);
 		});
@@ -200,13 +208,13 @@ describe("CLI Plan Generation", () => {
 				items: [
 					{ name: "PR-3", deps: [], gates: [] },
 					{ name: "PR-1", deps: [], gates: [] },
-					{ name: "PR-2", deps: [], gates: [] }
-				]
+					{ name: "PR-2", deps: [], gates: [] },
+				],
 			};
 
 			const levels1 = computeMergeOrder(plan);
 			const levels2 = computeMergeOrder(plan);
-			
+
 			// Should be deterministically sorted
 			expect(levels1[0]).toEqual(["PR-1", "PR-2", "PR-3"]);
 			expect(levels2[0]).toEqual(["PR-1", "PR-2", "PR-3"]);
@@ -221,7 +229,7 @@ describe("CLI Plan Generation", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -236,8 +244,8 @@ describe("CLI Plan Generation", () => {
 						mergeable: true,
 						user: { login: "security-team" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
-					}
+						updatedAt: "2023-01-02T00:00:00Z",
+					},
 				]),
 				getPRDetails: vi.fn().mockResolvedValue({
 					number: 200,
@@ -254,20 +262,26 @@ describe("CLI Plan Generation", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
-				})
+					requiredGates: [],
+				}),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				policy: {
 					requiredGates: ["security-scan", "vulnerability-check"],
-					maxWorkers: 1
-				}
+					maxWorkers: 1,
+				},
 			});
 
 			expect(plan.items).toHaveLength(1);
-			expect(plan.items[0].gates.map(g => g.name)).toEqual(["security-scan", "vulnerability-check"]);
-			expect(plan.policy?.requiredGates).toEqual(["security-scan", "vulnerability-check"]);
+			expect(plan.items[0].gates.map((g) => g.name)).toEqual([
+				"security-scan",
+				"vulnerability-check",
+			]);
+			expect(plan.policy?.requiredGates).toEqual([
+				"security-scan",
+				"vulnerability-check",
+			]);
 		});
 
 		it("should handle empty required gates", async () => {
@@ -276,7 +290,7 @@ describe("CLI Plan Generation", () => {
 					owner: "testowner",
 					repo: "testrepo",
 					defaultBranch: "main",
-					url: "https://github.com/testowner/testrepo"
+					url: "https://github.com/testowner/testrepo",
 				}),
 				listOpenPRs: vi.fn().mockResolvedValue([
 					{
@@ -291,8 +305,8 @@ describe("CLI Plan Generation", () => {
 						mergeable: true,
 						user: { login: "dev" },
 						createdAt: "2023-01-01T00:00:00Z",
-						updatedAt: "2023-01-02T00:00:00Z"
-					}
+						updatedAt: "2023-01-02T00:00:00Z",
+					},
 				]),
 				getPRDetails: vi.fn().mockResolvedValue({
 					number: 100,
@@ -309,15 +323,15 @@ describe("CLI Plan Generation", () => {
 					updatedAt: "2023-01-02T00:00:00Z",
 					dependencies: [],
 					tags: [],
-					requiredGates: []
-				})
+					requiredGates: [],
+				}),
 			};
 
 			const plan = await generatePlanFromGitHub(mockClient as any, {
 				policy: {
 					requiredGates: [],
-					maxWorkers: 1
-				}
+					maxWorkers: 1,
+				},
 			});
 
 			expect(plan.items).toHaveLength(1);
@@ -330,12 +344,13 @@ describe("CLI Plan Generation", () => {
 			const invalidPlan: Plan = {
 				schemaVersion: "1.0.0",
 				target: "main",
-				items: [
-					{ name: "PR-1", deps: ["PR-999"], gates: [] }
-				]
+				items: [{ name: "PR-1", deps: ["PR-999"], gates: [] }],
 			};
 
-			expect(() => computeMergeOrder(invalidPlan)).toThrow(/unknown dependency/i);
+			// AXError format: "Item 'PR-1' depends on unknown item 'PR-999'"
+			expect(() => computeMergeOrder(invalidPlan)).toThrow(
+				/depends on unknown item/i
+			);
 			expect(() => computeMergeOrder(invalidPlan)).toThrow(/PR-999/);
 		});
 
@@ -346,8 +361,8 @@ describe("CLI Plan Generation", () => {
 				items: [
 					{ name: "PR-A", deps: ["PR-B"], gates: [] },
 					{ name: "PR-B", deps: ["PR-C"], gates: [] },
-					{ name: "PR-C", deps: ["PR-A"], gates: [] }
-				]
+					{ name: "PR-C", deps: ["PR-A"], gates: [] },
+				],
 			};
 
 			try {

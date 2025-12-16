@@ -6,6 +6,11 @@
 import { MinHeap } from "../util/minHeap.js";
 import { createHash } from "crypto";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import {
+	AXErrorException,
+	cycleDetectedError,
+	unknownDependencyError,
+} from "../errors/index.js";
 
 export interface Node {
 	id: string;
@@ -33,16 +38,26 @@ export interface BatchPlan {
 	batches: Batch[];
 }
 
-export class CycleError extends Error {
-	constructor(message: string) {
-		super(message);
+/**
+ * CycleError - thrown when a dependency cycle is detected in batch planning
+ * Now extends AXErrorException to provide structured error with nextActions
+ */
+export class CycleError extends AXErrorException {
+	constructor(cycle: string[]) {
+		const axError = cycleDetectedError({ cycle });
+		super(axError.code, axError.message, axError.nextActions, axError.context);
 		this.name = "CycleError";
 	}
 }
 
-export class UnknownDependencyError extends Error {
-	constructor(message: string) {
-		super(message);
+/**
+ * UnknownDependencyError - thrown when a dependency reference doesn't exist in batch planning
+ * Now extends AXErrorException to provide structured error with nextActions
+ */
+export class UnknownDependencyError extends AXErrorException {
+	constructor(item: string, dependency: string, availableItems?: string[]) {
+		const axError = unknownDependencyError({ item, dependency, availableItems });
+		super(axError.code, axError.message, axError.nextActions, axError.context);
 		this.name = "UnknownDependencyError";
 	}
 }
@@ -61,9 +76,8 @@ export function computeBatches(nodes: Node[]): BatchPlan {
 	for (const node of nodes) {
 		for (const dep of node.dependencies) {
 			if (!nodeIds.has(dep)) {
-				throw new UnknownDependencyError(
-					`Node '${node.id}' has unknown dependency '${dep}'`
-				);
+				const availableItems = Array.from(nodeIds);
+				throw new UnknownDependencyError(node.id, dep, availableItems);
 			}
 		}
 	}
@@ -158,9 +172,13 @@ export function computeBatches(nodes: Node[]): BatchPlan {
 		const cycleNodes = Array.from(inDegree.entries())
 			.filter(([, degree]) => degree > 0)
 			.map(([id]) => id);
-		throw new CycleError(
-			`Dependency cycle detected involving: ${cycleNodes.join(', ')}`
-		);
+		
+		// Create a simple cycle representation showing nodes involved
+		// Note: This creates a basic visual (A → B → A) rather than the exact cycle path,
+		// as determining the precise path would require additional graph traversal
+		const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
+		
+		throw new CycleError(cycle);
 	}
 
 	// Create batch plan

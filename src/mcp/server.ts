@@ -72,6 +72,8 @@ import {
 	ErrorCodes,
 	cycleDetectedError,
 	unknownDependencyError,
+	AXErrorException,
+	isAXErrorException,
 } from "../errors/index.js";
 
 import * as fs from "fs";
@@ -1963,22 +1965,10 @@ async function handleMergeOrder(args: {
 		if (error instanceof McpError) {
 			throw error;
 		}
-		// Handle specific plan validation errors with appropriate AXError adapters
-		if (error instanceof CycleError) {
-			// Extract cycle information from error message if available
-			const cycleMatch = error.message.match(/involving: (.+)/);
-			const cycle = cycleMatch ? cycleMatch[1].split(', ') : [];
-			const axError = cycleDetectedError({ cycle });
+		// Handle AXErrorException instances (including CycleError, UnknownDependencyError)
+		if (isAXErrorException(error)) {
+			const axError = error.toAXError();
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
-		}
-		if (error instanceof UnknownDependencyError) {
-			// Extract dependency information from error message
-			const depMatch = error.message.match(/unknown dependency '(.+)' for item '(.+)'/);
-			if (depMatch) {
-				const [, dependency, item] = depMatch;
-				const axError = unknownDependencyError({ item, dependency });
-				throwMcpAXError(ErrorCode.InvalidParams, axError);
-			}
 		}
 		throwMcpToolError(ErrorCode.InternalError, "merge-order", error, "compute merge order");
 	}

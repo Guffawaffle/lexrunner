@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { TierAssignment } from "./tiers/schema.js";
+import {
+	AXErrorException,
+	planValidationError,
+	configInvalidError,
+} from "./errors/index.js";
 
 /**
  * Schema v1 for plan.json - the single frozen runtime input
@@ -59,12 +64,20 @@ export const SchemaVersion = z.string().regex(
 export function validateSchemaVersion(version: string): void {
 	const parsed = SchemaVersion.safeParse(version);
 	if (!parsed.success) {
-		throw new Error(`Unsupported schema version: ${version}. This runner only supports schema version 1.x.y`);
+		const axError = configInvalidError(
+			`Unsupported schema version: ${version}. This runner only supports schema version 1.x.y`,
+			{ version, expected: "1.x.y" }
+		);
+		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 	}
 
 	const [major] = version.split('.').map(Number);
 	if (major !== 1) {
-		throw new Error(`Incompatible schema major version: ${major}. This runner only supports major version 1.`);
+		const axError = configInvalidError(
+			`Incompatible schema major version: ${major}. This runner only supports major version 1.`,
+			{ version, major, expectedMajor: 1 }
+		);
+		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 	}
 }
 
@@ -216,9 +229,10 @@ export interface ValidationError {
 }
 
 /**
- * Validation errors for schema failures
+ * Schema validation error - thrown when Zod validation fails
+ * Now extends AXErrorException to provide structured error with nextActions
  */
-export class SchemaValidationError extends Error {
+export class SchemaValidationError extends AXErrorException {
 	public readonly issues: z.ZodIssue[];
 	public readonly errors: ValidationError[];
 
@@ -229,17 +243,22 @@ export class SchemaValidationError extends Error {
 			code: issue.code
 		}));
 
-		const message = errors.map(e => `${e.path}: ${e.message}`).join('; ');
-		super(`Schema validation failed: ${message}`);
+		const errorStrings = errors.map(e => `${e.path}: ${e.message}`);
+		const axError = planValidationError({ 
+			errors: errorStrings
+			// planPath is omitted as it's not available in this context
+		});
+		
+		super(axError.code, axError.message, axError.nextActions, axError.context);
 		this.name = "SchemaValidationError";
 		this.issues = issues;
 		this.errors = errors;
 	}
 
 	/**
-	 * Get machine-readable error format
+	 * Get legacy machine-readable error format for backward compatibility
 	 */
-	toJSON(): { valid: false; errors: ValidationError[] } {
+	toLegacyJSON(): { valid: false; errors: ValidationError[] } {
 		return {
 			valid: false,
 			errors: this.errors
@@ -272,7 +291,11 @@ export function loadPlan(planContent: string): Plan {
 		return validatePlan(planData);
 	} catch (error) {
 		if (error instanceof SyntaxError) {
-			throw new Error(`Invalid JSON: ${error.message}`);
+			const axError = configInvalidError(
+				`Invalid JSON: ${error.message}`,
+				{ parseError: error.message }
+			);
+			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
 		}
 		throw error;
 	}
