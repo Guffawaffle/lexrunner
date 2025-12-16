@@ -177,8 +177,12 @@ function main(): void {
 }
 
 // Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-	main();
+if (import.meta.url.startsWith("file:")) {
+	const modulePath = new URL(import.meta.url).pathname;
+	const scriptPath = process.argv[1];
+	if (modulePath === scriptPath || modulePath === scriptPath + ".ts") {
+		main();
+	}
 }
 
 export { findManifests, validateManifest, main };
