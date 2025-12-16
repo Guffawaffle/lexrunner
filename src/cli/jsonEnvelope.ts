@@ -73,7 +73,7 @@ function createMeta(command: string): JsonMeta {
 /**
  * Create a success JSON envelope
  * 
- * @param command - Command name (e.g., "weave discover", "weave plan")
+ * @param command - Command name (e.g., "lex-pr discover", "lex-pr plan")
  * @param data - Command-specific payload
  * @returns Standardized success envelope
  */
@@ -91,7 +91,7 @@ export function createSuccessEnvelope<T = unknown>(
 /**
  * Create an error JSON envelope
  * 
- * @param command - Command name (e.g., "weave discover", "weave plan")
+ * @param command - Command name (e.g., "lex-pr discover", "lex-pr plan")
  * @param error - Error code and details
  * @returns Standardized error envelope
  */

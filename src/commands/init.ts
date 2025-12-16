@@ -22,7 +22,7 @@ interface InitOptions {
 	nonInteractive?: boolean;
 	githubToken?: string;
 	profileDir?: string;
-	jsonMode?: boolean;  // Add jsonMode flag
+	jsonMode?: boolean;
 }
 
 export interface InitResult {
