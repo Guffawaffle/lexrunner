@@ -50,11 +50,11 @@ items:
         run: npm test
 `);
 
-		// Should throw with specific error message
+		// Should throw with specific error message (updated for AXError format)
 		expect(() => {
 			const inputs = loadInputs();
 			generatePlan(inputs);
-		}).toThrow(/Unknown dependency 'nonexistent-item' for item 'broken-item'/);
+		}).toThrow(/depends on unknown item 'nonexistent-item'/);
 	});
 
 	it('should exit with code 2 via CLI for unknown dependencies', (ctx) => {
@@ -92,6 +92,7 @@ items:
 
 		expect(caughtError).toBeDefined();
 		expect(caughtError.status).toBe(2);
-		expect(caughtError.stderr.toString()).toContain("Unknown dependency 'missing-dep' for item 'item-1'");
+		// Updated expectation for AXError format
+		expect(caughtError.stderr.toString()).toContain("depends on unknown item 'missing-dep'");
 	});
 });
