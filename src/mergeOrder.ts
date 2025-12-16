@@ -151,7 +151,9 @@ export function computeMergeOrder(plan: Plan): string[][] {
 			.filter(([, degree]) => degree > 0)
 			.map(([name]) => name);
 		
-		// Create a simple cycle representation for the error
+		// Create a simple cycle representation showing nodes involved
+		// Note: This creates a basic visual (A → B → A) rather than the actual cycle path,
+		// as determining the exact path would require additional graph traversal
 		const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
 		
 		throw new CycleError(cycle);

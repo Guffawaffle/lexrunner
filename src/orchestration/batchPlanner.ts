@@ -173,7 +173,9 @@ export function computeBatches(nodes: Node[]): BatchPlan {
 			.filter(([, degree]) => degree > 0)
 			.map(([id]) => id);
 		
-		// Create a simple cycle representation
+		// Create a simple cycle representation showing nodes involved
+		// Note: This creates a basic visual (A → B → A) rather than the exact cycle path,
+		// as determining the precise path would require additional graph traversal
 		const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
 		
 		throw new CycleError(cycle);

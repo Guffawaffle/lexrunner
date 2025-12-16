@@ -245,8 +245,8 @@ export class SchemaValidationError extends AXErrorException {
 
 		const errorStrings = errors.map(e => `${e.path}: ${e.message}`);
 		const axError = planValidationError({ 
-			errors: errorStrings,
-			planPath: undefined 
+			errors: errorStrings
+			// planPath is omitted as it's not available in this context
 		});
 		
 		super(axError.code, axError.message, axError.nextActions, axError.context);
