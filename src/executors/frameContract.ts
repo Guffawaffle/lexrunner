@@ -230,6 +230,31 @@ export function buildFrameFromTemplate(template: ExecutorFrameTemplate): Executi
 	const suffix = Math.random().toString(36).slice(-6);
 	const referencePoint = `executor-${template.role}-${timestamp}-${suffix}`;
 
+	// Build metadata with ExecutionFrameMetadata fields plus custom executor data
+	const metadata: Record<string, unknown> = {
+		duration_ms: template.durationMs,
+		run_id: template.runId,
+		error: template.error,
+	};
+
+	// Add executor-specific metadata
+	if (template.metadata) {
+		Object.assign(metadata, template.metadata);
+	}
+
+	// Add Frame contract metadata (stored as custom fields)
+	metadata.executor_role = template.role;
+	metadata.inputs_hash = template.inputsHash;
+	metadata.outputs_hash = template.outputsHash;
+	metadata.tool_calls_count = template.toolCalls.length;
+	metadata.tool_calls = template.toolCalls.map((tc) => ({
+		tool: tc.tool,
+		timestamp: tc.timestamp,
+		duration_ms: tc.durationMs,
+		success: tc.success,
+		error: tc.error,
+	}));
+
 	return {
 		type: "execution",
 		reference_point: referencePoint,
@@ -238,24 +263,6 @@ export function buildFrameFromTemplate(template: ExecutorFrameTemplate): Executi
 		keywords: ["executor", template.role, "execution"],
 		outcome: template.outcome,
 		next_actions: template.nextActions,
-		metadata: {
-			duration_ms: template.durationMs,
-			run_id: template.runId,
-			error: template.error,
-			// Store executor-specific metadata
-			...(template.metadata || {}),
-			// Store Frame contract metadata
-			executor_role: template.role,
-			inputs_hash: template.inputsHash,
-			outputs_hash: template.outputsHash,
-			tool_calls_count: template.toolCalls.length,
-			tool_calls: template.toolCalls.map((tc) => ({
-				tool: tc.tool,
-				timestamp: tc.timestamp,
-				duration_ms: tc.durationMs,
-				success: tc.success,
-				error: tc.error,
-			})),
-		},
+		metadata,
 	};
 }
