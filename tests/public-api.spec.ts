@@ -217,3 +217,81 @@ describe("Public API - Integration Test", () => {
 		}).toThrow();
 	});
 });
+
+describe("Public API - Executors FrameContract Module", () => {
+	it("should export frame contract types and functions", async () => {
+		const {
+			FrameContractViolationError,
+			createFrameMetadata,
+			enforceFrameEmission,
+			withFrameContract,
+			validateFrameMetadata,
+			buildFrameFromTemplate,
+		} = await import("../../src/executors/frameContract.js");
+
+		expect(FrameContractViolationError).toBeDefined();
+		expect(createFrameMetadata).toBeDefined();
+		expect(enforceFrameEmission).toBeDefined();
+		expect(withFrameContract).toBeDefined();
+		expect(validateFrameMetadata).toBeDefined();
+		expect(buildFrameFromTemplate).toBeDefined();
+
+		expect(typeof createFrameMetadata).toBe("function");
+		expect(typeof enforceFrameEmission).toBe("function");
+		expect(typeof withFrameContract).toBe("function");
+		expect(typeof validateFrameMetadata).toBe("function");
+		expect(typeof buildFrameFromTemplate).toBe("function");
+	});
+
+	it("should enforce frame emission requirement", async () => {
+		const { enforceFrameEmission, FrameContractViolationError } = await import(
+			"../../src/executors/frameContract.js"
+		);
+
+		const context = {
+			executorRole: "test-executor",
+			runId: "test-run-001",
+			inputs: { test: "value" },
+			toolCalls: [],
+			startTime: new Date().toISOString(),
+		};
+
+		const outputWithoutFrame = {
+			outputs: { result: "done" },
+			endTime: new Date().toISOString(),
+		};
+
+		// Should throw when frame is missing
+		expect(() => enforceFrameEmission(context, outputWithoutFrame)).toThrow(
+			FrameContractViolationError
+		);
+	});
+
+	it("should build frame from template", async () => {
+		const { buildFrameFromTemplate } = await import(
+			"../../src/executors/frameContract.js"
+		);
+
+		const template = {
+			role: "senior-dev",
+			runId: "test-run-002",
+			summary: "Test execution",
+			moduleScope: ["src/test.ts"],
+			outcome: "success" as const,
+			nextActions: ["Verify results"],
+			inputsHash: "abc123",
+			outputsHash: "def456",
+			toolCalls: [],
+			durationMs: 1000,
+		};
+
+		const frame = buildFrameFromTemplate(template);
+
+		expect(frame.type).toBe("execution");
+		expect(frame.summary_caption).toBe("Test execution");
+		expect(frame.outcome).toBe("success");
+		expect(frame.metadata?.executor_role).toBe("senior-dev");
+		expect(frame.metadata?.inputs_hash).toBe("abc123");
+		expect(frame.metadata?.outputs_hash).toBe("def456");
+	});
+});
