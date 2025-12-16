@@ -44,14 +44,18 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 			? options.profileDir
 			: path.resolve(baseDir, options.profileDir);
 	} else {
-		// Check if .smartergpt exists (tracked example)
-		const trackedExample = path.join(baseDir, ".smartergpt");
-		if (fs.existsSync(trackedExample)) {
-			// Use .smartergpt.local for local development
-			profileDir = path.join(baseDir, ".smartergpt.local");
-		} else {
-			// Use .smartergpt.local by default for new setups
-			profileDir = path.join(baseDir, ".smartergpt.local");
+		// Default to .smartergpt.local (either as override or new setup)
+		profileDir = path.join(baseDir, ".smartergpt.local");
+		
+		// Only log in non-JSON mode
+		if (!options.jsonMode) {
+			// Check if .smartergpt exists (tracked example)
+			const trackedExample = path.join(baseDir, ".smartergpt");
+			if (fs.existsSync(trackedExample)) {
+				logProfileMessage(
+					"Found tracked example profile, using .smartergpt.local for your workspace"
+				);
+			}
 		}
 	}
 
@@ -68,7 +72,7 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 			}
 		} catch (error) {
 			// If bootstrap fails, we'll create from scratch (might be missing files)
-			if (!options.force) {
+			if (!options.force && !options.jsonMode) {
 				logProfileMessage(`Profile directory exists but is incomplete. Use --force to recreate.`);
 			}
 		}

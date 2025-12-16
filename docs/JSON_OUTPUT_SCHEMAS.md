@@ -14,7 +14,7 @@ All commands that support `--json` output use a consistent envelope structure wi
   "data": { /* command-specific payload */ },
   "meta": {
     "command": "lex-pr <command-name>",
-    "timestamp": "2025-12-16T10:30:00.000Z",
+    "timestamp": "<ISO 8601 timestamp>",
     "version": "0.5.0"
   }
 }
@@ -32,7 +32,7 @@ All commands that support `--json` output use a consistent envelope structure wi
   },
   "meta": {
     "command": "lex-pr <command-name>",
-    "timestamp": "2025-12-16T10:30:00.000Z",
+    "timestamp": "<ISO 8601 timestamp>",
     "version": "0.5.0"
   }
 }
@@ -54,7 +54,7 @@ Initializes a new workspace configuration.
   },
   "meta": {
     "command": "lex-pr init",
-    "timestamp": "2025-12-16T10:30:00.000Z",
+    "timestamp": "<ISO 8601 timestamp>",
     "version": "0.5.0"
   }
 }
