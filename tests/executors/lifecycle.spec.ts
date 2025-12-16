@@ -267,10 +267,15 @@ describe.skip('Executor Lifecycle Integration', () => {
 			const receiptArtifact = artifacts.find(a => a.type === 'receipt');
 			expect(receiptArtifact).toBeDefined();
 
-			// Verify content is valid JSON
-			expect(() => JSON.parse(receiptArtifact!.content)).not.toThrow();
+			// Type guard ensures receiptArtifact is defined
+			if (!receiptArtifact) {
+				throw new Error('Receipt artifact should be defined');
+			}
 
-			const parsed = JSON.parse(receiptArtifact!.content);
+			// Verify content is valid JSON
+			expect(() => JSON.parse(receiptArtifact.content)).not.toThrow();
+
+			const parsed = JSON.parse(receiptArtifact.content);
 			expect(parsed.executorId).toBe('mock-executor');
 			expect(parsed.status).toBe('completed');
 		});
