@@ -22,6 +22,7 @@ interface InitOptions {
 	nonInteractive?: boolean;
 	githubToken?: string;
 	profileDir?: string;
+	jsonMode?: boolean;  // Add jsonMode flag
 }
 
 export interface InitResult {
@@ -36,40 +37,51 @@ export interface InitResult {
 export async function runInit(options: InitOptions = {}): Promise<InitResult> {
 	const baseDir = process.cwd();
 
-	// Check if configuration already exists
-	const bootstrap = bootstrapWorkspace(baseDir, options.profileDir);
-
-	if (bootstrap.hasConfiguration && !options.force) {
-		return {
-			success: false,
-			profileDir: bootstrap.profileDir,
-			message: `Configuration already exists at ${bootstrap.profileDir}. Use --force to overwrite.`,
-		};
-	}
-
-	// Determine profile directory
-	let profileDir = options.profileDir;
-	if (!profileDir) {
+	// Determine profile directory first (before calling bootstrapWorkspace)
+	let profileDir: string;
+	if (options.profileDir) {
+		profileDir = path.isAbsolute(options.profileDir)
+			? options.profileDir
+			: path.resolve(baseDir, options.profileDir);
+	} else {
 		// Check if .smartergpt exists (tracked example)
 		const trackedExample = path.join(baseDir, ".smartergpt");
 		if (fs.existsSync(trackedExample)) {
 			// Use .smartergpt.local for local development
 			profileDir = path.join(baseDir, ".smartergpt.local");
-			logProfileMessage(
-				"Found tracked example profile, using .smartergpt.local for your workspace"
-			);
 		} else {
 			// Use .smartergpt.local by default for new setups
 			profileDir = path.join(baseDir, ".smartergpt.local");
 		}
 	}
 
+	// Check if configuration already exists (only if directory and manifest exist)
+	if (fs.existsSync(profileDir) && fs.existsSync(path.join(profileDir, "profile.yml"))) {
+		try {
+			const bootstrap = bootstrapWorkspace(baseDir, options.profileDir);
+			if (bootstrap.hasConfiguration && !options.force) {
+				return {
+					success: false,
+					profileDir: bootstrap.profileDir,
+					message: `Configuration already exists at ${bootstrap.profileDir}. Use --force to overwrite.`,
+				};
+			}
+		} catch (error) {
+			// If bootstrap fails, we'll create from scratch (might be missing files)
+			if (!options.force) {
+				logProfileMessage(`Profile directory exists but is incomplete. Use --force to recreate.`);
+			}
+		}
+	}
+
 	// Detect project type
 	const projectType = detectProjectType(baseDir);
-	console.log(`\n🔍 Detected project type: ${projectType}\n`);
+	if (!options.jsonMode) {
+		console.log(`\n🔍 Detected project type: ${projectType}\n`);
+	}
 
 	// Interactive setup
-	if (!options.nonInteractive) {
+	if (!options.nonInteractive && !options.jsonMode) {
 		console.log("Welcome to lexrunner setup! 🚀\n");
 		console.log("This wizard will help you configure your workspace.\n");
 
@@ -139,26 +151,29 @@ description: Auto-generated workspace for local development
 			fs.writeFileSync(templatePath, templateContent);
 		}
 
-		console.log(`\n✅ Workspace initialized successfully!\n`);
-		console.log(`📂 Profile directory: ${profileDir}`);
-		console.log(`\n📝 Created files:`);
-		console.log(`   - intent.md (project goals and scope)`);
-		console.log(`   - scope.yml (PR discovery rules)`);
-		console.log(`   - deps.yml (dependency relationships)`);
-		console.log(`   - gates.yml (quality gates configuration)`);
-		console.log(
-			`   - pull-request-template.md (PR template with dependency syntax)`
-		);
-		console.log(`   - runner/ (working artifacts directory)`);
+		// Only show console output if not in JSON mode
+		if (!options.jsonMode) {
+			console.log(`\n✅ Workspace initialized successfully!\n`);
+			console.log(`📂 Profile directory: ${profileDir}`);
+			console.log(`\n📝 Created files:`);
+			console.log(`   - intent.md (project goals and scope)`);
+			console.log(`   - scope.yml (PR discovery rules)`);
+			console.log(`   - deps.yml (dependency relationships)`);
+			console.log(`   - gates.yml (quality gates configuration)`);
+			console.log(
+				`   - pull-request-template.md (PR template with dependency syntax)`
+			);
+			console.log(`   - runner/ (working artifacts directory)`);
 
-		console.log(`\n📚 Next steps:`);
-		console.log(
-			`   1. Edit ${profileDir}/intent.md to describe your project`
-		);
-		console.log(`   2. Configure ${profileDir}/scope.yml for PR discovery`);
-		console.log(`   3. Set up quality gates in ${profileDir}/gates.yml`);
-		console.log(`   4. Run 'lex-pr doctor' to verify your setup`);
-		console.log(`   5. Run 'lex-pr discover' to find open PRs\n`);
+			console.log(`\n📚 Next steps:`);
+			console.log(
+				`   1. Edit ${profileDir}/intent.md to describe your project`
+			);
+			console.log(`   2. Configure ${profileDir}/scope.yml for PR discovery`);
+			console.log(`   3. Set up quality gates in ${profileDir}/gates.yml`);
+			console.log(`   4. Run 'lex-pr doctor' to verify your setup`);
+			console.log(`   5. Run 'lex-pr discover' to find open PRs\n`);
+		}
 
 		return {
 			success: true,
