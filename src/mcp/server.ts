@@ -234,7 +234,7 @@ function createServer(options?: McpServerOptions): Server {
 				{
 					name: "plan_create",
 					description:
-						"Create a plan from configuration files or auto-discover from GitHub PRs",
+						"Create a plan from configuration files or auto-discover from GitHub PRs. Requires GITHUB_TOKEN environment variable when using fromGithub mode.",
 					inputSchema: {
 						type: "object",
 						properties: {
@@ -665,7 +665,7 @@ function createServer(options?: McpServerOptions): Server {
 				{
 					name: "discover",
 					description:
-						"Discover open pull requests from GitHub with optional dependency suggestions",
+						"Discover open pull requests from GitHub with optional dependency suggestions. Requires GITHUB_TOKEN environment variable.",
 					inputSchema: {
 						type: "object",
 						properties: {
@@ -967,6 +967,27 @@ function createServer(options?: McpServerOptions): Server {
 }
 
 /**
+ * Check if GitHub token is available and throw helpful error if not
+ */
+function ensureGitHubToken(providedToken?: string): void {
+	const token = providedToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+	
+	if (!token) {
+		const axError = githubApiError({
+			status: 401,
+			message: 
+				'GitHub authentication required. Set GITHUB_TOKEN environment variable.\n' +
+				'\n' +
+				'To fix:\n' +
+				'  export GITHUB_TOKEN=ghp_...\n' +
+				'\n' +
+				'See: https://github.com/Guffawaffle/lexrunner#authentication'
+		});
+		throwMcpAXError(ErrorCode.InvalidRequest, axError);
+	}
+}
+
+/**
  * Handle plan.create tool
  */
 async function handlePlanCreate(
@@ -1012,6 +1033,9 @@ async function handlePlanCreate(
 		}
 
 		if (args.fromGithub) {
+			// Check for GitHub authentication before making API calls
+			ensureGitHubToken(args.githubToken);
+			
 			// GitHub mode: auto-discover PRs
 			const client = await createGitHubClient({
 				token: args.githubToken,
@@ -1859,6 +1883,9 @@ async function handleDiscover(args: {
 	suggest?: boolean;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
 	try {
+		// Check for GitHub authentication early
+		ensureGitHubToken();
+		
 		let githubAPI = await createGitHubAPI();
 
 		// Override with arguments if provided
