@@ -265,8 +265,8 @@ describe("Lex Integration Smoke Test", () => {
 			}
 		});
 
-		it("should generate an Atlas Frame for seed modules", async () => {
-			const atlasFrame = await generateAtlasFrame(
+		it("should generate an Atlas Frame for seed modules", () => {
+			const atlasFrame = generateAtlasFrame(
 				["services/auth"],
 				1, // fold radius of 1
 				tempPolicyPath
@@ -283,8 +283,8 @@ describe("Lex Integration Smoke Test", () => {
 			expect(atlasFrame.atlas_timestamp).toBeDefined();
 		});
 
-		it("should include seed module and its neighbors", async () => {
-			const atlasFrame = await generateAtlasFrame(
+		it("should include seed module and its neighbors", () => {
+			const atlasFrame = generateAtlasFrame(
 				["services/auth"],
 				1,
 				tempPolicyPath
@@ -303,8 +303,8 @@ describe("Lex Integration Smoke Test", () => {
 			expect(Array.isArray(atlasFrame.edges)).toBe(true);
 		});
 
-		it("should support TypeScript types for AtlasFrame", async () => {
-			const atlasFrame = await generateAtlasFrame(
+		it("should support TypeScript types for AtlasFrame", () => {
+			const atlasFrame = generateAtlasFrame(
 				["services/auth"],
 				1,
 				tempPolicyPath
@@ -316,13 +316,13 @@ describe("Lex Integration Smoke Test", () => {
 			expect(typeof atlasFrame.critical_rule).toBe("string");
 		});
 
-		it("should expand with larger fold radius", async () => {
-			const radius1 = await generateAtlasFrame(
+		it("should expand with larger fold radius", () => {
+			const radius1 = generateAtlasFrame(
 				["services/auth"],
 				1,
 				tempPolicyPath
 			);
-			const radius2 = await generateAtlasFrame(
+			const radius2 = generateAtlasFrame(
 				["services/auth"],
 				2,
 				tempPolicyPath
