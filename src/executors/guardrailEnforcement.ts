@@ -60,7 +60,8 @@ export function matchesAccessPattern(
 	filePath: string,
 	pattern: AccessPattern
 ): boolean {
-	return minimatch(filePath, pattern.path);
+	// Use consistent options: dot=true to match dotfiles, nocase=false for case-sensitive matching
+	return minimatch(filePath, pattern.path, { dot: true, nocase: false });
 }
 
 /**
@@ -160,7 +161,7 @@ export function checkNetworkAccess(
 
 	// Check deny list first
 	for (const denyPattern of scope.network.deny ?? []) {
-		if (minimatch(host, denyPattern)) {
+		if (minimatch(host, denyPattern, { dot: true, nocase: false })) {
 			const violation: GuardrailViolation = {
 				timestamp: new Date().toISOString(),
 				guardrailType: "scope",
@@ -182,7 +183,7 @@ export function checkNetworkAccess(
 	if (scope.network.allow && scope.network.allow.length > 0) {
 		let allowed = false;
 		for (const allowPattern of scope.network.allow) {
-			if (minimatch(host, allowPattern)) {
+			if (minimatch(host, allowPattern, { dot: true, nocase: false })) {
 				allowed = true;
 				break;
 			}
@@ -229,7 +230,7 @@ export function checkEnvAccess(
 
 	// Check deny list first
 	for (const denyPattern of scope.env.deny ?? []) {
-		if (minimatch(envVar, denyPattern)) {
+		if (minimatch(envVar, denyPattern, { dot: true, nocase: false })) {
 			const violation: GuardrailViolation = {
 				timestamp: new Date().toISOString(),
 				guardrailType: "scope",
@@ -251,7 +252,7 @@ export function checkEnvAccess(
 	if (scope.env.allow && scope.env.allow.length > 0) {
 		let allowed = false;
 		for (const allowPattern of scope.env.allow) {
-			if (minimatch(envVar, allowPattern)) {
+			if (minimatch(envVar, allowPattern, { dot: true, nocase: false })) {
 				allowed = true;
 				break;
 			}
@@ -303,7 +304,10 @@ export function enforceGuardrail(
 			return checkNetworkAccess(action.target, profile.scope);
 		case "env_access":
 			return checkEnvAccess(action.target, profile.scope);
-		default:
-			return { allowed: true, violations: [] };
+		default: {
+			// Exhaustive check - TypeScript should prevent this
+			const _exhaustive: never = action.type;
+			throw new Error(`Unknown action type: ${_exhaustive}`);
+		}
 	}
 }
