@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { Command, CommanderError } from "commander";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -480,9 +481,7 @@ registerBudgetCommand(program, () => jsonModeActive);
 // Init command - Interactive workspace setup
 program
 	.command("init")
-	.description(
-		"Initialize lexrunner workspace with interactive setup wizard"
-	)
+	.description("Initialize lexrunner workspace with interactive setup wizard")
 	.option("--force", "Overwrite existing configuration files")
 	.option(
 		"--non-interactive",
