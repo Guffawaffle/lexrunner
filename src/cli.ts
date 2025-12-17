@@ -83,6 +83,7 @@ import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
+import { registerWeaveCommand } from "./commands/weave.js";
 import {
 	CLIExitSignal,
 	throwExit,
@@ -452,6 +453,12 @@ registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Discover command - modularized in Phase 2
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
+
+// Weave command group - Unified merge-weave workflow interface
+registerWeaveCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	getProgramOpts: () => program.opts(),
+});
 
 // Merge command - Execute merge pyramid with git operations
 registerMergeCommand(
