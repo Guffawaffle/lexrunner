@@ -88,7 +88,10 @@ Common Issues:
 				const authStatus = await resolvedAPI.checkAuth();
 				if (!authStatus.authenticated) {
 					console.warn(
-						"Warning: GitHub API not authenticated. Set GITHUB_TOKEN environment variable for better rate limits."
+						"⚠️  Warning: GitHub API not authenticated. Set GITHUB_TOKEN environment variable for better rate limits.\n\n" +
+						"To fix:\n" +
+						"  export GITHUB_TOKEN=ghp_...\n\n" +
+						"See: https://github.com/Guffawaffle/lexrunner#authentication\n"
 					);
 				}
 
