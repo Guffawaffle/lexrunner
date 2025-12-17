@@ -153,6 +153,31 @@ After installation, you'll see a reminder to initialize your workspace:
 
 ### For New Users
 
+**Quick Start: Merge-Weave Workflow (Recommended)**
+
+The fastest path to merging multiple PRs:
+
+```bash
+# 1. Discover open PRs
+lex-pr weave discover
+
+# 2. Generate merge plan
+lex-pr weave plan --from-github --output plan.json
+
+# 3. Preview execution (dry-run)
+lex-pr weave apply --dry-run
+
+# 4. Execute gates
+lex-pr weave apply
+
+# 5. Merge PRs (optional)
+lex-pr merge --plan plan.json --execute
+```
+
+**📖 Full guide:** [MERGE_WEAVE_QUICKSTART.md](./MERGE_WEAVE_QUICKSTART.md)
+
+**Traditional Workflow:**
+
 ```bash
 # 1. Initialize workspace (creates .smartergpt.local/ with v1 structure)
 npx lex-pr init
