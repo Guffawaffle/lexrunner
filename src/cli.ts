@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { Command, CommanderError } from "commander";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -82,6 +83,7 @@ import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
+import { registerWeaveCommand } from "./commands/weave.js";
 import {
 	CLIExitSignal,
 	throwExit,
@@ -452,6 +454,12 @@ registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
 // Discover command - modularized in Phase 2
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
 
+// Weave command group - Unified merge-weave workflow interface
+registerWeaveCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	getProgramOpts: () => program.opts(),
+});
+
 // Merge command - Execute merge pyramid with git operations
 registerMergeCommand(
 	program,
@@ -480,9 +488,7 @@ registerBudgetCommand(program, () => jsonModeActive);
 // Init command - Interactive workspace setup
 program
 	.command("init")
-	.description(
-		"Initialize lexrunner workspace with interactive setup wizard"
-	)
+	.description("Initialize lexrunner workspace with interactive setup wizard")
 	.option("--force", "Overwrite existing configuration files")
 	.option(
 		"--non-interactive",
