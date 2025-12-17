@@ -3,6 +3,9 @@
  *
  * This provides the canonical `lex-pr weave` command group that orchestrates
  * the complete merge-weave workflow: discover → plan → apply
+ *
+ * ALN-003 Phase 2: Extended with additional subcommands (status, report, order)
+ * to support full category-action pattern while maintaining PR #590 core workflow.
  */
 
 import { Command } from "commander";
@@ -16,6 +19,9 @@ import { createGitOperations } from "../git/operations.js";
 import { computeMergeOrder } from "../mergeOrder.js";
 import { ExecutionState } from "../executionState.js";
 import { executeGatesWithPolicy } from "../gates.js";
+import { registerStatusCommand } from "./status.js";
+import { registerReportCommand } from "./report.js";
+import { registerMergeOrderCommand } from "./mergeOrder.js";
 import fs from "fs";
 import path from "path";
 
@@ -437,4 +443,22 @@ Subcommands:
 				throwExit(1);
 			}
 		});
+
+	// ALN-003 Phase 2: Add additional weave subcommands for full category coverage
+	// These were originally intended to be added by PR #584
+	// Note: discover, plan, and apply are implemented inline above.
+	// We only add status, report, and order here.
+	
+	// weave status - Show execution status
+	registerStatusCommand(weave, deps.jsonModeActive);
+	
+	// weave report - Generate gate reports
+	registerReportCommand(weave, { jsonModeActive: deps.jsonModeActive });
+	
+	// weave order - Compute merge order (alias for merge-order)
+	registerMergeOrderCommand(weave, deps.jsonModeActive, (error: unknown) => {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`\n❌ Error: ${message}\n`);
+		throwExit(1);
+	});
 }
