@@ -930,3 +930,78 @@ export function securityScanFailedError(
 		{ ...ctx }
 	);
 }
+
+// =============================================================================
+// Tool Budget Error Adapters
+// =============================================================================
+
+export interface ToolBudgetExceededContext {
+	tool?: string;
+	violation:
+		| "tool_denied"
+		| "tool_not_allowed"
+		| "max_calls_exceeded"
+		| "max_tokens_exceeded";
+	limit?: number;
+	current?: number;
+	allowed?: string[];
+	denied?: string[];
+}
+
+/**
+ * Create an AXError for tool budget violations
+ */
+export function toolBudgetExceededError(
+	message: string,
+	ctx: ToolBudgetExceededContext
+): AXError {
+	const nextActions: string[] = [];
+
+	switch (ctx.violation) {
+		case "tool_denied":
+			nextActions.push(
+				`Tool '${ctx.tool}' is explicitly denied in the executor's tool budget`
+			);
+			nextActions.push("Review the executor manifest's toolBudget.denied list");
+			if (ctx.denied && ctx.denied.length > 0) {
+				nextActions.push(`Denied tools: ${ctx.denied.join(", ")}`);
+			}
+			break;
+		case "tool_not_allowed":
+			nextActions.push(
+				`Tool '${ctx.tool}' is not in the executor's allowed tool list`
+			);
+			nextActions.push(
+				"Add the tool to toolBudget.allowed in the executor manifest"
+			);
+			if (ctx.allowed && ctx.allowed.length > 0) {
+				nextActions.push(`Allowed tools: ${ctx.allowed.join(", ")}`);
+			}
+			break;
+		case "max_calls_exceeded":
+			nextActions.push(
+				`Maximum tool calls limit (${ctx.limit}) has been reached`
+			);
+			nextActions.push(`Current calls: ${ctx.current}`);
+			nextActions.push(
+				"Increase toolBudget.limits.maxToolCalls in the executor manifest"
+			);
+			break;
+		case "max_tokens_exceeded":
+			nextActions.push(
+				`Maximum token output limit (${ctx.limit}) would be exceeded`
+			);
+			nextActions.push(`Current tokens: ${ctx.current}`);
+			nextActions.push(
+				"Increase toolBudget.limits.maxTokensOut in the executor manifest"
+			);
+			break;
+	}
+
+	return createAXError(
+		ErrorCodes.TOOL_BUDGET_EXCEEDED,
+		message,
+		nextActions,
+		{ ...ctx }
+	);
+}

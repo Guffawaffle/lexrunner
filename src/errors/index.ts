@@ -52,6 +52,8 @@ export {
 	securitySecretNotFoundError,
 	securitySarifParseError,
 	securityScanFailedError,
+	// Tool budget adapters
+	toolBudgetExceededError,
 	// Governance support (Disciplined Failure Pattern)
 	type WithGovernance,
 	type GovernanceContext,
@@ -76,6 +78,8 @@ export {
 	type SecuritySecretNotFoundContext,
 	type SecuritySarifParseErrorContext,
 	type SecurityScanFailedContext,
+	// Tool budget context types
+	type ToolBudgetExceededContext,
 } from "./adapters.js";
 
 // =============================================================================
@@ -188,6 +192,8 @@ export const ErrorCodes = {
 	// ─────────────────────────────────────────────────────────────────────────
 	/** Budget limit exceeded */
 	BUDGET_EXCEEDED: "BUDGET_EXCEEDED",
+	/** Tool budget limit exceeded */
+	TOOL_BUDGET_EXCEEDED: "TOOL_BUDGET_EXCEEDED",
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Security errors
