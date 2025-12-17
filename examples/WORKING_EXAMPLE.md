@@ -24,11 +24,11 @@ lex-pr weave discover --owner Guffawaffle --repo lexrunner
 📋 Discovered N Pull Request(s)
 
 🟢 OPEN #XXX: Feature A
-       https://github.com/Guffawaffle/lexrunner/pull/XXX
+       Branch: feature/feature-a
        Labels: feature, ready-to-merge
 
 🟢 OPEN #YYY: Fix Bug B
-       https://github.com/Guffawaffle/lexrunner/pull/YYY
+       Branch: bugfix/fix-b
        Labels: bugfix, ready-to-merge
 
 Next step:
