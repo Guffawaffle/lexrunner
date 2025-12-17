@@ -35,6 +35,7 @@ import * as cleanup from './utils/cleanup.js';
 
 // Scenario fixtures
 import * as scenarios from './scenarios/mergeWorkflows.js';
+import * as syntheticWeave from './scenarios/syntheticWeave.js';
 
 /**
  * Organized fixture exports
@@ -200,7 +201,9 @@ export const fixtures = {
     withGateFailures: scenarios.withGateFailures,
     withRetries: scenarios.withRetries,
     withBlockedPRs: scenarios.withBlockedPRs,
-    empty: scenarios.empty
+    empty: scenarios.empty,
+    syntheticSixPRWeave: syntheticWeave.syntheticSixPRWeave,
+    getFileChangesForPR: syntheticWeave.getFileChangesForPR
   }
 };
 
@@ -208,6 +211,7 @@ export const fixtures = {
 export type { MockPR } from './prs/basic.js';
 export type { MockOctokit } from './utils/mockGitHub.js';
 export type { Scenario } from './scenarios/mergeWorkflows.js';
+export type { SyntheticWeaveScenario } from './scenarios/syntheticWeave.js';
 
 /**
  * Default export for convenience
