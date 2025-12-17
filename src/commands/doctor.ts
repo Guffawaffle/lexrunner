@@ -163,7 +163,7 @@ export function registerDoctorCommand(
 		.option("--environment-quality", "Run environmental hostility scoring")
 		.action(async (opts) => {
 			// Show deprecation warning if called as top-level command (not as workspace subcommand)
-			if (program.name() === "lex-pr" && !opts.json && jsonModeActive && !jsonModeActive()) {
+			if (program.name() === "lex-pr" && !opts.json && !(jsonModeActive && jsonModeActive())) {
 				console.warn("⚠️  'doctor' is deprecated. Use: lex-pr workspace doctor");
 			}
 			
