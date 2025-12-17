@@ -494,7 +494,10 @@ export class GitOperations {
 	async getCurrentHead(): Promise<string> {
 		try {
 			const log = await this.git.log(['-1']);
-			return log.latest?.hash || 'HEAD';
+			if (!log.latest?.hash) {
+				throw new GitOperationError('Unable to determine current HEAD - repository may be empty');
+			}
+			return log.latest.hash;
 		} catch (error) {
 			throw new GitOperationError(`Failed to get current HEAD: ${error instanceof Error ? error.message : String(error)}`);
 		}
