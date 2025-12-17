@@ -128,6 +128,19 @@ const scenario = fixtures.scenarios.complexMerge({
 });
 
 // scenario contains: { plan, prs, gates, expected }
+
+// Get the synthetic 6-PR weave scenario with 2 conflicts
+const syntheticScenario = fixtures.scenarios.syntheticSixPRWeave();
+// Returns: {
+//   plan: Plan,
+//   files: Record<string, string>,
+//   conflicts: Array<{ file, prs, resolution }>,
+//   expectedBudget: { maxPrompts, maxTokens },
+//   expected: { totalItems, levels, allGatesPass, conflictsResolved }
+// }
+
+// Get file changes for a specific PR in the synthetic scenario
+const changes = fixtures.scenarios.getFileChangesForPR('feature-x');
 ```
 
 ### Utils (`fixtures.utils`)
@@ -253,6 +266,34 @@ describe('Full merge workflow', () => {
     
     expect(result.merged).toBe(scenario.expected.merged);
     expect(result.blocked).toBe(scenario.expected.blocked);
+  });
+});
+```
+
+### Synthetic 6-PR Weave with Conflicts
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { fixtures } from '../fixtures';
+
+describe('E2E: Synthetic 6-PR Weave', () => {
+  it('executes 6-PR pyramid with 2 conflicts', async () => {
+    const scenario = fixtures.scenarios.syntheticSixPRWeave();
+    
+    // scenario.plan: Complete Plan with 6 items in 4 levels
+    // scenario.files: Initial repository files
+    // scenario.conflicts: 2 predictable conflicts with resolutions
+    // scenario.expectedBudget: { maxPrompts: 3, maxTokens: 5000 }
+    // scenario.expected: { totalItems: 6, levels: 4, allGatesPass: true, conflictsResolved: 2 }
+    
+    // Get file changes for each PR
+    const featureXChanges = fixtures.scenarios.getFileChangesForPR('feature-x');
+    
+    // Execute the weave workflow with budget tracking
+    const result = await executeWeave(scenario.plan);
+    
+    expect(result.levels).toHaveLength(4);
+    expect(result.allGatesGreen).toBe(true);
   });
 });
 ```
