@@ -345,15 +345,6 @@ registerGovernanceReportCommand(program);
 // Governance cleanup command (QOL-002) - modular implementation
 registerGovernanceCleanupCommand(program);
 
-// Plan generation command - modular implementation
-registerPlanCommand(program, {
-	jsonModeActive: () => jsonModeActive,
-	setJsonMode: (active: boolean) => {
-		jsonModeActive = active;
-	},
-	exitWith,
-});
-
 // Config inspect command
 program
 	.command("config:inspect")
@@ -419,14 +410,10 @@ program
 	});
 
 // Plan review command - Interactive plan validation and editing
-// Plan review command - modularized in Phase 2
 registerPlanReviewCommand(program, {
 	exitWith,
 	getProgramOpts: () => program.opts(),
 });
-
-// Merge order command - modular implementation
-registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
 
 // Plan diff command - modular implementation
 registerPlanDiffCommand(program, {
@@ -442,17 +429,6 @@ registerAutopilotCommand(program, {
 	getAuditKey: () => program.opts().auditKey as string | undefined,
 	finalizeAuditGuard,
 });
-
-// Execute plan command (replaces gate command)
-// Execute command - modularized in Phase 2
-registerExecuteCommand(program, {
-	jsonModeActive: () => jsonModeActive,
-	exitWith,
-	getProgramOpts: () => program.opts(),
-});
-
-// Status command - modularized in Phase 2.5
-registerStatusCommand(program, () => jsonModeActive);
 
 // Schema command - modularized in Phase 3.3
 registerSchemaCommand(program, {
@@ -583,18 +559,23 @@ registerExecuteCommand(gateCmd, {
 // ============================================================================
 // These commands are maintained for backward compatibility but show
 // deprecation warnings directing users to the canonical category-action forms.
+// The deprecation warnings are built into the command implementations themselves
+// by checking if program.name() === "lex-pr" (top-level) vs a category name.
 
-// Helper to show deprecation warning
-function showDeprecationWarning(oldCmd: string, newCmd: string, opts: any) {
-	if (!opts.json && !jsonModeActive) {
-		console.warn(`⚠️  '${oldCmd}' is deprecated. Use: ${newCmd}`);
-	}
-}
+// Note: We DON'T re-register weave subcommands (discover, plan, status, report, merge-order)
+// as top-level commands because that would create duplicate command errors.
+// Instead, users can still use the old top-level commands if we register them separately.
+// However, since the register functions check the parent program name, we just register them
+// once and the commands themselves will show the deprecation warning.
 
-// Legacy: discover -> weave discover
+// Legacy commands that need explicit registration (not part of weave):
+// - execute -> gate run (already registered above on gateCmd)
+// - doctor -> workspace doctor (already registered above on workspaceCmd)
+
+// But we DO need top-level discover, plan, status, report, merge-order for backward compat
+// Let's register them separately with deprecation built-in:
+
 registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
-
-// Legacy: plan -> weave plan
 registerPlanCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	setJsonMode: (active: boolean) => {
@@ -602,24 +583,14 @@ registerPlanCommand(program, {
 	},
 	exitWith,
 });
-
-// Legacy: status -> weave status
 registerStatusCommand(program, () => jsonModeActive);
-
-// Legacy: report -> weave report
 registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
-
-// Legacy: merge-order -> weave order
 registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
-
-// Legacy: execute -> gate run
 registerExecuteCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	exitWith,
 	getProgramOpts: () => program.opts(),
 });
-
-// Legacy: doctor -> workspace doctor
 registerDoctorCommand(program, () => jsonModeActive);
 
 // ============================================================================

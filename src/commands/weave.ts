@@ -446,6 +446,8 @@ Subcommands:
 
 	// ALN-003 Phase 2: Add additional weave subcommands for full category coverage
 	// These were originally intended to be added by PR #584
+	// Note: discover, plan, and apply are implemented inline above.
+	// We only add status, report, and order here.
 	
 	// weave status - Show execution status
 	registerStatusCommand(weave, deps.jsonModeActive);
