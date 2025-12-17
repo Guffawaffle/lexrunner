@@ -487,6 +487,41 @@ export class GitOperations {
 			throw new GitOperationError(`Cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
+
+	/**
+	 * Get current HEAD commit SHA
+	 */
+	async getCurrentHead(): Promise<string> {
+		try {
+			const log = await this.git.log(['-1']);
+			return log.latest?.hash || 'HEAD';
+		} catch (error) {
+			throw new GitOperationError(`Failed to get current HEAD: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Get diff between two commits
+	 */
+	async getDiff(baseSha: string, headSha: string): Promise<string> {
+		try {
+			const diff = await this.git.diff([baseSha, headSha]);
+			return diff;
+		} catch (error) {
+			throw new GitOperationError(`Failed to get diff: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Reset repository to a specific commit (hard reset)
+	 */
+	async resetHard(targetSha: string): Promise<void> {
+		try {
+			await this.git.reset(['--hard', targetSha]);
+		} catch (error) {
+			throw new GitOperationError(`Failed to reset to ${targetSha}: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
 }
 
 export class GitOperationError extends Error {
