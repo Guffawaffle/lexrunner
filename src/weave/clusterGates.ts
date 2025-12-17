@@ -372,8 +372,8 @@ async function createDraftPRForClusterFailure(
 
 		// Create draft PR
 		const githubAPI = await createGitHubAPI();
-		if (!githubAPI) {
-			console.warn("⚠️  GitHub API not available, skipping draft PR");
+		if (!githubAPI || !githubAPI.config?.owner || !githubAPI.config?.repo) {
+			console.warn("⚠️  GitHub API not available or not configured, skipping draft PR");
 			return;
 		}
 

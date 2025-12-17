@@ -116,7 +116,7 @@ function generatePRBody(bundle: ClusterFailureBundle, artifactPaths: string[]): 
 	sections.push(`The following artifacts have been stored in the \`.weave/\` directory:`);
 	sections.push("");
 	for (const artifactPath of artifactPaths) {
-		const relativePath = artifactPath.replace(process.cwd(), ".");
+		const relativePath = path.relative(process.cwd(), artifactPath);
 		sections.push(`- \`${relativePath}\``);
 	}
 	sections.push("");
