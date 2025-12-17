@@ -499,14 +499,37 @@ program
 		"--profile-dir <dir>",
 		"Profile directory (default: .smartergpt.local)"
 	)
+	.option("--json", "Output JSON format")
 	.action(async (opts) => {
+		// Check both command-level and global JSON mode
+		const isJsonMode = opts.json || jsonModeActive;
+		
 		try {
 			const result = await runInit({
 				force: opts.force,
 				nonInteractive: opts.nonInteractive,
 				githubToken: opts.githubToken,
 				profileDir: opts.profileDir,
+				jsonMode: isJsonMode,
 			});
+
+			if (isJsonMode) {
+				const { writeSuccessEnvelope, writeErrorEnvelope, errorToJsonError } = await import("./cli/jsonEnvelope.js");
+				if (result.success) {
+					writeSuccessEnvelope("lex-pr init", {
+						profileDir: result.profileDir,
+						message: result.message,
+					});
+					return;
+				} else {
+					writeErrorEnvelope("lex-pr init", {
+						code: "EINIT",
+						message: result.message,
+						details: { profileDir: result.profileDir },
+					});
+					throwExit(1);
+				}
+			}
 
 			if (!result.success) {
 				console.error(`\n❌ ${result.message}\n`);
@@ -515,6 +538,24 @@ program
 
 			return;
 		} catch (error) {
+			// Skip CLIExitSignal in JSON mode to avoid duplicate output
+			if (error instanceof CLIExitSignal) {
+				throw error;
+			}
+			
+			if (isJsonMode) {
+				const { writeErrorEnvelope, errorToJsonError } = await import("./cli/jsonEnvelope.js");
+				if (error instanceof WriteProtectionError) {
+					writeErrorEnvelope("lex-pr init", {
+						code: "EWRITE_PROTECTED",
+						message: error.message,
+					});
+					throwExit(2);
+				}
+				writeErrorEnvelope("lex-pr init", errorToJsonError(error, "EINIT_FAILED"));
+				throwExit(1);
+			}
+			
 			if (error instanceof WriteProtectionError) {
 				console.error(`\n❌ ${error.message}\n`);
 				throwExit(2);
