@@ -166,9 +166,9 @@ Subcommands:
 					}
 
 					for (const pr of pullRequests) {
-						const status = pr.draft ? "🟡 DRAFT" : "🟢 OPEN";
+						const status = pr.state === "open" ? "🟢 OPEN" : "🔴 CLOSED";
 						console.log(`${status} #${pr.number}: ${pr.title}`);
-						console.log(`       ${pr.url}`);
+						console.log(`       Branch: ${pr.branch}`);
 						if (pr.labels && pr.labels.length > 0) {
 							console.log(
 								`       Labels: ${pr.labels.join(", ")}`
