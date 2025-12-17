@@ -102,7 +102,7 @@ export function registerAssignBatchCommand(program: Command): void {
 	const assignBatch = program
 		.command("orchestrate:assign-batch")
 		.description(
-			"Bulk-assign GitHub Copilot agents to batched issues (canonical: lex-pr fanout assign)"
+			"Bulk-assign GitHub Copilot agents to batched issues [DEPRECATED: Use 'lex-pr fanout assign']"
 		)
 		.option("--batch <file>", "Batch plan JSON file")
 		.option(
@@ -126,6 +126,11 @@ export function registerAssignBatchCommand(program: Command): void {
 			// Get global options for JSON mode
 			const globalOpts = command.optsWithGlobals();
 			const isJsonMode = globalOpts.json || false;
+			
+			// Show deprecation warning
+			if (!isJsonMode) {
+				console.warn("⚠️  'orchestrate:assign-batch' is deprecated. Use: lex-pr fanout assign");
+			}
 
 			try {
 				// Validate inputs

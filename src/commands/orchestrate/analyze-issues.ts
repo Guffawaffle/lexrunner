@@ -127,12 +127,17 @@ export function registerAnalyzeIssuesCommand(
 	program
 		.command("orchestrate:analyze-issues")
 		.description(
-			"Analyze GitHub issues for fanout (canonical: lex-pr fanout analyze)"
+			"Analyze GitHub issues for fanout [DEPRECATED: Use 'lex-pr fanout analyze']"
 		)
 		.option("--repo <owner/repo>", "Repository (format: owner/repo)")
 		.option("--labels <labels>", "Filter by labels (comma-separated)")
 		.option("--json", "Output JSON format")
 		.action(async (opts) => {
+			// Show deprecation warning
+			if (!opts.json && !jsonModeActive()) {
+				console.warn("⚠️  'orchestrate:analyze-issues' is deprecated. Use: lex-pr fanout analyze");
+			}
+			
 			try {
 				// Parse repository option
 				let owner: string | undefined;

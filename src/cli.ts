@@ -281,23 +281,23 @@ program
 	.addHelpText(
 		"after",
 		`
-Examples:
-	$ lex-pr init                           Initialize workspace with interactive setup
+Examples (Canonical Category-Action Pattern):
+	$ lex-pr workspace init                 Initialize workspace with interactive setup
+	$ lex-pr workspace doctor               Validate environment and configuration
 	$ lex-pr idea                           Capture feature idea interactively
 	$ lex-pr idea --title "..." --description "..." --dry-run
-	$ lex-pr doctor                         Validate environment and configuration
 	$ lex-pr config show                    Display configuration with precedence chain
 	$ lex-pr config show --key scope.target Show specific configuration value
 	$ lex-pr config show --json             Output configuration in JSON format
 	$ lex-pr config:inspect                 Display merged configuration with provenance map
-	$ lex-pr discover                       Find open PRs matching scope
-	$ lex-pr discover --suggest             Generate dependency suggestions with heuristics
-	$ lex-pr plan --from-github             Generate merge plan from GitHub PRs
+	$ lex-pr weave discover                 Find open PRs matching scope
+	$ lex-pr weave discover --suggest       Generate dependency suggestions with heuristics
+	$ lex-pr weave plan --from-github       Generate merge plan from GitHub PRs
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
-	$ lex-pr execute plan.json              Run quality gates on plan
-	$ lex-pr orchestrate analyze            Analyze issues for parallel work planning
-	$ lex-pr orchestrate analyze --labels priority:P1 --json
+	$ lex-pr gate run plan.json             Run quality gates on plan
+	$ lex-pr fanout analyze                 Analyze issues for parallel work planning
+	$ lex-pr fanout analyze --labels priority:P1 --json
 	$ lex-pr security check-rotation        Check token rotation status
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
@@ -315,13 +315,24 @@ Power User Commands:
 	$ lex-pr retry --filter failed          Retry failed gates
 	$ lex-pr completion bash                Generate bash completion script
 
-Workflow:
+Canonical Workflow:
 	1. Ideate:      lex-pr idea (capture feature ideas as GitHub Issues)
-	2. Discover:    lex-pr discover (optionally add --suggest for dependencies)
-	3. Plan:        lex-pr plan --from-github --json > plan.json
+	2. Discover:    lex-pr weave discover (optionally add --suggest for dependencies)
+	3. Plan:        lex-pr weave plan --from-github --json > plan.json
 	4. Review:      lex-pr plan-review plan.json
-	5. Execute:     lex-pr execute plan.json
-	6. Report:      lex-pr report artifacts --out md
+	5. Execute:     lex-pr gate run plan.json
+	6. Report:      lex-pr weave report artifacts --out md
+
+Legacy Commands (Deprecated, use canonical forms above):
+	$ lex-pr init       → lex-pr workspace init
+	$ lex-pr doctor     → lex-pr workspace doctor
+	$ lex-pr discover   → lex-pr weave discover
+	$ lex-pr plan       → lex-pr weave plan
+	$ lex-pr status     → lex-pr weave status
+	$ lex-pr report     → lex-pr weave report
+	$ lex-pr execute    → lex-pr gate run
+	$ lex-pr orchestrate:analyze-issues → lex-pr fanout analyze
+	$ lex-pr orchestrate:assign-batch   → lex-pr fanout assign
 `
 	);
 
@@ -448,17 +459,172 @@ registerSchemaCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 });
 
-// Report command - modularized in Phase 3.4
-registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
-
-// Discover command - modularized in Phase 2
-registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
+// ============================================================================
+// Category-Action Pattern Commands (ALN-003 Phase 2)
+// ============================================================================
 
 // Weave command group - Unified merge-weave workflow interface
+// This is the primary interface for merge-weave operations
 registerWeaveCommand(program, {
 	jsonModeActive: () => jsonModeActive,
 	getProgramOpts: () => program.opts(),
 });
+
+// Workspace category - Local workspace management
+const workspaceCmd = program
+	.command("workspace")
+	.description("Workspace and profile configuration");
+
+// workspace init - Already registered as top-level, need to create wrapper
+workspaceCmd
+	.command("init")
+	.description("Initialize lexrunner workspace with interactive setup wizard")
+	.option("--force", "Overwrite existing configuration files")
+	.option(
+		"--non-interactive",
+		"Run without prompts (use environment variables)"
+	)
+	.option("--github-token <token>", "GitHub token for authentication")
+	.option(
+		"--profile-dir <dir>",
+		"Profile directory (default: .smartergpt.local)"
+	)
+	.option("--json", "Output JSON format")
+	.action(async (opts) => {
+		// Delegate to the init command handler (imported from runInit)
+		const isJsonMode = opts.json || jsonModeActive;
+		
+		try {
+			const result = await runInit({
+				force: opts.force,
+				nonInteractive: opts.nonInteractive,
+				githubToken: opts.githubToken,
+				profileDir: opts.profileDir,
+				jsonMode: isJsonMode,
+			});
+
+			if (isJsonMode) {
+				const { writeSuccessEnvelope, writeErrorEnvelope } = await import("./cli/jsonEnvelope.js");
+				if (result.success) {
+					writeSuccessEnvelope("lex-pr workspace init", {
+						profileDir: result.profileDir,
+						message: result.message,
+					});
+					return;
+				} else {
+					writeErrorEnvelope("lex-pr workspace init", {
+						code: "EINIT",
+						message: result.message,
+						details: { profileDir: result.profileDir },
+					});
+					throwExit(1);
+				}
+			}
+
+			if (!result.success) {
+				console.error(`\n❌ ${result.message}\n`);
+				throwExit(1);
+			}
+
+			return;
+		} catch (error) {
+			if (error instanceof CLIExitSignal) {
+				throw error;
+			}
+			
+			if (isJsonMode) {
+				const { writeErrorEnvelope, errorToJsonError } = await import("./cli/jsonEnvelope.js");
+				if (error instanceof WriteProtectionError) {
+					writeErrorEnvelope("lex-pr workspace init", {
+						code: "EWRITE_PROTECTED",
+						message: error.message,
+					});
+					throwExit(2);
+				}
+				writeErrorEnvelope("lex-pr workspace init", errorToJsonError(error, "EINIT_FAILED"));
+				throwExit(1);
+			}
+			
+			if (error instanceof WriteProtectionError) {
+				console.error(`\n❌ ${error.message}\n`);
+				throwExit(2);
+			}
+			console.error(
+				`\n❌ Initialization failed: ${
+					error instanceof Error ? error.message : String(error)
+				}\n`
+			);
+			throwExit(1);
+		}
+	});
+
+// workspace doctor - Environment validation
+registerDoctorCommand(workspaceCmd, () => jsonModeActive);
+
+// Fanout category - Worker/issue distribution for parallel work
+const fanoutCmd = program
+	.command("fanout")
+	.description("Worker and issue distribution for parallel work");
+
+registerAnalyzeIssuesCommand(fanoutCmd, () => jsonModeActive);
+registerAssignBatchCommand(fanoutCmd);
+
+// Gate category - Quality gate execution
+const gateCmd = program.command("gate").description("Quality gate execution");
+
+registerExecuteCommand(gateCmd, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith,
+	getProgramOpts: () => program.opts(),
+});
+
+// ============================================================================
+// Legacy Commands (Deprecated - ALN-003 Phase 2)
+// ============================================================================
+// These commands are maintained for backward compatibility but show
+// deprecation warnings directing users to the canonical category-action forms.
+
+// Helper to show deprecation warning
+function showDeprecationWarning(oldCmd: string, newCmd: string, opts: any) {
+	if (!opts.json && !jsonModeActive) {
+		console.warn(`⚠️  '${oldCmd}' is deprecated. Use: ${newCmd}`);
+	}
+}
+
+// Legacy: discover -> weave discover
+registerDiscoverCommand(program, { jsonModeActive: () => jsonModeActive });
+
+// Legacy: plan -> weave plan
+registerPlanCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	setJsonMode: (active: boolean) => {
+		jsonModeActive = active;
+	},
+	exitWith,
+});
+
+// Legacy: status -> weave status
+registerStatusCommand(program, () => jsonModeActive);
+
+// Legacy: report -> weave report
+registerReportCommand(program, { jsonModeActive: () => jsonModeActive });
+
+// Legacy: merge-order -> weave order
+registerMergeOrderCommand(program, () => jsonModeActive, exitWith);
+
+// Legacy: execute -> gate run
+registerExecuteCommand(program, {
+	jsonModeActive: () => jsonModeActive,
+	exitWith,
+	getProgramOpts: () => program.opts(),
+});
+
+// Legacy: doctor -> workspace doctor
+registerDoctorCommand(program, () => jsonModeActive);
+
+// ============================================================================
+// Other Commands (Not Part of Category-Action Pattern)
+// ============================================================================
 
 // Merge command - Execute merge pyramid with git operations
 registerMergeCommand(
@@ -466,9 +632,6 @@ registerMergeCommand(
 	() => jsonModeActive,
 	() => program.opts()
 );
-
-// Doctor command - modularized in Phase 4.4
-registerDoctorCommand(program, () => jsonModeActive);
 
 // Config command - configuration inspection and debugging
 registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });
@@ -1049,13 +1212,21 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
 
-// Orchestration commands
+// ============================================================================
+// Legacy Orchestration Commands (Deprecated - ALN-003 Phase 2)
+// ============================================================================
+// orchestrate:analyze-issues and orchestrate:assign-batch are deprecated
+// in favor of fanout analyze and fanout assign (registered above).
+// We still register them here on the main program for backward compatibility
+// but they show deprecation warnings.
 registerAnalyzeIssuesCommand(program, () => jsonModeActive);
+registerAssignBatchCommand(program);
+
+// Keep other orchestrate commands that don't have category equivalents yet
 registerPlanBatchCommand(program, () => jsonModeActive);
 registerPinToolchainCommand(program);
 registerPredictConflictsCommand(program, () => jsonModeActive);
 registerGenerateDeliverablesCommand(program);
-registerAssignBatchCommand(program);
 
 // Audit operations command
 registerAuditCommands(program);
