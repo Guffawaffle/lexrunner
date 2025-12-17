@@ -296,8 +296,8 @@ Examples (Canonical Category-Action Pattern):
 	$ lex-pr plan-review plan.json          Interactively review and edit plan
 	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
 	$ lex-pr gate run plan.json             Run quality gates on plan
-	$ lex-pr fanout analyze                 Analyze issues for parallel work planning
-	$ lex-pr fanout analyze --labels priority:P1 --json
+	$ lex-pr orchestrate:analyze-issues     Analyze issues for parallel work planning (fanout commands coming soon)
+	$ lex-pr orchestrate:analyze-issues --labels priority:P1 --json
 	$ lex-pr security check-rotation        Check token rotation status
 	$ lex-pr security scan-plan             Scan a plan file for secrets
 	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
@@ -538,12 +538,15 @@ workspaceCmd
 registerDoctorCommand(workspaceCmd, () => jsonModeActive);
 
 // Fanout category - Worker/issue distribution for parallel work
+// NOTE: Full fanout implementation deferred - see note in PR description
+// For now, use legacy orchestrate:analyze-issues and orchestrate:assign-batch commands
+// Future work: Create dedicated fanout analyze and fanout assign commands
+// that don't use the orchestrate: prefix.
 const fanoutCmd = program
 	.command("fanout")
-	.description("Worker and issue distribution for parallel work");
+	.description("Worker and issue distribution for parallel work (commands coming soon - use orchestrate:* for now)");
 
-registerAnalyzeIssuesCommand(fanoutCmd, () => jsonModeActive);
-registerAssignBatchCommand(fanoutCmd);
+// Placeholder - no subcommands yet, users should use orchestrate:analyze-issues and orchestrate:assign-batch
 
 // Gate category - Quality gate execution
 const gateCmd = program.command("gate").description("Quality gate execution");
