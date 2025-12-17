@@ -64,6 +64,7 @@
 		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
 		"format": "echo 'Format: using editorconfig for consistent formatting'",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"validate:manifests": "tsx scripts/validate-manifests.ts",
 		"test": "vitest run",
 		"test:git": "vitest run -c vitest.git.config.ts tests/release-prepare.spec.ts tests/promptsResolver.spec.ts tests/e2e-comprehensive.test.ts tests/autopilot-e2e-level3-4.spec.ts tests/deterministic-build.test.ts",
 		"test:cli:slow": "vitest run -c vitest.slow-cli.config.ts",
