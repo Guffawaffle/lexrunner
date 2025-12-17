@@ -321,8 +321,7 @@ export function featureY() {
 		},
 		'integration': {
 			'src/integration.ts': `// Integration module
-import { featureX } from './utils';
-import { featureY } from './utils';
+import { featureX, featureY } from './utils';
 
 export function integrate() {
   return [featureX(), featureY()];
