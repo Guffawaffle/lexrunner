@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 /**
  * lexrunner MCP Server
  *
@@ -10,6 +11,7 @@
  *   npx -y /srv/lex-mcp/lexrunner
  *
  * Environment variables:
+ *   GITHUB_TOKEN         - GitHub API token for authentication
  *   LEX_PR_PROFILE_DIR   - Path to profile directory (default: auto-resolve)
  *   ALLOW_MUTATIONS      - Enable write operations (default: false, use with caution)
  */
@@ -51,7 +53,8 @@ try {
 // MCP Tool implementations
 const tools = {
 	"plan.create": {
-		description: "Create a plan from configuration files or auto-discover from GitHub PRs",
+		description:
+			"Create a plan from configuration files or auto-discover from GitHub PRs",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -71,7 +74,8 @@ const tools = {
 				},
 				query: {
 					type: "string",
-					description: "GitHub search query (e.g., 'is:open label:stack:*')",
+					description:
+						"GitHub search query (e.g., 'is:open label:stack:*')",
 				},
 				labels: {
 					type: "array",
@@ -94,30 +98,36 @@ const tools = {
 				},
 				githubToken: {
 					type: "string",
-					description: "GitHub API token (or use GITHUB_TOKEN env var)",
+					description:
+						"GitHub API token (or use GITHUB_TOKEN env var)",
 				},
 				owner: {
 					type: "string",
-					description: "GitHub repository owner (auto-detected from git remote)",
+					description:
+						"GitHub repository owner (auto-detected from git remote)",
 				},
 				repo: {
 					type: "string",
-					description: "GitHub repository name (auto-detected from git remote)",
+					description:
+						"GitHub repository name (auto-detected from git remote)",
 				},
 				requiredGates: {
 					type: "array",
-					description: "List of required gates (default: lint,typecheck,test)",
+					description:
+						"List of required gates (default: lint,typecheck,test)",
 					items: {
 						type: "string",
 					},
 				},
 				maxWorkers: {
 					type: "number",
-					description: "Maximum parallel workers for execution (default: 2)",
+					description:
+						"Maximum parallel workers for execution (default: 2)",
 				},
 				target: {
 					type: "string",
-					description: "Target branch for merging PRs (default: repo default branch)",
+					description:
+						"Target branch for merging PRs (default: repo default branch)",
 				},
 			},
 		},
@@ -144,10 +154,8 @@ const tools = {
 
 				if (args.fromGithub) {
 					// GitHub mode: auto-discover PRs
-					const {
-						createGitHubClient,
-						generatePlanFromGitHub,
-					} = await import("./dist/cli.js");
+					const { createGitHubClient, generatePlanFromGitHub } =
+						await import("./dist/cli.js");
 
 					const client = await createGitHubClient({
 						token: args.githubToken,
@@ -179,10 +187,9 @@ const tools = {
 					});
 				} else {
 					// Traditional mode: load from configuration files
-					const {
-						loadInputs,
-						generatePlan,
-					} = await import("./dist/cli.js");
+					const { loadInputs, generatePlan } = await import(
+						"./dist/cli.js"
+					);
 					inputs = loadInputs(profilePath);
 					plan = generatePlan(inputs);
 				}
@@ -204,10 +211,8 @@ const tools = {
 				writeFileSync(planPath, planJson + "\n");
 
 				// Generate snapshot - use GitHub snapshot for GitHub mode
-				const {
-					generateSnapshot,
-					generateGitHubSnapshot,
-				} = await import("./dist/cli.js");
+				const { generateSnapshot, generateGitHubSnapshot } =
+					await import("./dist/cli.js");
 				let snapshot;
 				if (args.fromGithub) {
 					snapshot = generateGitHubSnapshot(plan);
@@ -583,11 +588,13 @@ const tools = {
 			properties: {
 				mode: {
 					type: "string",
-					description: "Persona mode (e.g., 'senior-dev', 'eager-pm')",
+					description:
+						"Persona mode (e.g., 'senior-dev', 'eager-pm')",
 				},
 				procedure: {
 					type: "string",
-					description: "Procedure identifier (e.g., 'merge-weave-main', 'pr-review')",
+					description:
+						"Procedure identifier (e.g., 'merge-weave-main', 'pr-review')",
 				},
 				repo: {
 					type: "string",
@@ -625,7 +632,8 @@ const tools = {
 	},
 
 	"lexrunner.getStatus": {
-		description: "Get current run state, summary, and next available actions",
+		description:
+			"Get current run state, summary, and next available actions",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -667,16 +675,26 @@ const tools = {
 				},
 				type: {
 					type: "string",
-					description: 'Filter by type: "plan", "decision", "failure", "gate", "report", "log"',
-					enum: ["plan", "decision", "failure", "gate", "report", "log"],
+					description:
+						'Filter by type: "plan", "decision", "failure", "gate", "report", "log"',
+					enum: [
+						"plan",
+						"decision",
+						"failure",
+						"gate",
+						"report",
+						"log",
+					],
 				},
 				path: {
 					type: "string",
-					description: "Filter by path pattern (supports * and ** wildcards)",
+					description:
+						"Filter by path pattern (supports * and ** wildcards)",
 				},
 				latestOnly: {
 					type: "boolean",
-					description: "Only return the most recent artifact of each type",
+					description:
+						"Only return the most recent artifact of each type",
 				},
 				inline: {
 					type: "boolean",
@@ -709,8 +727,9 @@ const tools = {
 	// MCP/CLI Parity Tools (AX-004)
 	// ─────────────────────────────────────────────────────────────────────────────
 
-	"discover": {
-		description: "Discover open pull requests from GitHub with optional dependency suggestions",
+	discover: {
+		description:
+			"Discover open pull requests from GitHub with optional dependency suggestions",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -730,14 +749,17 @@ const tools = {
 				},
 				suggest: {
 					type: "boolean",
-					description: "Generate dependency suggestions using heuristics",
+					description:
+						"Generate dependency suggestions using heuristics",
 					default: false,
 				},
 			},
 		},
 		call: async (args) => {
 			try {
-				const { createGitHubAPI, GitHubAPI } = await import("./dist/cli.js");
+				const { createGitHubAPI, GitHubAPI } = await import(
+					"./dist/cli.js"
+				);
 
 				let githubAPI = await createGitHubAPI();
 
@@ -761,12 +783,16 @@ const tools = {
 
 				// Fetch pull requests
 				const state = args.state || "open";
-				const pullRequests = await githubAPI.discoverPullRequests(state);
+				const pullRequests = await githubAPI.discoverPullRequests(
+					state
+				);
 
 				let result;
 
 				if (args.suggest) {
-					const { createFileAnalyzer } = await import("./dist/cli.js");
+					const { createFileAnalyzer } = await import(
+						"./dist/cli.js"
+					);
 
 					const analyzer = createFileAnalyzer(
 						githubAPI.getOctokit(),
@@ -779,7 +805,8 @@ const tools = {
 						sha: pr.sha,
 					}));
 
-					const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+					const suggestions =
+						await analyzer.suggestDependenciesWithHeuristics(prs);
 
 					result = {
 						pullRequests,
@@ -802,7 +829,11 @@ const tools = {
 					content: [
 						{
 							type: "text",
-							text: `Pull requests discovered:\n${JSON.stringify(result, null, 2)}`,
+							text: `Pull requests discovered:\n${JSON.stringify(
+								result,
+								null,
+								2
+							)}`,
 						},
 					],
 				};
@@ -812,8 +843,9 @@ const tools = {
 		},
 	},
 
-	"status": {
-		description: "Show current execution status and merge eligibility for a plan",
+	status: {
+		description:
+			"Show current execution status and merge eligibility for a plan",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -838,7 +870,10 @@ const tools = {
 				const plan = loadPlan(planContent);
 
 				const executionState = new ExecutionState(plan);
-				const evaluator = new MergeEligibilityEvaluator(plan, executionState);
+				const evaluator = new MergeEligibilityEvaluator(
+					plan,
+					executionState
+				);
 				const mergeSummary = evaluator.getMergeSummary();
 
 				const result = {
@@ -855,7 +890,11 @@ const tools = {
 					content: [
 						{
 							type: "text",
-							text: `Plan status:\n${JSON.stringify(result, null, 2)}`,
+							text: `Plan status:\n${JSON.stringify(
+								result,
+								null,
+								2
+							)}`,
 						},
 					],
 				};
@@ -865,7 +904,7 @@ const tools = {
 		},
 	},
 
-	"doctor": {
+	doctor: {
 		description: "Run environment and configuration sanity checks",
 		inputSchema: {
 			type: "object",
@@ -873,8 +912,13 @@ const tools = {
 		},
 		call: async (args) => {
 			try {
-				const { bootstrapWorkspace, detectProjectType, getEnvironmentSuggestions, createGitHubAPI, createGitOperations } =
-					await import("./dist/cli.js");
+				const {
+					bootstrapWorkspace,
+					detectProjectType,
+					getEnvironmentSuggestions,
+					createGitHubAPI,
+					createGitOperations,
+				} = await import("./dist/cli.js");
 
 				const checks = {
 					hasErrors: false,
@@ -889,15 +933,30 @@ const tools = {
 					const expectedVersion = nvmrcContent;
 
 					if (currentVersion === expectedVersion) {
-						checks.nodejs = { status: "ok", current: process.version, expected: `v${expectedVersion}` };
+						checks.nodejs = {
+							status: "ok",
+							current: process.version,
+							expected: `v${expectedVersion}`,
+						};
 					} else {
-						checks.nodejs = { status: "mismatch", current: process.version, expected: `v${expectedVersion}` };
+						checks.nodejs = {
+							status: "mismatch",
+							current: process.version,
+							expected: `v${expectedVersion}`,
+						};
 						checks.hasErrors = true;
-						checks.issues.push(`Node.js version mismatch: ${process.version} vs v${expectedVersion}`);
+						checks.issues.push(
+							`Node.js version mismatch: ${process.version} vs v${expectedVersion}`
+						);
 					}
 				} catch {
-					checks.nodejs = { status: "no_constraint", current: process.version };
-					checks.suggestions.push("Consider adding .nvmrc file for Node.js version consistency");
+					checks.nodejs = {
+						status: "no_constraint",
+						current: process.version,
+					};
+					checks.suggestions.push(
+						"Consider adding .nvmrc file for Node.js version consistency"
+					);
 				}
 
 				// Configuration check
@@ -948,14 +1007,20 @@ const tools = {
 						error: error.message,
 					};
 					checks.hasErrors = true;
-					checks.issues.push(`Git operations failed: ${error.message}`);
+					checks.issues.push(
+						`Git operations failed: ${error.message}`
+					);
 				}
 
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Doctor checks:\n${JSON.stringify(checks, null, 2)}`,
+							text: `Doctor checks:\n${JSON.stringify(
+								checks,
+								null,
+								2
+							)}`,
 						},
 					],
 				};
@@ -966,7 +1031,8 @@ const tools = {
 	},
 
 	"merge-order": {
-		description: "Compute dependency levels and merge order using Kahn's algorithm",
+		description:
+			"Compute dependency levels and merge order using Kahn's algorithm",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -985,7 +1051,9 @@ const tools = {
 					throw new Error(`Plan file not found: ${planFile}`);
 				}
 
-				const { loadPlan, computeMergeOrder } = await import("./dist/cli.js");
+				const { loadPlan, computeMergeOrder } = await import(
+					"./dist/cli.js"
+				);
 				const planContent = readFileSync(planFile, "utf-8");
 				const plan = loadPlan(planContent);
 
@@ -995,25 +1063,34 @@ const tools = {
 				const result = {
 					levels,
 					totalItems: plan.items.length,
-					maxParallelism: Math.max(...levels.map(level => level.length)),
+					maxParallelism: Math.max(
+						...levels.map((level) => level.length)
+					),
 				};
 
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Merge order:\n${JSON.stringify(result, null, 2)}`,
+							text: `Merge order:\n${JSON.stringify(
+								result,
+								null,
+								2
+							)}`,
 						},
 					],
 				};
 			} catch (error) {
-				throw new Error(`Failed to compute merge order: ${error.message}`);
+				throw new Error(
+					`Failed to compute merge order: ${error.message}`
+				);
 			}
 		},
 	},
 
 	"config.show": {
-		description: "Display configuration with precedence chain and provenance",
+		description:
+			"Display configuration with precedence chain and provenance",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -1059,7 +1136,11 @@ const tools = {
 						content: [
 							{
 								type: "text",
-								text: `Configuration:\n${JSON.stringify({ key: args.key, value }, null, 2)}`,
+								text: `Configuration:\n${JSON.stringify(
+									{ key: args.key, value },
+									null,
+									2
+								)}`,
 							},
 						],
 					};
@@ -1069,7 +1150,11 @@ const tools = {
 					content: [
 						{
 							type: "text",
-							text: `Configuration:\n${JSON.stringify(output, null, 2)}`,
+							text: `Configuration:\n${JSON.stringify(
+								output,
+								null,
+								2
+							)}`,
 						},
 					],
 				};
@@ -1080,7 +1165,8 @@ const tools = {
 	},
 
 	"workflow.guide": {
-		description: "Get context-aware workflow guidance for the current phase. Provides next steps, common issues, and recommendations.",
+		description:
+			"Get context-aware workflow guidance for the current phase. Provides next steps, common issues, and recommendations.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -1113,7 +1199,9 @@ const tools = {
 					],
 				};
 			} catch (error) {
-				throw new Error(`Failed to get workflow guide: ${error.message}`);
+				throw new Error(
+					`Failed to get workflow guide: ${error.message}`
+				);
 			}
 		},
 	},
