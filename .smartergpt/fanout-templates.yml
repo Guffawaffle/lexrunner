@@ -1,0 +1,263 @@
+# Fanout Templates for LexRunner
+#
+# These templates define patterns to detect in merged PRs and
+# automatically create follow-up issues.
+#
+# Schema: version 1
+# Documentation: .smartergpt/docs/fanout-templates.md
+
+version: 1
+
+templates:
+  # ==========================================================================
+  # NEW MCP TOOL DETECTION
+  # ==========================================================================
+  - id: new-mcp-tool-test
+    description: "Create integration tests for new MCP tools"
+    trigger:
+      pattern: 'tools\.push\(\{\s*name:\s*[''"]([^''"]+)[''"]'
+      files:
+        - "**/tools.ts"
+        - "**/mcp/tools.ts"
+        - "**/server.ts"
+      captures:
+        tool_name: "$1"
+      requires_judgment: false
+    issue:
+      title: "test: Add integration tests for {tool_name} MCP tool"
+      labels:
+        - testing
+        - mcp
+      body: |
+        ## Summary
+
+        Add integration tests for the new `{tool_name}` MCP tool.
+
+        ## Context
+
+        Added in PR #{pr_number} ({pr_title}).
+
+        ## Acceptance Criteria
+
+        - [ ] Happy path test
+        - [ ] Error handling test
+        - [ ] Edge case coverage
+
+        ## Files to Create
+
+        - `tests/integration/mcp/{tool_name}.spec.ts`
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: same
+    priority: 100
+
+  # ==========================================================================
+  # NEW ERROR CODE DOCUMENTATION
+  # ==========================================================================
+  - id: new-error-code-docs
+    description: "Document new error codes"
+    trigger:
+      pattern: 'ErrorCode\.(\w+)\s*='
+      files:
+        - "**/errors.ts"
+        - "**/error-codes.ts"
+      captures:
+        error_code: "$1"
+      requires_judgment: false
+    issue:
+      title: "docs: Document {error_code} error code"
+      labels:
+        - documentation
+      body: |
+        ## Summary
+
+        Document the new `{error_code}` error code.
+
+        ## Context
+
+        Added in PR #{pr_number}.
+
+        ## Acceptance Criteria
+
+        - [ ] Add to docs/error-codes.md
+        - [ ] Include suggested resolution steps
+        - [ ] Update TROUBLESHOOTING.md if user-facing
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: same
+    priority: 80
+
+  # ==========================================================================
+  # NEW CLI COMMAND DOCUMENTATION
+  # ==========================================================================
+  - id: new-cli-command
+    description: "Document new CLI commands in QUICK_START"
+    trigger:
+      pattern: '\.command\([''"]([^''"]+)[''"]'
+      files:
+        - "**/cli/**/*.ts"
+        - "**/commands/**/*.ts"
+      captures:
+        command_name: "$1"
+      requires_judgment: false
+    issue:
+      title: "docs: Add {command_name} to QUICK_START.md"
+      labels:
+        - documentation
+      body: |
+        ## Summary
+
+        Document the new `{command_name}` CLI command.
+
+        ## Context
+
+        Added in PR #{pr_number}.
+
+        ## Acceptance Criteria
+
+        - [ ] Add usage example to QUICK_START.md
+        - [ ] Add to CLI reference in README.md
+        - [ ] Include common use cases
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: same
+    priority: 70
+
+  # ==========================================================================
+  # CROSS-REPO API CHANGES (REQUIRES JUDGMENT)
+  # ==========================================================================
+  - id: cross-repo-api-change
+    description: "Coordinate API changes across consumer repos"
+    trigger:
+      pattern: 'export\s+(interface|type|function)\s+(\w+)'
+      files:
+        - "**/index.ts"
+      captures:
+        export_type: "$1"
+        export_name: "$2"
+      requires_judgment: true
+    issue:
+      title: "chore: Update {export_name} consumers"
+      labels:
+        - cross-repo
+        - api
+      body: |
+        ## Summary
+
+        Review and update consumers of `{export_name}` after API change.
+
+        ## Context
+
+        `{export_type} {export_name}` was modified in PR #{pr_number}.
+
+        **⚠️ This issue requires Senior Dev review** - assess whether
+        the change is breaking and identify affected consumers.
+
+        ## Consumer Repos
+
+        - [ ] Check lexsona
+        - [ ] Check lexrunner
+        - [ ] Check lex
+
+        ## Breaking Change Assessment
+
+        _Fill in after review:_
+        - [ ] Breaking change: Yes / No
+        - [ ] Consumers affected: (list)
+        - [ ] Migration needed: Yes / No
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: Guffawaffle/lexrunner
+    priority: 50
+    enabled: true
+
+  # ==========================================================================
+  # NEW ZSCHEMA EXPORTS
+  # ==========================================================================
+  - id: new-zod-schema
+    description: "Create validation tests for new Zod schemas"
+    trigger:
+      pattern: 'export\s+const\s+(\w+Schema)\s*=\s*z\.'
+      files:
+        - "**/schema*.ts"
+        - "**/schemas/**/*.ts"
+      captures:
+        schema_name: "$1"
+      requires_judgment: false
+    issue:
+      title: "test: Add validation tests for {schema_name}"
+      labels:
+        - testing
+        - schema
+      body: |
+        ## Summary
+
+        Add validation tests for the new `{schema_name}` Zod schema.
+
+        ## Context
+
+        Added in PR #{pr_number}.
+
+        ## Acceptance Criteria
+
+        - [ ] Valid input test
+        - [ ] Invalid input rejection test
+        - [ ] Edge case coverage (nulls, empties, boundaries)
+        - [ ] Error message quality test
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: same
+    priority: 90
+
+  # ==========================================================================
+  # NEW INTERVENTION TYPE
+  # ==========================================================================
+  - id: new-intervention-type
+    description: "Document new intervention types"
+    trigger:
+      pattern: '\|\s*[''"](\w+)[''"]'
+      files:
+        - "**/planner/types.ts"
+        - "**/intervention*.ts"
+      captures:
+        intervention_type: "$1"
+      requires_judgment: true
+    issue:
+      title: "docs: Document {intervention_type} intervention"
+      labels:
+        - documentation
+        - merge-weave
+      body: |
+        ## Summary
+
+        Document the new `{intervention_type}` intervention type.
+
+        ## Context
+
+        Added in PR #{pr_number}.
+
+        **⚠️ This requires review** - confirm this is a new intervention
+        type and not just a string match.
+
+        ## Acceptance Criteria
+
+        - [ ] Add to merge-weave-interventions.md
+        - [ ] Specify determinism level (D1/D2/D3)
+        - [ ] Document inputs/outputs
+        - [ ] Add usage examples
+
+        ## Related
+
+        - PR: {pr_url}
+      repo: same
+    priority: 60

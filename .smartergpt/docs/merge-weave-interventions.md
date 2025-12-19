@@ -142,16 +142,21 @@
 ## Fanout Interventions
 
 ### INT-018: Follow-up Work Suggestion
-**Level:** D2
+**Level:** D1 (with templates) / D2 (without templates)
 **Description:** Identify what new work is needed based on merged features
-**Policy:** `fanout.suggestions.triggers`
-**Handoff Ready:** ⚠️ Partially - pattern triggers are D1, suggestions are D2
+**Policy:** `fanout.suggestions.triggers`, `.smartergpt/fanout-templates.yml`
+**Handoff Ready:** ✅ Yes - with fanout templates (see [fanout-templates.md](fanout-templates.md))
 
 ### INT-019: Issue Creation
-**Level:** D2
+**Level:** D1 (with templates) / D2 (without templates)
 **Description:** Create well-formed GitHub issues for follow-up work
-**Policy:** `fanout.suggestions`
-**Handoff Ready:** ⚠️ Partially - need templates to make D1
+**Policy:** `.smartergpt/fanout-templates.yml`
+**Handoff Ready:** ✅ Yes - template-based issue generation
+
+**Implementation:** See `src/weave/fanout/` module for:
+- `schema.ts` - Template schema and types
+- `matcher.ts` - Pattern matching against PR diffs
+- `generator.ts` - Issue generation with placeholder substitution
 
 ---
 
@@ -159,14 +164,14 @@
 
 | Level | Interventions | Ready for Handoff | Blocking Factor |
 |-------|---------------|-------------------|-----------------|
-| D1 | 12 | ✅ All | None |
-| D2 | 5 | ⚠️ With policy | Need explicit parameters |
+| D1 | 14 | ✅ All | None |
+| D2 | 3 | ⚠️ With policy | Need explicit parameters |
 | D3 | 2 | ❌ No | Requires semantic reasoning |
 
 ### Path to Full D1/D2 Coverage
 
 1. **Define explicit patterns** for INT-010 (quality checks)
-2. **Create issue templates** for INT-019 (fanout issues)
+2. ~~**Create issue templates** for INT-019 (fanout issues)~~ ✅ Done (#611)
 3. **Add test fixture patterns** for INT-015, INT-016 (auto-fixes)
 4. **Track success rate** to validate D2 handoff readiness
 
