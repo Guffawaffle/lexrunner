@@ -23,6 +23,7 @@ import { registerStatusCommand } from "./status.js";
 import { registerReportCommand } from "./report.js";
 import { registerMergeOrderCommand } from "./mergeOrder.js";
 import { registerPolicyCommands } from "./weave-policy.js";
+import { registerFanoutCommands } from "./weave-fanout.js";
 import fs from "fs";
 import path from "path";
 
@@ -464,4 +465,7 @@ Subcommands:
 
 	// weave policy - Policy-based merge-weave execution
 	registerPolicyCommands(weave, { jsonModeActive: deps.jsonModeActive });
+
+	// weave fanout - Fanout templates for follow-up issue creation
+	registerFanoutCommands(weave);
 }
