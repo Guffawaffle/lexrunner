@@ -1,0 +1,28 @@
+{
+	"version": "1.0.0",
+	"task_id": "test-task-001",
+	"snapshot_hash": "abc123def456",
+	"snapshot_timestamp": "2025-01-15T10:00:00.000Z",
+	"verification": {
+		"command": "npm test",
+		"timeout_ms": 30000,
+		"expect": {
+			"exit_code": 0,
+			"must_include": ["All tests passed"],
+			"must_not_include": ["FAILED", "Error"]
+		}
+	},
+	"initial_state": {
+		"files": [
+			{
+				"path": "src/index.ts",
+				"hash": "file123hash"
+			},
+			{
+				"path": "test/index.test.ts",
+				"hash": "test456hash"
+			}
+		],
+		"git_ref": "main"
+	}
+}

@@ -1,0 +1,180 @@
+/**
+ * Engine Verifier (ADR-007)
+ * 
+ * Implements the "trust but verify" pattern for agent task completion.
+ */
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import {
+	TaskSnapshot_v1,
+	TaskReceipt_v1,
+	EngineVerification_v1,
+	verifySnapshotBinding,
+	computeCanonicalHash,
+	TASK_CONTRACT_VERSION,
+} from '../schemas/task-contract.js';
+import { DiffApplier } from './diff-applier.js';
+import { SnapshotMismatchError, VerificationTimeoutError } from './errors.js';
+
+const execAsync = promisify(exec);
+
+export interface VerifyOptions {
+	snapshot: TaskSnapshot_v1;
+	receipt: TaskReceipt_v1;
+	workingDir: string;
+	applyPatch?: boolean; // Default: true
+}
+
+export interface VerificationResult {
+	verification: EngineVerification_v1;
+	trustGap: boolean;
+	patchApplied: boolean;
+}
+
+interface CmdResult {
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+	durationMs: number;
+}
+
+export class EngineVerifier {
+	async verify(options: VerifyOptions): Promise<VerificationResult> {
+		const { snapshot, receipt, workingDir, applyPatch = true } = options;
+
+		// 1. Verify snapshot binding
+		if (!verifySnapshotBinding(snapshot, receipt.snapshot_hash)) {
+			throw new SnapshotMismatchError(
+				snapshot.snapshot_hash,
+				receipt.snapshot_hash,
+			);
+		}
+
+		// 2. Apply patch if provided
+		let patchApplied = false;
+		if (applyPatch && receipt.patch?.unified_diff) {
+			await this.applyUnifiedDiff(receipt.patch.unified_diff, workingDir);
+			patchApplied = true;
+		}
+
+		// 3. Run verification command
+		const result = await this.runVerificationCmd(
+			snapshot.verification,
+			workingDir,
+		);
+
+		// 4. Check verification expectations
+		const verified = this.checkExpectations(
+			snapshot.verification.expect,
+			result,
+		);
+
+		// 5. Detect trust gap
+		const trustGap = receipt.agent_decision.claimed_fixed && !verified;
+
+		// 6. Build verification record
+		const verification: EngineVerification_v1 = {
+			task_id: snapshot.task_id,
+			snapshot_hash: snapshot.snapshot_hash,
+			receipt_hash: computeCanonicalHash(receipt),
+			agent_claimed: receipt.agent_decision.claimed_fixed,
+			verified,
+			trust_gap: trustGap,
+			verification_output: {
+				exit_code: result.exitCode,
+				stdout: result.stdout,
+				stderr: result.stderr,
+				duration_ms: result.durationMs,
+			},
+			engine_timestamp: new Date().toISOString(),
+			version: TASK_CONTRACT_VERSION,
+		};
+
+		return { verification, trustGap, patchApplied };
+	}
+
+	/**
+	 * Apply unified diff to working directory
+	 */
+	private async applyUnifiedDiff(
+		unifiedDiff: string,
+		workingDir: string,
+	): Promise<void> {
+		const applier = new DiffApplier({ workingDir });
+		await applier.apply(unifiedDiff);
+	}
+
+	/**
+	 * Run verification command and capture results
+	 */
+	private async runVerificationCmd(
+		verification: TaskSnapshot_v1['verification'],
+		cwd: string,
+	): Promise<CmdResult> {
+		const startTime = Date.now();
+		const timeout = verification.timeout_ms || 60000; // Default 60s
+
+		try {
+			const { stdout, stderr } = await execAsync(verification.command, {
+				cwd,
+				timeout,
+				encoding: 'utf8',
+			});
+
+			const durationMs = Date.now() - startTime;
+
+			return {
+				exitCode: 0,
+				stdout: stdout || '',
+				stderr: stderr || '',
+				durationMs,
+			};
+		} catch (error: any) {
+			const durationMs = Date.now() - startTime;
+
+			// Handle timeout
+			if (error.killed && error.signal === 'SIGTERM') {
+				throw new VerificationTimeoutError(timeout);
+			}
+
+			// Handle non-zero exit code
+			return {
+				exitCode: error.code || 1,
+				stdout: error.stdout || '',
+				stderr: error.stderr || '',
+				durationMs,
+			};
+		}
+	}
+
+	/**
+	 * Check if verification output meets expectations
+	 */
+	private checkExpectations(
+		expect: TaskSnapshot_v1['verification']['expect'],
+		result: CmdResult,
+	): boolean {
+		// Check exit code
+		if (expect.exit_code !== undefined && result.exitCode !== expect.exit_code) {
+			return false;
+		}
+
+		// Check must_include patterns
+		const output = result.stdout + result.stderr;
+		for (const pattern of expect.must_include ?? []) {
+			if (!output.includes(pattern)) {
+				return false;
+			}
+		}
+
+		// Check must_not_include patterns
+		for (const pattern of expect.must_not_include ?? []) {
+			if (output.includes(pattern)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+}
