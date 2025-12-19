@@ -29,7 +29,7 @@ export class DiffApplier {
 		// Write diff to temporary file
 		const tmpDir = join(workingDir, '.tmp');
 		await mkdir(tmpDir, { recursive: true });
-		const diffPath = join(tmpDir, `patch-${Date.now()}.diff`);
+		const diffPath = join(tmpDir, `patch-${Date.now()}-${process.pid}.diff`);
 		
 		try {
 			await writeFile(diffPath, unifiedDiff, 'utf8');
@@ -41,9 +41,16 @@ export class DiffApplier {
 			);
 
 			// Check for patch warnings or errors in output
-			if (stderr && stderr.toLowerCase().includes('fail')) {
+			const errorIndicators = ['fail', 'reject', 'malformed', 'can\'t find file'];
+			const hasError = errorIndicators.some(
+				(indicator) =>
+					stderr.toLowerCase().includes(indicator) ||
+					stdout.toLowerCase().includes(indicator),
+			);
+
+			if (hasError) {
 				throw new PatchApplicationError(
-					`Patch application had errors: ${stderr}`,
+					`Patch application had errors: ${stderr || stdout}`,
 				);
 			}
 		} catch (error) {

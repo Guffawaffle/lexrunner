@@ -107,6 +107,10 @@ export class EngineVerifier {
 
 	/**
 	 * Run verification command and capture results
+	 * 
+	 * SECURITY NOTE: This executes the command specified in the TaskSnapshot.
+	 * The snapshot should be created by a trusted source and validated before use.
+	 * In a production system, consider implementing command allowlisting or sandboxing.
 	 */
 	private async runVerificationCmd(
 		verification: TaskSnapshot_v1['verification'],
