@@ -34,5 +34,6 @@ export * from "./planner/index.js";
 export * from "./executor/index.js";
 export * from "./audit/index.js";
 export * from "./fanout/index.js";
+export * from "./authority/index.js";
 
 export { WeaveStateMachine } from "./stateMachine.js";
