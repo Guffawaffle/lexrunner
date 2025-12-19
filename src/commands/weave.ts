@@ -22,6 +22,7 @@ import { executeGatesWithPolicy } from "../gates.js";
 import { registerStatusCommand } from "./status.js";
 import { registerReportCommand } from "./report.js";
 import { registerMergeOrderCommand } from "./mergeOrder.js";
+import { registerPolicyCommands } from "./weave-policy.js";
 import fs from "fs";
 import path from "path";
 
@@ -151,9 +152,7 @@ Subcommands:
 					fs.writeFileSync(opts.output, jsonOutput + "\n");
 					if (!opts.json && !deps.jsonModeActive()) {
 						console.log(`✅ Results written to ${opts.output}`);
-						console.log(
-							`   Found ${result.total} pull request(s)`
-						);
+						console.log(`   Found ${result.total} pull request(s)`);
 					}
 				} else if (opts.json || deps.jsonModeActive()) {
 					console.log(jsonOutput);
@@ -172,7 +171,8 @@ Subcommands:
 					}
 
 					for (const pr of pullRequests) {
-						const status = pr.state === "open" ? "🟢 OPEN" : "🔴 CLOSED";
+						const status =
+							pr.state === "open" ? "🟢 OPEN" : "🔴 CLOSED";
 						console.log(`${status} #${pr.number}: ${pr.title}`);
 						console.log(`       Branch: ${pr.branch}`);
 						if (pr.labels && pr.labels.length > 0) {
@@ -268,7 +268,8 @@ Subcommands:
 					console.log(`   File: ${opts.output}`);
 					console.log(`   Items: ${plan.items?.length || 0}`);
 					console.log(
-						`   Target: ${plan.target || "default branch"}`);
+						`   Target: ${plan.target || "default branch"}`
+					);
 					console.log("");
 					console.log("Next steps:");
 					console.log(
@@ -345,12 +346,11 @@ Subcommands:
 						});
 
 						console.log("\nGates to run:");
-						const gates =
-							plan.policy?.requiredGates || [
-								"lint",
-								"typecheck",
-								"test",
-							];
+						const gates = plan.policy?.requiredGates || [
+							"lint",
+							"typecheck",
+							"test",
+						];
 						gates.forEach((gate) => {
 							console.log(`  - ${gate}`);
 						});
@@ -448,17 +448,20 @@ Subcommands:
 	// These were originally intended to be added by PR #584
 	// Note: discover, plan, and apply are implemented inline above.
 	// We only add status, report, and order here.
-	
+
 	// weave status - Show execution status
 	registerStatusCommand(weave, deps.jsonModeActive);
-	
+
 	// weave report - Generate gate reports
 	registerReportCommand(weave, { jsonModeActive: deps.jsonModeActive });
-	
+
 	// weave order - Compute merge order (alias for merge-order)
 	registerMergeOrderCommand(weave, deps.jsonModeActive, (error: unknown) => {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error(`\n❌ Error: ${message}\n`);
 		throwExit(1);
 	});
+
+	// weave policy - Policy-based merge-weave execution
+	registerPolicyCommands(weave, { jsonModeActive: deps.jsonModeActive });
 }

@@ -28,4 +28,10 @@ export {
 	type DryRunOutput,
 } from "./types.js";
 
+// Policy-based merge-weave infrastructure
+export * from "./policy/index.js";
+export * from "./planner/index.js";
+export * from "./executor/index.js";
+export * from "./audit/index.js";
+
 export { WeaveStateMachine } from "./stateMachine.js";
