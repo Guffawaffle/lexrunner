@@ -65,6 +65,10 @@ export interface BuildSnapshotInput {
 export class SnapshotBuilder {
 	private repoRoot: string;
 	private contextRadius: number;
+	
+	// Hunk extraction thresholds
+	private static readonly SMALL_FILE_LINE_THRESHOLD = 100;
+	private static readonly LARGE_FILE_PREVIEW_LINES = 50;
 
 	constructor(options: SnapshotBuilderOptions) {
 		this.repoRoot = options.repoRoot;
@@ -169,10 +173,10 @@ export class SnapshotBuilder {
 			} else {
 				// Extract entire file for small files, or first portion for large files
 				startLine = 1;
-				if (lines.length <= 100) {
+				if (lines.length <= SnapshotBuilder.SMALL_FILE_LINE_THRESHOLD) {
 					endLine = lines.length;
 				} else {
-					endLine = Math.min(50, lines.length);
+					endLine = Math.min(SnapshotBuilder.LARGE_FILE_PREVIEW_LINES, lines.length);
 				}
 			}
 
@@ -264,6 +268,7 @@ export class SnapshotBuilder {
 	 * Normalize file path for comparison (handle different separators, leading slashes)
 	 */
 	private normalizeFilePath(filePath: string): string {
-		return filePath.replace(/^\/+/, "").replace(/\\/g, "/");
+		// Convert to posix-style path and remove leading slashes
+		return path.posix.normalize(filePath.replace(/\\/g, "/")).replace(/^\/+/, "");
 	}
 }

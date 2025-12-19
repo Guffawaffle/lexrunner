@@ -168,7 +168,8 @@ describe("SnapshotBuilder", () => {
 		// With context radius of 3, we should get ±3 lines around line 14
 		expect(hunk.start_line).toBe(Math.max(1, 14 - 3));
 		expect(hunk.end_line).toBeGreaterThanOrEqual(14);
-		expect(hunk.end_line - hunk.start_line).toBeLessThanOrEqual(6); // Max 7 lines total (±3 + center)
+		// Max 7 lines total: 3 before + center line + 3 after = 7 lines (diff of 6)
+		expect(hunk.end_line - hunk.start_line).toBeLessThanOrEqual(6);
 	});
 
 	it("hunk hash is deterministic", async () => {
