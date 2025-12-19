@@ -11,6 +11,7 @@
 export {
 	DeterminismLevel,
 	ModelTier,
+	TokenUsage,
 	InterventionAuditEntry,
 	InterventionStats,
 	TierReadiness,
@@ -24,6 +25,8 @@ export {
 	parseHandoffReport,
 	getInterventionById,
 	getInterventionsByLevel,
+	computeTokenUsage,
+	createAuditEntryWithTokens,
 } from "./schema.js";
 
 // Logger
