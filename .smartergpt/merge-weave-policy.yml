@@ -1,0 +1,248 @@
+# Merge-Weave Policy v1.0
+# =========================
+# Codifies Senior Dev interventions for deterministic merge-weave execution.
+#
+# Goal: Make interventions policy-driven rather than ad-hoc.
+# Philosophy: Same policy → same behavior every time.
+#
+# Determinism Levels:
+#   - D1 (Deterministic): Pure logic, no judgment needed
+#   - D2 (Bounded): Judgment within defined parameters
+#   - D3 (Stochastic): Requires model reasoning, harder to hand off
+
+version: 1
+schemaVersion: "1.0.0"
+
+# =============================================================================
+# DISCOVERY PHASE
+# =============================================================================
+discovery:
+  # Which repos to scan for open PRs
+  repos:
+    - owner: Guffawaffle
+      name: lex
+      priority: 1  # Merged first (foundation)
+    - owner: Guffawaffle
+      name: lexsona
+      priority: 2  # Merged second (depends on lex)
+    - owner: Guffawaffle
+      name: lexrunner
+      priority: 3  # Merged last (depends on both)
+
+  # PR filtering
+  filters:
+    include_drafts: false      # D1: Skip drafts by default
+    include_dependabot: true   # D1: Include dependency updates
+    include_copilot: true      # D1: Include Copilot agent PRs
+
+  # Draft handling
+  draft_policy:
+    undraft_copilot_prs: true  # D1: Auto-undraft Copilot PRs (they're ready by definition)
+    undraft_with_prefix:       # D2: Undraft if title matches these prefixes
+      - "feat:"
+      - "fix:"
+      - "chore:"
+    require_manual_for:        # D3: Always require human decision for these
+      - "BREAKING:"
+      - "security:"
+      - "experimental:"
+
+# =============================================================================
+# DEPENDENCY RESOLUTION
+# =============================================================================
+dependencies:
+  # How to determine PR order
+  resolution:
+    # D1: Explicit dependencies via footer
+    depends_on_footer: true
+    footer_pattern: "Depends-on: #(\\d+)"
+
+    # D1: Cross-repo implicit order (lex → lexsona → lexrunner)
+    cross_repo_chain: true
+
+    # D2: Heuristic detection (file overlap, import analysis)
+    heuristic_detection: false  # Off for now - add later for determinism
+
+  # Conflict handling
+  on_cycle: fail              # D1: Fail if dependency cycle detected
+  on_missing_dep: warn        # D2: Warn but continue if dep not found
+
+# =============================================================================
+# QUALITY GATES
+# =============================================================================
+gates:
+  # Pre-merge verification on base branch
+  base_branch:
+    required:
+      - name: install
+        command: "npm ci"
+        determinism: D1
+
+      - name: build
+        command: "npm run build"
+        determinism: D1
+
+      - name: test
+        command: "npm test"
+        determinism: D1
+        timeout_seconds: 300
+
+    optional:
+      - name: lint
+        command: "npm run lint"
+        determinism: D1
+
+      - name: local-ci
+        command: "npm run local-ci"
+        determinism: D1
+        when: available  # Only if script exists
+
+  # Per-PR verification (before merge)
+  per_pr:
+    # D1: Require CI passing
+    require_ci_green: true
+
+    # D2: Code review checklist
+    review_checklist:
+      - no_console_log_in_src: true
+      - conventional_commit_title: true
+      - test_count_matches: true  # If adding features, tests should exist
+
+    # D3: Quality assessment (model judgment)
+    quality_assessment:
+      enabled: true
+      criteria:
+        - "Code follows existing patterns"
+        - "No obvious bugs or security issues"
+        - "Changes are minimal and focused"
+      action_on_concern: warn  # warn | block | auto-fix
+
+# =============================================================================
+# MERGE EXECUTION
+# =============================================================================
+merge:
+  method: squash              # D1: Always squash-merge
+
+  # Commit message format
+  commit_title:
+    use_pr_title: true        # D1: Use PR title as commit title
+    validate_conventional: true
+
+  # Admin authority (delegated when local CI passes)
+  admin_authority:
+    enabled: true
+    conditions:
+      - local_ci_passes: true
+      - no_open_review_requests: true
+      - no_merge_conflicts: true
+
+  # Umbrella branch pattern (when main is protected)
+  umbrella:
+    enabled: false             # Enable when branch protection blocks direct merge
+    branch_pattern: "integration/umbrella-{date}"
+    auto_create: true
+
+# =============================================================================
+# POST-MERGE VERIFICATION
+# =============================================================================
+post_merge:
+  # D1: Always pull and verify after merge
+  pull_and_verify:
+    enabled: true
+    gates: [build, test]
+
+  # D2: Fix known test patterns automatically
+  auto_fix:
+    enabled: true
+    patterns:
+      # Tool count assertions (when new MCP tools added)
+      - pattern: "assert.*tools\\.length.*\\d+"
+        action: update_count
+        determinism: D2
+
+      # Environment-dependent tests (use explicit paths)
+      - pattern: "LexSona\\.connect\\(\\)"
+        action: add_explicit_path
+        determinism: D2
+
+    # D3: Complex fixes require human review
+    escalate_on:
+      - semantic_change      # Logic change, not just assertion update
+      - multiple_files       # Affecting > 3 files
+      - security_related     # Anything touching auth/crypto
+
+  # D1: Commit fixes with admin authority
+  commit_fixes:
+    enabled: true
+    message_template: "test: {description}\n\nAuto-fix applied by merge-weave policy"
+    require_green_before_push: true
+
+# =============================================================================
+# FANOUT PLANNING
+# =============================================================================
+fanout:
+  # D2: Suggest follow-up work based on merged features
+  suggestions:
+    enabled: true
+    triggers:
+      - type: new_mcp_tool
+        pattern: "tools\\.push.*name:"
+        suggest: "Create integration test issue for new tool"
+
+      - type: new_error_code
+        pattern: "ErrorCode\\.(\\w+)"
+        suggest: "Document error code in consumer repos"
+
+      - type: new_cli_command
+        pattern: "\\.command\\(['\"]"
+        suggest: "Add to QUICK_START.md"
+
+  # D3: Complex fanout requires PM decision
+  escalate_to_pm:
+    - breaking_changes
+    - cross_repo_api_changes
+    - deprecations
+
+# =============================================================================
+# MODEL TIER READINESS
+# =============================================================================
+model_handoff:
+  # Criteria for handing off to smaller models
+  # As we prove determinism, we can move tasks down the tier list
+
+  tiers:
+    - id: frontier
+      name: "Senior Dev (Claude Opus/Sonnet)"
+      handles:
+        - D1 tasks
+        - D2 tasks
+        - D3 tasks
+      current: true
+
+    - id: mid
+      name: "Mid-tier (Claude Haiku, GPT-4o-mini)"
+      handles:
+        - D1 tasks
+        - D2 tasks with explicit parameters
+      ready_when:
+        - D2_error_rate_below: 5%
+        - successful_runs: 10
+
+    - id: junior
+      name: "Junior (Gemini Flash, smaller models)"
+      handles:
+        - D1 tasks only
+      ready_when:
+        - D1_fully_deterministic: true
+        - no_judgment_required: true
+
+  # Track which interventions required model judgment
+  audit:
+    enabled: true
+    log_path: ".smartergpt/deliverables/merge-weave-audit.ndjson"
+    fields:
+      - intervention_type
+      - determinism_level
+      - model_used
+      - outcome
+      - could_be_automated  # Human feedback for improvement
