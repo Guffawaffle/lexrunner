@@ -544,21 +544,26 @@ const handleCommitFix: InterventionHandler<"commit_fix"> = async (
 // =============================================================================
 
 /**
- * Registry of D1 handlers
+ * Type-safe handler registry.
+ * We use explicit type assertion here because each handler is typed for its specific
+ * intervention type, but the registry needs to store them uniformly.
+ * The type safety is maintained through the InterventionType key matching.
  */
-const D1_HANDLERS: Partial<Record<InterventionType, InterventionHandler>> = {
-	discover_prs: handleDiscoverPRs,
-	filter_drafts: handleFilterDrafts,
-	parse_dependencies: handleParseDependencies,
-	run_base_gate: handleRunBaseGate,
-	check_ci_status: handleCheckCIStatus,
-	compute_merge_order: handleComputeMergeOrder,
-	check_admin_authority: handleCheckAdminAuthority,
-	execute_merge: handleExecuteMerge,
-	pull_changes: handlePullChanges,
-	verify_gates: handleVerifyGates,
-	commit_fix: handleCommitFix,
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const D1_HANDLERS: Partial<Record<InterventionType, InterventionHandler<any>>> =
+	{
+		discover_prs: handleDiscoverPRs,
+		filter_drafts: handleFilterDrafts,
+		parse_dependencies: handleParseDependencies,
+		run_base_gate: handleRunBaseGate,
+		check_ci_status: handleCheckCIStatus,
+		compute_merge_order: handleComputeMergeOrder,
+		check_admin_authority: handleCheckAdminAuthority,
+		execute_merge: handleExecuteMerge,
+		pull_changes: handlePullChanges,
+		verify_gates: handleVerifyGates,
+		commit_fix: handleCommitFix,
+	};
 
 /**
  * Check if an intervention type has a D1 handler
