@@ -385,6 +385,136 @@ ALLOW_MUTATIONS=true npm run mcp
 LEX_PROFILE_DIR=/my/project/.config npm run mcp
 ```
 
+## Task Handoff Tools (ADR-007)
+
+The task handoff tools implement the [Task Snapshot Contract (ADR-007)](docs/adr/ADR-007-task-snapshot-contract.md), enabling bounded work delegation to stochastic agents with rigorous verification.
+
+### create_task_snapshot
+
+Create a task snapshot for agent handoff with failure evidence, target files, and verification command.
+
+**Canonical name:** `lexrunner_create_task_snapshot`
+
+**Parameters:**
+- `procedure` (required): Procedure identifier (e.g., `"post-merge-fix"`, `"fanout-issue"`)
+- `determinism` (optional): Level `"D1"`, `"D2"`, or `"D3"` (default: `"D1"`)
+- `failureMessage` (required): Short error description
+- `failureFileRel` (required): Repo-relative path to failed file
+- `failureLine` (optional): Line number if available
+- `runnerOutputSnip` (required): Actual test runner output
+- `failureExcerpt` (optional): Code context around failure
+- `targetFiles` (required): Array of repo-relative paths to modify
+- `verificationCmd` (required): Command to run for verification
+- `expectedExitCode` (optional): Expected exit code (default: `0`)
+- `taskId` (optional): Custom task ID (auto-generated if not provided)
+- `repoRoot` (optional): Absolute repo path (auto-detected if not provided)
+- `repoId` (optional): Repository ID `"owner/repo"` (auto-detected if not provided)
+- `commitSha` (optional): Git commit SHA (auto-detected if not provided)
+
+**Returns:** `TaskSnapshot_v1` JSON with task ID
+
+**Example:**
+```javascript
+const result = await client.callTool("create_task_snapshot", {
+  procedure: "post-merge-fix",
+  determinism: "D1",
+  failureMessage: "Expected 6, received 7",
+  failureFileRel: "tests/unit/example.spec.ts",
+  failureLine: 42,
+  runnerOutputSnip: "FAIL tests/unit/example.spec.ts\n  Expected: 6\n  Received: 7",
+  targetFiles: ["tests/unit/example.spec.ts"],
+  verificationCmd: "npm test -- tests/unit/example.spec.ts",
+});
+
+console.log(result.taskId); // "01HQXYZ..."
+console.log(result.snapshot.snapshot_hash); // "sha256:abc..."
+```
+
+### submit_task_receipt
+
+Submit a task receipt after agent completes work. Returns acknowledgment and engine verification status.
+
+**Canonical name:** `lexrunner_submit_task_receipt`
+
+**Parameters:**
+- `receipt` (required): `TaskReceipt_v1` JSON object
+
+**Returns:** Verification result with trust gap detection
+
+**Example:**
+```javascript
+const receipt = {
+  schema_version: "1.0.0",
+  task_id: snapshot.task_id,
+  snapshot_hash: snapshot.snapshot_hash,
+  claims: {
+    success: true,
+    patch: "--- a/test.ts\n+++ b/test.ts\n...",
+    files_touched: ["test.ts"],
+    rationale: "Updated assertion to match new count",
+    confidence: "high",
+    assumptions_made: [
+      { type: "test", text: "No other tests depend on this value" }
+    ],
+  },
+  search_activity: [],
+  cost: { token_usage: { input: 1000, output: 200, total: 1200 } },
+  blockers: [],
+};
+
+const result = await client.callTool("submit_task_receipt", { receipt });
+
+console.log(result.verification.verified); // true/false
+console.log(result.verification.trustGap); // false if agent claim matches engine
+```
+
+### get_task_status
+
+Get current task state including snapshot, receipt, and verification info.
+
+**Canonical name:** `lexrunner_get_task_status`
+
+**Parameters:**
+- `taskId` (required): Unique task identifier
+
+**Returns:** Task status with state, snapshot, receipt, and verification
+
+**Example:**
+```javascript
+const status = await client.callTool("get_task_status", {
+  taskId: "01HQXYZ...",
+});
+
+console.log(status.state); // "pending" | "in_progress" | "completed" | "verified" | "failed"
+console.log(status.snapshot); // TaskSnapshot_v1
+console.log(status.receipt); // TaskReceipt_v1 (if submitted)
+```
+
+### list_pending_tasks
+
+List pending task snapshots with optional filtering.
+
+**Canonical name:** `lexrunner_list_pending_tasks`
+
+**Parameters:**
+- `procedure` (optional): Filter by procedure identifier
+- `determinism` (optional): Filter by level `"D1"`, `"D2"`, or `"D3"`
+- `limit` (optional): Maximum tasks to return
+
+**Returns:** Array of pending tasks
+
+**Example:**
+```javascript
+const tasks = await client.callTool("list_pending_tasks", {
+  procedure: "post-merge-fix",
+  determinism: "D1",
+  limit: 10,
+});
+
+console.log(tasks.total); // Total count
+console.log(tasks.tasks); // Array of task info
+```
+
 ## Workflow
 
 1. **Setup**: Configure your project in `LEX_PROFILE_DIR` (default: `.smartergpt/`)

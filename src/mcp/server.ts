@@ -52,6 +52,14 @@ import {
 	InitLocalResult,
 	ProfileResolveResult,
 	WorkflowGuideArgs,
+	CreateTaskSnapshotArgs,
+	SubmitTaskReceiptArgs,
+	GetTaskStatusArgs,
+	ListPendingTasksArgs,
+	CreateTaskSnapshotResult,
+	SubmitTaskReceiptResult,
+	GetTaskStatusResult,
+	ListPendingTasksResult,
 } from "./types.js";
 import {
 	resolveProfile,
@@ -142,6 +150,15 @@ import {
 	type WorkflowPhase,
 } from "./workflow/state-machine.js";
 import type { WorkflowGuide } from "./types/guided-response.js";
+
+// Task Snapshot Contract imports (ADR-007)
+import { SnapshotBuilder } from "../snapshot/index.js";
+import { EngineVerifier } from "../verification/index.js";
+import {
+	parseTaskReceipt,
+	TaskSnapshot_v1,
+	TaskReceipt_v1,
+} from "../schemas/task-contract.js";
 
 // =============================================================================
 // AXError MCP Helper
@@ -806,6 +823,140 @@ function createServer(options?: McpServerOptions): Server {
 						},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// Task Handoff Tools (ADR-007)
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "create_task_snapshot",
+					description:
+						"Create a task snapshot for agent handoff (ADR-007). Prepares work for external agent with failure info, target files, and verification command.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							taskId: {
+								type: "string",
+								description: "Optional task ID (auto-generated if not provided)",
+							},
+							procedure: {
+								type: "string",
+								description: "Procedure identifier (e.g., 'post-merge-fix', 'fanout-issue')",
+							},
+							determinism: {
+								type: "string",
+								enum: ["D1", "D2", "D3"],
+								description: "Determinism level (default: D1)",
+								default: "D1",
+							},
+							failureMessage: {
+								type: "string",
+								description: "Short error description",
+							},
+							failureFileRel: {
+								type: "string",
+								description: "Repo-relative path to failed file",
+							},
+							failureLine: {
+								type: "number",
+								description: "Line number if available",
+							},
+							runnerOutputSnip: {
+								type: "string",
+								description: "Actual test runner output snippet",
+							},
+							failureExcerpt: {
+								type: "string",
+								description: "Code context around failure",
+							},
+							targetFiles: {
+								type: "array",
+								items: { type: "string" },
+								description: "Repo-relative paths of files to modify",
+							},
+							verificationCmd: {
+								type: "string",
+								description: "Command to run for verification",
+							},
+							expectedExitCode: {
+								type: "number",
+								description: "Expected exit code (default: 0)",
+								default: 0,
+							},
+							repoRoot: {
+								type: "string",
+								description: "Absolute path to repo root (auto-detected if not provided)",
+							},
+							repoId: {
+								type: "string",
+								description: "Repository identifier in owner/repo format (auto-detected if not provided)",
+							},
+							commitSha: {
+								type: "string",
+								description: "Git commit SHA (auto-detected if not provided)",
+							},
+						},
+						required: [
+							"procedure",
+							"failureMessage",
+							"failureFileRel",
+							"runnerOutputSnip",
+							"targetFiles",
+							"verificationCmd",
+						],
+					},
+				},
+				{
+					name: "submit_task_receipt",
+					description:
+						"Submit a task receipt after agent completes work (ADR-007). Returns acknowledgment and engine verification status.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							receipt: {
+								type: "object",
+								description: "TaskReceipt_v1 JSON object",
+							},
+						},
+						required: ["receipt"],
+					},
+				},
+				{
+					name: "get_task_status",
+					description:
+						"Get current task state (ADR-007). Returns snapshot, receipt, and verification info.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							taskId: {
+								type: "string",
+								description: "Unique task identifier",
+							},
+						},
+						required: ["taskId"],
+					},
+				},
+				{
+					name: "list_pending_tasks",
+					description:
+						"List pending task snapshots (ADR-007). Used by PM agent to see work queue.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							procedure: {
+								type: "string",
+								description: "Filter by procedure identifier",
+							},
+							determinism: {
+								type: "string",
+								enum: ["D1", "D2", "D3"],
+								description: "Filter by determinism level",
+							},
+							limit: {
+								type: "number",
+								description: "Maximum tasks to return",
+							},
+						},
+					},
+				},
 			],
 		};
 	});
@@ -953,6 +1104,31 @@ function createServer(options?: McpServerOptions): Server {
 			case "lexrunner.submitDecision": // Deprecated alias
 				return await handleSubmitDecision(
 					args as unknown as SubmitDecisionInput
+				);
+
+			// Task Handoff tools (ADR-007)
+			case "create_task_snapshot":
+					case "lexrunner_create_task_snapshot": // canonical alias
+				return await handleCreateTaskSnapshot(
+					args as unknown as CreateTaskSnapshotArgs
+				);
+
+			case "submit_task_receipt":
+					case "lexrunner_submit_task_receipt": // canonical alias
+				return await handleSubmitTaskReceipt(
+					args as unknown as SubmitTaskReceiptArgs
+				);
+
+			case "get_task_status":
+					case "lexrunner_get_task_status": // canonical alias
+				return await handleGetTaskStatus(
+					args as unknown as GetTaskStatusArgs
+				);
+
+			case "list_pending_tasks":
+					case "lexrunner_list_pending_tasks": // canonical alias
+				return await handleListPendingTasks(
+					args as unknown as ListPendingTasksArgs
 				);
 
 			default:
@@ -2382,6 +2558,312 @@ async function handleWorkflowGuide(
 			"workflow.guide",
 			error,
 			"get workflow guide"
+		);
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task Handoff Tool Handlers (ADR-007)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * In-memory task store for MCP session
+ * In production, this should use RunStore or a dedicated task store
+ */
+const taskStore = new Map<string, {
+	snapshot: TaskSnapshot_v1;
+	receipt?: TaskReceipt_v1;
+	verification?: any;
+	state: "pending" | "in_progress" | "completed" | "verified" | "failed";
+}>();
+
+/**
+ * Handle create_task_snapshot tool
+ */
+async function handleCreateTaskSnapshot(
+	args: CreateTaskSnapshotArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = CreateTaskSnapshotArgs.parse(args);
+
+		// Auto-detect git info if not provided
+		const gitOps = createGitOperations();
+		const repoRoot = validated.repoRoot || process.cwd();
+		const commitSha = validated.commitSha || await gitOps.getCurrentCommitSHA();
+		
+		// Auto-detect repoId if not provided
+		let repoId = validated.repoId;
+		if (!repoId) {
+			try {
+				const githubAPI = await createGitHubAPI();
+				if (githubAPI) {
+					repoId = `${githubAPI.config.owner}/${githubAPI.config.repo}`;
+				} else {
+					repoId = "unknown/unknown";
+				}
+			} catch {
+				repoId = "unknown/unknown";
+			}
+		}
+
+		// Generate task ID if not provided
+		const taskId = validated.taskId || ulid();
+
+		// Build snapshot using SnapshotBuilder
+		const builder = new SnapshotBuilder({
+			repoRoot,
+			repoId,
+		});
+
+		const snapshot = await builder.buildSnapshot({
+			taskId,
+			procedure: validated.procedure,
+			determinism: validated.determinism as "D1" | "D2" | "D3" | undefined,
+			targetFiles: validated.targetFiles,
+			failure: {
+				message: validated.failureMessage,
+				fileRel: validated.failureFileRel,
+				line: validated.failureLine,
+				runnerOutputSnip: validated.runnerOutputSnip,
+				excerpt: validated.failureExcerpt,
+			},
+			commitSha,
+			verificationCmd: validated.verificationCmd,
+			expectedExitCode: validated.expectedExitCode,
+		});
+
+		// Store snapshot in task store
+		taskStore.set(taskId, {
+			snapshot,
+			state: "pending",
+		});
+
+		const result: CreateTaskSnapshotResult = {
+			snapshot,
+			taskId,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid create_task_snapshot parameters: ${error.message}`,
+				{ tool: "create_task_snapshot", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"create_task_snapshot",
+			error,
+			"create task snapshot"
+		);
+	}
+}
+
+/**
+ * Handle submit_task_receipt tool
+ */
+async function handleSubmitTaskReceipt(
+	args: SubmitTaskReceiptArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = SubmitTaskReceiptArgs.parse(args);
+
+		// Parse and validate receipt
+		const receipt = parseTaskReceipt(validated.receipt);
+
+		// Find corresponding snapshot
+		const taskData = taskStore.get(receipt.task_id);
+		if (!taskData) {
+			const axError = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				`Task not found: ${receipt.task_id}. Create snapshot first using create_task_snapshot.`,
+				{ tool: "submit_task_receipt", taskId: receipt.task_id }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+
+		// Update state
+		taskData.state = "in_progress";
+		taskData.receipt = receipt;
+
+		// Run engine verification
+		const verifier = new EngineVerifier();
+		const verificationResult = await verifier.verify({
+			snapshot: taskData.snapshot,
+			receipt,
+			workingDir: taskData.snapshot.repo.root,
+			applyPatch: true,
+		});
+
+		// Update task with verification
+		taskData.verification = verificationResult.verification;
+		taskData.state = verificationResult.verification.verified ? "verified" : "failed";
+
+		const result: SubmitTaskReceiptResult = {
+			acknowledged: true,
+			taskId: receipt.task_id,
+			verification: {
+				verified: verificationResult.verification.verified,
+				trustGap: verificationResult.trustGap,
+				patchApplied: verificationResult.patchApplied,
+			},
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid submit_task_receipt parameters: ${error.message}`,
+				{ tool: "submit_task_receipt", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"submit_task_receipt",
+			error,
+			"submit task receipt"
+		);
+	}
+}
+
+/**
+ * Handle get_task_status tool
+ */
+async function handleGetTaskStatus(
+	args: GetTaskStatusArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = GetTaskStatusArgs.parse(args);
+
+		// Find task
+		const taskData = taskStore.get(validated.taskId);
+		if (!taskData) {
+			const axError = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				`Task not found: ${validated.taskId}`,
+				{ tool: "get_task_status", taskId: validated.taskId }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+
+		const result: GetTaskStatusResult = {
+			taskId: validated.taskId,
+			state: taskData.state,
+			snapshot: taskData.snapshot,
+			receipt: taskData.receipt,
+			verification: taskData.verification,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid get_task_status parameters: ${error.message}`,
+				{ tool: "get_task_status", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"get_task_status",
+			error,
+			"get task status"
+		);
+	}
+}
+
+/**
+ * Handle list_pending_tasks tool
+ */
+async function handleListPendingTasks(
+	args: ListPendingTasksArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = ListPendingTasksArgs.parse(args);
+
+		// Filter tasks
+		const tasks: GetTaskStatusResult["snapshot"][] = [];
+		for (const [taskId, taskData] of taskStore.entries()) {
+			// Apply filters
+			if (validated.procedure && taskData.snapshot.procedure !== validated.procedure) {
+				continue;
+			}
+			if (validated.determinism && taskData.snapshot.determinism !== validated.determinism) {
+				continue;
+			}
+
+			tasks.push({
+				taskId,
+				procedure: taskData.snapshot.procedure,
+				determinism: taskData.snapshot.determinism,
+				state: taskData.state,
+				snapshot: taskData.snapshot,
+			});
+
+			// Apply limit
+			if (validated.limit && tasks.length >= validated.limit) {
+				break;
+			}
+		}
+
+		const result: ListPendingTasksResult = {
+			tasks,
+			total: tasks.length,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid list_pending_tasks parameters: ${error.message}`,
+				{ tool: "list_pending_tasks", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"list_pending_tasks",
+			error,
+			"list pending tasks"
 		);
 	}
 }

@@ -227,3 +227,80 @@ export interface ConfigShowResult {
 	key?: string;
 	value?: unknown;
 }
+
+/**
+ * ADR-007 Task Handoff Tools - argument schemas
+ */
+
+export const CreateTaskSnapshotArgs = z.object({
+	taskId: z.string().optional(),
+	procedure: z.string(),
+	determinism: z.enum(["D1", "D2", "D3"]).optional(),
+	failureMessage: z.string(),
+	failureFileRel: z.string(),
+	failureLine: z.number().int().positive().optional(),
+	runnerOutputSnip: z.string(),
+	failureExcerpt: z.string().optional(),
+	targetFiles: z.array(z.string()),
+	verificationCmd: z.string(),
+	expectedExitCode: z.number().int().optional(),
+	repoRoot: z.string().optional(),
+	repoId: z.string().optional(),
+	commitSha: z.string().optional(),
+});
+export type CreateTaskSnapshotArgs = z.infer<typeof CreateTaskSnapshotArgs>;
+
+export const SubmitTaskReceiptArgs = z.object({
+	receipt: z.any(), // Accept any object - will be validated by parseTaskReceipt
+});
+export type SubmitTaskReceiptArgs = z.infer<typeof SubmitTaskReceiptArgs>;
+
+export const GetTaskStatusArgs = z.object({
+	taskId: z.string(),
+});
+export type GetTaskStatusArgs = z.infer<typeof GetTaskStatusArgs>;
+
+export const ListPendingTasksArgs = z.object({
+	procedure: z.string().optional(),
+	determinism: z.enum(["D1", "D2", "D3"]).optional(),
+	limit: z.number().int().positive().optional(),
+});
+export type ListPendingTasksArgs = z.infer<typeof ListPendingTasksArgs>;
+
+/**
+ * ADR-007 Task Handoff Tools - result types
+ */
+
+export interface CreateTaskSnapshotResult {
+	snapshot: object; // TaskSnapshot_v1
+	taskId: string;
+}
+
+export interface SubmitTaskReceiptResult {
+	acknowledged: boolean;
+	taskId: string;
+	verification: {
+		verified: boolean;
+		trustGap: boolean;
+		patchApplied: boolean;
+	};
+}
+
+export interface GetTaskStatusResult {
+	taskId: string;
+	state: "pending" | "in_progress" | "completed" | "verified" | "failed";
+	snapshot?: object;
+	receipt?: object;
+	verification?: object;
+}
+
+export interface ListPendingTasksResult {
+	tasks: Array<{
+		taskId: string;
+		procedure: string;
+		determinism: string;
+		state: string;
+		snapshot?: object;
+	}>;
+	total: number;
+}
