@@ -96,7 +96,7 @@ export function safeLoadTestFixPatterns(
 	if (!result.success) {
 		return {
 			success: false,
-			error: `Schema validation failed: ${JSON.stringify(result.error.errors)}`,
+			error: `Schema validation failed: ${JSON.stringify(result.error.issues)}`,
 		};
 	}
 
