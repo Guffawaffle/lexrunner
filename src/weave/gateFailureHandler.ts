@@ -172,8 +172,8 @@ export class GateFailureHandler {
 			applyPatch: options?.applyPatch ?? true
 		});
 
-		// Log verification result
-		await this.logVerificationResult(verification.verification);
+		// Log verification result (pass determinism from snapshot)
+		await this.logVerificationResult(verification.verification, snapshot.determinism);
 
 		// Determine next action
 		const continueWeave = verification.verification.verified && !verification.trustGap;
@@ -201,7 +201,7 @@ export class GateFailureHandler {
 	 */
 	private parseFailureFiles(gate: GateResult, output: string): string[] {
 		// Heuristic: look for file paths in error output
-		const filePattern = /(?:at|in|file:?\s+)([a-zA-Z0-9_\-./]+\.(?:ts|js|json|md))/gi;
+		const filePattern = /(?:at|in|file:?\s+)([a-zA-Z0-9_./-]+\.(?:ts|js|json|md))/gi;
 		const matches = output.matchAll(filePattern);
 		const files = new Set<string>();
 
@@ -400,7 +400,8 @@ export class GateFailureHandler {
 	 * Log verification result
 	 */
 	private async logVerificationResult(
-		verification: VerificationResult['verification']
+		verification: VerificationResult['verification'],
+		determinism: DeterminismLevel
 	): Promise<void> {
 		if (!this.auditLogger) return;
 
@@ -409,7 +410,7 @@ export class GateFailureHandler {
 			interventionId: verification.task_id,
 			type: "auto_fix",
 			action: verification.verified ? "complete" : "fail",
-			determinism: "D1", // Would need to track this separately
+			determinism,
 			details: {
 				verified: verification.verified,
 				trust_gap: verification.trust_gap,

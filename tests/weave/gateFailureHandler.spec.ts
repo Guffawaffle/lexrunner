@@ -2,7 +2,7 @@
  * Tests for Gate Failure Handler (ADR-007)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { GateFailureHandler } from '../../src/weave/gateFailureHandler.js';
 import { GateResult } from '../../src/schema.js';
 import { TaskReceipt_v1, DeterminismLevel } from '../../src/schemas/task-contract.js';

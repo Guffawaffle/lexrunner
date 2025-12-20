@@ -47,7 +47,11 @@ export const STATE_TRANSITIONS: StateTransition[] = [
 	{ from: WeaveState.FAILED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
 	{ from: WeaveState.COMPLETED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
 	{ from: WeaveState.PAUSED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
-	{ from: WeaveState.TRUST_GAP, to: WeaveState.IDLE, event: WeaveEvent.RESET }
+	{ from: WeaveState.TRUST_GAP, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.AWAITING_FIX, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.FIX_SUBMITTED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.VERIFYING, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.VERIFIED, to: WeaveState.IDLE, event: WeaveEvent.RESET }
 ];
 
 /**
