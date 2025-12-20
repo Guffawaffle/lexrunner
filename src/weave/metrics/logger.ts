@@ -12,6 +12,7 @@ import {
 	type InterventionAuditEntry,
 	type DeterminismLevel,
 	type ModelTier,
+	type TokenUsage,
 	getInterventionById,
 	safeParseAuditEntry,
 } from "./schema.js";
@@ -52,6 +53,12 @@ export interface LogInterventionOptions {
 	error?: string;
 	/** Additional context */
 	context?: Record<string, unknown>;
+	/** Token usage tracking */
+	tokenUsage?: TokenUsage;
+	/** Task ID if linked to task snapshot contract */
+	taskId?: string;
+	/** Snapshot hash if linked to task snapshot */
+	snapshotHash?: string;
 }
 
 /**
@@ -91,6 +98,9 @@ export class AuditLogger {
 			repo: options.repo,
 			error_message: options.error,
 			context: options.context,
+			token_usage: options.tokenUsage,
+			task_id: options.taskId,
+			snapshot_hash: options.snapshotHash,
 		};
 
 		await this.appendEntry(entry);

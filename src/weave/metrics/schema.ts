@@ -26,6 +26,38 @@ export const ModelTier = z.enum(["frontier", "mid", "junior", "script"]);
 export type ModelTier = z.infer<typeof ModelTier>;
 
 // =============================================================================
+// TOKEN USAGE TRACKING
+// =============================================================================
+
+/**
+ * Token Usage Data Flow (ADR-007):
+ * 
+ * 1. Snapshot builder calculates `snapshot_tokens` from hint budget
+ * 2. Agent reports `search_activity` in receipt → `agent_search_tokens`
+ * 3. Receipt includes `output_tokens` from generation
+ * 4. Engine verification logs complete TokenUsage to audit entry
+ * 
+ * This enables future analysis:
+ * - "When we provided X tokens of hints, agent used Y fewer search tokens"
+ * - Token efficiency trends over time
+ * - Persona impact on token usage
+ */
+export const TokenUsage = z.object({
+	/** Tokens from snapshot hint budget (what we provided) */
+	snapshot_tokens: z.number().int().nonnegative(),
+
+	/** Additional tokens from agent-initiated search (what agent discovered) */
+	agent_search_tokens: z.number().int().nonnegative(),
+
+	/** Output tokens generated */
+	output_tokens: z.number().int().nonnegative(),
+
+	/** Total tokens used */
+	total: z.number().int().nonnegative(),
+});
+export type TokenUsage = z.infer<typeof TokenUsage>;
+
+// =============================================================================
 // INTERVENTION AUDIT ENTRY
 // =============================================================================
 
@@ -68,6 +100,15 @@ export const InterventionAuditEntry = z.object({
 
 	/** Additional context */
 	context: z.record(z.string(), z.any()).optional(),
+
+	/** Token usage tracking (optional, backward compatible) */
+	token_usage: TokenUsage.optional(),
+
+	/** Task ID if linked to task snapshot contract */
+	task_id: z.string().optional(),
+
+	/** Snapshot hash if linked to task snapshot */
+	snapshot_hash: z.string().optional(),
 });
 export type InterventionAuditEntry = z.infer<typeof InterventionAuditEntry>;
 
@@ -429,4 +470,44 @@ export function getInterventionsByLevel(
 	level: DeterminismLevel
 ): InterventionDefinition[] {
 	return INTERVENTION_CATALOG.filter((i) => i.determinism_level === level);
+}
+
+// =============================================================================
+// TOKEN USAGE HELPERS
+// =============================================================================
+
+/**
+ * Compute token usage from snapshot and receipt
+ */
+export function computeTokenUsage(
+	snapshotTokens: number,
+	searchTokens: number,
+	outputTokens: number
+): TokenUsage {
+	return {
+		snapshot_tokens: snapshotTokens,
+		agent_search_tokens: searchTokens,
+		output_tokens: outputTokens,
+		total: snapshotTokens + searchTokens + outputTokens,
+	};
+}
+
+/**
+ * Create audit entry with token tracking
+ */
+export function createAuditEntryWithTokens(
+	base: Omit<
+		z.infer<typeof InterventionAuditEntry>,
+		"token_usage" | "task_id" | "snapshot_hash"
+	>,
+	tokenUsage: TokenUsage,
+	taskId?: string,
+	snapshotHash?: string
+): z.infer<typeof InterventionAuditEntry> {
+	return {
+		...base,
+		token_usage: tokenUsage,
+		task_id: taskId,
+		snapshot_hash: snapshotHash,
+	};
 }
