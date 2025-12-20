@@ -52,6 +52,12 @@ import {
 	InitLocalResult,
 	ProfileResolveResult,
 	WorkflowGuideArgs,
+	PrListArgs,
+	PrListResult,
+	PlanValidateArgs,
+	PlanValidateResult,
+	PlanAnalyzeArgs,
+	PlanAnalyzeResult,
 } from "./types.js";
 import {
 	resolveProfile,
@@ -82,6 +88,8 @@ import {
 	unknownDependencyError,
 	AXErrorException,
 	isAXErrorException,
+	type CycleDetectedContext,
+	type UnknownDependencyContext,
 } from "../errors/index.js";
 
 import * as fs from "fs";
@@ -310,6 +318,96 @@ function createServer(options?: McpServerOptions): Server {
 								type: "string",
 								description:
 									"Target branch for merging PRs (default: repo default branch)",
+							},
+						},
+					},
+				},
+				{
+					name: "pr_list",
+					description:
+						"List pull requests from GitHub without creating a plan. Useful for discovering PRs before plan generation.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							owner: {
+								type: "string",
+								description:
+									"GitHub repository owner (auto-detected from git remote if not provided)",
+							},
+							repo: {
+								type: "string",
+								description:
+									"GitHub repository name (auto-detected from git remote if not provided)",
+							},
+							query: {
+								type: "string",
+								description:
+									"GitHub search query (e.g., 'is:open label:stack:*')",
+							},
+							labels: {
+								type: "array",
+								description: "Filter PRs by labels",
+								items: {
+									type: "string",
+								},
+							},
+							includeDrafts: {
+								type: "boolean",
+								description: "Include draft PRs in results",
+								default: true,
+							},
+							excludePRs: {
+								type: "array",
+								description: "Exclude specific PRs by number",
+								items: {
+									type: "number",
+								},
+							},
+							githubToken: {
+								type: "string",
+								description:
+									"GitHub API token (or use GITHUB_TOKEN env var)",
+							},
+							state: {
+								type: "string",
+								description: "PR state filter (default: open)",
+								enum: ["open", "closed", "all"],
+								default: "open",
+							},
+						},
+					},
+				},
+				{
+					name: "plan_validate",
+					description:
+						"Validate a plan.json file without executing it. Checks schema compliance and logical consistency.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							planFile: {
+								type: "string",
+								description:
+									"Path to plan.json file (default: <profile>/runner/plan.json)",
+							},
+							planContent: {
+								type: "string",
+								description:
+									"JSON string of plan content to validate (alternative to planFile)",
+							},
+						},
+					},
+				},
+				{
+					name: "plan_analyze",
+					description:
+						"Analyze a plan for potential conflicts and dependency issues. Performs dry-run dependency resolution and conflict detection.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							planFile: {
+								type: "string",
+								description:
+									"Path to plan.json file (default: <profile>/runner/plan.json)",
 							},
 						},
 					},
@@ -824,6 +922,15 @@ function createServer(options?: McpServerOptions): Server {
 			case "plan.create": // Deprecated alias
 				return await handlePlanCreate(args as PlanCreateArgs);
 
+			case "pr_list":
+				return await handlePrList(args as PrListArgs);
+
+			case "plan_validate":
+				return await handlePlanValidate(args as PlanValidateArgs);
+
+			case "plan_analyze":
+				return await handlePlanAnalyze(args as PlanAnalyzeArgs);
+
 			// Gate tools
 			case "gates_run":
 					case "lexrunner_gate_run": // deprecated alias
@@ -1153,6 +1260,321 @@ async function handlePlanCreate(
 			"plan.create",
 			error,
 			"create plan"
+		);
+	}
+}
+
+/**
+ * Handle pr_list tool
+ * Lists pull requests from GitHub without creating a plan
+ */
+async function handlePrList(
+	args: PrListArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Check for GitHub authentication early
+		ensureGitHubToken(args.githubToken);
+
+		// Create GitHub client
+		const client = await createGitHubClient({
+			token: args.githubToken,
+			owner: args.owner,
+			repo: args.repo,
+		});
+
+		// Validate repository access
+		const repoInfo = await client.validateRepository();
+
+		// Get state parameter (default to "open")
+		const state = args.state || "open";
+
+		// Discover PRs based on query/filters
+		const prs = await client.listOpenPRs({
+			state,
+			labels: args.labels,
+			...(args.query ? { query: args.query } : {})
+		});
+
+		// Default behavior: include drafts unless explicitly disabled
+		const includeDrafts = args.includeDrafts === undefined ? true : Boolean(args.includeDrafts);
+		const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
+
+		// Exclude specific PRs if requested
+		const excludePRs = args.excludePRs || [];
+		const finalPRs = excludePRs.length > 0
+			? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
+			: filteredPRs;
+
+		// Transform to result format
+		const result: PrListResult = {
+			pullRequests: finalPRs.map(pr => ({
+				number: pr.number,
+				title: pr.title,
+				branch: pr.head.ref,
+				author: pr.user.login,
+				labels: pr.labels.map(l => l.name),
+				sha: pr.head.sha,
+				draft: pr.draft
+			})),
+			total: prs.length,
+			filtered: finalPRs.length,
+			owner: client.getOwner(),
+			repo: client.getRepo()
+		};
+
+		// Log discovery results to stderr
+		const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
+		const filterInfo = args.labels ? ` labels=${args.labels.join(",")}` : "";
+		const queryInfo = args.query ? ` query="${args.query}"` : "";
+		console.error(
+			`[mcp:pr_list] repo=${repoDiag}${filterInfo}${queryInfo} found=${result.filtered}/${result.total} PRs`
+		);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof GitHubAPIError) {
+			const axError = githubApiError({
+				message: error.message,
+			});
+			throwMcpAXError(ErrorCode.InternalError, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"pr_list",
+			error,
+			"list pull requests"
+		);
+	}
+}
+
+/**
+ * Handle plan_validate tool
+ * Validates a plan.json file for schema compliance and logical consistency
+ */
+async function handlePlanValidate(
+	args: PlanValidateArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		let planContent: string;
+		let planPath: string | undefined;
+
+		// Get plan content either from file or direct content
+		if (args.planContent) {
+			planContent = args.planContent;
+		} else {
+			// Resolve plan file path
+			if (args.planFile) {
+				planPath = args.planFile;
+			} else {
+				const resolved = resolveProfile(undefined, process.cwd());
+				planPath = path.join(resolved.path, "runner", "plan.json");
+			}
+
+			// Check if plan file exists
+			if (!fs.existsSync(planPath)) {
+				throwMcpAXError(
+					ErrorCode.InvalidParams,
+					planNotFoundError(planPath)
+				);
+			}
+
+			planContent = fs.readFileSync(planPath, "utf-8");
+		}
+
+		// Try to validate the plan
+		const result: PlanValidateResult = {
+			valid: true,
+			warnings: []
+		};
+
+		try {
+			const plan = loadPlan(planContent);
+
+			// Basic validation passed
+			result.plan = {
+				schemaVersion: plan.schemaVersion,
+				target: plan.target,
+				itemCount: plan.items.length
+			};
+
+			// Additional logical validations
+			if (plan.items.length === 0) {
+				result.warnings?.push("Plan contains no items");
+			}
+
+			// Check for duplicate item names
+			const names = new Set<string>();
+			const duplicates: string[] = [];
+			for (const item of plan.items) {
+				if (names.has(item.name)) {
+					duplicates.push(item.name);
+				}
+				names.add(item.name);
+			}
+			if (duplicates.length > 0) {
+				result.valid = false;
+				result.errors = result.errors || [];
+				result.errors.push({
+					path: "items",
+					message: `Duplicate item names found: ${duplicates.join(", ")}`,
+					code: "DUPLICATE_NAMES"
+				});
+			}
+
+			console.error(
+				`[mcp:plan_validate] validated plan with ${plan.items.length} items, valid=${result.valid}`
+			);
+		} catch (error) {
+			result.valid = false;
+			result.errors = [];
+
+			if (error instanceof AXErrorException) {
+				result.errors.push({
+					path: "root",
+					message: error.message,
+					code: error.axError.code
+				});
+			} else if (error instanceof Error) {
+				result.errors.push({
+					path: "root",
+					message: error.message
+				});
+			}
+
+			console.error(`[mcp:plan_validate] validation failed: ${error}`);
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"plan_validate",
+			error,
+			"validate plan"
+		);
+	}
+}
+
+/**
+ * Handle plan_analyze tool
+ * Analyzes a plan for conflicts and dependency issues (dry-run)
+ */
+async function handlePlanAnalyze(
+	args: PlanAnalyzeArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		let planPath: string;
+
+		// Resolve plan file path
+		if (args.planFile) {
+			planPath = args.planFile;
+		} else {
+			const resolved = resolveProfile(undefined, process.cwd());
+			planPath = path.join(resolved.path, "runner", "plan.json");
+		}
+
+		// Check if plan file exists
+		if (!fs.existsSync(planPath)) {
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(planPath)
+			);
+		}
+
+		// Load and validate plan
+		const planContent = fs.readFileSync(planPath, "utf-8");
+		const plan = loadPlan(planContent);
+
+		const result: PlanAnalyzeResult = {
+			valid: true,
+			conflicts: [],
+			dependencies: {
+				total: 0,
+			},
+			summary: {
+				totalItems: plan.items.length,
+				maxParallelism: 0,
+				hasIssues: false
+			}
+		};
+
+		// Count dependencies
+		for (const item of plan.items) {
+			if (item.deps && item.deps.length > 0) {
+				result.dependencies!.total += item.deps.length;
+			}
+		}
+
+		// Try to compute merge order (will detect cycles and unknown deps)
+		try {
+			const levels = computeMergeOrder(plan);
+			result.mergeOrder = levels;
+			const levelSizes = levels.map(l => l.length);
+			result.summary.maxParallelism = levelSizes.length > 0 
+				? Math.max(0, ...levelSizes)
+				: 0;
+
+			console.error(
+				`[mcp:plan_analyze] analyzed plan: ${plan.items.length} items, ${levels.length} levels, max parallelism=${result.summary.maxParallelism}`
+			);
+		} catch (error) {
+			result.valid = false;
+			result.summary.hasIssues = true;
+
+			if (error instanceof CycleError) {
+				const cycle = (error.axError.context as unknown as CycleDetectedContext).cycle;
+				result.dependencies!.cycles = [[...cycle]];
+				result.conflicts?.push({
+					type: "cycle",
+					message: `Dependency cycle detected: ${cycle.join(" -> ")}`,
+					items: cycle
+				});
+				console.error(`[mcp:plan_analyze] cycle detected: ${cycle.join(" -> ")}`);
+			} else if (error instanceof UnknownDependencyError) {
+				const ctx = error.axError.context as unknown as UnknownDependencyContext;
+				result.dependencies!.unknown = [ctx.dependency];
+				result.conflicts?.push({
+					type: "unknown_dependency",
+					message: `Unknown dependency: ${ctx.dependency} referenced by ${ctx.item}`,
+					items: [ctx.item, ctx.dependency]
+				});
+				console.error(`[mcp:plan_analyze] unknown dependency: ${ctx.dependency}`);
+			} else {
+				result.conflicts?.push({
+					type: "analysis_error",
+					message: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"plan_analyze",
+			error,
+			"analyze plan"
 		);
 	}
 }

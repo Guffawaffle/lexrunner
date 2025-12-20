@@ -87,9 +87,11 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ### mcp_lexrunner_plan_create
 
-Creates a plan from configuration files or auto-discovers from GitHub PRs.
+Creates a plan from configuration files or auto-discovers from GitHub PRs. This is a **convenience wrapper** that combines PR discovery (`pr_list`), plan generation, validation, and file writing into a single operation.
 
 > **Deprecated alias:** `plan.create`
+>
+> **Note:** For more granular control, use `pr_list`, `plan_validate`, and `plan_analyze` tools individually.
 
 **Parameters:**
 - `json` (boolean, optional): Output plan as JSON to stdout
@@ -192,6 +194,185 @@ The tool will:
   }
 }
 ```
+
+### pr_list
+
+Lists pull requests from GitHub without creating a plan. This is a granular tool that allows agents to discover PRs independently before deciding whether to create a plan.
+
+**Parameters:**
+- `owner` (string, optional): GitHub repository owner (auto-detected from git remote if not provided)
+- `repo` (string, optional): GitHub repository name (auto-detected from git remote if not provided)
+- `query` (string, optional): GitHub search query (e.g., 'is:open label:stack:*')
+- `labels` (array of strings, optional): Filter PRs by labels
+- `includeDrafts` (boolean, optional): Include draft PRs in results (default: true)
+- `excludePRs` (array of numbers, optional): Exclude specific PR numbers
+- `githubToken` (string, optional): GitHub API token (or use GITHUB_TOKEN env var)
+- `state` (string, optional): PR state filter - "open", "closed", or "all" (default: "open")
+
+**Returns:**
+```json
+{
+  "pullRequests": [
+    {
+      "number": 123,
+      "title": "Add feature X",
+      "branch": "feature/x",
+      "author": "developer",
+      "labels": ["feature", "ready"],
+      "sha": "abc123def456",
+      "draft": false
+    }
+  ],
+  "total": 10,
+  "filtered": 5,
+  "owner": "myorg",
+  "repo": "myrepo"
+}
+```
+
+**Example:**
+```json
+{
+  "name": "pr_list",
+  "arguments": {
+    "labels": ["ready-merge"],
+    "includeDrafts": false,
+    "excludePRs": [100, 101]
+  }
+}
+```
+
+**Use Cases:**
+- **Pre-flight checks**: List PRs to verify what would be included before creating a plan
+- **Human review**: Show PRs to user for manual selection before plan creation
+- **Custom workflows**: Build multi-step workflows where PR discovery is separate from planning
+
+### plan_validate
+
+Validates a plan.json file for schema compliance and logical consistency without executing it. This granular tool allows checking plan validity independently of creation or execution.
+
+**Parameters:**
+- `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
+- `planContent` (string, optional): JSON string of plan content to validate (alternative to planFile)
+
+**Returns:**
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": ["Plan contains no items"],
+  "plan": {
+    "schemaVersion": "1.0.0",
+    "target": "main",
+    "itemCount": 5
+  }
+}
+```
+
+If validation fails:
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "path": "items",
+      "message": "Duplicate item names found: PR-1",
+      "code": "DUPLICATE_NAMES"
+    }
+  ]
+}
+```
+
+**Example (validate existing file):**
+```json
+{
+  "name": "plan_validate",
+  "arguments": {
+    "planFile": "/tmp/test-plan.json"
+  }
+}
+```
+
+**Example (validate plan content directly):**
+```json
+{
+  "name": "plan_validate",
+  "arguments": {
+    "planContent": "{\"schemaVersion\":\"1.0.0\",\"target\":\"main\",\"items\":[]}"
+  }
+}
+```
+
+**Use Cases:**
+- **Pre-execution validation**: Check a plan before running gates
+- **CI validation**: Validate plans in CI/CD pipelines
+- **Manual plan editing**: Validate hand-edited plan.json files
+
+### plan_analyze
+
+Analyzes a plan for potential conflicts and dependency issues. Performs dry-run dependency resolution and conflict detection without execution. This granular tool provides detailed analysis of plan structure and dependencies.
+
+**Parameters:**
+- `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
+
+**Returns:**
+```json
+{
+  "valid": true,
+  "mergeOrder": [
+    ["PR-1", "PR-2"],
+    ["PR-3"]
+  ],
+  "conflicts": [],
+  "dependencies": {
+    "total": 2
+  },
+  "summary": {
+    "totalItems": 3,
+    "maxParallelism": 2,
+    "hasIssues": false
+  }
+}
+```
+
+If issues are found:
+```json
+{
+  "valid": false,
+  "conflicts": [
+    {
+      "type": "cycle",
+      "message": "Dependency cycle detected: PR-1 -> PR-2 -> PR-1",
+      "items": ["PR-1", "PR-2"]
+    }
+  ],
+  "dependencies": {
+    "total": 3,
+    "cycles": [["PR-1", "PR-2", "PR-1"]],
+    "unknown": ["PR-99"]
+  },
+  "summary": {
+    "totalItems": 3,
+    "maxParallelism": 0,
+    "hasIssues": true
+  }
+}
+```
+
+**Example:**
+```json
+{
+  "name": "plan_analyze",
+  "arguments": {
+    "planFile": ".smartergpt/runner/plan.json"
+  }
+}
+```
+
+**Use Cases:**
+- **Dependency validation**: Verify no circular dependencies before execution
+- **Parallelism planning**: Understand maximum parallelism potential
+- **Conflict prediction**: Identify potential merge conflicts early
 
 ### mcp_lexrunner_gate_run
 

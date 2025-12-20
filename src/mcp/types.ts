@@ -227,3 +227,85 @@ export interface ConfigShowResult {
 	key?: string;
 	value?: unknown;
 }
+
+/**
+ * AX-016 Granular plan tools - argument schemas
+ */
+
+export const PrListArgs = z.object({
+	owner: z.string().optional(),
+	repo: z.string().optional(),
+	query: z.string().optional(),
+	labels: z.array(z.string()).optional(),
+	includeDrafts: z.boolean().optional(),
+	excludePRs: z.array(z.number()).optional(),
+	githubToken: z.string().optional(),
+	state: z.enum(["open", "closed", "all"]).optional()
+});
+export type PrListArgs = z.infer<typeof PrListArgs>;
+
+export const PlanValidateArgs = z.object({
+	planFile: z.string().optional(),
+	planContent: z.string().optional()
+});
+export type PlanValidateArgs = z.infer<typeof PlanValidateArgs>;
+
+export const PlanAnalyzeArgs = z.object({
+	planFile: z.string().optional()
+});
+export type PlanAnalyzeArgs = z.infer<typeof PlanAnalyzeArgs>;
+
+/**
+ * AX-016 Granular plan tools - result types
+ */
+
+export interface PrListResult {
+	pullRequests: Array<{
+		number: number;
+		title: string;
+		branch: string;
+		author: string;
+		labels: string[];
+		sha: string;
+		draft?: boolean;
+	}>;
+	total: number;
+	filtered: number;
+	owner: string;
+	repo: string;
+}
+
+export interface PlanValidateResult {
+	valid: boolean;
+	errors?: Array<{
+		path: string;
+		message: string;
+		code?: string;
+	}>;
+	warnings?: string[];
+	plan?: {
+		schemaVersion: string;
+		target: string;
+		itemCount: number;
+	};
+}
+
+export interface PlanAnalyzeResult {
+	valid: boolean;
+	mergeOrder?: string[][];
+	conflicts?: Array<{
+		type: string;
+		message: string;
+		items?: string[];
+	}>;
+	dependencies?: {
+		total: number;
+		cycles?: string[][];
+		unknown?: string[];
+	};
+	summary: {
+		totalItems: number;
+		maxParallelism: number;
+		hasIssues: boolean;
+	};
+}
