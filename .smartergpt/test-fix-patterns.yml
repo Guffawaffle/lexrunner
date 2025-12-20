@@ -1,0 +1,109 @@
+# Test Fix Patterns for LexRunner
+#
+# This library defines patterns to detect in failed test output and
+# automatically apply deterministic fixes to test files.
+#
+# Schema: version 1
+# Documentation: .smartergpt/docs/merge-weave-interventions.md
+
+version: 1
+
+patterns:
+  # ==========================================================================
+  # TOOL COUNT ASSERTION FIX (INT-015)
+  # ==========================================================================
+  - id: tool-count-assertion
+    description: "Fix tool count assertions when MCP tools are added/removed"
+    determinism: D1
+    trigger:
+      test_output: "assert.*tools\\.length.*expected (\\d+).*received (\\d+)"
+      error_message: "Should have \\d+ tools"
+    detection:
+      file_pattern: "**/*.spec.ts"
+      line_pattern: "expect\\(.*tools\\.length.*\\)\\.toBe\\((\\d+)\\)"
+    fix:
+      action: update_number
+      from_group: 1  # captured expected count
+      to_group: 2    # captured received count from test output
+    priority: 100
+    enabled: true
+
+  # ==========================================================================
+  # LEXSONA EXPLICIT PATH FIX (INT-016)
+  # ==========================================================================
+  - id: lexsona-connect-explicit-path
+    description: "Add explicit DB path to LexSona.connect() for environment-independent tests"
+    determinism: D1
+    trigger:
+      test_output: "isConnected.*expected false.*received true"
+      error_message: "LexSona\\.connect"
+    detection:
+      file_pattern: "**/lexsona/**/*.spec.ts"
+      line_pattern: "LexSona\\.connect\\(\\)"
+    fix:
+      action: replace
+      with: 'LexSona.connect({ lexDb: "/nonexistent/path/db.sqlite" })'
+    priority: 90
+    enabled: true
+
+  # ==========================================================================
+  # ENVIRONMENT-DEPENDENT HOMEDIR FIX (INT-016)
+  # ==========================================================================
+  - id: env-dependent-homedir
+    description: "Make homedir-based tests environment-aware"
+    determinism: D2
+    trigger:
+      test_output: "expected.*\\.smartergpt.*received.*\\.smartergpt"
+      error_message: "homedir"
+    detection:
+      file_pattern: "**/*.spec.ts"
+      line_pattern: "expect.*homedir.*\\.smartergpt"
+    fix:
+      action: make_environment_aware
+      template: |
+        // Check if DB exists, adjust expectation accordingly
+        const discoveries = discoverDbPath();
+        const firstExisting = discoveries.find((d) => d.exists);
+        if (firstExisting) {
+          expect(result).toBe(firstExisting.path);
+        } else {
+          expect(result).toBe(join(homedir(), ".smartergpt", "lex", "lex.db"));
+        }
+    priority: 80
+    enabled: true
+
+  # ==========================================================================
+  # GENERIC ASSERTION COUNT UPDATE
+  # ==========================================================================
+  - id: generic-count-assertion
+    description: "Update numeric assertions in tests (generic fallback)"
+    determinism: D2
+    trigger:
+      test_output: "expected (\\d+).*received (\\d+)"
+    detection:
+      file_pattern: "**/*.spec.ts"
+      line_pattern: "expect\\(.*\\)\\.toBe\\((\\d+)\\)"
+    fix:
+      action: update_number
+      from_group: 1
+      to_group: 2
+    priority: 50
+    enabled: false  # Disabled by default, enable manually
+
+  # ==========================================================================
+  # STRING ASSERTION UPDATE
+  # ==========================================================================
+  - id: string-assertion-update
+    description: "Update string assertions when expected values change"
+    determinism: D2
+    trigger:
+      test_output: "expected ['\"](.+?)['\"].*received ['\"](.+?)['\"]"
+    detection:
+      file_pattern: "**/*.spec.ts"
+      line_pattern: "expect\\(.*\\)\\.toBe\\(['\"](.+?)['\"]\\)"
+    fix:
+      action: update_string
+      from_group: 1
+      to_group: 2
+    priority: 70
+    enabled: false  # Disabled by default, requires judgment
