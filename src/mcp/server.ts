@@ -88,6 +88,8 @@ import {
 	unknownDependencyError,
 	AXErrorException,
 	isAXErrorException,
+	type CycleDetectedContext,
+	type UnknownDependencyContext,
 } from "../errors/index.js";
 
 import * as fs from "fs";
@@ -1305,10 +1307,10 @@ async function handlePrList(
 			pullRequests: finalPRs.map(pr => ({
 				number: pr.number,
 				title: pr.title,
-				branch: pr.headRef,
-				author: pr.author,
-				labels: pr.labels,
-				sha: pr.sha,
+				branch: pr.head.ref,
+				author: pr.user.login,
+				labels: pr.labels.map(l => l.name),
+				sha: pr.head.sha,
 				draft: pr.draft
 			})),
 			total: prs.length,
@@ -1337,7 +1339,6 @@ async function handlePrList(
 		if (error instanceof GitHubAPIError) {
 			const axError = githubApiError({
 				message: error.message,
-				statusCode: error.statusCode,
 			});
 			throwMcpAXError(ErrorCode.InternalError, axError);
 		}
@@ -1435,7 +1436,7 @@ async function handlePlanValidate(
 				result.errors.push({
 					path: "root",
 					message: error.message,
-					code: error.code
+					code: error.axError.code
 				});
 			} else if (error instanceof Error) {
 				result.errors.push({
@@ -1510,14 +1511,14 @@ async function handlePlanAnalyze(
 
 		// Count dependencies
 		for (const item of plan.items) {
-			if (item.dependsOn) {
-				result.dependencies.total += item.dependsOn.length;
+			if (item.deps && item.deps.length > 0) {
+				result.dependencies!.total += item.deps.length;
 			}
 		}
 
 		// Try to compute merge order (will detect cycles and unknown deps)
 		try {
-			const levels = computeMergeOrder(plan.items);
+			const levels = computeMergeOrder(plan);
 			result.mergeOrder = levels;
 			result.summary.maxParallelism = Math.max(...levels.map(l => l.length));
 
@@ -1529,21 +1530,23 @@ async function handlePlanAnalyze(
 			result.summary.hasIssues = true;
 
 			if (error instanceof CycleError) {
-				result.dependencies.cycles = [[...error.cycle]];
+				const cycle = (error.axError.context as unknown as CycleDetectedContext).cycle;
+				result.dependencies!.cycles = [[...cycle]];
 				result.conflicts?.push({
 					type: "cycle",
-					message: `Dependency cycle detected: ${error.cycle.join(" -> ")}`,
-					items: error.cycle
+					message: `Dependency cycle detected: ${cycle.join(" -> ")}`,
+					items: cycle
 				});
-				console.error(`[mcp:plan_analyze] cycle detected: ${error.cycle.join(" -> ")}`);
+				console.error(`[mcp:plan_analyze] cycle detected: ${cycle.join(" -> ")}`);
 			} else if (error instanceof UnknownDependencyError) {
-				result.dependencies.unknown = [error.dependency];
+				const ctx = error.axError.context as unknown as UnknownDependencyContext;
+				result.dependencies!.unknown = [ctx.dependency];
 				result.conflicts?.push({
 					type: "unknown_dependency",
-					message: `Unknown dependency: ${error.dependency} referenced by ${error.item}`,
-					items: [error.item, error.dependency]
+					message: `Unknown dependency: ${ctx.dependency} referenced by ${ctx.item}`,
+					items: [ctx.item, ctx.dependency]
 				});
-				console.error(`[mcp:plan_analyze] unknown dependency: ${error.dependency}`);
+				console.error(`[mcp:plan_analyze] unknown dependency: ${ctx.dependency}`);
 			} else {
 				result.conflicts?.push({
 					type: "analysis_error",
