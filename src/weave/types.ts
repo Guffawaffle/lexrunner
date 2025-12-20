@@ -21,6 +21,16 @@ export enum WeaveState {
 	MERGING = 'merging',
 	/** Running gates on merged result */
 	VALIDATING = 'validating',
+	/** Gate failed, awaiting automated fix attempt */
+	AWAITING_FIX = 'awaiting_fix',
+	/** Fix submitted, ready for verification */
+	FIX_SUBMITTED = 'fix_submitted',
+	/** Verifying submitted fix */
+	VERIFYING = 'verifying',
+	/** Fix verified successfully */
+	VERIFIED = 'verified',
+	/** Trust gap detected between agent claim and verification */
+	TRUST_GAP = 'trust_gap',
 	/** All batches completed successfully */
 	COMPLETED = 'completed',
 	/** Execution failed */
@@ -49,6 +59,16 @@ export enum WeaveEvent {
 	VALIDATION_PASSED = 'validation_passed',
 	/** Validation gates failed */
 	VALIDATION_FAILED = 'validation_failed',
+	/** Gate failed, snapshot generated */
+	GATE_FAILED = 'gate_failed',
+	/** Fix receipt submitted */
+	FIX_SUBMITTED = 'fix_submitted',
+	/** Begin verification of fix */
+	BEGIN_VERIFICATION = 'begin_verification',
+	/** Fix verified successfully */
+	FIX_VERIFIED = 'fix_verified',
+	/** Trust gap detected */
+	TRUST_GAP_DETECTED = 'trust_gap_detected',
 	/** All batches completed */
 	ALL_COMPLETE = 'all_complete',
 	/** Request to pause execution */
