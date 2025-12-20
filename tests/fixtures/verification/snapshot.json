@@ -1,28 +1,58 @@
 {
-	"version": "1.0.0",
+	"schema_version": "1.0.0",
 	"task_id": "test-task-001",
-	"snapshot_hash": "abc123def456",
-	"snapshot_timestamp": "2025-01-15T10:00:00.000Z",
+	"procedure": "post-merge-fix",
+	"determinism": "D1",
+	"snapshot_hash": "sha256:test_snapshot_hash_placeholder",
+	"repo": {
+		"id": "test-owner/test-repo",
+		"root": "/test/workspace",
+		"commit_sha": "abc123def456"
+	},
+	"scope": {
+		"read_globs": ["**/*.ts", "**/*.json"],
+		"write_globs": ["tests/**/*.spec.ts"],
+		"deny_globs": ["node_modules/**", "dist/**"],
+		"cross_repo_allowed": false
+	},
+	"failure": {
+		"message": "Test failed: Expected 42, got 41",
+		"file_rel": "tests/unit/index.spec.ts",
+		"line": 15,
+		"runner_output_snip": "FAIL tests/unit/index.spec.ts\n  ✕ should return 42 (3ms)\n    expect(received).toBe(expected)\n    Expected: 42\n    Received: 41",
+		"excerpt": "it('should return 42', () => {\n  expect(result).toBe(42);\n});"
+	},
+	"invariants": [
+		"Preserve existing test structure",
+		"Keep semantic assertions over brittle checks"
+	],
+	"targets": [
+		{
+			"path_rel": "tests/unit/index.spec.ts",
+			"hunk": "describe('test suite', () => {\n  it('should return 42', () => {\n    expect(result).toBe(41);\n  });\n});",
+			"hunk_sha256": "sha256:test_hunk_hash_placeholder",
+			"hint_edit": {
+				"find": "expect(result).toBe(41)",
+				"replace": "expect(result).toBe(42)"
+			}
+		}
+	],
+	"source_of_truth": {
+		"kind": "file",
+		"path_rel": "src/index.ts",
+		"excerpt": "export function getAnswer(): number {\n  return 42;\n}"
+	},
 	"verification": {
-		"command": "npm test",
-		"timeout_ms": 30000,
+		"cmd": "npm test",
 		"expect": {
 			"exit_code": 0,
 			"must_include": ["All tests passed"],
 			"must_not_include": ["FAILED", "Error"]
 		}
 	},
-	"initial_state": {
-		"files": [
-			{
-				"path": "src/index.ts",
-				"hash": "file123hash"
-			},
-			{
-				"path": "test/index.test.ts",
-				"hash": "test456hash"
-			}
-		],
-		"git_ref": "main"
-	}
+	"budget": {
+		"max_bytes": 8000,
+		"truncated_fields": []
+	},
+	"receipt_schema_id": "TaskReceipt_v1"
 }

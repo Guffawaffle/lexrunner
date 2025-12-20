@@ -53,8 +53,8 @@ export class EngineVerifier {
 
 		// 2. Apply patch if provided
 		let patchApplied = false;
-		if (applyPatch && receipt.patch?.unified_diff) {
-			await this.applyUnifiedDiff(receipt.patch.unified_diff, workingDir);
+		if (applyPatch && receipt.claims.patch) {
+			await this.applyUnifiedDiff(receipt.claims.patch, workingDir);
 			patchApplied = true;
 		}
 
@@ -71,24 +71,24 @@ export class EngineVerifier {
 		);
 
 		// 5. Detect trust gap
-		const trustGap = receipt.agent_decision.claimed_fixed && !verified;
+		const trustGap = receipt.claims.success && !verified;
 
 		// 6. Build verification record
 		const verification: EngineVerification_v1 = {
 			task_id: snapshot.task_id,
+			timestamp: new Date().toISOString(),
 			snapshot_hash: snapshot.snapshot_hash,
 			receipt_hash: computeCanonicalHash(receipt),
-			agent_claimed: receipt.agent_decision.claimed_fixed,
 			verified,
+			cmd_ran: snapshot.verification.cmd,
+			exit_code: result.exitCode,
+			stdout_snip: result.stdout,
+			stderr_snip: result.stderr,
+			patch_hash: receipt.claims.patch ? computeCanonicalHash(receipt.claims.patch) : undefined,
+			patch_applied: patchApplied,
+			agent_claimed: receipt.claims.success,
 			trust_gap: trustGap,
-			verification_output: {
-				exit_code: result.exitCode,
-				stdout: result.stdout,
-				stderr: result.stderr,
-				duration_ms: result.durationMs,
-			},
-			engine_timestamp: new Date().toISOString(),
-			version: TASK_CONTRACT_VERSION,
+			failures: [],
 		};
 
 		return { verification, trustGap, patchApplied };
@@ -117,10 +117,10 @@ export class EngineVerifier {
 		cwd: string,
 	): Promise<CmdResult> {
 		const startTime = Date.now();
-		const timeout = verification.timeout_ms || 60000; // Default 60s
+		const timeout = 60000; // Default 60s
 
 		try {
-			const { stdout, stderr } = await execAsync(verification.command, {
+			const { stdout, stderr } = await execAsync(verification.cmd, {
 				cwd,
 				timeout,
 				encoding: 'utf8',

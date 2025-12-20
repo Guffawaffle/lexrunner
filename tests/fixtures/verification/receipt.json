@@ -1,20 +1,39 @@
 {
-	"version": "1.0.0",
+	"schema_version": "1.0.0",
 	"task_id": "test-task-001",
-	"snapshot_hash": "abc123def456",
-	"receipt_timestamp": "2025-01-15T10:15:00.000Z",
-	"agent_decision": {
-		"claimed_fixed": true,
-		"confidence": 0.95,
-		"reasoning": "Fixed the failing test by correcting the assertion"
+	"snapshot_hash": "sha256:test_snapshot_hash_placeholder",
+	"claims": {
+		"success": true,
+		"patch": "--- a/tests/unit/index.spec.ts\n+++ b/tests/unit/index.spec.ts\n@@ -2,7 +2,7 @@\n describe('test suite', () => {\n   it('should return 42', () => {\n-    expect(result).toBe(41);\n+    expect(result).toBe(42);\n   });\n });",
+		"files_touched": ["tests/unit/index.spec.ts"],
+		"rationale": "Fixed the assertion to match the actual return value of 42",
+		"confidence": "high",
+		"invariants_respected": [
+			"Preserve existing test structure"
+		],
+		"assumptions_made": [
+			{
+				"type": "test",
+				"text": "Only one assertion needs updating",
+				"validated": true,
+				"evidence": "Checked all test files, only one assertion for getAnswer()"
+			}
+		]
 	},
-	"patch": {
-		"unified_diff": "--- a/test/index.test.ts\n+++ b/test/index.test.ts\n@@ -1,3 +1,3 @@\n-expect(result).toBe(41);\n+expect(result).toBe(42);\n",
-		"files_changed": ["test/index.test.ts"]
+	"search_activity": [],
+	"cost": {
+		"token_usage": {
+			"input": 800,
+			"output": 150,
+			"total": 950
+		},
+		"tool_calls_count": 2,
+		"elapsed_ms": 3500
 	},
-	"agent_metadata": {
-		"agent_id": "copilot-test",
-		"model": "gpt-4",
-		"attempts": 1
-	}
+	"agent_verification": {
+		"cmd_ran": true,
+		"exit_code": 0,
+		"output_snip": "PASS tests/unit/index.spec.ts"
+	},
+	"blockers": []
 }
