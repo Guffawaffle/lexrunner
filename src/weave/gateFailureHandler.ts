@@ -361,7 +361,7 @@ export class GateFailureHandler {
 		await this.auditLogger.logEvent({
 			timestamp: new Date().toISOString(),
 			interventionId: snapshot.task_id,
-			type: "gate-fix" as any, // Custom type for gate fix interventions
+			type: "auto_fix", // ADR-007 gate fix intervention
 			action: "start",
 			determinism: snapshot.determinism,
 			details: {
@@ -384,7 +384,7 @@ export class GateFailureHandler {
 		await this.auditLogger.logEvent({
 			timestamp: new Date().toISOString(),
 			interventionId: receipt.task_id,
-			type: "gate-fix" as any,
+			type: "auto_fix",
 			action: receipt.claims.success ? "complete" : "fail",
 			determinism: snapshot.determinism,
 			details: {
@@ -407,7 +407,7 @@ export class GateFailureHandler {
 		await this.auditLogger.logEvent({
 			timestamp: new Date().toISOString(),
 			interventionId: verification.task_id,
-			type: "gate-fix" as any,
+			type: "auto_fix",
 			action: verification.verified ? "complete" : "fail",
 			determinism: "D1", // Would need to track this separately
 			details: {
