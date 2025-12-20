@@ -1,7 +1,7 @@
 name: Auto-delete merged PR branches
 
 # Purpose: Automatically delete head branches after PR merge
-# Scope: Only same-repo branches matching allowed prefixes (copilot/*, integration/umbrella-*)
+# Scope: Only same-repo branches matching allowed prefixes (copilot/*, integration/umbrella-*, feature/*)
 # Safety: Ignores forks, protected branches, default branch, and PRs with 'keep-branch' label
 
 on:
@@ -76,12 +76,15 @@ jobs:
           HEAD_REF="${{ github.event.pull_request.head.ref }}"
           echo "Deleting branch: $HEAD_REF"
 
+          # URL encode the branch name for safe API usage
+          ENCODED_REF=$(printf '%s' "$HEAD_REF" | jq -sRr @uri)
+
           # Use GitHub CLI to delete the branch
           gh api \
             --method DELETE \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${{ github.repository }}/git/refs/heads/$HEAD_REF" || {
+            "/repos/${{ github.repository }}/git/refs/heads/$ENCODED_REF" || {
               echo "⚠️ Failed to delete (may already be deleted or protected)"
               exit 0
             }
