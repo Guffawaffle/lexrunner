@@ -40,13 +40,16 @@ export function buildFixInstruction(
 				return null;
 			}
 
-			// Replace old number with new number in matched line
+			// Extract old value from detection captures
 			const oldValue = location.detectionCaptures[String(fix.from_group || 1)];
 			if (!oldValue) {
 				return null;
 			}
 
-			replacement = location.matchedLine.replace(oldValue, newValue);
+			// Use regex to replace the specific captured number only
+			const escapedOldValue = oldValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const replaceRegex = new RegExp(`\\b${escapedOldValue}\\b`);
+			replacement = location.matchedLine.replace(replaceRegex, newValue);
 			break;
 		}
 
@@ -57,13 +60,16 @@ export function buildFixInstruction(
 				return null;
 			}
 
-			// Replace old string with new string in matched line
+			// Extract old value from detection captures
 			const oldValue = location.detectionCaptures[String(fix.from_group || 1)];
 			if (!oldValue) {
 				return null;
 			}
 
-			replacement = location.matchedLine.replace(oldValue, newValue);
+			// Use regex to replace the first exact match only
+			const escapedOldValue = oldValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const replaceRegex = new RegExp(escapedOldValue);
+			replacement = location.matchedLine.replace(replaceRegex, newValue);
 			break;
 		}
 
@@ -80,13 +86,16 @@ export function buildFixInstruction(
 		}
 
 		case "make_environment_aware": {
-			// Template-based replacement (requires more context)
+			// Template-based replacement (D2 - requires judgment)
+			// NOTE: This is experimental and may need manual review
 			if (!fix.template) {
 				return null;
 			}
 
-			// For now, just use the template as-is
-			// In a real implementation, this would be more sophisticated
+			// For now, this action requires manual implementation
+			// The template serves as documentation for what needs to be done
+			// In a real implementation, this would need more sophisticated
+			// multi-line code insertion with proper indentation handling
 			replacement = fix.template;
 			break;
 		}

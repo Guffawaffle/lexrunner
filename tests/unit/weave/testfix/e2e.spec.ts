@@ -139,6 +139,8 @@ FAIL  tests/lexsona/connection.spec.ts
 
     Expected: false
     Received: true
+    
+    LexSona.isConnected() returned true when expected false
 
       5 |     await LexSona.connect();
     > 6 |     expect(LexSona.isConnected()).toBe(false);

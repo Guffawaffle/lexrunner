@@ -8,7 +8,6 @@
 
 import { readFileSync } from "fs";
 import { join } from "path";
-import { minimatch } from "minimatch";
 import { globSync } from "glob";
 import type {
 	TestFixPattern,
@@ -34,7 +33,8 @@ export function matchTriggers(
 
 		// Check test_output pattern
 		if (trigger.test_output) {
-			const regex = new RegExp(trigger.test_output, "m");
+			// Use 's' flag to make . match newlines
+			const regex = new RegExp(trigger.test_output, "ms");
 			const match = testOutput.match(regex);
 
 			if (match) {
@@ -55,7 +55,8 @@ export function matchTriggers(
 
 		// Check error_message pattern
 		if (trigger.error_message) {
-			const regex = new RegExp(trigger.error_message, "m");
+			// Use 's' flag to make . match newlines
+			const regex = new RegExp(trigger.error_message, "ms");
 			const match = testOutput.match(regex);
 
 			if (match) {

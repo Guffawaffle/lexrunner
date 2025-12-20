@@ -17,7 +17,6 @@ patterns:
     determinism: D1
     trigger:
       test_output: "assert.*tools\\.length.*expected (\\d+).*received (\\d+)"
-      error_message: "Should have \\d+ tools"
     detection:
       file_pattern: "**/*.spec.ts"
       line_pattern: "expect\\(.*tools\\.length.*\\)\\.toBe\\((\\d+)\\)"
@@ -35,8 +34,7 @@ patterns:
     description: "Add explicit DB path to LexSona.connect() for environment-independent tests"
     determinism: D1
     trigger:
-      test_output: "isConnected.*expected false.*received true"
-      error_message: "LexSona\\.connect"
+      test_output: "Expected: false.*Received: true"
     detection:
       file_pattern: "**/lexsona/**/*.spec.ts"
       line_pattern: "LexSona\\.connect\\(\\)"
@@ -54,7 +52,6 @@ patterns:
     determinism: D2
     trigger:
       test_output: "expected.*\\.smartergpt.*received.*\\.smartergpt"
-      error_message: "homedir"
     detection:
       file_pattern: "**/*.spec.ts"
       line_pattern: "expect.*homedir.*\\.smartergpt"
