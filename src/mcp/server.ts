@@ -1520,7 +1520,9 @@ async function handlePlanAnalyze(
 		try {
 			const levels = computeMergeOrder(plan);
 			result.mergeOrder = levels;
-			result.summary.maxParallelism = Math.max(...levels.map(l => l.length));
+			result.summary.maxParallelism = levels.length > 0 
+				? Math.max(...levels.map(l => l.length))
+				: 0;
 
 			console.error(
 				`[mcp:plan_analyze] analyzed plan: ${plan.items.length} items, ${levels.length} levels, max parallelism=${result.summary.maxParallelism}`

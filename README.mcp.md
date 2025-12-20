@@ -87,9 +87,11 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ### mcp_lexrunner_plan_create
 
-Creates a plan from configuration files or auto-discovers from GitHub PRs.
+Creates a plan from configuration files or auto-discovers from GitHub PRs. This is a **convenience wrapper** that combines PR discovery (`pr_list`), plan generation, validation, and file writing into a single operation.
 
 > **Deprecated alias:** `plan.create`
+>
+> **Note:** For more granular control, use `pr_list`, `plan_validate`, and `plan_analyze` tools individually.
 
 **Parameters:**
 - `json` (boolean, optional): Output plan as JSON to stdout
