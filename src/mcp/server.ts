@@ -1520,8 +1520,9 @@ async function handlePlanAnalyze(
 		try {
 			const levels = computeMergeOrder(plan);
 			result.mergeOrder = levels;
-			result.summary.maxParallelism = levels.length > 0 
-				? Math.max(...levels.map(l => l.length))
+			const levelSizes = levels.map(l => l.length);
+			result.summary.maxParallelism = levelSizes.length > 0 
+				? Math.max(0, ...levelSizes)
 				: 0;
 
 			console.error(
