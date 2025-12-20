@@ -44,7 +44,7 @@ describe('ADR-007 Integration: Gate Failure Flow', () => {
 					deps: [],
 					gates: [
 						{
-							name: 'test',
+							gate: 'test',
 							cmd: 'npm test'
 						}
 					]
@@ -72,9 +72,9 @@ describe('ADR-007 Integration: Gate Failure Flow', () => {
 
 		// Step 2: Gate fails
 		const failedGate: GateResult = {
-			name: 'test',
-			cmd: 'npm test',
-			status: 'failed',
+			gate: 'test',
+			attempts: 1,
+			status: 'fail',
 			exitCode: 1,
 			stdout: '',
 			stderr: 'FAIL tests/example.spec.ts\n  ✕ should pass\n    Expected: true\n    Received: false'
@@ -199,9 +199,9 @@ describe('ADR-007 Integration: Gate Failure Flow', () => {
 
 		// Integration test fails (D2)
 		const failedGate: GateResult = {
-			name: 'integration-test',
-			cmd: 'npm run test:integration',
-			status: 'failed',
+			gate: 'integration-test',
+			attempts: 1,
+			status: 'fail',
 			exitCode: 1,
 			stdout: '',
 			stderr: 'Integration test failed: database connection timeout'
@@ -234,9 +234,9 @@ describe('ADR-007 Integration: Gate Failure Flow', () => {
 		stateMachine.transition(WeaveEvent.MERGE_SUCCESS);
 
 		const failedGate: GateResult = {
-			name: 'test',
-			cmd: 'exit 1', // Always fails
-			status: 'failed',
+			gate: 'test',
+			attempts: 1, // Always fails
+			status: 'fail',
 			exitCode: 1,
 			stdout: '',
 			stderr: 'Test failed'

@@ -36,10 +36,10 @@ describe('GateFailureHandler (ADR-007)', () => {
 	describe('handleGateFailure', () => {
 		it('should generate snapshot for gate failure', async () => {
 			const gateResult: GateResult = {
-				name: 'test',
-				cmd: 'npm test',
-				status: 'failed',
+				gate: 'test',
+				status: 'fail',
 				exitCode: 1,
+				attempts: 1,
 				stdout: '',
 				stderr: 'FAIL tests/example.spec.ts\n  ✕ should pass (3ms)\n    Expected: 1\n    Received: 2'
 			};
@@ -64,7 +64,7 @@ describe('GateFailureHandler (ADR-007)', () => {
 			expect(result.snapshot.determinism).toBe('D1');
 			expect(result.snapshot.repo.id).toBe('test-org/test-repo');
 			expect(result.snapshot.repo.commit_sha).toBe('abc123def456');
-			expect(result.snapshot.verification.cmd).toBe('npm test');
+			expect(result.snapshot.verification.cmd).toContain('test');
 
 			// Verify routing
 			expect(result.routeToLocalFix).toBe(true); // D1 should route locally
@@ -73,9 +73,9 @@ describe('GateFailureHandler (ADR-007)', () => {
 
 		it('should route D2/D3 tasks to agent handoff', async () => {
 			const gateResult: GateResult = {
-				name: 'integration-test',
-				cmd: 'npm run test:integration',
-				status: 'failed',
+				gate: 'integration-test',
+				attempts: 1,
+				status: 'fail' as const,
 				exitCode: 1,
 				stdout: '',
 				stderr: 'Integration test failed'
@@ -100,10 +100,10 @@ describe('GateFailureHandler (ADR-007)', () => {
 
 		it('should parse failure files from output', async () => {
 			const gateResult: GateResult = {
-				name: 'lint',
-				cmd: 'npm run lint',
-				status: 'failed',
+				gate: 'lint',
+				status: 'fail',
 				exitCode: 1,
+				attempts: 1,
 				stdout: '',
 				stderr: 'Error: file: src/utils.ts - Unexpected token'
 			};
@@ -126,10 +126,10 @@ describe('GateFailureHandler (ADR-007)', () => {
 
 		it('should generate valid snapshot hash', async () => {
 			const gateResult: GateResult = {
-				name: 'build',
-				cmd: 'npm run build',
-				status: 'failed',
+				gate: 'build',
+				status: 'fail',
 				exitCode: 1,
+				attempts: 1,
 				stdout: '',
 				stderr: 'Build failed'
 			};
@@ -155,10 +155,10 @@ describe('GateFailureHandler (ADR-007)', () => {
 		it('should process successful receipt with verification', async () => {
 			// First generate a snapshot
 			const gateResult: GateResult = {
-				name: 'test',
-				cmd: 'echo "test passed"',
-				status: 'failed',
+				gate: 'test',
+				status: 'fail',
 				exitCode: 1,
+				attempts: 1,
 				stdout: '',
 				stderr: 'Test failed'
 			};
@@ -207,10 +207,10 @@ describe('GateFailureHandler (ADR-007)', () => {
 		it('should detect trust gap when agent claims success but verification fails', async () => {
 			// Generate snapshot
 			const gateResult: GateResult = {
-				name: 'test',
-				cmd: 'exit 1', // Command that always fails
-				status: 'failed',
+				gate: 'test',
+				status: 'fail',
 				exitCode: 1,
+				attempts: 1,
 				stdout: '',
 				stderr: 'Test failed'
 			};

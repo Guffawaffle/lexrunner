@@ -75,3 +75,11 @@ export type {
 } from "./metrics/index.js";
 
 export { WeaveStateMachine } from "./stateMachine.js";
+
+// ADR-007: Task snapshot contract integration
+export {
+	GateFailureHandler,
+	type GateFailureContext,
+	type GateFailureHandlingResult,
+	type ReceiptProcessingResult,
+} from "./gateFailureHandler.js";
