@@ -158,7 +158,8 @@ export class GateFailureHandler {
 	async processReceipt(
 		snapshot: TaskSnapshot_v1,
 		receipt: TaskReceipt_v1,
-		workingDir: string
+		workingDir: string,
+		options?: { applyPatch?: boolean }
 	): Promise<ReceiptProcessingResult> {
 		// Log receipt submission
 		await this.logReceiptSubmission(snapshot, receipt);
@@ -168,7 +169,7 @@ export class GateFailureHandler {
 			snapshot,
 			receipt,
 			workingDir,
-			applyPatch: true
+			applyPatch: options?.applyPatch ?? true
 		});
 
 		// Log verification result
