@@ -65,7 +65,7 @@ jobs:
             echo "eligible=true" >> $GITHUB_OUTPUT
             echo "reason=allowed-prefix" >> $GITHUB_OUTPUT
           else
-            echo "❌ Skipping: No matching prefix (copilot/*, umbrella-*, feature/*)"
+            echo "❌ Skipping: No matching prefix (copilot/*, integration/umbrella-*, feature/*)"
             echo "eligible=false" >> $GITHUB_OUTPUT
             echo "reason=no-matching-prefix" >> $GITHUB_OUTPUT
           fi
