@@ -1,21 +1,20 @@
 /**
  * Engine Verifier (ADR-007)
- * 
+ *
  * Implements the "trust but verify" pattern for agent task completion.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { exec } from "child_process";
+import { promisify } from "util";
 import {
 	TaskSnapshot_v1,
 	TaskReceipt_v1,
 	EngineVerification_v1,
 	verifySnapshotBinding,
 	computeCanonicalHash,
-	TASK_CONTRACT_VERSION,
-} from '../schemas/task-contract.js';
-import { DiffApplier } from './diff-applier.js';
-import { SnapshotMismatchError, VerificationTimeoutError } from './errors.js';
+} from "../schemas/task-contract.js";
+import { DiffApplier } from "./diff-applier.js";
+import { SnapshotMismatchError, VerificationTimeoutError } from "./errors.js";
 
 const execAsync = promisify(exec);
 
@@ -47,7 +46,7 @@ export class EngineVerifier {
 		if (!verifySnapshotBinding(snapshot, receipt.snapshot_hash)) {
 			throw new SnapshotMismatchError(
 				snapshot.snapshot_hash,
-				receipt.snapshot_hash,
+				receipt.snapshot_hash
 			);
 		}
 
@@ -61,13 +60,13 @@ export class EngineVerifier {
 		// 3. Run verification command
 		const result = await this.runVerificationCmd(
 			snapshot.verification,
-			workingDir,
+			workingDir
 		);
 
 		// 4. Check verification expectations
 		const verified = this.checkExpectations(
 			snapshot.verification.expect,
-			result,
+			result
 		);
 
 		// 5. Detect trust gap
@@ -84,7 +83,9 @@ export class EngineVerifier {
 			exit_code: result.exitCode,
 			stdout_snip: result.stdout,
 			stderr_snip: result.stderr,
-			patch_hash: receipt.claims.patch ? computeCanonicalHash(receipt.claims.patch) : undefined,
+			patch_hash: receipt.claims.patch
+				? computeCanonicalHash(receipt.claims.patch)
+				: undefined,
 			patch_applied: patchApplied,
 			agent_claimed: receipt.claims.success,
 			trust_gap: trustGap,
@@ -99,7 +100,7 @@ export class EngineVerifier {
 	 */
 	private async applyUnifiedDiff(
 		unifiedDiff: string,
-		workingDir: string,
+		workingDir: string
 	): Promise<void> {
 		const applier = new DiffApplier({ workingDir });
 		await applier.apply(unifiedDiff);
@@ -107,14 +108,14 @@ export class EngineVerifier {
 
 	/**
 	 * Run verification command and capture results
-	 * 
+	 *
 	 * SECURITY NOTE: This executes the command specified in the TaskSnapshot.
 	 * The snapshot should be created by a trusted source and validated before use.
 	 * In a production system, consider implementing command allowlisting or sandboxing.
 	 */
 	private async runVerificationCmd(
-		verification: TaskSnapshot_v1['verification'],
-		cwd: string,
+		verification: TaskSnapshot_v1["verification"],
+		cwd: string
 	): Promise<CmdResult> {
 		const startTime = Date.now();
 		const timeout = 60000; // Default 60s
@@ -123,30 +124,30 @@ export class EngineVerifier {
 			const { stdout, stderr } = await execAsync(verification.cmd, {
 				cwd,
 				timeout,
-				encoding: 'utf8',
+				encoding: "utf8",
 			});
 
 			const durationMs = Date.now() - startTime;
 
 			return {
 				exitCode: 0,
-				stdout: stdout || '',
-				stderr: stderr || '',
+				stdout: stdout || "",
+				stderr: stderr || "",
 				durationMs,
 			};
 		} catch (error: any) {
 			const durationMs = Date.now() - startTime;
 
 			// Handle timeout
-			if (error.killed && error.signal === 'SIGTERM') {
+			if (error.killed && error.signal === "SIGTERM") {
 				throw new VerificationTimeoutError(timeout);
 			}
 
 			// Handle non-zero exit code
 			return {
 				exitCode: error.code || 1,
-				stdout: error.stdout || '',
-				stderr: error.stderr || '',
+				stdout: error.stdout || "",
+				stderr: error.stderr || "",
 				durationMs,
 			};
 		}
@@ -156,11 +157,14 @@ export class EngineVerifier {
 	 * Check if verification output meets expectations
 	 */
 	private checkExpectations(
-		expect: TaskSnapshot_v1['verification']['expect'],
-		result: CmdResult,
+		expect: TaskSnapshot_v1["verification"]["expect"],
+		result: CmdResult
 	): boolean {
 		// Check exit code
-		if (expect.exit_code !== undefined && result.exitCode !== expect.exit_code) {
+		if (
+			expect.exit_code !== undefined &&
+			result.exitCode !== expect.exit_code
+		) {
 			return false;
 		}
 

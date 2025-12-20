@@ -8,9 +8,6 @@
 		"files_touched": ["tests/unit/index.spec.ts"],
 		"rationale": "Fixed the assertion to match the actual return value of 42",
 		"confidence": "high",
-		"invariants_respected": [
-			"Preserve existing test structure"
-		],
 		"assumptions_made": [
 			{
 				"type": "test",
@@ -29,11 +26,6 @@
 		},
 		"tool_calls_count": 2,
 		"elapsed_ms": 3500
-	},
-	"agent_verification": {
-		"cmd_ran": true,
-		"exit_code": 0,
-		"output_snip": "PASS tests/unit/index.spec.ts"
 	},
 	"blockers": []
 }
