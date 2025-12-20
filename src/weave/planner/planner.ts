@@ -85,7 +85,7 @@ function planDiscoveryPhase(
 	const filterDraftsId = interventions[interventions.length - 1].id;
 
 	// 3. Undraft Copilot PRs if policy allows
-	if (policy.discovery.draft_policy.undraft_copilot_prs) {
+	if (policy.discovery.draft_policy?.undraft_copilot_prs) {
 		const copilotDrafts = prs.filter((pr) => pr.isDraft && pr.isCopilot);
 		for (const pr of copilotDrafts) {
 			interventions.push(
@@ -109,7 +109,7 @@ function planDiscoveryPhase(
 			undefined,
 			prependIds,
 			{
-				resolution: policy.dependencies.resolution,
+				resolution: policy.dependencies?.resolution,
 			}
 		)
 	);
@@ -127,8 +127,9 @@ function planGatesPhase(
 ): BaseIntervention[] {
 	const interventions: BaseIntervention[] = [];
 
-	// Base branch gates (run once)
-	for (const gate of policy.gates.base_branch.required) {
+	// Base branch gates (run once) - skip if not configured
+	const baseBranchGates = policy.gates?.base_branch?.required ?? [];
+	for (const gate of baseBranchGates) {
 		interventions.push(
 			createIntervention(
 				"run_base_gate",
@@ -145,12 +146,17 @@ function planGatesPhase(
 
 	const baseGateIds = interventions.map((i) => i.id);
 
-	// Per-PR gates
+	// Per-PR gates - skip if not configured
+	const perPrGates = policy.gates?.per_pr;
+	if (!perPrGates) {
+		return interventions;
+	}
+
 	for (const pr of prs) {
 		const prTarget = `${pr.owner}/${pr.repo}#${pr.number}`;
 
 		// CI status check
-		if (policy.gates.per_pr.require_ci_green) {
+		if (perPrGates.require_ci_green) {
 			interventions.push(
 				createIntervention(
 					"check_ci_status",
@@ -174,14 +180,14 @@ function planGatesPhase(
 				prTarget,
 				baseGateIds,
 				{
-					checklist: policy.gates.per_pr.review_checklist,
+					checklist: perPrGates.review_checklist,
 					prNumber: pr.number,
 				}
 			)
 		);
 
 		// Quality assessment (D3 - only if enabled)
-		if (policy.gates.per_pr.quality_assessment.enabled) {
+		if (perPrGates.quality_assessment?.enabled) {
 			interventions.push(
 				createIntervention(
 					"quality_assessment",
@@ -189,10 +195,8 @@ function planGatesPhase(
 					prTarget,
 					baseGateIds,
 					{
-						criteria:
-							policy.gates.per_pr.quality_assessment.criteria,
-						action: policy.gates.per_pr.quality_assessment
-							.action_on_concern,
+						criteria: perPrGates.quality_assessment.criteria,
+						action: perPrGates.quality_assessment.action_on_concern,
 					}
 				)
 			);
@@ -220,7 +224,7 @@ function planMergePhase(
 			undefined,
 			gateInterventionIds,
 			{
-				onCycle: policy.dependencies.on_cycle,
+				onCycle: policy.dependencies?.on_cycle,
 			}
 		)
 	);
@@ -228,11 +232,12 @@ function planMergePhase(
 
 	// For each PR, plan merge execution
 	let prevMergeId = computeOrderId;
+	const mergeConfig = policy.merge;
 	for (const pr of prs) {
 		const prTarget = `${pr.owner}/${pr.repo}#${pr.number}`;
 
 		// Check admin authority
-		if (policy.merge.admin_authority.enabled) {
+		if (mergeConfig?.admin_authority?.enabled) {
 			interventions.push(
 				createIntervention(
 					"check_admin_authority",
@@ -240,7 +245,7 @@ function planMergePhase(
 					prTarget,
 					[prevMergeId],
 					{
-						conditions: policy.merge.admin_authority.conditions,
+						conditions: mergeConfig.admin_authority.conditions,
 						owner: pr.owner,
 						repo: pr.repo,
 						prNumber: pr.number,
@@ -257,8 +262,8 @@ function planMergePhase(
 				prTarget,
 				[prevMergeId],
 				{
-					method: policy.merge.method,
-					commitTitle: policy.merge.commit_title,
+					method: mergeConfig?.method,
+					commitTitle: mergeConfig?.commit_title,
 					owner: pr.owner,
 					repo: pr.repo,
 					prNumber: pr.number,
@@ -280,12 +285,18 @@ function planPostMergePhase(
 	lastMergeId: string
 ): BaseIntervention[] {
 	const interventions: BaseIntervention[] = [];
+	const postMerge = policy.post_merge;
+
+	// Skip if post_merge not configured
+	if (!postMerge) {
+		return interventions;
+	}
 
 	// Pull and verify for each repo
 	for (const repo of repos) {
 		const repoTarget = `${repo.owner}/${repo.name}`;
 
-		if (policy.post_merge.pull_and_verify.enabled) {
+		if (postMerge.pull_and_verify?.enabled) {
 			interventions.push(
 				createIntervention(
 					"pull_changes",
@@ -300,7 +311,8 @@ function planPostMergePhase(
 			);
 			const pullId = interventions[interventions.length - 1].id;
 
-			for (const gate of policy.post_merge.pull_and_verify.gates) {
+			const gates = postMerge.pull_and_verify.gates ?? [];
+			for (const gate of gates) {
 				interventions.push(
 					createIntervention(
 						"verify_gates",
@@ -319,7 +331,7 @@ function planPostMergePhase(
 	}
 
 	// Auto-fix patterns (prepared but not executed until failure detected)
-	if (policy.post_merge.auto_fix.enabled) {
+	if (postMerge.auto_fix?.enabled) {
 		const verifyIds = interventions
 			.filter((i) => i.type === "verify_gates")
 			.map((i) => i.id);
@@ -330,7 +342,7 @@ function planPostMergePhase(
 				undefined,
 				verifyIds,
 				{
-					patterns: policy.post_merge.auto_fix.patterns,
+					patterns: postMerge.auto_fix.patterns,
 				}
 			)
 		);

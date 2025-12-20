@@ -90,30 +90,38 @@ Examples:
 							`     - ${repo.owner}/${repo.name} (priority: ${repo.priority})`
 						);
 					}
-					console.log(`\n🔐 Gates`);
-					console.log(
-						`   Base branch: ${result.policy.gates.base_branch.required.length} required`
-					);
-					console.log(
-						`   Per-PR CI: ${
-							result.policy.gates.per_pr.require_ci_green
-								? "required"
-								: "optional"
-						}`
-					);
-					console.log(`\n🔀 Merge`);
-					console.log(`   Method: ${result.policy.merge.method}`);
-					console.log(
-						`   Admin authority: ${
-							result.policy.merge.admin_authority.enabled
-								? "enabled"
-								: "disabled"
-						}`
-					);
-					console.log(`\n📊 Model Handoff`);
-					for (const tier of result.policy.model_handoff.tiers) {
-						const current = tier.current ? " (current)" : "";
-						console.log(`   ${tier.id}: ${tier.name}${current}`);
+					if (result.policy.gates?.base_branch?.required) {
+						console.log(`\n🔐 Gates`);
+						console.log(
+							`   Base branch: ${result.policy.gates.base_branch.required.length} required`
+						);
+						console.log(
+							`   Per-PR CI: ${
+								result.policy.gates?.per_pr?.require_ci_green
+									? "required"
+									: "optional"
+							}`
+						);
+					}
+					if (result.policy.merge) {
+						console.log(`\n🔀 Merge`);
+						console.log(`   Method: ${result.policy.merge.method}`);
+						console.log(
+							`   Admin authority: ${
+								result.policy.merge.admin_authority?.enabled
+									? "enabled"
+									: "disabled"
+							}`
+						);
+					}
+					if (result.policy.model_handoff?.tiers) {
+						console.log(`\n📊 Model Handoff`);
+						for (const tier of result.policy.model_handoff.tiers) {
+							const current = tier.current ? " (current)" : "";
+							console.log(
+								`   ${tier.id}: ${tier.name}${current}`
+							);
+						}
 					}
 				}
 			} catch (err) {
@@ -143,9 +151,9 @@ Examples:
 				console.log(
 					`   Repos: ${result.policy.discovery.repos.length}`
 				);
-				console.log(
-					`   Gates: ${result.policy.gates.base_branch.required.length} base branch gates`
-				);
+				const gateCount =
+					result.policy.gates?.base_branch?.required?.length ?? 0;
+				console.log(`   Gates: ${gateCount} base branch gates`);
 			} catch (err) {
 				if (err instanceof PolicyLoadError) {
 					console.error(`\n❌ Validation failed: ${err.message}`);
