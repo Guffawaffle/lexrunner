@@ -20,8 +20,11 @@ export interface MCPEnvironment {
  */
 export function getMCPEnvironment(): MCPEnvironment {
 	return {
-		LEX_PR_PROFILE_DIR: getEnvWithAlias('LEX_PR_PROFILE_DIR', 'LEXRUNNER_PROFILE_DIR'),
-		ALLOW_MUTATIONS: process.env.ALLOW_MUTATIONS === "true"
+		LEX_PR_PROFILE_DIR: getEnvWithAlias(
+			"LEX_PR_PROFILE_DIR",
+			"LEXRUNNER_PROFILE_DIR"
+		),
+		ALLOW_MUTATIONS: process.env.ALLOW_MUTATIONS === "true",
 	};
 }
 
@@ -43,7 +46,7 @@ export const PlanCreateArgs = z.object({
 	repo: z.string().optional(),
 	requiredGates: z.array(z.string()).optional(),
 	maxWorkers: z.number().optional(),
-	target: z.string().optional()
+	target: z.string().optional(),
 });
 export type PlanCreateArgs = z.infer<typeof PlanCreateArgs>;
 
@@ -51,22 +54,22 @@ export const GatesRunArgs = z.object({
 	planFile: z.string().optional(),
 	onlyItem: z.string().optional(),
 	onlyGate: z.string().optional(),
-	outDir: z.string().optional()
+	outDir: z.string().optional(),
 });
 export type GatesRunArgs = z.infer<typeof GatesRunArgs>;
 
 export const MergeApplyArgs = z.object({
-	dryRun: z.boolean().optional()
+	dryRun: z.boolean().optional(),
 });
 export type MergeApplyArgs = z.infer<typeof MergeApplyArgs>;
 
 export const InitLocalArgs = z.object({
-	force: z.boolean().optional()
+	force: z.boolean().optional(),
 });
 export type InitLocalArgs = z.infer<typeof InitLocalArgs>;
 
 export const ProfileResolveArgs = z.object({
-	profileDir: z.string().optional()
+	profileDir: z.string().optional(),
 });
 export type ProfileResolveArgs = z.infer<typeof ProfileResolveArgs>;
 
@@ -126,22 +129,22 @@ export const DiscoverArgs = z.object({
 	owner: z.string().optional(),
 	repo: z.string().optional(),
 	state: z.enum(["open", "closed", "all"]).optional(),
-	suggest: z.boolean().optional()
+	suggest: z.boolean().optional(),
 });
 export type DiscoverArgs = z.infer<typeof DiscoverArgs>;
 
 export const StatusArgs = z.object({
-	planFile: z.string().optional()
+	planFile: z.string().optional(),
 });
 export type StatusArgs = z.infer<typeof StatusArgs>;
 
 export const MergeOrderArgs = z.object({
-	planFile: z.string().optional()
+	planFile: z.string().optional(),
 });
 export type MergeOrderArgs = z.infer<typeof MergeOrderArgs>;
 
 export const ConfigShowArgs = z.object({
-	key: z.string().optional()
+	key: z.string().optional(),
 });
 export type ConfigShowArgs = z.infer<typeof ConfigShowArgs>;
 
@@ -152,8 +155,8 @@ export const WorkflowGuideArgs = z.object({
 		"post-gates-run",
 		"pre-merge",
 		"post-merge",
-		"error-recovery"
-	])
+		"error-recovery",
+	]),
 });
 export type WorkflowGuideArgs = z.infer<typeof WorkflowGuideArgs>;
 
@@ -203,11 +206,25 @@ export interface DoctorResult {
 	issues: string[];
 	suggestions: string[];
 	nodejs?: { status: string; current: string; expected?: string };
-	configuration?: { hasConfiguration: boolean; missingFiles: string[]; suggestions: string[] };
+	configuration?: {
+		hasConfiguration: boolean;
+		missingFiles: string[];
+		suggestions: string[];
+	};
 	projectType?: string;
 	environmentSuggestions?: string[];
-	github?: { detected: boolean; authenticated?: boolean; user?: string; error?: string };
-	git?: { status: string; isClean?: boolean; currentBranch?: string; error?: string };
+	github?: {
+		detected: boolean;
+		authenticated?: boolean;
+		user?: string;
+		error?: string;
+	};
+	git?: {
+		status: string;
+		isClean?: boolean;
+		currentBranch?: string;
+		error?: string;
+	};
 }
 
 export interface MergeOrderResult {
@@ -226,4 +243,163 @@ export interface ConfigShowResult {
 	sources?: Array<{ exists: boolean; file: string }>;
 	key?: string;
 	value?: unknown;
+}
+
+/**
+ * AX-016 Granular plan tools - argument schemas
+ */
+
+export const PrListArgs = z.object({
+	owner: z.string().optional(),
+	repo: z.string().optional(),
+	query: z.string().optional(),
+	labels: z.array(z.string()).optional(),
+	includeDrafts: z.boolean().optional(),
+	excludePRs: z.array(z.number()).optional(),
+	githubToken: z.string().optional(),
+	state: z.enum(["open", "closed", "all"]).optional(),
+});
+export type PrListArgs = z.infer<typeof PrListArgs>;
+
+export const PlanValidateArgs = z.object({
+	planFile: z.string().optional(),
+	planContent: z.string().optional(),
+});
+export type PlanValidateArgs = z.infer<typeof PlanValidateArgs>;
+
+export const PlanAnalyzeArgs = z.object({
+	planFile: z.string().optional(),
+});
+export type PlanAnalyzeArgs = z.infer<typeof PlanAnalyzeArgs>;
+
+/**
+ * AX-016 Granular plan tools - result types
+ */
+
+export interface PrListResult {
+	pullRequests: Array<{
+		number: number;
+		title: string;
+		branch: string;
+		author: string;
+		labels: string[];
+		sha: string;
+		draft?: boolean;
+	}>;
+	total: number;
+	filtered: number;
+	owner: string;
+	repo: string;
+}
+
+export interface PlanValidateResult {
+	valid: boolean;
+	errors?: Array<{
+		path: string;
+		message: string;
+		code?: string;
+	}>;
+	warnings?: string[];
+	plan?: {
+		schemaVersion: string;
+		target: string;
+		itemCount: number;
+	};
+}
+
+export interface PlanAnalyzeResult {
+	valid: boolean;
+	mergeOrder?: string[][];
+	conflicts?: Array<{
+		type: string;
+		message: string;
+		items?: string[];
+	}>;
+	dependencies?: {
+		total: number;
+		cycles?: string[][];
+		unknown?: string[];
+	};
+	summary: {
+		totalItems: number;
+		maxParallelism: number;
+		hasIssues: boolean;
+	};
+}
+
+/**
+ * ADR-007 Task Handoff Tools - argument schemas
+ */
+
+export const CreateTaskSnapshotArgs = z.object({
+	taskId: z.string().optional(),
+	procedure: z.string(),
+	determinism: z.enum(["D1", "D2", "D3"]).optional(),
+	failureMessage: z.string(),
+	failureFileRel: z.string(),
+	failureLine: z.number().int().positive().optional(),
+	runnerOutputSnip: z.string(),
+	failureExcerpt: z.string().optional(),
+	targetFiles: z.array(z.string()),
+	verificationCmd: z.string(),
+	expectedExitCode: z.number().int().optional(),
+	repoRoot: z.string().optional(),
+	repoId: z.string().optional(),
+	commitSha: z.string().optional(),
+});
+export type CreateTaskSnapshotArgs = z.infer<typeof CreateTaskSnapshotArgs>;
+
+export const SubmitTaskReceiptArgs = z.object({
+	receipt: z.any(), // Accept any object - will be validated by parseTaskReceipt
+});
+export type SubmitTaskReceiptArgs = z.infer<typeof SubmitTaskReceiptArgs>;
+
+export const GetTaskStatusArgs = z.object({
+	taskId: z.string(),
+});
+export type GetTaskStatusArgs = z.infer<typeof GetTaskStatusArgs>;
+
+export const ListPendingTasksArgs = z.object({
+	procedure: z.string().optional(),
+	determinism: z.enum(["D1", "D2", "D3"]).optional(),
+	limit: z.number().int().positive().optional(),
+});
+export type ListPendingTasksArgs = z.infer<typeof ListPendingTasksArgs>;
+
+/**
+ * ADR-007 Task Handoff Tools - result types
+ */
+
+export interface CreateTaskSnapshotResult {
+	snapshot: object; // TaskSnapshot_v1
+	taskId: string;
+}
+
+export interface SubmitTaskReceiptResult {
+	acknowledged: boolean;
+	taskId: string;
+	verification: {
+		verified: boolean;
+		trustGap: boolean;
+		patchApplied: boolean;
+	};
+}
+
+export interface GetTaskStatusResult {
+	taskId: string;
+	state: "pending" | "in_progress" | "completed" | "verified" | "failed";
+	snapshot?: object;
+	receipt?: object;
+	verification?: object;
+}
+
+export interface ListPendingTasksResult {
+	tasks: Array<{
+		taskId: string;
+		procedure: string;
+		determinism: string;
+		state: string;
+		snapshot?: object;
+	}>;
+	total: number;
 }

@@ -87,9 +87,11 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ### mcp_lexrunner_plan_create
 
-Creates a plan from configuration files or auto-discovers from GitHub PRs.
+Creates a plan from configuration files or auto-discovers from GitHub PRs. This is a **convenience wrapper** that combines PR discovery (`pr_list`), plan generation, validation, and file writing into a single operation.
 
 > **Deprecated alias:** `plan.create`
+>
+> **Note:** For more granular control, use `pr_list`, `plan_validate`, and `plan_analyze` tools individually.
 
 **Parameters:**
 - `json` (boolean, optional): Output plan as JSON to stdout
@@ -192,6 +194,185 @@ The tool will:
   }
 }
 ```
+
+### pr_list
+
+Lists pull requests from GitHub without creating a plan. This is a granular tool that allows agents to discover PRs independently before deciding whether to create a plan.
+
+**Parameters:**
+- `owner` (string, optional): GitHub repository owner (auto-detected from git remote if not provided)
+- `repo` (string, optional): GitHub repository name (auto-detected from git remote if not provided)
+- `query` (string, optional): GitHub search query (e.g., 'is:open label:stack:*')
+- `labels` (array of strings, optional): Filter PRs by labels
+- `includeDrafts` (boolean, optional): Include draft PRs in results (default: true)
+- `excludePRs` (array of numbers, optional): Exclude specific PR numbers
+- `githubToken` (string, optional): GitHub API token (or use GITHUB_TOKEN env var)
+- `state` (string, optional): PR state filter - "open", "closed", or "all" (default: "open")
+
+**Returns:**
+```json
+{
+  "pullRequests": [
+    {
+      "number": 123,
+      "title": "Add feature X",
+      "branch": "feature/x",
+      "author": "developer",
+      "labels": ["feature", "ready"],
+      "sha": "abc123def456",
+      "draft": false
+    }
+  ],
+  "total": 10,
+  "filtered": 5,
+  "owner": "myorg",
+  "repo": "myrepo"
+}
+```
+
+**Example:**
+```json
+{
+  "name": "pr_list",
+  "arguments": {
+    "labels": ["ready-merge"],
+    "includeDrafts": false,
+    "excludePRs": [100, 101]
+  }
+}
+```
+
+**Use Cases:**
+- **Pre-flight checks**: List PRs to verify what would be included before creating a plan
+- **Human review**: Show PRs to user for manual selection before plan creation
+- **Custom workflows**: Build multi-step workflows where PR discovery is separate from planning
+
+### plan_validate
+
+Validates a plan.json file for schema compliance and logical consistency without executing it. This granular tool allows checking plan validity independently of creation or execution.
+
+**Parameters:**
+- `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
+- `planContent` (string, optional): JSON string of plan content to validate (alternative to planFile)
+
+**Returns:**
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": ["Plan contains no items"],
+  "plan": {
+    "schemaVersion": "1.0.0",
+    "target": "main",
+    "itemCount": 5
+  }
+}
+```
+
+If validation fails:
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "path": "items",
+      "message": "Duplicate item names found: PR-1",
+      "code": "DUPLICATE_NAMES"
+    }
+  ]
+}
+```
+
+**Example (validate existing file):**
+```json
+{
+  "name": "plan_validate",
+  "arguments": {
+    "planFile": "/tmp/test-plan.json"
+  }
+}
+```
+
+**Example (validate plan content directly):**
+```json
+{
+  "name": "plan_validate",
+  "arguments": {
+    "planContent": "{\"schemaVersion\":\"1.0.0\",\"target\":\"main\",\"items\":[]}"
+  }
+}
+```
+
+**Use Cases:**
+- **Pre-execution validation**: Check a plan before running gates
+- **CI validation**: Validate plans in CI/CD pipelines
+- **Manual plan editing**: Validate hand-edited plan.json files
+
+### plan_analyze
+
+Analyzes a plan for potential conflicts and dependency issues. Performs dry-run dependency resolution and conflict detection without execution. This granular tool provides detailed analysis of plan structure and dependencies.
+
+**Parameters:**
+- `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
+
+**Returns:**
+```json
+{
+  "valid": true,
+  "mergeOrder": [
+    ["PR-1", "PR-2"],
+    ["PR-3"]
+  ],
+  "conflicts": [],
+  "dependencies": {
+    "total": 2
+  },
+  "summary": {
+    "totalItems": 3,
+    "maxParallelism": 2,
+    "hasIssues": false
+  }
+}
+```
+
+If issues are found:
+```json
+{
+  "valid": false,
+  "conflicts": [
+    {
+      "type": "cycle",
+      "message": "Dependency cycle detected: PR-1 -> PR-2 -> PR-1",
+      "items": ["PR-1", "PR-2"]
+    }
+  ],
+  "dependencies": {
+    "total": 3,
+    "cycles": [["PR-1", "PR-2", "PR-1"]],
+    "unknown": ["PR-99"]
+  },
+  "summary": {
+    "totalItems": 3,
+    "maxParallelism": 0,
+    "hasIssues": true
+  }
+}
+```
+
+**Example:**
+```json
+{
+  "name": "plan_analyze",
+  "arguments": {
+    "planFile": ".smartergpt/runner/plan.json"
+  }
+}
+```
+
+**Use Cases:**
+- **Dependency validation**: Verify no circular dependencies before execution
+- **Parallelism planning**: Understand maximum parallelism potential
+- **Conflict prediction**: Identify potential merge conflicts early
 
 ### mcp_lexrunner_gate_run
 
@@ -383,6 +564,136 @@ ALLOW_MUTATIONS=true npm run mcp
 
 # Custom profile directory
 LEX_PROFILE_DIR=/my/project/.config npm run mcp
+```
+
+## Task Handoff Tools (ADR-007)
+
+The task handoff tools implement the [Task Snapshot Contract (ADR-007)](docs/adr/ADR-007-task-snapshot-contract.md), enabling bounded work delegation to stochastic agents with rigorous verification.
+
+### create_task_snapshot
+
+Create a task snapshot for agent handoff with failure evidence, target files, and verification command.
+
+**Canonical name:** `lexrunner_create_task_snapshot`
+
+**Parameters:**
+- `procedure` (required): Procedure identifier (e.g., `"post-merge-fix"`, `"fanout-issue"`)
+- `determinism` (optional): Level `"D1"`, `"D2"`, or `"D3"` (default: `"D1"`)
+- `failureMessage` (required): Short error description
+- `failureFileRel` (required): Repo-relative path to failed file
+- `failureLine` (optional): Line number if available
+- `runnerOutputSnip` (required): Actual test runner output
+- `failureExcerpt` (optional): Code context around failure
+- `targetFiles` (required): Array of repo-relative paths to modify
+- `verificationCmd` (required): Command to run for verification
+- `expectedExitCode` (optional): Expected exit code (default: `0`)
+- `taskId` (optional): Custom task ID (auto-generated if not provided)
+- `repoRoot` (optional): Absolute repo path (auto-detected if not provided)
+- `repoId` (optional): Repository ID `"owner/repo"` (auto-detected if not provided)
+- `commitSha` (optional): Git commit SHA (auto-detected if not provided)
+
+**Returns:** `TaskSnapshot_v1` JSON with task ID
+
+**Example:**
+```javascript
+const result = await client.callTool("create_task_snapshot", {
+  procedure: "post-merge-fix",
+  determinism: "D1",
+  failureMessage: "Expected 6, received 7",
+  failureFileRel: "tests/unit/example.spec.ts",
+  failureLine: 42,
+  runnerOutputSnip: "FAIL tests/unit/example.spec.ts\n  Expected: 6\n  Received: 7",
+  targetFiles: ["tests/unit/example.spec.ts"],
+  verificationCmd: "npm test -- tests/unit/example.spec.ts",
+});
+
+console.log(result.taskId); // "01HQXYZ..."
+console.log(result.snapshot.snapshot_hash); // "sha256:abc..."
+```
+
+### submit_task_receipt
+
+Submit a task receipt after agent completes work. Returns acknowledgment and engine verification status.
+
+**Canonical name:** `lexrunner_submit_task_receipt`
+
+**Parameters:**
+- `receipt` (required): `TaskReceipt_v1` JSON object
+
+**Returns:** Verification result with trust gap detection
+
+**Example:**
+```javascript
+const receipt = {
+  schema_version: "1.0.0",
+  task_id: snapshot.task_id,
+  snapshot_hash: snapshot.snapshot_hash,
+  claims: {
+    success: true,
+    patch: "--- a/test.ts\n+++ b/test.ts\n...",
+    files_touched: ["test.ts"],
+    rationale: "Updated assertion to match new count",
+    confidence: "high",
+    assumptions_made: [
+      { type: "test", text: "No other tests depend on this value" }
+    ],
+  },
+  search_activity: [],
+  cost: { token_usage: { input: 1000, output: 200, total: 1200 } },
+  blockers: [],
+};
+
+const result = await client.callTool("submit_task_receipt", { receipt });
+
+console.log(result.verification.verified); // true/false
+console.log(result.verification.trustGap); // false if agent claim matches engine
+```
+
+### get_task_status
+
+Get current task state including snapshot, receipt, and verification info.
+
+**Canonical name:** `lexrunner_get_task_status`
+
+**Parameters:**
+- `taskId` (required): Unique task identifier
+
+**Returns:** Task status with state, snapshot, receipt, and verification
+
+**Example:**
+```javascript
+const status = await client.callTool("get_task_status", {
+  taskId: "01HQXYZ...",
+});
+
+console.log(status.state); // "pending" | "in_progress" | "completed" | "verified" | "failed"
+console.log(status.snapshot); // TaskSnapshot_v1
+console.log(status.receipt); // TaskReceipt_v1 (if submitted)
+```
+
+### list_pending_tasks
+
+List pending task snapshots with optional filtering.
+
+**Canonical name:** `lexrunner_list_pending_tasks`
+
+**Parameters:**
+- `procedure` (optional): Filter by procedure identifier
+- `determinism` (optional): Filter by level `"D1"`, `"D2"`, or `"D3"`
+- `limit` (optional): Maximum tasks to return
+
+**Returns:** Array of pending tasks
+
+**Example:**
+```javascript
+const tasks = await client.callTool("list_pending_tasks", {
+  procedure: "post-merge-fix",
+  determinism: "D1",
+  limit: 10,
+});
+
+console.log(tasks.total); // Total count
+console.log(tasks.tasks); // Array of task info
 ```
 
 ## Workflow

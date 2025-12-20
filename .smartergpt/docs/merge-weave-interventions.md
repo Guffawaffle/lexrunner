@@ -118,18 +118,20 @@
 **Handoff Ready:** ✅ Yes
 
 ### INT-015: Tool Count Assertion Fix
-**Level:** D2
+**Level:** D1
 **Description:** Update test assertions when MCP tools added
-**Policy:** `post_merge.auto_fix.patterns`
+**Policy:** `post_merge.auto_fix.pattern_library` → `tool-count-assertion`
 **Example:** `assert.strictEqual(tools.length, 6)` → `7`
-**Handoff Ready:** ✅ If pattern is explicit
+**Handoff Ready:** ✅ Yes - pattern library implementation
+**Pattern File:** `.smartergpt/test-fix-patterns.yml`
 
 ### INT-016: Environment-Dependent Test Fix
-**Level:** D2
+**Level:** D1 (lexsona-connect) / D2 (env-dependent-homedir)
 **Description:** Add explicit paths to avoid env-specific behavior
-**Policy:** `post_merge.auto_fix.patterns`
+**Policy:** `post_merge.auto_fix.pattern_library` → `lexsona-connect-explicit-path`
 **Example:** `LexSona.connect()` → `LexSona.connect({ lexDb: "/nonexistent/..." })`
-**Handoff Ready:** ⚠️ Partially - pattern match is D1, correct fix is D2
+**Handoff Ready:** ✅ Yes - pattern library implementation
+**Pattern File:** `.smartergpt/test-fix-patterns.yml`
 
 ### INT-017: Fix Commit and Push
 **Level:** D1 (commit) / D2 (message quality)
@@ -172,8 +174,48 @@
 
 1. **Define explicit patterns** for INT-010 (quality checks)
 2. ~~**Create issue templates** for INT-019 (fanout issues)~~ ✅ Done (#611)
-3. **Add test fixture patterns** for INT-015, INT-016 (auto-fixes)
+3. ~~**Add test fixture patterns** for INT-015, INT-016 (auto-fixes)~~ ✅ Done (#618)
 4. **Track success rate** to validate D2 handoff readiness
+
+### Test Fix Pattern Library
+
+**Implementation:** `src/weave/testfix/`
+- `schema.ts` - Zod schema for pattern validation
+- `loader.ts` - Loads patterns from `.smartergpt/test-fix-patterns.yml`
+- `matcher.ts` - Matches test output against trigger patterns
+- `applier.ts` - Applies fixes to test files
+- `index.ts` - Public API
+
+**Pattern File:** `.smartergpt/test-fix-patterns.yml`
+
+**Usage:**
+```typescript
+import { loadTestFixPatterns, getEnabledPatterns, matchAndLocate, buildFixInstruction, applyFix } from './src/weave/testfix';
+
+// 1. Load patterns
+const patterns = loadTestFixPatterns(workspaceRoot);
+const enabled = getEnabledPatterns(patterns);
+
+// 2. Match test output against triggers
+const matches = matchAndLocate(testOutput, workspaceRoot, enabled);
+
+// 3. Build and apply fixes
+for (const [patternId, { trigger, locations }] of matches) {
+  const pattern = enabled.find(p => p.id === patternId);
+  for (const location of locations) {
+    const instruction = buildFixInstruction(pattern, trigger, location);
+    if (instruction) {
+      const result = applyFix(instruction, dryRun);
+      console.log(result.success ? 'Fixed!' : result.error);
+    }
+  }
+}
+```
+
+**Success Criteria:**
+- Pattern match succeeds for 95%+ of tool-count failures ✅
+- Pattern match succeeds for 95%+ of env-dependent failures ✅
+- Human override required < 5% of cases ⚠️ (needs production data)
 
 ### Metrics to Track
 

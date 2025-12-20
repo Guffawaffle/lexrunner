@@ -154,6 +154,8 @@ post_merge:
   # D2: Fix known test patterns automatically
   auto_fix:
     enabled: true
+    # Pattern library for deterministic test fixes
+    pattern_library: ".smartergpt/test-fix-patterns.yml"
     patterns:
       # Tool count assertions (when new MCP tools added)
       - pattern: "assert.*tools\\.length.*\\d+"

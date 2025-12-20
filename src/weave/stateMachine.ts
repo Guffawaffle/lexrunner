@@ -28,6 +28,15 @@ export const STATE_TRANSITIONS: StateTransition[] = [
 	{ from: WeaveState.VALIDATING, to: WeaveState.COMPLETED, event: WeaveEvent.ALL_COMPLETE },
 	{ from: WeaveState.VALIDATING, to: WeaveState.FAILED, event: WeaveEvent.VALIDATION_FAILED },
 	
+	// Gate failure flow (ADR-007)
+	{ from: WeaveState.VALIDATING, to: WeaveState.AWAITING_FIX, event: WeaveEvent.GATE_FAILED },
+	{ from: WeaveState.AWAITING_FIX, to: WeaveState.FIX_SUBMITTED, event: WeaveEvent.FIX_SUBMITTED },
+	{ from: WeaveState.FIX_SUBMITTED, to: WeaveState.VERIFYING, event: WeaveEvent.BEGIN_VERIFICATION },
+	{ from: WeaveState.VERIFYING, to: WeaveState.VERIFIED, event: WeaveEvent.FIX_VERIFIED },
+	{ from: WeaveState.VERIFYING, to: WeaveState.TRUST_GAP, event: WeaveEvent.TRUST_GAP_DETECTED },
+	{ from: WeaveState.VERIFIED, to: WeaveState.VALIDATING, event: WeaveEvent.VALIDATION_PASSED },
+	{ from: WeaveState.TRUST_GAP, to: WeaveState.FAILED, event: WeaveEvent.VALIDATION_FAILED },
+	
 	// Pause/resume
 	{ from: WeaveState.READY, to: WeaveState.PAUSED, event: WeaveEvent.PAUSE },
 	{ from: WeaveState.MERGING, to: WeaveState.PAUSED, event: WeaveEvent.PAUSE },
@@ -37,7 +46,12 @@ export const STATE_TRANSITIONS: StateTransition[] = [
 	// Reset
 	{ from: WeaveState.FAILED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
 	{ from: WeaveState.COMPLETED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
-	{ from: WeaveState.PAUSED, to: WeaveState.IDLE, event: WeaveEvent.RESET }
+	{ from: WeaveState.PAUSED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.TRUST_GAP, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.AWAITING_FIX, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.FIX_SUBMITTED, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.VERIFYING, to: WeaveState.IDLE, event: WeaveEvent.RESET },
+	{ from: WeaveState.VERIFIED, to: WeaveState.IDLE, event: WeaveEvent.RESET }
 ];
 
 /**
@@ -281,6 +295,14 @@ export function generateMermaidDiagram(): string {
     validating --> ready : VALIDATION_PASSED
     validating --> completed : ALL_COMPLETE
     validating --> failed : VALIDATION_FAILED
+    validating --> awaiting_fix : GATE_FAILED
+    
+    awaiting_fix --> fix_submitted : FIX_SUBMITTED
+    fix_submitted --> verifying : BEGIN_VERIFICATION
+    verifying --> verified : FIX_VERIFIED
+    verifying --> trust_gap : TRUST_GAP_DETECTED
+    verified --> validating : VALIDATION_PASSED
+    trust_gap --> failed : VALIDATION_FAILED
     
     ready --> paused : PAUSE
     merging --> paused : PAUSE
@@ -290,6 +312,7 @@ export function generateMermaidDiagram(): string {
     failed --> idle : RESET
     completed --> idle : RESET
     paused --> idle : RESET
+    trust_gap --> idle : RESET
     
     completed --> [*]
     failed --> [*]
@@ -322,6 +345,31 @@ export function generateMermaidDiagram(): string {
     note right of validating
         Running gates
         Checking tests
+    end note
+    
+    note right of awaiting_fix
+        Gate failed
+        Snapshot generated (ADR-007)
+    end note
+    
+    note right of fix_submitted
+        Receipt received
+        Ready for verification
+    end note
+    
+    note right of verifying
+        Engine verification
+        Trust-but-verify pattern
+    end note
+    
+    note right of verified
+        Fix verified
+        Continuing weave
+    end note
+    
+    note right of trust_gap
+        Agent claim != verification
+        Human review required
     end note
     
     note right of paused

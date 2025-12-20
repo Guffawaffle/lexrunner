@@ -322,6 +322,14 @@ export async function prepareReviewContext(
 /**
  * Phase 1: Recall relevant Frames from Lex memory.
  *
+ * This function delegates to the Lex CLI (`lex recall`) to query the Lex memory
+ * system. It provides executor-specific workflow integration (query types, parsing,
+ * prompt suggestions) but ultimately accesses the same database as the Lex MCP
+ * server's `mcp_lex_frame_recall` tool.
+ *
+ * For direct access to Lex memory features, use the Lex MCP server tools instead.
+ * See docs/MEMORY_TOOLS.md for guidance on when to use which tool.
+ *
  * Queries Lex for prior reviews, developer history, or patterns.
  */
 export async function recallSeniorDevContext(
@@ -507,6 +515,14 @@ function parseFramesFromLexOutput(output: string, _queryType: string): Frame[] {
 
 /**
  * Phase 4: Capture review session as a Frame in Lex memory.
+ *
+ * This function delegates to the Lex CLI (`lex remember`) to write Frames to
+ * the Lex memory system. It provides executor-specific workflow integration
+ * (reference point formatting, keyword conventions) but ultimately writes to
+ * the same database as the Lex MCP server's `mcp_lex_frame_remember` tool.
+ *
+ * For direct access to Lex memory features, use the Lex MCP server tools instead.
+ * See docs/MEMORY_TOOLS.md for guidance on when to use which tool.
  *
  * Writes the "receipt" of the review session.
  */

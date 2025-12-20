@@ -52,6 +52,20 @@ import {
 	InitLocalResult,
 	ProfileResolveResult,
 	WorkflowGuideArgs,
+	PrListArgs,
+	PrListResult,
+	PlanValidateArgs,
+	PlanValidateResult,
+	PlanAnalyzeArgs,
+	PlanAnalyzeResult,
+	CreateTaskSnapshotArgs,
+	SubmitTaskReceiptArgs,
+	GetTaskStatusArgs,
+	ListPendingTasksArgs,
+	CreateTaskSnapshotResult,
+	SubmitTaskReceiptResult,
+	GetTaskStatusResult,
+	ListPendingTasksResult,
 } from "./types.js";
 import {
 	resolveProfile,
@@ -82,6 +96,8 @@ import {
 	unknownDependencyError,
 	AXErrorException,
 	isAXErrorException,
+	type CycleDetectedContext,
+	type UnknownDependencyContext,
 } from "../errors/index.js";
 
 import * as fs from "fs";
@@ -142,6 +158,15 @@ import {
 	type WorkflowPhase,
 } from "./workflow/state-machine.js";
 import type { WorkflowGuide } from "./types/guided-response.js";
+
+// Task Snapshot Contract imports (ADR-007)
+import { SnapshotBuilder } from "../snapshot/index.js";
+import { EngineVerifier } from "../verification/index.js";
+import {
+	parseTaskReceipt,
+	TaskSnapshot_v1,
+	TaskReceipt_v1,
+} from "../schemas/task-contract.js";
 
 // =============================================================================
 // AXError MCP Helper
@@ -315,6 +340,96 @@ function createServer(options?: McpServerOptions): Server {
 					},
 				},
 				{
+					name: "pr_list",
+					description:
+						"List pull requests from GitHub without creating a plan. Useful for discovering PRs before plan generation.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							owner: {
+								type: "string",
+								description:
+									"GitHub repository owner (auto-detected from git remote if not provided)",
+							},
+							repo: {
+								type: "string",
+								description:
+									"GitHub repository name (auto-detected from git remote if not provided)",
+							},
+							query: {
+								type: "string",
+								description:
+									"GitHub search query (e.g., 'is:open label:stack:*')",
+							},
+							labels: {
+								type: "array",
+								description: "Filter PRs by labels",
+								items: {
+									type: "string",
+								},
+							},
+							includeDrafts: {
+								type: "boolean",
+								description: "Include draft PRs in results",
+								default: true,
+							},
+							excludePRs: {
+								type: "array",
+								description: "Exclude specific PRs by number",
+								items: {
+									type: "number",
+								},
+							},
+							githubToken: {
+								type: "string",
+								description:
+									"GitHub API token (or use GITHUB_TOKEN env var)",
+							},
+							state: {
+								type: "string",
+								description: "PR state filter (default: open)",
+								enum: ["open", "closed", "all"],
+								default: "open",
+							},
+						},
+					},
+				},
+				{
+					name: "plan_validate",
+					description:
+						"Validate a plan.json file without executing it. Checks schema compliance and logical consistency.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							planFile: {
+								type: "string",
+								description:
+									"Path to plan.json file (default: <profile>/runner/plan.json)",
+							},
+							planContent: {
+								type: "string",
+								description:
+									"JSON string of plan content to validate (alternative to planFile)",
+							},
+						},
+					},
+				},
+				{
+					name: "plan_analyze",
+					description:
+						"Analyze a plan for potential conflicts and dependency issues. Performs dry-run dependency resolution and conflict detection.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							planFile: {
+								type: "string",
+								description:
+									"Path to plan.json file (default: <profile>/runner/plan.json)",
+							},
+						},
+					},
+				},
+				{
 					name: "gates_run",
 					description: "Execute gates for plan items",
 					inputSchema: {
@@ -451,7 +566,10 @@ function createServer(options?: McpServerOptions): Server {
 				{
 					name: "executor_recall_context",
 					description:
-						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns)",
+						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns). " +
+						"This tool delegates to the Lex CLI (`lex recall`) to query the Lex memory system. " +
+						"For direct access to Lex memory, use the Lex MCP server's `mcp_lex_frame_recall` tool instead. " +
+						"This executor-specific tool provides Senior Dev workflow integration.",
 					inputSchema: {
 						type: "object",
 						properties: {
@@ -806,6 +924,148 @@ function createServer(options?: McpServerOptions): Server {
 						},
 					},
 				},
+				// ─────────────────────────────────────────────────────────────────
+				// Task Handoff Tools (ADR-007)
+				// ─────────────────────────────────────────────────────────────────
+				{
+					name: "create_task_snapshot",
+					description:
+						"Create a task snapshot for agent handoff (ADR-007). Prepares work for external agent with failure info, target files, and verification command.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							taskId: {
+								type: "string",
+								description:
+									"Optional task ID (auto-generated if not provided)",
+							},
+							procedure: {
+								type: "string",
+								description:
+									"Procedure identifier (e.g., 'post-merge-fix', 'fanout-issue')",
+							},
+							determinism: {
+								type: "string",
+								enum: ["D1", "D2", "D3"],
+								description: "Determinism level (default: D1)",
+								default: "D1",
+							},
+							failureMessage: {
+								type: "string",
+								description: "Short error description",
+							},
+							failureFileRel: {
+								type: "string",
+								description:
+									"Repo-relative path to failed file",
+							},
+							failureLine: {
+								type: "number",
+								description: "Line number if available",
+							},
+							runnerOutputSnip: {
+								type: "string",
+								description:
+									"Actual test runner output snippet",
+							},
+							failureExcerpt: {
+								type: "string",
+								description: "Code context around failure",
+							},
+							targetFiles: {
+								type: "array",
+								items: { type: "string" },
+								description:
+									"Repo-relative paths of files to modify",
+							},
+							verificationCmd: {
+								type: "string",
+								description: "Command to run for verification",
+							},
+							expectedExitCode: {
+								type: "number",
+								description: "Expected exit code (default: 0)",
+								default: 0,
+							},
+							repoRoot: {
+								type: "string",
+								description:
+									"Absolute path to repo root (auto-detected if not provided)",
+							},
+							repoId: {
+								type: "string",
+								description:
+									"Repository identifier in owner/repo format (auto-detected if not provided)",
+							},
+							commitSha: {
+								type: "string",
+								description:
+									"Git commit SHA (auto-detected if not provided)",
+							},
+						},
+						required: [
+							"procedure",
+							"failureMessage",
+							"failureFileRel",
+							"runnerOutputSnip",
+							"targetFiles",
+							"verificationCmd",
+						],
+					},
+				},
+				{
+					name: "submit_task_receipt",
+					description:
+						"Submit a task receipt after agent completes work (ADR-007). Returns acknowledgment and engine verification status.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							receipt: {
+								type: "object",
+								description: "TaskReceipt_v1 JSON object",
+							},
+						},
+						required: ["receipt"],
+					},
+				},
+				{
+					name: "get_task_status",
+					description:
+						"Get current task state (ADR-007). Returns snapshot, receipt, and verification info.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							taskId: {
+								type: "string",
+								description: "Unique task identifier",
+							},
+						},
+						required: ["taskId"],
+					},
+				},
+				{
+					name: "list_pending_tasks",
+					description:
+						"List pending task snapshots (ADR-007). Used by PM agent to see work queue.",
+					inputSchema: {
+						type: "object",
+						properties: {
+							procedure: {
+								type: "string",
+								description: "Filter by procedure identifier",
+							},
+							determinism: {
+								type: "string",
+								enum: ["D1", "D2", "D3"],
+								description: "Filter by determinism level",
+							},
+							limit: {
+								type: "number",
+								description: "Maximum tasks to return",
+							},
+						},
+					},
+				},
 			],
 		};
 	});
@@ -817,24 +1077,33 @@ function createServer(options?: McpServerOptions): Server {
 		switch (name) {
 			// Plan tools
 			case "plan_create":
-					case "lexrunner_plan_create": // deprecated alias
+			case "lexrunner_plan_create": // deprecated alias
 			case "plan.create": // Deprecated alias
 				return await handlePlanCreate(args as PlanCreateArgs);
 
+			case "pr_list":
+				return await handlePrList(args as PrListArgs);
+
+			case "plan_validate":
+				return await handlePlanValidate(args as PlanValidateArgs);
+
+			case "plan_analyze":
+				return await handlePlanAnalyze(args as PlanAnalyzeArgs);
+
 			// Gate tools
 			case "gates_run":
-					case "lexrunner_gate_run": // deprecated alias
+			case "lexrunner_gate_run": // deprecated alias
 			case "gates.run": // Deprecated alias
 				return await handleGatesRun(args as GatesRunArgs);
 
 			// Weave tools
 			case "merge_apply":
-					case "lexrunner_weave_apply": // deprecated alias
+			case "lexrunner_weave_apply": // deprecated alias
 			case "merge.apply": // Deprecated alias
 				return await handleMergeApply(args as MergeApplyArgs);
 
 			case "discover":
-					case "lexrunner_weave_discover": // deprecated alias
+			case "lexrunner_weave_discover": // deprecated alias
 			case "discover": // Deprecated alias
 				return await handleDiscover(
 					args as {
@@ -846,28 +1115,28 @@ function createServer(options?: McpServerOptions): Server {
 				);
 
 			case "weave_status":
-					case "lexrunner_weave_status": // deprecated alias
+			case "lexrunner_weave_status": // deprecated alias
 			case "status": // Deprecated alias
 				return await handleStatus(args as { planFile?: string });
 
 			case "merge_order":
-					case "lexrunner_weave_order": // deprecated alias
+			case "lexrunner_weave_order": // deprecated alias
 			case "merge-order": // Deprecated alias
 				return await handleMergeOrder(args as { planFile?: string });
 
 			// Workspace tools
 			case "local_init":
-					case "lexrunner_workspace_init": // deprecated alias
+			case "lexrunner_workspace_init": // deprecated alias
 			case "local.init": // Deprecated alias
 				return await handleLocalInit(args as InitLocalArgs);
 
 			case "profile_resolve":
-					case "lexrunner_workspace_resolve": // deprecated alias
+			case "lexrunner_workspace_resolve": // deprecated alias
 			case "profile.resolve": // Deprecated alias
 				return await handleProfileResolve(args as ProfileResolveArgs);
 
 			case "doctor":
-					case "lexrunner_workspace_doctor": // deprecated alias
+			case "lexrunner_workspace_doctor": // deprecated alias
 			case "doctor": // Deprecated alias
 				return await handleDoctor(
 					args as { environmentQuality?: boolean }
@@ -875,22 +1144,22 @@ function createServer(options?: McpServerOptions): Server {
 
 			// Core tools
 			case "health":
-					case "lexrunner_core_health": // deprecated alias
+			case "lexrunner_core_health": // deprecated alias
 			case "health": // Deprecated alias
 				return await handleHealth(args as { includeMetrics?: boolean });
 
 			case "config_show":
-					case "lexrunner_core_config": // deprecated alias
+			case "lexrunner_core_config": // deprecated alias
 			case "config.show": // Deprecated alias
 				return await handleConfigShow(args as { key?: string });
 
 			case "workflow_guide":
-					case "lexrunner_core_guide": // deprecated alias
+			case "lexrunner_core_guide": // deprecated alias
 			case "workflow.guide": // Deprecated alias
 				return await handleWorkflowGuide(args as WorkflowGuideArgs);
 
 			case "metrics":
-					case "lexrunner_core_metrics": // deprecated alias
+			case "lexrunner_core_metrics": // deprecated alias
 			case "metrics": // Deprecated alias
 				return await handleMetrics(
 					args as { filter?: string; format?: string }
@@ -898,34 +1167,34 @@ function createServer(options?: McpServerOptions): Server {
 
 			// Executor tools (Senior Dev)
 			case "executor_prepare_context":
-					case "lexrunner_executor_prepare_context": // deprecated alias
+			case "lexrunner_executor_prepare_context": // deprecated alias
 			case "senior-dev.prepare-context": // Deprecated alias
 				return await handleSeniorDevPrepareContext(
 					args as unknown as PrepareContextInput
 				);
 
 			case "executor_recall_context":
-					case "lexrunner_executor_recall_context": // deprecated alias
+			case "lexrunner_executor_recall_context": // deprecated alias
 			case "senior-dev.recall-context": // Deprecated alias
 				return await handleSeniorDevRecallContext(
 					args as unknown as RecallContextInput
 				);
 
 			case "executor_capture_frame":
-					case "lexrunner_executor_capture_frame": // deprecated alias
+			case "lexrunner_executor_capture_frame": // deprecated alias
 			case "senior-dev.capture-frame": // Deprecated alias
 				return await handleSeniorDevCaptureFrame(
 					args as unknown as CaptureFrameInput
 				);
 
 			case "executor_modes":
-					case "lexrunner_executor_modes": // deprecated alias
+			case "lexrunner_executor_modes": // deprecated alias
 			case "senior-dev.modes": // Deprecated alias
 				return await handleSeniorDevModes();
 
 			// Run management tools
 			case "start_run":
-					case "lexrunner_run_start": // deprecated alias
+			case "lexrunner_run_start": // deprecated alias
 			case "lexrunner.startRun": // Deprecated alias
 				return await handleStartRun(
 					args as unknown as StartRunInput,
@@ -933,7 +1202,7 @@ function createServer(options?: McpServerOptions): Server {
 				);
 
 			case "get_status":
-					case "lexrunner_run_status": // deprecated alias
+			case "lexrunner_run_status": // deprecated alias
 			case "lexrunner.getStatus": // Deprecated alias
 				return await handleGetStatus(
 					args as unknown as GetStatusInput,
@@ -941,7 +1210,7 @@ function createServer(options?: McpServerOptions): Server {
 				);
 
 			case "list_artifacts":
-					case "lexrunner_run_list": // deprecated alias
+			case "lexrunner_run_list": // deprecated alias
 			case "lexrunner.listRuns": // Deprecated alias
 				return await handleListRuns(
 					args as unknown as ListRunsInput,
@@ -949,10 +1218,35 @@ function createServer(options?: McpServerOptions): Server {
 				);
 
 			case "run_decision":
-					case "lexrunner_run_decision": // deprecated alias
+			case "lexrunner_run_decision": // deprecated alias
 			case "lexrunner.submitDecision": // Deprecated alias
 				return await handleSubmitDecision(
 					args as unknown as SubmitDecisionInput
+				);
+
+			// Task Handoff tools (ADR-007)
+			case "create_task_snapshot":
+			case "lexrunner_create_task_snapshot": // canonical alias
+				return await handleCreateTaskSnapshot(
+					args as unknown as CreateTaskSnapshotArgs
+				);
+
+			case "submit_task_receipt":
+			case "lexrunner_submit_task_receipt": // canonical alias
+				return await handleSubmitTaskReceipt(
+					args as unknown as SubmitTaskReceiptArgs
+				);
+
+			case "get_task_status":
+			case "lexrunner_get_task_status": // canonical alias
+				return await handleGetTaskStatus(
+					args as unknown as GetTaskStatusArgs
+				);
+
+			case "list_pending_tasks":
+			case "lexrunner_list_pending_tasks": // canonical alias
+				return await handleListPendingTasks(
+					args as unknown as ListPendingTasksArgs
 				);
 
 			default:
@@ -970,18 +1264,19 @@ function createServer(options?: McpServerOptions): Server {
  * Check if GitHub token is available and throw helpful error if not
  */
 function ensureGitHubToken(providedToken?: string): void {
-	const token = providedToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-	
+	const token =
+		providedToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+
 	if (!token) {
 		const axError = githubApiError({
 			status: 401,
-			message: 
-				'GitHub authentication required. Set GITHUB_TOKEN environment variable.\n' +
-				'\n' +
-				'To fix:\n' +
-				'  export GITHUB_TOKEN=ghp_...\n' +
-				'\n' +
-				'See: https://github.com/Guffawaffle/lexrunner#authentication'
+			message:
+				"GitHub authentication required. Set GITHUB_TOKEN environment variable.\n" +
+				"\n" +
+				"To fix:\n" +
+				"  export GITHUB_TOKEN=ghp_...\n" +
+				"\n" +
+				"See: https://github.com/Guffawaffle/lexrunner#authentication",
 		});
 		throwMcpAXError(ErrorCode.InvalidRequest, axError);
 	}
@@ -1035,7 +1330,7 @@ async function handlePlanCreate(
 		if (args.fromGithub) {
 			// Check for GitHub authentication before making API calls
 			ensureGitHubToken(args.githubToken);
-			
+
 			// GitHub mode: auto-discover PRs
 			const client = await createGitHubClient({
 				token: args.githubToken,
@@ -1150,6 +1445,336 @@ async function handlePlanCreate(
 			"plan.create",
 			error,
 			"create plan"
+		);
+	}
+}
+
+/**
+ * Handle pr_list tool
+ * Lists pull requests from GitHub without creating a plan
+ */
+async function handlePrList(
+	args: PrListArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Check for GitHub authentication early
+		ensureGitHubToken(args.githubToken);
+
+		// Create GitHub client
+		const client = await createGitHubClient({
+			token: args.githubToken,
+			owner: args.owner,
+			repo: args.repo,
+		});
+
+		// Validate repository access
+		const repoInfo = await client.validateRepository();
+
+		// Get state parameter (default to "open")
+		const state = args.state || "open";
+
+		// Discover PRs based on query/filters
+		const prs = await client.listOpenPRs({
+			state,
+			labels: args.labels,
+			...(args.query ? { query: args.query } : {}),
+		});
+
+		// Default behavior: include drafts unless explicitly disabled
+		const includeDrafts =
+			args.includeDrafts === undefined
+				? true
+				: Boolean(args.includeDrafts);
+		const filteredPRs = includeDrafts ? prs : prs.filter((pr) => !pr.draft);
+
+		// Exclude specific PRs if requested
+		const excludePRs = args.excludePRs || [];
+		const finalPRs =
+			excludePRs.length > 0
+				? filteredPRs.filter((pr) => !excludePRs.includes(pr.number))
+				: filteredPRs;
+
+		// Transform to result format
+		const result: PrListResult = {
+			pullRequests: finalPRs.map((pr) => ({
+				number: pr.number,
+				title: pr.title,
+				branch: pr.head.ref,
+				author: pr.user.login,
+				labels: pr.labels.map((l) => l.name),
+				sha: pr.head.sha,
+				draft: pr.draft,
+			})),
+			total: prs.length,
+			filtered: finalPRs.length,
+			owner: client.getOwner(),
+			repo: client.getRepo(),
+		};
+
+		// Log discovery results to stderr
+		const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
+		const filterInfo = args.labels
+			? ` labels=${args.labels.join(",")}`
+			: "";
+		const queryInfo = args.query ? ` query="${args.query}"` : "";
+		console.error(
+			`[mcp:pr_list] repo=${repoDiag}${filterInfo}${queryInfo} found=${result.filtered}/${result.total} PRs`
+		);
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof GitHubAPIError) {
+			const axError = githubApiError({
+				message: error.message,
+			});
+			throwMcpAXError(ErrorCode.InternalError, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"pr_list",
+			error,
+			"list pull requests"
+		);
+	}
+}
+
+/**
+ * Handle plan_validate tool
+ * Validates a plan.json file for schema compliance and logical consistency
+ */
+async function handlePlanValidate(
+	args: PlanValidateArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		let planContent: string;
+		let planPath: string | undefined;
+
+		// Get plan content either from file or direct content
+		if (args.planContent) {
+			planContent = args.planContent;
+		} else {
+			// Resolve plan file path
+			if (args.planFile) {
+				planPath = args.planFile;
+			} else {
+				const resolved = resolveProfile(undefined, process.cwd());
+				planPath = path.join(resolved.path, "runner", "plan.json");
+			}
+
+			// Check if plan file exists
+			if (!fs.existsSync(planPath)) {
+				throwMcpAXError(
+					ErrorCode.InvalidParams,
+					planNotFoundError(planPath)
+				);
+			}
+
+			planContent = fs.readFileSync(planPath, "utf-8");
+		}
+
+		// Try to validate the plan
+		const result: PlanValidateResult = {
+			valid: true,
+			warnings: [],
+		};
+
+		try {
+			const plan = loadPlan(planContent);
+
+			// Basic validation passed
+			result.plan = {
+				schemaVersion: plan.schemaVersion,
+				target: plan.target,
+				itemCount: plan.items.length,
+			};
+
+			// Additional logical validations
+			if (plan.items.length === 0) {
+				result.warnings?.push("Plan contains no items");
+			}
+
+			// Check for duplicate item names
+			const names = new Set<string>();
+			const duplicates: string[] = [];
+			for (const item of plan.items) {
+				if (names.has(item.name)) {
+					duplicates.push(item.name);
+				}
+				names.add(item.name);
+			}
+			if (duplicates.length > 0) {
+				result.valid = false;
+				result.errors = result.errors || [];
+				result.errors.push({
+					path: "items",
+					message: `Duplicate item names found: ${duplicates.join(
+						", "
+					)}`,
+					code: "DUPLICATE_NAMES",
+				});
+			}
+
+			console.error(
+				`[mcp:plan_validate] validated plan with ${plan.items.length} items, valid=${result.valid}`
+			);
+		} catch (error) {
+			result.valid = false;
+			result.errors = [];
+
+			if (error instanceof AXErrorException) {
+				result.errors.push({
+					path: "root",
+					message: error.message,
+					code: error.axError.code,
+				});
+			} else if (error instanceof Error) {
+				result.errors.push({
+					path: "root",
+					message: error.message,
+				});
+			}
+
+			console.error(`[mcp:plan_validate] validation failed: ${error}`);
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"plan_validate",
+			error,
+			"validate plan"
+		);
+	}
+}
+
+/**
+ * Handle plan_analyze tool
+ * Analyzes a plan for conflicts and dependency issues (dry-run)
+ */
+async function handlePlanAnalyze(
+	args: PlanAnalyzeArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		let planPath: string;
+
+		// Resolve plan file path
+		if (args.planFile) {
+			planPath = args.planFile;
+		} else {
+			const resolved = resolveProfile(undefined, process.cwd());
+			planPath = path.join(resolved.path, "runner", "plan.json");
+		}
+
+		// Check if plan file exists
+		if (!fs.existsSync(planPath)) {
+			throwMcpAXError(
+				ErrorCode.InvalidParams,
+				planNotFoundError(planPath)
+			);
+		}
+
+		// Load and validate plan
+		const planContent = fs.readFileSync(planPath, "utf-8");
+		const plan = loadPlan(planContent);
+
+		const result: PlanAnalyzeResult = {
+			valid: true,
+			conflicts: [],
+			dependencies: {
+				total: 0,
+			},
+			summary: {
+				totalItems: plan.items.length,
+				maxParallelism: 0,
+				hasIssues: false,
+			},
+		};
+
+		// Count dependencies
+		for (const item of plan.items) {
+			if (item.deps && item.deps.length > 0) {
+				result.dependencies!.total += item.deps.length;
+			}
+		}
+
+		// Try to compute merge order (will detect cycles and unknown deps)
+		try {
+			const levels = computeMergeOrder(plan);
+			result.mergeOrder = levels;
+			const levelSizes = levels.map((l) => l.length);
+			result.summary.maxParallelism =
+				levelSizes.length > 0 ? Math.max(0, ...levelSizes) : 0;
+
+			console.error(
+				`[mcp:plan_analyze] analyzed plan: ${plan.items.length} items, ${levels.length} levels, max parallelism=${result.summary.maxParallelism}`
+			);
+		} catch (error) {
+			result.valid = false;
+			result.summary.hasIssues = true;
+
+			if (error instanceof CycleError) {
+				const cycle = (
+					error.axError.context as unknown as CycleDetectedContext
+				).cycle;
+				result.dependencies!.cycles = [[...cycle]];
+				result.conflicts?.push({
+					type: "cycle",
+					message: `Dependency cycle detected: ${cycle.join(" -> ")}`,
+					items: cycle,
+				});
+				console.error(
+					`[mcp:plan_analyze] cycle detected: ${cycle.join(" -> ")}`
+				);
+			} else if (error instanceof UnknownDependencyError) {
+				const ctx = error.axError
+					.context as unknown as UnknownDependencyContext;
+				result.dependencies!.unknown = [ctx.dependency];
+				result.conflicts?.push({
+					type: "unknown_dependency",
+					message: `Unknown dependency: ${ctx.dependency} referenced by ${ctx.item}`,
+					items: [ctx.item, ctx.dependency],
+				});
+				console.error(
+					`[mcp:plan_analyze] unknown dependency: ${ctx.dependency}`
+				);
+			} else {
+				result.conflicts?.push({
+					type: "analysis_error",
+					message:
+						error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"plan_analyze",
+			error,
+			"analyze plan"
 		);
 	}
 }
@@ -1885,7 +2510,7 @@ async function handleDiscover(args: {
 	try {
 		// Check for GitHub authentication early
 		ensureGitHubToken();
-		
+
 		let githubAPI = await createGitHubAPI();
 
 		// Override with arguments if provided
@@ -2382,6 +3007,334 @@ async function handleWorkflowGuide(
 			"workflow.guide",
 			error,
 			"get workflow guide"
+		);
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task Handoff Tool Handlers (ADR-007)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * In-memory task store for MCP session
+ * In production, this should use RunStore or a dedicated task store
+ */
+const taskStore = new Map<
+	string,
+	{
+		snapshot: TaskSnapshot_v1;
+		receipt?: TaskReceipt_v1;
+		verification?: any;
+		state: "pending" | "in_progress" | "completed" | "verified" | "failed";
+	}
+>();
+
+/**
+ * Handle create_task_snapshot tool
+ */
+async function handleCreateTaskSnapshot(
+	args: CreateTaskSnapshotArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = CreateTaskSnapshotArgs.parse(args);
+
+		// Auto-detect git info if not provided
+		const gitOps = createGitOperations();
+		const repoRoot = validated.repoRoot || process.cwd();
+		const commitSha =
+			validated.commitSha || (await gitOps.getCurrentHead());
+
+		// Auto-detect repoId if not provided
+		let repoId = validated.repoId;
+		if (!repoId) {
+			try {
+				const githubAPI = await createGitHubAPI();
+				if (githubAPI) {
+					repoId = `${githubAPI.config.owner}/${githubAPI.config.repo}`;
+				} else {
+					repoId = "unknown/unknown";
+				}
+			} catch {
+				repoId = "unknown/unknown";
+			}
+		}
+
+		// Generate task ID if not provided
+		const taskId = validated.taskId || ulid();
+
+		// Build snapshot using SnapshotBuilder
+		const builder = new SnapshotBuilder({
+			repoRoot,
+			repoId,
+		});
+
+		const snapshot = await builder.buildSnapshot({
+			taskId,
+			procedure: validated.procedure,
+			determinism: validated.determinism as
+				| "D1"
+				| "D2"
+				| "D3"
+				| undefined,
+			targetFiles: validated.targetFiles,
+			failure: {
+				message: validated.failureMessage,
+				fileRel: validated.failureFileRel,
+				line: validated.failureLine,
+				runnerOutputSnip: validated.runnerOutputSnip,
+				excerpt: validated.failureExcerpt,
+			},
+			commitSha,
+			verificationCmd: validated.verificationCmd,
+			expectedExitCode: validated.expectedExitCode,
+		});
+
+		// Store snapshot in task store
+		taskStore.set(taskId, {
+			snapshot,
+			state: "pending",
+		});
+
+		const result: CreateTaskSnapshotResult = {
+			snapshot,
+			taskId,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid create_task_snapshot parameters: ${error.message}`,
+				{
+					tool: "create_task_snapshot",
+					operation: "validate parameters",
+				}
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"create_task_snapshot",
+			error,
+			"create task snapshot"
+		);
+	}
+}
+
+/**
+ * Handle submit_task_receipt tool
+ */
+async function handleSubmitTaskReceipt(
+	args: SubmitTaskReceiptArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = SubmitTaskReceiptArgs.parse(args);
+
+		// Parse and validate receipt
+		const receipt = parseTaskReceipt(validated.receipt);
+
+		// Find corresponding snapshot
+		const taskData = taskStore.get(receipt.task_id);
+		if (!taskData) {
+			const axError = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				`Task not found: ${receipt.task_id}. Create snapshot first using create_task_snapshot.`,
+				{ tool: "submit_task_receipt", details: { taskId: receipt.task_id } }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+
+		// Update state
+		taskData.state = "in_progress";
+		taskData.receipt = receipt;
+
+		// Run engine verification
+		const verifier = new EngineVerifier();
+		const verificationResult = await verifier.verify({
+			snapshot: taskData.snapshot,
+			receipt,
+			workingDir: taskData.snapshot.repo.root,
+			applyPatch: true,
+		});
+
+		// Update task with verification
+		taskData.verification = verificationResult.verification;
+		taskData.state = verificationResult.verification.verified
+			? "verified"
+			: "failed";
+
+		const result: SubmitTaskReceiptResult = {
+			acknowledged: true,
+			taskId: receipt.task_id,
+			verification: {
+				verified: verificationResult.verification.verified,
+				trustGap: verificationResult.trustGap,
+				patchApplied: verificationResult.patchApplied,
+			},
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid submit_task_receipt parameters: ${error.message}`,
+				{
+					tool: "submit_task_receipt",
+					operation: "validate parameters",
+				}
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"submit_task_receipt",
+			error,
+			"submit task receipt"
+		);
+	}
+}
+
+/**
+ * Handle get_task_status tool
+ */
+async function handleGetTaskStatus(
+	args: GetTaskStatusArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = GetTaskStatusArgs.parse(args);
+
+		// Find task
+		const taskData = taskStore.get(validated.taskId);
+		if (!taskData) {
+			const axError = mcpToolError(
+				ErrorCodes.INTERNAL_ERROR,
+				`Task not found: ${validated.taskId}`,
+				{ tool: "get_task_status", details: { taskId: validated.taskId } }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+
+		const result: GetTaskStatusResult = {
+			taskId: validated.taskId,
+			state: taskData.state,
+			snapshot: taskData.snapshot,
+			receipt: taskData.receipt,
+			verification: taskData.verification,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid get_task_status parameters: ${error.message}`,
+				{ tool: "get_task_status", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"get_task_status",
+			error,
+			"get task status"
+		);
+	}
+}
+
+/**
+ * Handle list_pending_tasks tool
+ */
+async function handleListPendingTasks(
+	args: ListPendingTasksArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+	try {
+		// Validate args
+		const validated = ListPendingTasksArgs.parse(args);
+
+		// Filter tasks
+		const tasks: ListPendingTasksResult["tasks"] = [];
+		for (const [taskId, taskData] of taskStore.entries()) {
+			// Apply filters
+			if (
+				validated.procedure &&
+				taskData.snapshot.procedure !== validated.procedure
+			) {
+				continue;
+			}
+			if (
+				validated.determinism &&
+				taskData.snapshot.determinism !== validated.determinism
+			) {
+				continue;
+			}
+
+			tasks.push({
+				taskId,
+				procedure: taskData.snapshot.procedure,
+				determinism: taskData.snapshot.determinism,
+				state: taskData.state,
+				snapshot: taskData.snapshot,
+			});
+
+			// Apply limit
+			if (validated.limit && tasks.length >= validated.limit) {
+				break;
+			}
+		}
+
+		const result: ListPendingTasksResult = {
+			tasks,
+			total: tasks.length,
+		};
+
+		return {
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify(result, null, 2),
+				},
+			],
+		};
+	} catch (error) {
+		if (error instanceof Error && error.name === "ZodError") {
+			const axError = mcpToolError(
+				ErrorCodes.INVALID_INPUT,
+				`Invalid list_pending_tasks parameters: ${error.message}`,
+				{ tool: "list_pending_tasks", operation: "validate parameters" }
+			);
+			throwMcpAXError(ErrorCode.InvalidParams, axError);
+		}
+		throwMcpToolError(
+			ErrorCode.InternalError,
+			"list_pending_tasks",
+			error,
+			"list pending tasks"
 		);
 	}
 }
