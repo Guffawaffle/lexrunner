@@ -5,9 +5,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "fs";
-import { join } from "path";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
+import { fileURLToPath } from "url";
 import {
 	loadTestFixPatterns,
 	getEnabledPatterns,
@@ -15,6 +16,10 @@ import {
 	buildFixInstruction,
 	applyFix,
 } from "../../../../src/weave/testfix/index.js";
+
+// Find workspace root by going up from current file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe("End-to-End Scenarios", () => {
 	let tmpDir: string;
@@ -106,7 +111,6 @@ FAIL  tests/mcp-tools.spec.ts
 
 		// 1. Create a test file with implicit connection
 		const testDir = join(tmpDir, "lexsona");
-		const { mkdirSync } = require("fs");
 		mkdirSync(testDir, { recursive: true });
 		
 		const testFile = join(testDir, "connection.spec.ts");

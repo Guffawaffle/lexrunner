@@ -5,12 +5,17 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import {
 	loadTestFixPatterns,
 	safeLoadTestFixPatterns,
 } from "../../../../src/weave/testfix/loader.js";
 import { getEnabledPatterns } from "../../../../src/weave/testfix/schema.js";
+
+// Find workspace root by going up from current file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe("Test Fix Patterns Integration", () => {
 	const workspaceRoot = join(__dirname, "../../../..");

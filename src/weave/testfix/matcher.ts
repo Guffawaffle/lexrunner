@@ -124,10 +124,8 @@ export function findFixLocations(
 				}
 			}
 		} catch (err) {
-			// Skip files that can't be read
-			console.warn(
-				`Warning: Could not read file ${filePath}: ${err instanceof Error ? err.message : String(err)}`
-			);
+			// Skip files that can't be read (permissions, binary files, etc.)
+			// Logging is intentionally silent to avoid noise during pattern matching
 		}
 	}
 
