@@ -319,7 +319,7 @@ catch (error) {
 
 Frames emitted by executors integrate with the Lex memory system:
 
-1. **Storage** — Frames are stored in `.lexrunner/frames/`
+1. **Storage** — Frames are stored in `.lex/memory.db` (via Lex CLI delegation)
 2. **Recall** — Prior executions can be queried by role, module, or pattern
 3. **Learning** — Patterns emerge from accumulated Frame history
 
@@ -327,6 +327,8 @@ Frames emitted by executors integrate with the Lex memory system:
 ```bash
 lex recall "executor:senior-dev reviews for src/cli.ts"
 ```
+
+**Memory Tools:** For details on the relationship between Lex memory tools and LexRunner executor tools, see [MEMORY_TOOLS.md](../../docs/MEMORY_TOOLS.md).
 
 ---
 

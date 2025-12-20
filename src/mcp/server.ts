@@ -451,7 +451,10 @@ function createServer(options?: McpServerOptions): Server {
 				{
 					name: "executor_recall_context",
 					description:
-						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns)",
+						"Phase 1: Recall relevant Frames from Lex memory (module reviews, developer history, patterns). " +
+						"This tool delegates to the Lex CLI (`lex recall`) to query the Lex memory system. " +
+						"For direct access to Lex memory, use the Lex MCP server's `mcp_lex_frame_recall` tool instead. " +
+						"This executor-specific tool provides Senior Dev workflow integration.",
 					inputSchema: {
 						type: "object",
 						properties: {

@@ -2,12 +2,16 @@
 
 This document describes how the Senior Dev executor integrates with Lex memory for context accumulation and pattern recognition.
 
+> **📘 Memory Tools Overview:** For a complete explanation of the relationship between Lex memory tools and LexRunner executor tools, see [MEMORY_TOOLS.md](../../docs/MEMORY_TOOLS.md).
+
 ## Overview
 
 The Senior Dev executor uses Lex frames to:
 1. **Recall** prior reviews for context
 2. **Capture** new review sessions as frames
 3. **Build** developer and module histories
+
+**Note:** The `executor_recall_context` and `executor_capture_frame` tools are **wrappers** around the Lex CLI (`lex recall`, `lex remember`). They delegate to the same Lex memory system used by the Lex MCP server's `mcp_lex_frame_*` tools.
 
 ## Frame Schema
 
@@ -190,6 +194,40 @@ lexrunner senior-dev capture-frame \
   --severity should-fix \
   --developer alice
 ```
+
+## Relationship with Lex MCP Tools
+
+The Senior Dev executor tools (`executor_recall_context`, `executor_capture_frame`) are **wrappers** around the Lex CLI. They provide executor-specific workflow integration but ultimately delegate to the same Lex memory system.
+
+### Key Points
+
+1. **Same Database:** Both executor tools and Lex MCP tools (`mcp_lex_frame_recall`, `mcp_lex_frame_remember`) access the same SQLite database (`.lex/memory.db`)
+
+2. **CLI Wrapper:** Executor tools call the `lex` CLI, which writes to the Lex memory store
+
+3. **When to Use Which:**
+   - **Use executor tools** (`executor_recall_context`) when working within the Senior Dev workflow
+   - **Use Lex MCP tools** (`mcp_lex_frame_recall`) for direct, general-purpose memory access with better performance
+
+4. **Consistency:** For best results, choose one interface and use it consistently. Don't mix executor tools and Lex MCP tools unless necessary.
+
+### Example: Equivalent Operations
+
+Using executor tools:
+```bash
+# Recall via executor wrapper
+lexrunner senior-dev recall-context --module src/gates
+```
+
+Using Lex MCP tools directly:
+```bash
+# Recall via Lex CLI (same result, more direct)
+lex recall "reviews for src/gates"
+```
+
+Both access the same memory, but Lex MCP tools are more direct and performant.
+
+For a complete guide on choosing the right memory tool, see [MEMORY_TOOLS.md](../../docs/MEMORY_TOOLS.md).
 
 ## Related
 

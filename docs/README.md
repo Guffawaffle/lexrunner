@@ -108,6 +108,15 @@ New to lexrunner? Start here:
 - **[Azure DevOps](./integrations/README.md#azure-devops)** - Microsoft ecosystem
 - **[More platforms...](./integrations/README.md)** - Complete list
 
+### Memory & Lex Integration
+
+- **[Memory Tools Guide](./MEMORY_TOOLS.md)** - Understanding Lex vs LexRunner memory tools
+  - When to use `mcp_lex_frame_recall` vs `executor_recall_context`
+  - Avoiding split-brain confusion
+  - Performance and feature comparisons
+- **[Lex Integration](./LEX_INTEGRATION.md)** - How LexRunner integrates with Lex
+- **[Lex Public API](./LEX_PUBLIC_API.md)** - Lex API surface for LexRunner
+
 ### Communication Tools
 
 - **Slack Notifications** - Post merge results
