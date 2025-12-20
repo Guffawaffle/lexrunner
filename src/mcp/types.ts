@@ -20,8 +20,11 @@ export interface MCPEnvironment {
  */
 export function getMCPEnvironment(): MCPEnvironment {
 	return {
-		LEX_PR_PROFILE_DIR: getEnvWithAlias('LEX_PR_PROFILE_DIR', 'LEXRUNNER_PROFILE_DIR'),
-		ALLOW_MUTATIONS: process.env.ALLOW_MUTATIONS === "true"
+		LEX_PR_PROFILE_DIR: getEnvWithAlias(
+			"LEX_PR_PROFILE_DIR",
+			"LEXRUNNER_PROFILE_DIR"
+		),
+		ALLOW_MUTATIONS: process.env.ALLOW_MUTATIONS === "true",
 	};
 }
 
@@ -43,7 +46,7 @@ export const PlanCreateArgs = z.object({
 	repo: z.string().optional(),
 	requiredGates: z.array(z.string()).optional(),
 	maxWorkers: z.number().optional(),
-	target: z.string().optional()
+	target: z.string().optional(),
 });
 export type PlanCreateArgs = z.infer<typeof PlanCreateArgs>;
 
@@ -51,22 +54,22 @@ export const GatesRunArgs = z.object({
 	planFile: z.string().optional(),
 	onlyItem: z.string().optional(),
 	onlyGate: z.string().optional(),
-	outDir: z.string().optional()
+	outDir: z.string().optional(),
 });
 export type GatesRunArgs = z.infer<typeof GatesRunArgs>;
 
 export const MergeApplyArgs = z.object({
-	dryRun: z.boolean().optional()
+	dryRun: z.boolean().optional(),
 });
 export type MergeApplyArgs = z.infer<typeof MergeApplyArgs>;
 
 export const InitLocalArgs = z.object({
-	force: z.boolean().optional()
+	force: z.boolean().optional(),
 });
 export type InitLocalArgs = z.infer<typeof InitLocalArgs>;
 
 export const ProfileResolveArgs = z.object({
-	profileDir: z.string().optional()
+	profileDir: z.string().optional(),
 });
 export type ProfileResolveArgs = z.infer<typeof ProfileResolveArgs>;
 
@@ -126,22 +129,22 @@ export const DiscoverArgs = z.object({
 	owner: z.string().optional(),
 	repo: z.string().optional(),
 	state: z.enum(["open", "closed", "all"]).optional(),
-	suggest: z.boolean().optional()
+	suggest: z.boolean().optional(),
 });
 export type DiscoverArgs = z.infer<typeof DiscoverArgs>;
 
 export const StatusArgs = z.object({
-	planFile: z.string().optional()
+	planFile: z.string().optional(),
 });
 export type StatusArgs = z.infer<typeof StatusArgs>;
 
 export const MergeOrderArgs = z.object({
-	planFile: z.string().optional()
+	planFile: z.string().optional(),
 });
 export type MergeOrderArgs = z.infer<typeof MergeOrderArgs>;
 
 export const ConfigShowArgs = z.object({
-	key: z.string().optional()
+	key: z.string().optional(),
 });
 export type ConfigShowArgs = z.infer<typeof ConfigShowArgs>;
 
@@ -152,8 +155,8 @@ export const WorkflowGuideArgs = z.object({
 		"post-gates-run",
 		"pre-merge",
 		"post-merge",
-		"error-recovery"
-	])
+		"error-recovery",
+	]),
 });
 export type WorkflowGuideArgs = z.infer<typeof WorkflowGuideArgs>;
 
@@ -203,11 +206,25 @@ export interface DoctorResult {
 	issues: string[];
 	suggestions: string[];
 	nodejs?: { status: string; current: string; expected?: string };
-	configuration?: { hasConfiguration: boolean; missingFiles: string[]; suggestions: string[] };
+	configuration?: {
+		hasConfiguration: boolean;
+		missingFiles: string[];
+		suggestions: string[];
+	};
 	projectType?: string;
 	environmentSuggestions?: string[];
-	github?: { detected: boolean; authenticated?: boolean; user?: string; error?: string };
-	git?: { status: string; isClean?: boolean; currentBranch?: string; error?: string };
+	github?: {
+		detected: boolean;
+		authenticated?: boolean;
+		user?: string;
+		error?: string;
+	};
+	git?: {
+		status: string;
+		isClean?: boolean;
+		currentBranch?: string;
+		error?: string;
+	};
 }
 
 export interface MergeOrderResult {
@@ -240,18 +257,18 @@ export const PrListArgs = z.object({
 	includeDrafts: z.boolean().optional(),
 	excludePRs: z.array(z.number()).optional(),
 	githubToken: z.string().optional(),
-	state: z.enum(["open", "closed", "all"]).optional()
+	state: z.enum(["open", "closed", "all"]).optional(),
 });
 export type PrListArgs = z.infer<typeof PrListArgs>;
 
 export const PlanValidateArgs = z.object({
 	planFile: z.string().optional(),
-	planContent: z.string().optional()
+	planContent: z.string().optional(),
 });
 export type PlanValidateArgs = z.infer<typeof PlanValidateArgs>;
 
 export const PlanAnalyzeArgs = z.object({
-	planFile: z.string().optional()
+	planFile: z.string().optional(),
 });
 export type PlanAnalyzeArgs = z.infer<typeof PlanAnalyzeArgs>;
 

@@ -3043,7 +3043,7 @@ async function handleCreateTaskSnapshot(
 		const gitOps = createGitOperations();
 		const repoRoot = validated.repoRoot || process.cwd();
 		const commitSha =
-			validated.commitSha || (await gitOps.getCurrentCommitSHA());
+			validated.commitSha || (await gitOps.getCurrentHead());
 
 		// Auto-detect repoId if not provided
 		let repoId = validated.repoId;
@@ -3149,7 +3149,7 @@ async function handleSubmitTaskReceipt(
 			const axError = mcpToolError(
 				ErrorCodes.INTERNAL_ERROR,
 				`Task not found: ${receipt.task_id}. Create snapshot first using create_task_snapshot.`,
-				{ tool: "submit_task_receipt", taskId: receipt.task_id }
+				{ tool: "submit_task_receipt", details: { taskId: receipt.task_id } }
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
@@ -3228,7 +3228,7 @@ async function handleGetTaskStatus(
 			const axError = mcpToolError(
 				ErrorCodes.INTERNAL_ERROR,
 				`Task not found: ${validated.taskId}`,
-				{ tool: "get_task_status", taskId: validated.taskId }
+				{ tool: "get_task_status", details: { taskId: validated.taskId } }
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
@@ -3278,7 +3278,7 @@ async function handleListPendingTasks(
 		const validated = ListPendingTasksArgs.parse(args);
 
 		// Filter tasks
-		const tasks: GetTaskStatusResult["snapshot"][] = [];
+		const tasks: ListPendingTasksResult["tasks"] = [];
 		for (const [taskId, taskData] of taskStore.entries()) {
 			// Apply filters
 			if (
