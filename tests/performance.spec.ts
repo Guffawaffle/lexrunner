@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { performance } from "node:perf_hooks";
 import {
 	MemoryMonitor,
 	OperationCache,
@@ -81,6 +82,25 @@ describe("Performance - High-Throughput Execution", () => {
 
 			const result = cache.get("key1");
 			expect(result).toBeNull();
+		});
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it("should expire entries even if Date.now is mocked", () => {
+			const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
+			const perfNowSpy = vi.spyOn(performance, "now");
+
+			// First call is from cache.set(), second call is from cache.get().
+			perfNowSpy.mockReturnValueOnce(0);
+			perfNowSpy.mockReturnValueOnce(2000);
+
+			cache.set("key1", "value1");
+			const result = cache.get("key1");
+
+			expect(result).toBeNull();
+			// Guard against regressions back to Date.now-based expiration.
+			expect(dateNowSpy).not.toHaveBeenCalled();
 		});
 
 		it("should not cache when disabled", () => {
