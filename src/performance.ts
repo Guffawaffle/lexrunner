@@ -5,6 +5,7 @@
 
 import { PerformanceConfig } from "./schema.js";
 import { metrics, METRICS } from "./monitoring/metrics.js";
+import { performance } from "node:perf_hooks";
 
 /**
  * Memory monitor for tracking and throttling based on memory usage
@@ -100,7 +101,9 @@ export class OperationCache<T> {
 			return null;
 		}
 
-		const now = Date.now();
+		// Use a monotonic clock so tests or consumers mocking Date.now() don't
+		// accidentally disable expiration semantics.
+		const now = performance.now();
 		if (now - entry.timestamp > this.ttlMs) {
 			this.cache.delete(key);
 			return null;
@@ -119,7 +122,7 @@ export class OperationCache<T> {
 
 		this.cache.set(key, {
 			value,
-			timestamp: Date.now()
+			timestamp: performance.now()
 		});
 	}
 
@@ -194,7 +197,7 @@ export class BatchProcessor<T> {
 	 */
 	private createBatches(items: T[]): T[][] {
 		const batches: T[][] = [];
-		
+
 		for (let i = 0; i < items.length; i += this.batchSize) {
 			batches.push(items.slice(i, i + this.batchSize));
 		}
