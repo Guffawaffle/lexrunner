@@ -1,8 +1,11 @@
 /**
- * Placeholder ExecutorRegistry for Testing
+ * ExecutorRegistry Test Fixture
  * 
- * This is a simplified mock implementation until PR #412 is merged.
- * Real implementation will provide full registry functionality.
+ * This is a simplified test fixture for executor lifecycle tests.
+ * A production registry in src/executors/registry.ts does not currently exist;
+ * executors are loaded via direct TypeScript imports instead.
+ * 
+ * See docs/architecture/executors.md for registry architecture details.
  */
 
 import type { Executor, ExecutorRegistry as IExecutorRegistry } from './types.js';
