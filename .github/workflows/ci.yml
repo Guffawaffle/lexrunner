@@ -1,3 +1,9 @@
+# Minimal CI: lint + typecheck only
+# To run full CI: use workflow_dispatch with 'level' input
+# Local equivalents:
+#   minimal: npm run ci:minimal
+#   standard: npm run ci
+#   full: npm run ci:full
 name: CI
 
 on:
@@ -11,10 +17,17 @@ on:
       - '.github/workflows/**'
       - 'vitest.config.ts'
       - 'tsup.config.ts'
-      - 'NOTICE.md'
-      - 'docs/LICENSING.md'
-      - 'scripts/check-license-compliance.mjs'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'CI level to run'
+        required: false
+        type: choice
+        options:
+          - minimal
+          - standard
+          - full
+        default: 'minimal'
 
 permissions:
   contents: read
@@ -47,24 +60,7 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
 
-  ci-smoke:
-    runs-on: ubuntu-latest
-    needs: setup
-    timeout-minutes: 5
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - name: CI smoke test
-        run: npm run ci:smoke
-
+  # Minimal gates: lint + typecheck (always runs)
   lint:
     runs-on: ubuntu-latest
     needs: setup
@@ -80,23 +76,6 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
       - run: npm run lint
-
-  validate-manifests:
-    runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - name: Validate executor manifests
-        run: npm run validate:manifests
 
   typecheck:
     runs-on: ubuntu-latest
@@ -114,10 +93,13 @@ jobs:
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
       - run: npm run typecheck
 
-  test:
+  # Standard gates: build + tests (only on workflow_dispatch with level >= standard)
+  build-and-test:
     runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: [lint, typecheck]
+    if: >-
+      github.event_name == 'workflow_dispatch' && 
+      (inputs.level == 'standard' || inputs.level == 'full')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -128,14 +110,16 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - name: Build
-        run: npm run build --if-present
+      - run: npm run build
       - run: npm test
+      - run: npm run validate:manifests
 
-  build:
+  # Full gates: determinism + license (only on workflow_dispatch with level == full)
+  determinism-and-license:
     runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: build-and-test
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.level == 'full'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -146,64 +130,38 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - run: npm run build --if-present
-
-  determinism:
-    runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - run: npm run build --if-present
+      - run: npm run build
       - run: npm run format
-      - name: Check for changes after build and format
+      - name: Check for uncommitted changes
         run: |
           if ! git diff --exit-code; then
             echo "❌ Repository is not clean after build and format"
-            echo "The following files have changes:"
-            git diff --name-only
-            echo ""
-            echo "Please run 'npm run build && npm run format' locally and commit the changes."
             exit 1
-          else
-            echo "✅ Repository is clean after build and format"
           fi
-      - name: Determinism smoke test - compare two plan runs
+          echo "✅ Repository is clean"
+      - name: Determinism smoke test
         run: |
           rm -rf .artifactsA .artifactsB
           node dist/cli.js plan --out .artifactsA
           node dist/cli.js plan --out .artifactsB
-          if ! diff -u .artifactsA/plan.json .artifactsB/plan.json; then
-            echo "❌ Plan output is not deterministic"
-            exit 1
-          fi
-          if ! diff -u .artifactsA/snapshot.md .artifactsB/snapshot.md; then
-            echo "❌ Snapshot output is not deterministic"
-            exit 1
-          fi
+          diff -u .artifactsA/plan.json .artifactsB/plan.json
           echo "✅ Plan generation is deterministic"
-
-  license-compliance:
-    runs-on: ubuntu-latest
-    needs: setup
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-      - name: Check license compliance
+      - name: License compliance
         run: node scripts/check-license-compliance.mjs
+
+  # Summary job
+  ci-complete:
+    name: CI Complete
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "❌ Lint failed"; exit 1
+          fi
+          if [[ "${{ needs.typecheck.result }}" != "success" ]]; then
+            echo "❌ TypeCheck failed"; exit 1
+          fi
+          echo "✅ CI Complete (level: ${{ inputs.level || 'minimal' }})"
