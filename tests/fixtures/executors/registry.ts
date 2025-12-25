@@ -1,9 +1,13 @@
 /**
  * ExecutorRegistry Test Fixture
  * 
- * This is a simplified test fixture for executor lifecycle tests.
- * A production registry in src/executors/registry.ts does not currently exist;
- * executors are loaded via direct TypeScript imports instead.
+ * This is a test fixture for executor lifecycle tests.
+ * Currently, executors are loaded via direct TypeScript imports.
+ * 
+ * Note: A production registry was considered but is not currently planned.
+ * The direct import approach is sufficient for the current executor count.
+ * If dynamic loading becomes needed in the future, a production registry
+ * could be implemented in src/executors/registry.ts.
  * 
  * See docs/architecture/executors.md for registry architecture details.
  */

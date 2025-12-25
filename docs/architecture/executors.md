@@ -39,7 +39,7 @@ The executor registry is currently implemented as a **test fixture** for use in 
 - `list()` - List all registered executor IDs
 - `clear()` - Clear registry (for testing)
 
-**Note from code:**
+**Note from code (previous, now corrected):**
 ```typescript
 /**
  * Placeholder ExecutorRegistry for Testing
@@ -49,7 +49,7 @@ The executor registry is currently implemented as a **test fixture** for use in 
  */
 ```
 
-**IMPORTANT FINDING:** Issue #412 is **NOT** about Executor Registry. It's titled "LPR-048: Lex Memory Integration" and was closed on 2025-12-16. The comment in the test fixture is outdated/misleading.
+**IMPORTANT FINDING:** Issue #412 is **NOT** about Executor Registry. It's titled "LPR-048: Lex Memory Integration" and was closed on 2025-12-16. The comment in the test fixture was outdated/misleading and has been corrected.
 
 ### 3. Registry Implementation Status
 
@@ -139,15 +139,17 @@ Executors are currently loaded via direct TypeScript imports:
 import { executeReview } from '../executors/seniorDev/core.js';
 ```
 
-### Future: Registry Pattern
+### Future: Registry Pattern (Not Currently Planned)
 
-A production registry would enable:
+A production registry **could** enable:
 - Dynamic executor discovery from `executors/` directory
 - Runtime manifest loading and validation
 - Executor lifecycle management
 - Plugin-style executor additions
 
-**Potential implementation location:** `src/executors/registry.ts` (not yet created)
+**Current decision:** The direct import approach is sufficient for the current architecture (small number of executors, TypeScript module system). A production registry is **not currently planned** but could be implemented in the future if dynamic loading becomes a requirement.
+
+**Potential implementation location (if needed):** `src/executors/registry.ts`
 
 ## Summary for PR #583
 

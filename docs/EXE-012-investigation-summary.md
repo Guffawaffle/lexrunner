@@ -53,7 +53,7 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
 
 **Location:** `tests/fixtures/executors/registry.ts`
 
-**Comment in file:**
+**Comment in test fixture (previous, now corrected):**
 ```typescript
 /**
  * Placeholder ExecutorRegistry for Testing
@@ -63,7 +63,7 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
  */
 ```
 
-**Analysis:** This comment is misleading. It references "PR #412" which doesn't exist and conflates issue #412 (Lex Memory) with a registry implementation.
+**Analysis:** This comment was misleading and has been corrected. It references "PR #412" which doesn't exist and conflates issue #412 (Lex Memory) with a registry implementation.
 
 **Functionality:**
 - `register(executor)` - Add executor to in-memory map
@@ -209,10 +209,11 @@ Dependencies:
    - Clarified registry status
    - Documented file locations
 
-2. **Update code comment** - RECOMMENDED
+2. **Update code comment** - ✅ COMPLETED
    - File: `tests/fixtures/executors/registry.ts`
-   - Current: "This is a simplified mock implementation until PR #412 is merged."
-   - Suggested: "This is a test fixture for executor lifecycle tests. A production registry in src/ is not currently planned."
+   - Updated to clarify this is a test fixture
+   - Clarified that production registry is not currently planned
+   - Noted that direct imports are the current approach
 
 3. **Create clarification issue** - OPTIONAL
    - Title: "Clarify executor registry dependency confusion"
@@ -220,7 +221,7 @@ Dependencies:
 
 ### Future Considerations
 
-**If dynamic executor loading is needed:**
+**If dynamic executor loading becomes a requirement:**
 
 1. Create new issue: "EXE-XXX: Implement Production Executor Registry"
 2. Scope:
@@ -228,13 +229,14 @@ Dependencies:
    - Implement manifest loading from `executors/` directory
    - Support runtime executor discovery
    - Executor lifecycle management
-3. Priority: Low (current direct import approach is sufficient)
+3. Priority: **Not currently planned** - current direct import approach is intentional
 
-**Current approach is adequate because:**
+**Why current approach is preferred:**
 - Small number of executors (currently only senior-dev)
-- Executors are TypeScript modules with direct imports
+- Executors are TypeScript modules with compile-time type safety
 - Test fixtures provide registry pattern for testing
 - CI validation ensures manifest correctness
+- No runtime discovery requirement
 
 ---
 
