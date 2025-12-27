@@ -59,6 +59,50 @@ describe("GitHub Integration", () => {
 			});
 		});
 
+		it("should normalize repository name with different casing", async () => {
+			// Client is created with lowercase repo name
+			const clientWithLowercase = new GitHubClientImpl({
+				owner: "guffawaffle",
+				repo: "lexrunner"
+			});
+
+			// Mock GitHub API response with canonical casing
+			mockOctokit.rest.repos.get.mockResolvedValueOnce({
+				data: {
+					owner: { login: "Guffawaffle" },
+					name: "LexRunner",
+					default_branch: "main",
+					html_url: "https://github.com/Guffawaffle/LexRunner"
+				}
+			});
+
+			mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
+
+			// When listing PRs, the client should normalize to canonical casing
+			await clientWithLowercase.listOpenPRs();
+
+			// Verify that repos.get was called for normalization
+			expect(mockOctokit.rest.repos.get).toHaveBeenCalledWith({
+				owner: "guffawaffle",
+				repo: "lexrunner"
+			});
+
+			// Verify that pulls.list was called with normalized casing
+			expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
+				owner: "Guffawaffle",
+				repo: "LexRunner",
+				state: "open",
+				sort: "created",
+				direction: "desc",
+				per_page: 30,
+				page: 1
+			});
+
+			// Verify getOwner and getRepo return normalized values
+			expect(clientWithLowercase.getOwner()).toBe("Guffawaffle");
+			expect(clientWithLowercase.getRepo()).toBe("LexRunner");
+		});
+
 		it("should list open PRs with default options", async () => {
 			const mockPRs = [
 				{
