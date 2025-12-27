@@ -93,7 +93,7 @@ export class GitHubClientImpl implements GitHubClient {
 				repo: this.repo
 			});
 
-			// Update with canonical names from GitHub (if available)
+			// Update with canonical names from GitHub (defensive null checks)
 			if (response.data.owner?.login) {
 				this.owner = response.data.owner.login;
 			}
@@ -102,13 +102,13 @@ export class GitHubClientImpl implements GitHubClient {
 			}
 			this.normalized = true;
 		} catch (error: any) {
-			// If normalization fails, continue with original values
-			// The actual API call will fail with a more specific error
+			// If normalization fails with 404, throw immediately
 			if (error.status === 404) {
 				throw new GitHubAPIError(`Repository ${this.owner}/${this.repo} not found. Check repository name and access permissions.`);
 			}
-			// For other errors, let them propagate to the actual API call
-			this.normalized = true;
+			// For other errors (auth, rate limit, network), throw immediately
+			// Don't set normalized flag - we want to retry on next call
+			throw new GitHubAPIError(`Failed to normalize repository name: ${error.message}`, error.status);
 		}
 	}
 

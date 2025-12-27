@@ -79,16 +79,17 @@ export class GitHubAPI {
 				repo: this.config.repo,
 			});
 
-			// Update config with canonical names from GitHub
-			this.config.owner = repo.owner.login;
-			this.config.repo = repo.name;
+			// Update config with canonical names from GitHub (defensive null checks)
+			if (repo.owner?.login) {
+				this.config.owner = repo.owner.login;
+			}
+			if (repo.name) {
+				this.config.repo = repo.name;
+			}
 			this.normalized = true;
 		} catch (error) {
-			// If normalization fails, continue with original values
-			// The actual API call will fail with a more specific error
-			const status = error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
-				? (error as { status: number }).status
-				: undefined;
+			// Extract status from error for better error messages
+			const status = this.extractErrorStatus(error);
 			
 			if (status === 404) {
 				throw new GitHubAPIError(
@@ -96,9 +97,22 @@ export class GitHubAPI {
 					status
 				);
 			}
-			// For other errors, let them propagate to the actual API call
-			this.normalized = true;
+			// For other errors (auth, rate limit, network), throw immediately
+			// Don't set normalized flag - we want to retry on next call
+			throw new GitHubAPIError(
+				`Failed to normalize repository name: ${error instanceof Error ? error.message : String(error)}`,
+				status
+			);
 		}
+	}
+
+	/**
+	 * Extract HTTP status code from error object
+	 */
+	private extractErrorStatus(error: unknown): number | undefined {
+		return error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+			? (error as { status: number }).status
+			: undefined;
 	}
 
 	/**
