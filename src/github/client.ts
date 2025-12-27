@@ -101,15 +101,34 @@ export class GitHubClientImpl implements GitHubClient {
 				this.repo = response.data.name;
 			}
 			this.normalized = true;
-		} catch (error: any) {
+		} catch (error: unknown) {
+			// Extract status from error
+			const status = this.extractErrorStatus(error);
+			const message = error instanceof Error ? error.message : String(error);
+			
 			// If normalization fails with 404, throw immediately
-			if (error.status === 404) {
+			if (status === 404) {
 				throw new GitHubAPIError(`Repository ${this.owner}/${this.repo} not found. Check repository name and access permissions.`);
 			}
 			// For other errors (auth, rate limit, network), throw immediately
 			// Don't set normalized flag - we want to retry on next call
-			throw new GitHubAPIError(`Failed to normalize repository name: ${error.message}`, error.status);
+			throw new GitHubAPIError(`Failed to normalize repository name: ${message}`, status);
 		}
+	}
+
+	/**
+	 * Extract HTTP status code from error object
+	 */
+	private extractErrorStatus(error: unknown): number | undefined {
+		if (!error || typeof error !== 'object') {
+			return undefined;
+		}
+		
+		if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
+			return (error as { status: number }).status;
+		}
+		
+		return undefined;
 	}
 
 	async validateRepository(): Promise<RepositoryInfo> {

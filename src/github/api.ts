@@ -110,9 +110,15 @@ export class GitHubAPI {
 	 * Extract HTTP status code from error object
 	 */
 	private extractErrorStatus(error: unknown): number | undefined {
-		return error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
-			? (error as { status: number }).status
-			: undefined;
+		if (!error || typeof error !== 'object') {
+			return undefined;
+		}
+		
+		if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
+			return (error as { status: number }).status;
+		}
+		
+		return undefined;
 	}
 
 	/**
