@@ -1077,8 +1077,6 @@ function createServer(options?: McpServerOptions): Server {
 		switch (name) {
 			// Plan tools
 			case "plan_create":
-			case "lexrunner_plan_create": // deprecated alias
-			case "plan.create": // Deprecated alias
 				return await handlePlanCreate(args as PlanCreateArgs);
 
 			case "pr_list":
@@ -1092,19 +1090,13 @@ function createServer(options?: McpServerOptions): Server {
 
 			// Gate tools
 			case "gates_run":
-			case "lexrunner_gate_run": // deprecated alias
-			case "gates.run": // Deprecated alias
 				return await handleGatesRun(args as GatesRunArgs);
 
 			// Weave tools
 			case "merge_apply":
-			case "lexrunner_weave_apply": // deprecated alias
-			case "merge.apply": // Deprecated alias
 				return await handleMergeApply(args as MergeApplyArgs);
 
 			case "discover":
-			case "lexrunner_weave_discover": // deprecated alias
-			case "discover": // Deprecated alias
 				return await handleDiscover(
 					args as {
 						owner?: string;
@@ -1115,136 +1107,98 @@ function createServer(options?: McpServerOptions): Server {
 				);
 
 			case "weave_status":
-			case "lexrunner_weave_status": // deprecated alias
-			case "status": // Deprecated alias
 				return await handleStatus(args as { planFile?: string });
 
 			case "merge_order":
-			case "lexrunner_weave_order": // deprecated alias
-			case "merge-order": // Deprecated alias
 				return await handleMergeOrder(args as { planFile?: string });
 
 			// Workspace tools
 			case "local_init":
-			case "lexrunner_workspace_init": // deprecated alias
-			case "local.init": // Deprecated alias
 				return await handleLocalInit(args as InitLocalArgs);
 
 			case "profile_resolve":
-			case "lexrunner_workspace_resolve": // deprecated alias
-			case "profile.resolve": // Deprecated alias
 				return await handleProfileResolve(args as ProfileResolveArgs);
 
 			case "doctor":
-			case "lexrunner_workspace_doctor": // deprecated alias
-			case "doctor": // Deprecated alias
 				return await handleDoctor(
 					args as { environmentQuality?: boolean }
 				);
 
 			// Core tools
 			case "health":
-			case "lexrunner_core_health": // deprecated alias
-			case "health": // Deprecated alias
 				return await handleHealth(args as { includeMetrics?: boolean });
 
 			case "config_show":
-			case "lexrunner_core_config": // deprecated alias
-			case "config.show": // Deprecated alias
 				return await handleConfigShow(args as { key?: string });
 
 			case "workflow_guide":
-			case "lexrunner_core_guide": // deprecated alias
-			case "workflow.guide": // Deprecated alias
 				return await handleWorkflowGuide(args as WorkflowGuideArgs);
 
 			case "metrics":
-			case "lexrunner_core_metrics": // deprecated alias
-			case "metrics": // Deprecated alias
 				return await handleMetrics(
 					args as { filter?: string; format?: string }
 				);
 
 			// Executor tools (Senior Dev)
 			case "executor_prepare_context":
-			case "lexrunner_executor_prepare_context": // deprecated alias
-			case "senior-dev.prepare-context": // Deprecated alias
 				return await handleSeniorDevPrepareContext(
 					args as unknown as PrepareContextInput
 				);
 
 			case "executor_recall_context":
-			case "lexrunner_executor_recall_context": // deprecated alias
-			case "senior-dev.recall-context": // Deprecated alias
 				return await handleSeniorDevRecallContext(
 					args as unknown as RecallContextInput
 				);
 
 			case "executor_capture_frame":
-			case "lexrunner_executor_capture_frame": // deprecated alias
-			case "senior-dev.capture-frame": // Deprecated alias
 				return await handleSeniorDevCaptureFrame(
 					args as unknown as CaptureFrameInput
 				);
 
 			case "executor_modes":
-			case "lexrunner_executor_modes": // deprecated alias
-			case "senior-dev.modes": // Deprecated alias
 				return await handleSeniorDevModes();
 
 			// Run management tools
 			case "start_run":
-			case "lexrunner_run_start": // deprecated alias
-			case "lexrunner.startRun": // Deprecated alias
 				return await handleStartRun(
 					args as unknown as StartRunInput,
 					runStore
 				);
 
 			case "get_status":
-			case "lexrunner_run_status": // deprecated alias
-			case "lexrunner.getStatus": // Deprecated alias
 				return await handleGetStatus(
 					args as unknown as GetStatusInput,
 					runStore
 				);
 
 			case "list_artifacts":
-			case "lexrunner_run_list": // deprecated alias
-			case "lexrunner.listRuns": // Deprecated alias
 				return await handleListRuns(
 					args as unknown as ListRunsInput,
 					runStore
 				);
 
 			case "run_decision":
-			case "lexrunner_run_decision": // deprecated alias
-			case "lexrunner.submitDecision": // Deprecated alias
 				return await handleSubmitDecision(
 					args as unknown as SubmitDecisionInput
 				);
 
 			// Task Handoff tools (ADR-007)
 			case "create_task_snapshot":
-			case "lexrunner_create_task_snapshot": // canonical alias
 				return await handleCreateTaskSnapshot(
 					args as unknown as CreateTaskSnapshotArgs
 				);
 
 			case "submit_task_receipt":
-			case "lexrunner_submit_task_receipt": // canonical alias
 				return await handleSubmitTaskReceipt(
 					args as unknown as SubmitTaskReceiptArgs
 				);
 
 			case "get_task_status":
-			case "lexrunner_get_task_status": // canonical alias
 				return await handleGetTaskStatus(
 					args as unknown as GetTaskStatusArgs
 				);
 
 			case "list_pending_tasks":
-			case "lexrunner_list_pending_tasks": // canonical alias
 				return await handleListPendingTasks(
 					args as unknown as ListPendingTasksArgs
 				);
@@ -3149,7 +3103,10 @@ async function handleSubmitTaskReceipt(
 			const axError = mcpToolError(
 				ErrorCodes.INTERNAL_ERROR,
 				`Task not found: ${receipt.task_id}. Create snapshot first using create_task_snapshot.`,
-				{ tool: "submit_task_receipt", details: { taskId: receipt.task_id } }
+				{
+					tool: "submit_task_receipt",
+					details: { taskId: receipt.task_id },
+				}
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
@@ -3228,7 +3185,10 @@ async function handleGetTaskStatus(
 			const axError = mcpToolError(
 				ErrorCodes.INTERNAL_ERROR,
 				`Task not found: ${validated.taskId}`,
-				{ tool: "get_task_status", details: { taskId: validated.taskId } }
+				{
+					tool: "get_task_status",
+					details: { taskId: validated.taskId },
+				}
 			);
 			throwMcpAXError(ErrorCode.InvalidParams, axError);
 		}
