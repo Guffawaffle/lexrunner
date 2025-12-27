@@ -44,6 +44,7 @@ export class GitHubClientImpl implements GitHubClient {
 	private octokit: Octokit;
 	private owner: string;
 	private repo: string;
+	private normalized: boolean = false;
 
 	constructor(options: {
 		token?: string;
@@ -76,12 +77,56 @@ export class GitHubClientImpl implements GitHubClient {
 		}
 	}
 
+	/**
+	 * Normalize repository owner and name to match GitHub's canonical casing.
+	 * This handles case-insensitive lookups where git remote URLs may have
+	 * different casing than the actual GitHub repository.
+	 */
+	private async normalizeRepositoryName(): Promise<void> {
+		if (this.normalized) {
+			return;
+		}
+
+		try {
+			const response = await this.octokit.rest.repos.get({
+				owner: this.owner,
+				repo: this.repo
+			});
+
+			// Update with canonical names from GitHub (if available)
+			if (response.data.owner?.login) {
+				this.owner = response.data.owner.login;
+			}
+			if (response.data.name) {
+				this.repo = response.data.name;
+			}
+			this.normalized = true;
+		} catch (error: any) {
+			// If normalization fails, continue with original values
+			// The actual API call will fail with a more specific error
+			if (error.status === 404) {
+				throw new GitHubAPIError(`Repository ${this.owner}/${this.repo} not found. Check repository name and access permissions.`);
+			}
+			// For other errors, let them propagate to the actual API call
+			this.normalized = true;
+		}
+	}
+
 	async validateRepository(): Promise<RepositoryInfo> {
 		try {
 			const response = await this.octokit.rest.repos.get({
 				owner: this.owner,
 				repo: this.repo
 			});
+
+			// Normalize after successful fetch (if data available)
+			if (response.data.owner?.login) {
+				this.owner = response.data.owner.login;
+			}
+			if (response.data.name) {
+				this.repo = response.data.name;
+			}
+			this.normalized = true;
 
 			return {
 				owner: this.owner,
@@ -105,6 +150,9 @@ export class GitHubClientImpl implements GitHubClient {
 	}
 
 	async listOpenPRs(options: PRQueryOptions = {}): Promise<PullRequest[]> {
+		// Normalize repository name before making API calls
+		await this.normalizeRepositoryName();
+
 		try {
 			const params: any = {
 				owner: this.owner,

@@ -53,6 +53,7 @@ export class GitHubAPI {
 	private octokit: Octokit;
 	public config: GitHubConfig;
 	private circuitBreaker: CircuitBreaker;
+	private normalized: boolean = false;
 
 	constructor(config: GitHubConfig) {
 		this.config = config;
@@ -60,6 +61,44 @@ export class GitHubAPI {
 			auth: config.token || process.env.GITHUB_TOKEN,
 		});
 		this.circuitBreaker = createGitHubCircuitBreaker();
+	}
+
+	/**
+	 * Normalize repository owner and name to match GitHub's canonical casing.
+	 * This handles case-insensitive lookups where git remote URLs may have
+	 * different casing than the actual GitHub repository.
+	 */
+	private async normalizeRepositoryName(): Promise<void> {
+		if (this.normalized) {
+			return;
+		}
+
+		try {
+			const { data: repo } = await this.octokit.rest.repos.get({
+				owner: this.config.owner,
+				repo: this.config.repo,
+			});
+
+			// Update config with canonical names from GitHub
+			this.config.owner = repo.owner.login;
+			this.config.repo = repo.name;
+			this.normalized = true;
+		} catch (error) {
+			// If normalization fails, continue with original values
+			// The actual API call will fail with a more specific error
+			const status = error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+				? (error as { status: number }).status
+				: undefined;
+			
+			if (status === 404) {
+				throw new GitHubAPIError(
+					`Repository ${this.config.owner}/${this.config.repo} not found. Check repository name and access permissions.`,
+					status
+				);
+			}
+			// For other errors, let them propagate to the actual API call
+			this.normalized = true;
+		}
 	}
 
 	/**
@@ -73,6 +112,9 @@ export class GitHubAPI {
 	 * Discover open pull requests with stable ordering and error recovery
 	 */
 	async discoverPullRequests(state: "open" | "closed" | "all" = "open"): Promise<GitHubPullRequest[]> {
+		// Normalize repository name before making API calls
+		await this.normalizeRepositoryName();
+
 		return retryWithBackoff(
 			async () => {
 				return this.circuitBreaker.execute(async () => {
@@ -129,6 +171,9 @@ export class GitHubAPI {
 	 * Get repository information
 	 */
 	async getRepositoryInfo() {
+		// Normalize repository name before making API calls
+		await this.normalizeRepositoryName();
+
 		try {
 			const { data: repo } = await this.octokit.rest.repos.get({
 				owner: this.config.owner,
