@@ -609,6 +609,39 @@ Cross-repo version validation is performed in CI:
 
 For details, see [CI Version Validation](./ci-version-validation.md).
 
+### Frame Emission Gate (LPR-009)
+
+A dedicated CI workflow validates Frame emission quality:
+
+**Workflow**: `.github/workflows/frame-emission-gate.yml`
+
+**Triggers**:
+
+- Pull requests touching `src/frames/`, `src/hooks/`, `src/weave/`, `src/aliases/`
+- Push to `main` affecting Frame-related code
+- Manual workflow dispatch
+
+**Jobs**:
+
+1. **frame-emission-tests**: Runs all Frame-related unit tests
+2. **frame-schema-validation**: Validates module exports and schema compliance
+3. **frame-emission-integration**: Tests Frame emission in merge-weave context
+
+**Test Files**:
+
+- `tests/frames/emitter.spec.ts`: Frame emitter functions
+- `tests/frames/types.spec.ts`: Type validation
+- `tests/frames/v2-schema-integration.spec.ts`: v2 schema compliance
+- `tests/frames/ci-gate-integration.spec.ts`: CI-specific integration tests
+- `tests/hooks/`: Event schema tests
+
+This gate fails if:
+
+- Frame emission returns errors
+- v2 fields (runId, planHash) are missing
+- Module exports are broken
+- Event schemas fail validation
+
 ## Next Steps
 
 1. ✅ Implement hook emission logic in Epic B subtasks
