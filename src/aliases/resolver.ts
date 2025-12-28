@@ -116,6 +116,11 @@ export async function resolveModulePath(
       cachedAliasTable = loadAliasTable(options.aliasTablePath);
     }
 
+    // TypeScript: ensure policy is loaded before passing to resolveModuleId
+    if (!cachedPolicy) {
+      throw new Error("Failed to load policy");
+    }
+
     // Resolve through Lex alias system
     const resolution: AliasResolution = await resolveModuleId(
       input,
