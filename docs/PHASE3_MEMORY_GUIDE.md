@@ -20,6 +20,7 @@ DO NOT specify commit - this allows broader search across commits
 ### What This Returns
 
 Complete session state including:
+
 - Current branch and commit (main @ 478bfb8)
 - Epic completion status (75 CLOSED, 171 CLOSED)
 - Phase 3 assignments (issues #239-244, 6 agents assigned)
@@ -32,10 +33,11 @@ Complete session state including:
 **Tell the new chat copilot:**
 
 > "Please retrieve the Phase 3 merge-weave context using mcp_lexbrain_thought_get with:
->   - repo: Guffawaffle/LexRunner
->   - kind: note
->   - inputs_hash: session-2025-11-01-epic75-and-phase3
-> Don't specify a commit parameter - let it search broadly."
+>
+> - repo: Guffawaffle/LexRunner
+> - kind: note
+> - inputs_hash: session-2025-11-01-epic75-and-phase3
+>   Don't specify a commit parameter - let it search broadly."
 
 ## Why This Works Better Than Commit-Locked Query
 
@@ -54,10 +56,12 @@ Complete session state including:
 **Test Suite:** 1,737 tests passing
 
 ### Epics Completed
+
 - Epic #75: Diffgraph Planner (5 PRs, 8,700 lines) ✅ CLOSED
 - Epic #171: Pyramid Orchestration (7 features, 78% time savings) ✅ CLOSED
 
 ### Phase 3 Status
+
 - **Issues Assigned:** #239, #240, #241, #242, #243, #244
 - **Commands to Extract:** plan, discover, schema, report, retry, query
 - **Agents Working:** 6 (Copilot)
@@ -65,10 +69,12 @@ Complete session state including:
 - **Current cli.ts:** 2,493 lines → Target after Phase 3: 1,870-2,080 lines
 
 ### Known Issues
+
 - **#238:** Gate executor working directory bug (ENOENT: uv_cwd when running test gates)
   - **Workaround:** Test each PR branch individually with `npm test` before merging
 
 ### Next Session Checklist
+
 1. Check if Phase 3 PRs are ready: `gh pr list --state open --author app/github-copilot`
 2. Review PR descriptions for any dependencies or conflicts
 3. Dogfood: `lex-pr plan --from-github --include-drafts` to generate merge plan
@@ -81,6 +87,7 @@ Complete session state including:
 10. Decide: Create Phase 4 issues or pause for assessment
 
 ### Remaining Work
+
 - **Epic #172 Phase 4:** Complex commands (execute, merge, autopilot, doctor, gate-report)
   - Note: `execute` extraction can fix #238 bug
 - **Epic #172 Phase 5:** Remaining commands (not yet scoped)
@@ -90,6 +97,7 @@ Complete session state including:
 ## If Memory Query Returns Empty
 
 Fallback options:
+
 1. Check `.smartergpt.local/SESSION_PHASE3_READY.md` if it exists
 2. Run: `git log --oneline | head -20` to see recent commits
 3. Ask copilot to `cat .github/copilot-instructions.md` for project context
@@ -98,11 +106,13 @@ Fallback options:
 ## Dogfooding Discoveries This Session
 
 **What Worked:**
+
 - ✅ `lex-pr plan --from-github` - Generated perfect plan.json from open PRs
 - ✅ `lex-pr merge-order` - Computed dependency levels correctly
 - ✅ Manual merge-weave with git - Reliable when CLI tools unavailable
 
 **What Needs Fixing:**
+
 - ❌ `lex-pr execute` - Working directory context issues (Issue #238)
 - 🤔 CLI workflow integration - 3 separate commands needed (plan, execute, merge)
 - 💡 Future: Single `weave` command that chains them?

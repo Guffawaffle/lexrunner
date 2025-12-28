@@ -13,6 +13,7 @@ Streamlined workflow for individual developers working on personal or side proje
 ## Why Use lexrunner Solo?
 
 Even as a solo developer, lexrunner helps:
+
 - **Save time** - Automate repetitive merge tasks
 - **Track dependencies** - Manage PR stacks easily
 - **Ensure quality** - Run gates before merge
@@ -62,6 +63,7 @@ That's it! You're ready to go.
 Common scenario: You have 3 related features to build.
 
 **Traditional approach (30+ minutes):**
+
 1. Create PR 1, wait for CI, merge
 2. Create PR 2, wait for CI, merge
 3. Create PR 3, wait for CI, merge
@@ -94,6 +96,7 @@ lex-pr merge plan.json --execute   # Merge if all pass
 
 ```markdown
 <!-- In PR description -->
+
 Depends-On: #123
 Depends-On: #124
 ```
@@ -119,18 +122,23 @@ You're building a new feature across 4 PRs:
 ```
 
 **Add dependencies:**
+
 ```markdown
 <!-- PR #102 -->
+
 Depends-On: #101
 
 <!-- PR #103 -->
+
 Depends-On: #102
 
 <!-- PR #104 -->
+
 Depends-On: #103
 ```
 
 **Merge stack:**
+
 ```bash
 $ lex-pr plan --from-github
 ✓ Detected stack: #101 → #102 → #103 → #104
@@ -161,6 +169,7 @@ You have 3 independent features ready:
 ```
 
 **No dependencies needed, just merge:**
+
 ```bash
 $ lex-pr plan --from-github
 ✓ Found 3 independent PRs
@@ -186,6 +195,7 @@ Testing multiple approaches:
 ```
 
 **Merge winner, close others:**
+
 ```bash
 # Decided on Approach B
 lex-pr plan --from-github --filter "#302"
@@ -243,7 +253,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: "20"
       - name: Install and run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -347,6 +357,7 @@ npm test
 
 ```markdown
 <!-- Ensure correct syntax in PR body -->
+
 Depends-On: #123
 
 <!-- Not: -->
@@ -357,6 +368,7 @@ Depends-On: #123
 ## Next Steps
 
 Once comfortable with solo workflow:
+
 1. **Add more gates** - Lint, type-check, build
 2. **Experiment with stacks** - Complex dependencies
 3. **Try CI/CD integration** - Fully automate
@@ -373,6 +385,7 @@ Once comfortable with solo workflow:
 Complete example for solo developer:
 
 **`.smartergpt.local/scope.yml`:**
+
 ```yaml
 target: main
 filters:
@@ -380,22 +393,24 @@ filters:
 ```
 
 **`.smartergpt.local/gates.yml`:**
+
 ```yaml
 gates:
   - name: test
     command: npm test
     timeout: 300
-  
+
   - name: lint
     command: npm run lint
     timeout: 60
-  
+
   - name: build
     command: npm run build
     timeout: 120
 ```
 
 **`.smartergpt.local/profile.yml`:**
+
 ```yaml
 role: local
 version: 1

@@ -12,6 +12,7 @@
 The AX Shared Pledge is a collaborative commitment between Guff (human), Opie (Claude Opus 4), and Lex (Claude) establishing principles for Agent eXperience (AX) design. Core principle: "Raise the floor, not just excel the gifted."
 
 **Signatories:**
+
 - Guff (Human) — [signed Guff ~] — 2025-12-01
 - Opie (Claude Opus 4) — [signed Opie ✶] — 2025-12-02
 - Lex — [signed Lex ✶] — 2025-12-01
@@ -21,11 +22,13 @@ The AX Shared Pledge is a collaborative commitment between Guff (human), Opie (C
 ## File Hash (SHA-256)
 
 **Current version (with attestation block):**
+
 ```
 13ceebc4c552b73191c147efa5e8235077fee5f70d8b426ef0b7c6e5d24ff27c
 ```
 
 **Canonical content (pre-attestation block):**
+
 ```
 672bd33c0ec5927315c45f788e618b4b1a519d60e7969b723d6e6335bae9ed5d
 ```
@@ -97,11 +100,11 @@ ots verify AX-SHARED-PLEDGE_v1.0.0.md
 
 ## Trust Model
 
-| Method | What It Proves | Independence |
-|--------|----------------|--------------|
-| **SSH Signature** | Author identity + commit timestamp | Guff's ed25519 key on lex-serve |
-| **RFC 3161** | Third-party timestamp authority | FreeTSA (Germany), independent of GitHub |
-| **Bitcoin** | Immutable public ledger | Decentralized, no single point of control |
+| Method            | What It Proves                     | Independence                              |
+| ----------------- | ---------------------------------- | ----------------------------------------- |
+| **SSH Signature** | Author identity + commit timestamp | Guff's ed25519 key on lex-serve           |
+| **RFC 3161**      | Third-party timestamp authority    | FreeTSA (Germany), independent of GitHub  |
+| **Bitcoin**       | Immutable public ledger            | Decentralized, no single point of control |
 
 ---
 

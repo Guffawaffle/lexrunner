@@ -23,61 +23,59 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
 function getPackageVersion() {
-	const pkgPath = join(rootDir, "package.json");
-	const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-	return pkg.version;
+  const pkgPath = join(rootDir, "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  return pkg.version;
 }
 
 function getGitTags() {
-	try {
-		const output = execSync('git tag -l "v*"', {
-			cwd: rootDir,
-			encoding: "utf8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		return output.trim().split("\n").filter(Boolean);
-	} catch {
-		return [];
-	}
+  try {
+    const output = execSync('git tag -l "v*"', {
+      cwd: rootDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return output.trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function main() {
-	const version = getPackageVersion();
-	const expectedTag = `v${version}`;
-	const tags = getGitTags();
+  const version = getPackageVersion();
+  const expectedTag = `v${version}`;
+  const tags = getGitTags();
 
-	console.log(`📦 package.json version: ${version}`);
-	console.log(`🏷️  Expected tag: ${expectedTag}`);
+  console.log(`📦 package.json version: ${version}`);
+  console.log(`🏷️  Expected tag: ${expectedTag}`);
 
-	if (tags.includes(expectedTag)) {
-		console.log(`✅ Tag ${expectedTag} exists. No drift detected.`);
-		process.exit(0);
-	} else {
-		console.log(`\n❌ DRIFT DETECTED: Tag ${expectedTag} does not exist.`);
-		console.log(`\nExisting tags:`);
-		const semverTags = tags.filter((t) => /^v\d+\.\d+\.\d+/.test(t));
-		if (semverTags.length > 0) {
-			semverTags.slice(-5).forEach((t) => console.log(`  - ${t}`));
-			if (semverTags.length > 5) {
-				console.log(`  ... and ${semverTags.length - 5} more`);
-			}
-		} else {
-			console.log("  (none matching vX.Y.Z pattern)");
-		}
+  if (tags.includes(expectedTag)) {
+    console.log(`✅ Tag ${expectedTag} exists. No drift detected.`);
+    process.exit(0);
+  } else {
+    console.log(`\n❌ DRIFT DETECTED: Tag ${expectedTag} does not exist.`);
+    console.log(`\nExisting tags:`);
+    const semverTags = tags.filter((t) => /^v\d+\.\d+\.\d+/.test(t));
+    if (semverTags.length > 0) {
+      semverTags.slice(-5).forEach((t) => console.log(`  - ${t}`));
+      if (semverTags.length > 5) {
+        console.log(`  ... and ${semverTags.length - 5} more`);
+      }
+    } else {
+      console.log("  (none matching vX.Y.Z pattern)");
+    }
 
-		console.log(`\nTo fix, create the missing tag:`);
-		console.log(
-			`  git tag -s "${expectedTag}" -m "Release ${expectedTag}"`
-		);
-		console.log(`  git push origin "${expectedTag}"`);
+    console.log(`\nTo fix, create the missing tag:`);
+    console.log(`  git tag -s "${expectedTag}" -m "Release ${expectedTag}"`);
+    console.log(`  git push origin "${expectedTag}"`);
 
-		process.exit(1);
-	}
+    process.exit(1);
+  }
 }
 
 try {
-	main();
+  main();
 } catch (err) {
-	console.error("❌ Script error:", err.message);
-	process.exit(2);
+  console.error("❌ Script error:", err.message);
+  process.exit(2);
 }

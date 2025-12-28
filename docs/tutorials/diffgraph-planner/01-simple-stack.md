@@ -21,6 +21,7 @@ You have 3 open PRs that form a linear dependency chain:
 3. **PR-102:** `feature/auth-tests` - Add E2E tests for authentication (depends on UI)
 
 **Dependency graph:**
+
 ```
 PR-100 → PR-101 → PR-102
 ```
@@ -44,11 +45,13 @@ Update the PR descriptions with explicit `Depends-on:` footers.
 # Add Authentication API
 
 Implement core authentication endpoints:
+
 - POST /api/auth/login
 - POST /api/auth/logout
 - GET /api/auth/session
 
 ## Changes
+
 - Add auth routes
 - Add session management
 - Add password hashing
@@ -62,14 +65,17 @@ Implement core authentication endpoints:
 # Add Authentication UI
 
 Implement authentication UI components:
+
 - Login form
 - Logout button
 - Session indicator
 
 ## Dependencies
+
 Depends-on: #100
 
 ## Changes
+
 - Add LoginForm component
 - Add LogoutButton component
 - Add SessionStatus component
@@ -81,20 +87,24 @@ Depends-on: #100
 # Add Authentication E2E Tests
 
 Add end-to-end tests for the complete authentication flow:
+
 - Login flow test
 - Logout flow test
 - Session persistence test
 
 ## Dependencies
+
 Depends-on: #101
 
 ## Changes
+
 - Add E2E test suite
 - Add test fixtures
 - Add test utilities
 ```
 
 **Key points:**
+
 - PR-100 has **no dependencies** (foundation)
 - PR-101 **depends on PR-100** (`Depends-on: #100`)
 - PR-102 **depends on PR-101** (`Depends-on: #101`)
@@ -110,6 +120,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 3 open PRs
@@ -133,6 +144,7 @@ Plan written to: plan.json
 ```
 
 **What happened:**
+
 1. Planner fetched 3 open PRs from GitHub
 2. Parsed `Depends-on:` footers from PR descriptions
 3. Validated the dependency graph (no cycles)
@@ -150,6 +162,7 @@ cat plan.json
 ```
 
 **Expected content:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -187,6 +200,7 @@ cat plan.json
 ```
 
 **Key observations:**
+
 - `pr-100` has `deps: []` (no dependencies, Layer 0)
 - `pr-101` depends on `["auth-api"]` (Layer 1)
 - `pr-102` depends on `["auth-ui"]` (Layer 2)
@@ -203,6 +217,7 @@ lex-pr merge-order plan.json
 ```
 
 **Expected output:**
+
 ```
 📊 Merge order for 3 items:
 
@@ -217,11 +232,13 @@ Layer 2 (after PR-101):
 ```
 
 **Understanding layers:**
+
 - **Layer 0:** PRs with no dependencies, can merge immediately
 - **Layer 1:** PRs that depend on Layer 0, merge after Layer 0 completes
 - **Layer 2:** PRs that depend on Layer 1, merge after Layer 1 completes
 
 **Merge order:**
+
 1. Merge PR-100 first
 2. After PR-100 succeeds, merge PR-101
 3. After PR-101 succeeds, merge PR-102
@@ -237,6 +254,7 @@ lex-pr execute --plan plan.json
 ```
 
 **Expected output:**
+
 ```
 📦 Executing plan: 3 items, 3 layers
 
@@ -279,6 +297,7 @@ All gates passed for PR-102 ✓
 ```
 
 **What happened:**
+
 1. Gates run in **dependency order** (Layer 0 → Layer 1 → Layer 2)
 2. Each item's gates must **pass** before proceeding to the next layer
 3. Results are saved to `.smartergpt/runner/gate-results/`
@@ -299,6 +318,7 @@ lex-pr merge --plan plan.json --execute
 ```
 
 **Expected output (dry-run):**
+
 ```
 🔍 Dry-run mode: Previewing merge operations
 
@@ -316,6 +336,7 @@ Run with --execute to perform actual merges
 ```
 
 **Expected output (execute):**
+
 ```
 🚀 Executing merge plan...
 
@@ -349,6 +370,7 @@ git log --oneline --graph -10
 ```
 
 **Expected output:**
+
 ```
 *   abc1234 Merge PR #102: Add authentication E2E tests
 |\
@@ -363,6 +385,7 @@ git log --oneline --graph -10
 ```
 
 **Verification checklist:**
+
 - ✅ All 3 PRs merged to `main`
 - ✅ Merge order is correct (PR-100 → PR-101 → PR-102)
 - ✅ No merge conflicts occurred
@@ -376,6 +399,7 @@ git log --oneline --graph -10
 ### Issue: "Dependency cycle detected"
 
 **Symptom:**
+
 ```
 ❌ Validation failed: Dependency cycle detected
 ```
@@ -388,6 +412,7 @@ Check PR descriptions for circular `Depends-on:` references. Remove the cycle by
 ### Issue: "Invalid dependency reference"
 
 **Symptom:**
+
 ```
 ❌ Validation failed: Invalid dependency reference #100
 ```
@@ -395,6 +420,7 @@ Check PR descriptions for circular `Depends-on:` references. Remove the cycle by
 **Cause:** Referenced PR doesn't exist or is not included in the plan.
 
 **Solution:**
+
 - Check that PR-100 exists: `gh pr view 100`
 - Verify it's open and matches label filters
 - Update the PR number if incorrect
@@ -402,6 +428,7 @@ Check PR descriptions for circular `Depends-on:` references. Remove the cycle by
 ### Issue: Gates fail for PR-101
 
 **Symptom:**
+
 ```
 ❌ test: failed (exit code 1)
 ```
@@ -410,6 +437,7 @@ Check PR descriptions for circular `Depends-on:` references. Remove the cycle by
 
 **Solution:**
 This is expected! The planner will:
+
 1. Merge PR-100
 2. Then re-run gates for PR-101 (which should now pass)
 3. Then merge PR-101

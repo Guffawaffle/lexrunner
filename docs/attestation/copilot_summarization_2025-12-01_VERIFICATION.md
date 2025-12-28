@@ -14,6 +14,7 @@ deb5beb8b751734e95ebc0ed1b24667ed28574ef79d36ba2b45517be552955b4  copilot_summar
 ```
 
 **Combined hash** (cat md + png | sha256sum):
+
 ```
 629200ab2029a23c41adfcf7269ef3795079d9c378c950676771c80b752cf052
 ```
@@ -75,6 +76,7 @@ Once the Bitcoin block is mined, this timestamp proves the combined hash existed
 ## 3. GPG-Signed Git Commit
 
 The original commit `9db7a78` (and subsequent commits) are GPG-signed with Guff's key, providing:
+
 - Cryptographic author verification
 - Commit timestamp
 - Tamper evidence (any edit changes the hash)
@@ -89,10 +91,10 @@ git log --show-signature 9db7a78
 
 ## Summary of Trust Anchors
 
-| Method | Authority | Timestamp | Immutability |
-|--------|-----------|-----------|--------------|
-| GPG Commit | Guff's key | Dec 1, 2025 | Git history |
-| RFC 3161 | FreeTSA (DE) | Dec 1, 10:49:56 UTC | TSA signature |
-| Bitcoin | Bitcoin network | Pending block | Blockchain |
+| Method     | Authority       | Timestamp           | Immutability  |
+| ---------- | --------------- | ------------------- | ------------- |
+| GPG Commit | Guff's key      | Dec 1, 2025         | Git history   |
+| RFC 3161   | FreeTSA (DE)    | Dec 1, 10:49:56 UTC | TSA signature |
+| Bitcoin    | Bitcoin network | Pending block       | Blockchain    |
 
 All three methods independently prove these files existed on December 1, 2025.

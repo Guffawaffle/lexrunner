@@ -20,6 +20,7 @@
 > "Hi! Welcome to lexrunner. In this 5-minute video, you'll learn how to automate your PR merge workflow. We'll go from installation to your first successful automated merge."
 
 **[Screen: Show 3 bullet points]**
+
 - Install lexrunner
 - Set up your workspace
 - Merge PRs automatically
@@ -213,6 +214,7 @@ Successfully merged 2 PRs
 > "Congratulations! You've successfully:"
 
 **[Show checklist]**
+
 - ✓ Installed lexrunner
 - ✓ Initialized your workspace
 - ✓ Discovered PRs
@@ -223,6 +225,7 @@ Successfully merged 2 PRs
 > "For more advanced features like dependency management and CI/CD integration, check out the documentation at github.com/Guffawaffle/LexRunner."
 
 **[End screen with links]**
+
 - 📚 Documentation
 - 🎓 Next Tutorial: Understanding Dependencies
 - 💬 GitHub Discussions
@@ -239,17 +242,21 @@ Successfully merged 2 PRs
 ## Common Questions to Address
 
 **Q: Do I need a GitHub token?**
+
 > "It's optional but recommended for private repositories and higher API rate limits."
 
 **Q: What if I have merge conflicts?**
+
 > "lexrunner will detect conflicts and guide you through resolution. See the Troubleshooting guide."
 
 **Q: Can I use this with GitLab?**
+
 > "Currently GitHub only, but GitLab support is planned."
 
 ## Captions/Subtitles
 
 Provide full captions for accessibility:
+
 - Include command outputs as text
 - Describe visual elements ("terminal shows...")
 - Spell out technical terms

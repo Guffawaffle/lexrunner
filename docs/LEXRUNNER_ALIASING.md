@@ -56,10 +56,10 @@ When you configure LexRunner with module scopes, aliases are resolved:
 
 ```typescript
 // In LexRunner configuration or workflow
-import { resolveModuleId } from 'lex/shared/aliases';
+import { resolveModuleId } from "lex/shared/aliases";
 
 // Your team uses "auth" shorthand
-const resolution = await resolveModuleId('auth', policy);
+const resolution = await resolveModuleId("auth", policy);
 // → { canonical: 'services/auth-core', confidence: 1.0, source: 'alias' }
 
 // Store the canonical ID in the frame
@@ -77,25 +77,23 @@ LexRunner determines which modules a PR touches and validates them:
 
 ```typescript
 // LexRunner PR validation workflow
-import { resolveModuleId } from 'lex/shared/aliases';
-import { validateModuleIds } from 'lex/shared/module_ids';
+import { resolveModuleId } from "lex/shared/aliases";
+import { validateModuleIds } from "lex/shared/module_ids";
 
 async function validatePRModules(prModules: string[], policy: Policy) {
   // Resolve any aliases first
-  const resolutions = await Promise.all(
-    prModules.map(id => resolveModuleId(id, policy))
-  );
-  
+  const resolutions = await Promise.all(prModules.map((id) => resolveModuleId(id, policy)));
+
   // Validate all resolved IDs
   const validation = await validateModuleIds(
-    resolutions.map(r => r.canonical),
+    resolutions.map((r) => r.canonical),
     policy
   );
-  
+
   if (!validation.valid) {
-    throw new Error(`Invalid module IDs: ${validation.errors.join(', ')}`);
+    throw new Error(`Invalid module IDs: ${validation.errors.join(", ")}`);
   }
-  
+
   return validation.canonical; // Store these in frames
 }
 ```
@@ -140,6 +138,7 @@ When modules get renamed, LexRunner needs old frames to remain valid:
 ```
 
 This ensures:
+
 - Old frames from pre-rename PRs still work
 - Atlas frames can be generated for historical work
 - Policy-aware queries work across the rename boundary
@@ -159,16 +158,16 @@ LexRunner follows this resolution order:
 // Policy modules: ["services/auth-core", "services/user-api", "ui/admin-panel"]
 // Alias table: { "auth": "services/auth-core" }
 
-await resolveModuleId('services/auth-core', policy);
+await resolveModuleId("services/auth-core", policy);
 // → { canonical: 'services/auth-core', confidence: 1.0, source: 'exact' }
 
-await resolveModuleId('auth', policy);
+await resolveModuleId("auth", policy);
 // → { canonical: 'services/auth-core', confidence: 1.0, source: 'alias' }
 
-await resolveModuleId('auth-core', policy);
+await resolveModuleId("auth-core", policy);
 // → { canonical: 'services/auth-core', confidence: 0.9, source: 'substring' }
 
-await resolveModuleId('user', policy);
+await resolveModuleId("user", policy);
 // → { canonical: 'user', confidence: 0.0, source: 'fuzzy' }
 // (Ambiguous: matches both 'services/user-api' and could be substring)
 ```
@@ -185,12 +184,13 @@ LEX_STRICT_MODE=1 lexrunner merge-weave plan.json
 Or programmatically:
 
 ```typescript
-const resolution = await resolveModuleId('auth', policy, aliasTable, {
+const resolution = await resolveModuleId("auth", policy, aliasTable, {
   noSubstring: true, // Disable substring matching
 });
 ```
 
 This ensures CI only accepts:
+
 - Exact matches (confidence 1.0)
 - Explicit aliases (confidence 1.0)
 
@@ -199,21 +199,19 @@ This ensures CI only accepts:
 LexRunner should validate aliases during setup:
 
 ```typescript
-import { loadAliasTable, resolveModuleId } from 'lex/shared/aliases';
+import { loadAliasTable, resolveModuleId } from "lex/shared/aliases";
 
 async function validateLexRunnerAliases(aliasPath: string, policy: Policy) {
   const aliasTable = loadAliasTable(aliasPath);
-  
+
   for (const [alias, entry] of Object.entries(aliasTable.aliases)) {
     // Verify canonical ID exists in policy
     if (!policy.modules[entry.canonical]) {
-      throw new Error(
-        `Alias '${alias}' points to unknown module '${entry.canonical}'`
-      );
+      throw new Error(`Alias '${alias}' points to unknown module '${entry.canonical}'`);
     }
   }
-  
-  console.log('✓ All aliases valid');
+
+  console.log("✓ All aliases valid");
 }
 ```
 
@@ -225,7 +223,7 @@ LexRunner orchestrates dependent PRs:
 
 ```typescript
 // PR-123 touches ["services/auth-core"]
-// PR-124 touches ["api/user-access"] 
+// PR-124 touches ["api/user-access"]
 // PR-125 touches ["ui/admin-panel"]
 
 // All captured with canonical IDs via aliasing
@@ -371,45 +369,43 @@ Did you mean 'services/auth-core'?
 
 ```typescript
 // lexrunner-integration.ts
-import { resolveModuleId, loadAliasTable } from 'lex/shared/aliases';
-import { validateModuleIds } from 'lex/shared/module_ids';
-import { loadPolicy } from 'lex/shared/policy';
+import { resolveModuleId, loadAliasTable } from "lex/shared/aliases";
+import { validateModuleIds } from "lex/shared/module_ids";
+import { loadPolicy } from "lex/shared/policy";
 
-async function lexRunnerValidatePR(
-  prModules: string[],
-  policyPath: string,
-  aliasPath?: string
-) {
+async function lexRunnerValidatePR(prModules: string[], policyPath: string, aliasPath?: string) {
   // Load policy and optional alias table
   const policy = await loadPolicy(policyPath);
   const aliasTable = aliasPath ? loadAliasTable(aliasPath) : undefined;
-  
+
   // Resolve all module IDs
   const resolutions = await Promise.all(
-    prModules.map(id => resolveModuleId(id, policy, aliasTable, {
-      noSubstring: process.env.LEX_STRICT_MODE === '1',
-    }))
+    prModules.map((id) =>
+      resolveModuleId(id, policy, aliasTable, {
+        noSubstring: process.env.LEX_STRICT_MODE === "1",
+      })
+    )
   );
-  
+
   // Check for low-confidence matches
-  const lowConfidence = resolutions.filter(r => r.confidence < 1.0);
+  const lowConfidence = resolutions.filter((r) => r.confidence < 1.0);
   if (lowConfidence.length > 0) {
-    console.warn('⚠️  Low-confidence module IDs:');
-    lowConfidence.forEach(r => {
+    console.warn("⚠️  Low-confidence module IDs:");
+    lowConfidence.forEach((r) => {
       console.warn(`  '${r.original}' → '${r.canonical}' (${r.confidence})`);
     });
   }
-  
+
   // Validate canonical IDs
   const validation = await validateModuleIds(
-    resolutions.map(r => r.canonical),
+    resolutions.map((r) => r.canonical),
     policy
   );
-  
+
   if (!validation.valid) {
-    throw new Error(`Invalid modules: ${validation.errors.join(', ')}`);
+    throw new Error(`Invalid modules: ${validation.errors.join(", ")}`);
   }
-  
+
   // Return canonical IDs for frame storage
   return {
     canonical: validation.canonical,
@@ -420,12 +416,12 @@ async function lexRunnerValidatePR(
 
 // Usage in LexRunner workflow
 const result = await lexRunnerValidatePR(
-  ['auth', 'user-api', 'ui-admin'], // Team shorthand
-  './lexmap.policy.json',
-  './.smartergpt.local/lex/aliases.json'
+  ["auth", "user-api", "ui-admin"], // Team shorthand
+  "./lexmap.policy.json",
+  "./.smartergpt.local/lex/aliases.json"
 );
 
-console.log('✓ Module IDs validated:', result.canonical);
+console.log("✓ Module IDs validated:", result.canonical);
 // → ['services/auth-core', 'api/user-access', 'ui/admin-panel']
 ```
 

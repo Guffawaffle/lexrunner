@@ -10,11 +10,13 @@ This guide keeps contributions small, deterministic, and easy to review.
 - npm: 10.x (see `package.json` packageManager)
 
 Setup:
+
 - npm ci
 - npm run build
 - npm test
 
 Useful scripts:
+
 - Dev CLI (ts): `npm run cli -- <command>`
 - Build artifacts: `npm run build`
 - Types: `npm run typecheck`
@@ -32,6 +34,7 @@ Two-track separation (firm): The core runner never stores user/work artifacts. P
 ## Commit style
 
 Use imperative, descriptive commit messages. Optional prefixes:
+
 - `runner:` core CLI changes under `src/**`
 - `mcp:` adapter changes
 - `schema:` schema updates and regeneration
@@ -41,6 +44,7 @@ Use imperative, descriptive commit messages. Optional prefixes:
 - `workspace:` portable profile assets under `.smartergpt/**`
 
 Examples:
+
 - `runner: Add retry/backoff to gate executor`
 - `docs: Document plan schema validation CLI`
 
@@ -60,6 +64,7 @@ Options:
 ```
 
 **To avoid this:**
+
 - Either include formatting in your commit, or
 - Run `git checkout -- <files>` to discard them before committing
 
@@ -70,6 +75,7 @@ This keeps your commits clean and prevents "formatting commit" noise in history.
 Keep PRs small and focused. One PR = one chat/task. Include a "How to verify" section with exact commands and expected outcomes.
 
 Acceptance checklist per PR:
+
 - [ ] Clear scope and acceptance criteria
 - [ ] Deterministic outputs (stable order, sorted keys)
 - [ ] Scripts/types/tests green (`build`, `typecheck`, `test`)
@@ -78,6 +84,7 @@ Acceptance checklist per PR:
 ## Running the CLI locally
 
 Examples:
+
 - `npm run cli -- plan --from-github --json` → prints plan JSON to stdout
 - `npm run cli -- execute plan.json --json` → runs gates with policy
 - `npm run cli -- report ./gate-results --out md` → aggregates gate results
@@ -103,11 +110,11 @@ LEX_ENABLE_SLOW_CLI_TESTS=true npm run test:cli:slow
 
 **Test categorization:**
 
-| Category | Command | CI Lane |
-|----------|---------|---------|
-| Default tests | `npm test` | Every PR, fast |
-| Slow CLI tests | `npm run test:cli:slow` | Scheduled/manual |
-| Git-dependent tests | `npm run test:git` | Manual |
+| Category            | Command                 | CI Lane          |
+| ------------------- | ----------------------- | ---------------- |
+| Default tests       | `npm test`              | Every PR, fast   |
+| Slow CLI tests      | `npm run test:cli:slow` | Scheduled/manual |
+| Git-dependent tests | `npm run test:git`      | Manual           |
 
 **Adding new slow tests:**
 
@@ -120,6 +127,7 @@ LEX_ENABLE_SLOW_CLI_TESTS=true npm run test:cli:slow
 When working on diffgraph planner features (`src/planner/`), follow these guidelines:
 
 **Test Coverage Requirements:**
+
 - Dependency parser: Test all supported syntax variations
 - File analysis: Test intersection detection, confidence scoring
 - Dependency scoring: Test weight combinations, threshold filtering
@@ -127,12 +135,14 @@ When working on diffgraph planner features (`src/planner/`), follow these guidel
 
 **E2E Test Fixtures:**
 Located in `tests/fixtures/` - use realistic PR structures:
+
 - Simple stacks (linear dependencies)
 - Diamond patterns (fan-out/fan-in)
 - Complex graphs (10+ PRs with mixed dependencies)
 - Edge cases (cycles, orphans, self-dependencies)
 
 **Example test structure:**
+
 ```typescript
 import { parsePRDescription } from "../src/planner/dependencyParser.js";
 
@@ -157,6 +167,7 @@ describe("Dependency Parser", () => {
 ```
 
 **Run planner-specific tests:**
+
 ```bash
 # All planner tests
 npm test -- tests/batch-planner.spec.ts
@@ -170,6 +181,7 @@ npm test -- tests/fileAnalysis.spec.ts
 
 **Documentation Tests:**
 Ensure examples in documentation work:
+
 ```bash
 # Test examples from tutorials
 cd docs/tutorials/diffgraph-planner/
@@ -211,16 +223,16 @@ The lexrunner CLI uses a **modular command architecture** where each command liv
 
 ```typescript
 // src/commands/myCommand.ts
-import { Command } from 'commander';
-import { writeJsonOutput } from '../cli/output.js';
-import { throwExit } from '../cli/exitHandler.js';
+import { Command } from "commander";
+import { writeJsonOutput } from "../cli/output.js";
+import { throwExit } from "../cli/exitHandler.js";
 
 export function registerMyCommandCommand(program: Command): void {
   program
-    .command('my-command')
-    .description('Brief description')
-    .argument('<arg>', 'Argument description')
-    .option('--json', 'Output as JSON')
+    .command("my-command")
+    .description("Brief description")
+    .argument("<arg>", "Argument description")
+    .option("--json", "Output as JSON")
     .action(async (arg, options) => {
       try {
         const result = await executeMyCommand(arg, options);
@@ -243,13 +255,14 @@ async function executeMyCommand(arg: string, options: any) {
 }
 
 function formatOutput(result: any): string {
-  return `✅ ${result.success ? 'Success' : 'Failed'}`;
+  return `✅ ${result.success ? "Success" : "Failed"}`;
 }
 ```
 
 ### Best Practices
 
 ✅ **DO:**
+
 - Separate business logic from CLI handling (pure functions)
 - Support both `--json` and human-readable output
 - Use `throwExit()` for error handling
@@ -258,6 +271,7 @@ function formatOutput(result: any): string {
 - Keep commands focused and single-purpose
 
 ❌ **DON'T:**
+
 - Mix business logic into `.action()` handlers
 - Call `process.exit()` directly
 - Output to stdout when `--json` is used (except JSON itself)
@@ -272,6 +286,7 @@ function formatOutput(result: any): string {
 ### Full Guide
 
 For comprehensive documentation including:
+
 - Command templates
 - Testing patterns
 - Common utilities
@@ -326,4 +341,5 @@ gh release create v0.5.0 \
 ```
 
 ---
+
 Thank you for helping improve lexrunner! 💙

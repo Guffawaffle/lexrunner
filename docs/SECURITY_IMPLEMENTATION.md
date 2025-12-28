@@ -9,10 +9,12 @@ This implementation adds comprehensive enterprise-grade security and compliance 
 ### ✅ 1. Authentication & Authorization Framework
 
 **Files:**
+
 - `src/security/authentication.ts` - Authentication providers and token management
 - `src/security/authorization.ts` - RBAC and permission system
 
 **Features:**
+
 - GitHub token authentication with validation
 - Extensible authentication provider interface
 - Role-based access control (RBAC) with predefined roles
@@ -20,6 +22,7 @@ This implementation adds comprehensive enterprise-grade security and compliance 
 - Fine-grained operation permissions
 
 **Roles & Permissions:**
+
 - `viewer` → Level 0 (READ only)
 - `developer` → Level 2 (READ, ARTIFACTS, ANNOTATE)
 - `integrator` → Level 3 (+ CREATE_PR)
@@ -29,9 +32,11 @@ This implementation adds comprehensive enterprise-grade security and compliance 
 ### ✅ 2. Enhanced Audit Logging
 
 **Files:**
+
 - `src/security/compliance.ts` - Enterprise audit trail with digital signatures
 
 **Features:**
+
 - Cryptographic hashing of audit entries (SHA-256)
 - HMAC digital signatures for tamper detection
 - Secure audit entry storage with auth context
@@ -39,6 +44,7 @@ This implementation adds comprehensive enterprise-grade security and compliance 
 - Merge operation audit trail with full details
 
 **Compliance Exports:**
+
 - **SOX** - Sarbanes-Oxley compliance format
 - **SOC2** - Service Organization Control 2 format
 - **CSV** - Spreadsheet analysis format
@@ -47,25 +53,29 @@ This implementation adds comprehensive enterprise-grade security and compliance 
 ### ✅ 3. Digital Signatures
 
 **Implementation:**
+
 - HMAC-SHA256 signatures for audit entries
 - Hash-based tamper detection
 - Signature verification with key validation
 - Report signing for compliance exports
 
 **Usage:**
+
 ```typescript
 const auditService = new EnterpriseAuditService(process.env.AUDIT_SIGNING_KEY);
-const entry = auditService.logSecure('operation', 'decision', metadata, authContext);
+const entry = auditService.logSecure("operation", "decision", metadata, authContext);
 const isValid = auditService.verifyEntry(entry); // Verify integrity
 ```
 
 ### ✅ 4. Secrets Management
 
 **Files:**
+
 - `src/security/secrets.ts` - Secure credential handling
 - `scripts/rotate-secrets-example.ts` - Example rotation script
 
 **Features:**
+
 - Environment variable integration with prefix support
 - Secret provider abstraction for extensibility
 - Automatic GitHub token discovery (GITHUB_TOKEN, GH_TOKEN, GITHUB_PAT)
@@ -74,11 +84,13 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 - Cache management with automatic expiry
 
 **Security:**
+
 - Secrets never logged in plaintext
 - Automatic redaction in error messages
 - Rotation warnings for aged credentials
 
 **Rotation Guide:**
+
 - See [docs/security/rotation-guide.md](security/rotation-guide.md) for:
   - Recommended rotation cadences by secret type
   - Compliance framework requirements (SOX, PCI-DSS, SOC 2, HIPAA)
@@ -89,10 +101,12 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 ### ✅ 5. Security Scanning Integration
 
 **Files:**
+
 - `src/security/scanning.ts` - Vulnerability detection
 - `src/security/sarif.ts` - SARIF format parser
 
 **Features:**
+
 - NPM audit integration for dependency scanning
 - SARIF (Static Analysis Results Interchange Format) 2.1.0 support
 - CVE and CVSS tracking
@@ -102,12 +116,14 @@ const isValid = auditService.verifyEntry(entry); // Verify integrity
 
 **Vuln Gate:**
 The `vuln` gate provides artifact-based vulnerability scanning:
+
 - Automatically detects and parses SARIF files (`scan-results.sarif`)
 - Falls back to npm audit JSON (`npm-audit.json`) when SARIF not available
 - Enforces security policy thresholds configured in `plan.policy.security`
 - Provides deterministic, structured output with severity counts
 
 **Policy Controls:**
+
 - Block critical vulnerabilities (`blockCritical: true`)
 - Block high vulnerabilities (`blockHigh: true`)
 - Maximum allowed medium vulnerabilities (`maxMedium: 5`)
@@ -115,6 +131,7 @@ The `vuln` gate provides artifact-based vulnerability scanning:
 - Custom scanner integration support
 
 **Example Configuration:**
+
 ```json
 {
   "policy": {
@@ -143,9 +160,11 @@ The `vuln` gate provides artifact-based vulnerability scanning:
 ### ✅ 6. Compliance Policy Enforcement
 
 **Files:**
+
 - `src/security/policy.ts` - Policy rules and enforcement
 
 **Features:**
+
 - **Approval Requirements:**
   - Minimum approval count
   - Required reviewer roles
@@ -166,6 +185,7 @@ The `vuln` gate provides artifact-based vulnerability scanning:
 ### ✅ 7. Comprehensive Testing
 
 **Test Coverage:**
+
 - `tests/security-authentication.spec.ts` (5 tests)
 - `tests/security-authorization.spec.ts` (16 tests)
 - `tests/security-compliance.spec.ts` (15 tests)
@@ -177,10 +197,12 @@ The `vuln` gate provides artifact-based vulnerability scanning:
 ### ✅ 8. Documentation & Examples
 
 **Documentation:**
+
 - `src/security/README.md` - Comprehensive module documentation
 - `examples/security-integration.ts` - Full integration example
 
 **Guides:**
+
 - Authentication setup
 - Authorization configuration
 - Audit logging best practices
@@ -190,25 +212,26 @@ The `vuln` gate provides artifact-based vulnerability scanning:
 
 ### ✅ 9. Security CLI Exit Semantics (B5 Placeholder)
 
-| Exit Code | Meaning | Status Mapping | Retry Guidance |
-|-----------|---------|----------------|----------------|
-| 0 | Success / No findings | `ok` | Not required |
-| 1 | Findings detected (actionable issues, non-fatal) | `findings` | Address & re-run |
-| 2 | Internal error (unexpected failure) | `error` | Investigate infrastructure / stack trace |
+| Exit Code | Meaning                                          | Status Mapping | Retry Guidance                           |
+| --------- | ------------------------------------------------ | -------------- | ---------------------------------------- |
+| 0         | Success / No findings                            | `ok`           | Not required                             |
+| 1         | Findings detected (actionable issues, non-fatal) | `findings`     | Address & re-run                         |
+| 2         | Internal error (unexpected failure)              | `error`        | Investigate infrastructure / stack trace |
 
 Stability: Codes 0–2 are reserved and will not change without a documented major version bump.
 
 ### ✅ 10. Retention Trimming Contract (B4/B5)
 
 `EnterpriseAuditService.trimRetention(retentionDays?, framework?)` (non-destructive preview) returns:
+
 ```jsonc
 {
-  "total": 150,          // total audit entries
-  "trimmed": 42,         // entries older than applied retention
-  "kept": 108,           // total - trimmed
+  "total": 150, // total audit entries
+  "trimmed": 42, // entries older than applied retention
+  "kept": 108, // total - trimmed
   "retentionDaysApplied": 365, // resolved from args or framework default
-  "framework": "ISO 27001",   // canonical display name if framework recognized
-  "supportedFrameworks": ["GDPR","HIPAA","ISO 27001","PCI DSS","SOC2","SOX"]
+  "framework": "ISO 27001", // canonical display name if framework recognized
+  "supportedFrameworks": ["GDPR", "HIPAA", "ISO 27001", "PCI DSS", "SOC2", "SOX"],
 }
 ```
 
@@ -286,7 +309,7 @@ export LEX_PR_DATABASE_URL="..."
 ### Policy Configuration
 
 ```typescript
-import { CompliancePolicyService } from './security';
+import { CompliancePolicyService } from "./security";
 
 const policy = new CompliancePolicyService({
   reviewPolicy: {
@@ -294,26 +317,28 @@ const policy = new CompliancePolicyService({
     approvalRequirement: {
       minApprovals: 2,
       requireCodeOwners: true,
-      dismissStaleApprovals: true
+      dismissStaleApprovals: true,
     },
     allowSelfApproval: false,
-    requireConversationResolution: true
+    requireConversationResolution: true,
   },
-  branchProtections: [{
-    pattern: 'main',
-    requireStatusChecks: true,
-    requiredChecks: ['ci/test', 'ci/lint', 'security/scan'],
-    restrictPushers: true,
-    allowedPushers: ['admin', 'releaseManager']
-  }],
+  branchProtections: [
+    {
+      pattern: "main",
+      requireStatusChecks: true,
+      requiredChecks: ["ci/test", "ci/lint", "security/scan"],
+      restrictPushers: true,
+      allowedPushers: ["admin", "releaseManager"],
+    },
+  ],
   mergeRestrictions: {
-    allowedStrategies: ['squash'],
+    allowedStrategies: ["squash"],
     requireLinearHistory: true,
     requireSignedCommits: true,
-    blockForcePush: true
+    blockForcePush: true,
   },
   requireSecurityScan: true,
-  maxVulnerabilitySeverity: 'high'
+  maxVulnerabilitySeverity: "high",
 });
 ```
 
@@ -322,11 +347,7 @@ const policy = new CompliancePolicyService({
 ### Basic Secure Execution
 
 ```typescript
-import {
-  AuthenticationManager,
-  AuthorizationService,
-  EnterpriseAuditService
-} from './security';
+import { AuthenticationManager, AuthorizationService, EnterpriseAuditService } from "./security";
 
 // Authenticate
 const authManager = new AuthenticationManager();
@@ -338,31 +359,34 @@ authService.enforceAutopilotLevel(authContext, 4);
 
 // Audit
 const auditService = new EnterpriseAuditService(signingKey);
-auditService.logMergeOperation({
-  prNumbers: [101, 102],
-  targetBranch: 'main',
-  mergeStrategy: 'squash',
-  gateResults: { lint: 'passed', test: 'passed' },
-  decision: 'approved'
-}, authContext);
+auditService.logMergeOperation(
+  {
+    prNumbers: [101, 102],
+    targetBranch: "main",
+    mergeStrategy: "squash",
+    gateResults: { lint: "passed", test: "passed" },
+    decision: "approved",
+  },
+  authContext
+);
 ```
 
 ### Compliance Reporting
 
 ```typescript
-import { EnterpriseAuditService, ComplianceFormat } from './security';
+import { EnterpriseAuditService, ComplianceFormat } from "./security";
 
 const auditService = new EnterpriseAuditService(signingKey);
 
 // Generate SOC2 report
 const report = auditService.generateComplianceReport(
   ComplianceFormat.SOC2,
-  '2024-01-01T00:00:00Z',
-  '2024-12-31T23:59:59Z'
+  "2024-01-01T00:00:00Z",
+  "2024-12-31T23:59:59Z"
 );
 
 // Export for audit
-auditService.exportReport(report, './compliance/soc2-2024.json');
+auditService.exportReport(report, "./compliance/soc2-2024.json");
 ```
 
 ## Testing & Validation
@@ -402,17 +426,22 @@ npm test          # Full test suite (664 tests)
 ### Deployment Steps
 
 1. Set environment variables:
+
    ```bash
    export GITHUB_TOKEN="..."
    export AUDIT_SIGNING_KEY="..."
    ```
 
 2. Configure policies:
+
    ```typescript
-   const policy = new CompliancePolicyService({ /* config */ });
+   const policy = new CompliancePolicyService({
+     /* config */
+   });
    ```
 
 3. Initialize security:
+
    ```typescript
    const authManager = new AuthenticationManager();
    const authContext = await authManager.initialize();
@@ -475,6 +504,7 @@ This implementation provides the foundation for:
 ## Future Enhancements
 
 Potential extensions:
+
 - OAuth/SAML integration for SSO
 - HashiCorp Vault integration for secrets
 - Custom security scanner plugins

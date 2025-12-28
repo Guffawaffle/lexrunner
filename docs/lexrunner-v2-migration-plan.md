@@ -21,6 +21,7 @@ lex-mcp/
 ```
 
 **Rationale:**
+
 - Clean separation — no risk of v1/v2 code mixing
 - Both versions installable (`@lex/runner` vs `@lex/runner-legacy`)
 - Clear versioning: v2 starts at `2.0.0`
@@ -38,6 +39,7 @@ lexrunner/
 ```
 
 **Cons:**
+
 - Shared `node_modules` and config complexity
 - Less clear boundary
 
@@ -54,12 +56,14 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M0: Contract Sign-off (Target: Week 1)
 
 **Deliverables:**
+
 - [x] `docs/lexrunner-v1-summary.md` — Current state documented
 - [x] `docs/lexrunner-v2-contract.md` — v2 contract drafted
 - [x] `docs/lexrunner-v2-salvage-map.md` — Salvage map created
 - [x] `docs/lexrunner-v2-migration-plan.md` — This document
 
 **Exit criteria:**
+
 - Guff signs off on contract
 - Open questions answered (see §5)
 - v1 freeze tag agreed
@@ -69,6 +73,7 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M1: v1 Freeze & v2 Bootstrap (Target: Week 2)
 
 **Deliverables:**
+
 - Tag v1 as `lexrunner-v1-final`
 - Create `lex-runner/` directory (or `src-v2/`)
 - Scaffold v2 with:
@@ -78,6 +83,7 @@ My recommendation: **Sibling package** (`lex-runner/`)
   - Empty `src/core/dag.ts`, `src/errors/`, etc.
 
 **Exit criteria:**
+
 - `npm run build` succeeds (empty but valid)
 - `npm test` runs (no tests yet, but harness works)
 - v1 is frozen (no new features, only critical fixes)
@@ -87,6 +93,7 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M2: Core DAG + AX Guarantees (Target: Weeks 3-4)
 
 **Deliverables:**
+
 - Port `mergeOrder.ts` → `src/core/dag.ts`
 - Port AXError infrastructure → `src/errors/`
 - Port canonical JSON + hash utils → `src/util/`
@@ -94,6 +101,7 @@ My recommendation: **Sibling package** (`lex-runner/`)
 - Port determinism tests
 
 **Exit criteria:**
+
 - `lex-runner plan create --json` works with test input
 - Determinism tests pass
 - AXError shape tests pass
@@ -103,12 +111,14 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M3: First End-to-End Workflow (Target: Weeks 5-6)
 
 **Deliverables:**
+
 - Implement `lex-runner run --plan <file>` (dry-run mode)
 - Implement basic gate execution
 - Integrate with Lex for Frame emission (not local storage)
 - Integrate with LexSona for constraint checking (shadow mode)
 
 **Exit criteria:**
+
 - Can run merge-weave on test plan
 - Frame emitted to Lex store
 - Constraints derived from LexSona
@@ -121,12 +131,14 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M4: CLI & MCP Parity (Target: Weeks 7-8)
 
 **Deliverables:**
+
 - Full CLI with core commands (per contract §8.1)
 - MCP server with core tools
 - `lex-runner doctor` for diagnostics
 - `lex-runner config show` for debugging
 
 **Exit criteria:**
+
 - All core CLI commands work
 - MCP tools return structured responses
 - Exit codes follow contract §3.2
@@ -136,12 +148,14 @@ My recommendation: **Sibling package** (`lex-runner/`)
 ### M5: v1 Deprecation (Target: Week 9+)
 
 **Deliverables:**
+
 - v1 README updated with deprecation notice
 - Migration guide: v1 → v2
 - CI runs both v1 and v2 (v2 is primary)
 - v1 enters maintenance-only mode
 
 **Exit criteria:**
+
 - v2 is the default for new workflows
 - v1 is only used for legacy/migration
 - No new v1 development
@@ -170,6 +184,7 @@ Week 9+:   M5 — v1 deprecation
 **Risk:** Lex store API may not be exactly what v2 needs for Frame storage.
 
 **Mitigation:**
+
 - Review Lex store API early (M2)
 - If gaps exist, propose minimal additions to Lex (coordinated with Lex team)
 - Fall back to local storage + sync if needed (not preferred)
@@ -179,6 +194,7 @@ Week 9+:   M5 — v1 deprecation
 **Risk:** LexSona may not have the constraint derivation API v2 expects.
 
 **Mitigation:**
+
 - Review LexSona API early (M2)
 - Start with shadow mode (log constraints, don't enforce)
 - Iterate on API surface collaboratively
@@ -188,6 +204,7 @@ Week 9+:   M5 — v1 deprecation
 **Risk:** Tests that need GitHub API are slow/flaky.
 
 **Mitigation:**
+
 - All GitHub tests use mocks (no real API calls in CI)
 - Integration tests run separately, gated
 
@@ -196,6 +213,7 @@ Week 9+:   M5 — v1 deprecation
 **Risk:** Users relying on v1 features that v2 doesn't have.
 
 **Mitigation:**
+
 - v1 remains tagged and available
 - Migration guide documents differences
 - Critical v1-only features can be added to v2 if justified (contract amendment)
@@ -205,6 +223,7 @@ Week 9+:   M5 — v1 deprecation
 **Risk:** v2 could accumulate complexity over time.
 
 **Mitigation:**
+
 - Enforce file size limits (contract §7.2)
 - Code review for boundary violations
 - Periodic architecture reviews
@@ -218,6 +237,7 @@ Week 9+:   M5 — v1 deprecation
 **Question:** Which 2-3 workflows must v2 support first?
 
 **Suggested priority:**
+
 1. `merge-weave-main` — Core use case
 2. `gate-run` — Run gates on a plan
 3. `plan-create` — Generate plan from stack/GitHub
@@ -229,6 +249,7 @@ Week 9+:   M5 — v1 deprecation
 **Question:** Is v2 free to reshape CLI/schema, or must we provide compat shims?
 
 **Options:**
+
 - **A) Full break:** v2 is a new major version, no compat shims
 - **B) Partial shim:** v2 CLI accepts v1 flags but warns
 - **C) Full compat:** v2 behaves like v1 unless opted in
@@ -242,6 +263,7 @@ Week 9+:   M5 — v1 deprecation
 **Question:** What should the v2 CLI be called?
 
 **Options:**
+
 - `lex-pr` (same as v1, but v2 version)
 - `lex-runner` (new name, clearer purpose)
 - `lexrun` (shorter)
@@ -255,6 +277,7 @@ Week 9+:   M5 — v1 deprecation
 **Question:** Keep MCP server as separate entry or merge into CLI?
 
 **Options:**
+
 - **A) Separate:** `lex-runner-mcp` (like v1)
 - **B) Subcommand:** `lex-runner serve --mcp`
 - **C) Remove:** MCP not needed for v2
@@ -268,6 +291,7 @@ Week 9+:   M5 — v1 deprecation
 **Question:** What should the v1 freeze tag be called?
 
 **Options:**
+
 - `lexrunner-v1-final`
 - `v1-freeze-2025-12`
 - `legacy-v1.0.0`
@@ -361,4 +385,4 @@ Date: 2025-12-08
 
 ---
 
-*All four Phase 1-4 deliverables complete. Ready for Guff review.*
+_All four Phase 1-4 deliverables complete. Ready for Guff review._

@@ -57,6 +57,7 @@ The tracked profile serves as the canonical example configuration for the reposi
 ```
 
 **Key Characteristics:**
+
 - **Role:** `example` (defined in `profile.yml` if present, or implied)
 - **Write Protection:** Runner refuses to write artifacts to this profile
 - **Configuration Location:** Config files are at profile root, NOT in a subdirectory
@@ -103,6 +104,7 @@ The local profile is for development and customization. It overrides the tracked
 ```
 
 **Key Characteristics:**
+
 - **Role:** `development` (defined in `profile.yml`, REQUIRED)
 - **Write Protection:** Runner can write artifacts to this profile
 - **Configuration Location:** Config files at profile root override tracked profile
@@ -134,6 +136,7 @@ The runner resolves the active profile using the following precedence chain (hig
 4. **`.smartergpt/`** - Tracked example profile (repository default)
 
 **Resolution Rules:**
+
 - First existing directory in the chain is selected
 - If no profile found, runner exits with error
 - Profile must contain valid `profile.yml` (except `.smartergpt/` which defaults to `role: example`)
@@ -147,6 +150,7 @@ Prompts are resolved using a separate precedence chain (highest to lowest):
 3. **`.smartergpt/prompts/`** - Tracked canonical prompts
 
 **Resolution Rules:**
+
 - If `LEX_PROMPTS_DIR` is set but doesn't exist, an error is thrown
 - First existing directory in the chain is used
 - If no prompts directory found, error with helpful message listing all checked locations
@@ -169,31 +173,31 @@ Example: scope.yml resolution
 
 These files live at the **profile root**, not in a `runner/` subdirectory:
 
-| File | Purpose | Required | Schema |
-|------|---------|----------|--------|
-| `profile.yml` | Profile metadata (role, type) | Yes (except `.smartergpt/`) | Custom |
-| `intent.md` | Project goals and scope | Recommended | Markdown |
-| `scope.yml` | PR discovery rules | Required for planning | `runner.scope.schema.json` |
-| `deps.yml` | Dependency relationships | Optional | Custom YAML |
-| `gates.yml` | Quality gates configuration | Required for gates | `gates.schema.json` |
-| `stack.yml` | PR ordering configuration | Optional | `runner.stack.schema.json` |
-| `merge-policy.yml` | Merge rules and policies | Optional | Custom YAML |
-| `pull-request-template.md` | PR template | Recommended | Markdown |
-| `allowed-commands.json` | Security policy (permissive) | Optional | JSON array |
-| `allowed-commands.strict.json` | Security policy (strict) | Optional | JSON array |
+| File                           | Purpose                       | Required                    | Schema                     |
+| ------------------------------ | ----------------------------- | --------------------------- | -------------------------- |
+| `profile.yml`                  | Profile metadata (role, type) | Yes (except `.smartergpt/`) | Custom                     |
+| `intent.md`                    | Project goals and scope       | Recommended                 | Markdown                   |
+| `scope.yml`                    | PR discovery rules            | Required for planning       | `runner.scope.schema.json` |
+| `deps.yml`                     | Dependency relationships      | Optional                    | Custom YAML                |
+| `gates.yml`                    | Quality gates configuration   | Required for gates          | `gates.schema.json`        |
+| `stack.yml`                    | PR ordering configuration     | Optional                    | `runner.stack.schema.json` |
+| `merge-policy.yml`             | Merge rules and policies      | Optional                    | Custom YAML                |
+| `pull-request-template.md`     | PR template                   | Recommended                 | Markdown                   |
+| `allowed-commands.json`        | Security policy (permissive)  | Optional                    | JSON array                 |
+| `allowed-commands.strict.json` | Security policy (strict)      | Optional                    | JSON array                 |
 
 ### Working Directory (`runner/`)
 
 The `runner/` directory contains **working artifacts only**, not configuration:
 
-| Item | Purpose | Tracked |
-|------|---------|---------|
-| `plan.json` | Generated execution plan | No (gitignored) |
-| `snapshot.md` | Current state snapshot | No (gitignored) |
-| `cache/` | Ephemeral cache data | No (gitignored) |
-| `logs/` | Execution logs | No (gitignored) |
-| `bin/` | Temporary binaries | No (gitignored) |
-| `wt/` | Work tree | No (gitignored) |
+| Item          | Purpose                  | Tracked         |
+| ------------- | ------------------------ | --------------- |
+| `plan.json`   | Generated execution plan | No (gitignored) |
+| `snapshot.md` | Current state snapshot   | No (gitignored) |
+| `cache/`      | Ephemeral cache data     | No (gitignored) |
+| `logs/`       | Execution logs           | No (gitignored) |
+| `bin/`        | Temporary binaries       | No (gitignored) |
+| `wt/`         | Work tree                | No (gitignored) |
 
 **Important:** Config files do NOT belong in `runner/`. The `runner/` directory is purely for ephemeral working artifacts.
 
@@ -201,12 +205,12 @@ The `runner/` directory contains **working artifacts only**, not configuration:
 
 The `prompts/` directory contains prompt templates with optional frontmatter and token expansion:
 
-| File | Purpose | Tracked in `.smartergpt/` | Tracked in `.smartergpt.local/` |
-|------|---------|----------------------------|----------------------------------|
-| `create-project.md` | Project creation prompt | Yes | No |
-| `idea.md` | Idea generation prompt | Yes | No |
-| `[custom].md` | Custom prompts | Yes (if canonical) | No (local overlays) |
-| `README.md` | Prompts documentation | Optional | Recommended |
+| File                | Purpose                 | Tracked in `.smartergpt/` | Tracked in `.smartergpt.local/` |
+| ------------------- | ----------------------- | ------------------------- | ------------------------------- |
+| `create-project.md` | Project creation prompt | Yes                       | No                              |
+| `idea.md`           | Idea generation prompt  | Yes                       | No                              |
+| `[custom].md`       | Custom prompts          | Yes (if canonical)        | No (local overlays)             |
+| `README.md`         | Prompts documentation   | Optional                  | Recommended                     |
 
 ### Deliverables Directory (`deliverables/`)
 
@@ -225,16 +229,17 @@ See [Prompts Resolution Precedence](#prompts-resolution-precedence) above.
 
 Prompts support dynamic token expansion for context-aware content:
 
-| Token | Description | Example Output |
-|-------|-------------|----------------|
-| `{{today}}` | Current date (YYYY-MM-DD) | `2025-11-13` |
-| `{{now}}` | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
-| `{{repo_root}}` | Git repository root path | `/path/to/repo` |
-| `{{workspace_root}}` | Workspace root path | `/path/to/workspace` |
-| `{{branch}}` | Current git branch | `main` |
-| `{{commit}}` | Current commit SHA | `a1b2c3d4...` |
+| Token                | Description                  | Example Output            |
+| -------------------- | ---------------------------- | ------------------------- |
+| `{{today}}`          | Current date (YYYY-MM-DD)    | `2025-11-13`              |
+| `{{now}}`            | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
+| `{{repo_root}}`      | Git repository root path     | `/path/to/repo`           |
+| `{{workspace_root}}` | Workspace root path          | `/path/to/workspace`      |
+| `{{branch}}`         | Current git branch           | `main`                    |
+| `{{commit}}`         | Current commit SHA           | `a1b2c3d4...`             |
 
 **Usage Example:**
+
 ```markdown
 # Project Status Report
 
@@ -243,10 +248,12 @@ Branch: {{branch}}
 Commit: {{commit}}
 
 ## Analysis
+
 ...
 ```
 
 **Expanded Output:**
+
 ```markdown
 # Project Status Report
 
@@ -255,6 +262,7 @@ Branch: feature/new-feature
 Commit: cc2ff2c8a1b2c3d4e5f6...
 
 ## Analysis
+
 ...
 ```
 
@@ -314,14 +322,14 @@ import { loadPrompt, resolvePromptsDir, expandPromptTokens } from "./config/prom
 
 // Load prompt with automatic token expansion
 const prompt = loadPrompt("create-project");
-console.log(prompt.content);   // Expanded content
-console.log(prompt.metadata);  // { name: "create-project", ... }
-console.log(prompt.path);      // Absolute path
+console.log(prompt.content); // Expanded content
+console.log(prompt.metadata); // { name: "create-project", ... }
+console.log(prompt.path); // Absolute path
 
 // Resolve prompts directory
 const resolved = resolvePromptsDir();
-console.log(resolved.path);    // Absolute path
-console.log(resolved.source);  // "LEX_PROMPTS_DIR" | ".smartergpt.local/prompts" | ".smartergpt/prompts"
+console.log(resolved.path); // Absolute path
+console.log(resolved.source); // "LEX_PROMPTS_DIR" | ".smartergpt.local/prompts" | ".smartergpt/prompts"
 
 // Manual token expansion
 const expanded = expandPromptTokens("Today: {{today}}", process.cwd());
@@ -335,11 +343,11 @@ const expanded = expandPromptTokens("Today: {{today}}", process.cwd());
 
 Each profile has a `role` that determines write permissions:
 
-| Role | Description | Write Allowed | Typical Location |
-|------|-------------|---------------|------------------|
-| `example` | Read-only tracked profile | ❌ No | `.smartergpt/` |
-| `development` | Local development profile | ✅ Yes | `.smartergpt.local/` |
-| `local` | Custom local profile | ✅ Yes | Custom path |
+| Role          | Description               | Write Allowed | Typical Location     |
+| ------------- | ------------------------- | ------------- | -------------------- |
+| `example`     | Read-only tracked profile | ❌ No         | `.smartergpt/`       |
+| `development` | Local development profile | ✅ Yes        | `.smartergpt.local/` |
+| `local`       | Custom local profile      | ✅ Yes        | Custom path          |
 
 ### Write Protection Rules
 
@@ -379,11 +387,13 @@ Suggestion: Use .smartergpt.local/ or set LEX_PR_PROFILE_DIR
 ### Windows
 
 **Path Separators:**
+
 - Use forward slashes (`/`) in documentation
 - Runner handles path normalization automatically
 - Symlinks require administrator privileges or Developer Mode
 
 **Environment Variables:**
+
 ```powershell
 # PowerShell
 $env:LEX_PR_PROFILE_DIR = "C:\path\to\profile"
@@ -395,6 +405,7 @@ set LEX_PROMPTS_DIR=C:\path\to\prompts
 ```
 
 **Symlinks:**
+
 ```powershell
 # Requires admin or Developer Mode
 New-Item -ItemType SymbolicLink -Path ".smartergpt.local\prompts" -Target "..\..\lex\.smartergpt\prompts"
@@ -403,17 +414,20 @@ New-Item -ItemType SymbolicLink -Path ".smartergpt.local\prompts" -Target "..\..
 ### Linux/macOS
 
 **Environment Variables:**
+
 ```bash
 export LEX_PR_PROFILE_DIR=/path/to/profile
 export LEX_PROMPTS_DIR=/path/to/prompts
 ```
 
 **Symlinks:**
+
 ```bash
 ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ```
 
 **Permissions:**
+
 - Ensure read permissions on tracked profile
 - Ensure write permissions on local profile
 
@@ -429,6 +443,7 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ### From Pre-v1 Structure
 
 **Old Structure (Incorrect):**
+
 ```
 .smartergpt/
 └── runner/                    # ❌ Config in subdirectory
@@ -438,6 +453,7 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ```
 
 **New Structure (Correct):**
+
 ```
 .smartergpt/
 ├── intent.md                  # ✅ Config at root
@@ -451,6 +467,7 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ### Migration Steps
 
 1. **Move config files to profile root:**
+
    ```bash
    cd .smartergpt
    mv runner/intent.md .
@@ -461,19 +478,21 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
    ```
 
 2. **Update `.gitignore`:**
+
    ```gitignore
    # Ignore local profile
    .smartergpt.local/
-   
+
    # Ignore working directories
    .smartergpt/runner/
    .smartergpt/cache/
-   
+
    # Optionally ignore deliverables
    .smartergpt/deliverables/
    ```
 
 3. **Create `profile.yml` in `.smartergpt/` (optional):**
+
    ```yaml
    role: example
    name: my-project
@@ -481,6 +500,7 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
    ```
 
 4. **Initialize local profile:**
+
    ```bash
    lex-pr init-local
    ```
@@ -496,17 +516,19 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 If your code hardcodes `.smartergpt/` path:
 
 **Before:**
+
 ```typescript
 const profilePath = path.join(process.cwd(), ".smartergpt");
 const scopePath = path.join(profilePath, "scope.yml");
 ```
 
 **After:**
+
 ```typescript
 import { resolveProfile } from "./config/profileResolver.js";
 
 const resolved = resolveProfile();
-const profilePath = resolved.path;  // May be .smartergpt.local or custom
+const profilePath = resolved.path; // May be .smartergpt.local or custom
 const scopePath = path.join(profilePath, "scope.yml");
 ```
 
@@ -573,7 +595,7 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: 'PR scope query'
+        description: "PR scope query"
         required: true
 
 jobs:
@@ -620,6 +642,7 @@ jobs:
 ### Example 5: Custom Prompt with Tokens
 
 `.smartergpt.local/prompts/weekly-report.md`:
+
 ```markdown
 ---
 name: weekly-report
@@ -651,6 +674,7 @@ Generate a summary of changes made this week in the {{branch}} branch.
 ```
 
 Usage:
+
 ```typescript
 import { loadPrompt } from "./config/promptsResolver.js";
 
@@ -671,6 +695,7 @@ console.log(prompt.content);
 ## Changelog
 
 ### v1.0.0 (2025-11-13)
+
 - Initial specification
 - Documented actual structure (config at root, not in runner/)
 - Added prompts precedence system from PR #387

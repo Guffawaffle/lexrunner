@@ -11,12 +11,14 @@ The security module provides comprehensive security controls that integrate with
 ### 1. Authentication & Authorization
 
 **Authentication:**
+
 - GitHub token validation
 - Identity provider integration hooks
 - Token lifecycle management
 - Multi-method support (token, OAuth, SSO)
 
 **Authorization (RBAC):**
+
 - Role-based access control
 - Permission-based autopilot level restrictions
 - Fine-grained operation permissions
@@ -25,12 +27,14 @@ The security module provides comprehensive security controls that integrate with
 ### 2. Audit Logging & Compliance
 
 **Enhanced Audit Trail:**
+
 - Digital signatures for audit entries
 - Tamper detection with cryptographic hashes
 - Secure audit entry storage
 - Actor tracking and correlation IDs
 
 **Compliance Reporting:**
+
 - SOX (Sarbanes-Oxley) format
 - SOC2 compliance format
 - CSV export for analysis
@@ -39,6 +43,7 @@ The security module provides comprehensive security controls that integrate with
 ### 3. Secrets Management
 
 **Secure Credential Handling:**
+
 - Environment variable integration
 - Secret provider abstraction
 - Automatic secret rotation detection
@@ -48,6 +53,7 @@ The security module provides comprehensive security controls that integrate with
 ### 4. Security Scanning
 
 **Vulnerability Detection:**
+
 - npm audit integration
 - SARIF format support
 - Severity-based policy enforcement
@@ -56,6 +62,7 @@ The security module provides comprehensive security controls that integrate with
 ### 5. Command Whitelist & Hallucination Detection
 
 **Command Validation:**
+
 - Whitelist enforcement for gate commands
 - Shell operator blocking
 - Argument validation (allow/deny lists)
@@ -66,6 +73,7 @@ The security module provides comprehensive security controls that integrate with
 See [Command Whitelist Documentation](../../docs/command-whitelist.md) for details.
 
 ## Usage
+
 - NPM audit integration
 - CVE tracking
 - CVSS scoring
@@ -75,6 +83,7 @@ See [Command Whitelist Documentation](../../docs/command-whitelist.md) for detai
 ### 5. Policy Enforcement
 
 **Compliance Policies:**
+
 - Approval requirements
 - Branch protection rules
 - Merge strategy restrictions
@@ -92,8 +101,8 @@ import {
   EnterpriseAuditService,
   SecretsManager,
   SecurityScanningService,
-  CompliancePolicyService
-} from './security';
+  CompliancePolicyService,
+} from "./security";
 
 // Initialize authentication
 const authManager = new AuthenticationManager();
@@ -111,25 +120,25 @@ if (authService.canExecuteAutopilotLevel(authContext, 4)) {
 ### Authentication
 
 ```typescript
-import { AuthenticationManager, GitHubTokenAuthProvider } from './security';
+import { AuthenticationManager, GitHubTokenAuthProvider } from "./security";
 
 // Using default provider (GitHub token from env)
 const authManager = new AuthenticationManager();
 
 // Or provide custom token
-const provider = new GitHubTokenAuthProvider('ghp_...');
+const provider = new GitHubTokenAuthProvider("ghp_...");
 const authManager = new AuthenticationManager(provider);
 
 // Initialize and get context
 const context = await authManager.initialize();
 console.log(`Authenticated as: ${context.user}`);
-console.log(`Roles: ${context.roles.join(', ')}`);
+console.log(`Roles: ${context.roles.join(", ")}`);
 ```
 
 ### Authorization
 
 ```typescript
-import { AuthorizationService, Permission } from './security';
+import { AuthorizationService, Permission } from "./security";
 
 const authService = new AuthorizationService();
 
@@ -150,60 +159,63 @@ authService.enforceAutopilotLevel(context, 3);
 ### Audit Logging
 
 ```typescript
-import { EnterpriseAuditService, ComplianceFormat } from './security';
+import { EnterpriseAuditService, ComplianceFormat } from "./security";
 
 // Initialize with optional signing key
 const auditService = new EnterpriseAuditService(process.env.AUDIT_SIGNING_KEY);
 
 // Log secure audit entry
 const entry = auditService.logSecure(
-  'gate_execution',
-  'passed',
-  { gateType: 'lint', prId: 'PR-101' },
+  "gate_execution",
+  "passed",
+  { gateType: "lint", prId: "PR-101" },
   authContext,
   correlationId
 );
 
 // Log merge operation
-const mergeEntry = auditService.logMergeOperation({
-  prNumbers: [101, 102],
-  targetBranch: 'main',
-  mergeStrategy: 'squash',
-  gateResults: { lint: 'passed', test: 'passed' },
-  decision: 'approved'
-}, authContext);
+const mergeEntry = auditService.logMergeOperation(
+  {
+    prNumbers: [101, 102],
+    targetBranch: "main",
+    mergeStrategy: "squash",
+    gateResults: { lint: "passed", test: "passed" },
+    decision: "approved",
+  },
+  authContext
+);
 
 // Generate compliance report
 const report = auditService.generateComplianceReport(
   ComplianceFormat.SOC2,
-  '2024-01-01T00:00:00Z',
-  '2024-12-31T23:59:59Z'
+  "2024-01-01T00:00:00Z",
+  "2024-12-31T23:59:59Z"
 );
 
 // Export report to file
-auditService.exportReport(report, '/path/to/report.json');
+auditService.exportReport(report, "/path/to/report.json");
 ```
 
 ### Secrets Management
 
 ```typescript
-import { SecretsManager, secretsManager } from './security';
+import { SecretsManager, secretsManager } from "./security";
 
 // Get secret (returns null if not found)
-const apiKey = await secretsManager.getSecret('API_KEY');
+const apiKey = await secretsManager.getSecret("API_KEY");
 
 // Require secret (throws if not found)
-const token = await secretsManager.requireSecret('GITHUB_TOKEN');
+const token = await secretsManager.requireSecret("GITHUB_TOKEN");
 
 // Validate required secrets
 const validation = await secretsManager.validateSecrets([
-  'GITHUB_TOKEN',
-  'API_KEY',
-  'DATABASE_URL'
+  "GITHUB_TOKEN",
+  "API_KEY",
+  "DATABASE_URL",
 ]);
 
 if (!validation.valid) {
-  console.error(`Missing secrets: ${validation.missing.join(', ')}`);
+  console.error(`Missing secrets: ${validation.missing.join(", ")}`);
 }
 
 // Get GitHub token from standard locations
@@ -213,34 +225,34 @@ const ghToken = await secretsManager.getGitHubToken();
 const sanitized = secretsManager.redactSecret(logMessage, secretValue);
 
 // Check if rotation needed
-if (await secretsManager.checkRotationNeeded('API_KEY', 90)) {
-  console.warn('API_KEY needs rotation (>90 days old)');
+if (await secretsManager.checkRotationNeeded("API_KEY", 90)) {
+  console.warn("API_KEY needs rotation (>90 days old)");
 }
 ```
 
 ### Security Scanning
 
 ```typescript
-import { SecurityScanningService, Severity } from './security';
+import { SecurityScanningService, Severity } from "./security";
 
 // Initialize with custom policy
 const scanService = new SecurityScanningService({
   blockCritical: true,
   blockHigh: true,
   maxMedium: 5,
-  maxLow: 10
+  maxLow: 10,
 });
 
 // Run all scanners
-const results = await scanService.scanAll('./project-dir');
+const results = await scanService.scanAll("./project-dir");
 
 // Evaluate against policy
 for (const result of results) {
   const evaluation = scanService.evaluatePolicy(result);
-  
+
   if (!evaluation.passed) {
-    console.error('Security scan failed!');
-    evaluation.violations.forEach(v => console.error(`- ${v}`));
+    console.error("Security scan failed!");
+    evaluation.violations.forEach((v) => console.error(`- ${v}`));
   }
 }
 
@@ -252,7 +264,7 @@ console.log(report);
 ### Policy Enforcement
 
 ```typescript
-import { CompliancePolicyService, DEFAULT_COMPLIANCE_POLICY } from './security';
+import { CompliancePolicyService, DEFAULT_COMPLIANCE_POLICY } from "./security";
 
 // Initialize with custom policy
 const policyService = new CompliancePolicyService({
@@ -261,44 +273,39 @@ const policyService = new CompliancePolicyService({
     approvalRequirement: {
       minApprovals: 2,
       requireCodeOwners: true,
-      dismissStaleApprovals: true
-    }
-  }
+      dismissStaleApprovals: true,
+    },
+  },
 });
 
 // Check approval policy
 const prStatus = {
   prNumber: 101,
   approvals: [
-    { reviewer: 'alice', timestamp: new Date() },
-    { reviewer: 'bob', timestamp: new Date() }
+    { reviewer: "alice", timestamp: new Date() },
+    { reviewer: "bob", timestamp: new Date() },
   ],
   requestedReviewers: [],
-  hasCodeOwnerApproval: true
+  hasCodeOwnerApproval: true,
 };
 
 const approvalResult = policyService.checkApprovalPolicy(prStatus, authContext);
 if (!approvalResult.allowed) {
-  console.error('Approval policy violations:');
-  approvalResult.violations.forEach(v => console.error(`- ${v}`));
+  console.error("Approval policy violations:");
+  approvalResult.violations.forEach((v) => console.error(`- ${v}`));
 }
 
 // Check branch protection
-const branchResult = policyService.checkBranchProtection('main', authContext);
+const branchResult = policyService.checkBranchProtection("main", authContext);
 
 // Comprehensive merge check
-const mergeResult = policyService.checkMergeOperation(
-  prStatus,
-  'main',
-  'squash',
-  authContext
-);
+const mergeResult = policyService.checkMergeOperation(prStatus, "main", "squash", authContext);
 
 if (mergeResult.allowed) {
   // Proceed with merge
 } else {
   // Block merge
-  console.error('Merge blocked by policy');
+  console.error("Merge blocked by policy");
 }
 ```
 
@@ -306,13 +313,13 @@ if (mergeResult.allowed) {
 
 ### Predefined Roles
 
-| Role | Permissions | Max Autopilot Level |
-|------|------------|---------------------|
-| `viewer` | READ | 0 |
-| `developer` | READ, ARTIFACTS, ANNOTATE | 2 |
-| `integrator` | READ, ARTIFACTS, ANNOTATE, CREATE_PR | 3 |
-| `releaseManager` | READ, ARTIFACTS, ANNOTATE, CREATE_PR, MERGE | 4 |
-| `admin` | All permissions | 4 |
+| Role             | Permissions                                 | Max Autopilot Level |
+| ---------------- | ------------------------------------------- | ------------------- |
+| `viewer`         | READ                                        | 0                   |
+| `developer`      | READ, ARTIFACTS, ANNOTATE                   | 2                   |
+| `integrator`     | READ, ARTIFACTS, ANNOTATE, CREATE_PR        | 3                   |
+| `releaseManager` | READ, ARTIFACTS, ANNOTATE, CREATE_PR, MERGE | 4                   |
+| `admin`          | All permissions                             | 4                   |
 
 ### Permission Types
 
@@ -328,6 +335,7 @@ if (mergeResult.allowed) {
 ### SOX (Sarbanes-Oxley)
 
 Structured audit report with:
+
 - Operation-based grouping
 - Actor tracking
 - Timestamp audit trail
@@ -336,6 +344,7 @@ Structured audit report with:
 ### SOC2
 
 Compliance report with:
+
 - Access control events
 - Change management events
 - Security monitoring
@@ -344,6 +353,7 @@ Compliance report with:
 ### CSV
 
 Spreadsheet-compatible format:
+
 - Timestamp, Operation, Decision, Actor
 - Correlation ID tracking
 - Metadata in JSON format
@@ -351,6 +361,7 @@ Spreadsheet-compatible format:
 ### JSON/JSONL
 
 Machine-readable formats:
+
 - Full audit entry data
 - Programmatic access
 - Log aggregation support
@@ -358,15 +369,18 @@ Machine-readable formats:
 ## Environment Variables
 
 ### Authentication
+
 - `GITHUB_TOKEN` - GitHub personal access token
 - `GH_TOKEN` - Alternative GitHub token
 - `GITHUB_PAT` - GitHub PAT
 
 ### Audit
+
 - `AUDIT_SIGNING_KEY` - HMAC signing key for audit entries
 - `GITHUB_ACTOR` - Actor identifier for audit trail
 
-### Secrets (with LEX_PR_ prefix)
+### Secrets (with LEX*PR* prefix)
+
 - `LEX_PR_<SECRET_NAME>` - Secret values
 
 ## Security Best Practices
@@ -387,8 +401,8 @@ Machine-readable formats:
 The security module integrates seamlessly with the autopilot system:
 
 ```typescript
-import { AutopilotConfig } from './autopilot';
-import { AuthorizationService } from './security';
+import { AutopilotConfig } from "./autopilot";
+import { AuthorizationService } from "./security";
 
 // Check if user can execute requested autopilot level
 const authService = new AuthorizationService();
@@ -396,9 +410,7 @@ const requestedLevel = config.maxLevel;
 
 if (!authService.canExecuteAutopilotLevel(authContext, requestedLevel)) {
   const maxAllowed = authService.getMaxAutopilotLevel(authContext);
-  throw new Error(
-    `User cannot execute level ${requestedLevel}. Maximum allowed: ${maxAllowed}`
-  );
+  throw new Error(`User cannot execute level ${requestedLevel}. Maximum allowed: ${maxAllowed}`);
 }
 ```
 
@@ -469,6 +481,7 @@ lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL
 ## API Reference
 
 See individual module documentation:
+
 - [Authentication](./authentication.ts) - Auth providers and token management
 - [Authorization](./authorization.ts) - RBAC and permissions
 - [Compliance](./compliance.ts) - Audit logging and reporting

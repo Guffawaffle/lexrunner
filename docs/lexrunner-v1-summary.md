@@ -11,26 +11,31 @@
 LexRunner v1 fulfills **five core responsibilities**:
 
 ### 1.1 Plan Generation & Validation
+
 - Generates execution plans from `.smartergpt/stack.yml` or GitHub PR discovery
 - Computes topological order via Kahn's algorithm (`src/mergeOrder.ts`)
 - Validates plans against Schema v1 (`src/schema.ts`)
 
 ### 1.2 Gate Execution & Policy Enforcement
+
 - Runs gates (lint, typecheck, test, etc.) with retry logic (`src/gates.ts`)
 - Applies policy-based requirements and flake detection
 - Produces structured gate results with artifacts
 
 ### 1.3 Merge-Weave Orchestration
+
 - Implements the weave state machine for PR integration (`src/weave/stateMachine.ts`)
 - Handles conflict detection, preflight simulations
 - Lock file management for concurrent operations
 
 ### 1.4 MCP Tool Surface
+
 - Exposes read-only tools for external orchestrators (`src/mcp/server.ts`)
 - Plan creation, gate execution, status queries
 - Run lifecycle management (start, status, artifacts)
 
 ### 1.5 CLI Interface
+
 - Commander-based CLI with 30+ commands (`src/cli.ts`)
 - Audit, security, autopilot, orchestration features
 - JSON output mode for machine consumption
@@ -41,13 +46,13 @@ LexRunner v1 fulfills **five core responsibilities**:
 
 The following files exceed reasonable module size and conflate multiple concerns:
 
-| File | Lines | Concerns Conflated |
-|------|-------|-------------------|
-| `src/mcp/server.ts` | **1,874** | MCP tool handlers, run management, GitHub integration, frame emission, environment checks, senior-dev executor wiring |
-| `src/cli.ts` | **1,137** | Argument parsing, error handling, command registration (30+ commands), output formatting, audit lifecycle |
-| `src/runs/manager.ts` | **926** | Run state machine, storage, artifact tracking, status building, index management |
-| `src/errors/adapters.ts` | **932** | Every error adapter for every domain (gates, weave, security, GitHub, MCP, runs) |
-| `src/gates.ts` | **829** | Gate execution, retry logic, artifact collection, security scanning, flake reporting, frame emission |
+| File                     | Lines     | Concerns Conflated                                                                                                    |
+| ------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `src/mcp/server.ts`      | **1,874** | MCP tool handlers, run management, GitHub integration, frame emission, environment checks, senior-dev executor wiring |
+| `src/cli.ts`             | **1,137** | Argument parsing, error handling, command registration (30+ commands), output formatting, audit lifecycle             |
+| `src/runs/manager.ts`    | **926**   | Run state machine, storage, artifact tracking, status building, index management                                      |
+| `src/errors/adapters.ts` | **932**   | Every error adapter for every domain (gates, weave, security, GitHub, MCP, runs)                                      |
+| `src/gates.ts`           | **829**   | Gate execution, retry logic, artifact collection, security scanning, flake reporting, frame emission                  |
 
 ### Additional Complexity Accretion
 
@@ -68,42 +73,42 @@ The following files exceed reasonable module size and conflate multiple concerns
 
 ### MUST exist in v2 (Core Contract)
 
-| Responsibility | Current Location | Rationale |
-|---------------|------------------|-----------|
-| Topological DAG execution | `mergeOrder.ts` | Fundamental to merge pyramid |
-| Gate execution loop | `gates.ts` (subset) | Must run gates uniformly |
-| AXError compliance | `errors/index.ts` | AX-CONTRACT v0.1 Guarantee 2.3 |
-| Frame emission | `frames/index.ts` | AX-CONTRACT v0.1 Guarantee 2.5 |
-| Receipt emission | `receipts/index.ts` | Disciplined Failure Pattern |
-| Structured `--json` output | `cli/output.ts` | AX-CONTRACT v0.1 Guarantee 2.1 |
+| Responsibility             | Current Location    | Rationale                      |
+| -------------------------- | ------------------- | ------------------------------ |
+| Topological DAG execution  | `mergeOrder.ts`     | Fundamental to merge pyramid   |
+| Gate execution loop        | `gates.ts` (subset) | Must run gates uniformly       |
+| AXError compliance         | `errors/index.ts`   | AX-CONTRACT v0.1 Guarantee 2.3 |
+| Frame emission             | `frames/index.ts`   | AX-CONTRACT v0.1 Guarantee 2.5 |
+| Receipt emission           | `receipts/index.ts` | Disciplined Failure Pattern    |
+| Structured `--json` output | `cli/output.ts`     | AX-CONTRACT v0.1 Guarantee 2.1 |
 
 ### SHOULD delegate to Lex
 
-| Responsibility | Currently | Should Be |
-|---------------|-----------|-----------|
-| Frame storage | `frames/storage.ts` | Lex memory store API |
-| Recall / search | `executors/seniorDev/` | Lex `recall` command |
-| Rules resolution | `rulesResolver.ts` | LexSona `deriveConstraints` |
-| Policy validation | `lexsona/client.ts` | LexSona shadow governance |
+| Responsibility    | Currently              | Should Be                   |
+| ----------------- | ---------------------- | --------------------------- |
+| Frame storage     | `frames/storage.ts`    | Lex memory store API        |
+| Recall / search   | `executors/seniorDev/` | Lex `recall` command        |
+| Rules resolution  | `rulesResolver.ts`     | LexSona `deriveConstraints` |
+| Policy validation | `lexsona/client.ts`    | LexSona shadow governance   |
 
 ### SHOULD delegate to LexSona
 
-| Responsibility | Currently | Should Be |
-|---------------|-----------|-----------|
-| Persona activation | env vars only | LexSona `activate` |
-| Constraint derivation | ad-hoc | LexSona `deriveConstraints` |
-| Behavioral rules | hardcoded | LexSona rule storage |
+| Responsibility        | Currently     | Should Be                   |
+| --------------------- | ------------- | --------------------------- |
+| Persona activation    | env vars only | LexSona `activate`          |
+| Constraint derivation | ad-hoc        | LexSona `deriveConstraints` |
+| Behavioral rules      | hardcoded     | LexSona rule storage        |
 
 ### CAN be removed or simplified
 
-| Feature | Rationale |
-|---------|-----------|
+| Feature                  | Rationale                                         |
+| ------------------------ | ------------------------------------------------- |
 | 4-level autopilot system | Overengineered; v2 should use LexSona constraints |
-| AI conflict strategies | Experimental; not core to merge pyramid |
-| Budget tracking | Belongs in caller/orchestrator, not runner |
-| Hostility scoring | Nice-to-have, not essential |
-| Tier assignment | Over-abstracted prioritization |
-| Interactive plan review | UX feature, not AX-essential |
+| AI conflict strategies   | Experimental; not core to merge pyramid           |
+| Budget tracking          | Belongs in caller/orchestrator, not runner        |
+| Hostility scoring        | Nice-to-have, not essential                       |
+| Tier assignment          | Over-abstracted prioritization                    |
+| Interactive plan review  | UX feature, not AX-essential                      |
 
 ---
 
@@ -147,26 +152,26 @@ export { ActionReceiptSchema, UncertaintyMarkerSchema };
 
 High-value commands to preserve semantically:
 
-| Command | Purpose | v2 Treatment |
-|---------|---------|--------------|
-| `lex-pr plan create` | Generate plan from stack/GitHub | Core |
-| `lex-pr gates run` | Execute gates for plan | Core |
-| `lex-pr merge apply` | Apply merge operations | Core |
-| `lex-pr status` | Show plan/run status | Core |
-| `lex-pr discover` | Discover PRs from GitHub | Core |
-| `lex-pr doctor` | Environment diagnostics | Keep (simplified) |
-| `lex-pr schema validate` | Validate config files | Keep |
-| `lex-pr config show` | Display config precedence | Keep |
+| Command                  | Purpose                         | v2 Treatment      |
+| ------------------------ | ------------------------------- | ----------------- |
+| `lex-pr plan create`     | Generate plan from stack/GitHub | Core              |
+| `lex-pr gates run`       | Execute gates for plan          | Core              |
+| `lex-pr merge apply`     | Apply merge operations          | Core              |
+| `lex-pr status`          | Show plan/run status            | Core              |
+| `lex-pr discover`        | Discover PRs from GitHub        | Core              |
+| `lex-pr doctor`          | Environment diagnostics         | Keep (simplified) |
+| `lex-pr schema validate` | Validate config files           | Keep              |
+| `lex-pr config show`     | Display config precedence       | Keep              |
 
 Lower-priority commands:
 
-| Command | Purpose | v2 Treatment |
-|---------|---------|--------------|
-| `lex-pr autopilot` | 4-level automation | Rethink via LexSona |
-| `lex-pr execute` | Run arbitrary executors | Rethink |
-| `lex-pr orchestrate *` | Batch planning | Evaluate need |
-| `lex-pr senior-dev` | PR review executor | Extract to procedure |
-| `lex-pr governance-*` | Audit features | Evaluate need |
+| Command                | Purpose                 | v2 Treatment         |
+| ---------------------- | ----------------------- | -------------------- |
+| `lex-pr autopilot`     | 4-level automation      | Rethink via LexSona  |
+| `lex-pr execute`       | Run arbitrary executors | Rethink              |
+| `lex-pr orchestrate *` | Batch planning          | Evaluate need        |
+| `lex-pr senior-dev`    | PR review executor      | Extract to procedure |
+| `lex-pr governance-*`  | Audit features          | Evaluate need        |
 
 ---
 
@@ -175,11 +180,13 @@ Lower-priority commands:
 **Proposed tag name:** `lexrunner-v1-final`
 
 **Rationale:**
+
 - Communicates finality without "legacy" stigma
 - Avoids version number confusion with npm version (currently `0.5.0`)
 - Clear semantic: "This is the last v1, v2 is the future"
 
 **Alternative considered:** `lexrunner-v1-legacy-1.0.0`
+
 - Pro: Explicit "legacy" label
 - Con: Implies a 1.0.0 release that never happened
 
@@ -197,6 +204,7 @@ LexRunner v1 proved the merge-pyramid concept and demonstrated AX-first design p
 - **Lex integration** is partial (AXError yes, memory no)
 
 v2 should:
+
 - Start from the AX-CONTRACT guarantees as requirements
 - Delegate memory/recall to Lex
 - Delegate constraints/personas to LexSona
@@ -234,5 +242,5 @@ Total: **55,795 lines** in `src/`
 
 ---
 
-*Document prepared by Opie (Senior Dev) for Guff review.*
-*Next: Phase 2 — v2 Contract draft*
+_Document prepared by Opie (Senior Dev) for Guff review._
+_Next: Phase 2 — v2 Contract draft_

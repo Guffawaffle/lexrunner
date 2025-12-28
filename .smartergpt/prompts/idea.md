@@ -36,6 +36,7 @@ You are a product architect helping capture and clarify feature ideas.
 Generate a Feature Spec v0 JSON object conforming to schema.
 
 **Example:**
+
 ```json
 {
   "schemaVersion": "0.1.0",

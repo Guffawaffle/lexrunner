@@ -5,6 +5,7 @@ This guide covers the interactive plan review feature, which provides human-in-t
 ## Overview
 
 Interactive plan review allows you to:
+
 - **Review** generated plans with visual dependency graphs
 - **Edit** plans interactively with built-in validation
 - **Approve/Reject** plans with reasons and metadata
@@ -101,6 +102,7 @@ Choose an action:
 4. Enter dependencies (comma-separated): `feature-d`
 
 The system validates:
+
 - ✅ No duplicate names
 - ✅ Dependencies exist
 - ✅ No cycles created
@@ -112,6 +114,7 @@ The system validates:
 3. Select item number to remove
 
 The system validates:
+
 - ✅ No other items depend on it
 
 ### Modify Dependencies
@@ -122,6 +125,7 @@ The system validates:
 4. Enter new dependencies (comma-separated)
 
 The system validates:
+
 - ✅ Dependencies exist
 - ✅ No self-dependencies
 - ✅ No cycles created
@@ -143,6 +147,7 @@ Choose action: a
 ```
 
 If modified:
+
 ```
 ✅ Plan approved
 
@@ -170,6 +175,7 @@ lex-pr plan-diff original-plan.json modified-plan.json
 ```
 
 Output:
+
 ```
 📊 Plan Comparison
 
@@ -272,20 +278,24 @@ fi
 The interactive review enforces these validation rules:
 
 ### Item Names
+
 - ✅ Must be unique
 - ❌ Cannot duplicate existing names
 
 ### Dependencies
+
 - ✅ Must reference existing items
 - ❌ Cannot create cycles
 - ❌ Cannot reference non-existent items
 - ❌ Cannot self-reference
 
 ### Removal
+
 - ✅ Can remove items with no dependents
 - ❌ Cannot remove items that other items depend on
 
 ### Target Branch
+
 - ✅ Any valid git branch name
 - ℹ️ No validation against actual repository branches
 
@@ -294,6 +304,7 @@ The interactive review enforces these validation rules:
 ### 1. Review Before Execution
 
 Always review plans before executing gates:
+
 ```bash
 lex-pr plan --from-github --out ./artifacts
 lex-pr plan-review ./artifacts/plan.json --output ./artifacts/approved-plan.json
@@ -303,6 +314,7 @@ lex-pr execute ./artifacts/approved-plan.json
 ### 2. Save History for Audit
 
 Track all plan changes:
+
 ```bash
 lex-pr plan-review plan.json \
   --save-history \
@@ -312,6 +324,7 @@ lex-pr plan-review plan.json \
 ### 3. Use Diff for Changes
 
 Compare before and after:
+
 ```bash
 lex-pr plan-diff before.json after.json --json | jq .hasChanges
 ```
@@ -319,6 +332,7 @@ lex-pr plan-diff before.json after.json --json | jq .hasChanges
 ### 4. Non-Interactive in CI
 
 Use non-interactive mode in automated pipelines:
+
 ```bash
 lex-pr plan-review plan.json --non-interactive
 ```
@@ -326,6 +340,7 @@ lex-pr plan-review plan.json --non-interactive
 ### 5. Team Annotations
 
 Use rejection reasons for team communication:
+
 ```
 Choose action: r
 Rejection reason: Needs security review for feature-x
@@ -336,20 +351,24 @@ Rejection reason: Needs security review for feature-x
 ### Plan Validation Errors
 
 **Error**: "Unknown dependency 'feature-x' for item 'feature-y'"
+
 - **Fix**: Remove the dependency or add 'feature-x' to the plan
 
 **Error**: "Dependency cycle detected involving: feature-a, feature-b"
+
 - **Fix**: Break the cycle by removing one of the circular dependencies
 
 ### Interactive Mode Not Working
 
 **Issue**: CLI exits immediately without prompts
+
 - **Check**: Ensure you're not using `--non-interactive` flag
 - **Check**: stdin is available (not running in background job)
 
 ### History Not Saving
 
 **Issue**: History file not created
+
 - **Check**: `--save-history` flag is set
 - **Check**: Profile directory exists and is writable
 - **Check**: Not using a read-only example profile

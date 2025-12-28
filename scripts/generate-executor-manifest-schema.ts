@@ -8,18 +8,19 @@ import * as fs from "fs";
 import * as path from "path";
 
 const schema = zodToJsonSchema(ExecutorManifestSchema, {
-	name: "ExecutorManifest",
-	$refStrategy: "none"
+  name: "ExecutorManifest",
+  $refStrategy: "none",
 });
 
 // Add metadata
 // Note: zodToJsonSchema generates draft-07 schemas
 const jsonSchema = {
-	$schema: "http://json-schema.org/draft-07/schema#",
-	$id: "https://example.com/schemas/executor-manifest.schema.json",
-	title: "Executor Manifest Schema v1.0.0",
-	description: "Schema for executor-manifest.yaml files - generated from Zod schema in src/schemas/executorManifest.ts. Based on v0.3.0 thesis: Section 3.3 (Executors as Operational Units)",
-	...schema
+  $schema: "http://json-schema.org/draft-07/schema#",
+  $id: "https://example.com/schemas/executor-manifest.schema.json",
+  title: "Executor Manifest Schema v1.0.0",
+  description:
+    "Schema for executor-manifest.yaml files - generated from Zod schema in src/schemas/executorManifest.ts. Based on v0.3.0 thesis: Section 3.3 (Executors as Operational Units)",
+  ...schema,
 };
 
 // Write to schemas directory

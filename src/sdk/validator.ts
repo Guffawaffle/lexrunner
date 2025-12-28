@@ -2,10 +2,13 @@
  * Validation utilities for audit SDK (Phase 3A)
  */
 
-import { validateAuditManifest as zodValidateManifest, parseAuditManifest } from '../audit/schema/manifest.js';
-import { validateAuditEvent as zodValidateEvent, parseAuditEvent } from '../audit/schema/events.js';
-import type { AuditManifest } from '../audit/schema/manifest.js';
-import type { AuditEvent } from '../audit/schema/events.js';
+import {
+  validateAuditManifest as zodValidateManifest,
+  parseAuditManifest,
+} from "../audit/schema/manifest.js";
+import { validateAuditEvent as zodValidateEvent, parseAuditEvent } from "../audit/schema/events.js";
+import type { AuditManifest } from "../audit/schema/manifest.js";
+import type { AuditEvent } from "../audit/schema/events.js";
 
 /**
  * Validate an audit manifest
@@ -22,7 +25,7 @@ import type { AuditEvent } from '../audit/schema/events.js';
  * ```
  */
 export function validateAuditManifest(manifest: unknown): AuditManifest {
-	return parseAuditManifest(manifest);
+  return parseAuditManifest(manifest);
 }
 
 /**
@@ -42,7 +45,7 @@ export function validateAuditManifest(manifest: unknown): AuditManifest {
  * ```
  */
 export function validateAuditManifestSafe(manifest: unknown) {
-	return zodValidateManifest(manifest);
+  return zodValidateManifest(manifest);
 }
 
 /**
@@ -53,7 +56,7 @@ export function validateAuditManifestSafe(manifest: unknown) {
  * @throws ZodError if validation fails
  */
 export function validateAuditEvent(event: unknown): AuditEvent {
-	return parseAuditEvent(event);
+  return parseAuditEvent(event);
 }
 
 /**
@@ -63,7 +66,7 @@ export function validateAuditEvent(event: unknown): AuditEvent {
  * @returns Validation result with success flag
  */
 export function validateAuditEventSafe(event: unknown) {
-	return zodValidateEvent(event);
+  return zodValidateEvent(event);
 }
 
 /**
@@ -81,12 +84,12 @@ export function validateAuditEventSafe(event: unknown) {
  * ```
  */
 export function isSchemaCompatible(schemaVersion: string, majorVersion: number = 1): boolean {
-	const match = schemaVersion.match(/^(\d+)\.\d+\.\d+$/);
-	if (!match) {
-		return false;
-	}
-	const major = parseInt(match[1], 10);
-	return major === majorVersion;
+  const match = schemaVersion.match(/^(\d+)\.\d+\.\d+$/);
+  if (!match) {
+    return false;
+  }
+  const major = parseInt(match[1], 10);
+  return major === majorVersion;
 }
 
 /**
@@ -97,7 +100,7 @@ export function isSchemaCompatible(schemaVersion: string, majorVersion: number =
  * @throws ZodError if any validation fails
  */
 export function validateAuditEvents(events: unknown[]): AuditEvent[] {
-	return events.map(event => validateAuditEvent(event));
+  return events.map((event) => validateAuditEvent(event));
 }
 
 /**
@@ -107,5 +110,5 @@ export function validateAuditEvents(events: unknown[]): AuditEvent[] {
  * @returns Validation results with success/failure for each event
  */
 export function validateAuditEventsSafe(events: unknown[]) {
-	return events.map(event => zodValidateEvent(event));
+  return events.map((event) => zodValidateEvent(event));
 }

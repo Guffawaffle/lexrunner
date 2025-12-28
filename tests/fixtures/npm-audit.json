@@ -1,32 +1,32 @@
 {
-	"auditReportVersion": 2,
-	"vulnerabilities": {
-		"test-package": {
-			"name": "test-package",
-			"range": "1.0.0 - 1.2.0",
-			"via": [
-				{
-					"source": 1234,
-					"severity": "high",
-					"title": "Cross-Site Scripting (XSS)",
-					"url": "https://github.com/advisories/GHSA-xxxx",
-					"cve": "CVE-2024-1111"
-				}
-			],
-			"fixAvailable": true
-		},
-		"another-package": {
-			"name": "another-package",
-			"range": ">=2.0.0",
-			"via": [
-				{
-					"source": 5678,
-					"severity": "medium",
-					"title": "Denial of Service",
-					"url": "https://github.com/advisories/GHSA-yyyy"
-				}
-			],
-			"fixAvailable": false
-		}
-	}
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "test-package": {
+      "name": "test-package",
+      "range": "1.0.0 - 1.2.0",
+      "via": [
+        {
+          "source": 1234,
+          "severity": "high",
+          "title": "Cross-Site Scripting (XSS)",
+          "url": "https://github.com/advisories/GHSA-xxxx",
+          "cve": "CVE-2024-1111"
+        }
+      ],
+      "fixAvailable": true
+    },
+    "another-package": {
+      "name": "another-package",
+      "range": ">=2.0.0",
+      "via": [
+        {
+          "source": 5678,
+          "severity": "medium",
+          "title": "Denial of Service",
+          "url": "https://github.com/advisories/GHSA-yyyy"
+        }
+      ],
+      "fixAvailable": false
+    }
+  }
 }

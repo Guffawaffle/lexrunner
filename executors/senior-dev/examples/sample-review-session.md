@@ -192,12 +192,12 @@ lexrunner senior-dev capture-frame \
 
 ## Summary
 
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Prepare Context | ~60s | ✅ Success |
-| Recall Context | ~2s | ✅ Success |
-| Model Review | ~10s | ✅ Complete |
-| Capture Frame | ~1s | ✅ Success |
+| Phase           | Duration | Status      |
+| --------------- | -------- | ----------- |
+| Prepare Context | ~60s     | ✅ Success  |
+| Recall Context  | ~2s      | ✅ Success  |
+| Model Review    | ~10s     | ✅ Complete |
+| Capture Frame   | ~1s      | ✅ Success  |
 
 **Total Review Time:** ~75 seconds for a thorough code review with memory integration.
 

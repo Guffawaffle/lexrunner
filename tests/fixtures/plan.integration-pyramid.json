@@ -1,56 +1,56 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"policy": {
-		"requiredGates": ["lint", "test"],
-		"optionalGates": ["e2e"],
-		"maxWorkers": 4,
-		"retries": {},
-		"overrides": {},
-		"blockOn": [],
-		"mergeRule": { "type": "strict-required" }
-	},
-	"items": [
-		{
-			"name": "foundation-api",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} },
-				{ "name": "test", "run": "echo 'test pass'", "env": {} }
-			]
-		},
-		{
-			"name": "foundation-db",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} },
-				{ "name": "test", "run": "echo 'test pass'", "env": {} }
-			]
-		},
-		{
-			"name": "feature-auth",
-			"deps": ["foundation-api", "foundation-db"],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} },
-				{ "name": "test", "run": "echo 'test pass'", "env": {} }
-			]
-		},
-		{
-			"name": "feature-users",
-			"deps": ["foundation-api", "foundation-db"],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} },
-				{ "name": "test", "run": "echo 'test pass'", "env": {} }
-			]
-		},
-		{
-			"name": "feature-permissions",
-			"deps": ["feature-auth", "feature-users"],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} },
-				{ "name": "test", "run": "echo 'test pass'", "env": {} },
-				{ "name": "e2e", "run": "echo 'e2e pass'", "env": {} }
-			]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "policy": {
+    "requiredGates": ["lint", "test"],
+    "optionalGates": ["e2e"],
+    "maxWorkers": 4,
+    "retries": {},
+    "overrides": {},
+    "blockOn": [],
+    "mergeRule": { "type": "strict-required" }
+  },
+  "items": [
+    {
+      "name": "foundation-api",
+      "deps": [],
+      "gates": [
+        { "name": "lint", "run": "echo 'lint pass'", "env": {} },
+        { "name": "test", "run": "echo 'test pass'", "env": {} }
+      ]
+    },
+    {
+      "name": "foundation-db",
+      "deps": [],
+      "gates": [
+        { "name": "lint", "run": "echo 'lint pass'", "env": {} },
+        { "name": "test", "run": "echo 'test pass'", "env": {} }
+      ]
+    },
+    {
+      "name": "feature-auth",
+      "deps": ["foundation-api", "foundation-db"],
+      "gates": [
+        { "name": "lint", "run": "echo 'lint pass'", "env": {} },
+        { "name": "test", "run": "echo 'test pass'", "env": {} }
+      ]
+    },
+    {
+      "name": "feature-users",
+      "deps": ["foundation-api", "foundation-db"],
+      "gates": [
+        { "name": "lint", "run": "echo 'lint pass'", "env": {} },
+        { "name": "test", "run": "echo 'test pass'", "env": {} }
+      ]
+    },
+    {
+      "name": "feature-permissions",
+      "deps": ["feature-auth", "feature-users"],
+      "gates": [
+        { "name": "lint", "run": "echo 'lint pass'", "env": {} },
+        { "name": "test", "run": "echo 'test pass'", "env": {} },
+        { "name": "e2e", "run": "echo 'e2e pass'", "env": {} }
+      ]
+    }
+  ]
 }

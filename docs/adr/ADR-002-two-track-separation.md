@@ -21,11 +21,13 @@ We adopt **two-track separation**:
 Location: Repository root (`src/**`, CLI, MCP adapter, packaging, CI)
 
 Characteristics:
+
 - **Stateless** — Never stores user/work artifacts
 - **Packageable** — Can be distributed via npm
 - **Runtime-independent** — Never reads `.smartergpt/` at runtime
 
 Contents:
+
 - `src/` — TypeScript source
 - `dist/` — Compiled output
 - `package.json` — Dependencies
@@ -36,11 +38,13 @@ Contents:
 Location: `.smartergpt/**`
 
 Characteristics:
+
 - **Per-workspace** — Gitignored, not distributed
 - **Replaceable** — Can be swapped between projects
 - **Example profile** — The repo contains a canonical example
 
 Tracked files:
+
 - `intent.md`
 - `scope.yml`
 - `deps.yml`
@@ -49,6 +53,7 @@ Tracked files:
 - `pull-request-template.md`
 
 Ignored directories:
+
 - `.smartergpt/runner/`
 - `.smartergpt/cache/`
 - `.smartergpt/deliverables/`

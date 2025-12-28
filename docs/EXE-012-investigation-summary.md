@@ -19,6 +19,7 @@
 ### 1. GitHub Issue/PR Lookup
 
 **Issue #412 Details:**
+
 - **Title:** "LPR-048: Lex Memory Integration"
 - **State:** Closed (2025-12-16)
 - **Purpose:** Integrate Lex's memory APIs (`lex recall`, `lex remember`, `lex timeline`)
@@ -28,10 +29,11 @@
 **PR #412:** Does not exist (404 Not Found)
 
 **PR #583 Details:**
+
 - **Title:** "Add executor manifest validation to CI pipeline"
 - **State:** Merged (2025-12-17)
 - **Dependency Listed:** "Depends-on: #412 (Executor Registry)" ❌ INCORRECT
-- **Actual Dependencies:** 
+- **Actual Dependencies:**
   - #405 (ExecutorManifestSchema) ✅ Implemented
   - Validation logic itself ✅ Implemented
 
@@ -54,10 +56,11 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
 **Location:** `tests/fixtures/executors/registry.ts`
 
 **Comment in test fixture (previous, now corrected):**
+
 ```typescript
 /**
  * Placeholder ExecutorRegistry for Testing
- * 
+ *
  * This is a simplified mock implementation until PR #412 is merged.
  * Real implementation will provide full registry functionality.
  */
@@ -66,6 +69,7 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
 **Analysis:** This comment was misleading and has been corrected. It references "PR #412" which doesn't exist and conflates issue #412 (Lex Memory) with a registry implementation.
 
 **Functionality:**
+
 - `register(executor)` - Add executor to in-memory map
 - `load(executorId)` - Retrieve executor by ID
 - `list()` - List registered executor IDs
@@ -117,6 +121,7 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
 **Not applicable** - #412 was about Lex Memory, not a registry.
 
 **Registry-related files:**
+
 - `tests/fixtures/executors/registry.ts` - Test fixture only (not production code)
 - `src/schemas/executorManifest.ts` - Schema for manifests (not a registry)
 - `scripts/validate-manifests.ts` - Validation script (not a registry)
@@ -132,17 +137,20 @@ tests/executors/guardrailEnforcement.spec.ts  # Uses test registry
 **Analysis:**
 
 **Current approach:** Direct TypeScript imports
+
 ```typescript
-import { executeReview } from '../executors/seniorDev/core.js';
+import { executeReview } from "../executors/seniorDev/core.js";
 ```
 
 **Registry pattern would enable:**
+
 - Dynamic executor discovery
 - Runtime manifest loading
 - Plugin-style executor additions
 - Executor lifecycle management
 
 **Recommendation:**
+
 - **For now:** Test fixture registry is sufficient
 - **For future:** If dynamic executor loading is needed, create a new issue specifically for implementing a production registry in `src/executors/registry.ts`
 - **Priority:** Low - current direct import approach works fine for a small number of executors
@@ -152,6 +160,7 @@ import { executeReview } from '../executors/seniorDev/core.js';
 **Created:** `docs/architecture/executors.md`
 
 **Contents:**
+
 - Executor architecture overview
 - Manifest schema documentation
 - Registry status (test fixture vs production)
@@ -166,21 +175,25 @@ import { executeReview } from '../executors/seniorDev/core.js';
 ### Completed Issues
 
 **#404 - Executor Canonicalization**
+
 - Defined canonical structure for executors
 - Established `executors/` vs `project/` separation
 - Status: Closed (2025-12-01)
 
 **#405 - ExecutorManifestSchema**
+
 - Implemented Zod schema for manifests
 - Created `src/schemas/executorManifest.ts`
 - Status: Closed (2025-11-26)
 
 **#415 - Senior Dev Migration**
+
 - Migrated Senior Dev executor to canonical location
 - Demonstrates full manifest implementation
 - Status: Closed (2025-12-17)
 
 **#583 - Manifest Validation CI**
+
 - Created validation script
 - Added CI pipeline integration
 - Status: Merged (2025-12-17)
@@ -188,6 +201,7 @@ import { executeReview } from '../executors/seniorDev/core.js';
 ### Dependency Confusion
 
 **Issue #415** lists:
+
 ```
 Dependencies:
 - Depends-on: #412 (EXE-006: Executor Registry & Loader)
@@ -232,6 +246,7 @@ Dependencies:
 3. Priority: **Not currently planned** - current direct import approach is intentional
 
 **Why current approach is preferred:**
+
 - Small number of executors (currently only senior-dev)
 - Executors are TypeScript modules with compile-time type safety
 - Test fixtures provide registry pattern for testing
@@ -255,26 +270,31 @@ Dependencies:
 ## Appendix: File Inventory
 
 ### Executor Manifest & Schema
+
 - `src/schemas/executorManifest.ts` - Zod schema ✅
 - `executors/senior-dev/executor-manifest.yaml` - Example manifest ✅
 - `scripts/validate-manifests.ts` - Validation script ✅
 - `scripts/generate-executor-manifest-schema.ts` - JSON Schema generator ✅
 
 ### Executor Implementation
+
 - `src/executors/seniorDev/core.ts` - Core logic ✅
 - `src/executors/seniorDev/types.ts` - Type definitions ✅
 - `src/executors/seniorDev/index.ts` - Public exports ✅
 
 ### Test Fixtures
+
 - `tests/fixtures/executors/registry.ts` - Test registry ✅
 - `tests/fixtures/executors/mock-executor.ts` - Mock executor ✅
 - `tests/fixtures/executors/types.ts` - Test types ✅
 - `tests/fixtures/executors/index.ts` - Fixture exports ✅
 
 ### Documentation
+
 - `docs/executor-authoring.md` - Authoring guide ✅
 - `docs/executor-decoupling.md` - Architecture patterns ✅
 - `docs/architecture/executors.md` - Architecture reference ✅ NEW
 
 ### Production Registry
+
 - `src/executors/registry.ts` - ❌ DOES NOT EXIST

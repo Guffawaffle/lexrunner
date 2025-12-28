@@ -69,16 +69,19 @@ Create `.smartergpt/allowed-commands.json`:
 ### Modes
 
 #### Strict Mode (`"mode": "strict"`)
+
 - **Enforces whitelist** - Only allows commands explicitly listed
 - **Blocks shell operators** - Prevents `|`, `>`, `&&`, etc. (unless `allow_shell_operators: true`)
 - **Validates arguments** - Checks against `allow_args` and `deny_args`
 - **Length check** - Rejects commands exceeding `max_command_length`
 
 #### Permissive Mode (`"mode": "permissive"`)
+
 - **Allows all commands** - No validation, useful for development
 - **Logs only** - Logs commands but doesn't block them
 
 #### Dry Run Mode (`"dry_run_mode": true`)
+
 - **Validates but doesn't block** - Logs violations without failing gates
 - **Useful for testing** - Test whitelist rules before enforcement
 
@@ -87,6 +90,7 @@ Create `.smartergpt/allowed-commands.json`:
 ### 1. Command Whitelisting
 
 **Allowed:**
+
 ```bash
 npm test              # In defaults.npm.commands
 git status            # In defaults.git.commands
@@ -94,6 +98,7 @@ eslint --format json  # In custom.eslint with allowed args
 ```
 
 **Blocked:**
+
 ```bash
 curl https://evil.com         # Not whitelisted
 rm -rf /                      # Not whitelisted
@@ -103,6 +108,7 @@ npm test --ignore-scripts     # Denied argument
 ### 2. Shell Operators
 
 **Blocked by default** (when `allow_shell_operators: false`):
+
 ```bash
 npm test | grep pass          # Pipe operator
 npm test && npm run build     # AND operator
@@ -113,12 +119,14 @@ npm test $(whoami)            # Command substitution
 ```
 
 **Allowed** (when `allow_shell_operators: true`):
+
 - All shell operators permitted
 - Use with caution in production
 
 ### 3. Argument Validation
 
 **Allow Args** - Explicitly permitted arguments:
+
 ```json
 {
   "npm": {
@@ -134,6 +142,7 @@ npm test --verbose # ❌ Blocked (not in allow_args)
 ```
 
 **Deny Args** - Explicitly forbidden arguments:
+
 ```json
 {
   "npm": {
@@ -179,10 +188,11 @@ The validator tracks blocked commands and escalates after a threshold:
 ### Escalation
 
 When threshold is reached:
+
 ```
 ⏸️  AGENT PAUSED: Hallucination threshold reached (3 attempts)
 
-Agent paused after 3 hallucinated commands. 
+Agent paused after 3 hallucinated commands.
 Human review required. Resume with: lex-pr resume --plan plan.json
 ```
 
@@ -199,8 +209,9 @@ All hallucinations are logged to `.smartergpt/logs/hallucinations.jsonl`:
 ### Reset Count
 
 Manually reset hallucination count:
+
 ```typescript
-import { getCommandValidator } from './src/security/commandValidator.js';
+import { getCommandValidator } from "./src/security/commandValidator.js";
 
 const validator = getCommandValidator();
 validator.resetHallucinationCount();
@@ -219,6 +230,7 @@ Commands are validated before execution:
 ```
 
 **Failed validation result:**
+
 ```json
 {
   "gate": "test-gate",
@@ -314,27 +326,31 @@ Commands are validated before execution:
 ## Error Messages
 
 ### Not Whitelisted
+
 ```
-Command validation failed: Command not in whitelist. 
+Command validation failed: Command not in whitelist.
 Add to .smartergpt/allowed-commands.json if legitimate.
 Command: curl https://evil.com
 ```
 
 ### Dangerous Arguments
+
 ```
-Command validation failed: Command contains dangerous arguments 
+Command validation failed: Command contains dangerous arguments
 that are explicitly denied.
 Command: npm test --ignore-scripts
 ```
 
 ### Shell Operators
+
 ```
-Command validation failed: Command contains shell operators 
+Command validation failed: Command contains shell operators
 (|, >, <, &&, ||) which are not allowed.
 Command: npm test | grep pass
 ```
 
 ### Too Long
+
 ```
 Command validation failed: Command exceeds maximum allowed length.
 Command: npm test [... 600 characters ...]
@@ -369,14 +385,14 @@ Command: npm test [... 600 characters ...]
 
 ```typescript
 class CommandValidator {
-  constructor(whitelistPath?: string)
-  
+  constructor(whitelistPath?: string);
+
   // Validate command (throws if invalid)
-  validate(command: string): void
-  
+  validate(command: string): void;
+
   // Get/reset hallucination count
-  getHallucinationCount(): number
-  resetHallucinationCount(): void
+  getHallucinationCount(): number;
+  resetHallucinationCount(): void;
 }
 ```
 
@@ -384,8 +400,8 @@ class CommandValidator {
 
 ```typescript
 class CommandValidationError extends Error {
-  command: string
-  reason: 'not_whitelisted' | 'dangerous_args' | 'shell_operators' | 'too_long'
+  command: string;
+  reason: "not_whitelisted" | "dangerous_args" | "shell_operators" | "too_long";
 }
 ```
 
@@ -393,27 +409,29 @@ class CommandValidationError extends Error {
 
 ```typescript
 interface HallucinationEvent {
-  timestamp: string
-  command: string
-  reason: string
-  agent_id?: string
-  plan_id?: string
+  timestamp: string;
+  command: string;
+  reason: string;
+  agent_id?: string;
+  plan_id?: string;
 }
 
 class HallucinationTracker {
-  record(event: Omit<HallucinationEvent, 'timestamp'>): void
-  getRecentEvents(count?: number): HallucinationEvent[]
-  getEventCount(): number
+  record(event: Omit<HallucinationEvent, "timestamp">): void;
+  getRecentEvents(count?: number): HallucinationEvent[];
+  getEventCount(): number;
 }
 ```
 
 ## Testing
 
 Tests are in:
+
 - `tests/command-validator.spec.ts` - Unit tests for validator
 - `tests/command-validator-integration.spec.ts` - Integration tests with gate execution
 
 Run tests:
+
 ```bash
 npm test -- command-validator
 ```
@@ -423,11 +441,13 @@ npm test -- command-validator
 ### Existing Projects
 
 1. Create `.smartergpt/allowed-commands.json`:
+
    ```bash
    cp .smartergpt/allowed-commands.json.example .smartergpt/allowed-commands.json
    ```
 
 2. Start in **dry run mode**:
+
    ```json
    {
      "mode": "strict",
@@ -438,6 +458,7 @@ npm test -- command-validator
    ```
 
 3. Run gates and review logs:
+
    ```bash
    lex-pr execute plan.json
    cat .smartergpt/logs/hallucinations.jsonl

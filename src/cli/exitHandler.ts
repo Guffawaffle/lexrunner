@@ -8,44 +8,44 @@
  * Used to propagate exit codes without calling process.exit() directly
  */
 export class CLIExitSignal extends Error {
-	exitCode: number;
+  exitCode: number;
 
-	constructor(code: number, message?: string) {
-		super(message ?? `CLI exited with code ${code}`);
-		this.exitCode = code;
-	}
+  constructor(code: number, message?: string) {
+    super(message ?? `CLI exited with code ${code}`);
+    this.exitCode = code;
+  }
 }
 
 /**
  * Exit with error message to stderr.
  * Throws CLIExitSignal which should be caught by the main error handler.
- * 
+ *
  * @param code - Exit code (0 = success, 1 = system error, 2 = user error)
  * @param message - Optional error message
  */
 export function throwExit(code: number, message?: string): never {
-	throw new CLIExitSignal(code, message);
+  throw new CLIExitSignal(code, message);
 }
 
 /**
  * Exit with success (code 0).
  */
 export function exitSuccess(): never {
-	throw new CLIExitSignal(0);
+  throw new CLIExitSignal(0);
 }
 
 /**
  * Format error for stderr output.
  * Returns a human-readable error message.
- * 
+ *
  * @param error - Error to format
  * @returns Formatted error string
  */
 export function formatError(error: unknown): string {
-	if (error instanceof Error) {
-		return `${error.name}: ${error.message}`;
-	}
-	return String(error);
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
 }
 
 // Track if handlers are already installed to prevent duplicates
@@ -56,45 +56,43 @@ let unhandledRejectionHandlerInstalled = false;
  * Install global signal handlers for clean exits.
  * Handles SIGINT (Ctrl+C) and SIGTERM (termination signal).
  * Exits with standard codes: 130 for SIGINT, 143 for SIGTERM.
- * 
+ *
  * Note: This is idempotent - calling multiple times has no effect.
  */
 export function installSignalHandlers(): void {
-	if (signalHandlersInstalled) {
-		return;
-	}
-	
-	process.on('SIGINT', () => {
-		console.error('\nReceived SIGINT, exiting gracefully...');
-		process.exit(130); // 128 + SIGINT(2)
-	});
+  if (signalHandlersInstalled) {
+    return;
+  }
 
-	process.on('SIGTERM', () => {
-		console.error('\nReceived SIGTERM, exiting gracefully...');
-		process.exit(143); // 128 + SIGTERM(15)
-	});
-	
-	signalHandlersInstalled = true;
+  process.on("SIGINT", () => {
+    console.error("\nReceived SIGINT, exiting gracefully...");
+    process.exit(130); // 128 + SIGINT(2)
+  });
+
+  process.on("SIGTERM", () => {
+    console.error("\nReceived SIGTERM, exiting gracefully...");
+    process.exit(143); // 128 + SIGTERM(15)
+  });
+
+  signalHandlersInstalled = true;
 }
 
 /**
  * Install global unhandledRejection handler.
  * Catches async errors that are not properly handled.
  * Addresses Issue #158.
- * 
+ *
  * Note: This is idempotent - calling multiple times has no effect.
  */
 export function installUnhandledRejectionHandler(): void {
-	if (unhandledRejectionHandlerInstalled) {
-		return;
-	}
-	
-	process.on('unhandledRejection', (reason: unknown) => {
-		console.error('Unhandled async error:', formatError(reason));
-		process.exit(1);
-	});
-	
-	unhandledRejectionHandlerInstalled = true;
+  if (unhandledRejectionHandlerInstalled) {
+    return;
+  }
+
+  process.on("unhandledRejection", (reason: unknown) => {
+    console.error("Unhandled async error:", formatError(reason));
+    process.exit(1);
+  });
+
+  unhandledRejectionHandlerInstalled = true;
 }
-
-

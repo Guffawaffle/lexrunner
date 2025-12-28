@@ -46,6 +46,7 @@ Enterprise-grade workflow for large organizations with multiple repositories, te
 ### 1. Central Configuration Repository
 
 **Structure:**
+
 ```
 enterprise-automation/
 ├── config/
@@ -77,7 +78,7 @@ team:
   repos:
     - owner/service-auth
     - owner/service-users
-  
+
 scope:
   target: main
   filters:
@@ -91,17 +92,17 @@ gates:
     command: npm run security:scan
     timeout: 300
     required: true
-  
+
   - name: compliance-check
     command: ./scripts/compliance-check.sh
     timeout: 120
     required: true
-  
+
   - name: tests
     command: npm test
     timeout: 600
     required: true
-  
+
   - name: integration-tests
     command: npm run test:integration
     timeout: 900
@@ -124,13 +125,13 @@ organization:
   compliance:
     - SOC2
     - ISO27001
-  
+
 global_gates:
   - name: license-check
     command: npm run check:licenses
     timeout: 60
     required: true
-  
+
   - name: dependency-audit
     command: npm audit --audit-level=high
     timeout: 120
@@ -143,7 +144,7 @@ notifications:
       success: "#deployments"
       failure: "#incidents"
       audit: "#compliance-audit"
-  
+
   email:
     smtp_server: ${SMTP_SERVER}
     recipients:
@@ -176,14 +177,14 @@ mkdir -p "$LOG_DIR"
 
 for team in "${TEAMS[@]}"; do
   echo "Processing $team..."
-  
+
   # Load team config
   TEAM_CONFIG="./config/teams/${team}.yml"
-  
+
   # Run automation per team
   for repo in $(yq '.team.repos[]' "$TEAM_CONFIG"); do
     echo "  Repository: $repo"
-    
+
     # Clone/update repo
     REPO_DIR="./repos/$repo"
     if [ ! -d "$REPO_DIR" ]; then
@@ -191,25 +192,25 @@ for team in "${TEAMS[@]}"; do
     else
       cd "$REPO_DIR" && git pull && cd -
     fi
-    
+
     # Run lexrunner
     cd "$REPO_DIR"
-    
+
     # Use team-specific profile
     export LEX_PR_PROFILE_DIR="../../config/teams/$team"
-    
+
     # Execute automation
     lex-pr plan --from-github --out "$LOG_DIR/$repo/" 2>&1 | tee "$LOG_DIR/$repo/plan.log"
     lex-pr execute "$LOG_DIR/$repo/plan.json" 2>&1 | tee "$LOG_DIR/$repo/execute.log"
-    
+
     # Audit before merge
     ./../../scripts/audit-report.sh "$LOG_DIR/$repo" "$team" "$repo"
-    
+
     # Merge if approved
     if [ -f "$LOG_DIR/$repo/approved" ]; then
       lex-pr merge "$LOG_DIR/$repo/plan.json" --execute 2>&1 | tee "$LOG_DIR/$repo/merge.log"
     fi
-    
+
     cd -
   done
 done
@@ -263,11 +264,11 @@ name: Enterprise Merge Automation
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: "0 */6 * * *" # Every 6 hours
   workflow_dispatch:
     inputs:
       team:
-        description: 'Team to process'
+        description: "Team to process"
         required: false
         type: choice
         options:
@@ -278,26 +279,26 @@ on:
 
 jobs:
   orchestrate:
-    runs-on: self-hosted  # Enterprise runner
+    runs-on: self-hosted # Enterprise runner
     environment: production
-    
+
     steps:
       - name: Checkout automation repo
         uses: actions/checkout@v3
         with:
           repository: acmecorp/enterprise-automation
           token: ${{ secrets.AUTOMATION_PAT }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: |
           npm install -g lexrunner
           npm install -g yq
-      
+
       - name: Run orchestration
         env:
           GITHUB_TOKEN: ${{ secrets.AUTOMATION_PAT }}
@@ -311,19 +312,19 @@ jobs:
           else
             ./scripts/orchestrate.sh "${{ github.event.inputs.team }}"
           fi
-      
+
       - name: Upload audit logs
         uses: actions/upload-artifact@v3
         with:
           name: audit-logs-${{ github.run_number }}
           path: audit-logs/
           retention-days: 365
-      
+
       - name: Send compliance report
         if: always()
         run: |
           ./scripts/send-compliance-report.sh
-      
+
       - name: Notify on failure
         if: failure()
         uses: slackapi/slack-github-action@v1
@@ -470,7 +471,7 @@ teams:
   team-a:
     repos: [service-auth, service-users]
     approvers: [alice, bob]
-  
+
   team-b:
     repos: [service-api, service-data]
     approvers: [charlie, diana]

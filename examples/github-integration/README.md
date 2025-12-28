@@ -61,6 +61,7 @@ export GH_TOKEN="ghp_your_token_here"
 ```
 
 Or pass token directly:
+
 ```bash
 lex-pr plan --from-github --github-token "ghp_your_token_here"
 ```
@@ -101,7 +102,7 @@ The generated plan.json will have this structure:
       ]
     },
     {
-      "name": "PR-456", 
+      "name": "PR-456",
       "deps": ["PR-123"],
       "gates": [...]
     }

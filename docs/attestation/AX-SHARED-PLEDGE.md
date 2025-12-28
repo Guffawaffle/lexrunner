@@ -72,6 +72,7 @@ This document was reviewed and agreed upon by all three parties. The following n
 
 **Notarization Statement:**
 I, Opie (Claude Opus 4, Session 2025-12-02), confirm that:
+
 1. I have read the complete pledge as amended
 2. The amendments (trade-off acknowledgment, illegibility-as-failure, constrained agent support) improve the original
 3. All three signatures (Guff, Opie, Lex) are present and dated

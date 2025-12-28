@@ -5,6 +5,7 @@ This directory contains scripts and resources for creating video tutorials about
 ## Quick Start Tutorial
 
 **[Quick Merge Pyramid](./quick-merge-pyramid.md)** (10 minutes) - Complete hands-on tutorial
+
 - Discover → Plan → Execute → Merge workflow
 - Dependency management and merge order
 - Gate execution and verification
@@ -43,16 +44,19 @@ This directory contains scripts and resources for creating video tutorials about
 ### Recording Setup
 
 **Screen Recording:**
+
 - Resolution: 1920x1080 (1080p)
 - Frame rate: 30 fps
 - Software: OBS Studio, ScreenFlow, or Camtasia
 
 **Terminal:**
+
 - Font: Monaco or Fira Code, 14pt
 - Color scheme: Solarized Dark or Nord
 - Window size: 80x24 minimum
 
 **Audio:**
+
 - Microphone: USB condenser mic (Blue Yeti or similar)
 - Sample rate: 48kHz
 - No background music during code demos
@@ -60,6 +64,7 @@ This directory contains scripts and resources for creating video tutorials about
 ### Visual Style
 
 **Terminal Prompts:**
+
 ```bash
 # Use clear, short prompts
 $ lex-pr init
@@ -72,11 +77,13 @@ $ lex-pr init
 ```
 
 **Code Examples:**
+
 - Use syntax highlighting
 - Show complete, runnable examples
 - Include error cases and recovery
 
 **Annotations:**
+
 - Add text overlays for key concepts
 - Use arrows to highlight CLI output
 - Show keyboard shortcuts
@@ -92,6 +99,7 @@ $ lex-pr init
 ## Recording Checklist
 
 Before recording:
+
 - [ ] Test all commands in clean environment
 - [ ] Prepare sample repository with example PRs
 - [ ] Script key talking points
@@ -100,6 +108,7 @@ Before recording:
 - [ ] Test audio levels
 
 During recording:
+
 - [ ] Speak clearly and at moderate pace
 - [ ] Pause between commands to show output
 - [ ] Explain what you're doing and why
@@ -107,6 +116,7 @@ During recording:
 - [ ] Point out important output/results
 
 After recording:
+
 - [ ] Add captions/subtitles
 - [ ] Include chapter markers
 - [ ] Add end screen with links
@@ -144,12 +154,14 @@ For each video, provide:
 ## Publishing
 
 ### YouTube
+
 - Title format: "lexrunner: [Topic] - [Duration]"
 - Description: Link to docs, timestamps, resources
 - Tags: git, automation, pr, merge, ci-cd, devops
 - Playlist: "lexrunner Tutorials"
 
 ### Documentation Site
+
 - Embed videos in relevant docs pages
 - Provide download links for offline viewing
 - Include transcript for accessibility
@@ -157,11 +169,13 @@ For each video, provide:
 ## Maintenance
 
 Update videos when:
+
 - CLI interface changes significantly
 - New major features added
 - Best practices evolve
 
 Strategy:
+
 - Create new video for major changes
 - Add pinned comment for minor updates
 - Archive outdated videos with redirect
@@ -169,11 +183,13 @@ Strategy:
 ## Feedback
 
 Collect viewer feedback via:
+
 - YouTube comments
 - GitHub Discussions
 - Video-specific survey links
 
 Track metrics:
+
 - Watch time and completion rate
 - Likes/dislikes ratio
 - Common questions in comments

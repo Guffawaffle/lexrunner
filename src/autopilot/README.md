@@ -21,21 +21,17 @@ The autopilot system defines five levels of automation (0-4), allowing teams to 
 ## Usage
 
 ```typescript
-import { 
-  AutopilotLevel, 
-  parseAutopilotConfig, 
-  hasCapability 
-} from './autopilot/index.js';
+import { AutopilotLevel, parseAutopilotConfig, hasCapability } from "./autopilot/index.js";
 
 // Parse CLI options into config
 const config = parseAutopilotConfig({
   maxLevel: 3,
   openPr: true,
-  branchPrefix: 'integration/'
+  branchPrefix: "integration/",
 });
 
 // Check capabilities
-if (hasCapability(config, 'branches')) {
+if (hasCapability(config, "branches")) {
   // Create integration branches
 }
 ```
@@ -66,6 +62,7 @@ The module enforces strict validation rules:
 ### Configuration
 
 Configuration is parsed from CLI flags and validated for:
+
 1. Schema compliance (via Zod)
 2. Logical consistency (flag dependencies)
 3. Safety boundaries
@@ -82,6 +79,7 @@ Comprehensive test coverage for all levels:
 - `tests/autopilot-integration.spec.ts` - End-to-end integration tests
 
 Run tests:
+
 ```bash
 npm test -- tests/autopilot
 ```

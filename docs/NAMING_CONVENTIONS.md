@@ -8,12 +8,12 @@ This document summarizes the Lex ecosystem naming conventions. For the full spec
 
 ## Quick Reference
 
-| Context | Convention | Example |
-|---------|------------|---------|
+| Context            | Convention                | Example                        |
+| ------------------ | ------------------------- | ------------------------------ |
 | **MCP tool names** | `mcp_{ns}_{cat}_{action}` | `mcp_lexrunner_weave_discover` |
-| **CLI commands** | `{cli} {cat} {action}` | `lex-pr weave discover` |
-| **CLI multi-word** | hyphen-case | `--dry-run` |
-| **Persona IDs** | `{behavior}_{domain}` | `quality-first_engineering` |
+| **CLI commands**   | `{cli} {cat} {action}`    | `lex-pr weave discover`        |
+| **CLI multi-word** | hyphen-case               | `--dry-run`                    |
+| **Persona IDs**    | `{behavior}_{domain}`     | `quality-first_engineering`    |
 
 ---
 
@@ -23,28 +23,28 @@ Pattern: `mcp_lexrunner_{category}_{action}`
 
 ### Categories
 
-| Category | Purpose |
-|----------|---------|
-| `weave` | Merge-weave orchestration |
-| `gate` | CI/gate execution |
-| `plan` | Plan creation/validation |
-| `workspace` | Local workspace management |
-| `run` | Run lifecycle management |
-| `core` | Cross-cutting (use sparingly) |
+| Category    | Purpose                       |
+| ----------- | ----------------------------- |
+| `weave`     | Merge-weave orchestration     |
+| `gate`      | CI/gate execution             |
+| `plan`      | Plan creation/validation      |
+| `workspace` | Local workspace management    |
+| `run`       | Run lifecycle management      |
+| `core`      | Cross-cutting (use sparingly) |
 
 ### Current → Canonical Mapping
 
-| Current Name | Canonical Name | Status |
-|--------------|----------------|--------|
-| `discover` | `mcp_lexrunner_weave_discover` | Planned |
-| `status` | `mcp_lexrunner_weave_status` | Planned |
-| `plan.create` | `mcp_lexrunner_plan_create` | Planned |
-| `gates.run` | `mcp_lexrunner_gate_run` | Planned |
-| `merge-order` | `mcp_lexrunner_weave_order` | Planned |
-| `doctor` | `mcp_lexrunner_workspace_doctor` | Planned |
-| `local.init` | `mcp_lexrunner_workspace_init` | Planned |
-| `lexrunner.startRun` | `mcp_lexrunner_run_start` | Planned |
-| `lexrunner.getStatus` | `mcp_lexrunner_run_status` | Planned |
+| Current Name          | Canonical Name                   | Status  |
+| --------------------- | -------------------------------- | ------- |
+| `discover`            | `mcp_lexrunner_weave_discover`   | Planned |
+| `status`              | `mcp_lexrunner_weave_status`     | Planned |
+| `plan.create`         | `mcp_lexrunner_plan_create`      | Planned |
+| `gates.run`           | `mcp_lexrunner_gate_run`         | Planned |
+| `merge-order`         | `mcp_lexrunner_weave_order`      | Planned |
+| `doctor`              | `mcp_lexrunner_workspace_doctor` | Planned |
+| `local.init`          | `mcp_lexrunner_workspace_init`   | Planned |
+| `lexrunner.startRun`  | `mcp_lexrunner_run_start`        | Planned |
+| `lexrunner.getStatus` | `mcp_lexrunner_run_status`       | Planned |
 
 ---
 
@@ -56,13 +56,13 @@ See [CLI_VERBS.md](CLI_VERBS.md) for the full category-action contract.
 
 ### Current → Canonical Mapping
 
-| Current | Canonical |
-|---------|-----------|
-| `lex-pr discover` | `lex-pr weave discover` |
-| `lex-pr plan` | `lex-pr weave plan` |
-| `lex-pr status` | `lex-pr weave status` |
-| `lex-pr init` | `lex-pr workspace init` |
-| `lex-pr doctor` | `lex-pr workspace doctor` |
+| Current           | Canonical                 |
+| ----------------- | ------------------------- |
+| `lex-pr discover` | `lex-pr weave discover`   |
+| `lex-pr plan`     | `lex-pr weave plan`       |
+| `lex-pr status`   | `lex-pr weave status`     |
+| `lex-pr init`     | `lex-pr workspace init`   |
+| `lex-pr doctor`   | `lex-pr workspace doctor` |
 
 ---
 

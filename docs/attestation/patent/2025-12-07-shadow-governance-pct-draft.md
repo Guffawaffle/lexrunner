@@ -23,8 +23,8 @@ This disclosure presents methods, systems and command-line interfaces that:
 
 5. Provide a thin backwards-compatibility wrapper script that resolves the canonical CLI entry relative to the wrapper location, delegates all arguments to the canonical CLI command, preserves and propagates the child process exit code, and emits deprecation or compatibility notices to stderr to avoid corrupting stdout intended for programmatic consumption.
 
-Refinement (focus for defensibility)
------------------------------------
+## Refinement (focus for defensibility)
+
 Following practical review and counsel-oriented feedback, the inventive focus is refined to two core, technically specific pillars which provide measurable technical advantages over generic logging / CLI practice:
 
 - Pillar A — Deterministic schema-evolving telemetry with fail-forward legacy normalization and per-log uncertainty provenance (detailed deterministic normalization algorithm + deterministic uncertainty roll-up).
@@ -45,6 +45,7 @@ Detailed Description
 [Note to counsel: the following examples and algorithmic descriptions are representative and can be adapted to include implementation-specific parameters, thresholds and heuristics. This description is intended to show preferred embodiments but is not exhaustive.]
 
 1. Governance Comparison Log Format
+
 - schemaVersion: string, values follow semantic versioning (eg. "1.0.0"). Schema gating is based on major version: logs with major > CURRENT_MAJOR are rejected by strict readers.
 - id: string, unique log id (example: gov-<ULID>)
 - timestamp: iso8601 UTC string
@@ -57,6 +58,7 @@ Detailed Description
 
 1b. Per-Record Uncertainty Flags Schema (computed at analysis time)
 The following flags are derived per-record during uncertainty provenance computation:
+
 - offlineMode: boolean, true if lexsona.offlineMode is true
 - derivationFailure: boolean, true if lexsona.success is false
 - confidenceCeilingApplied: boolean, true if lexsona.constraintSet.metadata.confidenceCeiling is present and non-null
@@ -66,17 +68,20 @@ The following flags are derived per-record during uncertainty provenance computa
 These flags are not persisted but are computed deterministically from the log record during analysis. The roll-up aggregates counts of each flag across the log set.
 
 2. writeGovernanceLog
+
 - Ensures logs dir exists (e.g., .smartergpt/runner/governance-logs)
 - May apply retention policy prior to writes: age and size limits (e.g., maxAgeDays, maxSizeMB)
 - Persists the JSON representation of the log with indentation
 
 3. readGovernanceLogs (Strict Mode)
+
 - Enumerate .json files in the logs directory
 - For each file: parse JSON, check schemaVersion exists and that major version <= CURRENT_MAJOR_VERSION
 - Validate via schema; parse and collect into returned results
 - Skip logs with unsupported schema or invalid JSON, and emit warnings
 
 4. readGovernanceLogsWithLegacy (Fail-Forward Mode)
+
 - Enumerate .json files
 - For each file: parse JSON; if schemaVersion is absent, set wasLegacy=true and assign "0.0.0" placeholder
 - Infer missing fields with reasonable defaults: id from filename if present, default mode=unknown (not "offline" — see Mode Semantics invariant), empty but well-typed lexsona and runner blocks (with offlineMode=true), minimal context
@@ -84,8 +89,8 @@ These flags are not persisted but are computed deterministically from the log re
 - Validate the normalized object against the schema; if validation passes, include it with wasLegacy and normalizationWarnings; if fails, skip and warn
 - Return list of normalized results sorted by log.timestamp descending
 
-Deterministic Normalization Algorithm (pseudo-code)
--------------------------------------------------
+## Deterministic Normalization Algorithm (pseudo-code)
+
 The following deterministic, ordered algorithm is a preferred implementation of fail-forward normalization. The order and heuristics matter and form part of the invention.
 
 ```
@@ -136,6 +141,7 @@ function normalizeLog(rawJson, filename): (normalizedLog, warnings, wasLegacy)
 ```
 
 5. Uncertainty Summaries (Fail-Forward Visibility)
+
 - For a set of logs, compute:
   - total logs
   - successes (derived success) count
@@ -149,8 +155,8 @@ function normalizeLog(rawJson, filename): (normalizedLog, warnings, wasLegacy)
   - UncertaintySummary: offlineCount, failedCount, withConfidenceCeiling, noPersonaCount, hasUncertainty boolean
 - These are rendered in various formats; important point: this summary quantifies the presence of uncertainty and makes these logs visible for investigation
 
-Deterministic Uncertainty Roll-up (pseudo-code)
----------------------------------------------
+## Deterministic Uncertainty Roll-up (pseudo-code)
+
 This roll-up deterministically computes an uncertainty provenance summary that is both machine- and human-consumable.
 
 ```
@@ -176,12 +182,14 @@ function computeUncertaintySummary(logs): UncertaintySummary
 ```
 
 6. CLI: governance:report
+
 - Accepts options to filter logs based on time, persona, workflow, disagreements-only semantics
 - Optionally uses readGovernanceLogsWithLegacy when --accept-legacy is supplied
 - Supports multiple formatted outputs (text, json, table, markdown) and file output
 - If legacy logs were included, prints a concise advisory line that legacy logs were included and that they may have incomplete data
 
 7. Wrapper script behavior
+
 - The wrapper resolves the canonical CLI entry point relative to the wrapper script location (not process.cwd())
 - It writes a deprecation message to stderr to avoid polluting stdout
 - It spawns the canonical CLI with all provided args and returns/propagates exit code
@@ -189,12 +197,15 @@ function computeUncertaintySummary(logs): UncertaintySummary
 Supporting Examples and Embodiments
 
 Example 1: Typical Shadow Logging and Reporting
+
 - A typical merge run triggers deriveShadowConstraints producing lexsona object with constraintSet and metadata. A governance log is composed with schemaVersion "1.0.0" and persisted. An operator later runs: "lex-pr governance:report --since 2025-12-01 --format markdown" to review disagreements and uncertainty.
 
 Example 2: Legacy Logs Included
+
 - An organization has older logs without schemaVersion. The operator runs: "lex-pr governance:report --accept-legacy --format json". The reader normalizes older logs to "0.0.0", produces normalization warnings for each legacy file, and the operator receives a JSON array where each element includes an array of normalizationWarnings and an explicit wasLegacy boolean.
 
 Example 3: Backwards Compatibility via Wrapper
+
 - A build tool calls an older script: "node scripts/analyze-governance-logs.mjs --format json --top 5". The wrapper resolves the canonical CLI entry relative to its file, spawns it with arguments ["governance:report","--format","json","--top","5"], emits a deprecation notice to stderr, and exits with the child exit code so the calling tool observes the same exit semantics.
 
 Claims (Numbered, PCT-friendly)
@@ -203,46 +214,41 @@ Note: The following claims are tightened and centered on the two pillars advised
 
 Pillar A — Claim 1 (Independent - Schema-versioned governance telemetry generation):
 A method comprising:
-  obtaining, for a given execution of an automated workflow, an AI-derived governance result and a corresponding runner decision;
-  generating a governance comparison record that contains at least: a schemaVersion field conforming to semantic versioning, a unique identifier, a timestamp, a context block describing the workflow, an AI-derived governance block including an offlineMode indicator, and a runner signals block; and
-  storing the governance comparison record with the schemaVersion field in a persistent governance log store.
+obtaining, for a given execution of an automated workflow, an AI-derived governance result and a corresponding runner decision;
+generating a governance comparison record that contains at least: a schemaVersion field conforming to semantic versioning, a unique identifier, a timestamp, a context block describing the workflow, an AI-derived governance block including an offlineMode indicator, and a runner signals block; and
+storing the governance comparison record with the schemaVersion field in a persistent governance log store.
 
 Pillar A — Claim 2 (Independent - Deterministic fail-forward normalization on read path):
 A method for reading and normalizing governance logs from a governance log store, comprising:
-  enumerating stored log files in the governance log store;
-  for each stored log file, parsing the file to obtain a raw log object;
-  if the raw log object lacks a schemaVersion field, applying a deterministic, ordered normalization procedure comprising:
-    (a) marking the log as legacy by setting a wasLegacy flag to true,
-    (b) assigning a legacy placeholder schemaVersion (e.g., "0.0.0"),
-    (c) inferring missing fields using a deterministic field-inference order: id (from filename if available), mode (defaulting to "unknown"), lexsona block (with offlineMode=true), runner block (empty), context block (with unknown values),
-    (d) recording explicit per-field normalization warnings in a normalizationWarnings array,
-    (e) validating the normalized log against the schema;
-  if validation succeeds, including the validated log object with its wasLegacy flag and normalizationWarnings array in a result set;
-  if validation fails, excluding the log object and emitting a warning; and
-  returning the result set sorted by timestamp, with legacy indicators and normalization warnings exposed as structured provenance for downstream analysis.
+enumerating stored log files in the governance log store;
+for each stored log file, parsing the file to obtain a raw log object;
+if the raw log object lacks a schemaVersion field, applying a deterministic, ordered normalization procedure comprising:
+(a) marking the log as legacy by setting a wasLegacy flag to true,
+(b) assigning a legacy placeholder schemaVersion (e.g., "0.0.0"),
+(c) inferring missing fields using a deterministic field-inference order: id (from filename if available), mode (defaulting to "unknown"), lexsona block (with offlineMode=true), runner block (empty), context block (with unknown values),
+(d) recording explicit per-field normalization warnings in a normalizationWarnings array,
+(e) validating the normalized log against the schema;
+if validation succeeds, including the validated log object with its wasLegacy flag and normalizationWarnings array in a result set;
+if validation fails, excluding the log object and emitting a warning; and
+returning the result set sorted by timestamp, with legacy indicators and normalization warnings exposed as structured provenance for downstream analysis.
 
 Pillar A — Claim 3 (Independent - Uncertainty provenance computation and roll-up):
 A method for computing and surfacing uncertainty provenance across governance logs, comprising:
-  receiving a plurality of governance comparison records from a governance log store, the plurality including at least one record that was normalized via the deterministic normalization procedure recited in claim 2;
-  for each record, computing a set of per-record uncertainty provenance flags, including:
-    - offlineMode: true if lexsona.offlineMode is true,
-    - derivationFailure: true if lexsona.success is false,
-    - confidenceCeilingApplied: true if lexsona.confidenceCeiling is present,
-    - personaMissing: true if lexsona.personaId is null,
-    - normalizationWarningsPresent: true if the record's normalizationWarnings array is non-empty;
-  deterministically aggregating the per-record provenance flags into an uncertainty summary comprising counts for each flag category, an optional count of normalizationWarningsPresent records, and a boolean hasUncertainty indicator that is true if any count is greater than zero; and
-  outputting the uncertainty summary as part of a report in one or more machine- and human-readable formats where the uncertainty summary is rendered in a way that is explicitly visible to operators and downstream systems.
+receiving a plurality of governance comparison records from a governance log store, the plurality including at least one record that was normalized via the deterministic normalization procedure recited in claim 2;
+for each record, computing a set of per-record uncertainty provenance flags, including: - offlineMode: true if lexsona.offlineMode is true, - derivationFailure: true if lexsona.success is false, - confidenceCeilingApplied: true if lexsona.confidenceCeiling is present, - personaMissing: true if lexsona.personaId is null, - normalizationWarningsPresent: true if the record's normalizationWarnings array is non-empty;
+deterministically aggregating the per-record provenance flags into an uncertainty summary comprising counts for each flag category, an optional count of normalizationWarningsPresent records, and a boolean hasUncertainty indicator that is true if any count is greater than zero; and
+outputting the uncertainty summary as part of a report in one or more machine- and human-readable formats where the uncertainty summary is rendered in a way that is explicitly visible to operators and downstream systems.
 
 Pillar B — Claim 4 (Independent - Automation-safe analysis delegation contract):
 A method comprising:
-  providing a canonical command-line interface for governance analysis that exposes filtering, normalization-mode selection (including an --accept-legacy flag), and output-format options;
-  providing a compatibility wrapper script stored separately from the canonical command that deterministically resolves the canonical command's executable path relative to the wrapper's own storage location (not the current working directory);
-  when the wrapper is run:
-    (a) mapping inbound invocation arguments into a canonical invocation sequence,
-    (b) spawning the canonical command with the canonical invocation sequence,
-    (c) ensuring that the primary output stream (stdout) is reserved exclusively for programmatic content and that advisory or deprecation messages are written exclusively to a non-primary output stream (stderr),
-    (d) mapping the spawned command's exit code 1:1 into the wrapper's exit code; and
-  thereby preserving automation reliability, programmatic output compatibility, and exit-code fidelity while centralizing analysis logic in the canonical command.
+providing a canonical command-line interface for governance analysis that exposes filtering, normalization-mode selection (including an --accept-legacy flag), and output-format options;
+providing a compatibility wrapper script stored separately from the canonical command that deterministically resolves the canonical command's executable path relative to the wrapper's own storage location (not the current working directory);
+when the wrapper is run:
+(a) mapping inbound invocation arguments into a canonical invocation sequence,
+(b) spawning the canonical command with the canonical invocation sequence,
+(c) ensuring that the primary output stream (stdout) is reserved exclusively for programmatic content and that advisory or deprecation messages are written exclusively to a non-primary output stream (stderr),
+(d) mapping the spawned command's exit code 1:1 into the wrapper's exit code; and
+thereby preserving automation reliability, programmatic output compatibility, and exit-code fidelity while centralizing analysis logic in the canonical command.
 
 Dependent Claims (examples - narrow mechanics and variants):
 
@@ -268,15 +274,15 @@ Claim 14. A non-transitory computer-readable storage medium storing program inst
 
 Claim 15 (Combination claim - Full governance analysis workflow):
 A method for end-to-end governance telemetry and analysis, comprising:
-  (a) generating and storing a plurality of governance comparison records according to the method of claim 1;
-  (b) reading the stored governance comparison records from the governance log store using either a strict read procedure that excludes logs lacking a schemaVersion field, or a fail-forward read procedure according to the method of claim 2 that includes legacy logs with explicit provenance;
-  (c) computing per-record uncertainty provenance flags and aggregating them into an uncertainty summary according to the method of claim 3;
-  (d) generating a report that includes at least the uncertainty summary and governance metrics, the report being renderable in one or more of text, JSON, table, or markdown formats; and
-  (e) optionally invoking the report generation via a compatibility wrapper according to the method of claim 4, thereby preserving automation-safe output semantics;
+(a) generating and storing a plurality of governance comparison records according to the method of claim 1;
+(b) reading the stored governance comparison records from the governance log store using either a strict read procedure that excludes logs lacking a schemaVersion field, or a fail-forward read procedure according to the method of claim 2 that includes legacy logs with explicit provenance;
+(c) computing per-record uncertainty provenance flags and aggregating them into an uncertainty summary according to the method of claim 3;
+(d) generating a report that includes at least the uncertainty summary and governance metrics, the report being renderable in one or more of text, JSON, table, or markdown formats; and
+(e) optionally invoking the report generation via a compatibility wrapper according to the method of claim 4, thereby preserving automation-safe output semantics;
 wherein the combination of (a) through (e) provides a complete, auditable governance analysis pipeline that preserves historical log usability while explicitly surfacing uncertainty provenance to operators.
 
-Invariants and Defensible Constraints
-------------------------------------
+## Invariants and Defensible Constraints
+
 To strengthen novelty and practical defensibility, the following invariants form part of the disclosed, preferred embodiments and should be included with any provisional filing or defensive publication:
 
 - Invariant (Provenance Honesty): Legacy logs without schemaVersion are not silently promoted to first-class, primary-scheme records without explicit marking; normalization must set wasLegacy=true and populate normalizationWarnings as structured provenance.
@@ -285,8 +291,8 @@ To strengthen novelty and practical defensibility, the following invariants form
 - Invariant (Schema Gating): Major-version mismatches (raw log schema major > supported major) are gated and excluded by default unless an explicit migration/upgrade mechanism is provided.
 - Invariant (Automation-Safe Output Contract): Wrapper scripts and CLI commands must preserve programmatic stdout content exclusively for machine-readable output, emit only advisory/deprecation text to stderr, and map child exit codes 1:1 to the wrapper/parent exit code.
 
-Provisional filing / founder-grade package (recommended contents)
-----------------------------------------------------------------
+## Provisional filing / founder-grade package (recommended contents)
+
 If pursuing a provisional filing at low cost prior to counsel engagement, include these items in the package:
 
 1. 1–2 page problem statement (why naive archival/analysis of logs fails in practice and why uncertainty matters).
@@ -297,12 +303,14 @@ If pursuing a provisional filing at low cost prior to counsel engagement, includ
 6. Source-code pointers and commit references (evidence of implementation in the project tree: filenames and small code excerpts).
 
 Best Modes, Alternatives, and Variations
+
 - The schemaVersion may evolve (major/minor/patch) and major-version gating logic can be extended to provide migration or conversion strategies.
 - Fail-forward normalization may use heuristics beyond simple default substitution, for example machine-learned inference to guess missing fields, or probabilistic signatures indicating inferred values.
 - The persistent storage may be on local disk with retention policies, or on a remote storage or object store with similar retention enforcement.
 - The wrapper script may be implemented in any executable language or packaging suitable for distribution (node.js, bash shim, or OS-level package). The core behavior of path-resolution relative to the wrapper location and stderr-only deprecation is recommended for any such wrapper.
 
 Advantages
+
 - Preserves historical logs while explicitly indicating uncertainty rather than silently dropping or misinterpreting data
 - Makes legacy logs useful for trend analysis and investigations without introducing silent correctness assumptions
 - Provides operationally-sane retention and performance guarantees
@@ -310,29 +318,33 @@ Advantages
 - Ensures backwards compatibility via a robust wrapper that preserves exit semantics and stdout purity
 
 Examples of Implementation Code Mapping (for review)
+
 - readGovernanceLogs(), readGovernanceLogsWithLegacy(), createGovernanceComparisonLog(), writeGovernanceLog(), applyRetentionPolicy(), formatGovernanceLog(), formatShadowGovernanceSummary(), deriveShadowConstraints(), governanceReport(), and scripts/analyze-governance-logs.mjs are representative functional units in an embodiment in the lexrunner project.
 
 Legal and Filing Notes
+
 - The above disclosure is a provisional-quality draft intended to capture inventive concepts for counsel. Before filing a PCT or national stage application, perform a formal prior art search and work with patent counsel to refine claim scope and claim dependency trees.
 - When listing inventors, identify individuals who conceived of the claimed subject matter; do not list AI as a legal inventor in filings without counsel guidance and jurisdictional clearance.
 
 Appendix: Example Report Output (text)
 Governance logs summary:
-  total logs: 10
-  successful derivations: 8 (80%)
-  offline-mode logs: 2 (20%)
-  logs with >0 constraints: 3 (30%)
-  average constraintCount: 1.40
-  persona usage: {"quality-first_engineering": 6, "momentum-first_product": 4}
+total logs: 10
+successful derivations: 8 (80%)
+offline-mode logs: 2 (20%)
+logs with >0 constraints: 3 (30%)
+average constraintCount: 1.40
+persona usage: {"quality-first_engineering": 6, "momentum-first_product": 4}
 
 Top constraints (by frequency):
-  - "rule: disallow large refactor in minor release" x 2
+
+- "rule: disallow large refactor in minor release" x 2
 
 Simple agreement: runner allowed and LexSona no-block == 7/10 (70%)
 
-⚠️  Uncertainty Summary (fail-forward):
-  - offline mode: 2 logs (LexSona unavailable)
-  - derivation failures: 1 logs
-  - legacy-normalized logs: 1 logs (included only with --accept-legacy)
+⚠️ Uncertainty Summary (fail-forward):
+
+- offline mode: 2 logs (LexSona unavailable)
+- derivation failures: 1 logs
+- legacy-normalized logs: 1 logs (included only with --accept-legacy)
 
 END OF DRAFT

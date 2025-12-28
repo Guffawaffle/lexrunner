@@ -23,6 +23,7 @@ should remain stable even as implementation details evolve.
 6. **Auditability.** Every decision is inspectable (plan, gates, logs, outcomes).
 
 > ### Clarification: Scope of “Only Runtime Truth”
+>
 > - **Integration-time (Runner):** `plan.json` is the **only** input the runner reads to compute order and merges.
 > - **Development-time (Issues & Coding):** Implementation agents (humans/Copilot) are expected to use **Issue descriptions, specs, and project principles** to do the work. The runner does not constrain this phase.
 
@@ -31,30 +32,35 @@ should remain stable even as implementation details evolve.
 ## 1) Lifecycle & Surfaces (Who uses what, when)
 
 **Stage A — Issue Definition**
-- *Owners:* PM/Author
-- *Surfaces:* GitHub Issues / ADRs / specs
-- *Artifacts:* Clear acceptance criteria, rationale, links
+
+- _Owners:_ PM/Author
+- _Surfaces:_ GitHub Issues / ADRs / specs
+- _Artifacts:_ Clear acceptance criteria, rationale, links
 
 **Stage B — Implementation Work**
-- *Owners:* Humans & Copilot (implementation agents)
-- *Surfaces:* Branches/PRs, tests, docs, `.smartergpt/` workspace tools
-- *Inputs:* Issue descriptions + project principles (this document)
-- *Outputs:* One or more focused PRs per task
+
+- _Owners:_ Humans & Copilot (implementation agents)
+- _Surfaces:_ Branches/PRs, tests, docs, `.smartergpt/` workspace tools
+- _Inputs:_ Issue descriptions + project principles (this document)
+- _Outputs:_ One or more focused PRs per task
 
 **Stage C — Plan Synthesis (Out of Runner Scope)**
-- *Owner:* Plan‑generator tool or workflow
-- *Inputs:* Graph of PRs, declared dependencies, policy, optional metadata from Issues
-- *Output:* **`plan.json` (Schema v1)** — the frozen integration input
+
+- _Owner:_ Plan‑generator tool or workflow
+- _Inputs:_ Graph of PRs, declared dependencies, policy, optional metadata from Issues
+- _Output:_ **`plan.json` (Schema v1)** — the frozen integration input
 
 **Stage D — Integration Runner (This Project)**
-- *Owner:* lex‑pr‑runner (TS core)
-- *Input:* `plan.json` only
-- *Behavior:* Compute topo order, run gates uniformly, respect policy, merge cleanly
-- *Artifacts:* Gate logs (JUnit/SARIF/etc.), status tables, PR comments
+
+- _Owner:_ lex‑pr‑runner (TS core)
+- _Input:_ `plan.json` only
+- _Behavior:_ Compute topo order, run gates uniformly, respect policy, merge cleanly
+- _Artifacts:_ Gate logs (JUnit/SARIF/etc.), status tables, PR comments
 
 **Stage E — Merge & Release**
-- *Owner:* Maintainers/automation
-- *Artifacts:* Changelog, tags, release notes
+
+- _Owner:_ Maintainers/automation
+- _Artifacts:_ Changelog, tags, release notes
 
 ---
 
@@ -76,8 +82,6 @@ should remain stable even as implementation details evolve.
 - **Policy:** Merge rules (e.g., “all required gates green,” “no fast‑forward across failing siblings,” “block on security policy violations”).
 - **Outputs:** Expected artifacts per gate (logs, JUnit, coverage, SARIF, etc.).
 
-
-
 #### Policy Examples (Non-Normative)
 
 ```yaml
@@ -96,7 +100,9 @@ mergeRule:
   # “All required gates green; optional gates ignored unless specified”
   type: "strict-required"
 ```
+
 #### Schema Versioning
+
 - Plans must include `"schemaVersion": "1.x.y"`.
 - Versioning follows SemVer:
   - **Patch:** additive, optional fields or docs only.
@@ -115,17 +121,15 @@ _Anything not in the plan is out of scope for the runner._
 3. **Promotion:** A node is eligible to merge when all **required gates** pass and **policy** authorizes.
 4. **Short‑Circuiting:** If a dependency fails on required gates, **do not** run dependents (mark as blocked).
 
-
 ### Runner State Model (Statuses)
 
-| Status     | Meaning                                                | Merge Eligibility |
-|------------|--------------------------------------------------------|-------------------|
-| `pass`     | All required gates passed                              | Eligible          |
-| `fail`     | One or more required gates failed                      | Not eligible      |
-| `blocked`  | A dependency failed/blocked; node not executed         | Not eligible      |
-| `skipped`  | Policy or config excludes gates for this node          | Not eligible      |
-| `retrying` | Gate marked retryable; attempt in progress (bounded)   | Not eligible      |
-
+| Status     | Meaning                                              | Merge Eligibility |
+| ---------- | ---------------------------------------------------- | ----------------- |
+| `pass`     | All required gates passed                            | Eligible          |
+| `fail`     | One or more required gates failed                    | Not eligible      |
+| `blocked`  | A dependency failed/blocked; node not executed       | Not eligible      |
+| `skipped`  | Policy or config excludes gates for this node        | Not eligible      |
+| `retrying` | Gate marked retryable; attempt in progress (bounded) | Not eligible      |
 
 ### Umbrella Branch Pattern (When Main is Blocked)
 
@@ -174,6 +178,7 @@ The constraint applies only to the **final push to main**.
 ## 8) Operational Rules (Do / Don’t)
 
 **Do**
+
 - Treat `plan.json` as the **only integration‑time input** for the runner.
 - Keep the runner **stateless**; derive integration state from inputs and external APIs declared in the plan.
 - Prefer **pure functions** and small modules. TS‑first with Zod schemas.
@@ -181,6 +186,7 @@ The constraint applies only to the **final push to main**.
 - Uphold **imperative commit messages** (e.g., “Add…”, “Fix…”, “Refactor…”).
 
 **Don’t**
+
 - Don’t read `.smartergpt/` at runtime.
 - Don’t infer dependencies from file paths or heuristics. Only the plan decides.
 - Don’t hide side‑effects behind environment variables. All effects must be declared in the plan or policy.
@@ -232,11 +238,13 @@ The constraint applies only to the **final push to main**.
 ## 13) Checklists
 
 ### PR Author
+
 - [ ] Break work into small, independently reviewable PRs.
 - [ ] Declare dependencies explicitly in PR descriptions and/or `plan.json` pre‑cursor metadata.
 - [ ] Ensure required gates are defined and runnable.
 
 ### Agent (Runner/Gate)
+
 - [ ] Validate `plan.json` against Schema v1.
 - [ ] Compute topo order; verify DAG (no cycles).
 - [ ] Execute gates uniformly; collect artifacts.
@@ -244,6 +252,7 @@ The constraint applies only to the **final push to main**.
 - [ ] Emit artifacts/logs outside source; post results back to PR.
 
 ### Release
+
 - [ ] Tag runner version & schema version.
 - [ ] Changelog: note contract changes explicitly.
 - [ ] Verify CI template and local flows match.
@@ -288,6 +297,7 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 - **Containerization (recommended for parity):** If `runtime = container`, include `image`, `entrypoint`, and `mounts` in the plan or policy.
 - **Secrets & env:** Gate adapters may read env vars **only** to locate credentials; secrets must not change gate semantics.
 - **Example gate spec (non-normative):**
+
 ```json
 {
   "name": "e2e",
@@ -298,7 +308,6 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 }
 ```
 
-
 ---
 
 ## Appendix C — Plan Generator Reference (Non-Normative)
@@ -306,32 +315,38 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 **Purpose:** Show how teams can go from Issues/PRs → `plan.json` without constraining the runner.
 
 ### Dependency Declaration (PR metadata)
+
 - Footer syntax (suggested): `Depends-on: #123, #456`
 - Label-based (alternative): `dep:123`, `dep:456`
 - The generator resolves PR numbers → node IDs.
 
 ### Field Mapping (example)
 
-| Source               | Plan field             |
-|----------------------|------------------------|
-| PR number            | `node.id`              |
-| PR title             | `node.title`           |
-| PR labels            | `node.tags[]`          |
-| `Depends-on:` footer | `node.dependsOn[]`     |
-| Required checks label| `node.requiredGates[]` |
+| Source                | Plan field             |
+| --------------------- | ---------------------- |
+| PR number             | `node.id`              |
+| PR title              | `node.title`           |
+| PR labels             | `node.tags[]`          |
+| `Depends-on:` footer  | `node.dependsOn[]`     |
+| Required checks label | `node.requiredGates[]` |
 
 ### Minimal `plan.json` example
+
 ```json
 {
   "schemaVersion": "1.0.0",
   "policy": { "requiredGates": ["lint", "type", "unit"], "maxWorkers": 2 },
   "nodes": [
     { "id": "PR-101", "title": "Core utils", "dependsOn": [], "gates": ["lint", "type", "unit"] },
-    { "id": "PR-202", "title": "Feature A", "dependsOn": ["PR-101"], "gates": ["lint", "type", "unit"] }
+    {
+      "id": "PR-202",
+      "title": "Feature A",
+      "dependsOn": ["PR-101"],
+      "gates": ["lint", "type", "unit"]
+    }
   ]
 }
 ```
-
 
 ---
 

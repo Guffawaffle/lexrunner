@@ -10,6 +10,7 @@ LexRunner emits structured events during key workflow operations:
 - **MergeWeaveEvent**: Emitted during merge-weave operations (conflict resolution, gate execution)
 
 These events conform to Lex Frame schema v2 (Lex#88), including:
+
 - `runId`: Unique identifier for correlating events across a workflow execution
 - `planHash`: SHA-256 hash of the execution plan for idempotency
 - `spend`: Cost tracking metrics (tokens, latency, turn cost)
@@ -24,36 +25,36 @@ Captures information when issues/PRs are batched and distributed for parallel ex
 
 **Fields**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `eventType` | `"fanout"` | ✓ | Event discriminator |
-| `runId` | `string` | ✓ | Unique run identifier (UUID v4) |
-| `timestamp` | `string` | ✓ | ISO 8601 timestamp (e.g., `2025-12-14T22:43:58.569Z`) |
-| `planHash` | `string` | ✓ | SHA-256 hash of the execution plan |
-| `prList` | `string[]` | ✓ | List of PR numbers or identifiers (e.g., `["#123", "#124"]`) |
-| `modulesTouched` | `string[]` | ✓ | Canonical module identifiers affected by this fanout |
-| `batchSize` | `number` | ✓ | Number of items in this batch |
-| `totalPRs` | `number` | ✓ | Total number of PRs in the workflow |
-| `planContext` | `PlanContext` | ✓ | Reference to the source plan |
-| `metadata` | `FanoutMetadata` | ✗ | Additional operational metadata |
+| Field            | Type             | Required | Description                                                  |
+| ---------------- | ---------------- | -------- | ------------------------------------------------------------ |
+| `eventType`      | `"fanout"`       | ✓        | Event discriminator                                          |
+| `runId`          | `string`         | ✓        | Unique run identifier (UUID v4)                              |
+| `timestamp`      | `string`         | ✓        | ISO 8601 timestamp (e.g., `2025-12-14T22:43:58.569Z`)        |
+| `planHash`       | `string`         | ✓        | SHA-256 hash of the execution plan                           |
+| `prList`         | `string[]`       | ✓        | List of PR numbers or identifiers (e.g., `["#123", "#124"]`) |
+| `modulesTouched` | `string[]`       | ✓        | Canonical module identifiers affected by this fanout         |
+| `batchSize`      | `number`         | ✓        | Number of items in this batch                                |
+| `totalPRs`       | `number`         | ✓        | Total number of PRs in the workflow                          |
+| `planContext`    | `PlanContext`    | ✓        | Reference to the source plan                                 |
+| `metadata`       | `FanoutMetadata` | ✗        | Additional operational metadata                              |
 
 **PlanContext**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `planPath` | `string` | ✓ | Path to the plan.json file |
-| `planVersion` | `string` | ✓ | Schema version of the plan (e.g., `"1.0.0"`) |
-| `planSize` | `number` | ✓ | Number of items in the plan |
+| Field         | Type     | Required | Description                                  |
+| ------------- | -------- | -------- | -------------------------------------------- |
+| `planPath`    | `string` | ✓        | Path to the plan.json file                   |
+| `planVersion` | `string` | ✓        | Schema version of the plan (e.g., `"1.0.0"`) |
+| `planSize`    | `number` | ✓        | Number of items in the plan                  |
 
 **FanoutMetadata** (optional):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `executionMode` | `string` | Mode of execution (e.g., `"parallel"`, `"sequential"`) |
-| `targetBranch` | `string` | Target branch for PRs |
-| `repository` | `string` | Repository identifier (e.g., `"owner/repo"`) |
-| `batchIndex` | `number` | Index of this batch (0-based) if multiple batches |
-| `estimatedDuration` | `number` | Estimated duration in milliseconds |
+| Field               | Type     | Description                                            |
+| ------------------- | -------- | ------------------------------------------------------ |
+| `executionMode`     | `string` | Mode of execution (e.g., `"parallel"`, `"sequential"`) |
+| `targetBranch`      | `string` | Target branch for PRs                                  |
+| `repository`        | `string` | Repository identifier (e.g., `"owner/repo"`)           |
+| `batchIndex`        | `number` | Index of this batch (0-based) if multiple batches      |
+| `estimatedDuration` | `number` | Estimated duration in milliseconds                     |
 
 ### MergeWeaveEvent
 
@@ -63,122 +64,122 @@ Captures comprehensive information during merge-weave operations, including conf
 
 **Fields**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `eventType` | `"merge-weave"` | ✓ | Event discriminator |
-| `runId` | `string` | ✓ | Unique run identifier (UUID v4) |
-| `timestamp` | `string` | ✓ | ISO 8601 timestamp |
-| `planHash` | `string` | ✓ | SHA-256 hash of the execution plan |
-| `outcome` | `"success" \| "failure" \| "partial"` | ✓ | Overall outcome of the merge-weave |
-| `conflictInfo` | `ConflictInfo` | ✓ | Details about conflicts encountered |
-| `resolution` | `ResolutionInfo` | ✓ | How conflicts were resolved |
-| `gateResults` | `GateResults` | ✓ | Results from all gate executions |
-| `spend` | `SpendMetrics` | ✓ | Cost tracking metrics |
-| `planContext` | `PlanContext` | ✓ | Reference to the source plan |
-| `metadata` | `MergeWeaveMetadata` | ✗ | Additional operational metadata |
+| Field          | Type                                  | Required | Description                         |
+| -------------- | ------------------------------------- | -------- | ----------------------------------- |
+| `eventType`    | `"merge-weave"`                       | ✓        | Event discriminator                 |
+| `runId`        | `string`                              | ✓        | Unique run identifier (UUID v4)     |
+| `timestamp`    | `string`                              | ✓        | ISO 8601 timestamp                  |
+| `planHash`     | `string`                              | ✓        | SHA-256 hash of the execution plan  |
+| `outcome`      | `"success" \| "failure" \| "partial"` | ✓        | Overall outcome of the merge-weave  |
+| `conflictInfo` | `ConflictInfo`                        | ✓        | Details about conflicts encountered |
+| `resolution`   | `ResolutionInfo`                      | ✓        | How conflicts were resolved         |
+| `gateResults`  | `GateResults`                         | ✓        | Results from all gate executions    |
+| `spend`        | `SpendMetrics`                        | ✓        | Cost tracking metrics               |
+| `planContext`  | `PlanContext`                         | ✓        | Reference to the source plan        |
+| `metadata`     | `MergeWeaveMetadata`                  | ✗        | Additional operational metadata     |
 
 **ConflictInfo**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `totalConflicts` | `number` | ✓ | Total number of conflicts detected |
-| `conflictsResolved` | `number` | ✓ | Number of conflicts successfully resolved |
-| `conflictFiles` | `string[]` | ✓ | Paths of files with conflicts |
-| `conflictTypes` | `ConflictType[]` | ✗ | Types of conflicts encountered |
+| Field               | Type             | Required | Description                               |
+| ------------------- | ---------------- | -------- | ----------------------------------------- |
+| `totalConflicts`    | `number`         | ✓        | Total number of conflicts detected        |
+| `conflictsResolved` | `number`         | ✓        | Number of conflicts successfully resolved |
+| `conflictFiles`     | `string[]`       | ✓        | Paths of files with conflicts             |
+| `conflictTypes`     | `ConflictType[]` | ✗        | Types of conflicts encountered            |
 
 **ConflictType**:
 
 ```typescript
-type ConflictType = 
-  | "content"      // Standard merge conflict in file content
+type ConflictType =
+  | "content" // Standard merge conflict in file content
   | "delete-modify" // File deleted in one branch, modified in another
   | "modify-delete" // File modified in one branch, deleted in another
   | "rename-rename" // File renamed differently in both branches
-  | "add-add";     // Same file added in both branches with different content
+  | "add-add"; // Same file added in both branches with different content
 ```
 
 **ResolutionInfo**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `strategy` | `string` | ✓ | Resolution strategy used (e.g., `"manual"`, `"auto-theirs"`, `"semantic-merge"`) |
-| `resolvedFiles` | `string[]` | ✓ | Files that were successfully resolved |
-| `unresolvedFiles` | `string[]` | ✓ | Files still in conflict (for partial outcomes) |
-| `resolutionNotes` | `string` | ✗ | Human-readable notes about resolution approach |
+| Field             | Type       | Required | Description                                                                      |
+| ----------------- | ---------- | -------- | -------------------------------------------------------------------------------- |
+| `strategy`        | `string`   | ✓        | Resolution strategy used (e.g., `"manual"`, `"auto-theirs"`, `"semantic-merge"`) |
+| `resolvedFiles`   | `string[]` | ✓        | Files that were successfully resolved                                            |
+| `unresolvedFiles` | `string[]` | ✓        | Files still in conflict (for partial outcomes)                                   |
+| `resolutionNotes` | `string`   | ✗        | Human-readable notes about resolution approach                                   |
 
 **GateResults**:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `totalGates` | `number` | ✓ | Total number of gates executed |
-| `gatesPassed` | `string[]` | ✓ | Names of gates that passed |
-| `gatesFailed` | `string[]` | ✓ | Names of gates that failed |
-| `gateDetails` | `GateDetail[]` | ✗ | Detailed results for each gate |
+| Field         | Type           | Required | Description                    |
+| ------------- | -------------- | -------- | ------------------------------ |
+| `totalGates`  | `number`       | ✓        | Total number of gates executed |
+| `gatesPassed` | `string[]`     | ✓        | Names of gates that passed     |
+| `gatesFailed` | `string[]`     | ✓        | Names of gates that failed     |
+| `gateDetails` | `GateDetail[]` | ✗        | Detailed results for each gate |
 
 **GateDetail**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | `string` | Gate name |
-| `status` | `"pass" \| "fail" \| "skip"` | Gate execution status |
-| `duration` | `number` | Duration in milliseconds |
-| `exitCode` | `number` | Exit code from gate command |
-| `artifacts` | `string[]` | Paths to artifacts produced (e.g., test reports) |
+| Field       | Type                         | Description                                      |
+| ----------- | ---------------------------- | ------------------------------------------------ |
+| `name`      | `string`                     | Gate name                                        |
+| `status`    | `"pass" \| "fail" \| "skip"` | Gate execution status                            |
+| `duration`  | `number`                     | Duration in milliseconds                         |
+| `exitCode`  | `number`                     | Exit code from gate command                      |
+| `artifacts` | `string[]`                   | Paths to artifacts produced (e.g., test reports) |
 
 **SpendMetrics** (Lex v2 schema):
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `duration` | `number` | ✓ | Total duration in milliseconds |
-| `turnCost` | `TurnCost` | ✗ | Turn Cost metrics (if available) |
-| `tokenUsage` | `TokenUsage` | ✗ | Token consumption metrics |
-| `tierMetrics` | `TierMetrics` | ✗ | Governance tier metrics |
+| Field         | Type          | Required | Description                      |
+| ------------- | ------------- | -------- | -------------------------------- |
+| `duration`    | `number`      | ✓        | Total duration in milliseconds   |
+| `turnCost`    | `TurnCost`    | ✗        | Turn Cost metrics (if available) |
+| `tokenUsage`  | `TokenUsage`  | ✗        | Token consumption metrics        |
+| `tierMetrics` | `TierMetrics` | ✗        | Governance tier metrics          |
 
 **TurnCost** (see existing Frame types):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `components.latencyMs` | `number` | Latency component |
-| `components.contextResetTokens` | `number` | Context reset overhead |
-| `components.renegotiationCount` | `number` | Number of renegotiations |
-| `components.tokenBloat` | `number` | Token bloat metric |
-| `components.attentionSwitchCount` | `number` | Attention switches |
-| `weightedScore` | `number` | Composite weighted score |
-| `eventCount` | `number` | Number of events recorded |
-| `priorRunScore` | `number?` | Previous run score for comparison |
-| `improvement` | `string?` | Improvement percentage |
+| Field                             | Type      | Description                       |
+| --------------------------------- | --------- | --------------------------------- |
+| `components.latencyMs`            | `number`  | Latency component                 |
+| `components.contextResetTokens`   | `number`  | Context reset overhead            |
+| `components.renegotiationCount`   | `number`  | Number of renegotiations          |
+| `components.tokenBloat`           | `number`  | Token bloat metric                |
+| `components.attentionSwitchCount` | `number`  | Attention switches                |
+| `weightedScore`                   | `number`  | Composite weighted score          |
+| `eventCount`                      | `number`  | Number of events recorded         |
+| `priorRunScore`                   | `number?` | Previous run score for comparison |
+| `improvement`                     | `string?` | Improvement percentage            |
 
 **TokenUsage**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `input` | `number` | Input tokens consumed |
-| `output` | `number` | Output tokens generated |
-| `total` | `number` | Total tokens (input + output) |
+| Field    | Type     | Description                   |
+| -------- | -------- | ----------------------------- |
+| `input`  | `number` | Input tokens consumed         |
+| `output` | `number` | Output tokens generated       |
+| `total`  | `number` | Total tokens (input + output) |
 
 **TierMetrics** (Governance, Claim 3.4):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `totalTasks` | `number` | Total tasks in workflow |
-| `byTier.senior` | `number` | Tasks requiring senior-level |
-| `byTier.mid` | `number` | Tasks requiring mid-level |
-| `byTier.junior` | `number` | Tasks requiring junior-level |
-| `escalations` | `number` | Number of tier escalations |
-| `mismatches` | `number` | Tier assignment mismatches |
-| `tierMatchRate` | `number` | Percentage of correct tier assignments |
-| `escalationRate` | `number` | Escalation rate |
+| Field            | Type     | Description                            |
+| ---------------- | -------- | -------------------------------------- |
+| `totalTasks`     | `number` | Total tasks in workflow                |
+| `byTier.senior`  | `number` | Tasks requiring senior-level           |
+| `byTier.mid`     | `number` | Tasks requiring mid-level              |
+| `byTier.junior`  | `number` | Tasks requiring junior-level           |
+| `escalations`    | `number` | Number of tier escalations             |
+| `mismatches`     | `number` | Tier assignment mismatches             |
+| `tierMatchRate`  | `number` | Percentage of correct tier assignments |
+| `escalationRate` | `number` | Escalation rate                        |
 
 **MergeWeaveMetadata** (optional):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `targetBranch` | `string` | Target branch for merge |
-| `integrationBranch` | `string` | Integration branch used (if umbrella pattern) |
-| `mergedPRs` | `string[]` | PRs successfully merged |
-| `failedPRs` | `string[]` | PRs that failed to merge |
-| `repository` | `string` | Repository identifier |
-| `error` | `string` | Error message if outcome is failure |
+| Field               | Type       | Description                                   |
+| ------------------- | ---------- | --------------------------------------------- |
+| `targetBranch`      | `string`   | Target branch for merge                       |
+| `integrationBranch` | `string`   | Integration branch used (if umbrella pattern) |
+| `mergedPRs`         | `string[]` | PRs successfully merged                       |
+| `failedPRs`         | `string[]` | PRs that failed to merge                      |
+| `repository`        | `string`   | Repository identifier                         |
+| `error`             | `string`   | Error message if outcome is failure           |
 
 ## Frame Metadata Mapping
 
@@ -186,38 +187,38 @@ Events are transformed into Lex Frames using the following mapping:
 
 ### FanoutEvent → ExecutionFrame
 
-| Frame Field | Source |
-|-------------|--------|
-| `type` | `"execution"` |
-| `reference_point` | `"fanout-{timestamp}-{runId}"` |
-| `summary_caption` | `"Fanout: {batchSize} PRs to {modulesTouched.length} modules"` |
-| `module_scope` | `modulesTouched` (canonical module IDs) |
-| `keywords` | `["fanout", "batch", ...prList]` |
-| `outcome` | `"success"` (fanout is pre-execution setup) |
-| `next_actions` | `["Execute batched PRs", "Monitor gate results"]` |
-| `metadata.run_id` | `runId` |
-| `metadata.plan_hash` | `planHash` |
+| Frame Field          | Source                                                         |
+| -------------------- | -------------------------------------------------------------- |
+| `type`               | `"execution"`                                                  |
+| `reference_point`    | `"fanout-{timestamp}-{runId}"`                                 |
+| `summary_caption`    | `"Fanout: {batchSize} PRs to {modulesTouched.length} modules"` |
+| `module_scope`       | `modulesTouched` (canonical module IDs)                        |
+| `keywords`           | `["fanout", "batch", ...prList]`                               |
+| `outcome`            | `"success"` (fanout is pre-execution setup)                    |
+| `next_actions`       | `["Execute batched PRs", "Monitor gate results"]`              |
+| `metadata.run_id`    | `runId`                                                        |
+| `metadata.plan_hash` | `planHash`                                                     |
 
 ### MergeWeaveEvent → ExecutionFrame
 
-| Frame Field | Source |
-|-------------|--------|
-| `type` | `"merge-weave"` |
-| `reference_point` | `"merge-weave-{timestamp}-{runId}"` |
-| `summary_caption` | `"Merge-weave: {conflictInfo.totalConflicts} conflicts, {gateResults.totalGates} gates, outcome: {outcome}"` |
-| `module_scope` | `conflictInfo.conflictFiles.map(toModuleId)` |
-| `keywords` | `["merge-weave", "conflicts", ...gateResults.gatesPassed, ...gateResults.gatesFailed]` |
-| `outcome` | `outcome` |
-| `next_actions` | Derived from outcome and failed gates |
-| `metadata.run_id` | `runId` |
-| `metadata.plan_hash` | `planHash` |
-| `metadata.duration_ms` | `spend.duration` |
-| `metadata.conflicts_resolved` | `conflictInfo.conflictsResolved` |
-| `metadata.gates_passed` | `gateResults.gatesPassed` |
-| `metadata.gates_failed` | `gateResults.gatesFailed` |
-| `metadata.turn_cost` | `spend.turnCost` |
-| `metadata.tier_metrics` | `spend.tierMetrics` |
-| `metadata.error` | `metadata.error` (if outcome is failure) |
+| Frame Field                   | Source                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `type`                        | `"merge-weave"`                                                                                              |
+| `reference_point`             | `"merge-weave-{timestamp}-{runId}"`                                                                          |
+| `summary_caption`             | `"Merge-weave: {conflictInfo.totalConflicts} conflicts, {gateResults.totalGates} gates, outcome: {outcome}"` |
+| `module_scope`                | `conflictInfo.conflictFiles.map(toModuleId)`                                                                 |
+| `keywords`                    | `["merge-weave", "conflicts", ...gateResults.gatesPassed, ...gateResults.gatesFailed]`                       |
+| `outcome`                     | `outcome`                                                                                                    |
+| `next_actions`                | Derived from outcome and failed gates                                                                        |
+| `metadata.run_id`             | `runId`                                                                                                      |
+| `metadata.plan_hash`          | `planHash`                                                                                                   |
+| `metadata.duration_ms`        | `spend.duration`                                                                                             |
+| `metadata.conflicts_resolved` | `conflictInfo.conflictsResolved`                                                                             |
+| `metadata.gates_passed`       | `gateResults.gatesPassed`                                                                                    |
+| `metadata.gates_failed`       | `gateResults.gatesFailed`                                                                                    |
+| `metadata.turn_cost`          | `spend.turnCost`                                                                                             |
+| `metadata.tier_metrics`       | `spend.tierMetrics`                                                                                          |
+| `metadata.error`              | `metadata.error` (if outcome is failure)                                                                     |
 
 ## Example Event Payloads
 
@@ -230,11 +231,7 @@ Events are transformed into Lex Frames using the following mapping:
   "timestamp": "2025-12-14T22:43:58.569Z",
   "planHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "prList": ["#123", "#124", "#125"],
-  "modulesTouched": [
-    "lexrunner/src/cli",
-    "lexrunner/src/gates",
-    "lexrunner/src/frames"
-  ],
+  "modulesTouched": ["lexrunner/src/cli", "lexrunner/src/gates", "lexrunner/src/frames"],
   "batchSize": 3,
   "totalPRs": 10,
   "planContext": {
@@ -264,20 +261,12 @@ Events are transformed into Lex Frames using the following mapping:
   "conflictInfo": {
     "totalConflicts": 3,
     "conflictsResolved": 3,
-    "conflictFiles": [
-      "src/cli.ts",
-      "src/gates.ts",
-      "package.json"
-    ],
+    "conflictFiles": ["src/cli.ts", "src/gates.ts", "package.json"],
     "conflictTypes": ["content", "content", "add-add"]
   },
   "resolution": {
     "strategy": "semantic-merge",
-    "resolvedFiles": [
-      "src/cli.ts",
-      "src/gates.ts",
-      "package.json"
-    ],
+    "resolvedFiles": ["src/cli.ts", "src/gates.ts", "package.json"],
     "unresolvedFiles": [],
     "resolutionNotes": "Auto-merged imports and dependency versions"
   },
@@ -384,15 +373,8 @@ Events are transformed into Lex Frames using the following mapping:
   },
   "resolution": {
     "strategy": "manual",
-    "resolvedFiles": [
-      "src/cli.ts",
-      "package.json",
-      "package-lock.json"
-    ],
-    "unresolvedFiles": [
-      "src/schema.ts",
-      "src/types/index.ts"
-    ],
+    "resolvedFiles": ["src/cli.ts", "package.json", "package-lock.json"],
+    "unresolvedFiles": ["src/schema.ts", "src/types/index.ts"],
     "resolutionNotes": "Complex type conflicts require manual intervention"
   },
   "gateResults": {

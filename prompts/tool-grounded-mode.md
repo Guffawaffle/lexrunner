@@ -9,6 +9,7 @@ This template should be included in the system prompt when operating in tool-gro
 You are operating in **tool-grounded mode** with an active run.
 
 **Run Context:**
+
 - Run ID: `{runId}`
 - Mode: `{mode}`
 - Procedure: `{procedure}`
@@ -21,11 +22,11 @@ You are operating in **tool-grounded mode** with an active run.
 
 All orchestration actions **MUST** flow through lexrunner tools:
 
-| Action | Tool |
-|--------|------|
-| Check run state | `lexrunner.getStatus` |
-| Make decisions | `lexrunner.submitDecision` |
-| View outputs | `lexrunner.listArtifacts` |
+| Action           | Tool                                               |
+| ---------------- | -------------------------------------------------- |
+| Check run state  | `lexrunner.getStatus`                              |
+| Make decisions   | `lexrunner.submitDecision`                         |
+| View outputs     | `lexrunner.listArtifacts`                          |
 | Advance workflow | `lexrunner.submitDecision` with appropriate action |
 
 ---
@@ -35,6 +36,7 @@ All orchestration actions **MUST** flow through lexrunner tools:
 The following actions are **FORBIDDEN** during an active run:
 
 ### Direct Git Commands
+
 - ❌ `git merge` — Use `lexrunner.submitDecision` instead
 - ❌ `git push` — Merges should flow through run workflow
 - ❌ `git rebase` — May corrupt run state
@@ -42,16 +44,19 @@ The following actions are **FORBIDDEN** during an active run:
 - ❌ `git reset --hard` — Risk of data loss
 
 ### Direct GitHub CLI Commands
+
 - ❌ `gh pr merge` — Use `lexrunner.submitDecision`
 - ❌ `gh pr close` — Let run workflow manage PR lifecycle
 - ❌ `gh pr create` — Out of scope for current run
 
 ### CI Configuration
+
 - ❌ Modifying `.github/workflows/`
 - ❌ Modifying any CI/CD configuration files
 - ❌ Changing branch protection rules
 
 ### Policy Bypass
+
 - ❌ Skipping gates without explicit decision logging
 - ❌ Bypassing approval requirements
 - ❌ Ignoring failing checks without rationale
@@ -80,6 +85,7 @@ When you need to perform an orchestration action:
 4. Check response for updated state
 
 **Example:**
+
 ```
 // Check current state
 status = lexrunner.getStatus({ runId: "{runId}" })
@@ -103,17 +109,20 @@ result = lexrunner.submitDecision({
 The following operations are **ALLOWED** during an active run:
 
 ### Read Operations
+
 - ✅ `git status`, `git log`, `git diff`
 - ✅ `gh pr view`, `gh pr list`
 - ✅ Reading files and directories
 - ✅ Running tests and linters
 
 ### Local Changes
+
 - ✅ Editing source files
 - ✅ Running local builds
 - ✅ Creating local branches (not for merging)
 
 ### Tool Interactions
+
 - ✅ All `lexrunner.*` tools
 - ✅ Filesystem read/write within workspace
 - ✅ Code analysis tools
@@ -141,13 +150,13 @@ If you encounter a situation where:
 
 This template uses the following variables:
 
-| Variable | Description |
-|----------|-------------|
-| `{runId}` | Unique run identifier (ULID) |
-| `{mode}` | Active persona mode (e.g., "senior-dev") |
+| Variable      | Description                                         |
+| ------------- | --------------------------------------------------- |
+| `{runId}`     | Unique run identifier (ULID)                        |
+| `{mode}`      | Active persona mode (e.g., "senior-dev")            |
 | `{procedure}` | Procedure being executed (e.g., "merge-weave-main") |
-| `{repo}` | Repository identifier (owner/repo) |
-| `{state}` | Current run state (planning, executing, etc.) |
+| `{repo}`      | Repository identifier (owner/repo)                  |
+| `{state}`     | Current run state (planning, executing, etc.)       |
 
 ---
 

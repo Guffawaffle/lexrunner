@@ -5,6 +5,7 @@ Performance regression test suite for tracking critical operation performance ov
 ## Overview
 
 This benchmark suite measures performance of:
+
 - **Core Algorithms**: Topological sort, plan parsing, dependency resolution
 - **I/O Operations**: File operations, git operations
 - **End-to-End Workflows**: Plan generation, gate execution, merge weave
@@ -27,6 +28,7 @@ npm run benchmark:ci
 Baseline performance metrics are stored in `baselines/baseline.json`. These represent expected performance for the current version.
 
 To update baselines after performance improvements:
+
 ```bash
 npm run benchmark:baseline
 ```
@@ -34,6 +36,7 @@ npm run benchmark:baseline
 ## CI Integration
 
 The `benchmark:ci` script compares current performance against committed baselines:
+
 - ✅ **Pass**: Performance within 20% of baseline
 - ⚠️ **Warning**: Performance degraded 10-20%
 - ❌ **Fail**: Performance degraded >20%
@@ -41,6 +44,7 @@ The `benchmark:ci` script compares current performance against committed baselin
 ## Report Formats
 
 Benchmarks generate two report types:
+
 1. **JSON Report** (`benchmarks/results/latest.json`): Machine-readable metrics
 2. **Markdown Report** (`benchmarks/results/latest.md`): Human-readable summary
 
@@ -68,15 +72,15 @@ tests/benchmarks/
 ## Adding New Benchmarks
 
 ```typescript
-import { describe, bench } from 'vitest';
-import { myFunction } from '../../src/myModule';
+import { describe, bench } from "vitest";
+import { myFunction } from "../../src/myModule";
 
-describe('My Operation Performance', () => {
-  bench('operation with small input', () => {
+describe("My Operation Performance", () => {
+  bench("operation with small input", () => {
     myFunction(smallInput);
   });
-  
-  bench('operation with large input', () => {
+
+  bench("operation with large input", () => {
     myFunction(largeInput);
   });
 });
@@ -85,6 +89,7 @@ describe('My Operation Performance', () => {
 ## Performance Targets
 
 Current performance targets (baseline):
+
 - Topological sort (10 nodes): < 1ms
 - Topological sort (100 nodes): < 5ms
 - Topological sort (500 nodes): < 50ms

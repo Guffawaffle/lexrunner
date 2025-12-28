@@ -9,10 +9,7 @@ Add this to your MCP configuration file (e.g., `mcp.json` or Claude Desktop conf
   "mcpServers": {
     "lexrunner": {
       "command": "wsl",
-      "args": [
-        "--",
-        "/home/guff/lexrunner/lexrunner-launcher.sh"
-      ],
+      "args": ["--", "/home/guff/lexrunner/lexrunner-launcher.sh"],
       "env": {
         "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
         "LEX_PR_WORKSPACE": "/home/guff/lexrunner",
@@ -32,7 +29,7 @@ Add this to your MCP configuration file (e.g., `mcp.json` or Claude Desktop conf
 
 ## Production Installation (Optional)
 
-For alignment with other lex-* services, you can install to `/srv/lex-mcp`:
+For alignment with other lex-\* services, you can install to `/srv/lex-mcp`:
 
 ```bash
 # Create installation directory
@@ -55,6 +52,7 @@ cp -r node_modules/ /srv/lex-mcp/lexrunner/
 This MCP server configuration follows the same pattern as lex-brain and lex-map:
 
 ### lex-brain
+
 ```json
 "lexbrain": {
   "command": "wsl",
@@ -67,6 +65,7 @@ This MCP server configuration follows the same pattern as lex-brain and lex-map:
 ```
 
 ### lex-map
+
 ```json
 "lexmap": {
   "command": "wsl",
@@ -79,6 +78,7 @@ This MCP server configuration follows the same pattern as lex-brain and lex-map:
 ```
 
 ### lexrunner
+
 ```json
 "lexrunner": {
   "command": "wsl",
@@ -91,6 +91,7 @@ This MCP server configuration follows the same pattern as lex-brain and lex-map:
 ```
 
 All three services:
+
 1. Use a launcher shell script that sources nvm for Node.js availability
 2. Execute an `mcp-server.mjs` entry point
 3. Accept configuration via environment variables
@@ -114,6 +115,7 @@ bash /home/guff/lexrunner/lexrunner-launcher.sh
 ```
 
 The server should output:
+
 ```
 [lexrunner] Starting MCP server
 [lexrunner] Profile: /home/guff/lexrunner/.smartergpt

@@ -1,56 +1,56 @@
 {
-	"$schema": "../schemas/allowed-commands.schema.json",
-	"version": "1.0.0",
-	"mode": "strict",
-	"defaults": {
-		"npm": {
-			"commands": ["test", "run build", "run lint", "run typecheck", "ci"],
-			"allow_args": ["--", "--silent", "--json", "--coverage"],
-			"deny_args": ["--ignore-scripts"]
-		},
-		"git": {
-			"commands": ["status", "diff", "log", "show", "rev-parse"],
-			"allow_args": ["--short", "--oneline", "--stat", "--name-only"],
-			"deny_args": []
-		},
-		"node": {
-			"commands": ["-e", "--eval", "--check"],
-			"allow_args": [],
-			"deny_args": ["--experimental-*"]
-		},
-		"echo": {
-			"commands": [],
-			"allow_args": [],
-			"deny_args": []
-		},
-		"bash": {
-			"commands": ["-c"],
-			"allow_args": [],
-			"deny_args": []
-		}
-	},
-	"custom": {
-		"eslint": {
-			"binary": "node_modules/.bin/eslint",
-			"allow_args": ["--format json", "--fix", "--max-warnings 0"],
-			"deny_args": []
-		},
-		"vitest": {
-			"binary": "node_modules/.bin/vitest",
-			"allow_args": ["run", "--coverage", "--reporter json"],
-			"deny_args": []
-		},
-		"tsc": {
-			"binary": "node_modules/.bin/tsc",
-			"allow_args": ["--noEmit", "-p", "--project"],
-			"deny_args": []
-		}
-	},
-	"policy": {
-		"allow_shell_operators": false,
-		"allow_env_vars": ["NODE_ENV", "CI"],
-		"max_command_length": 500,
-		"hallucination_threshold": 3,
-		"dry_run_mode": false
-	}
+  "$schema": "../schemas/allowed-commands.schema.json",
+  "version": "1.0.0",
+  "mode": "strict",
+  "defaults": {
+    "npm": {
+      "commands": ["test", "run build", "run lint", "run typecheck", "ci"],
+      "allow_args": ["--", "--silent", "--json", "--coverage"],
+      "deny_args": ["--ignore-scripts"]
+    },
+    "git": {
+      "commands": ["status", "diff", "log", "show", "rev-parse"],
+      "allow_args": ["--short", "--oneline", "--stat", "--name-only"],
+      "deny_args": []
+    },
+    "node": {
+      "commands": ["-e", "--eval", "--check"],
+      "allow_args": [],
+      "deny_args": ["--experimental-*"]
+    },
+    "echo": {
+      "commands": [],
+      "allow_args": [],
+      "deny_args": []
+    },
+    "bash": {
+      "commands": ["-c"],
+      "allow_args": [],
+      "deny_args": []
+    }
+  },
+  "custom": {
+    "eslint": {
+      "binary": "node_modules/.bin/eslint",
+      "allow_args": ["--format json", "--fix", "--max-warnings 0"],
+      "deny_args": []
+    },
+    "vitest": {
+      "binary": "node_modules/.bin/vitest",
+      "allow_args": ["run", "--coverage", "--reporter json"],
+      "deny_args": []
+    },
+    "tsc": {
+      "binary": "node_modules/.bin/tsc",
+      "allow_args": ["--noEmit", "-p", "--project"],
+      "deny_args": []
+    }
+  },
+  "policy": {
+    "allow_shell_operators": false,
+    "allow_env_vars": ["NODE_ENV", "CI"],
+    "max_command_length": 500,
+    "hallucination_threshold": 3,
+    "dry_run_mode": false
+  }
 }

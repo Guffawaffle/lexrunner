@@ -2,4 +2,4 @@
  * Audit commands
  */
 
-export * from './verify.js';
+export * from "./verify.js";

@@ -30,12 +30,12 @@ const DEFAULT_BRANCH_NAME = "main";
  * @returns "off" or "live" based on LEX_GIT_MODE environment variable
  */
 export function getGitMode(): GitMode {
-	const mode = process.env.LEX_GIT_MODE?.toLowerCase();
-	if (mode === "live") {
-		return "live";
-	}
-	// Default to "off" for safety in CI/ephemeral environments
-	return "off";
+  const mode = process.env.LEX_GIT_MODE?.toLowerCase();
+  if (mode === "live") {
+    return "live";
+  }
+  // Default to "off" for safety in CI/ephemeral environments
+  return "off";
 }
 
 /**
@@ -44,7 +44,7 @@ export function getGitMode(): GitMode {
  * @returns true if LEX_GIT_MODE is "live", false otherwise
  */
 export function isGitEnabled(): boolean {
-	return getGitMode() === "live";
+  return getGitMode() === "live";
 }
 
 /**
@@ -53,7 +53,7 @@ export function isGitEnabled(): boolean {
  * @returns LEX_DEFAULT_BRANCH if set, otherwise "main"
  */
 export function getDefaultBranch(): string {
-	return process.env.LEX_DEFAULT_BRANCH || DEFAULT_BRANCH_NAME;
+  return process.env.LEX_DEFAULT_BRANCH || DEFAULT_BRANCH_NAME;
 }
 
 /**
@@ -62,5 +62,5 @@ export function getDefaultBranch(): string {
  * @returns LEX_DEFAULT_COMMIT if set, otherwise 40 zeros
  */
 export function getDefaultCommit(): string {
-	return process.env.LEX_DEFAULT_COMMIT || DEFAULT_COMMIT_SHA;
+  return process.env.LEX_DEFAULT_COMMIT || DEFAULT_COMMIT_SHA;
 }

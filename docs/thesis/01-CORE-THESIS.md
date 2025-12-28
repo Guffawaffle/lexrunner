@@ -18,15 +18,16 @@ We're playing a different game.
 
 When multiple agents (human or AI) work on a shared problem, they incur costs:
 
-| Cost Category | Description | Example |
-|---------------|-------------|---------|
-| **Onboarding** | Getting a new participant up to speed | "Let me explain the codebase structure..." |
-| **Re-synchronization** | Restoring context after interruption | "Where were we? Oh right, the auth refactor..." |
-| **Disambiguation** | Clarifying terms, expectations, intent | "When you say 'module' do you mean ESM or..." |
-| **Verification** | Confirming work meets expectations | "Did you run the tests? Which tests?" |
-| **Recovery** | Handling misunderstandings or errors | "That's not what I meant, let me rephrase..." |
+| Cost Category          | Description                            | Example                                         |
+| ---------------------- | -------------------------------------- | ----------------------------------------------- |
+| **Onboarding**         | Getting a new participant up to speed  | "Let me explain the codebase structure..."      |
+| **Re-synchronization** | Restoring context after interruption   | "Where were we? Oh right, the auth refactor..." |
+| **Disambiguation**     | Clarifying terms, expectations, intent | "When you say 'module' do you mean ESM or..."   |
+| **Verification**       | Confirming work meets expectations     | "Did you run the tests? Which tests?"           |
+| **Recovery**           | Handling misunderstandings or errors   | "That's not what I meant, let me rephrase..."   |
 
 In human teams, we reduce these costs through:
+
 - Shared vocabulary (domain language)
 - Written contracts (specs, ADRs)
 - Established norms (commit style, review process)
@@ -61,6 +62,7 @@ This works... until it doesn't.
 ### The Alternative
 
 What if we could:
+
 - Make any reasonably capable model productive in our environment
 - Reduce the cost of switching between models
 - Preserve context across sessions
@@ -78,6 +80,7 @@ The architecture is "portable" in several senses:
 ### Portable Across Models
 
 A well-governed agent session can be handed off between:
+
 - GPT-4 and Claude
 - Sonnet and Haiku
 - Today's model and next year's model
@@ -87,6 +90,7 @@ The governance, contracts, and receipts travel with the session.
 ### Portable Across Providers
 
 Nothing in the architecture is provider-specific:
+
 - No OpenAI-specific features
 - No Anthropic-specific memory
 - No vendor lock-in
@@ -94,6 +98,7 @@ Nothing in the architecture is provider-specific:
 ### Portable Across Sessions
 
 Context survives session boundaries:
+
 - Frames capture episodic memory
 - Receipts record what happened
 - Contracts define expectations
@@ -101,6 +106,7 @@ Context survives session boundaries:
 ### Portable Across Repositories
 
 The same primitives work in any codebase:
+
 - Rule files travel with the repo
 - Contracts are project-scoped
 - Memory is workspace-local
@@ -114,6 +120,7 @@ The Portable Cognitive Architecture consists of:
 ### 1. Governance Primitives
 
 Machine-readable expectations that define:
+
 - What the agent can do
 - What it cannot do
 - What it should do when uncertain
@@ -122,6 +129,7 @@ Machine-readable expectations that define:
 ### 2. Role Definitions
 
 Explicit scoping of agent capabilities:
+
 - Senior: Plan, design, decide
 - Mid: Implement, refactor
 - Junior: Instrument, verify, lint
@@ -129,6 +137,7 @@ Explicit scoping of agent capabilities:
 ### 3. Contracts
 
 Formal agreements between human and agent:
+
 - Scope boundaries
 - Acceptance criteria
 - Uncertainty protocols
@@ -137,6 +146,7 @@ Formal agreements between human and agent:
 ### 4. Receipts
 
 Structured records of:
+
 - Decisions made
 - Actions taken
 - Rationale provided
@@ -145,6 +155,7 @@ Structured records of:
 ### 5. Shared Language
 
 Consistent terminology that:
+
 - Reduces disambiguation cost
 - Survives model switches
 - Travels with the project
@@ -158,6 +169,7 @@ Consistent terminology that:
 > The "state" of an agent session is the shared language, expectations, governance primitives, and receipts — not latent vectors or hidden cache.
 
 When a model knows:
+
 - What terms mean in this context
 - What patterns are expected
 - What constraints are in place
@@ -168,14 +180,17 @@ When a model knows:
 ### The "Delta Reduction" Effect
 
 Consider two models with capability levels:
+
 - Model A: 85/100
 - Model B: 75/100
 
 Without governance:
+
 - Effective output A: 60/100 (capability × coordination efficiency)
 - Effective output B: 50/100
 
 With governance:
+
 - Effective output A: 80/100
 - Effective output B: 70/100
 
@@ -194,6 +209,7 @@ TurnCost = Latency + ContextReset + PromptRenegotiation + TokenBloat + Attention
 A high-token, low-turn workflow (agent does lots of work per interaction) beats a low-token, high-turn workflow (constant back-and-forth).
 
 Governance reduces Turn Cost by:
+
 - Reducing context reset (receipts)
 - Reducing prompt renegotiation (contracts)
 - Reducing disambiguation (shared language)
@@ -266,4 +282,4 @@ The Portable Cognitive Architecture is not about making AI smarter. It's about m
 
 ---
 
-*Next: [02-TURN-COST.md](./02-TURN-COST.md) — Formal definition of Turn and Turn Cost*
+_Next: [02-TURN-COST.md](./02-TURN-COST.md) — Formal definition of Turn and Turn Cost_

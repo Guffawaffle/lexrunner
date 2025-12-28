@@ -4,12 +4,12 @@
 
 // Dependency parsing (PR #110)
 export {
-        parsePRDescription,
-        validateDependencies,
-        isValidDependencyRef,
-        normalizeDependencyRef,
-        type ParsedDependency,
-        type ParserOptions
+  parsePRDescription,
+  validateDependencies,
+  isValidDependencyRef,
+  normalizeDependencyRef,
+  type ParsedDependency,
+  type ParserOptions,
 } from "./dependencyParser.js";
 
 // File analysis and intersection detection (PR #111)
@@ -18,11 +18,11 @@ export * from "./fileAnalysis.js";
 
 // Dependency scoring and weighting (Issue #196)
 export {
-	scoreDependencies,
-	mergeDuplicateScores,
-	sortScores,
-	type DependencyScore,
-	type ScoringOptions
+  scoreDependencies,
+  mergeDuplicateScores,
+  sortScores,
+  type DependencyScore,
+  type ScoringOptions,
 } from "./dependencyScoring.js";
 
 // Scope validation for agent edits
@@ -30,12 +30,12 @@ export * from "./scopeValidator.js";
 
 // Plan validation with cycle detection and diagnostics
 export {
-        validatePlan,
-        formatValidationResult,
-        type ValidationResult,
-        type ValidationError,
-        type ValidationWarning,
-        type ValidationDiagnostics,
-        type ValidationErrorType,
-        type ValidationWarningType
+  validatePlan,
+  formatValidationResult,
+  type ValidationResult,
+  type ValidationError,
+  type ValidationWarning,
+  type ValidationDiagnostics,
+  type ValidationErrorType,
+  type ValidationWarningType,
 } from "./validation.js";

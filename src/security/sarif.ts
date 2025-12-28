@@ -1,11 +1,11 @@
 /**
  * SARIF (Static Analysis Results Interchange Format) Parser
- * 
+ *
  * Parses SARIF 2.1.0 format for vulnerability scanning results
  * https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
  */
 
-import { Severity, SecurityScanResult, Vulnerability } from './scanning.js';
+import { Severity, SecurityScanResult, Vulnerability } from "./scanning.js";
 import { securitySarifParseError } from "../errors/index.js";
 import { AXErrorException } from "@smartergpt/lex/errors";
 
@@ -13,166 +13,167 @@ import { AXErrorException } from "@smartergpt/lex/errors";
  * SARIF severity level mapping
  */
 export enum SarifLevel {
-	ERROR = 'error',
-	WARNING = 'warning',
-	NOTE = 'note',
-	NONE = 'none',
+  ERROR = "error",
+  WARNING = "warning",
+  NOTE = "note",
+  NONE = "none",
 }
 
 /**
  * SARIF result object (simplified)
  */
 interface SarifResult {
-	level?: string;
-	message?: {
-		text?: string;
-	};
-	ruleId?: string;
-	locations?: Array<{
-		physicalLocation?: {
-			artifactLocation?: {
-				uri?: string;
-			};
-		};
-	}>;
-	properties?: {
-		'security-severity'?: string;
-		package?: string;
-		version?: string;
-		cve?: string;
-		cvss?: number;
-	};
+  level?: string;
+  message?: {
+    text?: string;
+  };
+  ruleId?: string;
+  locations?: Array<{
+    physicalLocation?: {
+      artifactLocation?: {
+        uri?: string;
+      };
+    };
+  }>;
+  properties?: {
+    "security-severity"?: string;
+    package?: string;
+    version?: string;
+    cve?: string;
+    cvss?: number;
+  };
 }
 
 /**
  * SARIF run object (simplified)
  */
 interface SarifRun {
-	tool?: {
-		driver?: {
-			name?: string;
-		};
-	};
-	results?: SarifResult[];
+  tool?: {
+    driver?: {
+      name?: string;
+    };
+  };
+  results?: SarifResult[];
 }
 
 /**
  * SARIF document structure (simplified)
  */
 interface SarifDocument {
-	version?: string;
-	runs?: SarifRun[];
+  version?: string;
+  runs?: SarifRun[];
 }
 
 /**
  * Map SARIF level to our Severity enum
  */
 function mapSarifLevel(level?: string, securitySeverity?: string): Severity {
-	// First check security-severity property if available
-	if (securitySeverity) {
-		const normalized = securitySeverity.toLowerCase();
-		if (normalized === 'critical') return Severity.CRITICAL;
-		if (normalized === 'high') return Severity.HIGH;
-		if (normalized === 'medium' || normalized === 'moderate') return Severity.MEDIUM;
-		if (normalized === 'low') return Severity.LOW;
-	}
+  // First check security-severity property if available
+  if (securitySeverity) {
+    const normalized = securitySeverity.toLowerCase();
+    if (normalized === "critical") return Severity.CRITICAL;
+    if (normalized === "high") return Severity.HIGH;
+    if (normalized === "medium" || normalized === "moderate") return Severity.MEDIUM;
+    if (normalized === "low") return Severity.LOW;
+  }
 
-	// Fall back to SARIF level
-	const normalized = (level || 'note').toLowerCase();
-	if (normalized === 'error') return Severity.HIGH;
-	if (normalized === 'warning') return Severity.MEDIUM;
-	if (normalized === 'note') return Severity.LOW;
-	return Severity.INFO;
+  // Fall back to SARIF level
+  const normalized = (level || "note").toLowerCase();
+  if (normalized === "error") return Severity.HIGH;
+  if (normalized === "warning") return Severity.MEDIUM;
+  if (normalized === "note") return Severity.LOW;
+  return Severity.INFO;
 }
 
 /**
  * Parse SARIF document and extract vulnerabilities
  */
 export function parseSarif(sarifContent: string): SecurityScanResult {
-	let sarif: SarifDocument;
-	
-	try {
-		sarif = JSON.parse(sarifContent);
-	} catch (error) {
-		const axError = securitySarifParseError(
-			`Invalid SARIF JSON: ${error instanceof Error ? error.message : String(error)}`,
-			{ parseError: error instanceof Error ? error.message : String(error) }
-		);
-		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
-	}
+  let sarif: SarifDocument;
 
-	if (!sarif.runs || sarif.runs.length === 0) {
-		return createEmptyResult('sarif');
-	}
+  try {
+    sarif = JSON.parse(sarifContent);
+  } catch (error) {
+    const axError = securitySarifParseError(
+      `Invalid SARIF JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { parseError: error instanceof Error ? error.message : String(error) }
+    );
+    throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
+  }
 
-	const vulnerabilities: Vulnerability[] = [];
-	const run = sarif.runs[0];
-	const scannerName = run.tool?.driver?.name || 'sarif';
-	
-	if (!run.results || run.results.length === 0) {
-		return createEmptyResult(scannerName);
-	}
+  if (!sarif.runs || sarif.runs.length === 0) {
+    return createEmptyResult("sarif");
+  }
 
-	// Process results - sort by rule ID for deterministic ordering
-	const sortedResults = [...run.results].sort((a, b) => {
-		const aId = a.ruleId || '';
-		const bId = b.ruleId || '';
-		return aId.localeCompare(bId);
-	});
+  const vulnerabilities: Vulnerability[] = [];
+  const run = sarif.runs[0];
+  const scannerName = run.tool?.driver?.name || "sarif";
 
-	for (const result of sortedResults) {
-		const securitySeverity = result.properties?.['security-severity'];
-		const severity = mapSarifLevel(result.level, securitySeverity);
-		
-		// Extract package info from properties or location
-		const packageName = result.properties?.package || 
-			result.locations?.[0]?.physicalLocation?.artifactLocation?.uri || 
-			'unknown';
-		
-		vulnerabilities.push({
-			id: result.ruleId || 'SARIF-UNKNOWN',
-			package: packageName,
-			version: result.properties?.version || 'unknown',
-			severity,
-			title: result.message?.text || 'Security finding',
-			description: result.message?.text || '',
-			cve: result.properties?.cve,
-			cvssScore: result.properties?.cvss,
-		});
-	}
+  if (!run.results || run.results.length === 0) {
+    return createEmptyResult(scannerName);
+  }
 
-	// Count by severity
-	const criticalCount = vulnerabilities.filter(v => v.severity === Severity.CRITICAL).length;
-	const highCount = vulnerabilities.filter(v => v.severity === Severity.HIGH).length;
-	const mediumCount = vulnerabilities.filter(v => v.severity === Severity.MEDIUM).length;
-	const lowCount = vulnerabilities.filter(v => v.severity === Severity.LOW).length;
+  // Process results - sort by rule ID for deterministic ordering
+  const sortedResults = [...run.results].sort((a, b) => {
+    const aId = a.ruleId || "";
+    const bId = b.ruleId || "";
+    return aId.localeCompare(bId);
+  });
 
-	return {
-		timestamp: new Date(),
-		scanner: scannerName,
-		totalVulnerabilities: vulnerabilities.length,
-		vulnerabilities,
-		criticalCount,
-		highCount,
-		mediumCount,
-		lowCount,
-		passed: criticalCount === 0 && highCount === 0,
-	};
+  for (const result of sortedResults) {
+    const securitySeverity = result.properties?.["security-severity"];
+    const severity = mapSarifLevel(result.level, securitySeverity);
+
+    // Extract package info from properties or location
+    const packageName =
+      result.properties?.package ||
+      result.locations?.[0]?.physicalLocation?.artifactLocation?.uri ||
+      "unknown";
+
+    vulnerabilities.push({
+      id: result.ruleId || "SARIF-UNKNOWN",
+      package: packageName,
+      version: result.properties?.version || "unknown",
+      severity,
+      title: result.message?.text || "Security finding",
+      description: result.message?.text || "",
+      cve: result.properties?.cve,
+      cvssScore: result.properties?.cvss,
+    });
+  }
+
+  // Count by severity
+  const criticalCount = vulnerabilities.filter((v) => v.severity === Severity.CRITICAL).length;
+  const highCount = vulnerabilities.filter((v) => v.severity === Severity.HIGH).length;
+  const mediumCount = vulnerabilities.filter((v) => v.severity === Severity.MEDIUM).length;
+  const lowCount = vulnerabilities.filter((v) => v.severity === Severity.LOW).length;
+
+  return {
+    timestamp: new Date(),
+    scanner: scannerName,
+    totalVulnerabilities: vulnerabilities.length,
+    vulnerabilities,
+    criticalCount,
+    highCount,
+    mediumCount,
+    lowCount,
+    passed: criticalCount === 0 && highCount === 0,
+  };
 }
 
 /**
  * Create empty scan result
  */
 function createEmptyResult(scanner: string): SecurityScanResult {
-	return {
-		timestamp: new Date(),
-		scanner,
-		totalVulnerabilities: 0,
-		vulnerabilities: [],
-		criticalCount: 0,
-		highCount: 0,
-		mediumCount: 0,
-		lowCount: 0,
-		passed: true,
-	};
+  return {
+    timestamp: new Date(),
+    scanner,
+    totalVulnerabilities: 0,
+    vulnerabilities: [],
+    criticalCount: 0,
+    highCount: 0,
+    mediumCount: 0,
+    lowCount: 0,
+    passed: true,
+  };
 }

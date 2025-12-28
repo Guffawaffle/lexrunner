@@ -3,12 +3,12 @@
  * Measures performance of dependency parsing and conflict detection
  */
 
-import { describe, bench } from 'vitest';
-import { parsePRDescription } from '../../../src/planner/dependencyParser.js';
+import { describe, bench } from "vitest";
+import { parsePRDescription } from "../../../src/planner/dependencyParser.js";
 
-describe('Dependency Resolution Performance', () => {
+describe("Dependency Resolution Performance", () => {
   // Simple dependencies
-  describe('Simple dependencies', () => {
+  describe("Simple dependencies", () => {
     const simplePRBody = `
 ## Description
 This PR implements a new feature.
@@ -22,15 +22,15 @@ This PR implements a new feature.
 All tests pass.
 `;
 
-    bench('parse simple dependencies', () => {
-      parsePRDescription(simplePRBody, 'Guffawaffle/LexRunner#200', {
-        repository: 'Guffawaffle/LexRunner'
+    bench("parse simple dependencies", () => {
+      parsePRDescription(simplePRBody, "Guffawaffle/LexRunner#200", {
+        repository: "Guffawaffle/LexRunner",
       });
     });
   });
 
   // Complex dependencies with metadata
-  describe('Complex dependencies', () => {
+  describe("Complex dependencies", () => {
     const complexPRBody = `
 ## Description
 Large feature with multiple dependencies.
@@ -53,20 +53,21 @@ Priority: high
 Labels: feature, breaking-change
 `;
 
-    bench('parse complex dependencies with metadata', () => {
-      parsePRDescription(complexPRBody, 'Guffawaffle/LexRunner#200', {
-        repository: 'Guffawaffle/LexRunner'
+    bench("parse complex dependencies with metadata", () => {
+      parsePRDescription(complexPRBody, "Guffawaffle/LexRunner#200", {
+        repository: "Guffawaffle/LexRunner",
       });
     });
   });
 
   // Many dependencies
-  describe('Many dependencies', () => {
+  describe("Many dependencies", () => {
     // Generate PR with 20 dependencies
-    const deps = Array.from({ length: 20 }, (_, i) => 
-      `- Depends on Guffawaffle/LexRunner#${100 + i}`
-    ).join('\n');
-    
+    const deps = Array.from(
+      { length: 20 },
+      (_, i) => `- Depends on Guffawaffle/LexRunner#${100 + i}`
+    ).join("\n");
+
     const manyDepsPRBody = `
 ## Description
 Integration PR with many dependencies.
@@ -78,15 +79,15 @@ ${deps}
 Integration tests pass.
 `;
 
-    bench('parse 20 dependencies', () => {
-      parsePRDescription(manyDepsPRBody, 'Guffawaffle/LexRunner#300', {
-        repository: 'Guffawaffle/LexRunner'
+    bench("parse 20 dependencies", () => {
+      parsePRDescription(manyDepsPRBody, "Guffawaffle/LexRunner#300", {
+        repository: "Guffawaffle/LexRunner",
       });
     });
   });
 
   // Cross-repository dependencies
-  describe('Cross-repository dependencies', () => {
+  describe("Cross-repository dependencies", () => {
     const crossRepoPRBody = `
 ## Dependencies
 - Depends on Guffawaffle/LexRunner#100
@@ -95,15 +96,15 @@ Integration tests pass.
 - Depends on Guffawaffle/LexRunner#101
 `;
 
-    bench('parse cross-repo dependencies', () => {
-      parsePRDescription(crossRepoPRBody, 'Guffawaffle/LexRunner#200', {
-        repository: 'Guffawaffle/LexRunner'
+    bench("parse cross-repo dependencies", () => {
+      parsePRDescription(crossRepoPRBody, "Guffawaffle/LexRunner#200", {
+        repository: "Guffawaffle/LexRunner",
       });
     });
   });
 
   // Mixed formats
-  describe('Mixed dependency formats', () => {
+  describe("Mixed dependency formats", () => {
     const mixedFormatBody = `
 ## Dependencies
 - Depends on #100 (relative)
@@ -118,9 +119,9 @@ Skip: e2e, perf
 Required: lint, test
 `;
 
-    bench('parse mixed dependency formats', () => {
-      parsePRDescription(mixedFormatBody, 'Guffawaffle/LexRunner#200', {
-        repository: 'Guffawaffle/LexRunner'
+    bench("parse mixed dependency formats", () => {
+      parsePRDescription(mixedFormatBody, "Guffawaffle/LexRunner#200", {
+        repository: "Guffawaffle/LexRunner",
       });
     });
   });

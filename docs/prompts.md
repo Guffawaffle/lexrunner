@@ -2,13 +2,15 @@
 
 Complete guide to prompts directory resolution, precedence rules, and token expansion in lexrunner.
 
-> **📖 See Also**: 
+> **📖 See Also**:
+>
 > - [Profile Resolution](./profile-resolution.md) - Profile directory resolution
 > - [Configuration Management](./config.md) - Configuration layering
 
 ## Overview
 
 The lexrunner supports flexible prompt loading with a precedence chain that allows:
+
 - Cross-repository prompt sharing (e.g., using Lex prompts from LexRunner)
 - Local prompt customization without modifying tracked files
 - Tracked canonical prompts in the repository
@@ -53,12 +55,14 @@ PromptsResolverError: Prompts directory not found. Expected one of:
 LexRunner now integrates with the `@smartergpt/lex` npm package to provide canonical prompt templates as a fallback. This ensures that projects always have access to standard prompts even without local configuration.
 
 **How it works:**
+
 - If no local prompts are configured, LexRunner attempts to load from `@smartergpt/lex/prompts/` first
 - If that doesn't exist, it falls back to `@smartergpt/lex/canon/prompts/`
 - Package prompts are automatically available when `@smartergpt/lex` is installed as a dependency
 - Local prompts always take precedence over package prompts
 
 **Benefits:**
+
 - **Zero configuration:** New projects get prompts automatically
 - **Canonical defaults:** Shared prompt templates across the ecosystem
 - **Easy updates:** Update prompts by upgrading the Lex package
@@ -66,13 +70,13 @@ LexRunner now integrates with the `@smartergpt/lex` npm package to provide canon
 
 **Package vs. Local Prompts:**
 
-| Aspect | Package Prompts | Local Prompts |
-|--------|----------------|---------------|
-| **Location** | `node_modules/@smartergpt/lex/canon/prompts/` | `.smartergpt/prompts/` |
-| **Updates** | Via `npm update @smartergpt/lex` | Manual edit |
-| **Customization** | Not recommended (overwritten on update) | Fully customizable |
-| **Precedence** | Lowest (levels 4-5 fallback) | Higher (levels 2-3) |
-| **Version Control** | Not tracked (in node_modules) | Tracked in repo |
+| Aspect              | Package Prompts                               | Local Prompts          |
+| ------------------- | --------------------------------------------- | ---------------------- |
+| **Location**        | `node_modules/@smartergpt/lex/canon/prompts/` | `.smartergpt/prompts/` |
+| **Updates**         | Via `npm update @smartergpt/lex`              | Manual edit            |
+| **Customization**   | Not recommended (overwritten on update)       | Fully customizable     |
+| **Precedence**      | Lowest (levels 4-5 fallback)                  | Higher (levels 2-3)    |
+| **Version Control** | Not tracked (in node_modules)                 | Tracked in repo        |
 
 **Example: Using package prompts**
 
@@ -102,6 +106,7 @@ lex-pr plan --from-github
 ```
 
 **When to use:**
+
 - Sharing prompts across multiple repositories
 - Testing prompt changes before committing
 - CI/CD environments with pre-configured prompt locations
@@ -116,6 +121,7 @@ ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ```
 
 **When to use:**
+
 - Development environments with side-by-side repositories
 - Automatic tracking of prompt updates from source repository
 - No need to set environment variables
@@ -130,6 +136,7 @@ cp -r ../lex/.smartergpt/prompts .smartergpt.local/
 ```
 
 **When to use:**
+
 - Customizing prompts while keeping original as base
 - Offline development
 - Snapshot of specific prompt versions
@@ -140,14 +147,14 @@ Prompts support dynamic token expansion for context-aware content.
 
 ### Supported Tokens
 
-| Token | Description | Example Output |
-|-------|-------------|----------------|
-| `{{today}}` | Current date (YYYY-MM-DD) | `2025-11-13` |
-| `{{now}}` | ISO timestamp without colons | `2025-11-13T07-24-17-072` |
-| `{{repo_root}}` | Git repository root path | `/path/to/repo` |
-| `{{workspace_root}}` | Workspace root path | `/path/to/workspace` |
-| `{{branch}}` | Current git branch | `main` |
-| `{{commit}}` | Current commit SHA | `a1b2c3d4...` |
+| Token                | Description                  | Example Output            |
+| -------------------- | ---------------------------- | ------------------------- |
+| `{{today}}`          | Current date (YYYY-MM-DD)    | `2025-11-13`              |
+| `{{now}}`            | ISO timestamp without colons | `2025-11-13T07-24-17-072` |
+| `{{repo_root}}`      | Git repository root path     | `/path/to/repo`           |
+| `{{workspace_root}}` | Workspace root path          | `/path/to/workspace`      |
+| `{{branch}}`         | Current git branch           | `main`                    |
+| `{{commit}}`         | Current commit SHA           | `a1b2c3d4...`             |
 
 ### Token Expansion Examples
 
@@ -161,10 +168,12 @@ Branch: {{branch}}
 Commit: {{commit}}
 
 ## Changes Since Last Review
+
 ...
 ```
 
 **Expanded output:**
+
 ```markdown
 # Project Status Report
 
@@ -173,6 +182,7 @@ Branch: feature/add-prompts
 Commit: cc2ff2c8a1b2c3d4e5f6...
 
 ## Changes Since Last Review
+
 ...
 ```
 
@@ -189,6 +199,7 @@ Please review changes in the following files:
 ```
 
 **Expanded output:**
+
 ```markdown
 # Code Review Prompt
 
@@ -211,6 +222,7 @@ Save as: analysis-{{now}}.md
 ```
 
 **Expanded output:**
+
 ```markdown
 # Analysis Report
 
@@ -239,12 +251,12 @@ Your actual prompt content here...
 
 ### Metadata Fields
 
-| Field | Description | Required |
-|-------|-------------|----------|
-| `name` | Prompt identifier | No (defaults to filename) |
-| `version` | Prompt version | No |
-| `schemaVersion` | Schema version for compatibility | No |
-| `description` | Human-readable description | No |
+| Field           | Description                      | Required                  |
+| --------------- | -------------------------------- | ------------------------- |
+| `name`          | Prompt identifier                | No (defaults to filename) |
+| `version`       | Prompt version                   | No                        |
+| `schemaVersion` | Schema version for compatibility | No                        |
+| `description`   | Human-readable description       | No                        |
 
 ## API Usage
 
@@ -256,9 +268,9 @@ import { loadPrompt } from "./config/promptsResolver.js";
 // Load prompt from resolved directory
 const prompt = loadPrompt("create-project");
 
-console.log(prompt.content);   // Expanded prompt content
-console.log(prompt.metadata);  // { name: "create-project", ... }
-console.log(prompt.path);      // Absolute path to prompt file
+console.log(prompt.content); // Expanded prompt content
+console.log(prompt.metadata); // { name: "create-project", ... }
+console.log(prompt.path); // Absolute path to prompt file
 ```
 
 ### Resolving Prompts Directory
@@ -268,7 +280,7 @@ import { resolvePromptsDir } from "./config/promptsResolver.js";
 
 const resolved = resolvePromptsDir();
 
-console.log(resolved.path);   // Absolute path to prompts directory
+console.log(resolved.path); // Absolute path to prompts directory
 console.log(resolved.source); // "LEX_PROMPTS_DIR" | ".smartergpt.local/prompts" | ".smartergpt/prompts"
 ```
 
@@ -354,12 +366,14 @@ console.log(prompt.content); // Verify tokens are expanded correctly
 ### Prompt Not Found
 
 **Error:**
+
 ```
 PromptsResolverError: Prompt not found: my-prompt in /path/to/.smartergpt/prompts
 Source: .smartergpt/prompts
 ```
 
 **Solutions:**
+
 1. Check that the prompt file exists: `.smartergpt/prompts/my-prompt.md`
 2. Verify you're loading the correct prompt name (without `.md` extension)
 3. Check precedence - prompt might be in different directory
@@ -367,11 +381,13 @@ Source: .smartergpt/prompts
 ### LEX_PROMPTS_DIR Not Found
 
 **Error:**
+
 ```
 PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 ```
 
 **Solutions:**
+
 1. Verify the path in `LEX_PROMPTS_DIR` exists
 2. Check that the path points to a directory (not a file)
 3. Ensure you have read permissions on the directory
@@ -381,6 +397,7 @@ PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 **Issue:** Tokens like `{{today}}` appear literally in output
 
 **Solutions:**
+
 1. Verify you're using `loadPrompt()` which automatically expands tokens
 2. Check token syntax - must be exactly `{{token}}` (no spaces)
 3. Ensure token name is supported (see Supported Tokens table)
@@ -390,6 +407,7 @@ PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 **Issue:** `{{branch}}` and `{{commit}}` are empty
 
 **Solutions:**
+
 1. Verify you're in a git repository
 2. Check that git is installed and in PATH
 3. Ensure current directory is within the repository
@@ -404,5 +422,6 @@ PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 ## Examples
 
 See example prompts in:
+
 - `.smartergpt/prompts/` - Canonical example prompts
 - `docs/sample-prompts/` - Documentation examples

@@ -7,49 +7,45 @@
  */
 
 // Schema and types
-export {
-	parseFanoutTemplates,
-	safeParseFanoutTemplates,
-	validateTemplateIds,
-} from "./schema.js";
+export { parseFanoutTemplates, safeParseFanoutTemplates, validateTemplateIds } from "./schema.js";
 export type {
-	FanoutTemplate,
-	FanoutTemplates,
-	GeneratedIssue,
-	IssueTemplate,
-	PatternTrigger,
-	TriggerConfig,
-	TriggerMatch,
+  FanoutTemplate,
+  FanoutTemplates,
+  GeneratedIssue,
+  IssueTemplate,
+  PatternTrigger,
+  TriggerConfig,
+  TriggerMatch,
 } from "./schema.js";
 
 // Loader
 export {
-	DEFAULT_FANOUT_TEMPLATES_FILENAME,
-	DEFAULT_FANOUT_TEMPLATES_PATHS,
-	discoverFanoutTemplates,
-	FanoutTemplatesLoadError,
-	loadFanoutTemplates,
-	loadFanoutTemplatesOrNull,
-	validateFanoutTemplatesContent,
+  DEFAULT_FANOUT_TEMPLATES_FILENAME,
+  DEFAULT_FANOUT_TEMPLATES_PATHS,
+  discoverFanoutTemplates,
+  FanoutTemplatesLoadError,
+  loadFanoutTemplates,
+  loadFanoutTemplatesOrNull,
+  validateFanoutTemplatesContent,
 } from "./loader.js";
 
 // Matcher
 export {
-	deduplicateMatches,
-	matchesFilePatterns,
-	matchTemplateAgainstFile,
-	matchTemplatesAgainstDiff,
-	parseDiffLines,
+  deduplicateMatches,
+  matchesFilePatterns,
+  matchTemplateAgainstFile,
+  matchTemplatesAgainstDiff,
+  parseDiffLines,
 } from "./matcher.js";
 export type { PRDiffFile } from "./matcher.js";
 
 // Generator
 export {
-	buildSubstitutionContext,
-	formatIssuePreview,
-	formatIssuesPreview,
-	generateIssue,
-	generateIssues,
-	substituteTemplate,
+  buildSubstitutionContext,
+  formatIssuePreview,
+  formatIssuesPreview,
+  generateIssue,
+  generateIssues,
+  substituteTemplate,
 } from "./generator.js";
 export type { SubstitutionContext } from "./generator.js";

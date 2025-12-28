@@ -5,6 +5,7 @@ Complete guide for sharing prompts across multiple repositories with lexrunner.
 ## Overview
 
 The prompts precedence system allows you to share prompts across repositories, enabling:
+
 - Consistent prompts across related projects
 - Centralized prompt management
 - Easy prompt testing and iteration
@@ -25,6 +26,7 @@ Prompts are resolved in this order (highest to lowest priority):
 **Use when:** CI/CD environments, explicit testing, temporary overrides
 
 **Setup:**
+
 ```bash
 # Point to another repository's prompts
 export LEX_PROMPTS_DIR=/path/to/lex/.smartergpt/prompts
@@ -35,16 +37,19 @@ lex-pr autopilot plan.json --level 1
 ```
 
 **Pros:**
+
 - ✅ Explicit and clear
 - ✅ Easy to switch between prompt sources
 - ✅ Works in CI/CD
 - ✅ No file system modifications
 
 **Cons:**
+
 - ❌ Must set environment variable each session
 - ❌ Easy to forget to set
 
 **Example: CI/CD Workflow**
+
 ```yaml
 # .github/workflows/merge-weave.yml
 name: Merge Weave
@@ -81,6 +86,7 @@ jobs:
 **Use when:** Development environments, automatic tracking of source updates
 
 **Setup:**
+
 ```bash
 # From LexRunner repository root
 cd .smartergpt.local
@@ -99,6 +105,7 @@ lex-pr plan --from-github
 ```
 
 **Directory structure:**
+
 ```
 projects/
 ├── lex/
@@ -112,17 +119,20 @@ projects/
 ```
 
 **Pros:**
+
 - ✅ Automatic tracking of prompt updates
 - ✅ No manual sync needed
 - ✅ One-time setup
 - ✅ Clear source of truth
 
 **Cons:**
+
 - ❌ Requires file system symlink support
 - ❌ May not work on Windows without Developer Mode
 - ❌ Can be confusing if source repo moves
 
 **Windows Setup:**
+
 ```powershell
 # Requires Administrator privileges or Developer Mode
 # Settings > Update & Security > For Developers > Developer Mode
@@ -139,6 +149,7 @@ Get-Item prompts | Select-Object Target
 **Use when:** Customizing prompts, offline development, snapshot of specific versions
 
 **Setup:**
+
 ```bash
 # From LexRunner repository root
 mkdir -p .smartergpt.local
@@ -155,17 +166,20 @@ lex-pr plan --from-github
 ```
 
 **Pros:**
+
 - ✅ Full control over prompts
 - ✅ Can customize without affecting source
 - ✅ Works offline
 - ✅ No symlink issues on Windows
 
 **Cons:**
+
 - ❌ Manual sync needed for updates
 - ❌ Can diverge from source
 - ❌ Higher maintenance burden
 
 **Update workflow:**
+
 ```bash
 # Pull latest prompts from source
 cp -r ../lex/.smartergpt/prompts .smartergpt.local/prompts.new
@@ -187,6 +201,7 @@ mv .smartergpt.local/prompts.new .smartergpt.local/prompts
 **Recommended Method:** Symlink (development) or Environment Variable (CI/CD)
 
 **Setup:**
+
 ```bash
 # Development (symlink)
 cd lexrunner/.smartergpt.local
@@ -197,6 +212,7 @@ export LEX_PROMPTS_DIR=/srv/lex/.smartergpt/prompts
 ```
 
 **Validation:**
+
 ```bash
 # Verify prompts source
 lex-pr doctor | grep prompts
@@ -210,6 +226,7 @@ lex-pr doctor | grep prompts
 **Recommended Method:** Environment Variable
 
 **Setup:**
+
 ```bash
 # Create test prompts directory
 mkdir -p /tmp/test-prompts
@@ -241,6 +258,7 @@ git commit -m "Update create-project prompt"
 **Recommended Method:** Copy + Edit
 
 **Setup:**
+
 ```bash
 # Copy base prompts
 cp -r ../lex/.smartergpt/prompts .smartergpt.local/
@@ -260,6 +278,7 @@ lex-pr plan --from-github
 ```
 
 **Tracking Updates:**
+
 ```bash
 # Periodically sync non-customized prompts
 for file in ../lex/.smartergpt/prompts/*.md; do
@@ -277,6 +296,7 @@ done
 **Recommended Method:** Environment Variable + Shared Location
 
 **Setup:**
+
 ```bash
 # Create shared prompts repo
 git clone https://github.com/org/shared-prompts.git /opt/shared-prompts
@@ -291,6 +311,7 @@ cd repo-b && lex-pr plan --from-github
 ```
 
 **CI/CD:**
+
 ```yaml
 # Shared workflow config
 env:
@@ -310,18 +331,19 @@ Prompts support dynamic token expansion regardless of source:
 
 ### Available Tokens
 
-| Token | Description | Example |
-|-------|-------------|---------|
-| `{{today}}` | Current date (YYYY-MM-DD) | `2025-11-13` |
-| `{{now}}` | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
-| `{{repo_root}}` | Git repository root path | `/path/to/repo` |
-| `{{workspace_root}}` | Workspace root path | `/path/to/workspace` |
-| `{{branch}}` | Current git branch | `main` |
-| `{{commit}}` | Current commit SHA | `a1b2c3d4...` |
+| Token                | Description                  | Example                   |
+| -------------------- | ---------------------------- | ------------------------- |
+| `{{today}}`          | Current date (YYYY-MM-DD)    | `2025-11-13`              |
+| `{{now}}`            | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
+| `{{repo_root}}`      | Git repository root path     | `/path/to/repo`           |
+| `{{workspace_root}}` | Workspace root path          | `/path/to/workspace`      |
+| `{{branch}}`         | Current git branch           | `main`                    |
+| `{{commit}}`         | Current commit SHA           | `a1b2c3d4...`             |
 
 ### Example: Date-Stamped Prompt
 
 `prompts/weekly-report.md`:
+
 ```markdown
 ---
 name: weekly-report
@@ -335,10 +357,12 @@ version: 1.0.0
 **Commit:** {{commit}}
 
 ## Summary
+
 ...
 ```
 
 **Expanded Output:**
+
 ```markdown
 # Weekly Report - 2025-11-13
 
@@ -347,6 +371,7 @@ version: 1.0.0
 **Commit:** cc2ff2c8a1b2c3d4e5f6...
 
 ## Summary
+
 ...
 ```
 
@@ -402,7 +427,7 @@ const resolved = resolvePromptsDir();
 console.log("Resolution result:", {
   path: resolved.path,
   source: resolved.source,
-  exists: fs.existsSync(resolved.path)
+  exists: fs.existsSync(resolved.path),
 });
 ```
 
@@ -412,21 +437,25 @@ console.log("Resolution result:", {
 
 Add a comment to README or docs:
 
-```markdown
+````markdown
 ## Prompts
 
 This project uses prompts from [Lex](https://github.com/Guffawaffle/lex).
 
 **Setup:**
+
 ```bash
 export LEX_PROMPTS_DIR=../lex/.smartergpt/prompts
 ```
+````
 
 Or symlink:
+
 ```bash
 ln -s ../lex/.smartergpt/prompts .smartergpt.local/prompts
 ```
-```
+
+````
 
 ### 2. Version Your Prompts
 
@@ -445,7 +474,7 @@ changelog:
 
 # Create Project Prompt
 ...
-```
+````
 
 ### 3. Test Prompts in Isolation
 
@@ -490,11 +519,13 @@ ln -s ../lex/.smartergpt/prompts .smartergpt.local/prompts
 ### Problem: "LEX_PROMPTS_DIR not found"
 
 **Error:**
+
 ```
 PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 ```
 
 **Solutions:**
+
 1. Verify path exists: `ls -la $LEX_PROMPTS_DIR`
 2. Use absolute path: `export LEX_PROMPTS_DIR=/absolute/path/to/prompts`
 3. Check permissions: `test -r $LEX_PROMPTS_DIR && echo "readable"`
@@ -502,11 +533,13 @@ PromptsResolverError: LEX_PROMPTS_DIR not found: /invalid/path
 ### Problem: Symlink broken on Windows
 
 **Error:**
+
 ```
 Error: ENOENT: no such file or directory
 ```
 
 **Solutions:**
+
 1. Enable Developer Mode (Windows 10+)
 2. Use environment variable instead:
    ```powershell
@@ -524,6 +557,7 @@ Error: ENOENT: no such file or directory
 **Solutions:**
 
 **For Symlink:**
+
 ```bash
 # Verify symlink is correct
 ls -la .smartergpt.local/prompts
@@ -534,6 +568,7 @@ ls ../lex/.smartergpt/prompts/
 ```
 
 **For Environment Variable:**
+
 ```bash
 # Verify variable is set
 echo $LEX_PROMPTS_DIR
@@ -543,6 +578,7 @@ ls $LEX_PROMPTS_DIR
 ```
 
 **For Copy:**
+
 ```bash
 # Re-copy to get updates
 cp -r ../lex/.smartergpt/prompts .smartergpt.local/
@@ -553,6 +589,7 @@ cp -r ../lex/.smartergpt/prompts .smartergpt.local/
 **Symptom:** `{{today}}` appears literally in output
 
 **Solutions:**
+
 1. Verify you're using `loadPrompt()` API (auto-expands tokens)
 2. Check token syntax: must be `{{token}}` (no spaces)
 3. Ensure token is supported (see [Token Expansion](#token-expansion))

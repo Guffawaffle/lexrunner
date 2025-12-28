@@ -42,19 +42,19 @@ If you progressively de-hostilize the environment, models can behave like reliab
 
 ## Document Index
 
-| Document | Purpose |
-|----------|---------|
-| [00-EVOLUTION-NOTES.md](./00-EVOLUTION-NOTES.md) | **Start here** — Crystallized synthesis and core commitments |
-| [01-CORE-THESIS.md](./01-CORE-THESIS.md) | The foundational argument: why governance matters more than model strength |
-| [02-TURN-COST.md](./02-TURN-COST.md) | Formal definition of Turn and Turn Cost as optimization targets |
-| [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md) | How to encode productive failure without enabling sloppiness |
-| [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) | Session state as shared language, not latent vectors |
-| [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md) | Machine-consumable governance contracts for IDE agents |
-| [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md) | Matching model strength to task complexity |
-| [07-ROBERT-FIELD-REPORT.md](./07-ROBERT-FIELD-REPORT.md) | The experiment that validated these ideas |
-| [08-IMPLEMENTATION-GUIDE.md](./08-IMPLEMENTATION-GUIDE.md) | How to implement these primitives in LexRunner |
-| [09-METRICS-AND-TELEMETRY.md](./09-METRICS-AND-TELEMETRY.md) | What to measure and how |
-| [10-FAILURE-MODES.md](./10-FAILURE-MODES.md) | Known risks, biases, and limitations |
+| Document                                                       | Purpose                                                                    |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [00-EVOLUTION-NOTES.md](./00-EVOLUTION-NOTES.md)               | **Start here** — Crystallized synthesis and core commitments               |
+| [01-CORE-THESIS.md](./01-CORE-THESIS.md)                       | The foundational argument: why governance matters more than model strength |
+| [02-TURN-COST.md](./02-TURN-COST.md)                           | Formal definition of Turn and Turn Cost as optimization targets            |
+| [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md)         | How to encode productive failure without enabling sloppiness               |
+| [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) | Session state as shared language, not latent vectors                       |
+| [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md)                 | Machine-consumable governance contracts for IDE agents                     |
+| [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md)             | Matching model strength to task complexity                                 |
+| [07-ROBERT-FIELD-REPORT.md](./07-ROBERT-FIELD-REPORT.md)       | The experiment that validated these ideas                                  |
+| [08-IMPLEMENTATION-GUIDE.md](./08-IMPLEMENTATION-GUIDE.md)     | How to implement these primitives in LexRunner                             |
+| [09-METRICS-AND-TELEMETRY.md](./09-METRICS-AND-TELEMETRY.md)   | What to measure and how                                                    |
+| [10-FAILURE-MODES.md](./10-FAILURE-MODES.md)                   | Known risks, biases, and limitations                                       |
 
 ---
 
@@ -105,11 +105,11 @@ The "state" of an agent session is:
 
 ## Relationship to Lex and LexRunner
 
-| Layer | Concern | Scope |
-|-------|---------|-------|
-| **Lex** | Constitution | Schemas, contracts, memory primitives |
-| **LexRunner** | Government | Execution, gates, merge pyramid, orchestration |
-| **This Thesis** | Philosophy | Why these patterns work, how to implement them |
+| Layer           | Concern      | Scope                                          |
+| --------------- | ------------ | ---------------------------------------------- |
+| **Lex**         | Constitution | Schemas, contracts, memory primitives          |
+| **LexRunner**   | Government   | Execution, gates, merge pyramid, orchestration |
+| **This Thesis** | Philosophy   | Why these patterns work, how to implement them |
 
 Lex is the open standard.
 LexRunner is one implementation.
@@ -148,4 +148,4 @@ We would rather be accurate than impressive.
 
 ---
 
-*— Lex, December 2025*
+_— Lex, December 2025_

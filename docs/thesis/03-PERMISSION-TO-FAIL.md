@@ -13,6 +13,7 @@ This creates perverse incentives:
 ### The Confidence Inflation Problem
 
 When failure isn't acceptable, agents inflate confidence:
+
 - Claim certainty when uncertain
 - Hide edge cases in verbose explanations
 - Default to safe, generic answers
@@ -21,6 +22,7 @@ When failure isn't acceptable, agents inflate confidence:
 ### The Recovery Cost Problem
 
 When an agent produces incorrect output confidently:
+
 - Human doesn't know to verify
 - Error propagates into production
 - Recovery is expensive (debugging, rollback, trust damage)
@@ -28,6 +30,7 @@ When an agent produces incorrect output confidently:
 ### The Stagnation Problem
 
 When agents avoid uncertainty:
+
 - They don't explore novel solutions
 - They don't flag genuine confusion
 - They don't improve through experimentation
@@ -40,11 +43,13 @@ When agents avoid uncertainty:
 > **Permission to fail ≠ Permission to be sloppy.**
 
 Permission to fail is:
+
 - Explicit acknowledgment that uncertainty exists
 - Structured protocols for what to do when uncertain
 - Discipline requirements that make failures informative
 
 Permission to fail is not:
+
 - An excuse for careless work
 - A license to skip verification
 - Permission to hide mistakes
@@ -71,7 +76,7 @@ uncertainty:
     format: "explicit_marker"
     marker: "⚠️ UNCERTAIN:"
     required_content:
-      - confidence_level  # 0.0-1.0
+      - confidence_level # 0.0-1.0
       - uncertainty_reason
       - alternatives_considered
 ```
@@ -99,12 +104,14 @@ discipline:
 ## The Value of Well-Instrumented Failure
 
 A failure with:
+
 - Clear error boundaries
 - Preserved debug state
 - Documented decision trail
 - Reversion pathway
 
 ...is **more valuable** than a fragile success that:
+
 - Might break later
 - Has hidden assumptions
 - Can't be debugged
@@ -113,6 +120,7 @@ A failure with:
 ### The "Failure as Data" Principle
 
 Every failure is data about:
+
 - Model limitations
 - Contract gaps
 - Environmental edge cases
@@ -204,7 +212,7 @@ const permissionToFailGate: Gate = {
         if (!hasEscalation(context, u)) {
           return {
             status: "fail",
-            message: `Low-confidence change (${u.confidence}) without escalation`
+            message: `Low-confidence change (${u.confidence}) without escalation`,
           };
         }
       }
@@ -213,7 +221,7 @@ const permissionToFailGate: Gate = {
         if (!hasReviewFlag(context, u)) {
           return {
             status: "fail",
-            message: `Non-reversible uncertain change without review flag`
+            message: `Non-reversible uncertain change without review flag`,
           };
         }
       }
@@ -224,20 +232,20 @@ const permissionToFailGate: Gate = {
       if (!f.state.preserved) {
         return {
           status: "fail",
-          message: `Failure ${f.failureId} did not preserve state`
+          message: `Failure ${f.failureId} did not preserve state`,
         };
       }
 
       if (!f.recovery.proposed) {
         return {
           status: "fail",
-          message: `Failure ${f.failureId} has no recovery proposal`
+          message: `Failure ${f.failureId} has no recovery proposal`,
         };
       }
     }
 
     return { status: "pass", data: { uncertainties, failures } };
-  }
+  },
 };
 ```
 
@@ -271,15 +279,16 @@ Signed-off-by: Agent <agent@lex.dev>
 
 ## Uncertainty Report
 
-| Item | Confidence | Status |
-|------|------------|--------|
-| PKCE implementation | 0.9 | ✅ High confidence |
-| Token storage schema | 0.8 | ✅ Acceptable |
-| Refresh timing | 0.6 | ⚠️ Needs review |
+| Item                 | Confidence | Status             |
+| -------------------- | ---------- | ------------------ |
+| PKCE implementation  | 0.9        | ✅ High confidence |
+| Token storage schema | 0.8        | ✅ Acceptable      |
+| Refresh timing       | 0.6        | ⚠️ Needs review    |
 
 ### Low Confidence Items
 
 **Refresh timing (0.6)**
+
 - Not sure if 80% TTL is optimal
 - Could cause token churn under high load
 - Recommend: Review in staging before production
@@ -300,7 +309,7 @@ Signed-off-by: Agent <agent@lex.dev>
 ```typescript
 interface DecisionWithConfidence {
   decision: string;
-  confidence: number;  // 0.0-1.0
+  confidence: number; // 0.0-1.0
   factors: {
     positive: string[];
     negative: string[];
@@ -385,8 +394,8 @@ impact:
 interface RevertibleChange {
   changeId: string;
   files: string[];
-  revertCommit: string;  // Git commit that reverses the change
-  preservedState: string;  // Path to preserved debug state
+  revertCommit: string; // Git commit that reverses the change
+  preservedState: string; // Path to preserved debug state
 }
 
 async function autoRevert(failure: FailureReceipt): Promise<void> {
@@ -402,7 +411,7 @@ async function autoRevert(failure: FailureReceipt): Promise<void> {
     failure_id: failure.failureId,
     reverted_change: change.changeId,
     revert_commit: change.revertCommit,
-    state_preserved_at: change.preservedState
+    state_preserved_at: change.preservedState,
   });
 
   // Execute reversion
@@ -411,7 +420,7 @@ async function autoRevert(failure: FailureReceipt): Promise<void> {
   // Notify
   await notify({
     type: "auto_revert",
-    message: `Automatically reverted ${change.changeId} due to failure ${failure.failureId}`
+    message: `Automatically reverted ${change.changeId} due to failure ${failure.failureId}`,
   });
 }
 ```
@@ -444,7 +453,7 @@ levels:
       - create_github_issue
       - notify_human
       - pause_task
-    timeout: null  # Wait for human
+    timeout: null # Wait for human
 ```
 
 ---
@@ -471,7 +480,7 @@ permission_to_fail:
   enabled: true
   uncertainty:
     allowed: true
-  discipline: {}  # Empty! No accountability
+  discipline: {} # Empty! No accountability
 ```
 
 Permission to fail without discipline is just permission to be sloppy.
@@ -480,7 +489,7 @@ Permission to fail without discipline is just permission to be sloppy.
 
 ```typescript
 // ❌ BAD: Lowering confidence threshold to avoid escalation
-const CONFIDENCE_THRESHOLD = 0.1;  // "Everything is fine!"
+const CONFIDENCE_THRESHOLD = 0.1; // "Everything is fine!"
 ```
 
 Thresholds should be set based on risk tolerance, not convenience.
@@ -507,18 +516,21 @@ In the Robert experiment, permission to fail was crucial:
 > "With the right contracts, an agent can progressively de-hostilize the environment."
 
 Robert was allowed to:
+
 - Express uncertainty about unfamiliar patterns
 - Make reversible changes even when unsure
 - Leave receipts of what was tried
 - Fail informatively rather than silently
 
 This produced:
+
 - 4-hour feature implementation
 - Reusable widget class
 - Cross-session continuity
 - Honest capability assessment
 
 Without permission to fail, Robert would have:
+
 - Refused to attempt unfamiliar patterns
 - Hidden uncertainty behind verbose hedging
 - Produced less value with higher confidence
@@ -548,12 +560,14 @@ For adding permission to fail to a new task or project:
 Permission to fail is a contract clause, not a personality trait.
 
 **Structure:**
+
 1. **Uncertainty clause:** What doubt is acceptable, how to express it
 2. **Discipline clause:** What must happen when uncertain or failed
 
 **Key insight:** A well-instrumented failure is more valuable than a fragile success.
 
 **Implementation:**
+
 - Confidence scoring on decisions
 - Uncertainty markers in code and commits
 - Failure receipts with preserved state
@@ -564,4 +578,4 @@ Permission to fail is a contract clause, not a personality trait.
 
 ---
 
-*Next: [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) — Shared language as session state*
+_Next: [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) — Shared language as session state_

@@ -2,13 +2,15 @@
 
 Complete guide to lexrunner configuration layering, inspection, and precedence rules.
 
-> **📖 See Also**: 
+> **📖 See Also**:
+>
 > - [Profile Resolution](./profile-resolution.md) - Profile directory resolution and management
 > - [CLI Reference](./cli.md) - Complete CLI command reference
 
 ## Overview
 
 The lexrunner uses a layered configuration system that allows you to:
+
 - Define configuration in multiple files with clear precedence rules
 - Inspect merged configuration with provenance tracking
 - Understand which file sets each configuration value
@@ -18,7 +20,7 @@ The lexrunner uses a layered configuration system that allows you to:
 Configuration is loaded from the `.smartergpt/` directory in the following precedence order (highest to lowest):
 
 1. **`stack.yml`** - Highest precedence, defines complete stack configuration
-2. **`scope.yml`** - Fallback for discovery and target settings  
+2. **`scope.yml`** - Fallback for discovery and target settings
 3. **`deps.yml`** - Future support for dependency-only definitions
 
 ### File Precedence Rules
@@ -109,6 +111,7 @@ items:
 ```
 
 **Provenance:**
+
 - `version`: stack.yml
 - `target`: stack.yml
 - All item settings from stack.yml
@@ -126,6 +129,7 @@ sources:
 ```
 
 **Provenance:**
+
 - `version`: scope.yml
 - `target`: scope.yml
 
@@ -147,6 +151,7 @@ items: []
 ```
 
 **Result:**
+
 - `version`: 1 (from stack.yml)
 - `target`: main (from stack.yml)
 - Stack completely overrides scope settings
@@ -181,11 +186,13 @@ lex-pr config:inspect --json | jq '.sources'
 ## Deterministic Output
 
 The `config:inspect --json` command ensures:
+
 - **Stable key ordering** - All object keys are sorted alphabetically
 - **Consistent formatting** - 2-space indentation, trailing newline
 - **Byte-for-byte identical output** - Same input always produces identical output
 
 This makes it ideal for:
+
 - CI/CD pipelines that check configuration changes
 - Git diffs that track configuration evolution
 - Automated testing and validation
@@ -232,6 +239,7 @@ lex-pr config:inspect
 ---
 
 **Next Steps:**
+
 - Read [CLI Reference](./cli.md) for all command details
 - See [Profile Resolution](./profile-resolution.md) for directory management
 - Check [Troubleshooting](./troubleshooting.md) for common issues

@@ -1,4 +1,4 @@
-import type { Plan } from '../../../src/schema.js';
+import type { Plan } from "../../../src/schema.js";
 
 /**
  * Simple plan with 2-3 independent PRs (no dependencies)
@@ -6,25 +6,25 @@ import type { Plan } from '../../../src/schema.js';
  */
 export function simple(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feat-b',
+        name: "feat-b",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feat-c',
+        name: "feat-c",
         deps: [],
-        gates: []
-      }
-    ]
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -33,29 +33,29 @@ export function simple(): Plan {
  */
 export function simpleWithGates(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     policy: {
-      requiredGates: ['lint', 'test'],
-      maxWorkers: 2
+      requiredGates: ["lint", "test"],
+      maxWorkers: 2,
     },
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
         gates: [
-          { name: 'lint', run: 'echo "lint pass"', env: {} },
-          { name: 'test', run: 'echo "test pass"', env: {} }
-        ]
+          { name: "lint", run: 'echo "lint pass"', env: {} },
+          { name: "test", run: 'echo "test pass"', env: {} },
+        ],
       },
       {
-        name: 'feat-b',
+        name: "feat-b",
         deps: [],
         gates: [
-          { name: 'lint', run: 'echo "lint pass"', env: {} },
-          { name: 'test', run: 'echo "test pass"', env: {} }
-        ]
-      }
-    ]
+          { name: "lint", run: 'echo "lint pass"', env: {} },
+          { name: "test", run: 'echo "test pass"', env: {} },
+        ],
+      },
+    ],
   };
 }

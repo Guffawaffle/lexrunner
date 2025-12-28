@@ -10,21 +10,21 @@ The Senior Dev executor provides structured code review with mentorship feedback
 
 ## Quick Links
 
-| Document | Purpose |
-|----------|---------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Design, phases, integration points |
-| [QUICK_START.md](./QUICK_START.md) | Getting started in 5 minutes |
-| [MEMORY_INTEGRATION.md](./MEMORY_INTEGRATION.md) | Lex frame patterns and recall |
-| [executor-manifest.yaml](./executor-manifest.yaml) | Contract definition |
+| Document                                           | Purpose                            |
+| -------------------------------------------------- | ---------------------------------- |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)               | Design, phases, integration points |
+| [QUICK_START.md](./QUICK_START.md)                 | Getting started in 5 minutes       |
+| [MEMORY_INTEGRATION.md](./MEMORY_INTEGRATION.md)   | Lex frame patterns and recall      |
+| [executor-manifest.yaml](./executor-manifest.yaml) | Contract definition                |
 
 ## Modes
 
-| Mode | Use Case |
-|------|----------|
-| `triage` | Quick PR assessment |
-| `deep_review` | Detailed code analysis |
-| `pattern_mining` | Find recurring issues |
-| `mentorship` | Developer growth tracking |
+| Mode             | Use Case                  |
+| ---------------- | ------------------------- |
+| `triage`         | Quick PR assessment       |
+| `deep_review`    | Detailed code analysis    |
+| `pattern_mining` | Find recurring issues     |
+| `mentorship`     | Developer growth tracking |
 
 ## Core Functions
 
@@ -50,20 +50,20 @@ Writes review session to Lex memory as a frame receipt.
 
 ## Prompts
 
-| Prompt | Mode | Purpose |
-|--------|------|---------|
-| [`code-review.prompt.md`](./prompts/code-review.prompt.md) | `deep_review` | Detailed code analysis |
-| [`pr-analysis.prompt.md`](./prompts/pr-analysis.prompt.md) | `triage` | Quick assessment |
-| [`pattern-recognition.prompt.md`](./prompts/pattern-recognition.prompt.md) | `pattern_mining` | Pattern discovery |
-| [`mentorship-feedback.prompt.md`](./prompts/mentorship-feedback.prompt.md) | `mentorship` | Growth tracking |
+| Prompt                                                                     | Mode             | Purpose                |
+| -------------------------------------------------------------------------- | ---------------- | ---------------------- |
+| [`code-review.prompt.md`](./prompts/code-review.prompt.md)                 | `deep_review`    | Detailed code analysis |
+| [`pr-analysis.prompt.md`](./prompts/pr-analysis.prompt.md)                 | `triage`         | Quick assessment       |
+| [`pattern-recognition.prompt.md`](./prompts/pattern-recognition.prompt.md) | `pattern_mining` | Pattern discovery      |
+| [`mentorship-feedback.prompt.md`](./prompts/mentorship-feedback.prompt.md) | `mentorship`     | Growth tracking        |
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| [`prepare-review-context.sh`](./scripts/prepare-review-context.sh) | Run prep phase |
-| [`recall-context.sh`](./scripts/recall-context.sh) | Query Lex memory |
-| [`capture-review-frame.sh`](./scripts/capture-review-frame.sh) | Write frame receipt |
+| Script                                                             | Purpose             |
+| ------------------------------------------------------------------ | ------------------- |
+| [`prepare-review-context.sh`](./scripts/prepare-review-context.sh) | Run prep phase      |
+| [`recall-context.sh`](./scripts/recall-context.sh)                 | Query Lex memory    |
+| [`capture-review-frame.sh`](./scripts/capture-review-frame.sh)     | Write frame receipt |
 
 ## Examples
 

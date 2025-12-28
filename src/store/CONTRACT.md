@@ -15,6 +15,7 @@ export const RUN_STORE_SCHEMA_VERSION = "1.0.0";
 ```
 
 Implementations MUST:
+
 - Store this version in the database
 - Refuse to open databases with incompatible major versions
 - Provide clear error messages for version mismatches
@@ -45,22 +46,22 @@ All timestamps MUST be stored and returned in UTC.
 
 ### Required Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `runId` | ULID | Unique identifier |
-| `planId` | string | Reference to the plan being executed |
-| `state` | RunState | Current lifecycle state |
-| `createdAt` | ISO 8601 | Creation time (UTC) |
-| `updatedAt` | ISO 8601 | Last modification time (UTC) |
+| Field       | Type     | Description                          |
+| ----------- | -------- | ------------------------------------ |
+| `runId`     | ULID     | Unique identifier                    |
+| `planId`    | string   | Reference to the plan being executed |
+| `state`     | RunState | Current lifecycle state              |
+| `createdAt` | ISO 8601 | Creation time (UTC)                  |
+| `updatedAt` | ISO 8601 | Last modification time (UTC)         |
 
 ### Optional Fields
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `metadata` | object | `{}` | Arbitrary key-value pairs |
-| `artifacts` | string[] | `[]` | Paths to generated artifacts |
-| `parentRunId` | ULID | `null` | For nested/child runs |
-| `error` | object | `null` | Error details if failed |
+| Field         | Type     | Default | Description                  |
+| ------------- | -------- | ------- | ---------------------------- |
+| `metadata`    | object   | `{}`    | Arbitrary key-value pairs    |
+| `artifacts`   | string[] | `[]`    | Paths to generated artifacts |
+| `parentRunId` | ULID     | `null`  | For nested/child runs        |
+| `error`       | object   | `null`  | Error details if failed      |
 
 ---
 
@@ -70,13 +71,13 @@ All timestamps MUST be stored and returned in UTC.
 pending → running → completed | failed | cancelled
 ```
 
-| State | Description | Terminal |
-|-------|-------------|----------|
-| `pending` | Run created, not yet started | No |
-| `running` | Run actively executing | No |
-| `completed` | Run finished successfully | Yes |
-| `failed` | Run terminated with error | Yes |
-| `cancelled` | Run stopped by user | Yes |
+| State       | Description                  | Terminal |
+| ----------- | ---------------------------- | -------- |
+| `pending`   | Run created, not yet started | No       |
+| `running`   | Run actively executing       | No       |
+| `completed` | Run finished successfully    | Yes      |
+| `failed`    | Run terminated with error    | Yes      |
+| `cancelled` | Run stopped by user          | Yes      |
 
 ### State Transitions
 
@@ -92,13 +93,13 @@ Invalid transitions MUST throw an error.
 
 ### Cross-Repo Mapping (LexRunner ↔ Lex)
 
-| RunStore | FrameStore | Notes |
-|----------|------------|-------|
-| `pending` | `created` | Initial state |
-| `running` | `active` | In-progress work |
+| RunStore    | FrameStore | Notes            |
+| ----------- | ---------- | ---------------- |
+| `pending`   | `created`  | Initial state    |
+| `running`   | `active`   | In-progress work |
 | `completed` | `archived` | Terminal success |
-| `failed` | `archived` | Terminal failure |
-| `cancelled` | `archived` | User-terminated |
+| `failed`    | `archived` | Terminal failure |
+| `cancelled` | `archived` | User-terminated  |
 
 ---
 
@@ -134,7 +135,7 @@ Runs contain steps, each with an outcome:
 interface StepOutcome {
   stepId: string;
   gateName: string;
-  status: 'pass' | 'fail' | 'skip' | 'blocked';
+  status: "pass" | "fail" | "skip" | "blocked";
   duration_ms: number;
   artifacts?: string[];
   error?: { code: string; message: string };
@@ -151,7 +152,7 @@ Terminal runs generate receipts:
 interface Receipt {
   runId: string;
   planId: string;
-  finalState: 'completed' | 'failed' | 'cancelled';
+  finalState: "completed" | "failed" | "cancelled";
   startedAt: string;
   completedAt: string;
   duration_ms: number;

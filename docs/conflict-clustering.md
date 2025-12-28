@@ -37,13 +37,13 @@ lex-pr --json orchestrate:predict-conflicts --prs 166,167,168 \
 import {
   clusterConflicts,
   generateClusteredReport,
-  writeConflictsJson
+  writeConflictsJson,
 } from "./orchestration/conflictClustering.js";
 
 // Example: Cluster conflicts from merge-tree simulation
 const conflicts = [
   { file: "src/example.ts", lines: "10-20", type: "both-modified" },
-  { file: "src/utils.ts", lines: "5-15", type: "both-modified" }
+  { file: "src/utils.ts", lines: "5-15", type: "both-modified" },
 ];
 
 // Generate clustered report
@@ -133,20 +133,27 @@ Supports TypeScript/JavaScript symbols:
 ## Rename Detection
 
 Two symbols are considered potential renames if:
+
 1. Same symbol type (e.g., both functions)
 2. Different names
 3. Identical signatures after removing the name
 
 Example:
+
 ```typescript
 // Likely a rename
-function oldCalculate(x: number): number { return x * 2; }
-function newCalculate(x: number): number { return x * 2; }
+function oldCalculate(x: number): number {
+  return x * 2;
+}
+function newCalculate(x: number): number {
+  return x * 2;
+}
 ```
 
 ## Whitespace Normalization
 
 Normalization rules:
+
 - Line endings: `\r\n` → `\n`
 - Tabs: `\t` → `  ` (2 spaces)
 - Trailing whitespace: removed
@@ -163,12 +170,15 @@ import { predictConflicts } from "./orchestration/conflictPredictor.js";
 const report = await predictConflicts({
   prs: [
     { number: 166, files: ["src/cli.ts"], head: "abc123" },
-    { number: 167, files: ["src/cli.ts"], head: "def456" }
+    { number: 167, files: ["src/cli.ts"], head: "def456" },
   ],
   baseBranch: "main",
-  prHeads: new Map([["166", "abc123"], ["167", "def456"]]),
+  prHeads: new Map([
+    ["166", "abc123"],
+    ["167", "def456"],
+  ]),
   enableClustering: true,
-  writeWeaveConflicts: true
+  writeWeaveConflicts: true,
 });
 
 // Access clustered report

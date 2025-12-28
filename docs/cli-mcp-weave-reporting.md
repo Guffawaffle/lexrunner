@@ -20,18 +20,18 @@ The **integration matrix** is a structured representation of the merge-weave exe
 
 ```typescript
 interface IntegrationMatrix {
-  schemaVersion: string;        // "1.0.0"
-  generated: string;            // ISO 8601 timestamp
+  schemaVersion: string; // "1.0.0"
+  generated: string; // ISO 8601 timestamp
   plan: {
-    target: string;             // Target branch (e.g., "main")
+    target: string; // Target branch (e.g., "main")
     itemCount: number;
-    levels: number;             // Merge pyramid levels
+    levels: number; // Merge pyramid levels
   };
   execution: {
     levels: Array<{
-      level: number;            // 1-indexed level number
-      items: string[];          // Item names in this level
-      parallel: boolean;        // Can items in this level run in parallel?
+      level: number; // 1-indexed level number
+      items: string[]; // Item names in this level
+      parallel: boolean; // Can items in this level run in parallel?
     }>;
     gates: Array<{
       item: string;
@@ -168,7 +168,7 @@ on:
   workflow_dispatch:
     inputs:
       matrix_json:
-        description: 'Integration matrix JSON'
+        description: "Integration matrix JSON"
         required: true
 
 jobs:
@@ -199,18 +199,18 @@ jobs:
 
 ```typescript
 // Example: Parse matrix for progress tracking
-import { IntegrationMatrix } from './types';
+import { IntegrationMatrix } from "./types";
 
 function calculateProgress(matrix: IntegrationMatrix, results: GateResult[]): Progress {
   const totalGates = matrix.execution.gates.length;
-  const completed = results.filter(r => r.status === 'pass' || r.status === 'fail').length;
-  const passing = results.filter(r => r.status === 'pass').length;
+  const completed = results.filter((r) => r.status === "pass" || r.status === "fail").length;
+  const passing = results.filter((r) => r.status === "pass").length;
 
   return {
     percent: (completed / totalGates) * 100,
     passing: passing,
     failing: completed - passing,
-    pending: totalGates - completed
+    pending: totalGates - completed,
   };
 }
 ```
@@ -242,10 +242,10 @@ interface ReportSummary {
   };
   items: Array<{
     name: string;
-    status: 'pass' | 'fail' | 'pending';
+    status: "pass" | "fail" | "pending";
     gates: Array<{
       name: string;
-      status: 'pass' | 'fail' | 'pending';
+      status: "pass" | "fail" | "pending";
       duration_ms?: number;
       started_at?: string;
     }>;
@@ -262,6 +262,7 @@ interface ReportSummary {
 **Status:** ✅ All gates passed
 
 ## Summary
+
 - **Total Items:** 3
 - **Total Gates:** 10
 - **Passing:** 10
@@ -270,16 +271,19 @@ interface ReportSummary {
 ## Items
 
 ### auth-foundation ✅
+
 - ✅ lint (1.2s)
 - ✅ type (3.4s)
 - ✅ unit (12.3s)
 
 ### api-endpoints ✅
+
 - ✅ lint (1.1s)
 - ✅ type (3.2s)
 - ✅ unit (8.9s)
 
 ### user-management ✅
+
 - ✅ lint (1.0s)
 - ✅ type (2.8s)
 - ✅ unit (7.5s)
@@ -331,22 +335,22 @@ interface ReportSummary {
 Test matrix generation logic in isolation:
 
 ```typescript
-describe('Matrix Generation', () => {
-  it('should generate correct level structure', () => {
+describe("Matrix Generation", () => {
+  it("should generate correct level structure", () => {
     const plan = loadPlan(simplePlanJson);
     const matrix = generateMatrix(plan);
 
     expect(matrix.execution.levels).toHaveLength(2);
-    expect(matrix.execution.levels[0].items).toEqual(['auth-foundation']);
-    expect(matrix.execution.levels[1].items).toEqual(['api-endpoints', 'user-management']);
+    expect(matrix.execution.levels[0].items).toEqual(["auth-foundation"]);
+    expect(matrix.execution.levels[1].items).toEqual(["api-endpoints", "user-management"]);
   });
 
-  it('should mark parallel levels correctly', () => {
+  it("should mark parallel levels correctly", () => {
     const plan = loadPlan(parallelPlanJson);
     const matrix = generateMatrix(plan);
 
     expect(matrix.execution.levels[0].parallel).toBe(false); // Single item
-    expect(matrix.execution.levels[1].parallel).toBe(true);  // Multiple independent items
+    expect(matrix.execution.levels[1].parallel).toBe(true); // Multiple independent items
   });
 });
 ```
@@ -356,23 +360,23 @@ describe('Matrix Generation', () => {
 Test end-to-end CLI output:
 
 ```typescript
-describe('CLI Matrix Output', () => {
-  it('should output valid matrix JSON', () => {
-    const output = execSync('npm run cli -- execute plan.json --dry-run --json', {
-      encoding: 'utf8'
+describe("CLI Matrix Output", () => {
+  it("should output valid matrix JSON", () => {
+    const output = execSync("npm run cli -- execute plan.json --dry-run --json", {
+      encoding: "utf8",
     });
 
     const result = JSON.parse(output);
-    expect(result).toHaveProperty('execution.levels');
+    expect(result).toHaveProperty("execution.levels");
     expect(result.execution.levels).toBeInstanceOf(Array);
   });
 
-  it('should have deterministic matrix output', () => {
-    const output1 = execSync('npm run cli -- execute plan.json --dry-run --json', {
-      encoding: 'utf8'
+  it("should have deterministic matrix output", () => {
+    const output1 = execSync("npm run cli -- execute plan.json --dry-run --json", {
+      encoding: "utf8",
     });
-    const output2 = execSync('npm run cli -- execute plan.json --dry-run --json', {
-      encoding: 'utf8'
+    const output2 = execSync("npm run cli -- execute plan.json --dry-run --json", {
+      encoding: "utf8",
     });
 
     expect(output1).toBe(output2);
@@ -385,23 +389,23 @@ describe('CLI Matrix Output', () => {
 The following test stubs document planned functionality:
 
 ```typescript
-describe('Weave Reporting (Planned)', () => {
-  it.skip('should generate integration matrix from plan', () => {
+describe("Weave Reporting (Planned)", () => {
+  it.skip("should generate integration matrix from plan", () => {
     // TODO: Implement matrix.generate CLI command
     // Expected: npm run cli -- matrix --from-plan plan.json
   });
 
-  it.skip('should include gate timing predictions in matrix', () => {
+  it.skip("should include gate timing predictions in matrix", () => {
     // TODO: Add historical timing data to matrix
     // Expected: matrix.execution.gates[].estimatedDuration
   });
 
-  it.skip('should support matrix filtering by item/gate', () => {
+  it.skip("should support matrix filtering by item/gate", () => {
     // TODO: Add filtering options
     // Expected: npm run cli -- matrix --items auth-foundation,api-endpoints
   });
 
-  it.skip('should generate GitHubActions workflow from matrix', () => {
+  it.skip("should generate GitHubActions workflow from matrix", () => {
     // TODO: Add workflow template generation
     // Expected: npm run cli -- matrix --format github-actions
   });
@@ -451,6 +455,7 @@ This specification aligns with [weave-contract.md](./weave-contract.md) by:
 ---
 
 **Next Steps:**
+
 - Implement `matrix.generate` command
 - Add test coverage for matrix generation
 - Create CI/CD workflow examples

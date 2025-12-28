@@ -1,36 +1,36 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"items": [
-		{
-			"name": "check-package",
-			"deps": [],
-			"gates": [
-				{
-					"name": "validate-package-json",
-					"run": "node -e \"const pkg = require('./package.json'); if (!pkg.name || !pkg.version) process.exit(1); console.log('Package valid');\""
-				}
-			]
-		},
-		{
-			"name": "check-schema",
-			"deps": [],
-			"gates": [
-				{
-					"name": "validate-schema-files",
-					"run": "test -f schemas/plan.schema.json && echo 'Schema files exist'"
-				}
-			]
-		},
-		{
-			"name": "run-typecheck",
-			"deps": ["check-package", "check-schema"],
-			"gates": [
-				{
-					"name": "typecheck",
-					"run": "npm run typecheck"
-				}
-			]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "check-package",
+      "deps": [],
+      "gates": [
+        {
+          "name": "validate-package-json",
+          "run": "node -e \"const pkg = require('./package.json'); if (!pkg.name || !pkg.version) process.exit(1); console.log('Package valid');\""
+        }
+      ]
+    },
+    {
+      "name": "check-schema",
+      "deps": [],
+      "gates": [
+        {
+          "name": "validate-schema-files",
+          "run": "test -f schemas/plan.schema.json && echo 'Schema files exist'"
+        }
+      ]
+    },
+    {
+      "name": "run-typecheck",
+      "deps": ["check-package", "check-schema"],
+      "gates": [
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        }
+      ]
+    }
+  ]
 }

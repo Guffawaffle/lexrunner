@@ -63,15 +63,18 @@ Joseph Gustavson - 2025-11-26 - gpg signature verified by signed git commit.
 This document was originally committed on **2025-11-26** in GPG-signed commit `763120d`.
 
 On **2025-12-01**, I am adding external timestamp proofs to anchor this document to:
+
 1. RFC 3161 Timestamp Authority (FreeTSA)
 2. Bitcoin blockchain (OpenTimestamps)
 
 **I attest that:**
+
 - The content above (sections 1-5 and original signature) is unchanged from the original commit.
 - The original commit timestamp of **Wed Nov 26 07:43:33 2025 CST** is accurate.
 - I am adding these external timestamps to provide independent, non-Git verification.
 
 **Original commit details:**
+
 - Commit: `763120d606d8c4f4b4d22fcdc98f89139f8968fc`
 - GPG Key: `65C94BA03E88F53D365C36CF7145A1CE635B1902`
 - Signature: `Good signature from "Guffawaffle <guff@smartergpt.dev>"`

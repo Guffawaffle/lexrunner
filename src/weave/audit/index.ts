@@ -7,11 +7,11 @@
  */
 
 export {
-	createAuditLogger,
-	createAuditEmitter,
-	type AuditLogger,
-	type AuditLoggerOptions,
-	type MergeWeaveAuditEntry,
-	type PlanEvent,
-	type SummaryEvent,
+  createAuditLogger,
+  createAuditEmitter,
+  type AuditLogger,
+  type AuditLoggerOptions,
+  type MergeWeaveAuditEntry,
+  type PlanEvent,
+  type SummaryEvent,
 } from "./logger.js";

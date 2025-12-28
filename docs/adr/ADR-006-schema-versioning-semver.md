@@ -29,11 +29,11 @@ Plans must include a schema version:
 
 ### Versioning Rules
 
-| Change Type | Version Bump | Example |
-|-------------|--------------|---------|
-| **Patch** | 1.0.0 → 1.0.1 | Additive, optional fields or docs only |
-| **Minor** | 1.0.0 → 1.1.0 | Additive required fields with safe defaults |
-| **Major** | 1.x.y → 2.0.0 | Breaking changes to structure or semantics |
+| Change Type | Version Bump  | Example                                     |
+| ----------- | ------------- | ------------------------------------------- |
+| **Patch**   | 1.0.0 → 1.0.1 | Additive, optional fields or docs only      |
+| **Minor**   | 1.0.0 → 1.1.0 | Additive required fields with safe defaults |
+| **Major**   | 1.x.y → 2.0.0 | Breaking changes to structure or semantics  |
 
 ### Runner Behavior
 
@@ -43,7 +43,7 @@ Plans must include a schema version:
 
 ```typescript
 function validateSchema(plan: Plan): void {
-  const [major] = plan.schemaVersion.split('.').map(Number);
+  const [major] = plan.schemaVersion.split(".").map(Number);
   if (major > SUPPORTED_MAJOR) {
     throw new Error(`Unsupported schema version: ${plan.schemaVersion}`);
   }
@@ -53,6 +53,7 @@ function validateSchema(plan: Plan): void {
 ### Migration Path
 
 When a major version changes:
+
 1. Document migration steps
 2. Provide upgrade tooling if feasible
 3. Support previous major for deprecation period

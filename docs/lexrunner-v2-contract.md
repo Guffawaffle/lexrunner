@@ -15,6 +15,7 @@
 **LexRunner v2 is a thin, AX3-compliant DAG executor that reads Lex contracts, runs gates, and emits Frames/Receipts under LexSona-derived constraints.**
 
 In one sentence:
+
 > Runner v2 is the **execution engine** of the Lex constitution. It does not store memory, derive rules, or hold state beyond a single run. It orchestrates tools and reports outcomes.
 
 ### Metaphor
@@ -33,19 +34,19 @@ Runner v2 is **stateless between runs**. All persistent state lives in Lex.
 
 ### 2.1 Required Inputs
 
-| Input | Source | Description |
-|-------|--------|-------------|
-| **Plan** | `plan.json` or generated | The DAG of items to execute (**Schema v2 (draft)**). |
-| **Lex connection** | `LEX_DB_PATH` or API | Memory store for Frames, Receipts, Recall |
+| Input              | Source                   | Description                                          |
+| ------------------ | ------------------------ | ---------------------------------------------------- |
+| **Plan**           | `plan.json` or generated | The DAG of items to execute (**Schema v2 (draft)**). |
+| **Lex connection** | `LEX_DB_PATH` or API     | Memory store for Frames, Receipts, Recall            |
 
 ### 2.2 Optional Inputs
 
-| Input | Source | Default | Description |
-|-------|--------|---------|-------------|
-| CLI flags | `argv` | — | `--json`, `--dry-run`, `--profile-dir`, etc. |
-| LexSona persona | `LEXSONA_PERSONA` | none | Active persona for constraint derivation |
-| Environment | `process.env` | — | `GITHUB_TOKEN`, `ALLOW_MUTATIONS`, etc. |
-| Config files | `--profile-dir` | `.smartergpt.local/` | Workspace profile inputs (e.g., `stack.yml`, `gates.yml`, `scope.yml`). **Note:** `.smartergpt/` is a portable example profile in this repo; it is not a required runtime input. |
+| Input           | Source            | Default              | Description                                                                                                                                                                      |
+| --------------- | ----------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI flags       | `argv`            | —                    | `--json`, `--dry-run`, `--profile-dir`, etc.                                                                                                                                     |
+| LexSona persona | `LEXSONA_PERSONA` | none                 | Active persona for constraint derivation                                                                                                                                         |
+| Environment     | `process.env`     | —                    | `GITHUB_TOKEN`, `ALLOW_MUTATIONS`, etc.                                                                                                                                          |
+| Config files    | `--profile-dir`   | `.smartergpt.local/` | Workspace profile inputs (e.g., `stack.yml`, `gates.yml`, `scope.yml`). **Note:** `.smartergpt/` is a portable example profile in this repo; it is not a required runtime input. |
 
 ### 2.3 Input Precedence
 
@@ -61,21 +62,21 @@ All precedence is **explicit and documented**. No hidden overrides.
 
 ### 3.1 Guaranteed Artifacts
 
-| Artifact | When | Format | AX Guarantee |
-|----------|------|--------|--------------|
-| **Exit code** | Always | `0 \| 1 \| 2` | 2.1 Structured Output |
-| **Structured output** | `--json` | JSON | 2.1 Structured Output |
-| **AXError** | On failure | JSON | 2.3 Recoverable Errors |
-| **Frame** | Run completion | Lex Frame | 2.5 Frame Emission |
-| **Receipt** | Actions taken | Lex Receipt | Disciplined Failure |
+| Artifact              | When           | Format        | AX Guarantee           |
+| --------------------- | -------------- | ------------- | ---------------------- |
+| **Exit code**         | Always         | `0 \| 1 \| 2` | 2.1 Structured Output  |
+| **Structured output** | `--json`       | JSON          | 2.1 Structured Output  |
+| **AXError**           | On failure     | JSON          | 2.3 Recoverable Errors |
+| **Frame**             | Run completion | Lex Frame     | 2.5 Frame Emission     |
+| **Receipt**           | Actions taken  | Lex Receipt   | Disciplined Failure    |
 
 ### 3.2 Exit Code Semantics
 
-| Code | Meaning | Recovery |
-|------|---------|----------|
-| `0` | Success | — |
-| `1` | Operational failure (gate failed, merge conflict) | Retry or fix |
-| `2` | Contract violation (schema error, policy block) | Fix input |
+| Code | Meaning                                           | Recovery     |
+| ---- | ------------------------------------------------- | ------------ |
+| `0`  | Success                                           | —            |
+| `1`  | Operational failure (gate failed, merge conflict) | Retry or fix |
+| `2`  | Contract violation (schema error, policy block)   | Fix input    |
 
 ### 3.3 Frame Emission Contract
 
@@ -106,52 +107,52 @@ LexRunner v2 commits to AX-CONTRACT v0.1 guarantees:
 
 ### 4.1 Structured Output (Guarantee 2.1)
 
-| Requirement | v2 Implementation |
-|-------------|-------------------|
-| `--json` flag on all data-emitting commands | Enforced by CLI framework |
-| MCP tools return JSON | All tools return structured responses |
-| Machine format ≥ human format | JSON contains all info prose would have |
+| Requirement                                 | v2 Implementation                       |
+| ------------------------------------------- | --------------------------------------- |
+| `--json` flag on all data-emitting commands | Enforced by CLI framework               |
+| MCP tools return JSON                       | All tools return structured responses   |
+| Machine format ≥ human format               | JSON contains all info prose would have |
 
 **Violation surfaces as:** Build-time check; missing `--json` fails lint.
 
 ### 4.2 Deterministic Preparation (Guarantee 2.2)
 
-| Requirement | v2 Implementation |
-|-------------|-------------------|
-| Same inputs → same plan | Canonical JSON, sorted iteration, no timestamps in keys |
-| Same inputs → same gate list | Order derived from topo sort (stable) |
-| No hidden randomness | Explicit seed if randomness ever needed |
+| Requirement                  | v2 Implementation                                       |
+| ---------------------------- | ------------------------------------------------------- |
+| Same inputs → same plan      | Canonical JSON, sorted iteration, no timestamps in keys |
+| Same inputs → same gate list | Order derived from topo sort (stable)                   |
+| No hidden randomness         | Explicit seed if randomness ever needed                 |
 
 **Violation surfaces as:** Determinism tests fail; CI gate blocks merge.
 
 ### 4.3 Recoverable Errors (Guarantee 2.3)
 
-| Requirement | v2 Implementation |
-|-------------|-------------------|
-| Errors have stable codes | `ErrorCodes` enum from Lex |
+| Requirement                 | v2 Implementation                           |
+| --------------------------- | ------------------------------------------- |
+| Errors have stable codes    | `ErrorCodes` enum from Lex                  |
 | Errors have `nextActions[]` | Every AXError adapter provides at least one |
-| Exit codes are documented | See §3.2 |
+| Exit codes are documented   | See §3.2                                    |
 
 **Violation surfaces as:** AXError missing `nextActions` fails schema validation.
 
 ### 4.4 Memory and Recall (Guarantee 2.4)
 
-| Requirement | v2 Implementation |
-|-------------|-------------------|
-| Recall before major decisions | `lex recall` called at run start |
-| Search keywords, reference_point, summary_caption | Delegated to Lex |
-| Case-insensitive search | Lex responsibility |
+| Requirement                                       | v2 Implementation                |
+| ------------------------------------------------- | -------------------------------- |
+| Recall before major decisions                     | `lex recall` called at run start |
+| Search keywords, reference_point, summary_caption | Delegated to Lex                 |
+| Case-insensitive search                           | Lex responsibility               |
 
 **Violation surfaces as:** Integration test: recall finds known Frame.
 
 ### 4.5 Frame Emission (Guarantee 2.5)
 
-| Requirement | v2 Implementation |
-|-------------|-------------------|
-| Merge-weave emits Frame | `emitMergeWeaveFrame()` |
-| Gate runs emit Frame | `emitGateFrame()` |
-| Executor runs emit Frame | `emitExecutorFrame()` |
-| Frames stored in Lex | Via `@smartergpt/lex/store` |
+| Requirement              | v2 Implementation           |
+| ------------------------ | --------------------------- |
+| Merge-weave emits Frame  | `emitMergeWeaveFrame()`     |
+| Gate runs emit Frame     | `emitGateFrame()`           |
+| Executor runs emit Frame | `emitExecutorFrame()`       |
+| Frames stored in Lex     | Via `@smartergpt/lex/store` |
 
 **Violation surfaces as:** Missing Frame fails post-run validation.
 
@@ -161,26 +162,26 @@ LexRunner v2 commits to AX-CONTRACT v0.1 guarantees:
 
 ### 5.1 Explicit Exclusions
 
-| Non-Goal | Rationale |
-|----------|-----------|
-| **Store Frames locally** | Lex is the memory store |
-| **Define personas or rules** | LexSona is the constraint engine |
-| **Manage GitHub state** | Runner uses GitHub API, doesn't own it |
-| **Provide human UX polish** | AX-first; human UX is separate concern |
+| Non-Goal                             | Rationale                                                  |
+| ------------------------------------ | ---------------------------------------------------------- |
+| **Store Frames locally**             | Lex is the memory store                                    |
+| **Define personas or rules**         | LexSona is the constraint engine                           |
+| **Manage GitHub state**              | Runner uses GitHub API, doesn't own it                     |
+| **Provide human UX polish**          | AX-first; human UX is separate concern                     |
 | **Support arbitrary config formats** | Only Lex contract surface (lex.yaml, stack.yml, gates.yml) |
-| **Run as a daemon/server** | Stateless per-run; MCP adapter is separate entry |
-| **Budget/cost tracking** | Belongs in caller, not runner |
-| **Interactive prompts** | Deterministic; no TTY assumptions |
+| **Run as a daemon/server**           | Stateless per-run; MCP adapter is separate entry           |
+| **Budget/cost tracking**             | Belongs in caller, not runner                              |
+| **Interactive prompts**              | Deterministic; no TTY assumptions                          |
 
 ### 5.2 Delegations
 
-| Responsibility | Delegated To | Interface |
-|----------------|--------------|-----------|
-| Frame storage | Lex | `saveFrame()`, `searchFrames()` |
-| Recall | Lex | `lex recall "topic"` or API |
-| Constraint derivation | LexSona | `deriveConstraints(context)` |
-| Persona management | LexSona | `activate(personaId)` |
-| Rule learning | LexSona → Lex | `recordCorrection()` |
+| Responsibility        | Delegated To  | Interface                       |
+| --------------------- | ------------- | ------------------------------- |
+| Frame storage         | Lex           | `saveFrame()`, `searchFrames()` |
+| Recall                | Lex           | `lex recall "topic"` or API     |
+| Constraint derivation | LexSona       | `deriveConstraints(context)`    |
+| Persona management    | LexSona       | `activate(personaId)`           |
+| Rule learning         | LexSona → Lex | `recordCorrection()`            |
 
 ---
 
@@ -257,12 +258,12 @@ src/
 
 ### 7.2 Size Limits
 
-| Module | Max Lines | Rationale |
-|--------|-----------|-----------|
-| Any single file | 400 | Prevents god-objects |
-| `core/dag.ts` | 200 | Focused on one thing |
-| `cli/commands/*.ts` | 100 | Thin wrappers |
-| `mcp/server.ts` | 300 | Tool dispatch only |
+| Module              | Max Lines | Rationale            |
+| ------------------- | --------- | -------------------- |
+| Any single file     | 400       | Prevents god-objects |
+| `core/dag.ts`       | 200       | Focused on one thing |
+| `cli/commands/*.ts` | 100       | Thin wrappers        |
+| `mcp/server.ts`     | 300       | Tool dispatch only   |
 
 ### 7.3 Dependency Rules
 
@@ -302,14 +303,14 @@ lex-pr config show [--json]
 
 ### 8.2 Removed/Changed from v1
 
-| v1 Command | v2 Status | Rationale |
-|------------|-----------|-----------|
-| `lex-pr merge apply` | Subsumed into `run` | Merge is part of weave procedure |
-| `lex-pr autopilot` | Removed | Use LexSona personas |
-| `lex-pr senior-dev` | Removed | Define as procedure |
-| `lex-pr orchestrate *` | Removed | Over-abstraction |
-| `lex-pr governance-*` | Removed | Audit is separate concern |
-| `lex-pr execute` | Replaced by `run` | Single execution entry |
+| v1 Command             | v2 Status           | Rationale                        |
+| ---------------------- | ------------------- | -------------------------------- |
+| `lex-pr merge apply`   | Subsumed into `run` | Merge is part of weave procedure |
+| `lex-pr autopilot`     | Removed             | Use LexSona personas             |
+| `lex-pr senior-dev`    | Removed             | Define as procedure              |
+| `lex-pr orchestrate *` | Removed             | Over-abstraction                 |
+| `lex-pr governance-*`  | Removed             | Audit is separate concern        |
+| `lex-pr execute`       | Replaced by `run`   | Single execution entry           |
 
 ---
 
@@ -325,13 +326,15 @@ lex-pr config show [--json]
 
 const PlanV2 = z.object({
   schemaVersion: z.string().regex(/^2\.\d+\.\d+$/),
-  procedure: z.string(),           // e.g., "merge-weave-main"
+  procedure: z.string(), // e.g., "merge-weave-main"
   items: z.array(PlanItemV2),
   policy: PolicyV2,
-  lex: z.object({
-    recall: z.boolean().default(true),  // Recall before run?
-    emit_frame: z.boolean().default(true)
-  }).optional()
+  lex: z
+    .object({
+      recall: z.boolean().default(true), // Recall before run?
+      emit_frame: z.boolean().default(true),
+    })
+    .optional(),
 });
 ```
 
@@ -347,13 +350,13 @@ const PlanV2 = z.object({
 
 ### 10.1 Required Test Categories
 
-| Category | Purpose | Example |
-|----------|---------|---------|
-| Determinism | Same input → same output | `determinism.spec.ts` |
-| AXError shape | Errors have code + nextActions | `ax-error.spec.ts` |
-| Frame emission | Runs emit Frames | `frame-emission.spec.ts` |
-| Recall integration | Can find known Frames | `recall.spec.ts` |
-| Exit codes | Correct codes for scenarios | `exit-codes.spec.ts` |
+| Category           | Purpose                        | Example                  |
+| ------------------ | ------------------------------ | ------------------------ |
+| Determinism        | Same input → same output       | `determinism.spec.ts`    |
+| AXError shape      | Errors have code + nextActions | `ax-error.spec.ts`       |
+| Frame emission     | Runs emit Frames               | `frame-emission.spec.ts` |
+| Recall integration | Can find known Frames          | `recall.spec.ts`         |
+| Exit codes         | Correct codes for scenarios    | `exit-codes.spec.ts`     |
 
 ### 10.2 Test Size Limits
 
@@ -398,4 +401,4 @@ Date: 2025-12-08
 
 ---
 
-*Next: Phase 3 — Salvage Map*
+_Next: Phase 3 — Salvage Map_

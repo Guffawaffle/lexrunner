@@ -8,9 +8,9 @@ import * as path from "path";
 import YAML from "yaml";
 import { exec } from "child_process";
 import {
-	resolveProfile,
-	validateWriteOperation,
-	WriteProtectionError,
+  resolveProfile,
+  validateWriteOperation,
+  WriteProtectionError,
 } from "../config/profileResolver.js";
 
 // Cached Docker availability probe. null = unknown, true = available, false = not available
@@ -20,26 +20,26 @@ let dockerAvailable: boolean | null = null;
 // We use a short timeout to avoid hanging in environments where Docker is installed but
 // inaccessible. This keeps `getEnvironmentSuggestions()` non-blocking.
 (function probeDockerAvailability() {
-	try {
-		exec("docker --version", { timeout: 2000 }, (err) => {
-			dockerAvailable = err ? false : true;
-		});
-	} catch {
-		dockerAvailable = false;
-	}
+  try {
+    exec("docker --version", { timeout: 2000 }, (err) => {
+      dockerAvailable = err ? false : true;
+    });
+  } catch {
+    dockerAvailable = false;
+  }
 })();
 
 export interface BootstrapConfig {
-	profileDir: string;
-	hasConfiguration: boolean;
-	missingFiles: string[];
-	suggestions: string[];
+  profileDir: string;
+  hasConfiguration: boolean;
+  missingFiles: string[];
+  suggestions: string[];
 }
 
 export interface WorkspaceTemplate {
-	name: string;
-	description: string;
-	files: Record<string, string>;
+  name: string;
+  description: string;
+  files: Record<string, string>;
 }
 
 /**
@@ -49,59 +49,55 @@ export interface WorkspaceTemplate {
  * @param profileDirFlag - Optional profile directory override (from CLI --profile-dir)
  */
 export function bootstrapWorkspace(
-	baseDir: string = ".",
-	profileDirFlag?: string
+  baseDir: string = ".",
+  profileDirFlag?: string
 ): BootstrapConfig {
-	// Resolve the profile directory
-	const resolved = resolveProfile(profileDirFlag, baseDir);
-	const profileDir = resolved.path;
-	const expectedFiles = ["intent.md", "scope.yml", "deps.yml", "gates.yml"];
+  // Resolve the profile directory
+  const resolved = resolveProfile(profileDirFlag, baseDir);
+  const profileDir = resolved.path;
+  const expectedFiles = ["intent.md", "scope.yml", "deps.yml", "gates.yml"];
 
-	const missingFiles: string[] = [];
-	const suggestions: string[] = [];
+  const missingFiles: string[] = [];
+  const suggestions: string[] = [];
 
-	// Check if profile directory exists
-	if (!fs.existsSync(profileDir)) {
-		suggestions.push(
-			`Create .smartergpt.local directory: mkdir ${profileDir}`
-		);
-		missingFiles.push(...expectedFiles);
-	} else {
-		// Check for config files at profile root (v1 structure)
-		for (const file of expectedFiles) {
-			const filePath = path.join(profileDir, file);
+  // Check if profile directory exists
+  if (!fs.existsSync(profileDir)) {
+    suggestions.push(`Create .smartergpt.local directory: mkdir ${profileDir}`);
+    missingFiles.push(...expectedFiles);
+  } else {
+    // Check for config files at profile root (v1 structure)
+    for (const file of expectedFiles) {
+      const filePath = path.join(profileDir, file);
 
-			if (!fs.existsSync(filePath)) {
-				missingFiles.push(file);
-			}
-		}
-	}
+      if (!fs.existsSync(filePath)) {
+        missingFiles.push(file);
+      }
+    }
+  }
 
-	// Generate contextual suggestions
-	if (missingFiles.includes("intent.md")) {
-		suggestions.push(
-			"Create intent.md to describe project goals and scope"
-		);
-	}
+  // Generate contextual suggestions
+  if (missingFiles.includes("intent.md")) {
+    suggestions.push("Create intent.md to describe project goals and scope");
+  }
 
-	if (missingFiles.includes("scope.yml")) {
-		suggestions.push("Create scope.yml to define PR discovery rules");
-	}
+  if (missingFiles.includes("scope.yml")) {
+    suggestions.push("Create scope.yml to define PR discovery rules");
+  }
 
-	if (missingFiles.includes("deps.yml")) {
-		suggestions.push("Create deps.yml to specify dependency relationships");
-	}
+  if (missingFiles.includes("deps.yml")) {
+    suggestions.push("Create deps.yml to specify dependency relationships");
+  }
 
-	if (missingFiles.includes("gates.yml")) {
-		suggestions.push("Create gates.yml to define quality gates");
-	}
+  if (missingFiles.includes("gates.yml")) {
+    suggestions.push("Create gates.yml to define quality gates");
+  }
 
-	return {
-		profileDir,
-		hasConfiguration: missingFiles.length === 0,
-		missingFiles,
-		suggestions,
-	};
+  return {
+    profileDir,
+    hasConfiguration: missingFiles.length === 0,
+    missingFiles,
+    suggestions,
+  };
 }
 
 /**
@@ -111,54 +107,51 @@ export function bootstrapWorkspace(
  * @param profileDirFlag - Optional profile directory override (from CLI --profile-dir)
  * @throws WriteProtectionError if attempting to write to a read-only profile
  */
-export function createMinimalWorkspace(
-	baseDir: string = ".",
-	profileDirFlag?: string
-): void {
-	// Resolve the profile directory and check write permissions
-	const resolved = resolveProfile(profileDirFlag, baseDir);
-	const profileDir = resolved.path;
-	const role = resolved.manifest.role;
+export function createMinimalWorkspace(baseDir: string = ".", profileDirFlag?: string): void {
+  // Resolve the profile directory and check write permissions
+  const resolved = resolveProfile(profileDirFlag, baseDir);
+  const profileDir = resolved.path;
+  const role = resolved.manifest.role;
 
-	// Validate write operation is allowed
-	validateWriteOperation(profileDir, role, "create minimal workspace");
+  // Validate write operation is allowed
+  validateWriteOperation(profileDir, role, "create minimal workspace");
 
-	// Ensure profile directory exists
-	fs.mkdirSync(profileDir, { recursive: true });
+  // Ensure profile directory exists
+  fs.mkdirSync(profileDir, { recursive: true });
 
-	// Create runner/ subdirectory for working artifacts
-	const runnerDir = path.join(profileDir, "runner");
-	fs.mkdirSync(runnerDir, { recursive: true });
+  // Create runner/ subdirectory for working artifacts
+  const runnerDir = path.join(profileDir, "runner");
+  fs.mkdirSync(runnerDir, { recursive: true });
 
-	// Create config files at profile root (v1 structure)
-	const intentPath = path.join(profileDir, "intent.md");
-	if (!fs.existsSync(intentPath)) {
-		fs.writeFileSync(intentPath, getMinimalTemplate("intent"));
-	}
+  // Create config files at profile root (v1 structure)
+  const intentPath = path.join(profileDir, "intent.md");
+  if (!fs.existsSync(intentPath)) {
+    fs.writeFileSync(intentPath, getMinimalTemplate("intent"));
+  }
 
-	const scopePath = path.join(profileDir, "scope.yml");
-	if (!fs.existsSync(scopePath)) {
-		fs.writeFileSync(scopePath, getMinimalTemplate("scope"));
-	}
+  const scopePath = path.join(profileDir, "scope.yml");
+  if (!fs.existsSync(scopePath)) {
+    fs.writeFileSync(scopePath, getMinimalTemplate("scope"));
+  }
 
-	const depsPath = path.join(profileDir, "deps.yml");
-	if (!fs.existsSync(depsPath)) {
-		fs.writeFileSync(depsPath, getMinimalTemplate("deps"));
-	}
+  const depsPath = path.join(profileDir, "deps.yml");
+  if (!fs.existsSync(depsPath)) {
+    fs.writeFileSync(depsPath, getMinimalTemplate("deps"));
+  }
 
-	const gatesPath = path.join(profileDir, "gates.yml");
-	if (!fs.existsSync(gatesPath)) {
-		fs.writeFileSync(gatesPath, getMinimalTemplate("gates"));
-	}
+  const gatesPath = path.join(profileDir, "gates.yml");
+  if (!fs.existsSync(gatesPath)) {
+    fs.writeFileSync(gatesPath, getMinimalTemplate("gates"));
+  }
 }
 
 /**
  * Get minimal template content for configuration files
  */
 function getMinimalTemplate(type: string): string {
-	switch (type) {
-		case "intent":
-			return `# Project Intent
+  switch (type) {
+    case "intent":
+      return `# Project Intent
 
 ## Goals
 - Define project objectives and scope
@@ -175,8 +168,8 @@ function getMinimalTemplate(type: string): string {
 - Use this to guide PR selection and integration priorities
 `;
 
-		case "scope":
-			return `version: 1
+    case "scope":
+      return `version: 1
 target: main
 sources:
   - query: "is:pr is:open"
@@ -191,8 +184,8 @@ defaults:
 pin_commits: false
 `;
 
-		case "deps":
-			return `version: 1
+    case "deps":
+      return `version: 1
 target: main
 items: []
 # Example item:
@@ -202,8 +195,8 @@ items: []
 #   strategy: merge-weave
 `;
 
-		case "gates":
-			return `version: 1
+    case "gates":
+      return `version: 1
 gates:
   - name: typecheck
     run: npm run typecheck
@@ -221,80 +214,74 @@ gates:
 #     - test-results.xml
 `;
 
-		default:
-			return `# Configuration file
+    default:
+      return `# Configuration file
 # Please update with appropriate content
 `;
-	}
+  }
 }
 
 /**
  * Detect project type and suggest appropriate templates
  */
 export function detectProjectType(baseDir: string = "."): string {
-	// Check for Node.js project
-	if (fs.existsSync(path.join(baseDir, "package.json"))) {
-		return "nodejs";
-	}
+  // Check for Node.js project
+  if (fs.existsSync(path.join(baseDir, "package.json"))) {
+    return "nodejs";
+  }
 
-	// Check for Python project
-	if (
-		fs.existsSync(path.join(baseDir, "pyproject.toml")) ||
-		fs.existsSync(path.join(baseDir, "requirements.txt")) ||
-		fs.existsSync(path.join(baseDir, "setup.py"))
-	) {
-		return "python";
-	}
+  // Check for Python project
+  if (
+    fs.existsSync(path.join(baseDir, "pyproject.toml")) ||
+    fs.existsSync(path.join(baseDir, "requirements.txt")) ||
+    fs.existsSync(path.join(baseDir, "setup.py"))
+  ) {
+    return "python";
+  }
 
-	// Check for Rust project
-	if (fs.existsSync(path.join(baseDir, "Cargo.toml"))) {
-		return "rust";
-	}
+  // Check for Rust project
+  if (fs.existsSync(path.join(baseDir, "Cargo.toml"))) {
+    return "rust";
+  }
 
-	// Check for Go project
-	if (fs.existsSync(path.join(baseDir, "go.mod"))) {
-		return "go";
-	}
+  // Check for Go project
+  if (fs.existsSync(path.join(baseDir, "go.mod"))) {
+    return "go";
+  }
 
-	return "generic";
+  return "generic";
 }
 
 /**
  * Get environment-specific configuration suggestions
  */
 export function getEnvironmentSuggestions(): string[] {
-	const suggestions: string[] = [];
+  const suggestions: string[] = [];
 
-	// Check for CI environment
-	if (process.env.CI) {
-		suggestions.push(
-			"Running in CI environment - consider CI-specific gate configurations"
-		);
-	}
+  // Check for CI environment
+  if (process.env.CI) {
+    suggestions.push("Running in CI environment - consider CI-specific gate configurations");
+  }
 
-	// Check for GitHub Actions
-	if (process.env.GITHUB_ACTIONS) {
-		suggestions.push(
-			"GitHub Actions detected - can use 'ci-service' runtime for gates"
-		);
-	}
+  // Check for GitHub Actions
+  if (process.env.GITHUB_ACTIONS) {
+    suggestions.push("GitHub Actions detected - can use 'ci-service' runtime for gates");
+  }
 
-	// Docker availability is checked asynchronously on module load and cached in
-	// `dockerAvailable`. If the value is true, emit a suggestion. If it's false
-	// or unknown (null) we don't block the event loop by running a sync check
-	// here. The async check is started once when the module is imported.
-	if (dockerAvailable === true) {
-		suggestions.push(
-			"Docker available - can use 'container' runtime for isolated gate execution"
-		);
-	}
+  // Docker availability is checked asynchronously on module load and cached in
+  // `dockerAvailable`. If the value is true, emit a suggestion. If it's false
+  // or unknown (null) we don't block the event loop by running a sync check
+  // here. The async check is started once when the module is imported.
+  if (dockerAvailable === true) {
+    suggestions.push("Docker available - can use 'container' runtime for isolated gate execution");
+  }
 
-	return suggestions;
+  return suggestions;
 }
 
 export class BootstrapError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "BootstrapError";
-	}
+  constructor(message: string) {
+    super(message);
+    this.name = "BootstrapError";
+  }
 }

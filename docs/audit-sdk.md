@@ -8,6 +8,7 @@ The Audit SDK provides **two distinct APIs**:
 2. **Consumer SDK** - For third-party tools to consume audit outputs (Phase 3A)
 
 **Key Features:**
+
 - 🎯 **Simple API** - Initialize, emit events, close (Gate SDK)
 - 📖 **Parser & Query** - Read, validate, and filter audit events (Consumer SDK)
 - 📝 **NDJSON Format** - Newline-delimited JSON for easy parsing
@@ -54,15 +55,15 @@ import {
   computeStatistics,
   validateAuditManifest,
   EventQuery,
-  type AuditEvent
-} from 'lexrunner/src/sdk/index.js';
+  type AuditEvent,
+} from "lexrunner/src/sdk/index.js";
 ```
 
 Or use the types and parsers directly:
 
 ```typescript
-import { parseAuditEvent, type AuditEvent } from 'lexrunner/src/audit/schema/events.js';
-import { parseAuditManifest } from 'lexrunner/src/audit/schema/manifest.js';
+import { parseAuditEvent, type AuditEvent } from "lexrunner/src/audit/schema/events.js";
+import { parseAuditManifest } from "lexrunner/src/audit/schema/manifest.js";
 ```
 
 ## Quick Start (Consumer SDK)
@@ -70,11 +71,11 @@ import { parseAuditManifest } from 'lexrunner/src/audit/schema/manifest.js';
 ### Example 1: Read and Filter Events
 
 ```typescript
-import { readAuditNDJSON, filterEvents } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSON, filterEvents } from "lexrunner/src/sdk/index.js";
 
 // Read all events from audit output
-for await (const event of readAuditNDJSON('./audit.ndjson')) {
-  if (event.event === 'gate_finished' && event.payload.status === 'fail') {
+for await (const event of readAuditNDJSON("./audit.ndjson")) {
+  if (event.event === "gate_finished" && event.payload.status === "fail") {
     console.log(`Failed gate: ${event.payload.gate} (item: ${event.payload.item})`);
   }
 }
@@ -83,16 +84,16 @@ for await (const event of readAuditNDJSON('./audit.ndjson')) {
 ### Example 2: Load into Memory and Query
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, EventQuery } from "lexrunner/src/sdk/index.js";
 
 // Load all events into memory
-const events = await readAuditNDJSONSync('./audit.ndjson');
+const events = await readAuditNDJSONSync("./audit.ndjson");
 
 // Use fluent query API
 const failedGates = new EventQuery(events)
-  .byEventType('gate_finished')
-  .byGateStatus('fail')
-  .byLevel('error')
+  .byEventType("gate_finished")
+  .byGateStatus("fail")
+  .byLevel("error")
   .execute();
 
 console.log(`Found ${failedGates.length} failed gates`);
@@ -101,9 +102,9 @@ console.log(`Found ${failedGates.length} failed gates`);
 ### Example 3: Compute Statistics
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, computeStatistics } from "lexrunner/src/sdk/index.js";
 
-const events = await readAuditNDJSONSync('./audit.ndjson');
+const events = await readAuditNDJSONSync("./audit.ndjson");
 const stats = computeStatistics(events);
 
 console.log(`Total events: ${stats.totalEvents}`);
@@ -115,16 +116,16 @@ console.log(`Time range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
 ### Example 4: Validate Manifest
 
 ```typescript
-import { validateAuditManifest } from 'lexrunner/src/sdk/index.js';
-import * as fs from 'fs';
+import { validateAuditManifest } from "lexrunner/src/sdk/index.js";
+import * as fs from "fs";
 
-const manifestData = JSON.parse(fs.readFileSync('./audit-manifest.json', 'utf8'));
+const manifestData = JSON.parse(fs.readFileSync("./audit-manifest.json", "utf8"));
 
 try {
   const manifest = validateAuditManifest(manifestData);
   console.log(`Valid manifest: ${manifest.files.length} files, ${manifest.totalBytes} bytes`);
 } catch (error) {
-  console.error('Invalid manifest:', error);
+  console.error("Invalid manifest:", error);
 }
 ```
 
@@ -137,8 +138,9 @@ try {
 Read audit events from an NDJSON file (async iterable).
 
 **Example:**
+
 ```typescript
-for await (const event of readAuditNDJSON('./audit.ndjson')) {
+for await (const event of readAuditNDJSON("./audit.ndjson")) {
   console.log(event.event, event.ts);
 }
 ```
@@ -148,8 +150,9 @@ for await (const event of readAuditNDJSON('./audit.ndjson')) {
 Read all audit events from an NDJSON file into an array.
 
 **Example:**
+
 ```typescript
-const events = await readAuditNDJSONSync('./audit.ndjson');
+const events = await readAuditNDJSONSync("./audit.ndjson");
 console.log(`Loaded ${events.length} events`);
 ```
 
@@ -158,6 +161,7 @@ console.log(`Loaded ${events.length} events`);
 Parse a single NDJSON line into a validated audit event.
 
 **Example:**
+
 ```typescript
 const event = parseAuditEventLine('{"schema_version":"1.0.0",...}');
 ```
@@ -167,6 +171,7 @@ const event = parseAuditEventLine('{"schema_version":"1.0.0",...}');
 Parse NDJSON content from a string.
 
 **Example:**
+
 ```typescript
 const events = parseAuditNDJSONString(ndjsonContent);
 ```
@@ -178,6 +183,7 @@ const events = parseAuditNDJSONString(ndjsonContent);
 Validate an audit manifest. Throws on validation error.
 
 **Example:**
+
 ```typescript
 const manifest = validateAuditManifest(manifestData);
 console.log(`Total bytes: ${manifest.totalBytes}`);
@@ -188,12 +194,13 @@ console.log(`Total bytes: ${manifest.totalBytes}`);
 Validate an audit manifest (safe version that returns result object).
 
 **Example:**
+
 ```typescript
 const result = validateAuditManifestSafe(manifestData);
 if (result.success) {
-  console.log('Valid manifest:', result.data);
+  console.log("Valid manifest:", result.data);
 } else {
-  console.error('Validation errors:', result.error);
+  console.error("Validation errors:", result.error);
 }
 ```
 
@@ -206,6 +213,7 @@ Validate a single audit event. Throws on validation error.
 Check if a schema version is compatible with a given major version.
 
 **Example:**
+
 ```typescript
 if (!isSchemaCompatible(event.schema_version, 1)) {
   console.warn(`Incompatible schema version: ${event.schema_version}`);
@@ -219,6 +227,7 @@ if (!isSchemaCompatible(event.schema_version, 1)) {
 Filter audit events by criteria.
 
 **Filter Options:**
+
 - `eventType` - Filter by event type(s)
 - `level` - Filter by level(s)
 - `sessionId` - Filter by session ID
@@ -229,11 +238,12 @@ Filter audit events by criteria.
 - `timeRange` - Filter by timestamp range
 
 **Example:**
+
 ```typescript
 const failedGates = filterEvents(events, {
-  eventType: 'gate_finished',
-  gateStatus: 'fail',
-  level: 'error'
+  eventType: "gate_finished",
+  gateStatus: "fail",
+  level: "error",
 });
 ```
 
@@ -242,6 +252,7 @@ const failedGates = filterEvents(events, {
 Fluent query builder for filtering events.
 
 **Methods:**
+
 - `byEventType(type)` - Filter by event type
 - `byLevel(level)` - Filter by level
 - `bySessionId(sessionId)` - Filter by session ID
@@ -256,11 +267,12 @@ Fluent query builder for filtering events.
 - `exists()` - Check if any events match
 
 **Example:**
+
 ```typescript
 const query = new EventQuery(events)
-  .byEventType('gate_finished')
-  .byGateStatus(['fail', 'error'])
-  .byTimeRange('2024-11-01T00:00:00Z', '2024-11-02T23:59:59Z');
+  .byEventType("gate_finished")
+  .byGateStatus(["fail", "error"])
+  .byTimeRange("2024-11-01T00:00:00Z", "2024-11-02T23:59:59Z");
 
 console.log(`Count: ${query.count()}`);
 console.log(`First: ${query.first()?.payload.gate}`);
@@ -274,36 +286,42 @@ const results = query.execute();
 Compute statistics from audit events.
 
 **Returns:**
+
 ```typescript
 {
   totalEvents: number;
   eventTypes: Record<string, number>;
-  levels: { info: number; warn: number; error: number };
+  levels: {
+    info: number;
+    warn: number;
+    error: number;
+  }
   gateStats: {
     total: number;
     passed: number;
     failed: number;
     skipped: number;
     errored: number;
-  };
+  }
   mergeStats: {
     total: number;
     success: number;
     conflict: number;
     errored: number;
-  };
+  }
   timeRange: {
     start: string;
     end: string;
-  };
+  }
 }
 ```
 
 **Example:**
+
 ```typescript
 const stats = computeStatistics(events);
 console.log(`Total events: ${stats.totalEvents}`);
-console.log(`Gate pass rate: ${stats.gateStats.passed / stats.gateStats.total * 100}%`);
+console.log(`Gate pass rate: ${(stats.gateStats.passed / stats.gateStats.total) * 100}%`);
 ```
 
 ## Consumer SDK Examples
@@ -311,14 +329,14 @@ console.log(`Gate pass rate: ${stats.gateStats.passed / stats.gateStats.total * 
 ### Example 1: CI/CD Integration - Report Failed Gates
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
 
 async function reportFailedGates() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
-  
+  const events = await readAuditNDJSONSync("./audit.ndjson");
+
   const failedGates = filterEvents(events, {
-    eventType: 'gate_finished',
-    gateStatus: ['fail', 'error']
+    eventType: "gate_finished",
+    gateStatus: ["fail", "error"],
   });
 
   if (failedGates.length > 0) {
@@ -328,7 +346,7 @@ async function reportFailedGates() {
     }
     process.exit(1);
   } else {
-    console.log('✅ All gates passed');
+    console.log("✅ All gates passed");
   }
 }
 
@@ -338,16 +356,16 @@ reportFailedGates();
 ### Example 2: Generate HTML Report
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics, filterEvents } from 'lexrunner/src/sdk/index.js';
-import * as fs from 'fs';
+import { readAuditNDJSONSync, computeStatistics, filterEvents } from "lexrunner/src/sdk/index.js";
+import * as fs from "fs";
 
 async function generateReport() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
+  const events = await readAuditNDJSONSync("./audit.ndjson");
   const stats = computeStatistics(events);
 
   const failedGates = filterEvents(events, {
-    eventType: 'gate_finished',
-    gateStatus: 'fail'
+    eventType: "gate_finished",
+    gateStatus: "fail",
   });
 
   const html = `
@@ -365,14 +383,14 @@ async function generateReport() {
   </ul>
   <h2>Failed Gates</h2>
   <ul>
-    ${failedGates.map(e => `<li>${e.payload.gate} (item ${e.payload.item})</li>`).join('\n')}
+    ${failedGates.map((e) => `<li>${e.payload.gate} (item ${e.payload.item})</li>`).join("\n")}
   </ul>
 </body>
 </html>
   `;
 
-  fs.writeFileSync('audit-report.html', html);
-  console.log('Report generated: audit-report.html');
+  fs.writeFileSync("audit-report.html", html);
+  console.log("Report generated: audit-report.html");
 }
 
 generateReport();
@@ -381,28 +399,28 @@ generateReport();
 ### Example 3: SIEM Integration - Export to JSON
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
-import * as fs from 'fs';
+import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
+import * as fs from "fs";
 
 async function exportToSIEM() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
-  
+  const events = await readAuditNDJSONSync("./audit.ndjson");
+
   // Filter high-priority events
   const criticalEvents = filterEvents(events, {
-    level: ['warn', 'error']
+    level: ["warn", "error"],
   });
 
   // Transform to SIEM format
-  const siemEvents = criticalEvents.map(event => ({
+  const siemEvents = criticalEvents.map((event) => ({
     timestamp: event.ts,
     severity: event.level,
-    source: 'lexrunner',
+    source: "lexrunner",
     event_type: event.event,
     session_id: event.session_id,
-    details: event.payload
+    details: event.payload,
   }));
 
-  fs.writeFileSync('siem-export.json', JSON.stringify(siemEvents, null, 2));
+  fs.writeFileSync("siem-export.json", JSON.stringify(siemEvents, null, 2));
   console.log(`Exported ${siemEvents.length} events to SIEM`);
 }
 
@@ -412,40 +430,37 @@ exportToSIEM();
 ### Example 4: Compliance Dashboard - Aggregate Metrics
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery, computeStatistics } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, EventQuery, computeStatistics } from "lexrunner/src/sdk/index.js";
 
 async function complianceDashboard() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
+  const events = await readAuditNDJSONSync("./audit.ndjson");
   const stats = computeStatistics(events);
 
   // Compute metrics
   const totalGates = stats.gateStats.total;
-  const passRate = totalGates > 0 ? (stats.gateStats.passed / totalGates * 100).toFixed(2) : 'N/A';
-  
-  const mergeConflicts = new EventQuery(events)
-    .byEventType('merge_conflict_detected')
-    .count();
+  const passRate =
+    totalGates > 0 ? ((stats.gateStats.passed / totalGates) * 100).toFixed(2) : "N/A";
 
-  const errors = new EventQuery(events)
-    .byLevel('error')
-    .count();
+  const mergeConflicts = new EventQuery(events).byEventType("merge_conflict_detected").count();
+
+  const errors = new EventQuery(events).byLevel("error").count();
 
   // Generate dashboard
-  console.log('=== Compliance Dashboard ===');
-  console.log(`Session ID: ${events[0]?.session_id || 'N/A'}`);
+  console.log("=== Compliance Dashboard ===");
+  console.log(`Session ID: ${events[0]?.session_id || "N/A"}`);
   console.log(`Time Range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
-  console.log('');
-  console.log('Gate Execution:');
+  console.log("");
+  console.log("Gate Execution:");
   console.log(`  Total: ${totalGates}`);
   console.log(`  Passed: ${stats.gateStats.passed}`);
   console.log(`  Failed: ${stats.gateStats.failed}`);
   console.log(`  Pass Rate: ${passRate}%`);
-  console.log('');
-  console.log('Merge Operations:');
+  console.log("");
+  console.log("Merge Operations:");
   console.log(`  Total: ${stats.mergeStats.total}`);
   console.log(`  Success: ${stats.mergeStats.success}`);
   console.log(`  Conflicts: ${mergeConflicts}`);
-  console.log('');
+  console.log("");
   console.log(`Total Errors: ${errors}`);
 }
 
@@ -455,16 +470,16 @@ complianceDashboard();
 ### Example 5: Filter by Time Range
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
 
 async function eventsInTimeRange() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
-  
+  const events = await readAuditNDJSONSync("./audit.ndjson");
+
   const filtered = filterEvents(events, {
     timeRange: {
-      start: '2024-11-02T00:00:00Z',
-      end: '2024-11-02T23:59:59Z'
-    }
+      start: "2024-11-02T00:00:00Z",
+      end: "2024-11-02T23:59:59Z",
+    },
   });
 
   console.log(`Events in date range: ${filtered.length}`);
@@ -476,30 +491,28 @@ eventsInTimeRange();
 ### Example 6: Type-Safe Event Handling
 
 ```typescript
-import { readAuditNDJSONSync, type GateFinishedEvent } from 'lexrunner/src/sdk/index.js';
+import { readAuditNDJSONSync, type GateFinishedEvent } from "lexrunner/src/sdk/index.js";
 
 async function analyzeGatePerformance() {
-  const events = await readAuditNDJSONSync('./audit.ndjson');
-  
+  const events = await readAuditNDJSONSync("./audit.ndjson");
+
   // Type-safe filtering
-  const gateEvents = events.filter(
-    (e): e is GateFinishedEvent => e.event === 'gate_finished'
-  );
+  const gateEvents = events.filter((e): e is GateFinishedEvent => e.event === "gate_finished");
 
   // Calculate average duration per gate
   const durationsByGate: Record<string, number[]> = {};
-  
+
   for (const event of gateEvents) {
     const gate = event.payload.gate;
     const duration = event.payload.duration_ms;
-    
+
     if (!durationsByGate[gate]) {
       durationsByGate[gate] = [];
     }
     durationsByGate[gate].push(duration);
   }
 
-  console.log('Average gate durations:');
+  console.log("Average gate durations:");
   for (const [gate, durations] of Object.entries(durationsByGate)) {
     const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
     console.log(`  ${gate}: ${avg.toFixed(0)}ms`);
@@ -525,7 +538,7 @@ npm install lexrunner
 Or import directly from the source:
 
 ```typescript
-import { initAuditSDK } from 'lexrunner/src/audit/sdk';
+import { initAuditSDK } from "lexrunner/src/audit/sdk";
 ```
 
 ---
@@ -536,23 +549,27 @@ import { initAuditSDK } from 'lexrunner/src/audit/sdk';
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lexrunner/src/audit/sdk';
+import { initAuditSDK } from "lexrunner/src/audit/sdk";
 
-const audit = initAuditSDK('my-gate');
+const audit = initAuditSDK("my-gate");
 
 async function runGate() {
   try {
     // Emit custom events
-    await audit.emit('gate_start', { version: '1.0.0' });
-    
+    await audit.emit("gate_start", { version: "1.0.0" });
+
     // Your gate logic here
     const result = await executeGateLogic();
-    
-    await audit.emit('gate_complete', { result });
+
+    await audit.emit("gate_complete", { result });
   } catch (error) {
-    await audit.emit('gate_error', { 
-      error: error instanceof Error ? error.message : String(error) 
-    }, 'error');
+    await audit.emit(
+      "gate_error",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "error"
+    );
     throw error;
   } finally {
     await audit.close();
@@ -580,13 +597,15 @@ The SDK requires two environment variables to be active:
 Initialize the Audit SDK for a gate.
 
 **Parameters:**
+
 - `gateName` - Identifier for this gate (used in events and file naming)
 
 **Returns:** `AuditSDK` instance
 
 **Example:**
+
 ```typescript
-const audit = initAuditSDK('lint');
+const audit = initAuditSDK("lint");
 ```
 
 ---
@@ -596,17 +615,23 @@ const audit = initAuditSDK('lint');
 Emit a custom audit event.
 
 **Parameters:**
+
 - `event` - Event name (e.g., 'scan_complete', 'test_start')
 - `payload` - Event data (any JSON-serializable object)
 - `level` - Log level (default: 'info')
 
 **Example:**
+
 ```typescript
-await audit.emit('scan_complete', {
-  total: 100,
-  passed: 95,
-  failed: 5
-}, 'info');
+await audit.emit(
+  "scan_complete",
+  {
+    total: 100,
+    passed: 95,
+    failed: 5,
+  },
+  "info"
+);
 ```
 
 ---
@@ -616,16 +641,18 @@ await audit.emit('scan_complete', {
 Emit a vulnerability finding.
 
 **Parameters:**
+
 - `cve` - CVE identifier or vulnerability ID
 - `severity` - One of 'critical', 'high', 'medium', 'low'
 - `details` - Optional additional data (package, version, fixedIn, etc.)
 
 **Example:**
+
 ```typescript
-await audit.emitVuln('CVE-2024-1234', 'high', {
-  package: 'lodash',
-  version: '4.17.20',
-  fixedIn: '4.17.21'
+await audit.emitVuln("CVE-2024-1234", "high", {
+  package: "lodash",
+  version: "4.17.20",
+  fixedIn: "4.17.21",
 });
 ```
 
@@ -636,15 +663,17 @@ await audit.emitVuln('CVE-2024-1234', 'high', {
 Emit a test result.
 
 **Parameters:**
+
 - `name` - Test name or identifier
 - `status` - One of 'pass', 'fail', 'skip'
 - `duration_ms` - Optional test duration in milliseconds
 
 **Example:**
+
 ```typescript
-await audit.emitTestResult('unit-test-auth', 'pass', 123);
-await audit.emitTestResult('integration-test-api', 'fail', 456);
-await audit.emitTestResult('e2e-test-ui', 'skip');
+await audit.emitTestResult("unit-test-auth", "pass", 123);
+await audit.emitTestResult("integration-test-api", "fail", 456);
+await audit.emitTestResult("e2e-test-ui", "skip");
 ```
 
 ---
@@ -656,9 +685,10 @@ Close the audit stream and flush remaining events.
 **Must be called** when done emitting events to ensure all data is written.
 
 **Example:**
+
 ```typescript
 try {
-  await audit.emit('event', {});
+  await audit.emit("event", {});
 } finally {
   await audit.close();
 }
@@ -672,20 +702,20 @@ try {
 
 The SDK supports arbitrary custom events, but here are recommended standard events:
 
-| Event | Description | Example Payload |
-|-------|-------------|-----------------|
-| `gate_start` | Gate execution begins | `{ version: '1.0.0' }` |
-| `gate_complete` | Gate execution succeeds | `{ duration_ms: 1234 }` |
-| `gate_error` | Gate execution fails | `{ error: 'message' }` |
-| `scan_start` | Vulnerability scan begins | `{ target: 'package.json' }` |
-| `scan_complete` | Vulnerability scan ends | `{ total: 100, vulnerable: 5 }` |
-| `vuln_found` | Vulnerability detected | `{ cve: '...', severity: 'high' }` |
-| `test_result` | Individual test result | `{ name: '...', status: 'pass' }` |
-| `test_run_start` | Test suite begins | `{ suite: 'unit-tests' }` |
-| `test_run_complete` | Test suite ends | `{ passed: 10, failed: 2 }` |
-| `lint_start` | Linting begins | `{ files: 42 }` |
-| `lint_complete` | Linting complete | `{ violations: 0 }` |
-| `lint_violations` | Lint violations found | `{ count: 5, violations: [...] }` |
+| Event               | Description               | Example Payload                    |
+| ------------------- | ------------------------- | ---------------------------------- |
+| `gate_start`        | Gate execution begins     | `{ version: '1.0.0' }`             |
+| `gate_complete`     | Gate execution succeeds   | `{ duration_ms: 1234 }`            |
+| `gate_error`        | Gate execution fails      | `{ error: 'message' }`             |
+| `scan_start`        | Vulnerability scan begins | `{ target: 'package.json' }`       |
+| `scan_complete`     | Vulnerability scan ends   | `{ total: 100, vulnerable: 5 }`    |
+| `vuln_found`        | Vulnerability detected    | `{ cve: '...', severity: 'high' }` |
+| `test_result`       | Individual test result    | `{ name: '...', status: 'pass' }`  |
+| `test_run_start`    | Test suite begins         | `{ suite: 'unit-tests' }`          |
+| `test_run_complete` | Test suite ends           | `{ passed: 10, failed: 2 }`        |
+| `lint_start`        | Linting begins            | `{ files: 42 }`                    |
+| `lint_complete`     | Linting complete          | `{ violations: 0 }`                |
+| `lint_violations`   | Lint violations found     | `{ count: 5, violations: [...] }`  |
 
 ---
 
@@ -696,12 +726,14 @@ Events are written to NDJSON (newline-delimited JSON) files:
 **File Path:** `{LEX_AUDIT_DROP_DIR}/{gateName}.{pid}.ndjson`
 
 **Format:**
+
 ```json
 {"event":"gate_start","ts":"2024-10-13T12:00:00Z","level":"info","gate":"lint","payload":{"version":"1.0.0"}}
 {"event":"lint_complete","ts":"2024-10-13T12:00:02Z","level":"info","gate":"lint","payload":{"violations":0}}
 ```
 
 **Fields:**
+
 - `event` - Event name
 - `ts` - ISO 8601 timestamp
 - `level` - Log level ('info', 'warn', 'error')
@@ -761,20 +793,20 @@ class AuditSDK:
         self.gate_name = gate_name
         self.drop_dir = os.environ.get('LEX_AUDIT_DROP_DIR')
         self.session_id = os.environ.get('LEX_AUDIT_SESSION_ID')
-        
+
         if self.drop_dir and self.session_id:
             self.sidecar_path = os.path.join(
-                self.drop_dir, 
+                self.drop_dir,
                 f"{gate_name}.{os.getpid()}.ndjson"
             )
             self.file = open(self.sidecar_path, 'a')
         else:
             self.file = None
-    
+
     def emit(self, event, payload, level='info'):
         if not self.file:
             return
-        
+
         entry = {
             'event': event,
             'ts': datetime.utcnow().isoformat() + 'Z',
@@ -784,7 +816,7 @@ class AuditSDK:
         }
         self.file.write(json.dumps(entry) + '\n')
         self.file.flush()
-    
+
     def close(self):
         if self.file:
             self.file.close()
@@ -807,97 +839,101 @@ finally:
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lexrunner/src/audit/sdk';
-import { execSync } from 'child_process';
+import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { execSync } from "child_process";
 
-const audit = initAuditSDK('vuln');
+const audit = initAuditSDK("vuln");
 
 async function scanVulnerabilities(packageJsonPath: string) {
   try {
-    await audit.emit('scan_start', { 
+    await audit.emit("scan_start", {
       target: packageJsonPath,
-      scanner: 'npm-audit'
+      scanner: "npm-audit",
     });
-    
-    const output = execSync('npm audit --json', { encoding: 'utf-8' });
+
+    const output = execSync("npm audit --json", { encoding: "utf-8" });
     const auditData = JSON.parse(output);
-    
+
     // Emit each vulnerability
     for (const [id, vuln] of Object.entries(auditData.vulnerabilities)) {
       await audit.emitVuln(vuln.cves?.[0] || id, vuln.severity, {
         package: vuln.name,
         version: vuln.range,
-        fixedIn: vuln.fixAvailable?.version
+        fixedIn: vuln.fixAvailable?.version,
       });
     }
-    
-    await audit.emit('scan_complete', {
+
+    await audit.emit("scan_complete", {
       total: Object.keys(auditData.vulnerabilities).length,
       vulnerable: auditData.metadata.vulnerabilities.total,
-      severity_breakdown: auditData.metadata.vulnerabilities
+      severity_breakdown: auditData.metadata.vulnerabilities,
     });
-    
+
     process.exit(auditData.metadata.vulnerabilities.total > 0 ? 1 : 0);
   } catch (error) {
-    await audit.emit('scan_error', { 
-      error: error instanceof Error ? error.message : String(error) 
-    }, 'error');
+    await audit.emit(
+      "scan_error",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "error"
+    );
     process.exit(2);
   } finally {
     await audit.close();
   }
 }
 
-scanVulnerabilities(process.argv[2] || 'package.json');
+scanVulnerabilities(process.argv[2] || "package.json");
 ```
 
 ### Example 2: Test Runner
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lexrunner/src/audit/sdk';
-import { execSync } from 'child_process';
+import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { execSync } from "child_process";
 
-const audit = initAuditSDK('test');
+const audit = initAuditSDK("test");
 
 async function runTests() {
   try {
-    await audit.emit('test_run_start', { 
-      suite: 'unit-tests',
-      framework: 'vitest'
+    await audit.emit("test_run_start", {
+      suite: "unit-tests",
+      framework: "vitest",
     });
-    
+
     const startTime = Date.now();
-    
+
     try {
-      const output = execSync('npm run test:unit -- --reporter=json', { 
-        encoding: 'utf-8' 
+      const output = execSync("npm run test:unit -- --reporter=json", {
+        encoding: "utf-8",
       });
       const results = JSON.parse(output);
-      
+
       // Emit individual test results
       for (const test of results.tests) {
-        await audit.emitTestResult(
-          test.name, 
-          test.status, 
-          test.duration
-        );
+        await audit.emitTestResult(test.name, test.status, test.duration);
       }
-      
+
       const duration = Date.now() - startTime;
-      
-      await audit.emit('test_run_complete', {
+
+      await audit.emit("test_run_complete", {
         passed: results.passed,
         failed: results.failed,
         skipped: results.skipped,
-        duration_ms: duration
+        duration_ms: duration,
       });
-      
+
       process.exit(results.failed > 0 ? 1 : 0);
     } catch (error) {
-      await audit.emit('test_run_failed', { 
-        error: error instanceof Error ? error.message : String(error) 
-      }, 'error');
+      await audit.emit(
+        "test_run_failed",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "error"
+      );
       process.exit(1);
     }
   } finally {
@@ -912,30 +948,34 @@ runTests();
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from 'lexrunner/src/audit/sdk';
-import { execSync } from 'child_process';
+import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { execSync } from "child_process";
 
-const audit = initAuditSDK('lint');
+const audit = initAuditSDK("lint");
 
 async function runLinter() {
   try {
-    await audit.emit('lint_start', { 
-      tool: 'eslint',
-      config: '.eslintrc.json'
+    await audit.emit("lint_start", {
+      tool: "eslint",
+      config: ".eslintrc.json",
     });
-    
+
     try {
-      execSync('npm run lint', { stdio: 'pipe' });
-      await audit.emit('lint_complete', { violations: 0 });
+      execSync("npm run lint", { stdio: "pipe" });
+      await audit.emit("lint_complete", { violations: 0 });
       process.exit(0);
     } catch (error: any) {
       const violations = parseLintOutput(error.stdout);
-      
-      await audit.emit('lint_violations', { 
-        count: violations.length,
-        violations: violations.slice(0, 10) // First 10 for brevity
-      }, 'warn');
-      
+
+      await audit.emit(
+        "lint_violations",
+        {
+          count: violations.length,
+          violations: violations.slice(0, 10), // First 10 for brevity
+        },
+        "warn"
+      );
+
       process.exit(1);
     }
   } finally {
@@ -974,7 +1014,7 @@ The runner periodically ingests sidecar files and enriches them with envelope me
 
 ```typescript
 try {
-  await audit.emit('event', {});
+  await audit.emit("event", {});
 } finally {
   await audit.close(); // Ensures data is flushed
 }
@@ -987,10 +1027,10 @@ Prefer standard event names from the event catalog for consistency across gates.
 ### 3. Include Contextual Metadata
 
 ```typescript
-await audit.emit('gate_start', {
-  version: '1.0.0',
+await audit.emit("gate_start", {
+  version: "1.0.0",
   config: configPath,
-  environment: process.env.NODE_ENV
+  environment: process.env.NODE_ENV,
 });
 ```
 
@@ -1000,10 +1040,14 @@ await audit.emit('gate_start', {
 try {
   await runGateLogic();
 } catch (error) {
-  await audit.emit('gate_error', { 
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined
-  }, 'error');
+  await audit.emit(
+    "gate_error",
+    {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    },
+    "error"
+  );
   throw error;
 }
 ```
@@ -1043,25 +1087,25 @@ try {
 The SDK is fully typed for TypeScript users:
 
 ```typescript
-import { 
-  initAuditSDK, 
-  AuditSDK, 
+import {
+  initAuditSDK,
+  AuditSDK,
   VulnFoundPayload,
-  TestResultPayload 
-} from 'lexrunner/src/audit/sdk';
+  TestResultPayload,
+} from "lexrunner/src/audit/sdk";
 
-const audit: AuditSDK = initAuditSDK('my-gate');
+const audit: AuditSDK = initAuditSDK("my-gate");
 
 // Typed payloads
 const vulnPayload: VulnFoundPayload = {
-  cve: 'CVE-2024-1234',
-  severity: 'high',
-  package: 'lodash',
-  version: '4.17.20',
-  fixedIn: '4.17.21'
+  cve: "CVE-2024-1234",
+  severity: "high",
+  package: "lodash",
+  version: "4.17.20",
+  fixedIn: "4.17.21",
 };
 
-await audit.emit<VulnFoundPayload>('vuln_found', vulnPayload, 'warn');
+await audit.emit<VulnFoundPayload>("vuln_found", vulnPayload, "warn");
 ```
 
 ---
@@ -1075,6 +1119,7 @@ npm install @lexrunner/audit-sdk
 ```
 
 This would enable:
+
 - Independent versioning
 - Smaller dependency footprint
 - Easier adoption for external gates

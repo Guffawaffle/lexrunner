@@ -5,6 +5,7 @@ This document describes how LexRunner integrates with the Lex memory system.
 ## Module Validation Context
 
 When LexRunner encounters module validation errors:
+
 - **In local dev**: Non-blocking warning, falls back to substring matching
 - **In CI (strict mode)**: Build fails, must fix before merge
 
@@ -12,25 +13,23 @@ When LexRunner encounters module validation errors:
 
 ```typescript
 async function lexrunnerValidateModules(modules: string[], policy: Policy) {
-  const resolutions = await Promise.all(
-    modules.map(id => resolveModuleId(id, policy))
-  );
+  const resolutions = await Promise.all(modules.map((id) => resolveModuleId(id, policy)));
 
-  const warnings = resolutions.filter(r => r.confidence < 1.0 && r.confidence > 0);
-  const errors = resolutions.filter(r => r.confidence === 0);
+  const warnings = resolutions.filter((r) => r.confidence < 1.0 && r.confidence > 0);
+  const errors = resolutions.filter((r) => r.confidence === 0);
 
   if (warnings.length > 0) {
-    console.warn('⚠️  Low-confidence resolutions:');
-    warnings.forEach(w => {
+    console.warn("⚠️  Low-confidence resolutions:");
+    warnings.forEach((w) => {
       console.warn(`  '${w.original}' → '${w.canonical}' (${w.source})`);
     });
   }
 
   if (errors.length > 0) {
-    throw new Error(`Invalid modules: ${errors.map(e => e.original).join(', ')}`);
+    throw new Error(`Invalid modules: ${errors.map((e) => e.original).join(", ")}`);
   }
 
-  return resolutions.map(r => r.canonical);
+  return resolutions.map((r) => r.canonical);
 }
 ```
 

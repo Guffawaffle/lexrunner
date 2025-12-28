@@ -2,15 +2,15 @@
  * Mock GitHub API responses for testing
  */
 
-import type { MockPR } from '../prs/basic.js';
+import type { MockPR } from "../prs/basic.js";
 
 export interface MockOctokit {
   rest: {
     pulls: {
       list: (params?: { state?: string }) => Promise<{ data: MockPR[] }>;
       get: (params: { pull_number: number }) => Promise<{ data: MockPR }>;
-      listFiles: (params: { pull_number: number }) => Promise<{ 
-        data: MockPR['files'] 
+      listFiles: (params: { pull_number: number }) => Promise<{
+        data: MockPR["files"];
       }>;
     };
     issues: {
@@ -26,17 +26,15 @@ export interface MockOctokit {
  * Create a mock GitHub/Octokit client with fixture PRs
  */
 export function createMockGitHub(prs: MockPR[]): MockOctokit {
-  const prMap = new Map(prs.map(pr => [pr.number, pr]));
+  const prMap = new Map(prs.map((pr) => [pr.number, pr]));
 
   return {
     rest: {
       pulls: {
         list: async (params?: { state?: string }) => {
-          const state = params?.state ?? 'open';
-          const filtered = state === 'all' 
-            ? prs 
-            : prs.filter(pr => pr.state === state);
-          
+          const state = params?.state ?? "open";
+          const filtered = state === "all" ? prs : prs.filter((pr) => pr.state === state);
+
           return { data: filtered };
         },
         get: async ({ pull_number }: { pull_number: number }) => {
@@ -52,7 +50,7 @@ export function createMockGitHub(prs: MockPR[]): MockOctokit {
             throw new Error(`PR #${pull_number} not found`);
           }
           return { data: pr.files };
-        }
+        },
       },
       issues: {
         listLabelsOnIssue: async ({ issue_number }: { issue_number: number }) => {
@@ -60,22 +58,22 @@ export function createMockGitHub(prs: MockPR[]): MockOctokit {
           if (!pr) {
             throw new Error(`Issue #${issue_number} not found`);
           }
-          return { 
-            data: pr.labels?.map(l => ({ name: l.name })) ?? [] 
+          return {
+            data: pr.labels?.map((l) => ({ name: l.name })) ?? [],
           };
         },
         addLabels: async () => {
           // Mock implementation - no-op
-        }
-      }
-    }
+        },
+      },
+    },
   };
 }
 
 /**
  * Create a mock that throws errors (for error handling tests)
  */
-export function createErrorMock(errorMessage: string = 'API Error'): MockOctokit {
+export function createErrorMock(errorMessage: string = "API Error"): MockOctokit {
   const error = async () => {
     throw new Error(errorMessage);
   };
@@ -85,12 +83,12 @@ export function createErrorMock(errorMessage: string = 'API Error'): MockOctokit
       pulls: {
         list: error,
         get: error,
-        listFiles: error
+        listFiles: error,
       },
       issues: {
-        listLabelsOnIssue: error
-      }
-    }
+        listLabelsOnIssue: error,
+      },
+    },
   };
 }
 
@@ -113,21 +111,21 @@ export function createRateLimitedMock(
     if (callCount % resetAfter < limit) {
       return;
     }
-    const error = new Error('API rate limit exceeded') as APIError;
+    const error = new Error("API rate limit exceeded") as APIError;
     error.status = 403;
     throw error;
   };
 
-  const prMap = new Map(prs.map(pr => [pr.number, pr]));
+  const prMap = new Map(prs.map((pr) => [pr.number, pr]));
 
   return {
     rest: {
       pulls: {
         list: async (params?: { state?: string }) => {
           checkRateLimit();
-          const state = params?.state ?? 'open';
-          return { 
-            data: prs.filter(pr => pr.state === state) 
+          const state = params?.state ?? "open";
+          return {
+            data: prs.filter((pr) => pr.state === state),
           };
         },
         get: async ({ pull_number }: { pull_number: number }) => {
@@ -145,7 +143,7 @@ export function createRateLimitedMock(
             throw new Error(`PR #${pull_number} not found`);
           }
           return { data: pr.files };
-        }
+        },
       },
       issues: {
         listLabelsOnIssue: async ({ issue_number }: { issue_number: number }) => {
@@ -154,33 +152,30 @@ export function createRateLimitedMock(
           if (!pr) {
             throw new Error(`Issue #${issue_number} not found`);
           }
-          return { 
-            data: pr.labels?.map(l => ({ name: l.name })) ?? [] 
+          return {
+            data: pr.labels?.map((l) => ({ name: l.name })) ?? [],
           };
-        }
-      }
-    }
+        },
+      },
+    },
   };
 }
 
 /**
  * Create a mock with delayed responses (for timeout testing)
  */
-export function createSlowMock(
-  prs: MockPR[],
-  delayMs: number = 1000
-): MockOctokit {
-  const delay = () => new Promise(resolve => setTimeout(resolve, delayMs));
-  const prMap = new Map(prs.map(pr => [pr.number, pr]));
+export function createSlowMock(prs: MockPR[], delayMs: number = 1000): MockOctokit {
+  const delay = () => new Promise((resolve) => setTimeout(resolve, delayMs));
+  const prMap = new Map(prs.map((pr) => [pr.number, pr]));
 
   return {
     rest: {
       pulls: {
         list: async (params?: { state?: string }) => {
           await delay();
-          const state = params?.state ?? 'open';
-          return { 
-            data: prs.filter(pr => pr.state === state) 
+          const state = params?.state ?? "open";
+          return {
+            data: prs.filter((pr) => pr.state === state),
           };
         },
         get: async ({ pull_number }: { pull_number: number }) => {
@@ -198,7 +193,7 @@ export function createSlowMock(
             throw new Error(`PR #${pull_number} not found`);
           }
           return { data: pr.files };
-        }
+        },
       },
       issues: {
         listLabelsOnIssue: async ({ issue_number }: { issue_number: number }) => {
@@ -207,12 +202,12 @@ export function createSlowMock(
           if (!pr) {
             throw new Error(`Issue #${issue_number} not found`);
           }
-          return { 
-            data: pr.labels?.map(l => ({ name: l.name })) ?? [] 
+          return {
+            data: pr.labels?.map((l) => ({ name: l.name })) ?? [],
           };
-        }
-      }
-    }
+        },
+      },
+    },
   };
 }
 

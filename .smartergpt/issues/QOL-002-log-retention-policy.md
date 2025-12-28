@@ -22,6 +22,7 @@ Governance logs will accumulate over time. Need automatic cleanup to prevent unb
 ## Implementation Details
 
 **Files Modified:**
+
 - `src/lexsona/logger.ts`: Added retention functions, async writeGovernanceLog
   - `cleanupOldLogs(maxAgeDays)`: Deletes logs older than threshold
   - `enforceRetentionPolicy(maxSizeMB)`: Deletes oldest logs if size exceeded
@@ -40,6 +41,7 @@ Governance logs will accumulate over time. Need automatic cleanup to prevent unb
 - `src/cli.ts`: Registered governanceCleanup command
 
 **Tests Added:**
+
 - `tests/governance-retention.spec.ts`: 8 comprehensive tests
   - Age-based cleanup
   - Size-based cleanup
@@ -47,12 +49,14 @@ Governance logs will accumulate over time. Need automatic cleanup to prevent unb
   - Config resolution
 
 **Defaults:**
+
 - Max age: 30 days
 - Max size: 100 MB
 - Compression: Deferred (not implemented - add when disk usage becomes issue)
 - Cleanup: Automatic before every log write
 
 **CLI Examples:**
+
 ```bash
 # Show current stats
 lex-pr governance:cleanup --stats

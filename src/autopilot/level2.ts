@@ -14,248 +14,249 @@ import * as path from "path";
  * Adds PR comments and status checks to Level 1 artifacts
  */
 export class AutopilotLevel2 extends AutopilotLevel1 {
-	getLevel(): number {
-		return 2;
-	}
+  getLevel(): number {
+    return 2;
+  }
 
-	async execute(customDeliverablesDir?: string): Promise<AutopilotResult> {
-		try {
-			// Execute Level 1 first to generate artifacts
-			const level1Result = await super.execute(customDeliverablesDir);
-			if (!level1Result.success) {
-				return level1Result; // Propagate Level 1 failure
-			}
+  async execute(customDeliverablesDir?: string): Promise<AutopilotResult> {
+    try {
+      // Execute Level 1 first to generate artifacts
+      const level1Result = await super.execute(customDeliverablesDir);
+      if (!level1Result.success) {
+        return level1Result; // Propagate Level 1 failure
+      }
 
-			// Extract PR context from plan or environment
-			const prContext = this.extractPRContext();
-			if (!prContext) {
-				// No PR context - Level 2 operates in artifact-only mode
-				return {
-					level: 2,
-					success: true,
-					message: level1Result.message + "\n\nLevel 2: No PR context detected - artifacts only mode",
-					artifacts: level1Result.artifacts
-				};
-			}
+      // Extract PR context from plan or environment
+      const prContext = this.extractPRContext();
+      if (!prContext) {
+        // No PR context - Level 2 operates in artifact-only mode
+        return {
+          level: 2,
+          success: true,
+          message:
+            level1Result.message + "\n\nLevel 2: No PR context detected - artifacts only mode",
+          artifacts: level1Result.artifacts,
+        };
+      }
 
-			// Initialize GitHub client
-			const github = await this.createGitHubClient();
+      // Initialize GitHub client
+      const github = await this.createGitHubClient();
 
-			// Generate PR comment content
-			const commentContent = await this.generatePRComment();
+      // Generate PR comment content
+      const commentContent = await this.generatePRComment();
 
-			// Update or create PR comment
-			await this.updatePRComment(github, prContext, commentContent);
+      // Update or create PR comment
+      await this.updatePRComment(github, prContext, commentContent);
 
-			// Update PR status check
-			await this.updatePRStatus(github, prContext);
+      // Update PR status check
+      await this.updatePRStatus(github, prContext);
 
-			const message = [
-				level1Result.message,
-				"",
-				"Level 2: PR annotations complete",
-				`  • Updated PR #${prContext.number} comment`,
-				`  • Set status check: lex-pr/weave-analysis`,
-				`  • Comment marker: lex-pr:analysis:v1:${new Date().toISOString().slice(0, 19).replace(/[-:]/g, "")}`
-			].join("\n");
+      const message = [
+        level1Result.message,
+        "",
+        "Level 2: PR annotations complete",
+        `  • Updated PR #${prContext.number} comment`,
+        `  • Set status check: lex-pr/weave-analysis`,
+        `  • Comment marker: lex-pr:analysis:v1:${new Date().toISOString().slice(0, 19).replace(/[-:]/g, "")}`,
+      ].join("\n");
 
-			return {
-				level: 2,
-				success: true,
-				message,
-				artifacts: level1Result.artifacts
-			};
+      return {
+        level: 2,
+        success: true,
+        message,
+        artifacts: level1Result.artifacts,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        level: 2,
+        success: false,
+        message: `Level 2 execution failed: ${errorMessage}`,
+      };
+    }
+  }
 
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			return {
-				level: 2,
-				success: false,
-				message: `Level 2 execution failed: ${errorMessage}`
-			};
-		}
-	}
+  /**
+   * Extract PR context from environment or plan metadata
+   */
+  private extractPRContext(): { owner: string; repo: string; number: number } | null {
+    // Try environment variables (common in CI)
+    const prNumber = process.env.GITHUB_PR_NUMBER || process.env.PR_NUMBER;
+    const repo = process.env.GITHUB_REPOSITORY;
 
-	/**
-	 * Extract PR context from environment or plan metadata
-	 */
-	private extractPRContext(): { owner: string; repo: string; number: number } | null {
-		// Try environment variables (common in CI)
-		const prNumber = process.env.GITHUB_PR_NUMBER || process.env.PR_NUMBER;
-		const repo = process.env.GITHUB_REPOSITORY;
+    if (prNumber && repo) {
+      const [owner, repoName] = repo.split("/");
+      return {
+        owner,
+        repo: repoName,
+        number: parseInt(prNumber, 10),
+      };
+    }
 
-		if (prNumber && repo) {
-			const [owner, repoName] = repo.split('/');
-			return {
-				owner,
-				repo: repoName,
-				number: parseInt(prNumber, 10)
-			};
-		}
+    // Try extracting from current branch name (e.g., pr/123)
+    // This would require git operations - simplified for now
+    return null;
+  }
 
-		// Try extracting from current branch name (e.g., pr/123)
-		// This would require git operations - simplified for now
-		return null;
-	}
+  /**
+   * Create GitHub client with authentication
+   */
+  private async createGitHubClient() {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new Error("GitHub token required for Level 2 (set GITHUB_TOKEN environment variable)");
+    }
 
-	/**
-	 * Create GitHub client with authentication
-	 */
-	private async createGitHubClient() {
-		const token = process.env.GITHUB_TOKEN;
-		if (!token) {
-			throw new Error("GitHub token required for Level 2 (set GITHUB_TOKEN environment variable)");
-		}
+    // Use Octokit directly for PR comments/status since current GitHubClient doesn't support them
+    const { Octokit } = await import("@octokit/rest");
+    return new Octokit({
+      auth: token,
+    });
+  }
 
-		// Use Octokit directly for PR comments/status since current GitHubClient doesn't support them
-		const { Octokit } = await import("@octokit/rest");
-		return new Octokit({
-			auth: token
-		});
-	}
+  /**
+   * Generate PR comment content from Level 1 artifacts
+   */
+  private async generatePRComment(): Promise<string> {
+    const plan = this.context.plan;
+    const mergeOrder = this.computeMergeOrder();
+    const recommendations = this.generateRecommendations();
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "");
 
-	/**
-	 * Generate PR comment content from Level 1 artifacts
-	 */
-	private async generatePRComment(): Promise<string> {
-		const plan = this.context.plan;
-		const mergeOrder = this.computeMergeOrder();
-		const recommendations = this.generateRecommendations();
-		const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "");
+    // Check for comment template
+    const templatePath = this.getCommentTemplatePath();
+    if (templatePath && fs.existsSync(templatePath)) {
+      return this.renderCommentTemplate(templatePath, {
+        plan,
+        mergeOrder,
+        recommendations,
+        timestamp,
+      });
+    }
 
-		// Check for comment template
-		const templatePath = this.getCommentTemplatePath();
-		if (templatePath && fs.existsSync(templatePath)) {
-			return this.renderCommentTemplate(templatePath, {
-				plan,
-				mergeOrder,
-				recommendations,
-				timestamp
-			});
-		}
+    // Default comment format
+    const mergeLevel =
+      mergeOrder.findIndex((level) =>
+        level.some((item) => plan.items.find((i) => i.name === item))
+      ) + 1;
 
-		// Default comment format
-		const mergeLevel = mergeOrder.findIndex(level =>
-			level.some(item => plan.items.find(i => i.name === item))
-		) + 1;
+    const dependencyStatus = this.analyzeDependencies();
+    const gatesPrediction = this.predictGateOutcomes();
 
-		const dependencyStatus = this.analyzeDependencies();
-		const gatesPrediction = this.predictGateOutcomes();
+    return [
+      `<!-- lex-pr:analysis:v1:${timestamp} -->`,
+      "",
+      "## 🤖 Lex-PR Merge Analysis",
+      "",
+      `**Status**: ${this.getIntegrationStatus()}`,
+      `**Merge Level**: ${mergeLevel} of ${mergeOrder.length}`,
+      `**Dependencies**: ${dependencyStatus}`,
+      "",
+      "### Predicted Outcome",
+      ...gatesPrediction.map((p) => `- ${p.icon} ${p.description}`),
+      "",
+      "### Integration Preview",
+      `This PR will be integrated at level ${mergeLevel} with:`,
+      ...(mergeOrder[mergeLevel - 1]?.slice(1).map((item) => `- ${item} (parallel merge)`) || []),
+      "",
+      "### Recommendations",
+      ...recommendations.map((r, i) => `${i + 1}. ${r}`),
+      "",
+      "---",
+      "*Generated by lexrunner autopilot Level 2*",
+    ].join("\n");
+  }
 
-		return [
-			`<!-- lex-pr:analysis:v1:${timestamp} -->`,
-			"",
-			"## 🤖 Lex-PR Merge Analysis",
-			"",
-			`**Status**: ${this.getIntegrationStatus()}`,
-			`**Merge Level**: ${mergeLevel} of ${mergeOrder.length}`,
-			`**Dependencies**: ${dependencyStatus}`,
-			"",
-			"### Predicted Outcome",
-			...gatesPrediction.map(p => `- ${p.icon} ${p.description}`),
-			"",
-			"### Integration Preview",
-			`This PR will be integrated at level ${mergeLevel} with:`,
-			...mergeOrder[mergeLevel - 1]?.slice(1).map(item => `- ${item} (parallel merge)`) || [],
-			"",
-			"### Recommendations",
-			...recommendations.map((r, i) => `${i + 1}. ${r}`),
-			"",
-			"---",
-			"*Generated by lexrunner autopilot Level 2*"
-		].join("\n");
-	}
+  /**
+   * Update or create PR comment with idempotent marker
+   */
+  private async updatePRComment(github: any, prContext: any, content: string): Promise<void> {
+    // List existing comments to find our marker
+    const comments = await github.rest.issues.listComments({
+      owner: prContext.owner,
+      repo: prContext.repo,
+      issue_number: prContext.number,
+    });
 
-	/**
-	 * Update or create PR comment with idempotent marker
-	 */
-	private async updatePRComment(github: any, prContext: any, content: string): Promise<void> {
-		// List existing comments to find our marker
-		const comments = await github.rest.issues.listComments({
-			owner: prContext.owner,
-			repo: prContext.repo,
-			issue_number: prContext.number
-		});
+    // Look for existing lex-pr comment
+    const existingComment = comments.data.find((comment: any) =>
+      comment.body.includes("<!-- lex-pr:analysis:v1:")
+    );
 
-		// Look for existing lex-pr comment
-		const existingComment = comments.data.find((comment: any) =>
-			comment.body.includes("<!-- lex-pr:analysis:v1:")
-		);
+    if (existingComment) {
+      // Update existing comment
+      await github.rest.issues.updateComment({
+        owner: prContext.owner,
+        repo: prContext.repo,
+        comment_id: existingComment.id,
+        body: content,
+      });
+    } else {
+      // Create new comment
+      await github.rest.issues.createComment({
+        owner: prContext.owner,
+        repo: prContext.repo,
+        issue_number: prContext.number,
+        body: content,
+      });
+    }
+  }
 
-		if (existingComment) {
-			// Update existing comment
-			await github.rest.issues.updateComment({
-				owner: prContext.owner,
-				repo: prContext.repo,
-				comment_id: existingComment.id,
-				body: content
-			});
-		} else {
-			// Create new comment
-			await github.rest.issues.createComment({
-				owner: prContext.owner,
-				repo: prContext.repo,
-				issue_number: prContext.number,
-				body: content
-			});
-		}
-	}
+  /**
+   * Update PR status check (non-blocking)
+   */
+  private async updatePRStatus(github: any, prContext: any): Promise<void> {
+    // Get current commit SHA (simplified - would need git operations)
+    const sha = process.env.GITHUB_SHA || "HEAD";
 
-	/**
-	 * Update PR status check (non-blocking)
-	 */
-	private async updatePRStatus(github: any, prContext: any): Promise<void> {
-		// Get current commit SHA (simplified - would need git operations)
-		const sha = process.env.GITHUB_SHA || "HEAD";
+    const status = this.getStatusCheckState();
 
-		const status = this.getStatusCheckState();
+    await github.rest.repos.createCommitStatus({
+      owner: prContext.owner,
+      repo: prContext.repo,
+      sha,
+      state: status.state,
+      description: status.description,
+      context: "lex-pr/weave-analysis",
+      target_url: status.targetUrl,
+    });
+  }
 
-		await github.rest.repos.createCommitStatus({
-			owner: prContext.owner,
-			repo: prContext.repo,
-			sha,
-			state: status.state,
-			description: status.description,
-			context: "lex-pr/weave-analysis",
-			target_url: status.targetUrl
-		});
-	}
+  /**
+   * Helper methods for comment generation
+   */
+  private getCommentTemplatePath(): string | null {
+    // Check for template in profile or CLI option
+    return null; // Simplified for now
+  }
 
-	/**
-	 * Helper methods for comment generation
-	 */
-	private getCommentTemplatePath(): string | null {
-		// Check for template in profile or CLI option
-		return null; // Simplified for now
-	}
+  private renderCommentTemplate(templatePath: string, variables: any): string {
+    // Template rendering - simplified for now
+    return fs.readFileSync(templatePath, "utf-8");
+  }
 
-	private renderCommentTemplate(templatePath: string, variables: any): string {
-		// Template rendering - simplified for now
-		return fs.readFileSync(templatePath, "utf-8");
-	}
+  private analyzeDependencies(): string {
+    // Analyze dependency status - simplified
+    return "Ready for integration";
+  }
 
-	private analyzeDependencies(): string {
-		// Analyze dependency status - simplified
-		return "Ready for integration";
-	}
+  private predictGateOutcomes(): Array<{ icon: string; description: string }> {
+    // Gate prediction logic - simplified
+    return [
+      { icon: "✅", description: "Clean merge expected" },
+      { icon: "✅", description: "All gates predicted to pass" },
+    ];
+  }
 
-	private predictGateOutcomes(): Array<{icon: string, description: string}> {
-		// Gate prediction logic - simplified
-		return [
-			{ icon: "✅", description: "Clean merge expected" },
-			{ icon: "✅", description: "All gates predicted to pass" }
-		];
-	}
+  private getIntegrationStatus(): string {
+    return "Ready for integration";
+  }
 
-	private getIntegrationStatus(): string {
-		return "Ready for integration";
-	}
-
-	private getStatusCheckState(): { state: string, description: string, targetUrl?: string } {
-		return {
-			state: "success",
-			description: "Integration analysis complete - ready for merge",
-			targetUrl: undefined // Would link to deliverables
-		};
-	}
+  private getStatusCheckState(): { state: string; description: string; targetUrl?: string } {
+    return {
+      state: "success",
+      description: "Integration analysis complete - ready for merge",
+      targetUrl: undefined, // Would link to deliverables
+    };
+  }
 }

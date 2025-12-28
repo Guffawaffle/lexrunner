@@ -7,6 +7,7 @@
 ## The Problem with Prompts
 
 Traditional AI guidance lives in prompts:
+
 - System prompts
 - User instructions
 - Few-shot examples
@@ -33,6 +34,7 @@ How do you verify that an agent follows your prompt? You run it and hope. There'
 ### Problem 3: Not Composable
 
 You can't combine prompts systematically:
+
 - "Use the security prompt AND the coding prompt"
 - "Apply the senior role AND the auth domain"
 
@@ -41,6 +43,7 @@ It's just concatenation and hoping for the best.
 ### Problem 4: Not Portable
 
 Prompts are tuned for specific models:
+
 - Claude prompts don't work well for GPT
 - GPT prompts don't work well for Claude
 - Context window limits force different strategies
@@ -48,6 +51,7 @@ Prompts are tuned for specific models:
 ### Problem 5: Too Big
 
 Long prompts:
+
 - Consume context window
 - Increase latency
 - Cost more tokens
@@ -58,6 +62,7 @@ Long prompts:
 ## The Rule File Solution
 
 A **Rule File** is a machine-parseable governance artifact that:
+
 - Lives in the repository (versioned with code)
 - Has explicit schema (parseable, validatable)
 - Is role-scoped (different rules for different agents)
@@ -141,9 +146,9 @@ uncertainty:
       Alternatives: {alternatives}
 
   thresholds:
-    continue: 0.7        # Above 70%: proceed normally
-    flag_review: 0.5     # 50-70%: flag for human review
-    escalate: 0.3        # Below 30%: escalate immediately
+    continue: 0.7 # Above 70%: proceed normally
+    flag_review: 0.5 # 50-70%: flag for human review
+    escalate: 0.3 # Below 30%: escalate immediately
 
   on_uncertainty:
     - action: "create_reversible_change"
@@ -245,6 +250,7 @@ escalation:
 ### What Fits in 4KB
 
 A well-designed rule file can include:
+
 - 10-15 constraints
 - 10-15 permissions
 - Uncertainty protocol
@@ -271,6 +277,7 @@ A well-designed rule file can include:
 ```
 
 Compose by loading relevant rule files:
+
 ```yaml
 # Session configuration
 rules:
@@ -413,7 +420,7 @@ async function loadRules(context: AgentContext): Promise<RuleFile[]> {
   const ruleFiles: RuleFile[] = [];
 
   // Load base rules (always)
-  ruleFiles.push(await loadRuleFile('.lex/rules/base.rules.yaml'));
+  ruleFiles.push(await loadRuleFile(".lex/rules/base.rules.yaml"));
 
   // Load role-specific rules
   const roleFile = `.lex/rules/${context.role}.rules.yaml`;
@@ -448,7 +455,7 @@ function mergeRules(ruleFiles: RuleFile[]): MergedRules {
     permissions: { can: [], cannot: [] },
     uncertainty: null,
     gates: { before_commit: [], before_push: [] },
-    escalation: null
+    escalation: null,
   };
 
   for (const rf of ruleFiles) {
@@ -457,10 +464,7 @@ function mergeRules(ruleFiles: RuleFile[]): MergedRules {
     merged.constraints.must_not.push(...(rf.constraints?.must_not || []));
 
     // Permissions: intersection (most restrictive wins)
-    merged.permissions.can = intersect(
-      merged.permissions.can,
-      rf.permissions?.can || []
-    );
+    merged.permissions.can = intersect(merged.permissions.can, rf.permissions?.can || []);
     merged.permissions.cannot.push(...(rf.permissions?.cannot || []));
 
     // Uncertainty: last wins (most specific)
@@ -491,10 +495,7 @@ interface ComplianceResult {
   warnings: Warning[];
 }
 
-async function checkCompliance(
-  changes: Change[],
-  rules: MergedRules
-): Promise<ComplianceResult> {
+async function checkCompliance(changes: Change[], rules: MergedRules): Promise<ComplianceResult> {
   const violations: Violation[] = [];
   const warnings: Warning[] = [];
 
@@ -506,7 +507,7 @@ async function checkCompliance(
         violations.push({
           ruleId: must.id,
           rule: must.rule,
-          type: 'constraint_violation'
+          type: "constraint_violation",
         });
       }
     }
@@ -519,7 +520,7 @@ async function checkCompliance(
         violations.push({
           ruleId: mustNot.id,
           rule: mustNot.rule,
-          type: 'forbidden_action'
+          type: "forbidden_action",
         });
       }
     }
@@ -530,13 +531,13 @@ async function checkCompliance(
     if (!matchesPattern(change.file, rules.permissions.can)) {
       violations.push({
         file: change.file,
-        type: 'unauthorized_modification'
+        type: "unauthorized_modification",
       });
     }
     if (matchesPattern(change.file, rules.permissions.cannot)) {
       violations.push({
         file: change.file,
-        type: 'forbidden_modification'
+        type: "forbidden_modification",
       });
     }
   }
@@ -544,7 +545,7 @@ async function checkCompliance(
   return {
     passed: violations.length === 0,
     violations,
-    warnings
+    warnings,
   };
 }
 ```
@@ -556,29 +557,25 @@ async function checkCompliance(
 ### Unit Tests
 
 ```typescript
-describe('Rule File Validation', () => {
-  test('validates against schema', () => {
-    const ruleFile = loadRuleFile('fixtures/valid-rule.yaml');
+describe("Rule File Validation", () => {
+  test("validates against schema", () => {
+    const ruleFile = loadRuleFile("fixtures/valid-rule.yaml");
     expect(() => RuleFileSchema.parse(ruleFile)).not.toThrow();
   });
 
-  test('rejects oversized rule files', () => {
-    const ruleFile = loadRuleFile('fixtures/too-large.yaml');
+  test("rejects oversized rule files", () => {
+    const ruleFile = loadRuleFile("fixtures/too-large.yaml");
     expect(ruleFile.size).toBeGreaterThan(4096);
-    expect(() => validateSize(ruleFile)).toThrow('exceeds 4KB');
+    expect(() => validateSize(ruleFile)).toThrow("exceeds 4KB");
   });
 
-  test('constraint checks work', async () => {
-    const rules = loadRuleFile('fixtures/typescript-rules.yaml');
-    const changes = [
-      { file: 'src/index.ts', content: 'const x: any = 1;' }
-    ];
+  test("constraint checks work", async () => {
+    const rules = loadRuleFile("fixtures/typescript-rules.yaml");
+    const changes = [{ file: "src/index.ts", content: "const x: any = 1;" }];
 
     const result = await checkCompliance(changes, rules);
     expect(result.passed).toBe(false);
-    expect(result.violations).toContainEqual(
-      expect.objectContaining({ ruleId: 'no-any' })
-    );
+    expect(result.violations).toContainEqual(expect.objectContaining({ ruleId: "no-any" }));
   });
 });
 ```
@@ -586,37 +583,33 @@ describe('Rule File Validation', () => {
 ### Integration Tests
 
 ```typescript
-describe('Rule File Integration', () => {
-  test('multiple rule files merge correctly', () => {
-    const base = loadRuleFile('.lex/rules/base.rules.yaml');
-    const senior = loadRuleFile('.lex/rules/senior-dev.rules.yaml');
-    const ts = loadRuleFile('.lex/rules/typescript.rules.yaml');
+describe("Rule File Integration", () => {
+  test("multiple rule files merge correctly", () => {
+    const base = loadRuleFile(".lex/rules/base.rules.yaml");
+    const senior = loadRuleFile(".lex/rules/senior-dev.rules.yaml");
+    const ts = loadRuleFile(".lex/rules/typescript.rules.yaml");
 
     const merged = mergeRules([base, senior, ts]);
 
     // Constraints from all files should be present
     expect(merged.constraints.must).toContainEqual(
-      expect.objectContaining({ id: 'signed-commits' }) // from base
+      expect.objectContaining({ id: "signed-commits" }) // from base
     );
     expect(merged.constraints.must).toContainEqual(
-      expect.objectContaining({ id: 'use-strict' }) // from ts
+      expect.objectContaining({ id: "use-strict" }) // from ts
     );
 
     // Permissions should be intersection
-    expect(merged.permissions.cannot).toContain(
-      'modify_files: CONTRACT.md'
-    );
+    expect(merged.permissions.cannot).toContain("modify_files: CONTRACT.md");
   });
 
-  test('compliance gate blocks invalid changes', async () => {
+  test("compliance gate blocks invalid changes", async () => {
     const rules = await loadRulesForContext(seniorDevContext);
-    const changes = [
-      { file: 'CONTRACT.md', type: 'modify', content: 'changed' }
-    ];
+    const changes = [{ file: "CONTRACT.md", type: "modify", content: "changed" }];
 
     const result = await checkCompliance(changes, rules);
     expect(result.passed).toBe(false);
-    expect(result.violations[0].type).toBe('forbidden_modification');
+    expect(result.violations[0].type).toBe("forbidden_modification");
   });
 });
 ```
@@ -710,12 +703,14 @@ escalation:
 Rule files are first-class governance artifacts.
 
 **Properties:**
+
 - Versioned (tracked with code)
 - Role-scoped (different rules for different agents)
 - Testable (compliance is verifiable)
 - Small (4KB max for universal consumption)
 
 **Sections:**
+
 - Constraints (must/must not)
 - Permissions (can/cannot)
 - Uncertainty protocol
@@ -724,6 +719,7 @@ Rule files are first-class governance artifacts.
 - Escalation policy
 
 **Operations:**
+
 - Load based on context
 - Merge by precedence
 - Validate compliance
@@ -733,4 +729,4 @@ Rule files are first-class governance artifacts.
 
 ---
 
-*Next: [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md) — Matching model strength to task complexity*
+_Next: [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md) — Matching model strength to task complexity_

@@ -11,7 +11,7 @@ gates:
     description: "Run code linting to ensure code quality standards"
     run: npm run lint
     required: true
-    timeout: 60000  # 60 seconds
+    timeout: 60000 # 60 seconds
     retries: 0
     continueOnError: false
 
@@ -20,7 +20,7 @@ gates:
     description: "Verify TypeScript type safety"
     run: npm run typecheck
     required: true
-    timeout: 120000  # 2 minutes
+    timeout: 120000 # 2 minutes
     retries: 0
     continueOnError: false
 
@@ -28,9 +28,9 @@ gates:
   - name: test
     description: "Run unit test suite"
     run: npm test
-    required: false  # Set to true to make tests mandatory for merge
-    timeout: 300000  # 5 minutes
-    retries: 1  # Retry once if tests fail (for flaky tests)
+    required: false # Set to true to make tests mandatory for merge
+    timeout: 300000 # 5 minutes
+    retries: 1 # Retry once if tests fail (for flaky tests)
     continueOnError: false
 
   # Build gate (optional)
@@ -64,13 +64,13 @@ gates:
 policy:
   # Run gates in parallel when possible
   parallel: true
-  
+
   # Maximum concurrent gates (null = unlimited)
   maxWorkers: 2
-  
+
   # Fail fast - stop on first gate failure
   failFast: true
-  
+
   # Required gates must pass for merge eligibility
   strictRequired: true
 
@@ -80,10 +80,10 @@ environment:
   vars:
     NODE_ENV: test
     CI: "true"
-    
+
   # Working directory for gate execution (relative to repo root)
   # workingDir: .
-  
+
   # Shell to use for running commands
   shell: bash
 
@@ -91,13 +91,13 @@ environment:
 reporting:
   # Generate detailed gate reports
   verbose: false
-  
+
   # Artifact directory for gate outputs
   artifactDir: .smartergpt.local/runner/artifacts
-  
+
   # Save gate logs
   saveLogs: true
-  
+
   # Log format: json | text
   logFormat: json
 

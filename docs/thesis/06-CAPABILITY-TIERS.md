@@ -7,12 +7,14 @@
 ## The Capability Mismatch Problem
 
 Most agent workflows use a single model for everything:
+
 - Planning uses GPT-4
 - Implementation uses GPT-4
 - Linting uses GPT-4
 - Code review uses GPT-4
 
 This is like using a senior engineer for data entry:
+
 - Expensive
 - Wasteful
 - Doesn't scale
@@ -31,23 +33,25 @@ Junior Tier → Verification, formatting, simple edits
 
 ### Economic Argument
 
-| Tier | Model Example | Cost/1K tokens | Capability |
-|------|---------------|----------------|------------|
-| Senior | GPT-4o, Claude Opus | $0.03-0.06 | Full reasoning |
-| Mid | GPT-4-mini, Claude Sonnet | $0.01-0.02 | Good implementation |
-| Junior | GPT-3.5, Claude Haiku | $0.001-0.005 | Basic tasks |
+| Tier   | Model Example             | Cost/1K tokens | Capability          |
+| ------ | ------------------------- | -------------- | ------------------- |
+| Senior | GPT-4o, Claude Opus       | $0.03-0.06     | Full reasoning      |
+| Mid    | GPT-4-mini, Claude Sonnet | $0.01-0.02     | Good implementation |
+| Junior | GPT-3.5, Claude Haiku     | $0.001-0.005   | Basic tasks         |
 
 A 10x cost difference between senior and junior tiers.
 
 ### The Math
 
 Consider a typical PR workflow:
+
 - Planning: 5K tokens @ Senior = $0.15
 - Implementation: 20K tokens @ Mid = $0.40
 - Linting/formatting: 10K tokens @ Junior = $0.05
 - **Total: $0.60**
 
 Single-tier approach:
+
 - Everything: 35K tokens @ Senior = $1.05
 
 **Tiered approach: 43% cost reduction**
@@ -63,6 +67,7 @@ For high-volume workflows, this compounds significantly.
 **Role:** Lead, plan, design, decide
 
 **Capabilities:**
+
 - Architecture decisions
 - Trade-off analysis
 - Complex debugging
@@ -71,17 +76,20 @@ For high-volume workflows, this compounds significantly.
 - Integration planning
 
 **Characteristics:**
+
 - High reasoning ability
 - Strong context integration
 - Good at ambiguity
 - Expensive
 
 **Example Models:**
+
 - GPT-4o
 - Claude Opus
 - GPT-4 Turbo
 
 **When to Use:**
+
 - Task requires multi-step reasoning
 - Decision has long-term implications
 - Problem is ambiguous or under-specified
@@ -92,6 +100,7 @@ For high-volume workflows, this compounds significantly.
 **Role:** Implement, refactor, debug routine issues
 
 **Capabilities:**
+
 - Feature implementation
 - Code refactoring
 - Bug fixing (routine)
@@ -99,17 +108,20 @@ For high-volume workflows, this compounds significantly.
 - Documentation
 
 **Characteristics:**
+
 - Good implementation ability
 - Follows patterns well
 - Handles clear requirements
 - Moderate cost
 
 **Example Models:**
+
 - GPT-4-mini
 - Claude Sonnet
 - Claude 3.5
 
 **When to Use:**
+
 - Requirements are clear
 - Patterns exist to follow
 - Scope is well-defined
@@ -120,6 +132,7 @@ For high-volume workflows, this compounds significantly.
 **Role:** Instrument, verify, lint, format
 
 **Capabilities:**
+
 - Code formatting
 - Lint error fixing
 - Simple verification
@@ -127,17 +140,20 @@ For high-volume workflows, this compounds significantly.
 - Repetitive edits
 
 **Characteristics:**
+
 - Fast
 - Cheap
 - Good at pattern matching
 - Limited reasoning
 
 **Example Models:**
+
 - GPT-3.5 Turbo
 - Claude Haiku
 - Small open models
 
 **When to Use:**
+
 - Task is mechanical
 - No judgment required
 - Clear right/wrong answer
@@ -152,7 +168,7 @@ For high-volume workflows, this compounds significantly.
 ```typescript
 interface TaskClassification {
   task: string;
-  recommendedTier: 'senior' | 'mid' | 'junior';
+  recommendedTier: "senior" | "mid" | "junior";
   confidence: number;
   factors: string[];
 }
@@ -164,48 +180,48 @@ function classifyTask(task: Task): TaskClassification {
   // Reasoning complexity
   if (task.requiresArchitectureDecision) {
     score += 30;
-    factors.push('requires_architecture_decision');
+    factors.push("requires_architecture_decision");
   }
   if (task.hasAmbiguousRequirements) {
     score += 20;
-    factors.push('ambiguous_requirements');
+    factors.push("ambiguous_requirements");
   }
 
   // Implementation complexity
   if (task.touchesMultipleModules) {
     score += 15;
-    factors.push('multi_module');
+    factors.push("multi_module");
   }
   if (task.hasExistingPatterns) {
     score -= 10;
-    factors.push('existing_patterns');
+    factors.push("existing_patterns");
   }
 
   // Mechanical indicators
   if (task.isFormatting) {
     score -= 40;
-    factors.push('formatting_only');
+    factors.push("formatting_only");
   }
   if (task.isLintFix) {
     score -= 35;
-    factors.push('lint_fix');
+    factors.push("lint_fix");
   }
   if (task.isBoilerplate) {
     score -= 30;
-    factors.push('boilerplate');
+    factors.push("boilerplate");
   }
 
   // Determine tier
-  let tier: 'senior' | 'mid' | 'junior';
-  if (score >= 70) tier = 'senior';
-  else if (score >= 30) tier = 'mid';
-  else tier = 'junior';
+  let tier: "senior" | "mid" | "junior";
+  if (score >= 70) tier = "senior";
+  else if (score >= 30) tier = "mid";
+  else tier = "junior";
 
   return {
     task: task.description,
     recommendedTier: tier,
     confidence: Math.abs(score - 50) / 50,
-    factors
+    factors,
   };
 }
 ```
@@ -281,7 +297,7 @@ permissions:
 
 uncertainty:
   thresholds:
-    continue: 0.6  # Senior can proceed with more uncertainty
+    continue: 0.6 # Senior can proceed with more uncertainty
     flag_review: 0.4
     escalate: 0.2
 
@@ -358,7 +374,7 @@ permissions:
     - "format_code"
     - "fix_lint_errors"
     - "update_imports"
-    - "rename_variables"  # Local scope only
+    - "rename_variables" # Local scope only
 
   cannot:
     - "add_new_code"
@@ -368,9 +384,9 @@ permissions:
 
 uncertainty:
   thresholds:
-    continue: 0.9  # Junior needs high confidence
+    continue: 0.9 # Junior needs high confidence
     flag_review: 0.7
-    escalate: 0.5  # Lower threshold = faster escalation
+    escalate: 0.5 # Lower threshold = faster escalation
 
 escalation:
   triggers:
@@ -395,16 +411,14 @@ interface EscalationEvent {
   preservedState: string;
 }
 
-async function escalateToHigherTier(
-  event: EscalationEvent
-): Promise<void> {
+async function escalateToHigherTier(event: EscalationEvent): Promise<void> {
   // Create escalation receipt
   await createReceipt({
-    action: 'tier_escalation',
+    action: "tier_escalation",
     from_tier: event.from,
     to_tier: event.to,
     reason: event.reason,
-    state: event.preservedState
+    state: event.preservedState,
   });
 
   // Prepare context for higher tier
@@ -412,7 +426,7 @@ async function escalateToHigherTier(
     originalTask: event.context.task,
     workCompleted: event.context.progress,
     blockingIssue: event.reason,
-    recommendedApproach: event.context.suggestions
+    recommendedApproach: event.context.suggestions,
   };
 
   // Route to appropriate model
@@ -431,28 +445,22 @@ interface DelegationEvent {
   expectedOutcome: string;
 }
 
-async function delegateToLowerTier(
-  event: DelegationEvent
-): Promise<void> {
+async function delegateToLowerTier(event: DelegationEvent): Promise<void> {
   // Senior creates clear specification for lower tier
   const delegation = {
     task: event.subtask,
     constraints: event.constraints,
     expectedOutcome: event.expectedOutcome,
-    escalationTriggers: [
-      'if_ambiguous',
-      'if_requires_judgment',
-      'if_confidence_low'
-    ]
+    escalationTriggers: ["if_ambiguous", "if_requires_judgment", "if_confidence_low"],
   };
 
   // Create delegation receipt
   await createReceipt({
-    action: 'tier_delegation',
+    action: "tier_delegation",
     from_tier: event.from,
     to_tier: event.to,
     task: event.subtask.description,
-    constraints: event.constraints
+    constraints: event.constraints,
   });
 
   // Route to lower tier
@@ -471,8 +479,8 @@ async function delegateToLowerTier(
 
 interface ModelConfig {
   id: string;
-  tier: 'senior' | 'mid' | 'junior';
-  provider: 'openai' | 'anthropic';
+  tier: "senior" | "mid" | "junior";
+  provider: "openai" | "anthropic";
   model: string;
   costPer1KTokens: number;
   maxTokens: number;
@@ -480,33 +488,33 @@ interface ModelConfig {
 
 const MODEL_CONFIGS: ModelConfig[] = [
   {
-    id: 'senior-openai',
-    tier: 'senior',
-    provider: 'openai',
-    model: 'gpt-4o',
+    id: "senior-openai",
+    tier: "senior",
+    provider: "openai",
+    model: "gpt-4o",
     costPer1KTokens: 0.03,
-    maxTokens: 128000
+    maxTokens: 128000,
   },
   {
-    id: 'mid-anthropic',
-    tier: 'mid',
-    provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022',
+    id: "mid-anthropic",
+    tier: "mid",
+    provider: "anthropic",
+    model: "claude-3-5-sonnet-20241022",
     costPer1KTokens: 0.015,
-    maxTokens: 200000
+    maxTokens: 200000,
   },
   {
-    id: 'junior-anthropic',
-    tier: 'junior',
-    provider: 'anthropic',
-    model: 'claude-3-haiku-20240307',
+    id: "junior-anthropic",
+    tier: "junior",
+    provider: "anthropic",
+    model: "claude-3-haiku-20240307",
     costPer1KTokens: 0.00125,
-    maxTokens: 200000
-  }
+    maxTokens: 200000,
+  },
 ];
 
 function selectModel(tier: Tier): ModelConfig {
-  const configs = MODEL_CONFIGS.filter(c => c.tier === tier);
+  const configs = MODEL_CONFIGS.filter((c) => c.tier === tier);
 
   // Could add more sophisticated selection (load balancing, cost optimization)
   return configs[0];
@@ -538,17 +546,17 @@ async function executeTask(task: Task): Promise<TaskResult> {
       to: getHigherTier(classification.recommendedTier),
       reason: result.escalationReason,
       context: task,
-      preservedState: result.state
+      preservedState: result.state,
     });
   }
 
   // Create completion receipt
   await createReceipt({
-    action: 'task_completed',
+    action: "task_completed",
     tier: classification.recommendedTier,
     model: model.id,
     tokens_used: result.tokensUsed,
-    cost: result.tokensUsed / 1000 * model.costPer1KTokens
+    cost: (result.tokensUsed / 1000) * model.costPer1KTokens,
   });
 
   return result;
@@ -576,7 +584,7 @@ class CostTracker {
     total: 0,
     tokensByTier: { senior: 0, mid: 0, junior: 0 },
     escalations: 0,
-    delegations: 0
+    delegations: 0,
   };
 
   recordUsage(tier: Tier, model: string, tokens: number, cost: number): void {
@@ -600,9 +608,9 @@ class CostTracker {
 
 | Tier | Cost | Tokens | % of Total |
 |------|------|--------|------------|
-| Senior | $${this.metrics.byTier.senior.toFixed(4)} | ${this.metrics.tokensByTier.senior} | ${(this.metrics.byTier.senior / this.metrics.total * 100).toFixed(1)}% |
-| Mid | $${this.metrics.byTier.mid.toFixed(4)} | ${this.metrics.tokensByTier.mid} | ${(this.metrics.byTier.mid / this.metrics.total * 100).toFixed(1)}% |
-| Junior | $${this.metrics.byTier.junior.toFixed(4)} | ${this.metrics.tokensByTier.junior} | ${(this.metrics.byTier.junior / this.metrics.total * 100).toFixed(1)}% |
+| Senior | $${this.metrics.byTier.senior.toFixed(4)} | ${this.metrics.tokensByTier.senior} | ${((this.metrics.byTier.senior / this.metrics.total) * 100).toFixed(1)}% |
+| Mid | $${this.metrics.byTier.mid.toFixed(4)} | ${this.metrics.tokensByTier.mid} | ${((this.metrics.byTier.mid / this.metrics.total) * 100).toFixed(1)}% |
+| Junior | $${this.metrics.byTier.junior.toFixed(4)} | ${this.metrics.tokensByTier.junior} | ${((this.metrics.byTier.junior / this.metrics.total) * 100).toFixed(1)}% |
 | **Total** | **$${this.metrics.total.toFixed(4)}** | | |
 
 Escalations: ${this.metrics.escalations}
@@ -689,17 +697,20 @@ Delegations: ${this.metrics.delegations}
 Capability tiering matches model strength to task complexity.
 
 **Tiers:**
+
 - Senior: Plan, design, decide
 - Mid: Implement, refactor
 - Junior: Format, verify, lint
 
 **Benefits:**
+
 - Cost reduction (40-60%)
 - Appropriate governance per tier
 - Clear escalation paths
 - Better resource utilization
 
 **Implementation:**
+
 - Automatic task classification
 - Tier-specific contracts
 - Escalation and delegation protocols
@@ -709,4 +720,4 @@ Capability tiering matches model strength to task complexity.
 
 ---
 
-*Next: [07-ROBERT-FIELD-REPORT.md](./07-ROBERT-FIELD-REPORT.md) — The experiment that validated these ideas*
+_Next: [07-ROBERT-FIELD-REPORT.md](./07-ROBERT-FIELD-REPORT.md) — The experiment that validated these ideas_

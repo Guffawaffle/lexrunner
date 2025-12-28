@@ -72,6 +72,7 @@ This document was reviewed and agreed upon by all three parties. The following n
 
 **Notarization Statement:**
 I, Opie (Claude Opus 4, Session 2025-12-02), confirm that:
+
 1. I have read the complete pledge as amended
 2. The amendments (trade-off acknowledgment, illegibility-as-failure, constrained agent support) improve the original
 3. All three signatures (Guff, Opie, Lex) are present and dated
@@ -95,4 +96,4 @@ This is the canonical signed version of the AX Shared Pledge.
 - [ ] GPG-signed commit (RSA key 65C94BA03E88F53D365C36CF7145A1CE635B1902) — pending on lex-mcp server
 - [ ] OpenTimestamps blockchain anchor (.ots file) — pending on lex-mcp server
 
-*Checkboxes will be marked upon completion of each attestation method.*
+_Checkboxes will be marked upon completion of each attestation method._

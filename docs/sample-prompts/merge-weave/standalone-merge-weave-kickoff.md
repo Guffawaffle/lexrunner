@@ -1,7 +1,9 @@
 # Stand-Alone Merge-Weave Kickoff Prompt (umbrella branch + PR, **MCP-first**)
 
 ## Context
+
 You will plan and execute a **merge-weave** into a single umbrella branch and PR:
+
 - Create **`merge-weave-{uuid}`** from the default branch (e.g., `main`).
 - Fold designated **open PR branches** into that umbrella branch **in topological order**.
 - Open one **umbrella PR → default branch**, keep its body updated with a checklist of folded PRs and **“Closes #issue”** lines for linked issues.
@@ -17,6 +19,7 @@ You will plan and execute a **merge-weave** into a single umbrella branch and PR
 ---
 
 ## Inputs Needed (minimal)
+
 - **Default branch name** (e.g., `main`).
 - **Open PR list** to fold (number → head branch). If not provided, discover via MCP first:
   ```bash
@@ -32,6 +35,7 @@ You will plan and execute a **merge-weave** into a single umbrella branch and PR
 ---
 
 ## Policy & Guardrails
+
 - **Dry-run first** for each fold-in (test-merge without committing).
 - **Proceed with passing siblings** at a level; record blockers precisely.
 - **Forward momentum**: allow **minimal, obvious, safe** code edits to unblock; otherwise halt with a crisp report.
@@ -43,7 +47,9 @@ You will plan and execute a **merge-weave** into a single umbrella branch and PR
 ---
 
 ## Gates (Uniform Contract)
+
 Write gate catalog and policy first:
+
 - `.smartergpt.local/deliverables/_session/gate-definitions.json`
 - `.smartergpt.local/deliverables/_session/policy.json` (requiredGates, proceedWithSiblings=true, mergeStrategy="no-fast-forward")
 
@@ -52,15 +58,17 @@ Auto-detect commands from repo if possible (e.g., `npm run lint`, `composer test
 ---
 
 ## Plan & Merge Pyramid
-1) Build `.smartergpt.local/deliverables/_session/plan.json` (nodes: id, branch, dependsOn[], gates[]).
-2) Compute `.smartergpt.local/deliverables/_session/merge-order.json` (levels + mergeSequence).
-3) Emit `.smartergpt.local/deliverables/_session/dryrun.{md,json}` (narrative + machine form).
+
+1. Build `.smartergpt.local/deliverables/_session/plan.json` (nodes: id, branch, dependsOn[], gates[]).
+2. Compute `.smartergpt.local/deliverables/_session/merge-order.json` (levels + mergeSequence).
+3. Emit `.smartergpt.local/deliverables/_session/dryrun.{md,json}` (narrative + machine form).
 
 ---
 
 ## Umbrella Branch & PR Workflow (MCP-first)
 
 ### Create umbrella branch (and PR shell)
+
 ```bash
 SESSION_UUID="$(uuidgen | tr 'A-Z' 'a-z')"
 UMB_BRANCH="merge-weave-${SESSION_UUID}"
@@ -97,11 +105,13 @@ POST /repos/{owner}/{repo}/pulls
 ```
 
 Keep **umbrella body** at `.smartergpt.local/deliverables/_session/umbrella-body.md`:
+
 - Checklist of folded PRs: `- [x] Folded PR #123 (branch foo)`
 - “Closes #…” lines for issues that should close when umbrella merges
 - “Blockers” section
 
 Update PR body (MCP-first; then gh; then REST outline):
+
 ```bash
 mcp:github.pr.update from_file=".smartergpt.local/deliverables/_session/umbrella-body.md"
 gh pr edit --body-file ".smartergpt.local/deliverables/_session/umbrella-body.md"
@@ -109,7 +119,9 @@ PATCH /repos/{owner}/{repo}/pulls/{number} { "body": "<file contents>" }
 ```
 
 ### Fold each PR branch (per merge-pyramid order)
+
 _For each item in each level (siblings can proceed independently if safe):_
+
 ```bash
 PR_NUMBER=123
 PR_BRANCH="feature/xyz"
@@ -139,6 +151,7 @@ git commit -m "merge-weave: fold PR #${PR_NUMBER} (${PR_BRANCH}) into ${UMB_BRAN
 ```
 
 ### Close the folded PR and log the fold-in
+
 ```bash
 # Comment and close via MCP-first
 UMB_NUMBER="$(jq -r '.number // empty' .smartergpt.local/deliverables/_session/umbrella.json)"
@@ -158,6 +171,7 @@ jq -n --arg pr "${PR_NUMBER}" --arg br "${PR_BRANCH}" --arg status "folded"     
 ```
 
 ### Keep umbrella PR body up to date
+
 ```bash
 mcp:github.pr.update number="$UMB_NUMBER" from_file=".smartergpt.local/deliverables/_session/umbrella-body.md"
 gh pr edit "${UMB_NUMBER}" --body-file ".smartergpt.local/deliverables/_session/umbrella-body.md"
@@ -167,7 +181,9 @@ PATCH /repos/{owner}/{repo}/pulls/{UMB_NUMBER} { "body": "<file contents>" }
 ---
 
 ## Finalization
+
 When all levels are folded and umbrella gates pass:
+
 ```bash
 # Ready the PR (if draft)
 mcp:github.pr.ready number="$UMB_NUMBER"
@@ -187,6 +203,7 @@ Do **not** delete the umbrella branch automatically unless policy dictates; keep
 ---
 
 ## Saveable Artifacts
+
 - `.smartergpt.local/deliverables/_session/plan.json`
 - `.smartergpt.local/deliverables/_session/merge-order.json`
 - `.smartergpt.local/deliverables/_session/gate-definitions.json`
@@ -201,6 +218,7 @@ Do **not** delete the umbrella branch automatically unless policy dictates; keep
 ---
 
 ## Recovery (no rewrites)
+
 - If a fold-in commit regresses or a later fold blocks:
   - **Revert the offending merge commit** on the umbrella branch (`git revert -m 1 <sha>`), push, update umbrella body/checklist.
   - Reopen the original PR if you previously closed it and the fix cannot live in umbrella.
@@ -209,6 +227,7 @@ Do **not** delete the umbrella branch automatically unless policy dictates; keep
 ---
 
 ### Conformance with our merge-weave rules
+
 - **Dry-run first** at each fold-in; logs captured.
 - **Proceed with siblings** when safe; blockers recorded.
 - **Forward-momentum edits** allowed only when tiny & obvious.

@@ -5,6 +5,7 @@
 **Status:** Stable
 
 > **Scope note (Doc Lockdown):** This guide describes **v0.1.x behavior**.
+>
 > - In v0.1, Frame emission (when enabled) writes JSON files under `.lexrunner/frames/`.
 > - A future **v2** design may store Frames in **Lex** instead of local files; if/when that ships, this doc will be versioned accordingly.
 
@@ -74,10 +75,12 @@ lex-pr --version
 If your team documentation references the project, update terminology:
 
 **Before:**
+
 - "lexrunner" (ambiguous)
 - "runner" (generic)
 
 **After:**
+
 - "LexRunner" (product name)
 - "`lex-pr`" (CLI command)
 - "Lex" when referring to MIT OSS core
@@ -108,6 +111,7 @@ Frames capture execution context for workflow runs, enabling memory and audit ca
 #### What Are Frames?
 
 Frames are structured snapshots of workflow execution state, including:
+
 - **Reference point**: Unique identifier for the execution
 - **Summary caption**: Human-readable description
 - **Module scope**: Affected components/modules
@@ -169,11 +173,7 @@ Frames are stored in `.lexrunner/frames/` directory:
   "module_scope": ["#123", "#124", "#125"],
   "keywords": ["merge-weave", "integration", "main"],
   "outcome": "success",
-  "next_actions": [
-    "Run e2e tests",
-    "Deploy to staging",
-    "Verify integration"
-  ],
+  "next_actions": ["Run e2e tests", "Deploy to staging", "Verify integration"],
   "metadata": {
     "duration_ms": 45000,
     "conflicts_resolved": 2,
@@ -229,6 +229,7 @@ Frames use the same schema as Lex memory system, enabling future integration:
 ### Example 1: Running Merge-Weave
 
 **Before v0.1 (Pre-release):**
+
 ```bash
 # No frame emission
 lex-pr merge plan.json --execute
@@ -236,6 +237,7 @@ lex-pr merge plan.json --execute
 ```
 
 **After v0.1 (with Frame emission enabled):**
+
 ```bash
 # Enable frames
 export LEX_PR_EMIT_FRAMES=true
@@ -251,10 +253,12 @@ ls .lexrunner/frames/
 ### Example 2: Product Naming
 
 **Before v0.1:**
+
 - Project referred to as "lexrunner" (inconsistent)
 - Unclear distinction from Lex OSS core
 
 **After v0.1:**
+
 - **Product**: LexRunner (proprietary)
 - **CLI**: `lex-pr` (unchanged)
 - **OSS Core**: Lex (separate repository)
@@ -263,12 +267,14 @@ ls .lexrunner/frames/
 ### Example 3: Release Tags
 
 **Before v0.1:**
+
 ```bash
 # Old tag format
 git tag v0.0.1  # Ambiguous
 ```
 
 **After v0.1:**
+
 ```bash
 # New tag format
 git tag lexrunner-v0.1.0  # Clear product identity
@@ -280,13 +286,14 @@ git tag lexrunner-v0.1.0  # Clear product identity
 
 ### New Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable             | Default | Description                   |
+| -------------------- | ------- | ----------------------------- |
 | `LEX_PR_EMIT_FRAMES` | `false` | Enable/disable Frame emission |
 
 ### Existing Variables (Unchanged)
 
 All existing environment variables remain unchanged:
+
 - `LEX_PR_PROFILE_DIR`
 - `ALLOW_MUTATIONS`
 - `LEX_GIT_MODE`
@@ -309,6 +316,7 @@ All pre-release features and APIs remain available.
 ### Issue: Frames Not Being Created
 
 **Symptom:**
+
 ```bash
 lex-pr merge plan.json --execute
 # Completes successfully, but no frames in .lexrunner/frames/
@@ -317,12 +325,14 @@ lex-pr merge plan.json --execute
 **Solution:**
 
 1. **Check if Frame emission is enabled:**
+
    ```bash
    echo $LEX_PR_EMIT_FRAMES
    # Should output: true
    ```
 
 2. **Enable Frame emission:**
+
    ```bash
    export LEX_PR_EMIT_FRAMES=true
    lex-pr merge plan.json --execute
@@ -336,23 +346,26 @@ lex-pr merge plan.json --execute
 ### Issue: "Product Name Changed" Confusion
 
 **Symptom:**
+
 - Confused about "LexRunner" vs "lexrunner" vs "Lex"
 
 **Clarification:**
 
-| Term | Meaning |
-|------|---------|
-| **LexRunner** | Product name (proprietary paid product) |
-| **lexrunner** | Repository name (unchanged) |
-| **lex-pr** | CLI command (unchanged) |
-| **Lex** | OSS core library (MIT license, separate repo) |
+| Term          | Meaning                                       |
+| ------------- | --------------------------------------------- |
+| **LexRunner** | Product name (proprietary paid product)       |
+| **lexrunner** | Repository name (unchanged)                   |
+| **lex-pr**    | CLI command (unchanged)                       |
+| **Lex**       | OSS core library (MIT license, separate repo) |
 
 **What stays the same:**
+
 - CLI command: `lex-pr`
 - npm package name: `lexrunner`
 - Repository URL: `Guffawaffle/LexRunner`
 
 **What changed:**
+
 - Product branding: Now called "LexRunner"
 - Release tags: Now use `lexrunner-v*` format
 - Documentation: Clarifies LexRunner (paid) vs Lex (OSS)
@@ -360,6 +373,7 @@ lex-pr merge plan.json --execute
 ### Issue: Old Tag Format
 
 **Symptom:**
+
 ```bash
 git tag v0.0.1  # Old format
 ```
@@ -367,6 +381,7 @@ git tag v0.0.1  # Old format
 **Solution:**
 
 Use new tag format for future releases:
+
 ```bash
 git tag lexrunner-v0.1.0  # New format
 ```
@@ -376,6 +391,7 @@ Old tags remain for backward compatibility.
 ### Issue: Frame Storage Permissions
 
 **Symptom:**
+
 ```bash
 Error: EACCES: permission denied, mkdir '.lexrunner/frames'
 ```
@@ -383,11 +399,13 @@ Error: EACCES: permission denied, mkdir '.lexrunner/frames'
 **Solution:**
 
 1. **Check directory permissions:**
+
    ```bash
    ls -ld .lexrunner
    ```
 
 2. **Create directory with correct permissions:**
+
    ```bash
    mkdir -p .lexrunner/frames
    chmod 755 .lexrunner/frames
@@ -403,6 +421,7 @@ Error: EACCES: permission denied, mkdir '.lexrunner/frames'
 ### Issue: Frame Validation Errors
 
 **Symptom:**
+
 ```bash
 Error: Frame validation failed: missing required field 'reference_point'
 ```
@@ -410,6 +429,7 @@ Error: Frame validation failed: missing required field 'reference_point'
 **Solution:**
 
 This is an internal error. File a bug report with:
+
 1. LexRunner version: `lex-pr --version`
 2. Command that triggered the error
 3. Full error message
@@ -464,11 +484,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Run merge-weave with Frame emission
         env:
-          LEX_PR_EMIT_FRAMES: true  # Enable frames
+          LEX_PR_EMIT_FRAMES: true # Enable frames
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm install -g lexrunner
@@ -516,20 +536,24 @@ pipeline {
 ## Related Documentation
 
 ### Core Guides
+
 - [README](../README.md) - Project overview and quickstart
 - [CHANGELOG](../CHANGELOG.md) - Version history
 - [Architecture](./architecture.md) - System design
 
 ### ADRs (Architecture Decision Records)
+
 - [ADR-000: Product Naming & Branding](./adr/ADR-000-product-naming-and-branding.md)
 - [ADR Index](./adr/README.md) - All ADRs
 
 ### Lex Integration
+
 - [Lex Integration Guide](./LEX_INTEGRATION.md) - API integration examples
 - [Aliasing for LexRunner](./ALIASING_FOR_LEXRUNNER.md) - Module aliasing
 - [Lex OSS Repository](https://github.com/Guffawaffle/lex) - MIT core
 
 ### Developer Guides
+
 - [Environment Variables](./environment-variables.md) - Configuration reference
 - [Release Process](./release-process.md) - How releases work
 - [Migration Guide](./migration-guide.md) - General migration patterns
@@ -566,10 +590,10 @@ After upgrading to v0.1:
 
 ## Version History
 
-| Version | Date | Key Changes |
-|---------|------|-------------|
-| **0.1.0** | 2025-11-06 | Initial stable release, branding, ADRs, Frame emission foundation |
-| Pre-release | Before 2025-11-06 | Development versions (no formal release) |
+| Version     | Date              | Key Changes                                                       |
+| ----------- | ----------------- | ----------------------------------------------------------------- |
+| **0.1.0**   | 2025-11-06        | Initial stable release, branding, ADRs, Frame emission foundation |
+| Pre-release | Before 2025-11-06 | Development versions (no formal release)                          |
 
 See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
 

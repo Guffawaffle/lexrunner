@@ -26,7 +26,7 @@ export interface ComparisonResult {
   current: number;
   delta: number;
   deltaPercent: number;
-  status: 'pass' | 'warning' | 'regression';
+  status: "pass" | "warning" | "regression";
 }
 
 /**
@@ -36,7 +36,7 @@ export function compareResults(
   current: BenchmarkResult[],
   baseline: BaselineResult[]
 ): ComparisonResult[] {
-  const baselineMap = new Map(baseline.map(b => [`${b.suite}:${b.name}`, b]));
+  const baselineMap = new Map(baseline.map((b) => [`${b.suite}:${b.name}`, b]));
   const comparisons: ComparisonResult[] = [];
 
   for (const result of current) {
@@ -51,13 +51,13 @@ export function compareResults(
     const delta = result.meanTime - baselineResult.meanTime;
     const deltaPercent = (delta / baselineResult.meanTime) * 100;
 
-    let status: 'pass' | 'warning' | 'regression';
+    let status: "pass" | "warning" | "regression";
     if (deltaPercent > 20) {
-      status = 'regression';
+      status = "regression";
     } else if (deltaPercent > 10) {
-      status = 'warning';
+      status = "warning";
     } else {
-      status = 'pass';
+      status = "pass";
     }
 
     comparisons.push({
@@ -67,7 +67,7 @@ export function compareResults(
       current: result.meanTime,
       delta,
       deltaPercent,
-      status
+      status,
     });
   }
 
@@ -88,16 +88,18 @@ export function generateMarkdownReport(
   const lines: string[] = [];
 
   // Header
-  lines.push('# Performance Benchmark Results\n');
-  
+  lines.push("# Performance Benchmark Results\n");
+
   if (metadata) {
     if (metadata.baselineVersion) {
-      lines.push(`**Baseline:** ${metadata.baselineVersion}${metadata.baselineDate ? ` (${metadata.baselineDate})` : ''}`);
+      lines.push(
+        `**Baseline:** ${metadata.baselineVersion}${metadata.baselineDate ? ` (${metadata.baselineDate})` : ""}`
+      );
     }
     if (metadata.currentVersion) {
       lines.push(`**Current:** ${metadata.currentVersion}`);
     }
-    lines.push('');
+    lines.push("");
   }
 
   // Group by suite
@@ -112,8 +114,8 @@ export function generateMarkdownReport(
   // Generate table for each suite
   for (const [suite, results] of suites) {
     lines.push(`## ${suite}\n`);
-    lines.push('| Operation | Baseline | Current | Delta | Status |');
-    lines.push('|-----------|----------|---------|-------|--------|');
+    lines.push("| Operation | Baseline | Current | Delta | Status |");
+    lines.push("|-----------|----------|---------|-------|--------|");
 
     for (const result of results) {
       const baselineStr = formatTime(result.baseline);
@@ -121,40 +123,42 @@ export function generateMarkdownReport(
       const deltaStr = formatDelta(result.deltaPercent);
       const statusIcon = getStatusIcon(result.status);
 
-      lines.push(`| ${result.name} | ${baselineStr} | ${currentStr} | ${deltaStr} | ${statusIcon} |`);
+      lines.push(
+        `| ${result.name} | ${baselineStr} | ${currentStr} | ${deltaStr} | ${statusIcon} |`
+      );
     }
 
-    lines.push('');
+    lines.push("");
   }
 
   // Summary
-  const regressions = comparisons.filter(c => c.status === 'regression');
-  const warnings = comparisons.filter(c => c.status === 'warning');
-  const passes = comparisons.filter(c => c.status === 'pass');
+  const regressions = comparisons.filter((c) => c.status === "regression");
+  const warnings = comparisons.filter((c) => c.status === "warning");
+  const passes = comparisons.filter((c) => c.status === "pass");
 
-  lines.push('## Summary\n');
+  lines.push("## Summary\n");
   lines.push(`- ✅ Passed: ${passes.length}`);
   lines.push(`- ⚠️ Warnings: ${warnings.length}`);
   lines.push(`- ❌ Regressions: ${regressions.length}`);
-  lines.push('');
+  lines.push("");
 
   if (regressions.length > 0) {
-    lines.push('### ❌ Performance Regressions Detected\n');
+    lines.push("### ❌ Performance Regressions Detected\n");
     for (const reg of regressions) {
       lines.push(`- **${reg.suite} / ${reg.name}**: ${formatDelta(reg.deltaPercent)} slower`);
     }
-    lines.push('');
+    lines.push("");
   }
 
   if (warnings.length > 0) {
-    lines.push('### ⚠️ Performance Warnings\n');
+    lines.push("### ⚠️ Performance Warnings\n");
     for (const warn of warnings) {
       lines.push(`- **${warn.suite} / ${warn.name}**: ${formatDelta(warn.deltaPercent)} slower`);
     }
-    lines.push('');
+    lines.push("");
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -170,15 +174,15 @@ export function generateJSONReport(
 ): string {
   const report = {
     metadata: {
-      baselineVersion: metadata?.baselineVersion || 'unknown',
-      currentVersion: metadata?.currentVersion || 'unknown',
+      baselineVersion: metadata?.baselineVersion || "unknown",
+      currentVersion: metadata?.currentVersion || "unknown",
       timestamp: metadata?.timestamp || new Date().toISOString(),
       totalBenchmarks: comparisons.length,
-      regressions: comparisons.filter(c => c.status === 'regression').length,
-      warnings: comparisons.filter(c => c.status === 'warning').length,
-      passes: comparisons.filter(c => c.status === 'pass').length
+      regressions: comparisons.filter((c) => c.status === "regression").length,
+      warnings: comparisons.filter((c) => c.status === "warning").length,
+      passes: comparisons.filter((c) => c.status === "pass").length,
     },
-    results: comparisons
+    results: comparisons,
   };
 
   return JSON.stringify(report, null, 2);
@@ -201,21 +205,21 @@ function formatTime(ms: number): string {
  * Format delta percentage
  */
 function formatDelta(deltaPercent: number): string {
-  const sign = deltaPercent >= 0 ? '+' : '';
+  const sign = deltaPercent >= 0 ? "+" : "";
   return `${sign}${deltaPercent.toFixed(1)}%`;
 }
 
 /**
  * Get status icon
  */
-function getStatusIcon(status: 'pass' | 'warning' | 'regression'): string {
+function getStatusIcon(status: "pass" | "warning" | "regression"): string {
   switch (status) {
-    case 'pass':
-      return '✅';
-    case 'warning':
-      return '⚠️';
-    case 'regression':
-      return '❌ REGRESSION';
+    case "pass":
+      return "✅";
+    case "warning":
+      return "⚠️";
+    case "regression":
+      return "❌ REGRESSION";
   }
 }
 
@@ -223,5 +227,5 @@ function getStatusIcon(status: 'pass' | 'warning' | 'regression'): string {
  * Check if there are any regressions
  */
 export function hasRegressions(comparisons: ComparisonResult[]): boolean {
-  return comparisons.some(c => c.status === 'regression');
+  return comparisons.some((c) => c.status === "regression");
 }

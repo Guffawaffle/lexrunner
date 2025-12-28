@@ -1,9 +1,9 @@
 ---
 name: Static Scope Validation for Agent Edits
 about: Add static analysis to validate agent edit scope before execution
-title: '[planner] Add static analysis to validate agent edit scope before execution'
-labels: ['agent-safety', 'planner', 'security', 'P0']
-assignees: ''
+title: "[planner] Add static analysis to validate agent edit scope before execution"
+labels: ["agent-safety", "planner", "security", "P0"]
+assignees: ""
 ---
 
 ## Problem Statement
@@ -21,17 +21,20 @@ For agent-driven development to be safe, we need **pre-edit scope validation** t
 - Agents can accidentally introduce side effects
 
 **Example vulnerability:**
+
 ```javascript
 // File: src/legacy/paymentProcessor.js (AMD module)
-define(['dep'], function(dep) {
-  window.DEBUG_MODE = true;  // ❌ GLOBAL SIDE EFFECT - not detected
+define(["dep"], function (dep) {
+  window.DEBUG_MODE = true; // ❌ GLOBAL SIDE EFFECT - not detected
 
-  function processPayment(amount) {  // Agent intended to edit this
+  function processPayment(amount) {
+    // Agent intended to edit this
     return amount * 1.1;
   }
 
-  function auditLog(msg) {  // Agent accidentally modified this too
-    console.log('AUDIT:', msg);
+  function auditLog(msg) {
+    // Agent accidentally modified this too
+    console.log("AUDIT:", msg);
   }
 
   return { processPayment, auditLog };
@@ -48,6 +51,7 @@ define(['dep'], function(dep) {
 ### Architecture: Edit Plan + Validator
 
 **Flow:**
+
 1. Agent declares intended edits in **Edit Plan** (JSON manifest)
 2. **Scope Validator** parses file via AST (Babel/TypeScript)
 3. Validator detects: globals written, functions/classes modified, side effects
@@ -55,6 +59,7 @@ define(['dep'], function(dep) {
 5. If validation passes → proceed with edit
 
 ### 1. Create Edit Plan Schema
+
 **Location:** `schemas/edit-plan.schema.json`
 
 ```json
@@ -77,19 +82,19 @@ define(['dep'], function(dep) {
     },
     "functions_modified": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": { "type": "string" },
       "default": [],
       "description": "List of function names being modified"
     },
     "classes_modified": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": { "type": "string" },
       "default": [],
       "description": "List of class names being modified"
     },
     "variables_modified": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": { "type": "string" },
       "default": [],
       "description": "List of module-level variables being modified"
     },
@@ -101,7 +106,7 @@ define(['dep'], function(dep) {
     },
     "globals_written": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": { "type": "string" },
       "default": [],
       "description": "List of global variables being written (window.*, global.*)"
     },
@@ -120,9 +125,15 @@ define(['dep'], function(dep) {
         "type": "object",
         "required": ["type", "message", "location"],
         "properties": {
-          "type": {"type": "string", "enum": ["undeclared_function", "undeclared_class", "global_write", "side_effect"]},
-          "message": {"type": "string"},
-          "location": {"type": "object", "properties": {"line": {"type": "number"}, "column": {"type": "number"}}}
+          "type": {
+            "type": "string",
+            "enum": ["undeclared_function", "undeclared_class", "global_write", "side_effect"]
+          },
+          "message": { "type": "string" },
+          "location": {
+            "type": "object",
+            "properties": { "line": { "type": "number" }, "column": { "type": "number" } }
+          }
         }
       },
       "description": "List of scope violations detected"
@@ -132,38 +143,41 @@ define(['dep'], function(dep) {
 ```
 
 ### 2. Implement Scope Validator (JavaScript/TypeScript)
+
 **Location:** `src/planner/scopeValidator.ts` (new file)
 
 ```typescript
-import { parse } from '@babel/parser';
-import traverse from '@babel/traverse';
-import * as fs from 'fs';
-import * as path from 'path';
+import { parse } from "@babel/parser";
+import traverse from "@babel/traverse";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface EditPlan {
   file: string;
-  module_system: 'esm' | 'commonjs' | 'amd' | 'umd' | 'iife' | 'unknown';
+  module_system: "esm" | "commonjs" | "amd" | "umd" | "iife" | "unknown";
   functions_modified?: string[];
   classes_modified?: string[];
   variables_modified?: string[];
-  side_effects?: 'none' | 'module' | 'global';
+  side_effects?: "none" | "module" | "global";
   globals_written?: string[];
   scope_validated: boolean;
-  validation_method: 'babel-ast' | 'typescript-ast' | 'python-ast' | 'regex-fallback';
+  validation_method: "babel-ast" | "typescript-ast" | "python-ast" | "regex-fallback";
   violations?: Array<{
-    type: 'undeclared_function' | 'undeclared_class' | 'global_write' | 'side_effect';
+    type: "undeclared_function" | "undeclared_class" | "global_write" | "side_effect";
     message: string;
     location: { line: number; column: number };
   }>;
 }
 
 export class ScopeValidationError extends Error {
-  public readonly violations: EditPlan['violations'];
+  public readonly violations: EditPlan["violations"];
 
-  constructor(file: string, violations: EditPlan['violations']) {
-    const summary = violations?.map(v => `  - ${v.type}: ${v.message} (line ${v.location.line})`).join('\n');
+  constructor(file: string, violations: EditPlan["violations"]) {
+    const summary = violations
+      ?.map((v) => `  - ${v.type}: ${v.message} (line ${v.location.line})`)
+      .join("\n");
     super(`Scope validation failed for ${file}:\n${summary}`);
-    this.name = 'ScopeValidationError';
+    this.name = "ScopeValidationError";
     this.violations = violations;
   }
 }
@@ -175,21 +189,21 @@ export async function validateEditScope(
   filePath: string,
   declaredPlan: Partial<EditPlan>
 ): Promise<EditPlan> {
-  const code = fs.readFileSync(filePath, 'utf-8');
+  const code = fs.readFileSync(filePath, "utf-8");
   const ext = path.extname(filePath);
 
   let actualPlan: EditPlan;
 
-  if (ext === '.ts' || ext === '.tsx') {
+  if (ext === ".ts" || ext === ".tsx") {
     actualPlan = await validateTypeScriptFile(filePath, code, declaredPlan);
-  } else if (ext === '.js' || ext === '.jsx' || ext === '.mjs') {
+  } else if (ext === ".js" || ext === ".jsx" || ext === ".mjs") {
     actualPlan = await validateJavaScriptFile(filePath, code, declaredPlan);
   } else {
     throw new Error(`Unsupported file type for scope validation: ${ext}`);
   }
 
   // Compare declared vs. actual
-  const violations: EditPlan['violations'] = [];
+  const violations: EditPlan["violations"] = [];
 
   // Check for undeclared function modifications
   const actualFunctions = new Set(actualPlan.functions_modified ?? []);
@@ -197,9 +211,9 @@ export async function validateEditScope(
   for (const fn of actualFunctions) {
     if (!declaredFunctions.has(fn)) {
       violations.push({
-        type: 'undeclared_function',
+        type: "undeclared_function",
         message: `Function '${fn}' modified but not declared in edit plan`,
-        location: { line: 0, column: 0 } // TODO: Extract from AST
+        location: { line: 0, column: 0 }, // TODO: Extract from AST
       });
     }
   }
@@ -210,19 +224,19 @@ export async function validateEditScope(
   for (const global of actualGlobals) {
     if (!declaredGlobals.has(global)) {
       violations.push({
-        type: 'global_write',
+        type: "global_write",
         message: `Global variable '${global}' written but not declared in edit plan`,
-        location: { line: 0, column: 0 }
+        location: { line: 0, column: 0 },
       });
     }
   }
 
   // Check for undeclared side effects
-  if (actualPlan.side_effects !== 'none' && declaredPlan.side_effects === 'none') {
+  if (actualPlan.side_effects !== "none" && declaredPlan.side_effects === "none") {
     violations.push({
-      type: 'side_effect',
+      type: "side_effect",
       message: `Side effects detected (${actualPlan.side_effects}) but plan declared 'none'`,
-      location: { line: 0, column: 0 }
+      location: { line: 0, column: 0 },
     });
   }
 
@@ -242,27 +256,27 @@ async function validateJavaScriptFile(
   declaredPlan: Partial<EditPlan>
 ): Promise<EditPlan> {
   const ast = parse(code, {
-    sourceType: 'unambiguous',
-    plugins: ['jsx', 'dynamicImport', 'exportDefaultFrom']
+    sourceType: "unambiguous",
+    plugins: ["jsx", "dynamicImport", "exportDefaultFrom"],
   });
 
   const functionsModified: string[] = [];
   const classesModified: string[] = [];
   const globalsWritten: string[] = [];
-  let moduleSystem: EditPlan['module_system'] = 'unknown';
-  let sideEffects: EditPlan['side_effects'] = 'none';
+  let moduleSystem: EditPlan["module_system"] = "unknown";
+  let sideEffects: EditPlan["side_effects"] = "none";
 
   traverse(ast, {
     // Detect module system
     ImportDeclaration() {
-      moduleSystem = 'esm';
+      moduleSystem = "esm";
     },
     CallExpression(path) {
-      if (path.node.callee.type === 'Identifier' && path.node.callee.name === 'require') {
-        moduleSystem = 'commonjs';
+      if (path.node.callee.type === "Identifier" && path.node.callee.name === "require") {
+        moduleSystem = "commonjs";
       }
-      if (path.node.callee.type === 'Identifier' && path.node.callee.name === 'define') {
-        moduleSystem = 'amd';
+      if (path.node.callee.type === "Identifier" && path.node.callee.name === "define") {
+        moduleSystem = "amd";
       }
     },
 
@@ -282,17 +296,18 @@ async function validateJavaScriptFile(
 
     // Detect global writes (window.*, global.*)
     MemberExpression(path) {
-      if (path.node.object.type === 'Identifier' &&
-          (path.node.object.name === 'window' || path.node.object.name === 'global')) {
-        if (path.parent.type === 'AssignmentExpression' && path.parent.left === path.node) {
-          const propName = path.node.property.type === 'Identifier'
-            ? path.node.property.name
-            : '<computed>';
+      if (
+        path.node.object.type === "Identifier" &&
+        (path.node.object.name === "window" || path.node.object.name === "global")
+      ) {
+        if (path.parent.type === "AssignmentExpression" && path.parent.left === path.node) {
+          const propName =
+            path.node.property.type === "Identifier" ? path.node.property.name : "<computed>";
           globalsWritten.push(`${path.node.object.name}.${propName}`);
-          sideEffects = 'global';
+          sideEffects = "global";
         }
       }
-    }
+    },
   });
 
   return {
@@ -303,7 +318,7 @@ async function validateJavaScriptFile(
     globals_written: globalsWritten,
     side_effects: sideEffects,
     scope_validated: false, // Will be set by validateEditScope
-    validation_method: 'babel-ast'
+    validation_method: "babel-ast",
   };
 }
 
@@ -315,8 +330,8 @@ async function validateTypeScriptFile(
   // Similar to validateJavaScriptFile but with TypeScript parser
   // Use @typescript-eslint/parser or babel with typescript plugin
   const ast = parse(code, {
-    sourceType: 'module',
-    plugins: ['typescript', 'jsx']
+    sourceType: "module",
+    plugins: ["typescript", "jsx"],
   });
 
   // Same traversal logic as JavaScript
@@ -325,6 +340,7 @@ async function validateTypeScriptFile(
 ```
 
 ### 3. Create Scope Policy Files
+
 **Location:** `.smartergpt/scope-policies/default.json`
 
 ```json
@@ -348,12 +364,16 @@ async function validateTypeScriptFile(
 ```
 
 ### 4. Integration with Planner
+
 **Location:** `src/planner/fileAnalysis.ts` (modify existing)
 
 ```typescript
-import { validateEditScope, type EditPlan } from './scopeValidator';
+import { validateEditScope, type EditPlan } from "./scopeValidator";
 
-export async function analyzeFileEdit(filePath: string, declaredPlan: Partial<EditPlan>): Promise<EditPlan> {
+export async function analyzeFileEdit(
+  filePath: string,
+  declaredPlan: Partial<EditPlan>
+): Promise<EditPlan> {
   // Existing heuristic analysis...
 
   // NEW: Scope validation
@@ -392,6 +412,7 @@ export async function analyzeFileEdit(filePath: string, declaredPlan: Partial<Ed
 ## Effort Estimate
 
 **Large** (4-5 days)
+
 - **Day 1:** Design edit plan schema, research AST parsers (Babel, TypeScript)
 - **Day 2:** Implement JavaScript/TypeScript scope validator with AST traversal
 - **Day 3:** Add policy system, exception handling, integration with `fileAnalysis.ts`
@@ -401,6 +422,7 @@ export async function analyzeFileEdit(filePath: string, declaredPlan: Partial<Ed
 ## Dependencies
 
 **Required packages:**
+
 ```bash
 npm install --save-dev @babel/parser @babel/traverse @typescript-eslint/parser
 ```
@@ -417,10 +439,12 @@ npm install --save-dev @babel/parser @babel/traverse @typescript-eslint/parser
 ## References
 
 **Existing code:**
+
 - `src/planner/fileAnalysis.ts` (lines 30-150) - Import/export parsing
 - `src/security/` - Security patterns to follow
 
 **External:**
+
 - Babel Parser: https://babeljs.io/docs/babel-parser
 - Babel Traverse: https://babeljs.io/docs/babel-traverse
 - TypeScript AST Viewer: https://ts-ast-viewer.com/
@@ -460,15 +484,18 @@ npm install --save-dev @babel/parser @babel/traverse @typescript-eslint/parser
 **Breaking Changes:** None (validation is additive)
 
 **User Impact:**
+
 - **Agents:** Must declare edit plans before modifying files
 - **Humans:** Can bypass validation for manual edits (validation only enforced in agent workflows)
 
 **Rollout Strategy:**
+
 1. **Phase 1 (Week 1):** Deploy with validation in "warn" mode (log violations, don't block)
 2. **Phase 2 (Week 2):** Analyze logs, tune policy exceptions
 3. **Phase 3 (Week 3):** Enable "block" mode (fail on violations)
 
 **Emergency Override:**
+
 ```bash
 # Disable scope validation (emergency use only)
 LEX_SKIP_SCOPE_VALIDATION=1 lex-pr execute plan.json

@@ -24,16 +24,16 @@ export type CapabilityTier = z.infer<typeof CapabilityTier>;
  * Tier assignment for a plan item
  */
 export const TierAssignment = z.object({
-	/** Suggested tier based on heuristics */
-	suggested: CapabilityTier,
-	/** Actual tier used during execution (may differ due to override) */
-	actual: CapabilityTier.optional(),
-	/** Whether the task was escalated to a higher tier */
-	escalated: z.boolean().default(false),
-	/** Reason for escalation if applicable */
-	escalationReason: z.string().optional(),
-	/** Whether actual tier differs from suggested tier */
-	mismatch: z.boolean().optional(),
+  /** Suggested tier based on heuristics */
+  suggested: CapabilityTier,
+  /** Actual tier used during execution (may differ due to override) */
+  actual: CapabilityTier.optional(),
+  /** Whether the task was escalated to a higher tier */
+  escalated: z.boolean().default(false),
+  /** Reason for escalation if applicable */
+  escalationReason: z.string().optional(),
+  /** Whether actual tier differs from suggested tier */
+  mismatch: z.boolean().optional(),
 });
 
 export type TierAssignment = z.infer<typeof TierAssignment>;
@@ -43,10 +43,10 @@ export type TierAssignment = z.infer<typeof TierAssignment>;
  * Format: "item-name=tier" (e.g., "PR-123=senior")
  */
 export const TierOverride = z.object({
-	/** Item name to override */
-	itemName: z.string(),
-	/** Tier to assign */
-	tier: CapabilityTier,
+  /** Item name to override */
+  itemName: z.string(),
+  /** Tier to assign */
+  tier: CapabilityTier,
 });
 
 export type TierOverride = z.infer<typeof TierOverride>;
@@ -57,22 +57,22 @@ export type TierOverride = z.infer<typeof TierOverride>;
  * @returns Parsed tier override or null if invalid
  */
 export function parseTierOverride(overrideStr: string): TierOverride | null {
-	const parts = overrideStr.split("=");
-	if (parts.length !== 2) {
-		return null;
-	}
+  const parts = overrideStr.split("=");
+  if (parts.length !== 2) {
+    return null;
+  }
 
-	const [itemName, tierStr] = parts;
-	const tierResult = CapabilityTier.safeParse(tierStr.toLowerCase());
+  const [itemName, tierStr] = parts;
+  const tierResult = CapabilityTier.safeParse(tierStr.toLowerCase());
 
-	if (!tierResult.success || !itemName) {
-		return null;
-	}
+  if (!tierResult.success || !itemName) {
+    return null;
+  }
 
-	return {
-		itemName: itemName.trim(),
-		tier: tierResult.data,
-	};
+  return {
+    itemName: itemName.trim(),
+    tier: tierResult.data,
+  };
 }
 
 /**
@@ -80,19 +80,16 @@ export function parseTierOverride(overrideStr: string): TierOverride | null {
  * @param overrides Array of override strings or comma-separated string
  * @returns Array of valid tier overrides
  */
-export function parseTierOverrides(
-	overrides: string | string[]
-): TierOverride[] {
-	const overrideList =
-		typeof overrides === "string" ? overrides.split(",") : overrides;
+export function parseTierOverrides(overrides: string | string[]): TierOverride[] {
+  const overrideList = typeof overrides === "string" ? overrides.split(",") : overrides;
 
-	const result: TierOverride[] = [];
-	for (const override of overrideList) {
-		const parsed = parseTierOverride(override.trim());
-		if (parsed) {
-			result.push(parsed);
-		}
-	}
+  const result: TierOverride[] = [];
+  for (const override of overrideList) {
+    const parsed = parseTierOverride(override.trim());
+    if (parsed) {
+      result.push(parsed);
+    }
+  }
 
-	return result;
+  return result;
 }

@@ -43,6 +43,7 @@ Configuration files (`intent.md`, `scope.yml`, `gates.yml`, `deps.yml`, etc.) ar
 ### Working Directory vs Configuration
 
 **Important distinction:**
+
 - **Profile root** (`runner/`, NOT in a subdirectory) - Contains configuration files
 - **`runner/` directory** - Contains only working artifacts (plan.json, cache, logs)
 
@@ -59,6 +60,7 @@ Prompts are resolved using a **5-level precedence chain** separate from profiles
 5. **`@smartergpt/lex/canon/prompts`** - Canonical fallback from Lex package
 
 **Key Features:**
+
 - Independent from profile resolution (e.g., can use `.smartergpt/` profile with Lex prompts)
 - Enables cross-repository prompt sharing
 - Supports token expansion (`{{today}}`, `{{now}}`, `{{repo_root}}`, `{{branch}}`, `{{commit}}`)
@@ -93,6 +95,7 @@ lexrunner gates run
 ```
 
 **Result:**
+
 - `.smartergpt.local/` created with `role: development`
 - Project type auto-detected (Python/JS/TypeScript/etc.)
 - Relevant config files copied from `.smartergpt/` as templates
@@ -120,6 +123,7 @@ steps:
 ```
 
 **Result:**
+
 - Runner uses `/tmp/ci-profile/` (ephemeral, write-safe)
 - No conflicts with repository tracked files
 - Clean workspace between runs
@@ -134,6 +138,7 @@ lexrunner plan --profile-dir /path/to/test-profile
 ```
 
 **Result:**
+
 - Explicit override takes precedence
 - Useful for testing different configurations
 - Safe isolation between projects
@@ -162,6 +167,7 @@ lexrunner mcp
 ```
 
 **MCP Tools:**
+
 ```typescript
 // Resolve current profile
 {
@@ -183,12 +189,14 @@ lexrunner mcp
 ### From Hardcoded `.smartergpt/`
 
 **Before:**
+
 ```typescript
 // Old code hardcoded profile path
 const profilePath = path.join(process.cwd(), ".smartergpt");
 ```
 
 **After:**
+
 ```typescript
 import { resolveProfile } from "./config/profileResolver.js";
 
@@ -201,6 +209,7 @@ const role = resolved.manifest.role;
 ### From Custom Profile Logic
 
 **Before:**
+
 ```bash
 # Manual profile management
 cp -r .smartergpt .smartergpt.local
@@ -208,6 +217,7 @@ cp -r .smartergpt .smartergpt.local
 ```
 
 **After:**
+
 ```bash
 # Automated local overlay
 lexrunner init-local
@@ -287,6 +297,7 @@ See [Use Cases - MCP Server Context](#mcp-server-context) above.
 **Symptom:** Runner exits with "No profile directory found in precedence chain"
 
 **Solution:**
+
 ```bash
 # Check current resolution
 lexrunner doctor
@@ -303,6 +314,7 @@ lexrunner plan --profile-dir .smartergpt
 **Symptom:** Runner refuses to write artifacts to profile
 
 **Solution:**
+
 ```bash
 # Initialize local overlay for development
 lexrunner init-local
@@ -316,6 +328,7 @@ echo "role: development" > /path/to/profile/profile.yml
 **Symptom:** Runner picks unexpected profile
 
 **Diagnosis:**
+
 ```bash
 # Check precedence chain
 lexrunner doctor  # Shows resolved path and source
@@ -344,12 +357,12 @@ Profile directories must contain `profile.yml`:
 
 ```yaml
 # Minimum profile.yml
-role: development  # "example" | "development" | "local"
+role: development # "example" | "development" | "local"
 
 # Optional metadata
 name: my-project
 version: 1.0.0
-projectType: typescript  # Auto-detected by init-local
+projectType: typescript # Auto-detected by init-local
 ```
 
 ## Examples
@@ -435,6 +448,7 @@ jobs:
 ---
 
 **Next Steps:**
+
 - Read [Environment Variables](./environment-variables.md) for environment configuration and CI safety
 - Read [CLI Usage](./cli.md) for command details
 - See [AGENTS.md](../AGENTS.md) for architectural context

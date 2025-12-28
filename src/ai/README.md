@@ -41,13 +41,13 @@ const input = {
   paths: ["src/file1.ts"],
   hunkHashes: ["abc123..."],
   symbols: [{ name: "MyClass", type: "class", path: "src/file1.ts" }],
-  hints: [{ type: "import-order", message: "Import conflict", confidence: 0.9 }]
+  hints: [{ type: "import-order", message: "Import conflict", confidence: 0.9 }],
 };
 
 const result = await resolveConflict(input);
 
-console.log(result.strategy);  // "auto-resolve" | "manual-review" | "abort"
-console.log(result.risk);      // 0.25
+console.log(result.strategy); // "auto-resolve" | "manual-review" | "abort"
+console.log(result.risk); // 0.25
 console.log(result.abstained); // false
 ```
 
@@ -60,7 +60,7 @@ const aiCaller = async (systemPrompt: string, userPrompt: string) => {
   // Call your AI model (OpenAI, Anthropic, etc.)
   const response = await yourAIModel.complete({
     system: systemPrompt,
-    user: userPrompt
+    user: userPrompt,
   });
   return response.text;
 };
@@ -71,15 +71,12 @@ const result = await resolveConflict(input, { aiCaller });
 ### With Custom Cache
 
 ```typescript
-import { 
-  resolveConflict, 
-  ConflictResolutionCache 
-} from "./ai/conflictStrategy.js";
+import { resolveConflict, ConflictResolutionCache } from "./ai/conflictStrategy.js";
 
 const cache = new ConflictResolutionCache();
-const result = await resolveConflict(input, { 
-  cache, 
-  cacheTTL: 3600 // 1 hour
+const result = await resolveConflict(input, {
+  cache,
+  cacheTTL: 3600, // 1 hour
 });
 
 // Check cache stats
@@ -130,14 +127,14 @@ console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
 
 Risk is calculated based on multiple factors:
 
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| Multiple files | 0.15 | More files = higher risk |
-| Multiple hunks | 0.15 | More conflict regions = higher risk |
-| Semantic conflicts | 0.25 | Logic changes = high risk |
-| Structural changes | 0.20 | Function/class changes = high risk |
-| Low confidence hints | 0.15 | Uncertain analysis = higher risk |
-| Unknown symbols | 0.10 | Unrecognized code = higher risk |
+| Factor               | Weight | Description                         |
+| -------------------- | ------ | ----------------------------------- |
+| Multiple files       | 0.15   | More files = higher risk            |
+| Multiple hunks       | 0.15   | More conflict regions = higher risk |
+| Semantic conflicts   | 0.25   | Logic changes = high risk           |
+| Structural changes   | 0.20   | Function/class changes = high risk  |
+| Low confidence hints | 0.15   | Uncertain analysis = higher risk    |
+| Unknown symbols      | 0.10   | Unrecognized code = higher risk     |
 
 **Abstention Threshold**: 0.35 (risk > 0.35 → use heuristic fallback)
 
@@ -153,6 +150,7 @@ Risk is calculated based on multiple factors:
 When AI abstains or is unavailable, the system uses rule-based strategies:
 
 ### Import Order Conflicts
+
 ```typescript
 Strategy: merge-both
 Risk: 0.15
@@ -160,6 +158,7 @@ Rationale: Import conflicts are typically safe to merge
 ```
 
 ### Whitespace/Formatting Conflicts
+
 ```typescript
 Strategy: accept-theirs
 Risk: 0.10
@@ -167,6 +166,7 @@ Rationale: Formatting conflicts are cosmetic, accept incoming
 ```
 
 ### Semantic/Structural Conflicts
+
 ```typescript
 Strategy: manual-review
 Risk: 0.50
@@ -187,6 +187,7 @@ const key = generateCacheKey(input);
 ```
 
 **Properties:**
+
 - Deterministic: Same input → same key
 - Order-independent: Sorted internally
 - Collision-resistant: SHA-256 guarantees
@@ -231,12 +232,14 @@ const { system, user } = buildPrompt(input);
 ```
 
 **System Prompt** sets context and rules:
+
 - Output JSON format
 - Risk calculation guidelines
 - Strategy selection criteria
 - Safety constraints
 
 **User Prompt** provides conflict details:
+
 - File paths
 - Hunk hashes
 - Symbol information
@@ -245,6 +248,7 @@ const { system, user } = buildPrompt(input);
 ## Testing
 
 ### Schema Validation
+
 ```bash
 npm test -- tests/ai-conflict-strategy-schema.spec.ts
 ```
@@ -252,6 +256,7 @@ npm test -- tests/ai-conflict-strategy-schema.spec.ts
 Tests all Zod schemas, validation rules, and edge cases.
 
 ### Cache Functionality
+
 ```bash
 npm test -- tests/ai-conflict-strategy-cache.spec.ts
 ```
@@ -259,6 +264,7 @@ npm test -- tests/ai-conflict-strategy-cache.spec.ts
 Tests cache hits/misses, TTL, cleanup, and key generation.
 
 ### Risk Scoring
+
 ```bash
 npm test -- tests/ai-conflict-strategy-risk.spec.ts
 ```
@@ -266,6 +272,7 @@ npm test -- tests/ai-conflict-strategy-risk.spec.ts
 Tests risk calculation, abstention logic, and factor weighting.
 
 ### Integration
+
 ```bash
 npm test -- tests/ai-conflict-strategy.spec.ts
 ```
@@ -273,6 +280,7 @@ npm test -- tests/ai-conflict-strategy.spec.ts
 End-to-end tests covering the complete workflow.
 
 ### Run All AI Tests
+
 ```bash
 npm test -- tests/ai-conflict-strategy*.spec.ts
 ```
@@ -284,38 +292,44 @@ npm test -- tests/ai-conflict-strategy*.spec.ts
 ### Main Functions
 
 #### `resolveConflict(input, options?)`
+
 Resolve a single conflict with AI strategy and caching.
 
 **Parameters:**
+
 - `input: ConflictResolutionInput` - Conflict details
 - `options?: ResolveConflictOptions` - Configuration
 
 **Returns:** `Promise<ConflictResolutionOutput>`
 
 #### `resolveConflictsBatch(inputs, options?)`
+
 Resolve multiple conflicts in parallel with shared cache.
 
 **Parameters:**
+
 - `inputs: ConflictResolutionInput[]` - Array of conflicts
 - `options?: ResolveConflictOptions` - Configuration
 
 **Returns:** `Promise<ConflictResolutionOutput[]>`
 
 #### `getCacheStats(cache?)`
+
 Get cache statistics (hits, misses, size, hit rate).
 
 #### `clearCache(cache?)`
+
 Clear all cache entries.
 
 ### Options
 
 ```typescript
 interface ResolveConflictOptions {
-  cache?: ConflictResolutionCache;  // Custom cache instance
-  skipCache?: boolean;               // Skip cache lookup
-  aiCaller?: (system, user) => Promise<string>;  // AI model caller
-  cacheTTL?: number;                 // Cache TTL in seconds
-  forceHeuristic?: boolean;          // Force heuristic fallback
+  cache?: ConflictResolutionCache; // Custom cache instance
+  skipCache?: boolean; // Skip cache lookup
+  aiCaller?: (system, user) => Promise<string>; // AI model caller
+  cacheTTL?: number; // Cache TTL in seconds
+  forceHeuristic?: boolean; // Force heuristic fallback
 }
 ```
 
@@ -324,6 +338,7 @@ interface ResolveConflictOptions {
 ### Token Usage
 
 Estimated tokens per request:
+
 - System prompt: ~150 tokens
 - Input (typical): ~50-200 tokens
 - Output (typical): ~100-300 tokens
@@ -332,6 +347,7 @@ Estimated tokens per request:
 ### Caching Benefits
 
 With 80% cache hit rate:
+
 - 80% reduction in AI calls
 - 90% reduction in latency
 - 95% cost savings
@@ -345,7 +361,7 @@ const input = {
   paths: ["src/utils.ts"],
   hunkHashes: ["abc123..."],
   symbols: [],
-  hints: [{ type: "import-order", message: "Import order", confidence: 0.95 }]
+  hints: [{ type: "import-order", message: "Import order", confidence: 0.95 }],
 };
 
 const result = await resolveConflict(input);
@@ -367,12 +383,12 @@ const input = {
   hunkHashes: ["abc123...", "def456..."],
   symbols: [
     { name: "CoreClass", type: "class", path: "src/core.ts" },
-    { name: "processData", type: "function", path: "src/api.ts" }
+    { name: "processData", type: "function", path: "src/api.ts" },
   ],
   hints: [
     { type: "semantic", message: "Logic conflict", confidence: 0.6 },
-    { type: "structural", message: "Function signature change", confidence: 0.7 }
-  ]
+    { type: "structural", message: "Function signature change", confidence: 0.7 },
+  ],
 };
 
 const result = await resolveConflict(input);
@@ -397,13 +413,13 @@ This module is designed to integrate with the merge-weave pipeline:
 for (const conflict of conflicts) {
   const input = {
     paths: conflict.files,
-    hunkHashes: conflict.hunks.map(h => sha256(h)),
+    hunkHashes: conflict.hunks.map((h) => sha256(h)),
     symbols: await analyzeSymbols(conflict),
-    hints: await generateHints(conflict)
+    hints: await generateHints(conflict),
   };
-  
+
   const resolution = await resolveConflict(input, { aiCaller });
-  
+
   if (resolution.strategy === "auto-resolve") {
     await applyResolution(resolution.ops);
   } else {

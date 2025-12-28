@@ -3,6 +3,7 @@
 Complete reference for the lexrunner command-line interface, including all subcommands, options, and JSON output schemas.
 
 > **📖 See Also**:
+>
 > - [Merge-Weave Quickstart](./merge-weave-quickstart.md) - End-to-end guide for merge-weave operations
 > - [Autopilot Levels](./autopilot-levels.md) - Comprehensive guide to automation levels 0-4
 > - [Advanced CLI Features](./advanced-cli.md) - Power user tools and interactive modes
@@ -62,12 +63,12 @@ Each command module exports a single registration function:
 
 ```typescript
 // src/commands/myCommand.ts
-import { Command } from 'commander';
+import { Command } from "commander";
 
 export function registerMyCommandCommand(program: Command): void {
   program
-    .command('my-command')
-    .description('Command description')
+    .command("my-command")
+    .description("Command description")
     .action(async (args, options) => {
       // Thin wrapper - delegates to business logic
       const result = await executeMyCommand(args, options);
@@ -82,6 +83,7 @@ async function executeMyCommand(args, options) {
 ```
 
 **Key Principles:**
+
 - **Separation of Concerns**: CLI registration separate from business logic
 - **Pure Functions**: Business logic has no side effects (testable)
 - **Consistent Output**: All commands support `--json` and human-readable formats
@@ -101,19 +103,19 @@ writeJsonOutput({ success: true, items: [...] });
 #### Exit Handling (`src/cli/exitHandler.js`)
 
 ```typescript
-import { throwExit, CLIExitSignal } from '../cli/exitHandler.js';
+import { throwExit, CLIExitSignal } from "../cli/exitHandler.js";
 
 // Graceful exit with error message
-throwExit(new Error('Operation failed'), 1);
+throwExit(new Error("Operation failed"), 1);
 
 // Exit with success
-throw new CLIExitSignal(0, 'Operation complete');
+throw new CLIExitSignal(0, "Operation complete");
 ```
 
 #### Global Flags (`src/cli/flags.js`)
 
 ```typescript
-import { parseGlobalFlags } from '../cli/flags.js';
+import { parseGlobalFlags } from "../cli/flags.js";
 
 // Access global flags (--json, --no-color, etc.)
 const globalOpts = parseGlobalFlags(process.argv);
@@ -122,6 +124,7 @@ const globalOpts = parseGlobalFlags(process.argv);
 ### Adding New Commands
 
 See the **[Command Creation Guide](./command-creation-guide.md)** for:
+
 - Step-by-step command creation
 - Templates and examples
 - Testing patterns
@@ -129,6 +132,7 @@ See the **[Command Creation Guide](./command-creation-guide.md)** for:
 - Complete checklist
 
 Quick reference:
+
 1. Create `src/commands/myCommand.ts`
 2. Export `registerMyCommandCommand(program: Command)`
 3. Register in `src/cli.ts`
@@ -157,11 +161,13 @@ Options:
 Unconditionally disables ANSI escape codes in output, regardless of TTY detection.
 
 **Use cases:**
+
 - Force plain text output when piping to tools that don't handle ANSI codes
 - Debugging in environments where color codes interfere with output
 - CI/CD pipelines where color codes are not needed
 
 **Example:**
+
 ```bash
 lex-pr --no-color config:inspect
 ```
@@ -169,22 +175,26 @@ lex-pr --no-color config:inspect
 #### `--json`
 
 Enables JSON output mode and automatically disables colors. This flag:
+
 - Forces JSON output to stdout for supported commands
 - Disables ANSI color codes (implies `--no-color`)
 - Suppresses human-friendly decorations (emojis, tips, progress indicators)
 - Uses plain text prefixes in error messages (e.g., `[lex-pr]` instead of ❌)
 
 **Use cases:**
+
 - Machine-readable output for automation and scripting
 - Clean JSON output for piping to `jq` or other JSON processors
 - CI/CD pipelines and automated testing
 
 **Example:**
+
 ```bash
 lex-pr --json plan > plan.json
 ```
 
 **Note:** The `--json` flag can be used either globally or at the command level:
+
 ```bash
 # Global flag (affects all output)
 lex-pr --json plan
@@ -204,13 +214,13 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LEX_PR_OUT_DIR` | Default output directory for artifacts | `.smartergpt/runner` |
-| `LEX_PR_MAX_WORKERS` | Maximum parallel gate execution | `1` |
-| `LEX_PR_TIMEOUT` | Default gate timeout in seconds | `300` |
-| `NO_COLOR` | Disable ANSI color codes when set (any value) | unset |
-| `LOG_FORMAT` | Log output format: 'json' or 'human' | `human` |
+| Variable             | Description                                   | Default              |
+| -------------------- | --------------------------------------------- | -------------------- |
+| `LEX_PR_OUT_DIR`     | Default output directory for artifacts        | `.smartergpt/runner` |
+| `LEX_PR_MAX_WORKERS` | Maximum parallel gate execution               | `1`                  |
+| `LEX_PR_TIMEOUT`     | Default gate timeout in seconds               | `300`                |
+| `NO_COLOR`           | Disable ANSI color codes when set (any value) | unset                |
+| `LOG_FORMAT`         | Log output format: 'json' or 'human'          | `human`              |
 
 ## Commands
 
@@ -275,10 +285,10 @@ lex-pr init --github-token ghp_your_token_here
 
 #### Environment Variables
 
-| Variable | Description | Used When |
-|----------|-------------|-----------|
+| Variable       | Description                  | Used When            |
+| -------------- | ---------------------------- | -------------------- |
 | `GITHUB_TOKEN` | GitHub personal access token | Token authentication |
-| `GH_TOKEN` | Alternative GitHub token | Token authentication |
+| `GH_TOKEN`     | Alternative GitHub token     | Token authentication |
 
 #### Exit Codes
 
@@ -323,6 +333,7 @@ Options:
 #### Validation Checks
 
 The validator performs comprehensive checks:
+
 1. **Schema validation** - Ensures plan follows correct structure
 2. **Cycle detection** - Identifies circular dependencies with full path details
 3. **Orphan detection** - Warns about items with no dependencies/dependents
@@ -382,6 +393,7 @@ Suggestion: Consider if these items should have dependencies or dependents.
 #### JSON Output Schema
 
 **Success Response:**
+
 ```json
 {
   "valid": true,
@@ -400,6 +412,7 @@ Suggestion: Consider if these items should have dependencies or dependents.
 ```
 
 **Error Response (Cycle):**
+
 ```json
 {
   "valid": false,
@@ -424,6 +437,7 @@ Suggestion: Consider if these items should have dependencies or dependents.
 ```
 
 **Warning Response (Orphans):**
+
 ```json
 {
   "valid": true,
@@ -449,15 +463,18 @@ Suggestion: Consider if these items should have dependencies or dependents.
 ```
 
 **Error Types:**
+
 - `cycle` - Circular dependency detected
 - `invalid-ref` - Reference to non-existent item
 - `self-dependency` - Item depends on itself
 
 **Warning Types:**
+
 - `orphan` - Item has no dependencies and no dependents
 - `large-layer` - Layer has too many items (potential merge conflicts)
 
 **Exit Codes:**
+
 - `0`: Validation successful (may have warnings)
 - `1`: Validation failed with errors or system error
 - `2`: Validation failed
@@ -519,6 +536,7 @@ lex-pr plan --from-github --exclude-labels "wip,draft"
 ```
 
 **What auto-discovery does:**
+
 1. Fetches open PRs from GitHub
 2. Parses `Depends-on:` footers from PR descriptions
 3. Analyzes file changes to suggest implicit dependencies (if `--suggest-deps`)
@@ -554,15 +572,19 @@ The planner recognizes these dependency formats in PR descriptions:
 
 ```markdown
 # Single dependency
+
 Depends-on: #123
 
 # Multiple dependencies
+
 Depends-on: #123, #456, #789
 
 # Cross-repo references
+
 Depends-on: owner/repo#123
 
 # Alternative keywords (aliases)
+
 Depends: #123
 Requires: #456
 ```
@@ -573,13 +595,14 @@ Requires: #456
 
 When `--suggest-deps` is used, the planner analyzes file changes to suggest dependencies:
 
-| Heuristic | Confidence Range | Description |
-|-----------|-----------------|-------------|
-| **Shared files** | 0.6 - 1.0 | Both PRs modify the same files |
-| **Directory proximity** | 0.3 - 0.8 | PRs work in the same directories |
-| **Test overlap** | 0.5 - 0.85 | PRs test the same modules |
+| Heuristic               | Confidence Range | Description                      |
+| ----------------------- | ---------------- | -------------------------------- |
+| **Shared files**        | 0.6 - 1.0        | Both PRs modify the same files   |
+| **Directory proximity** | 0.3 - 0.8        | PRs work in the same directories |
+| **Test overlap**        | 0.5 - 0.85       | PRs test the same modules        |
 
 **Threshold guidelines:**
+
 - `≥0.8`: Very high confidence, almost always valid
 - `≥0.7`: High confidence, recommended for hybrid workflow
 - `≥0.5`: Medium confidence, requires manual review
@@ -639,6 +662,7 @@ lex-pr plan --from-github --validate-cycles=false
 ```
 
 Example output with `--optimize`:
+
 ```
 ✓ Auto-discovered 5 PRs from GitHub
 ✓ Parsed dependencies: 3 explicit, 1 implicit
@@ -669,6 +693,7 @@ Example output with `--optimize`:
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -715,12 +740,14 @@ Example output with `--optimize`:
 ```
 
 **Deterministic Guarantees:**
+
 - Keys sorted alphabetically at all levels
 - Arrays maintain stable ordering (deps sorted, items by name)
 - No runtime timestamps or random values
 - Cross-platform identical output
 
 **Exit Codes:**
+
 - `0`: Plan generated successfully
 - `1`: System error (filesystem, permissions)
 - `2`: Configuration validation failed
@@ -759,12 +786,13 @@ lex-pr merge-order --plan ./configs/plan.json
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
   "levels": [
-    ["item-a", "item-c"],  // Level 0: No dependencies
-    ["item-b"],            // Level 1: Depends on level 0
-    ["item-d"]             // Level 2: Depends on level 1
+    ["item-a", "item-c"], // Level 0: No dependencies
+    ["item-b"], // Level 1: Depends on level 0
+    ["item-d"] // Level 2: Depends on level 1
   ],
   "totalItems": 4,
   "maxParallelism": 2
@@ -772,6 +800,7 @@ lex-pr merge-order --plan ./configs/plan.json
 ```
 
 **Human-Readable Output:**
+
 ```
 Merge Order (3 levels):
   Level 0: item-a, item-c
@@ -782,6 +811,7 @@ Total items: 4, Max parallelism: 2
 ```
 
 **Exit Codes:**
+
 - `0`: Merge order computed successfully
 - `1`: System error (file not readable)
 - `2`: Dependency cycle or unknown dependency detected
@@ -809,6 +839,7 @@ Options:
 3. **Merge Simulation**: Run `git merge-tree` to validate predicted conflicts
 
 **Greedy MIS Algorithm:**
+
 - Sort nodes by degree (fewest conflicts first), then by PR number
 - Greedily select nodes that don't conflict with already selected nodes
 - Result: Maximum set of PRs that can merge in parallel
@@ -832,6 +863,7 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102 --base develop
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
   "analyzedAt": "2025-10-13T02:00:00Z",
@@ -887,6 +919,7 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102 --base develop
 ```
 
 **Human-Readable Output:**
+
 ```
 🔍 Conflict Analysis
 ============================================================
@@ -912,6 +945,7 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102 --base develop
 ```
 
 **Exit Codes:**
+
 - `0`: Conflict analysis completed successfully
 - `1`: Missing required parameters or system error
 
@@ -977,6 +1011,7 @@ When running in interactive mode, you'll see:
 3. **Merge Order**: Computed execution levels
 
 Then you can choose:
+
 - `[a]` Approve plan - Accept the plan as-is
 - `[r]` Reject plan - Reject with optional reason
 - `[e]` Edit plan - Interactively modify the plan
@@ -987,6 +1022,7 @@ Then you can choose:
 #### Edit Operations
 
 When editing, you can:
+
 - Add new items with dependencies
 - Remove items (validated against dependents)
 - Modify item dependencies (cycle detection)
@@ -1144,6 +1180,7 @@ The `vuln` gate is a special built-in gate that scans for security vulnerabiliti
 - **Deterministic Output**: Provides consistent, structured vulnerability counts
 
 **Policy Configuration:**
+
 ```json
 {
   "policy": {
@@ -1159,6 +1196,7 @@ The `vuln` gate is a special built-in gate that scans for security vulnerabiliti
 ```
 
 **Example Gate:**
+
 ```json
 {
   "gates": [
@@ -1171,6 +1209,7 @@ The `vuln` gate is a special built-in gate that scans for security vulnerabiliti
 ```
 
 **Supported Scanners:**
+
 - Trivy: `trivy fs --format sarif`
 - Snyk: `snyk test --sarif`
 - CodeQL: `codeql database analyze --format=sarif-latest`
@@ -1181,9 +1220,10 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
-  "executionId": "string",       // Unique execution identifier
+  "executionId": "string", // Unique execution identifier
   "startedAt": "2024-01-15T10:30:00Z",
   "completedAt": "2024-01-15T10:35:00Z",
   "status": "completed|failed|running",
@@ -1199,7 +1239,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
           "gate": "test",
           "status": "pass|fail|blocked|skipped|retrying",
           "exitCode": 0,
-          "duration": 1500,     // milliseconds
+          "duration": 1500, // milliseconds
           "stdout": "string",
           "stderr": "string",
           "artifacts": ["coverage.json"],
@@ -1207,7 +1247,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
           "lastAttempt": "2024-01-15T10:32:00Z"
         }
       ],
-      "blockedBy": [],          // Items that blocked this one
+      "blockedBy": [], // Items that blocked this one
       "eligibleForMerge": true
     }
   ]
@@ -1215,6 +1255,7 @@ See [Gate Report Examples](./gate-report-examples.md#vulnerability-gate-vuln) fo
 ```
 
 **Exit Codes:**
+
 - `0`: All gates passed successfully
 - `1`: System error during execution
 - `2`: One or more gates failed
@@ -1252,7 +1293,7 @@ Options:
 ```
 
 > **📖 Quick Start**: See [Merge-Weave Quickstart](./merge-weave-quickstart.md) for an end-to-end walkthrough with examples.
-> 
+>
 > **📖 Autopilot Levels**: See [Autopilot Levels](./autopilot-levels.md) for details on automation levels 0-4.
 
 #### Basic Examples
@@ -1312,6 +1353,7 @@ The merge command uses a lock file (`weave-lock.json`) for idempotency and resum
 - **Resume**: Failed executions can be resumed with `--resume`
 
 **Lock File Example:**
+
 ```json
 {
   "lockHash": "abc123de",
@@ -1330,11 +1372,13 @@ The merge command uses a lock file (`weave-lock.json`) for idempotency and resum
 Enabled by default in dry-run mode. Uses `git merge-tree` to simulate merges without modifying the working tree.
 
 **Benefits:**
+
 - Detects conflicts early before actual merge execution
 - No working tree modifications
 - Fast simulation of merge operations
 
 **Example Dry-Run Output with Conflicts:**
+
 ```json
 {
   "mode": "dry-run",
@@ -1350,9 +1394,7 @@ Enabled by default in dry-run mode. Uses `git merge-tree` to simulate merges wit
       }
     ]
   },
-  "warnings": [
-    "feature-ui has 2 potential conflicts. Review and resolve before executing."
-  ]
+  "warnings": ["feature-ui has 2 potential conflicts. Review and resolve before executing."]
 }
 ```
 
@@ -1365,6 +1407,7 @@ lex-pr merge --execute --track-turncost
 ```
 
 **Components:**
+
 - **Latency (L)**: Total execution time
 - **Renegotiation (R)**: Conflicts requiring manual resolution
 - **Token Bloat (T)**: Token usage overhead (future)
@@ -1419,6 +1462,7 @@ lex-pr status --json plan.json
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
   "executionStatus": "not_started|running|completed|failed",
@@ -1446,6 +1490,7 @@ lex-pr status --json plan.json
 ```
 
 **Exit Codes:**
+
 - `0`: Status retrieved successfully
 - `1`: System error (state files not readable)
 - `2`: No execution state found
@@ -1484,6 +1529,7 @@ lex-pr report --validate ./gate-results
 #### JSON Output Schema (`--out json`)
 
 **Success Response:**
+
 ```json
 {
   "summary": {
@@ -1516,10 +1562,12 @@ lex-pr report --validate ./gate-results
 ```
 
 **Markdown Output (`--out md`):**
+
 ```markdown
 # Gate Execution Report
 
 ## Summary
+
 - **Total Items**: 4
 - **Total Gates**: 12
 - **Passed**: 10 ✅
@@ -1529,12 +1577,14 @@ lex-pr report --validate ./gate-results
 ## Item Results
 
 ### item-a ✅
+
 - test: ✅ PASS (1.5s)
 - lint: ✅ PASS (0.8s)
 - build: ✅ PASS (12.3s)
 ```
 
 **Exit Codes:**
+
 - `0`: All gates passed (allGreen: true)
 - `1`: System error (directory not readable, invalid reports)
 - `2`: One or more gates failed
@@ -1566,6 +1616,7 @@ lex-pr doctor --json
 #### JSON Output Schema (`--json` flag)
 
 **Success Response:**
+
 ```json
 {
   "status": "healthy|warning|error",
@@ -1582,10 +1633,7 @@ lex-pr doctor --json
       "name": "config_files",
       "status": "pass",
       "message": "All configuration files found",
-      "details": [
-        ".smartergpt/intent.md: ✓",
-        ".smartergpt/scope.yml: ✓"
-      ]
+      "details": [".smartergpt/intent.md: ✓", ".smartergpt/scope.yml: ✓"]
     }
   ],
   "summary": {
@@ -1598,6 +1646,7 @@ lex-pr doctor --json
 ```
 
 **Exit Codes:**
+
 - `0`: All checks passed or warnings only
 - `1`: System error during checks
 - `2`: One or more critical checks failed
@@ -1655,6 +1704,7 @@ const throwExit = (code: number): never => {
 ```
 
 **Why**: This approach allows:
+
 - Centralized exit handling in the main error handler
 - Proper cleanup of resources before exit
 - Testability (errors can be caught in tests)
@@ -1672,6 +1722,7 @@ program.exitOverride((err: CommanderError) => {
 ```
 
 **Why**: Commander's default exit behavior calls `process.exit()` directly. Overriding ensures:
+
 - All exits go through the same path
 - Help/version commands work correctly with exit code 0
 - No bypassing of error handlers
@@ -1681,14 +1732,15 @@ program.exitOverride((err: CommanderError) => {
 Use the standard exit codes consistently:
 
 ```typescript
-throwExit(0);  // Success
-throwExit(1);  // System/infrastructure errors
-throwExit(2);  // User/validation errors
+throwExit(0); // Success
+throwExit(1); // System/infrastructure errors
+throwExit(2); // User/validation errors
 ```
 
 **Examples**:
 
 ✅ **Correct**:
+
 ```typescript
 try {
   const plan = loadPlan(planPath);
@@ -1697,14 +1749,15 @@ try {
 } catch (e) {
   if (e instanceof SchemaValidationError) {
     console.error(`Validation failed: ${e.message}`);
-    throwExit(2);  // User can fix this
+    throwExit(2); // User can fix this
   }
   console.error(`Unexpected error: ${e.message}`);
-  throwExit(1);  // System error
+  throwExit(1); // System error
 }
 ```
 
 ❌ **Incorrect**:
+
 ```typescript
 // DON'T: Direct process.exit
 process.exit(1);
@@ -1732,6 +1785,7 @@ program.configureOutput({
 ```
 
 **Why**: This ensures:
+
 - Help/version output goes to stderr (Commander default)
 - stdout remains pure for JSON or data output
 - Pipeable commands work correctly
@@ -1764,6 +1818,7 @@ command.action(async (opts) => {
 ```
 
 **Rules for JSON mode**:
+
 1. **No console.log** in JSON mode - use `process.stdout.write()` directly
 2. **No progress messages** - suppress all diagnostics in JSON mode
 3. **No emojis or formatting** - JSON only
@@ -1772,6 +1827,7 @@ command.action(async (opts) => {
 **Examples**:
 
 ✅ **Correct**:
+
 ```typescript
 if (opts.json) {
   // Pure JSON to stdout
@@ -1785,11 +1841,12 @@ console.error("ℹ️ Note: Some items were skipped");
 ```
 
 ❌ **Incorrect**:
+
 ```typescript
 if (opts.json) {
-  console.log("Processing...");  // DON'T: breaks JSON purity
-  console.log(JSON.stringify(data));  // DON'T: use canonicalJSONStringify
-  console.error(JSON.stringify(error));  // DON'T: errors to stderr, not JSON mixed in
+  console.log("Processing..."); // DON'T: breaks JSON purity
+  console.log(JSON.stringify(data)); // DON'T: use canonicalJSONStringify
+  console.error(JSON.stringify(error)); // DON'T: errors to stderr, not JSON mixed in
 }
 ```
 
@@ -1807,6 +1864,7 @@ console.log(canonicalJSONStringify(result));
 ```
 
 **Why**: Allows users to pipe output while still seeing progress:
+
 ```bash
 lex-pr plan --json > plan.json  # Progress visible, JSON piped
 ```
@@ -1827,6 +1885,7 @@ process.stdout.write(canonicalJSONStringify(data));
 **Note**: Import path shown is from `src/` directory. Adjust relative path based on your file location. Use `.js` extension in imports even for TypeScript source files (required for ES modules - TypeScript doesn't rewrite extensions).
 
 **Why**: Ensures deterministic output:
+
 - Keys sorted alphabetically at all levels
 - Consistent 2-space indentation
 - Always includes trailing newline
@@ -1845,6 +1904,7 @@ console.log(generatePlanSummary(plan));
 ```
 
 **Guidelines**:
+
 - Use emojis for visual clarity
 - Include spacing for readability
 - Provide actionable next steps
@@ -1873,11 +1933,13 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   }
 
   // Handle known validation errors (exit 2)
-  if (e instanceof SchemaValidationError ||
-      e instanceof CycleError ||
-      e instanceof UnknownDependencyError ||
-      e instanceof WriteProtectionError ||
-      e instanceof AutopilotConfigError) {
+  if (
+    e instanceof SchemaValidationError ||
+    e instanceof CycleError ||
+    e instanceof UnknownDependencyError ||
+    e instanceof WriteProtectionError ||
+    e instanceof AutopilotConfigError
+  ) {
     console.error(`\n❌ Error: ${err.message}\n`);
 
     // Add contextual help based on error type
@@ -1896,6 +1958,7 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
 **Note**: Simplified example. See `src/cli.ts` for the full implementation with contextual error messages.
 
 **Usage**:
+
 ```typescript
 try {
   const plan = await generatePlan();
@@ -1954,6 +2017,7 @@ describe("CLI exit codes", () => {
 5. **Stream Separation**: Commander's `configureOutput()` ensures help/errors don't pollute stdout
 
 **Related Documentation**:
+
 - [Error Taxonomy](./errors.md) - Complete error code reference
 - [Deterministic Output](#deterministic-output-requirements) - JSON output guarantees
 - Source: `src/cli.ts` - See `CLIExitSignal`, `throwExit()`, `exitWith()`
@@ -1981,6 +2045,7 @@ Options:
 ```
 
 **Keyboard Navigation:**
+
 - `↑/↓` - Navigate items
 - `/` - Enter filter mode
 - `d` - Toggle dependencies
@@ -2025,6 +2090,7 @@ Options:
 ```
 
 **Query Syntax:**
+
 ```
 field operator value [AND field operator value]
 ```
@@ -2128,12 +2194,14 @@ lex-pr completion bash --install
 **Installation:**
 
 For bash:
+
 ```bash
 # Add to ~/.bashrc
 eval "$(lex-pr completion bash)"
 ```
 
 For zsh:
+
 ```bash
 # Add to ~/.zshrc
 eval "$(lex-pr completion zsh)"
@@ -2179,6 +2247,7 @@ All commands follow consistent error handling:
 - **Exit code 2**: User/validation errors
 
 JSON error responses use consistent format:
+
 ```json
 {
   "error": true,

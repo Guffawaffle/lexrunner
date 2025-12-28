@@ -6,616 +6,575 @@
 
 import { describe, it, expect } from "vitest";
 import {
-	gateFailedError,
-	mergeConflictError,
-	cycleDetectedError,
-	unknownDependencyError,
-	githubApiError,
-	gitOperationError,
-	planValidationError,
-	toAXError,
-	isAXError,
-	ErrorCodes,
-	// MCP-specific adapters
-	mcpToolError,
-	planNotFoundError,
-	writeProtectionError,
-	// Weave-specific adapters
-	weaveLockConflictError,
-	weaveStateInvalidError,
-	weavePreflightFailedError,
+  gateFailedError,
+  mergeConflictError,
+  cycleDetectedError,
+  unknownDependencyError,
+  githubApiError,
+  gitOperationError,
+  planValidationError,
+  toAXError,
+  isAXError,
+  ErrorCodes,
+  // MCP-specific adapters
+  mcpToolError,
+  planNotFoundError,
+  writeProtectionError,
+  // Weave-specific adapters
+  weaveLockConflictError,
+  weaveStateInvalidError,
+  weavePreflightFailedError,
 } from "../src/errors/index.js";
 
 describe("AXError adapters", () => {
-	describe("gateFailedError", () => {
-		it("should create valid AXError for lint gate failure", () => {
-			const error = gateFailedError({
-				gate: "lint",
-				item: "PR-123",
-				exitCode: 1,
-			});
+  describe("gateFailedError", () => {
+    it("should create valid AXError for lint gate failure", () => {
+      const error = gateFailedError({
+        gate: "lint",
+        item: "PR-123",
+        exitCode: 1,
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GATE_FAILED);
-			expect(error.message).toContain("lint");
-			expect(error.message).toContain("PR-123");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-			expect(
-				error.nextActions.some((a) => a.includes("npm run lint"))
-			).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GATE_FAILED);
+      expect(error.message).toContain("lint");
+      expect(error.message).toContain("PR-123");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+      expect(error.nextActions.some((a) => a.includes("npm run lint"))).toBe(true);
+    });
 
-		it("should include artifact path in nextActions when provided", () => {
-			const error = gateFailedError({
-				gate: "test",
-				artifactPath: "artifacts/PR-123/test/",
-			});
+    it("should include artifact path in nextActions when provided", () => {
+      const error = gateFailedError({
+        gate: "test",
+        artifactPath: "artifacts/PR-123/test/",
+      });
 
-			expect(
-				error.nextActions.some((a) => a.includes("artifacts/PR-123"))
-			).toBe(true);
-		});
-	});
+      expect(error.nextActions.some((a) => a.includes("artifacts/PR-123"))).toBe(true);
+    });
+  });
 
-	describe("mergeConflictError", () => {
-		it("should create valid AXError for merge conflict", () => {
-			const error = mergeConflictError({
-				item: "PR-456",
-				pr: 456,
-				files: ["src/cli.ts", "src/schema.ts"],
-				targetBranch: "main",
-			});
+  describe("mergeConflictError", () => {
+    it("should create valid AXError for merge conflict", () => {
+      const error = mergeConflictError({
+        item: "PR-456",
+        pr: 456,
+        files: ["src/cli.ts", "src/schema.ts"],
+        targetBranch: "main",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.MERGE_CONFLICT);
-			expect(error.message).toContain("PR-456");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-			expect(error.nextActions.some((a) => a.includes("Rebase"))).toBe(
-				true
-			);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.MERGE_CONFLICT);
+      expect(error.message).toContain("PR-456");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+      expect(error.nextActions.some((a) => a.includes("Rebase"))).toBe(true);
+    });
+  });
 
-	describe("cycleDetectedError", () => {
-		it("should create valid AXError for dependency cycle", () => {
-			const error = cycleDetectedError({
-				cycle: ["PR-1", "PR-2", "PR-3", "PR-1"],
-			});
+  describe("cycleDetectedError", () => {
+    it("should create valid AXError for dependency cycle", () => {
+      const error = cycleDetectedError({
+        cycle: ["PR-1", "PR-2", "PR-3", "PR-1"],
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_CYCLE_DETECTED);
-			expect(error.message).toContain("cycle");
-			expect(
-				error.nextActions.some((a) => a.includes("dependencies"))
-			).toBe(true);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_CYCLE_DETECTED);
+      expect(error.message).toContain("cycle");
+      expect(error.nextActions.some((a) => a.includes("dependencies"))).toBe(true);
+    });
+  });
 
-	describe("unknownDependencyError", () => {
-		it("should create valid AXError for unknown dependency", () => {
-			const error = unknownDependencyError({
-				item: "PR-100",
-				dependency: "PR-999",
-				availableItems: ["PR-1", "PR-2", "PR-3"],
-			});
+  describe("unknownDependencyError", () => {
+    it("should create valid AXError for unknown dependency", () => {
+      const error = unknownDependencyError({
+        item: "PR-100",
+        dependency: "PR-999",
+        availableItems: ["PR-1", "PR-2", "PR-3"],
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.UNKNOWN_DEPENDENCY);
-			expect(error.message).toContain("PR-100");
-			expect(error.message).toContain("PR-999");
-			expect(
-				error.nextActions.some((a) => a.includes("Available items"))
-			).toBe(true);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.UNKNOWN_DEPENDENCY);
+      expect(error.message).toContain("PR-100");
+      expect(error.message).toContain("PR-999");
+      expect(error.nextActions.some((a) => a.includes("Available items"))).toBe(true);
+    });
+  });
 
-	describe("githubApiError", () => {
-		it("should handle authentication errors", () => {
-			const error = githubApiError({
-				status: 401,
-				message: "Bad credentials",
-			});
+  describe("githubApiError", () => {
+    it("should handle authentication errors", () => {
+      const error = githubApiError({
+        status: 401,
+        message: "Bad credentials",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_AUTH_ERROR);
-			expect(
-				error.nextActions.some((a) => a.includes("GITHUB_TOKEN"))
-			).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_AUTH_ERROR);
+      expect(error.nextActions.some((a) => a.includes("GITHUB_TOKEN"))).toBe(true);
+    });
 
-		it("should handle rate limiting", () => {
-			const error = githubApiError({
-				status: 429,
-				retryAfter: 60,
-			});
+    it("should handle rate limiting", () => {
+      const error = githubApiError({
+        status: 429,
+        retryAfter: 60,
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_RATE_LIMIT);
-			expect(
-				error.nextActions.some((a) => a.includes("60 seconds"))
-			).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_RATE_LIMIT);
+      expect(error.nextActions.some((a) => a.includes("60 seconds"))).toBe(true);
+    });
 
-		it("should handle generic API errors", () => {
-			const error = githubApiError({
-				status: 500,
-				endpoint: "/repos/owner/repo/pulls",
-			});
+    it("should handle generic API errors", () => {
+      const error = githubApiError({
+        status: 500,
+        endpoint: "/repos/owner/repo/pulls",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
 
-		it("should handle 404 not found errors", () => {
-			const error = githubApiError({
-				status: 404,
-				message: "Failed to fetch pull requests: Not Found",
-			});
+    it("should handle 404 not found errors", () => {
+      const error = githubApiError({
+        status: 404,
+        message: "Failed to fetch pull requests: Not Found",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
-			expect(error.context?.status).toBe(404);
-			expect(error.message).toContain("Not Found");
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_API_ERROR);
+      expect(error.context?.status).toBe(404);
+      expect(error.message).toContain("Not Found");
+    });
+  });
 
-	describe("gitOperationError", () => {
-		it("should create valid AXError for git operation failure", () => {
-			const error = gitOperationError({
-				operation: "merge",
-				command: "git merge feature-branch",
-				message: "Automatic merge failed",
-			});
+  describe("gitOperationError", () => {
+    it("should create valid AXError for git operation failure", () => {
+      const error = gitOperationError({
+        operation: "merge",
+        command: "git merge feature-branch",
+        message: "Automatic merge failed",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GIT_OPERATION_FAILED);
-			expect(error.message).toContain("merge");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GIT_OPERATION_FAILED);
+      expect(error.message).toContain("merge");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 
-	describe("planValidationError", () => {
-		it("should create valid AXError for plan validation failure", () => {
-			const error = planValidationError({
-				errors: [
-					"Missing required field: id",
-					"Invalid gate configuration",
-				],
-				planPath: "plan.json",
-			});
+  describe("planValidationError", () => {
+    it("should create valid AXError for plan validation failure", () => {
+      const error = planValidationError({
+        errors: ["Missing required field: id", "Invalid gate configuration"],
+        planPath: "plan.json",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_VALIDATION_FAILED);
-			expect(error.message).toContain("2 error(s)");
-			expect(error.nextActions.some((a) => a.includes("plan.json"))).toBe(
-				true
-			);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_VALIDATION_FAILED);
+      expect(error.message).toContain("2 error(s)");
+      expect(error.nextActions.some((a) => a.includes("plan.json"))).toBe(true);
+    });
+  });
 
-	describe("toAXError", () => {
-		it("should wrap standard Error as AXError", () => {
-			const standardError = new Error("Something went wrong");
-			const axError = toAXError(standardError);
+  describe("toAXError", () => {
+    it("should wrap standard Error as AXError", () => {
+      const standardError = new Error("Something went wrong");
+      const axError = toAXError(standardError);
 
-			expect(isAXError(axError)).toBe(true);
-			expect(axError.code).toBe(ErrorCodes.INTERNAL_ERROR);
-			expect(axError.message).toBe("Something went wrong");
-			expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
+      expect(isAXError(axError)).toBe(true);
+      expect(axError.code).toBe(ErrorCodes.INTERNAL_ERROR);
+      expect(axError.message).toBe("Something went wrong");
+      expect(axError.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
 
-		it("should allow custom error code", () => {
-			const error = new Error("Config error");
-			const axError = toAXError(error, ErrorCodes.CONFIG_INVALID);
+    it("should allow custom error code", () => {
+      const error = new Error("Config error");
+      const axError = toAXError(error, ErrorCodes.CONFIG_INVALID);
 
-			expect(axError.code).toBe(ErrorCodes.CONFIG_INVALID);
-		});
+      expect(axError.code).toBe(ErrorCodes.CONFIG_INVALID);
+    });
 
-		it("should allow custom nextActions", () => {
-			const error = new Error("Custom error");
-			const axError = toAXError(error, ErrorCodes.INTERNAL_ERROR, [
-				"Check the config file",
-				"Try running with --verbose",
-			]);
+    it("should allow custom nextActions", () => {
+      const error = new Error("Custom error");
+      const axError = toAXError(error, ErrorCodes.INTERNAL_ERROR, [
+        "Check the config file",
+        "Try running with --verbose",
+      ]);
 
-			expect(axError.nextActions).toHaveLength(2);
-			expect(axError.nextActions[0]).toBe("Check the config file");
-		});
-	});
+      expect(axError.nextActions).toHaveLength(2);
+      expect(axError.nextActions[0]).toBe("Check the config file");
+    });
+  });
 
-	describe("AXError schema compliance", () => {
-		it("should always have at least one nextAction", () => {
-			// All adapters must satisfy the AX requirement
-			const errors = [
-				gateFailedError({ gate: "unknown" }),
-				mergeConflictError({}),
-				cycleDetectedError({ cycle: [] }),
-				unknownDependencyError({ item: "a", dependency: "b" }),
-				githubApiError({}),
-				gitOperationError({ operation: "unknown" }),
-				planValidationError({ errors: [] }),
-			];
+  describe("AXError schema compliance", () => {
+    it("should always have at least one nextAction", () => {
+      // All adapters must satisfy the AX requirement
+      const errors = [
+        gateFailedError({ gate: "unknown" }),
+        mergeConflictError({}),
+        cycleDetectedError({ cycle: [] }),
+        unknownDependencyError({ item: "a", dependency: "b" }),
+        githubApiError({}),
+        gitOperationError({ operation: "unknown" }),
+        planValidationError({ errors: [] }),
+      ];
 
-			for (const error of errors) {
-				expect(
-					error.nextActions.length,
-					`Error ${error.code} should have at least one nextAction`
-				).toBeGreaterThanOrEqual(1);
-			}
-		});
+      for (const error of errors) {
+        expect(
+          error.nextActions.length,
+          `Error ${error.code} should have at least one nextAction`
+        ).toBeGreaterThanOrEqual(1);
+      }
+    });
 
-		it("should have UPPER_SNAKE_CASE error codes", () => {
-			const codePattern = /^[A-Z][A-Z0-9_]*$/;
-			const codes = Object.values(ErrorCodes);
+    it("should have UPPER_SNAKE_CASE error codes", () => {
+      const codePattern = /^[A-Z][A-Z0-9_]*$/;
+      const codes = Object.values(ErrorCodes);
 
-			for (const code of codes) {
-				expect(code).toMatch(codePattern);
-			}
-		});
-	});
+      for (const code of codes) {
+        expect(code).toMatch(codePattern);
+      }
+    });
+  });
 });
 
 describe("MCP-specific AXError adapters", () => {
-	describe("mcpToolError", () => {
-		it("should create valid AXError for MCP tool failures", () => {
-			const error = mcpToolError(
-				ErrorCodes.INTERNAL_ERROR,
-				"plan.create failed: Config not found",
-				{ tool: "plan.create", operation: "load config" }
-			);
+  describe("mcpToolError", () => {
+    it("should create valid AXError for MCP tool failures", () => {
+      const error = mcpToolError(
+        ErrorCodes.INTERNAL_ERROR,
+        "plan.create failed: Config not found",
+        { tool: "plan.create", operation: "load config" }
+      );
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.INTERNAL_ERROR);
-			expect(error.message).toContain("plan.create");
-			expect(error.context?.tool).toBe("plan.create");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.INTERNAL_ERROR);
+      expect(error.message).toContain("plan.create");
+      expect(error.context?.tool).toBe("plan.create");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
 
-		it("should add tool-specific suggestions for plan.create", () => {
-			const error = mcpToolError(
-				ErrorCodes.INTERNAL_ERROR,
-				"Failed",
-				{ tool: "plan.create" }
-			);
+    it("should add tool-specific suggestions for plan.create", () => {
+      const error = mcpToolError(ErrorCodes.INTERNAL_ERROR, "Failed", { tool: "plan.create" });
 
-			expect(error.nextActions.some(a => a.includes("local.init"))).toBe(true);
-		});
+      expect(error.nextActions.some((a) => a.includes("local.init"))).toBe(true);
+    });
 
-		it("should add tool-specific suggestions for gates.run", () => {
-			const error = mcpToolError(
-				ErrorCodes.INTERNAL_ERROR,
-				"Failed",
-				{ tool: "gates.run" }
-			);
+    it("should add tool-specific suggestions for gates.run", () => {
+      const error = mcpToolError(ErrorCodes.INTERNAL_ERROR, "Failed", { tool: "gates.run" });
 
-			expect(error.nextActions.some(a => a.includes("plan.create"))).toBe(true);
-		});
+      expect(error.nextActions.some((a) => a.includes("plan.create"))).toBe(true);
+    });
 
-		it("should add tool-specific suggestions for merge.apply", () => {
-			const error = mcpToolError(
-				ErrorCodes.INTERNAL_ERROR,
-				"Failed",
-				{ tool: "merge.apply" }
-			);
+    it("should add tool-specific suggestions for merge.apply", () => {
+      const error = mcpToolError(ErrorCodes.INTERNAL_ERROR, "Failed", { tool: "merge.apply" });
 
-			expect(error.nextActions.some(a => a.includes("ALLOW_MUTATIONS"))).toBe(true);
-		});
+      expect(error.nextActions.some((a) => a.includes("ALLOW_MUTATIONS"))).toBe(true);
+    });
 
-		it("should use provided nextActions when given", () => {
-			const customActions = ["Do this first", "Then do this"];
-			const error = mcpToolError(
-				ErrorCodes.INTERNAL_ERROR,
-				"Failed",
-				{ tool: "custom.tool" },
-				customActions
-			);
+    it("should use provided nextActions when given", () => {
+      const customActions = ["Do this first", "Then do this"];
+      const error = mcpToolError(
+        ErrorCodes.INTERNAL_ERROR,
+        "Failed",
+        { tool: "custom.tool" },
+        customActions
+      );
 
-			expect(error.nextActions).toEqual(customActions);
-		});
-	});
+      expect(error.nextActions).toEqual(customActions);
+    });
+  });
 
-	describe("planNotFoundError", () => {
-		it("should create valid AXError for missing plan file", () => {
-			const error = planNotFoundError("custom/path/plan.json");
+  describe("planNotFoundError", () => {
+    it("should create valid AXError for missing plan file", () => {
+      const error = planNotFoundError("custom/path/plan.json");
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
-			expect(error.message).toContain("custom/path/plan.json");
-			expect(error.nextActions.some(a => a.includes("plan.create"))).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+      expect(error.message).toContain("custom/path/plan.json");
+      expect(error.nextActions.some((a) => a.includes("plan.create"))).toBe(true);
+    });
 
-		it("should handle undefined plan file path", () => {
-			const error = planNotFoundError();
+    it("should handle undefined plan file path", () => {
+      const error = planNotFoundError();
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
-			expect(error.message).toContain("Run plan.create first");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+      expect(error.message).toContain("Run plan.create first");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 
-	describe("writeProtectionError", () => {
-		it("should create valid AXError for write protection violations", () => {
-			const error = writeProtectionError(
-				"Cannot write to shared profile",
-				"plan.create"
-			);
+  describe("writeProtectionError", () => {
+    it("should create valid AXError for write protection violations", () => {
+      const error = writeProtectionError("Cannot write to shared profile", "plan.create");
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.WRITE_PROTECTION_ERROR);
-			expect(error.message).toContain("shared profile");
-			expect(error.nextActions.some(a => a.includes("local.init"))).toBe(true);
-			expect(error.context?.operation).toBe("plan.create");
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.WRITE_PROTECTION_ERROR);
+      expect(error.message).toContain("shared profile");
+      expect(error.nextActions.some((a) => a.includes("local.init"))).toBe(true);
+      expect(error.context?.operation).toBe("plan.create");
+    });
+  });
 });
 
 describe("Weave-specific AXError adapters", () => {
-	describe("weaveLockConflictError", () => {
-		it("should create valid AXError for lock file conflict", () => {
-			const error = weaveLockConflictError({
-				lockFile: "weave-lock.json",
-				expectedVersion: "1.0.0",
-				actualVersion: "2.0.0",
-				originalError: "Incompatible lock file version"
-			});
+  describe("weaveLockConflictError", () => {
+    it("should create valid AXError for lock file conflict", () => {
+      const error = weaveLockConflictError({
+        lockFile: "weave-lock.json",
+        expectedVersion: "1.0.0",
+        actualVersion: "2.0.0",
+        originalError: "Incompatible lock file version",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
-			expect(error.message).toContain("Incompatible lock file version");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-			expect(error.nextActions.some(a => a.includes("rm"))).toBe(true);
-			expect(error.context?.expectedVersion).toBe("1.0.0");
-			expect(error.context?.actualVersion).toBe("2.0.0");
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.WEAVE_LOCK_CONFLICT);
+      expect(error.message).toContain("Incompatible lock file version");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+      expect(error.nextActions.some((a) => a.includes("rm"))).toBe(true);
+      expect(error.context?.expectedVersion).toBe("1.0.0");
+      expect(error.context?.actualVersion).toBe("2.0.0");
+    });
 
-		it("should provide default message when originalError not provided", () => {
-			const error = weaveLockConflictError({
-				lockFile: "/path/to/weave-lock.json"
-			});
+    it("should provide default message when originalError not provided", () => {
+      const error = weaveLockConflictError({
+        lockFile: "/path/to/weave-lock.json",
+      });
 
-			expect(error.message).toBe("Lock file conflict detected");
-			expect(error.nextActions.some(a => a.includes("/path/to/weave-lock.json"))).toBe(true);
-		});
+      expect(error.message).toBe("Lock file conflict detected");
+      expect(error.nextActions.some((a) => a.includes("/path/to/weave-lock.json"))).toBe(true);
+    });
 
-		it("should include default reversibility and rollbackPath", () => {
-			const error = weaveLockConflictError({
-				lockFile: "weave-lock.json",
-			});
+    it("should include default reversibility and rollbackPath", () => {
+      const error = weaveLockConflictError({
+        lockFile: "weave-lock.json",
+      });
 
-			expect(error.context?.reversibility).toBe("reversible");
-			expect(error.context?.rollbackPath).toBe("rm weave-lock.json");
-		});
-	});
+      expect(error.context?.reversibility).toBe("reversible");
+      expect(error.context?.rollbackPath).toBe("rm weave-lock.json");
+    });
+  });
 
-	describe("weaveStateInvalidError", () => {
-		it("should create valid AXError for invalid state transition", () => {
-			const error = weaveStateInvalidError({
-				currentState: "idle",
-				event: "MERGE_SUCCESS",
-				availableEvents: ["START"]
-			});
+  describe("weaveStateInvalidError", () => {
+    it("should create valid AXError for invalid state transition", () => {
+      const error = weaveStateInvalidError({
+        currentState: "idle",
+        event: "MERGE_SUCCESS",
+        availableEvents: ["START"],
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
-			expect(error.message).toContain("MERGE_SUCCESS");
-			expect(error.message).toContain("idle");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-			expect(error.nextActions.some(a => a.includes("START"))).toBe(true);
-			expect(error.context?.currentState).toBe("idle");
-			expect(error.context?.event).toBe("MERGE_SUCCESS");
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
+      expect(error.message).toContain("MERGE_SUCCESS");
+      expect(error.message).toContain("idle");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+      expect(error.nextActions.some((a) => a.includes("START"))).toBe(true);
+      expect(error.context?.currentState).toBe("idle");
+      expect(error.context?.event).toBe("MERGE_SUCCESS");
+    });
 
-		it("should handle missing availableEvents", () => {
-			const error = weaveStateInvalidError({
-				currentState: "completed",
-				event: "START"
-			});
+    it("should handle missing availableEvents", () => {
+      const error = weaveStateInvalidError({
+        currentState: "completed",
+        event: "START",
+      });
 
-			expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
-			expect(error.nextActions.some(a => a.includes("reset"))).toBe(true);
-		});
+      expect(error.code).toBe(ErrorCodes.WEAVE_STATE_INVALID);
+      expect(error.nextActions.some((a) => a.includes("reset"))).toBe(true);
+    });
 
-		it("should include default reversibility and rollbackPath", () => {
-			const error = weaveStateInvalidError({
-				currentState: "failed",
-				event: "START"
-			});
+    it("should include default reversibility and rollbackPath", () => {
+      const error = weaveStateInvalidError({
+        currentState: "failed",
+        event: "START",
+      });
 
-			expect(error.context?.reversibility).toBe("reversible");
-			expect(error.context?.rollbackPath).toContain("reset");
-		});
-	});
+      expect(error.context?.reversibility).toBe("reversible");
+      expect(error.context?.rollbackPath).toContain("reset");
+    });
+  });
 
-	describe("weavePreflightFailedError", () => {
-		it("should create valid AXError for preflight failure", () => {
-			const error = weavePreflightFailedError({
-				itemBranch: "feature-branch",
-				targetBranch: "main",
-				originalError: "Branch not found"
-			});
+  describe("weavePreflightFailedError", () => {
+    it("should create valid AXError for preflight failure", () => {
+      const error = weavePreflightFailedError({
+        itemBranch: "feature-branch",
+        targetBranch: "main",
+        originalError: "Branch not found",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
-			expect(error.message).toContain("feature-branch");
-			expect(error.message).toContain("Branch not found");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-			expect(error.nextActions.some(a => a.includes("feature-branch"))).toBe(true);
-			expect(error.nextActions.some(a => a.includes("main"))).toBe(true);
-			expect(error.context?.itemBranch).toBe("feature-branch");
-			expect(error.context?.targetBranch).toBe("main");
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
+      expect(error.message).toContain("feature-branch");
+      expect(error.message).toContain("Branch not found");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+      expect(error.nextActions.some((a) => a.includes("feature-branch"))).toBe(true);
+      expect(error.nextActions.some((a) => a.includes("main"))).toBe(true);
+      expect(error.context?.itemBranch).toBe("feature-branch");
+      expect(error.context?.targetBranch).toBe("main");
+    });
 
-		it("should handle missing optional fields", () => {
-			const error = weavePreflightFailedError({
-				itemBranch: "some-branch"
-			});
+    it("should handle missing optional fields", () => {
+      const error = weavePreflightFailedError({
+        itemBranch: "some-branch",
+      });
 
-			expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
-			expect(error.message).toContain("some-branch");
-			expect(error.nextActions.some(a => a.includes("git fetch"))).toBe(true);
-		});
+      expect(error.code).toBe(ErrorCodes.WEAVE_PREFLIGHT_FAILED);
+      expect(error.message).toContain("some-branch");
+      expect(error.nextActions.some((a) => a.includes("git fetch"))).toBe(true);
+    });
 
-		it("should include default reversibility", () => {
-			const error = weavePreflightFailedError({
-				itemBranch: "test-branch"
-			});
+    it("should include default reversibility", () => {
+      const error = weavePreflightFailedError({
+        itemBranch: "test-branch",
+      });
 
-			expect(error.context?.reversibility).toBe("reversible");
-		});
-	});
+      expect(error.context?.reversibility).toBe("reversible");
+    });
+  });
 
-	describe("AXError schema compliance for weave errors", () => {
-		it("should always have at least one nextAction", () => {
-			const errors = [
-				weaveLockConflictError({}),
-				weaveStateInvalidError({ currentState: "test", event: "TEST" }),
-				weavePreflightFailedError({ itemBranch: "test" }),
-			];
+  describe("AXError schema compliance for weave errors", () => {
+    it("should always have at least one nextAction", () => {
+      const errors = [
+        weaveLockConflictError({}),
+        weaveStateInvalidError({ currentState: "test", event: "TEST" }),
+        weavePreflightFailedError({ itemBranch: "test" }),
+      ];
 
-			for (const error of errors) {
-				expect(
-					error.nextActions.length,
-					`Error ${error.code} should have at least one nextAction`
-				).toBeGreaterThanOrEqual(1);
-			}
-		});
-	});
+      for (const error of errors) {
+        expect(
+          error.nextActions.length,
+          `Error ${error.code} should have at least one nextAction`
+        ).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
 });
 
 describe("Governance fields in AXError adapters", () => {
-	describe("gateFailedError with governance", () => {
-		it("should include default reversibility for gates", () => {
-			const error = gateFailedError({
-				gate: "test",
-				item: "PR-123"
-			});
+  describe("gateFailedError with governance", () => {
+    it("should include default reversibility for gates", () => {
+      const error = gateFailedError({
+        gate: "test",
+        item: "PR-123",
+      });
 
-			expect(error.context?.reversibility).toBe("reversible");
-		});
+      expect(error.context?.reversibility).toBe("reversible");
+    });
 
-		it("should respect custom reversibility", () => {
-			const error = gateFailedError({
-				gate: "deploy",
-				item: "PR-456",
-				reversibility: "irreversible",
-				confidence: "low",
-				rollbackPath: "Manual rollback required"
-			});
+    it("should respect custom reversibility", () => {
+      const error = gateFailedError({
+        gate: "deploy",
+        item: "PR-456",
+        reversibility: "irreversible",
+        confidence: "low",
+        rollbackPath: "Manual rollback required",
+      });
 
-			expect(error.context?.reversibility).toBe("irreversible");
-			expect(error.context?.confidence).toBe("low");
-			expect(error.context?.rollbackPath).toBe("Manual rollback required");
-		});
-	});
+      expect(error.context?.reversibility).toBe("irreversible");
+      expect(error.context?.confidence).toBe("low");
+      expect(error.context?.rollbackPath).toBe("Manual rollback required");
+    });
+  });
 
-	describe("mergeConflictError with governance", () => {
-		it("should include default rollbackPath for merge conflicts", () => {
-			const error = mergeConflictError({
-				item: "PR-123",
-				files: ["src/cli.ts"]
-			});
+  describe("mergeConflictError with governance", () => {
+    it("should include default rollbackPath for merge conflicts", () => {
+      const error = mergeConflictError({
+        item: "PR-123",
+        files: ["src/cli.ts"],
+      });
 
-			expect(error.context?.reversibility).toBe("reversible");
-			expect(error.context?.rollbackPath).toContain("git");
-		});
+      expect(error.context?.reversibility).toBe("reversible");
+      expect(error.context?.rollbackPath).toContain("git");
+    });
 
-		it("should respect custom governance fields", () => {
-			const error = mergeConflictError({
-				item: "PR-789",
-				reversibility: "partially-reversible",
-				confidence: "medium",
-				uncertaintyNotes: ["Complex merge history"]
-			});
+    it("should respect custom governance fields", () => {
+      const error = mergeConflictError({
+        item: "PR-789",
+        reversibility: "partially-reversible",
+        confidence: "medium",
+        uncertaintyNotes: ["Complex merge history"],
+      });
 
-			expect(error.context?.reversibility).toBe("partially-reversible");
-			expect(error.context?.confidence).toBe("medium");
-			expect(error.context?.uncertaintyNotes).toEqual(["Complex merge history"]);
-		});
-	});
+      expect(error.context?.reversibility).toBe("partially-reversible");
+      expect(error.context?.confidence).toBe("medium");
+      expect(error.context?.uncertaintyNotes).toEqual(["Complex merge history"]);
+    });
+  });
 });
 
 describe("MCP AXError Integration", () => {
-	describe("MCP error helpers", () => {
-		it("should format errors consistently for MCP tools", () => {
-			const error = mcpToolError(
-				ErrorCodes.PLAN_NOT_FOUND,
-				"Plan file not found: plan.json",
-				{ tool: "gates.run", operation: "load plan" }
-			);
+  describe("MCP error helpers", () => {
+    it("should format errors consistently for MCP tools", () => {
+      const error = mcpToolError(ErrorCodes.PLAN_NOT_FOUND, "Plan file not found: plan.json", {
+        tool: "gates.run",
+        operation: "load plan",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
-			expect(error.message).toContain("plan.json");
-			expect(error.context?.tool).toBe("gates.run");
-			expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_NOT_FOUND);
+      expect(error.message).toContain("plan.json");
+      expect(error.context?.tool).toBe("gates.run");
+      expect(error.nextActions.length).toBeGreaterThanOrEqual(1);
+    });
 
-		it("should provide tool-specific nextActions for common tools", () => {
-			const planCreateError = mcpToolError(
-				ErrorCodes.CONFIG_INVALID,
-				"Failed",
-				{ tool: "plan.create" }
-			);
-			expect(planCreateError.nextActions.some(a => a.includes("local.init"))).toBe(true);
+    it("should provide tool-specific nextActions for common tools", () => {
+      const planCreateError = mcpToolError(ErrorCodes.CONFIG_INVALID, "Failed", {
+        tool: "plan.create",
+      });
+      expect(planCreateError.nextActions.some((a) => a.includes("local.init"))).toBe(true);
 
-			const gatesRunError = mcpToolError(
-				ErrorCodes.GATE_FAILED,
-				"Failed",
-				{ tool: "gates.run" }
-			);
-			expect(gatesRunError.nextActions.some(a => a.includes("plan.create"))).toBe(true);
-		});
-	});
+      const gatesRunError = mcpToolError(ErrorCodes.GATE_FAILED, "Failed", { tool: "gates.run" });
+      expect(gatesRunError.nextActions.some((a) => a.includes("plan.create"))).toBe(true);
+    });
+  });
 
-	describe("Plan validation errors", () => {
-		it("should convert cycle detection to AXError", () => {
-			const cycle = ["PR-1", "PR-2", "PR-3", "PR-1"];
-			const error = cycleDetectedError({ cycle });
+  describe("Plan validation errors", () => {
+    it("should convert cycle detection to AXError", () => {
+      const cycle = ["PR-1", "PR-2", "PR-3", "PR-1"];
+      const error = cycleDetectedError({ cycle });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.PLAN_CYCLE_DETECTED);
-			expect(error.message).toContain("cycle");
-			expect(error.nextActions.some(a => a.includes("dependencies"))).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.PLAN_CYCLE_DETECTED);
+      expect(error.message).toContain("cycle");
+      expect(error.nextActions.some((a) => a.includes("dependencies"))).toBe(true);
+    });
 
-		it("should convert unknown dependency to AXError", () => {
-			const error = unknownDependencyError({
-				item: "PR-100",
-				dependency: "PR-999",
-				availableItems: ["PR-1", "PR-2"]
-			});
+    it("should convert unknown dependency to AXError", () => {
+      const error = unknownDependencyError({
+        item: "PR-100",
+        dependency: "PR-999",
+        availableItems: ["PR-1", "PR-2"],
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.UNKNOWN_DEPENDENCY);
-			expect(error.message).toContain("PR-100");
-			expect(error.message).toContain("PR-999");
-			expect(error.nextActions.some(a => a.includes("Available items"))).toBe(true);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.UNKNOWN_DEPENDENCY);
+      expect(error.message).toContain("PR-100");
+      expect(error.message).toContain("PR-999");
+      expect(error.nextActions.some((a) => a.includes("Available items"))).toBe(true);
+    });
+  });
 
-	describe("GitHub API errors", () => {
-		it("should handle authentication failures with proper nextActions", () => {
-			const error = githubApiError({
-				status: 401,
-				message: "Bad credentials"
-			});
+  describe("GitHub API errors", () => {
+    it("should handle authentication failures with proper nextActions", () => {
+      const error = githubApiError({
+        status: 401,
+        message: "Bad credentials",
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_AUTH_ERROR);
-			expect(error.nextActions.some(a => a.includes("GITHUB_TOKEN"))).toBe(true);
-		});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_AUTH_ERROR);
+      expect(error.nextActions.some((a) => a.includes("GITHUB_TOKEN"))).toBe(true);
+    });
 
-		it("should handle rate limiting with retry guidance", () => {
-			const error = githubApiError({
-				status: 429,
-				retryAfter: 60
-			});
+    it("should handle rate limiting with retry guidance", () => {
+      const error = githubApiError({
+        status: 429,
+        retryAfter: 60,
+      });
 
-			expect(isAXError(error)).toBe(true);
-			expect(error.code).toBe(ErrorCodes.GITHUB_RATE_LIMIT);
-			expect(error.nextActions.some(a => a.includes("60 seconds"))).toBe(true);
-		});
-	});
+      expect(isAXError(error)).toBe(true);
+      expect(error.code).toBe(ErrorCodes.GITHUB_RATE_LIMIT);
+      expect(error.nextActions.some((a) => a.includes("60 seconds"))).toBe(true);
+    });
+  });
 });

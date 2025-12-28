@@ -19,6 +19,7 @@ This document provides manual testing steps to verify the fix for the empty plan
 ## Test Case 1: CLI - Auto-Detection from scope.yml
 
 ### Setup
+
 ```bash
 cd /path/to/test-repo
 mkdir -p .smartergpt
@@ -39,12 +40,14 @@ EOF
 ```
 
 ### Execute
+
 ```bash
 # Run plan command WITHOUT --from-github flag
 lex-pr plan
 ```
 
 ### Expected Output
+
 ```
 [plan] Auto-detected GitHub mode from scope.yml filters
 ✓ Auto-detected and discovered N PRs from GitHub
@@ -56,6 +59,7 @@ lex-pr plan
 ```
 
 ### Verify
+
 ```bash
 # Check that plan.json is NOT empty
 cat .smartergpt/runner/plan.json
@@ -65,6 +69,7 @@ cat .smartergpt/runner/plan.json
 ## Test Case 2: MCP Server - Auto-Detection
 
 ### Setup
+
 Same as Test Case 1, plus start MCP server:
 
 ```bash
@@ -74,6 +79,7 @@ node /path/to/lexrunner/mcp-server.mjs
 ```
 
 ### Execute MCP Call
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -87,6 +93,7 @@ node /path/to/lexrunner/mcp-server.mjs
 ```
 
 ### Expected Stderr Output
+
 ```
 [mcp:plan.create] Auto-detected GitHub mode from scope.yml filters
 [mcp:plan.create] repo=owner/repo labels=ready-merge query="is:open label:ready-merge" discovered=N PRs
@@ -94,20 +101,24 @@ node /path/to/lexrunner/mcp-server.mjs
 ```
 
 ### Expected Response
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "content": [{
-      "type": "text",
-      "text": "{\"plan\":{\"schemaVersion\":\"1.0.0\",\"target\":\"main\",\"items\":[...]},\"outDir\":\"...\"}"
-    }]
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"plan\":{\"schemaVersion\":\"1.0.0\",\"target\":\"main\",\"items\":[...]},\"outDir\":\"...\"}"
+      }
+    ]
   }
 }
 ```
 
 ### Verify
+
 ```bash
 # Check plan.json contains discovered PRs
 cat /path/to/test-repo/.smartergpt/runner/plan.json | jq '.items | length'
@@ -117,18 +128,21 @@ cat /path/to/test-repo/.smartergpt/runner/plan.json | jq '.items | length'
 ## Test Case 3: CLI - Explicit fromGithub Still Works
 
 ### Execute
+
 ```bash
 # Explicit --from-github flag should override auto-detection
 lex-pr plan --from-github --labels "feature,bugfix"
 ```
 
 ### Expected
+
 - Should use explicit labels instead of scope.yml labels
 - Should NOT show "Auto-detected" message (explicit mode)
 
 ## Test Case 4: Traditional Mode Still Works
 
 ### Setup
+
 ```bash
 # Remove scope.yml, create stack.yml instead
 rm .smartergpt/scope.yml
@@ -144,11 +158,13 @@ EOF
 ```
 
 ### Execute
+
 ```bash
 lex-pr plan
 ```
 
 ### Expected
+
 - Should use stack.yml (traditional mode)
 - Should NOT enable GitHub auto-detection
 - Plan should contain 1 item from stack.yml
@@ -156,6 +172,7 @@ lex-pr plan
 ## Test Case 5: Empty scope.yml (No Auto-Detection)
 
 ### Setup
+
 ```bash
 cat > .smartergpt/scope.yml << 'EOF'
 version: 1
@@ -172,11 +189,13 @@ EOF
 ```
 
 ### Execute
+
 ```bash
 lex-pr plan
 ```
 
 ### Expected
+
 - Should NOT auto-detect GitHub mode
 - Should return empty plan (no stack.yml, no PRs)
 - Should NOT show auto-detection message

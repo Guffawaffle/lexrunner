@@ -7,7 +7,7 @@ This document defines the standardized error codes, exit codes, and error handli
 The CLI follows standard Unix conventions for automation and CI integration:
 
 - **`0`**: Success - operation completed without errors
-- **`1`**: Unexpected errors - system failures, network issues, crashes  
+- **`1`**: Unexpected errors - system failures, network issues, crashes
 - **`2`**: Validation errors - invalid configuration, unknown dependencies, schema violations
 
 ### Exit Code Examples
@@ -18,7 +18,7 @@ npm run cli -- plan --json
 echo $? # Returns 0
 
 # Validation error (user fixable)
-npm run cli -- schema validate invalid-plan.json  
+npm run cli -- schema validate invalid-plan.json
 echo $? # Returns 2
 
 # System error (infrastructure issue)
@@ -30,36 +30,36 @@ echo $? # Returns 1
 
 ### Schema and Validation Errors
 
-| Error Code | Description | Exit Code | Example |
-|------------|-------------|-----------|---------|
-| `SCHEMA_VALIDATION` | Plan fails Zod schema validation | 2 | Missing required fields, invalid types |
-| `SCHEMA_VERSION` | Unsupported or incompatible schema version | 2 | Schema version 2.x.y when only 1.x.y supported |
-| `JSON_PARSE` | Invalid JSON syntax in plan file | 2 | Malformed JSON, trailing commas |
+| Error Code          | Description                                | Exit Code | Example                                        |
+| ------------------- | ------------------------------------------ | --------- | ---------------------------------------------- |
+| `SCHEMA_VALIDATION` | Plan fails Zod schema validation           | 2         | Missing required fields, invalid types         |
+| `SCHEMA_VERSION`    | Unsupported or incompatible schema version | 2         | Schema version 2.x.y when only 1.x.y supported |
+| `JSON_PARSE`        | Invalid JSON syntax in plan file           | 2         | Malformed JSON, trailing commas                |
 
 ### Dependency and Planning Errors
 
-| Error Code | Description | Exit Code | Example |
-|------------|-------------|-----------|---------|
-| `PLAN_CYCLE` | Circular dependency detected in plan | 2 | Item A depends on B, B depends on A |
-| `UNKNOWN_DEPENDENCY` | Reference to non-existent item | 2 | Item depends on "nonexistent-item" |
-| `EMPTY_PLAN` | Plan contains no items | 2 | Valid plan.json with empty items array |
+| Error Code           | Description                          | Exit Code | Example                                |
+| -------------------- | ------------------------------------ | --------- | -------------------------------------- |
+| `PLAN_CYCLE`         | Circular dependency detected in plan | 2         | Item A depends on B, B depends on A    |
+| `UNKNOWN_DEPENDENCY` | Reference to non-existent item       | 2         | Item depends on "nonexistent-item"     |
+| `EMPTY_PLAN`         | Plan contains no items               | 2         | Valid plan.json with empty items array |
 
 ### Gate Execution Errors
 
-| Error Code | Description | Exit Code | Example |
-|------------|-------------|-----------|---------|
-| `GATE_TIMEOUT` | Gate execution exceeded timeout | 1 | Long-running test takes >30min |
-| `GATE_FAILURE` | Gate command returned non-zero exit | 2 | Test suite fails, linter errors |
-| `GATE_MISSING` | Referenced gate not found in item | 2 | Policy requires gate "test" but item has no such gate |
+| Error Code     | Description                         | Exit Code | Example                                               |
+| -------------- | ----------------------------------- | --------- | ----------------------------------------------------- |
+| `GATE_TIMEOUT` | Gate execution exceeded timeout     | 1         | Long-running test takes >30min                        |
+| `GATE_FAILURE` | Gate command returned non-zero exit | 2         | Test suite fails, linter errors                       |
+| `GATE_MISSING` | Referenced gate not found in item   | 2         | Policy requires gate "test" but item has no such gate |
 
 ### System and Infrastructure Errors
 
-| Error Code | Description | Exit Code | Example |
-|------------|-------------|-----------|---------|
-| `FILE_NOT_FOUND` | Required configuration file missing | 2 | plan.json not found |
-| `PERMISSION_DENIED` | Insufficient filesystem permissions | 1 | Cannot write to output directory |
-| `NETWORK_ERROR` | Network connectivity issues | 1 | Cannot reach Git remote, container registry |
-| `CONTAINER_ERROR` | Container runtime failures | 1 | Docker daemon not running, image pull failed |
+| Error Code          | Description                         | Exit Code | Example                                      |
+| ------------------- | ----------------------------------- | --------- | -------------------------------------------- |
+| `FILE_NOT_FOUND`    | Required configuration file missing | 2         | plan.json not found                          |
+| `PERMISSION_DENIED` | Insufficient filesystem permissions | 1         | Cannot write to output directory             |
+| `NETWORK_ERROR`     | Network connectivity issues         | 1         | Cannot reach Git remote, container registry  |
+| `CONTAINER_ERROR`   | Container runtime failures          | 1         | Docker daemon not running, image pull failed |
 
 ## Error Response Formats
 
@@ -81,7 +81,7 @@ echo $? # Returns 1
   "errors": [
     {
       "path": "items.0.name",
-      "message": "Required", 
+      "message": "Required",
       "code": "invalid_type"
     },
     {
@@ -108,7 +108,7 @@ MCP tools return errors using the ModelContextProtocol error format:
   ]
 }
 
-// Error response  
+// Error response
 throw new McpError(
   ErrorCode.InvalidRequest,
   "Schema validation failed: items.0.name is required"
@@ -117,13 +117,13 @@ throw new McpError(
 
 #### MCP Error Code Mappings
 
-| Internal Error | MCP ErrorCode | Description |
-|----------------|---------------|-------------|
-| `SCHEMA_VALIDATION` | `InvalidRequest` | Client provided invalid input |
-| `PLAN_CYCLE` | `InvalidRequest` | Client provided cyclic dependencies |
-| `FILE_NOT_FOUND` | `InternalError` | Server cannot access required files |
-| `GATE_TIMEOUT` | `InternalError` | Server-side execution timeout |
-| `NETWORK_ERROR` | `InternalError` | Server connectivity issues |
+| Internal Error      | MCP ErrorCode    | Description                         |
+| ------------------- | ---------------- | ----------------------------------- |
+| `SCHEMA_VALIDATION` | `InvalidRequest` | Client provided invalid input       |
+| `PLAN_CYCLE`        | `InvalidRequest` | Client provided cyclic dependencies |
+| `FILE_NOT_FOUND`    | `InternalError`  | Server cannot access required files |
+| `GATE_TIMEOUT`      | `InternalError`  | Server-side execution timeout       |
+| `NETWORK_ERROR`     | `InternalError`  | Server connectivity issues          |
 
 ## Error Class Hierarchy
 
@@ -134,8 +134,8 @@ throw new McpError(
 export class SchemaValidationError extends Error {
   public readonly issues: z.ZodIssue[];
   public readonly errors: ValidationError[];
-  
-  toJSON(): { valid: false; errors: ValidationError[] }
+
+  toJSON(): { valid: false; errors: ValidationError[] };
 }
 
 // Dependency graph errors
@@ -149,7 +149,7 @@ export class CycleError extends Error {
 export class UnknownDependencyError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "UnknownDependencyError"; 
+    this.name = "UnknownDependencyError";
   }
 }
 ```
@@ -159,7 +159,7 @@ export class UnknownDependencyError extends Error {
 Each error should provide:
 
 1. **Context**: What operation was being performed
-2. **Cause**: Root cause of the failure  
+2. **Cause**: Root cause of the failure
 3. **Recovery**: Suggested fix or mitigation
 4. **Code**: Structured error code for automation
 
@@ -171,7 +171,7 @@ Example structured error:
   message: "Unknown dependency 'nonexistent-item' for item 'item-a'",
   context: {
     operation: "plan_validation",
-    item: "item-a", 
+    item: "item-a",
     dependency: "nonexistent-item"
   },
   recovery: "Add item 'nonexistent-item' to plan or remove from dependencies"
@@ -185,15 +185,17 @@ Example structured error:
 ```typescript
 function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   const err: any = e;
-  
+
   // Structured validation errors
-  if (e instanceof SchemaValidationError || 
-      e instanceof CycleError || 
-      e instanceof UnknownDependencyError) {
+  if (
+    e instanceof SchemaValidationError ||
+    e instanceof CycleError ||
+    e instanceof UnknownDependencyError
+  ) {
     console.error(String(err?.message ?? e));
     process.exit(2); // User-fixable validation errors
   }
-  
+
   // System/infrastructure errors
   console.error(String(err?.message ?? e));
   process.exit(1); // Unexpected failures
@@ -210,7 +212,7 @@ try {
   if (error instanceof SchemaValidationError) {
     throw new McpError(ErrorCode.InvalidRequest, error.message);
   }
-  
+
   // Log internal errors, return generic message
   console.error("Internal error:", error);
   throw new McpError(ErrorCode.InternalError, "Plan creation failed");
@@ -239,7 +241,7 @@ if ! npm run cli -- schema validate plan.json --json > validation.json; then
     echo "❌ Plan validation failed (user error):"
     cat validation.json | jq -r '.errors[].message'
   else
-    echo "💥 System error during validation"  
+    echo "💥 System error during validation"
   fi
   exit $exit_code
 fi
@@ -270,17 +272,16 @@ Error handling should be tested systematically:
 
 ```typescript
 // Test schema validation errors
-test('should return SCHEMA_VALIDATION for invalid plan', () => {
+test("should return SCHEMA_VALIDATION for invalid plan", () => {
   const invalidPlan = { target: "main", items: [{ deps: ["missing"] }] };
-  expect(() => validatePlan(invalidPlan))
-    .toThrow(SchemaValidationError);
+  expect(() => validatePlan(invalidPlan)).toThrow(SchemaValidationError);
 });
 
 // Test CLI exit codes
-test('should exit with code 2 for validation errors', () => {
-  const result = execSync('npm run cli -- schema validate invalid.json', { 
-    encoding: 'utf8',
-    stdio: 'pipe'
+test("should exit with code 2 for validation errors", () => {
+  const result = execSync("npm run cli -- schema validate invalid.json", {
+    encoding: "utf8",
+    stdio: "pipe",
   });
   expect(result.status).toBe(2);
 });

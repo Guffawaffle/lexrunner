@@ -2,7 +2,7 @@
  * Cleanup utilities for test resources
  */
 
-import * as tempDir from './tempDir.js';
+import * as tempDir from "./tempDir.js";
 
 /**
  * Cleanup manager for tracking and cleaning up test resources
@@ -55,7 +55,7 @@ export class CleanupManager {
 
     // Throw if there were errors
     if (errors.length > 0) {
-      const messages = errors.map(e => e.message).join('; ');
+      const messages = errors.map((e) => e.message).join("; ");
       throw new Error(`Cleanup errors: ${messages}`);
     }
   }
@@ -71,9 +71,7 @@ export function createCleanupManager(): CleanupManager {
 /**
  * Helper to ensure cleanup runs even if test fails
  */
-export async function withCleanup<T>(
-  fn: (cleanup: CleanupManager) => Promise<T>
-): Promise<T> {
+export async function withCleanup<T>(fn: (cleanup: CleanupManager) => Promise<T>): Promise<T> {
   const cleanup = createCleanupManager();
   try {
     return await fn(cleanup);

@@ -20,6 +20,7 @@
 > "Welcome back! In this video, you'll learn how to manage PR dependencies with lexrunner. We'll cover dependency syntax, merge order computation, and how to handle complex PR stacks."
 
 **[Screen: Show outline]**
+
 - Dependency syntax
 - Merge order
 - PR stacks
@@ -49,9 +50,11 @@
 
 ```markdown
 ## Description
+
 This PR adds user authentication.
 
 ## Dependencies
+
 Depends-On: #101
 ```
 
@@ -63,12 +66,14 @@ Depends-On: #101
 
 ```markdown
 # ❌ Wrong
+
 Requires: #101
 Needs: #101
 depends on #101
 Depends-On #101
 
 # ✅ Correct
+
 Depends-On: #101
 ```
 
@@ -166,6 +171,7 @@ Level 3: api-endpoints
 
 ```markdown
 <!-- In PR #105 -->
+
 Depends-On: #102
 Depends-On: #103
 ```
@@ -223,8 +229,9 @@ $ lex-pr plan --from-github
 
 ```markdown
 # In PR body
-depends-on: #101  ❌
-Depends-On: #101  ✅
+
+depends-on: #101 ❌
+Depends-On: #101 ✅
 ```
 
 > "Remember: exact case matters. 'Depends-On' with capital D and O."
@@ -245,6 +252,7 @@ Depends-On: #101  ✅
 **[Screen: Summary]**
 
 > "You now know how to:"
+
 - ✓ Declare dependencies with correct syntax
 - ✓ Create PR stacks
 - ✓ Understand merge order
@@ -266,6 +274,7 @@ Depends-On: #101  ✅
 ## Code Examples to Prepare
 
 ### Simple Linear Stack
+
 ```bash
 # 3 PRs in sequence
 gh pr create --title "PR1" --body "Base"
@@ -274,12 +283,14 @@ gh pr create --title "PR3" --body "Depends-On: #PR2"
 ```
 
 ### Diamond Dependency
+
 ```bash
 # PR4 depends on both PR2 and PR3
 gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 ```
 
 ### Complex Graph
+
 ```bash
 # Multiple independent and dependent branches
 # (Prepare diagram)
@@ -308,6 +319,7 @@ gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 ## Accessibility
 
 ### Captions
+
 ```
 [Terminal shows: lex-pr plan --from-github]
 [Narrator: The plan.json file now contains the dependency graph]
@@ -315,6 +327,7 @@ gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 ```
 
 ### Screen Reader Support
+
 - Describe all visual graphs verbally
 - Read command outputs aloud
 - Explain diagram relationships
@@ -322,6 +335,7 @@ gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 ## Post-Production
 
 ### Editing Checklist
+
 - [ ] Remove long pauses (>2 seconds)
 - [ ] Add smooth transitions between sections
 - [ ] Color-code syntax highlighting
@@ -329,6 +343,7 @@ gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 - [ ] Add chapter markers at each section
 
 ### Export Settings
+
 - Format: MP4 (H.264)
 - Resolution: 1080p
 - Bitrate: 8 Mbps
@@ -337,19 +352,24 @@ gh pr create --title "PR4" --body "Depends-On: #PR2\nDepends-On: #PR3"
 ## Companion Resources
 
 ### GitHub Gist
+
 Create gist with:
+
 - Full command reference
 - Syntax cheat sheet
 - Troubleshooting flowchart
 - Example PR bodies
 
 ### Interactive Quiz
+
 1. What's the correct dependency syntax?
 2. How do you handle circular dependencies?
 3. Can a PR depend on multiple other PRs?
 
 ### Sample Repository
+
 Provide fork-able repo with:
+
 - Example PR stack
 - Configured lexrunner
 - Sample gates

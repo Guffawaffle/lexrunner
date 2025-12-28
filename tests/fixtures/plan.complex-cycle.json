@@ -1,22 +1,22 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"items": [
-		{
-			"name": "feat-a",
-			"deps": ["feat-b"]
-		},
-		{
-			"name": "feat-b",
-			"deps": ["feat-c"]
-		},
-		{
-			"name": "feat-c",
-			"deps": ["feat-d"]
-		},
-		{
-			"name": "feat-d",
-			"deps": ["feat-b"]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "feat-a",
+      "deps": ["feat-b"]
+    },
+    {
+      "name": "feat-b",
+      "deps": ["feat-c"]
+    },
+    {
+      "name": "feat-c",
+      "deps": ["feat-d"]
+    },
+    {
+      "name": "feat-d",
+      "deps": ["feat-b"]
+    }
+  ]
 }

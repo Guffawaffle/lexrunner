@@ -20,16 +20,16 @@ This command implements the front-end capture pipeline for feature planning:
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--spec <path>` | Feature Spec v0 file path (required) | - |
-| `--dry-run` | Generate plan without creating Issues | `false` |
-| `--output <path>` | Output path for Execution Plan v1 | `.smartergpt.local/deliverables/_session/plan-{timestamp}.json` |
-| `--repo <owner/repo>` | Target repository | Auto-detect from spec |
-| `--project <name/num>` | Link Issues to GitHub Project | - |
-| `--epic-labels <labels>` | Additional Epic labels (comma-separated) | `[]` |
-| `--issue-labels <labels>` | Additional sub-issue labels (comma-separated) | `[]` |
-| `--no-link` | Skip sub-issue linking to Epic | `false` |
+| Option                    | Description                                   | Default                                                         |
+| ------------------------- | --------------------------------------------- | --------------------------------------------------------------- |
+| `--spec <path>`           | Feature Spec v0 file path (required)          | -                                                               |
+| `--dry-run`               | Generate plan without creating Issues         | `false`                                                         |
+| `--output <path>`         | Output path for Execution Plan v1             | `.smartergpt.local/deliverables/_session/plan-{timestamp}.json` |
+| `--repo <owner/repo>`     | Target repository                             | Auto-detect from spec                                           |
+| `--project <name/num>`    | Link Issues to GitHub Project                 | -                                                               |
+| `--epic-labels <labels>`  | Additional Epic labels (comma-separated)      | `[]`                                                            |
+| `--issue-labels <labels>` | Additional sub-issue labels (comma-separated) | `[]`                                                            |
+| `--no-link`               | Skip sub-issue linking to Epic                | `false`                                                         |
 
 ## Feature Spec v0 Format
 
@@ -39,10 +39,7 @@ A Feature Spec v0 file is a JSON document with the following structure:
 {
   "title": "Feature Title",
   "description": "Detailed feature description",
-  "acceptanceCriteria": [
-    "Criterion 1",
-    "Criterion 2"
-  ],
+  "acceptanceCriteria": ["Criterion 1", "Criterion 2"],
   "repo": "owner/repo",
   "labels": ["enhancement", "priority-high"],
   "priority": "high",
@@ -71,7 +68,9 @@ The generated Execution Plan v1 contains:
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": { /* Feature Spec v0 */ },
+  "sourceSpec": {
+    /* Feature Spec v0 */
+  },
   "epic": {
     "title": "Epic Title",
     "description": "Epic description",
@@ -149,6 +148,7 @@ lex-pr create-project \
 ## Workflow
 
 1. **Create Feature Spec v0**:
+
    ```bash
    cat > feature-spec.json << EOF
    {
@@ -165,6 +165,7 @@ lex-pr create-project \
    ```
 
 2. **Generate and Review Plan** (dry run):
+
    ```bash
    lex-pr create-project --spec feature-spec.json --dry-run
    ```

@@ -2,268 +2,275 @@
  * Integration tests for audit manifest signing with emitter
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initAuditEmitter, finalizeAudit } from '../../src/audit/emitter.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { initAuditEmitter, finalizeAudit } from "../../src/audit/emitter.js";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
-describe('Audit Signing Integration', () => {
-	let tmpDir: string;
+describe("Audit Signing Integration", () => {
+  let tmpDir: string;
 
-	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lex-audit-signing-int-'));
-	});
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lex-audit-signing-int-"));
+  });
 
-	afterEach(() => {
-		if (fs.existsSync(tmpDir)) {
-			fs.rmSync(tmpDir, { recursive: true, force: true });
-		}
-		vi.clearAllMocks();
-	});
+  afterEach(() => {
+    if (fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+    vi.clearAllMocks();
+  });
 
-	it('should create audit manifest without signing when signer is not specified', async () => {
-		const emitter = await initAuditEmitter({
-			profile: 'basic',
-			dir: tmpDir
-		});
+  it("should create audit manifest without signing when signer is not specified", async () => {
+    const emitter = await initAuditEmitter({
+      profile: "basic",
+      dir: tmpDir,
+    });
 
-		await emitter.emit('test_event', { message: 'test' });
-		await finalizeAudit(emitter, 'success');
+    await emitter.emit("test_event", { message: "test" });
+    await finalizeAudit(emitter, "success");
 
-		// Manifest should exist
-		const manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		expect(fs.existsSync(manifestPath)).toBe(true);
+    // Manifest should exist
+    const manifestPath = path.join(tmpDir, "audit-manifest.json");
+    expect(fs.existsSync(manifestPath)).toBe(true);
 
-		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-		expect(manifest.schemaVersion).toBe('1.0.0');
-		expect(manifest.files).toBeDefined();
-		expect(Array.isArray(manifest.files)).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    expect(manifest.schemaVersion).toBe("1.0.0");
+    expect(manifest.files).toBeDefined();
+    expect(Array.isArray(manifest.files)).toBe(true);
 
-		// No signing files should exist
-		expect(fs.existsSync(path.join(tmpDir, 'audit-manifest.sig'))).toBe(false);
-		expect(fs.existsSync(path.join(tmpDir, 'audit-manifest.sig.meta'))).toBe(false);
-	});
+    // No signing files should exist
+    expect(fs.existsSync(path.join(tmpDir, "audit-manifest.sig"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "audit-manifest.sig.meta"))).toBe(false);
+  });
 
-	it('should skip signing when profile is off', async () => {
-		const emitter = await initAuditEmitter({
-			profile: 'off',
-			dir: tmpDir,
-			signer: 'kms:arn:aws:kms:us-east-1:123456789012:key/test'
-		});
+  it("should skip signing when profile is off", async () => {
+    const emitter = await initAuditEmitter({
+      profile: "off",
+      dir: tmpDir,
+      signer: "kms:arn:aws:kms:us-east-1:123456789012:key/test",
+    });
 
-		await emitter.emit('test_event', { message: 'test' });
-		await finalizeAudit(emitter, 'success');
+    await emitter.emit("test_event", { message: "test" });
+    await finalizeAudit(emitter, "success");
 
-		// No manifest should be created when profile is off
-		const manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		expect(fs.existsSync(manifestPath)).toBe(false);
-	});
+    // No manifest should be created when profile is off
+    const manifestPath = path.join(tmpDir, "audit-manifest.json");
+    expect(fs.existsSync(manifestPath)).toBe(false);
+  });
 
-	it('should call signing when signer option is provided (KMS mocked)', async () => {
-		// Mock AWS SDK
-		const mockSend = vi.fn().mockResolvedValue({
-			Signature: Buffer.from('mock-kms-signature')
-		});
+  it("should call signing when signer option is provided (KMS mocked)", async () => {
+    // Mock AWS SDK
+    const mockSend = vi.fn().mockResolvedValue({
+      Signature: Buffer.from("mock-kms-signature"),
+    });
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(function () {
-				return { send: mockSend };
-			}),
-			SignCommand: vi.fn(function (params) {
-				return params;
-			})
-		}));
+    vi.doMock("@aws-sdk/client-kms", () => ({
+      KMSClient: vi.fn(function () {
+        return { send: mockSend };
+      }),
+      SignCommand: vi.fn(function (params) {
+        return params;
+      }),
+    }));
 
-		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/integration-test';
-		
-		const emitter = await initAuditEmitter({
-			profile: 'soc2',
-			dir: tmpDir,
-			signer: `kms:${keyArn}`,
-			context: ['git']
-		});
+    const keyArn = "arn:aws:kms:us-east-1:123456789012:key/integration-test";
 
-		await emitter.emit('gate_started', { item: 'pr-1', gate: 'lint' });
-		await emitter.emit('gate_finished', { item: 'pr-1', gate: 'lint', status: 'pass', duration_ms: 1000 });
-		await finalizeAudit(emitter, 'success');
+    const emitter = await initAuditEmitter({
+      profile: "soc2",
+      dir: tmpDir,
+      signer: `kms:${keyArn}`,
+      context: ["git"],
+    });
 
-		// Verify all files exist
-		const manifestPath = path.join(tmpDir, 'audit-manifest.json');
-		const sigPath = path.join(tmpDir, 'audit-manifest.sig');
-		const metaPath = path.join(tmpDir, 'audit-manifest.sig.meta');
+    await emitter.emit("gate_started", { item: "pr-1", gate: "lint" });
+    await emitter.emit("gate_finished", {
+      item: "pr-1",
+      gate: "lint",
+      status: "pass",
+      duration_ms: 1000,
+    });
+    await finalizeAudit(emitter, "success");
 
-		expect(fs.existsSync(manifestPath)).toBe(true);
-		expect(fs.existsSync(sigPath)).toBe(true);
-		expect(fs.existsSync(metaPath)).toBe(true);
+    // Verify all files exist
+    const manifestPath = path.join(tmpDir, "audit-manifest.json");
+    const sigPath = path.join(tmpDir, "audit-manifest.sig");
+    const metaPath = path.join(tmpDir, "audit-manifest.sig.meta");
 
-		// Verify manifest has signing metadata
-		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-		expect(manifest.signing).toBeDefined();
-		expect(manifest.signing.provider).toBe('kms');
-		expect(manifest.signing.key_ref).toBe(keyArn);
-		expect(manifest.signing.algorithm).toBe('RSASSA_PSS_SHA_256');
+    expect(fs.existsSync(manifestPath)).toBe(true);
+    expect(fs.existsSync(sigPath)).toBe(true);
+    expect(fs.existsSync(metaPath)).toBe(true);
 
-		// Verify signature metadata
-		const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-		expect(metadata.provider).toBe('kms');
-		expect(metadata.key_ref).toBe(keyArn);
-		expect(metadata.manifest_sha256).toBeDefined();
-		expect(metadata.signed_at).toBeDefined();
+    // Verify manifest has signing metadata
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    expect(manifest.signing).toBeDefined();
+    expect(manifest.signing.provider).toBe("kms");
+    expect(manifest.signing.key_ref).toBe(keyArn);
+    expect(manifest.signing.algorithm).toBe("RSASSA_PSS_SHA_256");
 
-		vi.doUnmock('@aws-sdk/client-kms');
-	});
+    // Verify signature metadata
+    const metadata = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    expect(metadata.provider).toBe("kms");
+    expect(metadata.key_ref).toBe(keyArn);
+    expect(metadata.manifest_sha256).toBeDefined();
+    expect(metadata.signed_at).toBeDefined();
 
-	it('should handle GPG signing failure gracefully', async () => {
-		// Test GPG signing with missing key (expected to fail)
-		const fingerprint = 'ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234';
-		
-		const emitter = await initAuditEmitter({
-			profile: 'basic',
-			dir: tmpDir,
-			signer: `gpg:${fingerprint}`
-		});
+    vi.doUnmock("@aws-sdk/client-kms");
+  });
 
-		await emitter.emit('test_event', { data: 'test-data' });
+  it("should handle GPG signing failure gracefully", async () => {
+    // Test GPG signing with missing key (expected to fail)
+    const fingerprint = "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234";
 
-		// Should throw GPG signing error
-		await expect(finalizeAudit(emitter, 'success')).rejects.toThrow('GPG signing failed');
-	});
+    const emitter = await initAuditEmitter({
+      profile: "basic",
+      dir: tmpDir,
+      signer: `gpg:${fingerprint}`,
+    });
 
-	it('should propagate signing errors during finalize', async () => {
-		// Mock AWS SDK to throw error
-		const mockSend = vi.fn().mockRejectedValue(new Error('KMS AccessDeniedException'));
+    await emitter.emit("test_event", { data: "test-data" });
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(function () {
-				return { send: mockSend };
-			}),
-			SignCommand: vi.fn(function (params) {
-				return params;
-			})
-		}));
+    // Should throw GPG signing error
+    await expect(finalizeAudit(emitter, "success")).rejects.toThrow("GPG signing failed");
+  });
 
-		const emitter = await initAuditEmitter({
-			profile: 'soc2',
-			dir: tmpDir,
-			signer: 'kms:arn:aws:kms:us-east-1:123456789012:key/no-access'
-		});
+  it("should propagate signing errors during finalize", async () => {
+    // Mock AWS SDK to throw error
+    const mockSend = vi.fn().mockRejectedValue(new Error("KMS AccessDeniedException"));
 
-		await emitter.emit('test_event', { message: 'test' });
+    vi.doMock("@aws-sdk/client-kms", () => ({
+      KMSClient: vi.fn(function () {
+        return { send: mockSend };
+      }),
+      SignCommand: vi.fn(function (params) {
+        return params;
+      }),
+    }));
 
-		// Finalize should throw signing error
-		await expect(finalizeAudit(emitter, 'success')).rejects.toThrow('AWS KMS signing failed');
+    const emitter = await initAuditEmitter({
+      profile: "soc2",
+      dir: tmpDir,
+      signer: "kms:arn:aws:kms:us-east-1:123456789012:key/no-access",
+    });
 
-		vi.doUnmock('@aws-sdk/client-kms');
-	});
+    await emitter.emit("test_event", { message: "test" });
 
-	it('should work with encrypted audit logs and signing', async () => {
-		// Mock KMS
-		const mockSend = vi.fn().mockResolvedValue({
-			Signature: Buffer.from('encrypted-audit-signature')
-		});
+    // Finalize should throw signing error
+    await expect(finalizeAudit(emitter, "success")).rejects.toThrow("AWS KMS signing failed");
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(function () {
-				return { send: mockSend };
-			}),
-			SignCommand: vi.fn(function (params) {
-				return params;
-			})
-		}));
+    vi.doUnmock("@aws-sdk/client-kms");
+  });
 
-		// Generate 32-byte hex key for encryption
-		const encryptionKey = Buffer.alloc(32).fill(0xAB).toString('hex');
+  it("should work with encrypted audit logs and signing", async () => {
+    // Mock KMS
+    const mockSend = vi.fn().mockResolvedValue({
+      Signature: Buffer.from("encrypted-audit-signature"),
+    });
 
-		const emitter = await initAuditEmitter({
-			profile: 'hipaa-strict',
-			dir: tmpDir,
-			signer: 'kms:arn:aws:kms:us-east-1:123456789012:key/hipaa-test',
-			encryptionKeyHex: encryptionKey
-		});
+    vi.doMock("@aws-sdk/client-kms", () => ({
+      KMSClient: vi.fn(function () {
+        return { send: mockSend };
+      }),
+      SignCommand: vi.fn(function (params) {
+        return params;
+      }),
+    }));
 
-		await emitter.emit('phi_access', { record_id: 'patient-123' });
-		await finalizeAudit(emitter, 'success');
+    // Generate 32-byte hex key for encryption
+    const encryptionKey = Buffer.alloc(32).fill(0xab).toString("hex");
 
-		// Verify encrypted log exists
-		expect(fs.existsSync(path.join(tmpDir, 'audit.ndjson.enc'))).toBe(true);
-		expect(fs.existsSync(path.join(tmpDir, 'audit.ndjson'))).toBe(false); // Plaintext removed
+    const emitter = await initAuditEmitter({
+      profile: "hipaa-strict",
+      dir: tmpDir,
+      signer: "kms:arn:aws:kms:us-east-1:123456789012:key/hipaa-test",
+      encryptionKeyHex: encryptionKey,
+    });
 
-		// Verify manifest includes encrypted file
-		const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, 'audit-manifest.json'), 'utf-8'));
-		const encFile = manifest.files.find((f: any) => f.file === 'audit.ndjson.enc');
-		expect(encFile).toBeDefined();
+    await emitter.emit("phi_access", { record_id: "patient-123" });
+    await finalizeAudit(emitter, "success");
 
-		// Verify signing metadata
-		expect(manifest.signing).toBeDefined();
-		expect(manifest.signing.provider).toBe('kms');
+    // Verify encrypted log exists
+    expect(fs.existsSync(path.join(tmpDir, "audit.ndjson.enc"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "audit.ndjson"))).toBe(false); // Plaintext removed
 
-		vi.doUnmock('@aws-sdk/client-kms');
-	});
+    // Verify manifest includes encrypted file
+    const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, "audit-manifest.json"), "utf-8"));
+    const encFile = manifest.files.find((f: any) => f.file === "audit.ndjson.enc");
+    expect(encFile).toBeDefined();
 
-	it('should handle invalid signer format gracefully', async () => {
-		const emitter = await initAuditEmitter({
-			profile: 'basic',
-			dir: tmpDir,
-			signer: 'invalid-format-no-colon'
-		});
+    // Verify signing metadata
+    expect(manifest.signing).toBeDefined();
+    expect(manifest.signing.provider).toBe("kms");
 
-		await emitter.emit('test_event', { message: 'test' });
+    vi.doUnmock("@aws-sdk/client-kms");
+  });
 
-		await expect(finalizeAudit(emitter, 'success')).rejects.toThrow('Invalid signer option format');
-	});
+  it("should handle invalid signer format gracefully", async () => {
+    const emitter = await initAuditEmitter({
+      profile: "basic",
+      dir: tmpDir,
+      signer: "invalid-format-no-colon",
+    });
 
-	it('should create deterministic manifest with signing metadata', async () => {
-		// Mock KMS with deterministic response
-		const mockSend = vi.fn().mockResolvedValue({
-			Signature: Buffer.from('deterministic-signature')
-		});
+    await emitter.emit("test_event", { message: "test" });
 
-		vi.doMock('@aws-sdk/client-kms', () => ({
-			KMSClient: vi.fn(function () {
-				return { send: mockSend };
-			}),
-			SignCommand: vi.fn(function (params) {
-				return params;
-			})
-		}));
+    await expect(finalizeAudit(emitter, "success")).rejects.toThrow("Invalid signer option format");
+  });
 
-		const keyArn = 'arn:aws:kms:us-east-1:123456789012:key/deterministic-test';
-		
-		const emitter = await initAuditEmitter({
-			profile: 'soc2',
-			dir: tmpDir,
-			signer: `kms:${keyArn}`,
-			sessionId: 'fixed-session-id',
-			runId: 'fixed-run-id',
-			tool: { name: 'lexrunner', version: '1.0.0' }
-		});
+  it("should create deterministic manifest with signing metadata", async () => {
+    // Mock KMS with deterministic response
+    const mockSend = vi.fn().mockResolvedValue({
+      Signature: Buffer.from("deterministic-signature"),
+    });
 
-		await emitter.emit('gate_finished', { 
-			item: 'pr-1', 
-			gate: 'lint', 
-			status: 'pass',
-			duration_ms: 1000 
-		});
-		
-		await finalizeAudit(emitter, 'success');
+    vi.doMock("@aws-sdk/client-kms", () => ({
+      KMSClient: vi.fn(function () {
+        return { send: mockSend };
+      }),
+      SignCommand: vi.fn(function (params) {
+        return params;
+      }),
+    }));
 
-		// Read manifest
-		const manifest1 = JSON.parse(fs.readFileSync(path.join(tmpDir, 'audit-manifest.json'), 'utf-8'));
+    const keyArn = "arn:aws:kms:us-east-1:123456789012:key/deterministic-test";
 
-		// Verify signing metadata structure is consistent
-		expect(manifest1.signing).toBeDefined();
-		expect(manifest1.signing.provider).toBe('kms');
-		expect(manifest1.signing.key_ref).toBe(keyArn);
-		expect(manifest1.signing.signature_file).toBe('audit.sig');
-		expect(manifest1.signing.metadata_file).toBe('audit.sig.meta');
+    const emitter = await initAuditEmitter({
+      profile: "soc2",
+      dir: tmpDir,
+      signer: `kms:${keyArn}`,
+      sessionId: "fixed-session-id",
+      runId: "fixed-run-id",
+      tool: { name: "lexrunner", version: "1.0.0" },
+    });
 
-		// Verify files array is sorted
-		const files = manifest1.files;
-		for (let i = 1; i < files.length; i++) {
-			expect(files[i].file.localeCompare(files[i - 1].file)).toBeGreaterThanOrEqual(0);
-		}
+    await emitter.emit("gate_finished", {
+      item: "pr-1",
+      gate: "lint",
+      status: "pass",
+      duration_ms: 1000,
+    });
 
-		vi.doUnmock('@aws-sdk/client-kms');
-	});
+    await finalizeAudit(emitter, "success");
+
+    // Read manifest
+    const manifest1 = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "audit-manifest.json"), "utf-8")
+    );
+
+    // Verify signing metadata structure is consistent
+    expect(manifest1.signing).toBeDefined();
+    expect(manifest1.signing.provider).toBe("kms");
+    expect(manifest1.signing.key_ref).toBe(keyArn);
+    expect(manifest1.signing.signature_file).toBe("audit.sig");
+    expect(manifest1.signing.metadata_file).toBe("audit.sig.meta");
+
+    // Verify files array is sorted
+    const files = manifest1.files;
+    for (let i = 1; i < files.length; i++) {
+      expect(files[i].file.localeCompare(files[i - 1].file)).toBeGreaterThanOrEqual(0);
+    }
+
+    vi.doUnmock("@aws-sdk/client-kms");
+  });
 });

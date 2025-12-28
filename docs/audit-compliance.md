@@ -48,22 +48,22 @@ Use the following snippet to decrypt an `audit.ndjson.enc` file created by the r
 
 ```js
 // decrypt-audit.js
-import fs from 'fs';
-import crypto from 'crypto';
+import fs from "fs";
+import crypto from "crypto";
 
 const keyHex = process.env.LEX_AUDIT_KEY_HEX;
-if (!keyHex || keyHex.length !== 64) throw new Error('Provide LEX_AUDIT_KEY_HEX (64 hex chars)');
-const key = Buffer.from(keyHex, 'hex');
+if (!keyHex || keyHex.length !== 64) throw new Error("Provide LEX_AUDIT_KEY_HEX (64 hex chars)");
+const key = Buffer.from(keyHex, "hex");
 
-const buf = fs.readFileSync('audit.ndjson.enc');
+const buf = fs.readFileSync("audit.ndjson.enc");
 const iv = buf.slice(0, 12);
 const tag = buf.slice(12, 28);
 const ciphertext = buf.slice(28);
 
-const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
 decipher.setAuthTag(tag);
 const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-process.stdout.write(plain.toString('utf8'));
+process.stdout.write(plain.toString("utf8"));
 ```
 
 Run it with:
@@ -134,7 +134,7 @@ This generates `audit-sarif.json` alongside the regular audit artifacts.
 ### Severity Mapping
 
 | Vulnerability Severity | SARIF Level |
-|------------------------|-------------|
+| ---------------------- | ----------- |
 | `critical`             | `error`     |
 | `high`                 | `error`     |
 | `medium`               | `warning`   |
@@ -144,13 +144,13 @@ This generates `audit-sarif.json` alongside the regular audit artifacts.
 
 The SARIF adapter extracts fields from `vuln_found` events:
 
-| Audit Event Field       | SARIF Field                                      |
-|-------------------------|--------------------------------------------------|
-| `payload.cve`           | `result.ruleId`, `rule.id`                       |
-| `payload.severity`      | `result.level`, `rule.defaultConfiguration.level`|
-| `payload.package`       | `result.properties.package`                      |
-| `payload.version`       | `result.properties.version`                      |
-| `payload.fixedIn`       | `result.properties.fixedIn`                      |
+| Audit Event Field         | SARIF Field                                                 |
+| ------------------------- | ----------------------------------------------------------- |
+| `payload.cve`             | `result.ruleId`, `rule.id`                                  |
+| `payload.severity`        | `result.level`, `rule.defaultConfiguration.level`           |
+| `payload.package`         | `result.properties.package`                                 |
+| `payload.version`         | `result.properties.version`                                 |
+| `payload.fixedIn`         | `result.properties.fixedIn`                                 |
 | `payload.file` (optional) | `result.locations[0].physicalLocation.artifactLocation.uri` |
 
 If `payload.file` is not specified, the location defaults to `package.json`.
@@ -170,15 +170,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
-      
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Run security scan with audit
         run: |
           lex-pr discover --state open | \
@@ -186,7 +186,7 @@ jobs:
           lex-pr execute --plan - \
             --audit soc2 \
             --audit-sarif
-      
+
       - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v2
         with:
@@ -281,4 +281,3 @@ Generated SARIF files can be validated using:
 1. **Official SARIF schema validator**: The SARIF schema is available at `https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json`
 2. **Internal parser**: The runner includes a SARIF parser in `src/security/sarif.ts` that can validate the format
 3. **GitHub Actions**: GitHub will validate SARIF on upload and provide feedback in the Code Scanning UI
-

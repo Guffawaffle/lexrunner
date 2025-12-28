@@ -18,7 +18,7 @@ items:
     gates:
       - name: test
         run: npm test
-        
+
   - id: integration-tests
     branch: feat/integration
     deps: [unit-tests]
@@ -51,6 +51,7 @@ items:
 ```
 
 **Explanation:**
+
 - Unit tests run once (no retries) - they should be stable
 - Integration tests retry up to 3 times with 5-second exponential backoff
 - Integration tests are optional (won't block merge if they fail after retries)
@@ -75,7 +76,7 @@ items:
         run: npm test
       - name: e2e
         run: npm run test:e2e
-        runtime: ci-service  # Will gracefully degrade if unavailable
+        runtime: ci-service # Will gracefully degrade if unavailable
 ```
 
 ```json
@@ -102,6 +103,7 @@ items:
 ```
 
 **Explanation:**
+
 - E2E tests use CI service runtime (not yet implemented)
 - System will gracefully degrade and skip E2E tests
 - Core gates (lint, test) are still required
@@ -151,15 +153,15 @@ Different retry strategies for different gate types:
 
 **Retry Strategy Guidelines:**
 
-| Gate Type | Max Attempts | Backoff | Rationale |
-|-----------|--------------|---------|-----------|
-| Build | 1 | 0s | Deterministic, config errors |
-| Lint | 1 | 0s | Deterministic, code quality |
-| Unit Tests | 1-2 | 3-5s | Mostly stable, rare flakes |
-| Integration Tests | 2-3 | 5-10s | External deps, network |
-| E2E Tests | 3-5 | 10-20s | Browser, timing, network |
-| Performance Tests | 3-5 | 15-30s | Resource contention |
-| Security Scans | 2-3 | 10-15s | Network, rate limits |
+| Gate Type         | Max Attempts | Backoff | Rationale                    |
+| ----------------- | ------------ | ------- | ---------------------------- |
+| Build             | 1            | 0s      | Deterministic, config errors |
+| Lint              | 1            | 0s      | Deterministic, code quality  |
+| Unit Tests        | 1-2          | 3-5s    | Mostly stable, rare flakes   |
+| Integration Tests | 2-3          | 5-10s   | External deps, network       |
+| E2E Tests         | 3-5          | 10-20s  | Browser, timing, network     |
+| Performance Tests | 3-5          | 15-30s  | Resource contention          |
+| Security Scans    | 2-3          | 10-15s  | Network, rate limits         |
 
 ## Best Practices
 

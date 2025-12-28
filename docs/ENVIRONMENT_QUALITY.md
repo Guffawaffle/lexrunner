@@ -36,21 +36,22 @@ The `doctor` MCP tool supports an `environmentQuality` parameter:
 ## Hostility Score
 
 The hostility score ranges from 0 to 1, where:
+
 - **0.0 - 0.3**: Low hostility (good) - Environment is well-configured for agent operation
 - **0.3 - 0.6**: Medium hostility - Improvement recommended
 - **0.6 - 1.0**: High hostility - Significant impediments to effective operation
 
 ### Component Breakdown
 
-| Component | Description | Checks |
-|-----------|-------------|--------|
-| **Constraint Clarity** | Are constraints explicit and machine-readable? | AGENTS.md, copilot instructions, policy files |
-| **Requirement Explicitness** | Are requirements stated explicitly? | scope.yml, intent.md, plan validation |
-| **Problem Boundedness** | Is the problem surface bounded? | Plan item count (recommend < 10) |
-| **Receipt Completeness** | Are operations traced with receipts? | Frame emission, deliverables directories |
-| **Error Recoverability** | Are rollback paths defined? | gates.yml, retry config, git availability |
-| **State Coherence** | Is state consolidated? | Standard vs. fragmented locations |
-| **Model Continuity** | Are handoff protocols in place? | HANDOFF.md, session state, intent.md |
+| Component                    | Description                                    | Checks                                        |
+| ---------------------------- | ---------------------------------------------- | --------------------------------------------- |
+| **Constraint Clarity**       | Are constraints explicit and machine-readable? | AGENTS.md, copilot instructions, policy files |
+| **Requirement Explicitness** | Are requirements stated explicitly?            | scope.yml, intent.md, plan validation         |
+| **Problem Boundedness**      | Is the problem surface bounded?                | Plan item count (recommend < 10)              |
+| **Receipt Completeness**     | Are operations traced with receipts?           | Frame emission, deliverables directories      |
+| **Error Recoverability**     | Are rollback paths defined?                    | gates.yml, retry config, git availability     |
+| **State Coherence**          | Is state consolidated?                         | Standard vs. fragmented locations             |
+| **Model Continuity**         | Are handoff protocols in place?                | HANDOFF.md, session state, intent.md          |
 
 ## Example Output
 
@@ -77,36 +78,43 @@ Recommendations:
 ## Reducing Hostility
 
 ### Constraint Clarity
+
 - Add `AGENTS.md` with machine-readable agent instructions
 - Create `.github/copilot-instructions.md` for GitHub Copilot
 - Define `lexmap.policy.json` for policy enforcement
 
 ### Requirement Explicitness
+
 - Create `.smartergpt/scope.yml` with explicit scope definitions
 - Write `.smartergpt/intent.md` describing project goals
 - Generate `plan.json` with `lex-pr plan` command
 
 ### Problem Boundedness
+
 - Keep plans under 10 items for optimal agent operation
 - Split large work into smaller, focused batches
 - Use dependencies to manage complexity
 
 ### Receipt Completeness
+
 - Enable frame emission with `--emit-frames` flag
 - Run autopilot to generate deliverables with receipts
 - Review generated receipts for traceability
 
 ### Error Recoverability
+
 - Create `.smartergpt/gates.yml` with quality gates
 - Configure retry policies in plan.json
 - Ensure git repository is initialized for rollback capability
 
 ### State Coherence
+
 - Store all state in `.smartergpt/` or `.lexrunner/` directories
 - Avoid temporary directories or cache locations
 - Clean up fragmented state from non-standard locations
 
 ### Model Continuity
+
 - Create `HANDOFF.md` documenting continuity protocols
 - Maintain session state files for context preservation
 - Write clear `intent.md` for handoff context
@@ -117,7 +125,7 @@ The hostility score follows this structure:
 
 ```typescript
 interface HostilityScore {
-  total: number;           // 0-1, aggregate score
+  total: number; // 0-1, aggregate score
   status: "low" | "medium" | "high";
   components: {
     constraintClarity: HostilityComponent;
@@ -132,7 +140,7 @@ interface HostilityScore {
 }
 
 interface HostilityComponent {
-  score: number;           // 0-1, component score
+  score: number; // 0-1, component score
   status: "good" | "warning" | "critical";
   details: string;
   recommendation?: string;

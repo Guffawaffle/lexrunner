@@ -11,6 +11,7 @@
 This document was created and GPG-signed on **November 26, 2025**.
 
 On **December 1, 2025**, external timestamp proofs were added to anchor the document to independent authorities, preserving both:
+
 1. The original Git/GPG timestamp (Nov 26, 2025)
 2. New RFC 3161 and Bitcoin timestamps (Dec 1, 2025)
 
@@ -19,11 +20,13 @@ On **December 1, 2025**, external timestamp proofs were added to anchor the docu
 ## File Hash (SHA-256)
 
 **After addendum (timestamped version):**
+
 ```
 b4f5b227f0185cc07a6bd04c46ab319a8b2996c29a481eec25013e93221cb6cd
 ```
 
 **Original (before addendum):**
+
 ```
 564ee084775ad503cd9d7e16aaa6ceea4df66310c00aae27a953f63a5326e064
 ```
@@ -100,11 +103,11 @@ ots info employment_separation_2025-11-26.ots
 
 ## Summary of Trust Anchors
 
-| Method | Authority | Timestamp | What It Proves |
-|--------|-----------|-----------|----------------|
-| GPG Commit | Guff's key | Nov 26, 2025 07:43 CST | Original document creation |
-| RFC 3161 | FreeTSA (DE) | Dec 1, 2025 10:59 UTC | Document existed at this time |
-| Bitcoin | Bitcoin network | Pending block | Immutable public ledger anchor |
+| Method     | Authority       | Timestamp              | What It Proves                 |
+| ---------- | --------------- | ---------------------- | ------------------------------ |
+| GPG Commit | Guff's key      | Nov 26, 2025 07:43 CST | Original document creation     |
+| RFC 3161   | FreeTSA (DE)    | Dec 1, 2025 10:59 UTC  | Document existed at this time  |
+| Bitcoin    | Bitcoin network | Pending block          | Immutable public ledger anchor |
 
 ---
 
@@ -117,6 +120,7 @@ ots info employment_separation_2025-11-26.ots
 5. **Pending:** Bitcoin block confirmation (immutable anchor)
 
 This creates a verifiable chain showing:
+
 - The document was **originally created** on Nov 26, 2025 (GPG commit)
 - The author **re-attested** the original date on Dec 1, 2025
 - Independent authorities **confirm** the Dec 1 re-attestation timestamp

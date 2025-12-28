@@ -26,10 +26,10 @@ import { z, type ZodSafeParseResult } from "zod";
  * ```
  */
 export const AccessPatternSchema = z.object({
-	/** Glob pattern for file/directory matching */
-	path: z.string().min(1),
-	/** Access level: read-only or read-write */
-	access: z.enum(["read", "write"]),
+  /** Glob pattern for file/directory matching */
+  path: z.string().min(1),
+  /** Access level: read-only or read-write */
+  access: z.enum(["read", "write"]),
 });
 export type AccessPattern = z.infer<typeof AccessPatternSchema>;
 
@@ -58,33 +58,33 @@ export type AccessPattern = z.infer<typeof AccessPatternSchema>;
  * ```
  */
 export const G_scopeSchema = z.object({
-	/** File system access boundaries */
-	files: z
-		.object({
-			/** Allowed file access patterns */
-			allow: z.array(AccessPatternSchema).default([]),
-			/** Denied file access patterns (takes precedence over allow) */
-			deny: z.array(AccessPatternSchema).default([]),
-		})
-		.optional(),
-	/** Network access boundaries */
-	network: z
-		.object({
-			/** Allowed network hosts/patterns */
-			allow: z.array(z.string()).default([]),
-			/** Denied network hosts/patterns (takes precedence over allow) */
-			deny: z.array(z.string()).default([]),
-		})
-		.optional(),
-	/** Environment variable access boundaries */
-	env: z
-		.object({
-			/** Allowed environment variable patterns */
-			allow: z.array(z.string()).default([]),
-			/** Denied environment variable patterns (takes precedence over allow) */
-			deny: z.array(z.string()).default([]),
-		})
-		.optional(),
+  /** File system access boundaries */
+  files: z
+    .object({
+      /** Allowed file access patterns */
+      allow: z.array(AccessPatternSchema).default([]),
+      /** Denied file access patterns (takes precedence over allow) */
+      deny: z.array(AccessPatternSchema).default([]),
+    })
+    .optional(),
+  /** Network access boundaries */
+  network: z
+    .object({
+      /** Allowed network hosts/patterns */
+      allow: z.array(z.string()).default([]),
+      /** Denied network hosts/patterns (takes precedence over allow) */
+      deny: z.array(z.string()).default([]),
+    })
+    .optional(),
+  /** Environment variable access boundaries */
+  env: z
+    .object({
+      /** Allowed environment variable patterns */
+      allow: z.array(z.string()).default([]),
+      /** Denied environment variable patterns (takes precedence over allow) */
+      deny: z.array(z.string()).default([]),
+    })
+    .optional(),
 });
 export type G_scope = z.infer<typeof G_scopeSchema>;
 
@@ -106,14 +106,14 @@ export type G_scope = z.infer<typeof G_scopeSchema>;
  * ```
  */
 export const ToolConstraintSchema = z.object({
-	/** Tool name or pattern */
-	name: z.string().min(1),
-	/** Allowed argument patterns (empty = all allowed) */
-	allowedArgs: z.array(z.string()).default([]),
-	/** Denied argument patterns */
-	deniedArgs: z.array(z.string()).default([]),
-	/** Maximum invocations per session (undefined = unlimited) */
-	maxInvocations: z.number().int().positive().optional(),
+  /** Tool name or pattern */
+  name: z.string().min(1),
+  /** Allowed argument patterns (empty = all allowed) */
+  allowedArgs: z.array(z.string()).default([]),
+  /** Denied argument patterns */
+  deniedArgs: z.array(z.string()).default([]),
+  /** Maximum invocations per session (undefined = unlimited) */
+  maxInvocations: z.number().int().positive().optional(),
 });
 export type ToolConstraint = z.infer<typeof ToolConstraintSchema>;
 
@@ -139,12 +139,12 @@ export type ToolConstraint = z.infer<typeof ToolConstraintSchema>;
  * ```
  */
 export const G_toolSchema = z.object({
-	/** Allowed tools with optional constraints */
-	allow: z.array(ToolConstraintSchema).default([]),
-	/** Denied tools (takes precedence over allow) */
-	deny: z.array(ToolConstraintSchema).default([]),
-	/** Tool invocations requiring user confirmation */
-	requireConfirmation: z.array(z.string()).default([]),
+  /** Allowed tools with optional constraints */
+  allow: z.array(ToolConstraintSchema).default([]),
+  /** Denied tools (takes precedence over allow) */
+  deny: z.array(ToolConstraintSchema).default([]),
+  /** Tool invocations requiring user confirmation */
+  requireConfirmation: z.array(z.string()).default([]),
 });
 export type G_tool = z.infer<typeof G_toolSchema>;
 
@@ -165,10 +165,10 @@ export type G_tool = z.infer<typeof G_toolSchema>;
  * ```
  */
 export const UncertaintyThresholdSchema = z.object({
-	/** Confidence threshold (0-1, where 0 = no confidence, 1 = full confidence) */
-	level: z.number().min(0).max(1),
-	/** Action to take when confidence falls below threshold */
-	action: z.enum(["continue", "warn", "escalate", "halt"]),
+  /** Confidence threshold (0-1, where 0 = no confidence, 1 = full confidence) */
+  level: z.number().min(0).max(1),
+  /** Action to take when confidence falls below threshold */
+  action: z.enum(["continue", "warn", "escalate", "halt"]),
 });
 export type UncertaintyThreshold = z.infer<typeof UncertaintyThresholdSchema>;
 
@@ -193,16 +193,16 @@ export type UncertaintyThreshold = z.infer<typeof UncertaintyThresholdSchema>;
  * ```
  */
 export const G_epistSchema = z.object({
-	/** Whether to require citations for factual claims */
-	requireSourceCitation: z.boolean().default(false),
-	/** Uncertainty threshold configuration */
-	uncertaintyHandling: UncertaintyThresholdSchema.optional(),
-	/** Prohibit generating content without factual basis */
-	prohibitHallucination: z.boolean().default(true),
-	/** Allowed assumptions the executor may make */
-	allowedAssumptions: z.array(z.string()).default([]),
-	/** Require explicit uncertainty markers in output */
-	requireExplicitUncertainty: z.boolean().default(false),
+  /** Whether to require citations for factual claims */
+  requireSourceCitation: z.boolean().default(false),
+  /** Uncertainty threshold configuration */
+  uncertaintyHandling: UncertaintyThresholdSchema.optional(),
+  /** Prohibit generating content without factual basis */
+  prohibitHallucination: z.boolean().default(true),
+  /** Allowed assumptions the executor may make */
+  allowedAssumptions: z.array(z.string()).default([]),
+  /** Require explicit uncertainty markers in output */
+  requireExplicitUncertainty: z.boolean().default(false),
 });
 export type G_epist = z.infer<typeof G_epistSchema>;
 
@@ -222,12 +222,12 @@ export type G_epist = z.infer<typeof G_epistSchema>;
  * ```
  */
 export const OutputFormatSchema = z.object({
-	/** Output format type */
-	type: z.enum(["text", "json", "yaml", "markdown", "code"]),
-	/** Optional schema reference for structured output */
-	schema: z.string().optional(),
-	/** Maximum output length (characters) */
-	maxLength: z.number().int().positive().optional(),
+  /** Output format type */
+  type: z.enum(["text", "json", "yaml", "markdown", "code"]),
+  /** Optional schema reference for structured output */
+  schema: z.string().optional(),
+  /** Maximum output length (characters) */
+  maxLength: z.number().int().positive().optional(),
 });
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
 
@@ -253,25 +253,25 @@ export type OutputFormat = z.infer<typeof OutputFormatSchema>;
  * ```
  */
 export const G_styleSchema = z.object({
-	/** Output format requirements */
-	outputFormat: OutputFormatSchema.optional(),
-	/** Language/locale for output */
-	language: z.string().default("en-US"),
-	/** Code style constraints */
-	codeStyle: z
-		.object({
-			/** Indentation style */
-			indentation: z.enum(["tabs", "spaces"]).optional(),
-			/** Maximum line length */
-			lineLength: z.number().int().positive().optional(),
-			/** Style conventions to follow */
-			conventions: z.array(z.string()).default([]),
-		})
-		.optional(),
-	/** Patterns prohibited in output */
-	prohibitedPatterns: z.array(z.string()).default([]),
-	/** Required sections in structured output */
-	requiredSections: z.array(z.string()).default([]),
+  /** Output format requirements */
+  outputFormat: OutputFormatSchema.optional(),
+  /** Language/locale for output */
+  language: z.string().default("en-US"),
+  /** Code style constraints */
+  codeStyle: z
+    .object({
+      /** Indentation style */
+      indentation: z.enum(["tabs", "spaces"]).optional(),
+      /** Maximum line length */
+      lineLength: z.number().int().positive().optional(),
+      /** Style conventions to follow */
+      conventions: z.array(z.string()).default([]),
+    })
+    .optional(),
+  /** Patterns prohibited in output */
+  prohibitedPatterns: z.array(z.string()).default([]),
+  /** Required sections in structured output */
+  requiredSections: z.array(z.string()).default([]),
 });
 export type G_style = z.infer<typeof G_styleSchema>;
 
@@ -291,12 +291,12 @@ export type G_style = z.infer<typeof G_styleSchema>;
  * ```
  */
 export const FrameRequirementSchema = z.object({
-	/** When to capture a frame */
-	trigger: z.enum(["on-start", "on-complete", "on-error", "on-milestone", "periodic"]),
-	/** Required fields in the frame */
-	requiredFields: z.array(z.string()).default([]),
-	/** Optional: interval for periodic frames (seconds) */
-	intervalSeconds: z.number().int().positive().optional(),
+  /** When to capture a frame */
+  trigger: z.enum(["on-start", "on-complete", "on-error", "on-milestone", "periodic"]),
+  /** Required fields in the frame */
+  requiredFields: z.array(z.string()).default([]),
+  /** Optional: interval for periodic frames (seconds) */
+  intervalSeconds: z.number().int().positive().optional(),
 });
 export type FrameRequirement = z.infer<typeof FrameRequirementSchema>;
 
@@ -322,18 +322,18 @@ export type FrameRequirement = z.infer<typeof FrameRequirementSchema>;
  * ```
  */
 export const G_auditSchema = z.object({
-	/** Minimum log level */
-	logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
-	/** Frame capture requirements */
-	frames: z.array(FrameRequirementSchema).default([]),
-	/** Whether to capture input data */
-	captureInputs: z.boolean().default(true),
-	/** Whether to capture output data */
-	captureOutputs: z.boolean().default(true),
-	/** Log retention period in days */
-	retentionDays: z.number().int().positive().optional(),
-	/** Fields to redact from logs */
-	sensitiveFields: z.array(z.string()).default([]),
+  /** Minimum log level */
+  logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /** Frame capture requirements */
+  frames: z.array(FrameRequirementSchema).default([]),
+  /** Whether to capture input data */
+  captureInputs: z.boolean().default(true),
+  /** Whether to capture output data */
+  captureOutputs: z.boolean().default(true),
+  /** Log retention period in days */
+  retentionDays: z.number().int().positive().optional(),
+  /** Fields to redact from logs */
+  sensitiveFields: z.array(z.string()).default([]),
 });
 export type G_audit = z.infer<typeof G_auditSchema>;
 
@@ -376,24 +376,24 @@ export type G_audit = z.infer<typeof G_auditSchema>;
  * ```
  */
 export const GuardrailProfileSchema = z.object({
-	/** Profile identifier */
-	name: z.string().min(1),
-	/** Profile version (semver) */
-	version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be semver format (x.y.z)"),
-	/** Human-readable description */
-	description: z.string().optional(),
-	/** Profiles this profile extends (inheritance) */
-	extends: z.array(z.string()).default([]),
-	/** Scope guardrails */
-	scope: G_scopeSchema.optional(),
-	/** Tool guardrails */
-	tool: G_toolSchema.optional(),
-	/** Epistemic guardrails */
-	epist: G_epistSchema.optional(),
-	/** Style guardrails */
-	style: G_styleSchema.optional(),
-	/** Audit guardrails */
-	audit: G_auditSchema.optional(),
+  /** Profile identifier */
+  name: z.string().min(1),
+  /** Profile version (semver) */
+  version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be semver format (x.y.z)"),
+  /** Human-readable description */
+  description: z.string().optional(),
+  /** Profiles this profile extends (inheritance) */
+  extends: z.array(z.string()).default([]),
+  /** Scope guardrails */
+  scope: G_scopeSchema.optional(),
+  /** Tool guardrails */
+  tool: G_toolSchema.optional(),
+  /** Epistemic guardrails */
+  epist: G_epistSchema.optional(),
+  /** Style guardrails */
+  style: G_styleSchema.optional(),
+  /** Audit guardrails */
+  audit: G_auditSchema.optional(),
 });
 export type GuardrailProfile = z.infer<typeof GuardrailProfileSchema>;
 
@@ -417,7 +417,7 @@ export type GuardrailProfile = z.infer<typeof GuardrailProfileSchema>;
  * ```
  */
 export function validateGuardrailProfile(profile: unknown): GuardrailProfile {
-	return GuardrailProfileSchema.parse(profile);
+  return GuardrailProfileSchema.parse(profile);
 }
 
 /**
@@ -437,9 +437,9 @@ export function validateGuardrailProfile(profile: unknown): GuardrailProfile {
  * ```
  */
 export function safeValidateGuardrailProfile(
-	profile: unknown
+  profile: unknown
 ): ZodSafeParseResult<GuardrailProfile> {
-	return GuardrailProfileSchema.safeParse(profile);
+  return GuardrailProfileSchema.safeParse(profile);
 }
 
 /**

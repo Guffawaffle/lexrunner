@@ -1,105 +1,105 @@
 {
-	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/behavior-rule.schema.json",
-	"title": "Behavior Rule Configuration",
-	"description": "Configuration for behavioral rules that provide guidance and policy enforcement for AI agents in the LexRunner ecosystem",
-	"type": "object",
-	"additionalProperties": false,
-	"properties": {
-		"version": {
-			"type": "string",
-			"description": "Schema version for behavior rules configuration"
-		},
-		"rules": {
-			"type": "array",
-			"description": "Array of behavioral rules",
-			"items": {
-				"type": "object",
-				"required": ["id", "title", "description", "content"],
-				"additionalProperties": false,
-				"properties": {
-					"id": {
-						"type": "string",
-						"description": "Unique rule identifier"
-					},
-					"title": {
-						"type": "string",
-						"description": "Rule title/name"
-					},
-					"description": {
-						"type": "string",
-						"description": "Human-readable description of what this rule does"
-					},
-					"content": {
-						"type": "string",
-						"description": "Rule content/guidance"
-					},
-					"scope": {
-						"type": "object",
-						"description": "Scope metadata for context filtering",
-						"additionalProperties": false,
-						"properties": {
-							"environment": {
-								"type": "string",
-								"description": "Environment (e.g., \"development\", \"production\")"
-							},
-							"project": {
-								"type": "string",
-								"description": "Project identifier"
-							},
-							"agentFamily": {
-								"type": "string",
-								"description": "Agent family (e.g., \"copilot\", \"claude\")"
-							}
-						}
-					},
-					"priority": {
-						"type": "integer",
-						"minimum": 0,
-						"description": "Priority (higher = more important)"
-					}
-				}
-			}
-		}
-	},
-	"examples": [
-		{
-			"version": "1.0.0",
-			"rules": [
-				{
-					"id": "code-review-required",
-					"title": "Code Review Required",
-					"description": "All code changes must be reviewed before merge",
-					"content": "Before merging any pull request, ensure at least one peer review has been completed. Reviewers should check for correctness, style, and security issues.",
-					"priority": 10
-				}
-			]
-		},
-		{
-			"version": "1.0.0",
-			"rules": [
-				{
-					"id": "no-force-push",
-					"title": "No Force Push to Main",
-					"description": "Prevent force pushing to protected branches",
-					"content": "Never use git push --force on main, master, or release branches. Always use git push --force-with-lease if force pushing is absolutely necessary on feature branches.",
-					"scope": {
-						"environment": "production"
-					},
-					"priority": 100
-				},
-				{
-					"id": "test-coverage-minimum",
-					"title": "Minimum Test Coverage",
-					"description": "Maintain minimum test coverage thresholds",
-					"content": "All new code must include tests. Aim for at least 80% line coverage and 70% branch coverage.",
-					"scope": {
-						"agentFamily": "copilot",
-						"project": "lexrunner"
-					},
-					"priority": 50
-				}
-			]
-		}
-	]
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/behavior-rule.schema.json",
+  "title": "Behavior Rule Configuration",
+  "description": "Configuration for behavioral rules that provide guidance and policy enforcement for AI agents in the LexRunner ecosystem",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for behavior rules configuration"
+    },
+    "rules": {
+      "type": "array",
+      "description": "Array of behavioral rules",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "description", "content"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique rule identifier"
+          },
+          "title": {
+            "type": "string",
+            "description": "Rule title/name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this rule does"
+          },
+          "content": {
+            "type": "string",
+            "description": "Rule content/guidance"
+          },
+          "scope": {
+            "type": "object",
+            "description": "Scope metadata for context filtering",
+            "additionalProperties": false,
+            "properties": {
+              "environment": {
+                "type": "string",
+                "description": "Environment (e.g., \"development\", \"production\")"
+              },
+              "project": {
+                "type": "string",
+                "description": "Project identifier"
+              },
+              "agentFamily": {
+                "type": "string",
+                "description": "Agent family (e.g., \"copilot\", \"claude\")"
+              }
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Priority (higher = more important)"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "1.0.0",
+      "rules": [
+        {
+          "id": "code-review-required",
+          "title": "Code Review Required",
+          "description": "All code changes must be reviewed before merge",
+          "content": "Before merging any pull request, ensure at least one peer review has been completed. Reviewers should check for correctness, style, and security issues.",
+          "priority": 10
+        }
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "rules": [
+        {
+          "id": "no-force-push",
+          "title": "No Force Push to Main",
+          "description": "Prevent force pushing to protected branches",
+          "content": "Never use git push --force on main, master, or release branches. Always use git push --force-with-lease if force pushing is absolutely necessary on feature branches.",
+          "scope": {
+            "environment": "production"
+          },
+          "priority": 100
+        },
+        {
+          "id": "test-coverage-minimum",
+          "title": "Minimum Test Coverage",
+          "description": "Maintain minimum test coverage thresholds",
+          "content": "All new code must include tests. Aim for at least 80% line coverage and 70% branch coverage.",
+          "scope": {
+            "agentFamily": "copilot",
+            "project": "lexrunner"
+          },
+          "priority": 50
+        }
+      ]
+    }
+  ]
 }

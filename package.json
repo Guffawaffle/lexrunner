@@ -1,118 +1,131 @@
 {
-	"name": "lexrunner",
-	"version": "0.6.0",
-	"private": true,
-	"type": "module",
-	"engines": {
-		"node": ">=20 <23"
-	},
-	"packageManager": "npm@10.0.0",
-	"auditSchemaVersion": "1.0.0",
-	"bin": {
-		"lex-pr": "dist/cli.js",
-		"lexrunner-mcp": "./mcp-server.mjs"
-	},
-	"types": "dist/cli.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/cli.d.ts",
-			"import": "./dist/cli.js",
-			"require": "./dist/cli.cjs"
-		},
-		"./audit-sdk": {
-			"types": "./dist/sdk/index.d.ts",
-			"import": "./dist/sdk/index.js"
-		},
-		"./frames": {
-			"types": "./dist/frames/index.d.ts",
-			"import": "./dist/frames/index.js"
-		},
-		"./errors": {
-			"types": "./dist/errors/index.d.ts",
-			"import": "./dist/errors/index.js"
-		},
-		"./schemas/runner-stack": {
-			"types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
-			"import": "./.smartergpt/schemas/runner.stack.schema.js"
-		},
-		"./schemas/runner-scope": {
-			"types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
-			"import": "./.smartergpt/schemas/runner.scope.schema.js"
-		},
-		"./schemas/execution-plan-v1": {
-			"types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
-			"import": "./.smartergpt/schemas/execution-plan-v1.js"
-		},
-		"./schemas/gates": {
-			"types": "./.smartergpt/schemas/gates.schema.d.ts",
-			"import": "./.smartergpt/schemas/gates.schema.js"
-		},
-		"./schemas/behavior-rule": {
-			"types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
-			"import": "./.smartergpt/schemas/behavior-rule.schema.js"
-		}
-	},
-	"scripts": {
-		"postinstall": "node -e \"console.log('\\n📦 lexrunner installed! Run \\\"npx lex-pr init\\\" to set up your workspace.\\n')\"",
-		"dev": "tsx watch src/cli.ts",
-		"cli": "tsx src/cli.ts",
-		"cli:built": "node dist/cli.js",
-		"mcp": "node mcp-server.mjs",
-		"build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist",
-		"pretest": "npm run build",
-		"generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts && tsx scripts/generate-executor-manifest-schema.ts && tsx scripts/generate-run-schemas.ts",
-		"lint": "echo 'Lint: TypeScript compilation handles most issues' && npm run typecheck",
-		"format": "echo 'Format: using editorconfig for consistent formatting'",
-		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"validate:manifests": "tsx scripts/validate-manifests.ts",
-		"test": "vitest run",
-		"test:git": "vitest run -c vitest.git.config.ts tests/release-prepare.spec.ts tests/promptsResolver.spec.ts tests/e2e-comprehensive.test.ts tests/autopilot-e2e-level3-4.spec.ts tests/deterministic-build.test.ts",
-		"test:cli:slow": "vitest run -c vitest.slow-cli.config.ts",
-		"benchmark": "vitest bench -c vitest.benchmark.config.ts",
-		"benchmark:baseline": "echo 'Update baseline manually after running benchmarks and reviewing results'",
-		"benchmark:ci": "tsx scripts/benchmark-ci.ts",
-		"benchmark:smoke": "tsx scripts/benchmark-ci.ts --mode=smoke",
-		"benchmark:compare": "tsx scripts/benchmark-ci.ts --mode=compare",
-		"release:prepare": "tsx scripts/release-prepare.ts",
-		"generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
-		"generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
-		"ci:minimal": "npm run lint && npm run typecheck",
-		"ci": "npm run lint && npm run typecheck && npm run build && npm test",
-		"ci:full": "npm run lint && npm run typecheck && npm run build && npm test && npm run test:git && npm run benchmark:smoke",
-		"ci:debug": "bash scripts/ci-debug.sh",
-		"ci:smoke": "node scripts/ci-smoke.mjs",
-		"ci:local": "npm run ci",
-		"ci:docker": "echo '⚠️ Docker CI not configured, falling back to local' && npm run ci",
-		"test:run": "vitest run",
-		"check:release-drift": "node scripts/check-release-drift.mjs"
-	},
-	"dependencies": {
-		"@babel/parser": "^7.28.4",
-		"@babel/traverse": "^7.28.4",
-		"@modelcontextprotocol/sdk": "^1.18.2",
-		"@octokit/auth-token": "^6.0.0",
-		"@octokit/rest": "^22.0.0",
-		"@smartergpt/lex": "^2.0.2",
-		"@types/babel__traverse": "^7.28.0",
-		"better-sqlite3": "^12.5.0",
-		"chalk": "^5.3.0",
-		"commander": "^14.0.2",
-		"dotenv": "^17.2.3",
-		"execa": "^9.6.1",
-		"fs-extra": "^11.2.0",
-		"minimatch": "^10.1.1",
-		"simple-git": "^3.24.0",
-		"ulid": "^3.0.2",
-		"yaml": "^2.8.2",
-		"zod": "^4.1.13"
-	},
-	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.13",
-		"@types/node": "^24.10.4",
-		"eslint": "^9.39.2",
-		"tsup": "^8.1.0",
-		"tsx": "^4.21.0",
-		"typescript": "^5.6.3",
-		"vitest": "^4.0.15"
-	}
+  "name": "lexrunner",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20 <23"
+  },
+  "packageManager": "npm@10.0.0",
+  "auditSchemaVersion": "1.0.0",
+  "bin": {
+    "lex-pr": "dist/cli.js",
+    "lexrunner-mcp": "./mcp-server.mjs"
+  },
+  "types": "dist/cli.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js",
+      "require": "./dist/cli.cjs"
+    },
+    "./audit-sdk": {
+      "types": "./dist/sdk/index.d.ts",
+      "import": "./dist/sdk/index.js"
+    },
+    "./frames": {
+      "types": "./dist/frames/index.d.ts",
+      "import": "./dist/frames/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js"
+    },
+    "./schemas/runner-stack": {
+      "types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
+      "import": "./.smartergpt/schemas/runner.stack.schema.js"
+    },
+    "./schemas/runner-scope": {
+      "types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
+      "import": "./.smartergpt/schemas/runner.scope.schema.js"
+    },
+    "./schemas/execution-plan-v1": {
+      "types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
+      "import": "./.smartergpt/schemas/execution-plan-v1.js"
+    },
+    "./schemas/gates": {
+      "types": "./.smartergpt/schemas/gates.schema.d.ts",
+      "import": "./.smartergpt/schemas/gates.schema.js"
+    },
+    "./schemas/behavior-rule": {
+      "types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
+      "import": "./.smartergpt/schemas/behavior-rule.schema.js"
+    }
+  },
+  "scripts": {
+    "postinstall": "node -e \"console.log('\\n📦 lexrunner installed! Run \\\"npx lex-pr init\\\" to set up your workspace.\\n')\"",
+    "dev": "tsx watch src/cli.ts",
+    "cli": "tsx src/cli.ts",
+    "cli:built": "node dist/cli.js",
+    "mcp": "node mcp-server.mjs",
+    "build": "tsup src/cli.ts --format esm,cjs --dts --out-dir dist",
+    "pretest": "npm run build",
+    "generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts && tsx scripts/generate-executor-manifest-schema.ts && tsx scripts/generate-run-schemas.ts",
+    "lint": "npm run typecheck && npm run format:check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "validate:manifests": "tsx scripts/validate-manifests.ts",
+    "test": "vitest run",
+    "test:git": "vitest run -c vitest.git.config.ts tests/release-prepare.spec.ts tests/promptsResolver.spec.ts tests/e2e-comprehensive.test.ts tests/autopilot-e2e-level3-4.spec.ts tests/deterministic-build.test.ts",
+    "test:cli:slow": "vitest run -c vitest.slow-cli.config.ts",
+    "benchmark": "vitest bench -c vitest.benchmark.config.ts",
+    "benchmark:baseline": "echo 'Update baseline manually after running benchmarks and reviewing results'",
+    "benchmark:ci": "tsx scripts/benchmark-ci.ts",
+    "benchmark:smoke": "tsx scripts/benchmark-ci.ts --mode=smoke",
+    "benchmark:compare": "tsx scripts/benchmark-ci.ts --mode=compare",
+    "release:prepare": "tsx scripts/release-prepare.ts",
+    "generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
+    "generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
+    "ci:minimal": "npm run lint && npm run typecheck",
+    "ci": "npm run lint && npm run typecheck && npm run build && npm test",
+    "ci:full": "npm run lint && npm run typecheck && npm run build && npm test && npm run test:git && npm run benchmark:smoke",
+    "ci:debug": "bash scripts/ci-debug.sh",
+    "ci:smoke": "node scripts/ci-smoke.mjs",
+    "ci:local": "npm run ci",
+    "ci:docker": "echo '⚠️ Docker CI not configured, falling back to local' && npm run ci",
+    "test:run": "vitest run",
+    "check:release-drift": "node scripts/check-release-drift.mjs",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.28.4",
+    "@babel/traverse": "^7.28.4",
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@octokit/auth-token": "^6.0.0",
+    "@octokit/rest": "^22.0.0",
+    "@smartergpt/lex": "^2.0.2",
+    "@types/babel__traverse": "^7.28.0",
+    "better-sqlite3": "^12.5.0",
+    "chalk": "^5.3.0",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "execa": "^9.6.1",
+    "fs-extra": "^11.2.0",
+    "minimatch": "^10.1.1",
+    "simple-git": "^3.24.0",
+    "ulid": "^3.0.2",
+    "yaml": "^2.8.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.10.4",
+    "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
+    "tsup": "^8.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.0.15"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "prettier --check"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --check"
+    ]
+  }
 }

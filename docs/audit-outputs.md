@@ -56,16 +56,16 @@ lex-pr execute plan.json --audit hipaa-strict
 
 ### Profile Comparison
 
-| Feature | off | basic | soc2 | hipaa-strict |
-|---------|-----|-------|------|--------------|
-| Event stream | ❌ | ✅ | ✅ | ✅ |
-| Context (git/ci/os) | ❌ | ❌ | ✅ | ✅ |
-| Gate matrix | ❌ | ❌ | ✅ | ✅ |
-| Path hashing | ❌ | ❌ | ❌ | ✅ |
-| PHI redaction | ❌ | ❌ | ❌ | ✅ |
-| Encryption | ❌ | Optional | Optional | **Required** |
-| Signature | ❌ | ❌ | Stub | Stub |
-| Retention | N/A | 365 days | 730 days | 2190 days (6 years, per HIPAA 45 CFR 164.316) |
+| Feature             | off | basic    | soc2     | hipaa-strict                                  |
+| ------------------- | --- | -------- | -------- | --------------------------------------------- |
+| Event stream        | ❌  | ✅       | ✅       | ✅                                            |
+| Context (git/ci/os) | ❌  | ❌       | ✅       | ✅                                            |
+| Gate matrix         | ❌  | ❌       | ✅       | ✅                                            |
+| Path hashing        | ❌  | ❌       | ❌       | ✅                                            |
+| PHI redaction       | ❌  | ❌       | ❌       | ✅                                            |
+| Encryption          | ❌  | Optional | Optional | **Required**                                  |
+| Signature           | ❌  | ❌       | Stub     | Stub                                          |
+| Retention           | N/A | 365 days | 730 days | 2190 days (6 years, per HIPAA 45 CFR 164.316) |
 
 ### Profile Details
 
@@ -84,6 +84,7 @@ Minimal audit logging for operational visibility:
 - Retention: 365 days (recommendation)
 
 **Use cases:**
+
 - Operational troubleshooting
 - Non-compliance environments
 - Development/staging
@@ -101,6 +102,7 @@ Comprehensive audit logging for SOC 2 Type II compliance:
 - Retention: 730 days (2 years)
 
 **Use cases:**
+
 - SOC 2 Type II audits
 - Security compliance reporting
 - Change management audits
@@ -118,6 +120,7 @@ Maximum protection for HIPAA 164.312(b) compliance:
 - Retention: 2190 days (6 years, per HIPAA 45 CFR 164.316)
 
 **Use cases:**
+
 - HIPAA-regulated environments
 - Healthcare data processing
 - Maximum security posture
@@ -181,39 +184,39 @@ Every event is wrapped in a consistent envelope:
 
 #### Core Events
 
-| Event | Description | Payload Fields |
-|-------|-------------|----------------|
-| `command_invocation` | CLI command executed | `argv`, `cwd` |
-| `plan_discovered` | Plan loaded and parsed | `pr_ids`, `base`, `head`, `plan_hash` |
-| `plan_validated` | Plan schema validated | `schema_version`, `warnings[]` |
-| `merge_order_computed` | Dependency order computed | `levels`, `items_per_level[]` |
+| Event                  | Description               | Payload Fields                        |
+| ---------------------- | ------------------------- | ------------------------------------- |
+| `command_invocation`   | CLI command executed      | `argv`, `cwd`                         |
+| `plan_discovered`      | Plan loaded and parsed    | `pr_ids`, `base`, `head`, `plan_hash` |
+| `plan_validated`       | Plan schema validated     | `schema_version`, `warnings[]`        |
+| `merge_order_computed` | Dependency order computed | `levels`, `items_per_level[]`         |
 
 #### Gate Events
 
-| Event | Description | Payload Fields |
-|-------|-------------|----------------|
-| `gate_started` | Gate execution started | `item`, `gate` |
+| Event           | Description              | Payload Fields                                                          |
+| --------------- | ------------------------ | ----------------------------------------------------------------------- |
+| `gate_started`  | Gate execution started   | `item`, `gate`                                                          |
 | `gate_finished` | Gate execution completed | `item`, `gate`, `duration_ms`, `status`, `exit_code`, `artifact_refs[]` |
 
 **Status values:** `pass`, `fail`, `skip`, `blocked`
 
 #### Merge Events
 
-| Event | Description | Payload Fields |
-|-------|-------------|----------------|
-| `merge_dry_run_started` | Dry run merge started | `item`, `base`, `head` |
-| `merge_dry_run_finished` | Dry run completed | `item`, `status`, `conflicts[]` |
-| `merge_execute_started` | Real merge started | `item`, `base`, `head` |
-| `merge_conflict_detected` | Conflict found during merge | `item`, `files[]` |
-| `merge_finished` | Merge completed | `item`, `status`, `commit` |
+| Event                     | Description                 | Payload Fields                  |
+| ------------------------- | --------------------------- | ------------------------------- |
+| `merge_dry_run_started`   | Dry run merge started       | `item`, `base`, `head`          |
+| `merge_dry_run_finished`  | Dry run completed           | `item`, `status`, `conflicts[]` |
+| `merge_execute_started`   | Real merge started          | `item`, `base`, `head`          |
+| `merge_conflict_detected` | Conflict found during merge | `item`, `files[]`               |
+| `merge_finished`          | Merge completed             | `item`, `status`, `commit`      |
 
 #### Artifact & Summary Events
 
-| Event | Description | Payload Fields |
-|-------|-------------|----------------|
-| `artifact_written` | Output artifact created | `path`, `sha256`, `bytes` |
-| `error` | Error occurred | `code`, `message`, `where` |
-| `run_summary` | Execution summary | `totals`, `pass_fail_matrix`, `final_status` |
+| Event              | Description             | Payload Fields                               |
+| ------------------ | ----------------------- | -------------------------------------------- |
+| `artifact_written` | Output artifact created | `path`, `sha256`, `bytes`                    |
+| `error`            | Error occurred          | `code`, `message`, `where`                   |
+| `run_summary`      | Execution summary       | `totals`, `pass_fail_matrix`, `final_status` |
 
 ## Output Files
 
@@ -234,12 +237,14 @@ Every event is wrapped in a consistent envelope:
 Newline-delimited JSON event stream. Each line is a complete event envelope.
 
 **Example:**
+
 ```json
 {"schema_version":"0.1.0","event":"gate_started","ts":"2025-11-02T14:30:22Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lexrunner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint"}}
 {"schema_version":"0.1.0","event":"gate_finished","ts":"2025-11-02T14:30:28Z","level":"info","session_id":"01JB123","run_id":"01JB456","tool":{"name":"lexrunner","version":"0.1.0"},"actor":{"type":"cli"},"repo":{},"payload":{"item":"166","gate":"lint","exit_code":0,"duration_ms":6200,"status":"pass"}}
 ```
 
 **Processing:**
+
 ```bash
 # Extract all gate failures
 cat audit.ndjson | jq 'select(.event == "gate_finished" and .payload.status == "fail")'
@@ -256,6 +261,7 @@ cat audit.ndjson | jq -s 'group_by(.event) | map({event: .[0].event, count: leng
 High-level execution summary.
 
 **Example:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -285,6 +291,7 @@ High-level execution summary.
 File inventory with SHA-256 integrity hashes. For SOC 2 and HIPAA profiles, also includes CI context (git, CI environment, and OS details).
 
 **Example (basic profile):**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -306,6 +313,7 @@ File inventory with SHA-256 integrity hashes. For SOC 2 and HIPAA profiles, also
 ```
 
 **Example (soc2/hipaa-strict profile with CI context):**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -361,6 +369,7 @@ File inventory with SHA-256 integrity hashes. For SOC 2 and HIPAA profiles, also
 Pass/fail matrix for all gates across all PRs.
 
 **Example:**
+
 ```json
 {
   "generated_at": "2025-11-02T14:35:00Z",
@@ -397,10 +406,12 @@ lex-pr --audit-profile <profile> [command]
 ```
 
 **Options:**
+
 - `--audit-profile <profile>`: Audit profile (off|basic|soc2|hipaa-strict) [default: off]
 - `--audit-key <hex>`: Encryption key (64 hex chars, 32 bytes) - overrides `LEX_AUDIT_KEY_HEX` env var
 
 **Example:**
+
 ```bash
 # Enable basic audit for all commands
 lex-pr --audit-profile basic execute plan.json
@@ -417,6 +428,7 @@ lex-pr execute plan.json --audit <profile> [options]
 ```
 
 **Options:**
+
 - `--audit <profile>`: Audit profile (off|basic|soc2|hipaa-strict) [default: off]
 - `--audit-dir <path>`: Output directory [default: `<deliverables>/audit`]
 - `--audit-include-env <keys>`: Comma-separated env var names to include
@@ -427,6 +439,7 @@ lex-pr execute plan.json --audit <profile> [options]
 - `--audit-retain-days <days>`: Retention hint in days
 
 **Examples:**
+
 ```bash
 # Basic audit to custom directory
 lex-pr execute plan.json --audit basic --audit-dir /tmp/audit
@@ -446,12 +459,12 @@ lex-pr execute plan.json --audit basic --audit-sample 50
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `LEX_AUDIT_KEY_HEX` | Encryption key (64 hex chars) | `0123...cdef` |
-| `LEX_AUDIT_PHI` | Enable PHI redaction (1=on) | `1` |
-| `LEX_AUDIT_DROP_DIR` | Sidecar file drop directory (auto-set) | `/tmp/lex-audit-session-{id}` |
-| `LEX_AUDIT_SESSION_ID` | Session ID (auto-set) | `01JB123456789` |
+| Variable               | Description                            | Example                       |
+| ---------------------- | -------------------------------------- | ----------------------------- |
+| `LEX_AUDIT_KEY_HEX`    | Encryption key (64 hex chars)          | `0123...cdef`                 |
+| `LEX_AUDIT_PHI`        | Enable PHI redaction (1=on)            | `1`                           |
+| `LEX_AUDIT_DROP_DIR`   | Sidecar file drop directory (auto-set) | `/tmp/lex-audit-session-{id}` |
+| `LEX_AUDIT_SESSION_ID` | Session ID (auto-set)                  | `01JB123456789`               |
 
 ## Security & Compliance
 
@@ -460,16 +473,19 @@ lex-pr execute plan.json --audit basic --audit-sample 50
 All audit profiles apply redaction to prevent secrets from being logged.
 
 **Default patterns (basic, soc2):**
+
 ```
 token|secret|pass|key|auth
 ```
 
 **Strict patterns (hipaa-strict):**
+
 ```
 token|secret|pass|key|auth|api[_-]?key|bearer|credential|pwd|ssn|ein|dob
 ```
 
 **Custom redaction:**
+
 ```bash
 lex-pr execute plan.json --audit basic --audit-redact 'my_secret|custom_token'
 ```
@@ -485,6 +501,7 @@ HIPAA-strict profile automatically detects and redacts:
 - Common PHI patterns
 
 **Example:**
+
 ```json
 // Before redaction
 {"patient_id": "123-45-6789", "dob": "1990-01-01"}
@@ -498,6 +515,7 @@ HIPAA-strict profile automatically detects and redacts:
 HIPAA-strict profile hashes all file paths to protect PII:
 
 **Example:**
+
 ```json
 // Before hashing
 {"path": "/projects/patient-data/john-doe/results.csv"}
@@ -511,16 +529,19 @@ HIPAA-strict profile hashes all file paths to protect PII:
 HIPAA-strict profile requires AES-256-GCM encryption:
 
 1. Set encryption key (32 bytes, 64 hex chars):
+
    ```bash
    export LEX_AUDIT_KEY_HEX="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
    ```
 
 2. Run with HIPAA profile:
+
    ```bash
    lex-pr execute plan.json --audit hipaa-strict
    ```
 
 3. Output is encrypted:
+
    ```
    audit/
    ├── audit.ndjson.enc     # Encrypted (AES-256-GCM)
@@ -535,6 +556,7 @@ HIPAA-strict profile requires AES-256-GCM encryption:
    ```
 
 **Fail-closed behavior:**
+
 - Invalid key → immediate abort, plaintext scrubbed, `audit.error.json` written
 - Missing key → immediate abort, no plaintext written
 - Encryption failure → immediate abort, partial files scrubbed
@@ -549,13 +571,14 @@ Audit outputs are deterministic for the same execution:
 - **Fixed timestamps**: Use `--audit-session-id` and `--audit-run-id` for reproducible tests
 
 **Example (testing):**
+
 ```typescript
 const emitter = await initAuditEmitter({
-  profile: 'basic',
-  dir: '/tmp/audit',
-  sessionId: 'test-session-123',
-  runId: 'test-run-456',
-  tool: { name: 'lexrunner', version: '0.1.0' }
+  profile: "basic",
+  dir: "/tmp/audit",
+  sessionId: "test-session-123",
+  runId: "test-run-456",
+  tool: { name: "lexrunner", version: "0.1.0" },
 });
 ```
 
@@ -569,6 +592,7 @@ Audit overhead is minimal:
 - **Async finalization**: Summary/manifest written after main execution
 
 **Benchmarks:**
+
 - Basic profile: <1% overhead
 - SOC2 profile: <2% overhead
 - HIPAA profile: <3% overhead (includes encryption)
@@ -578,12 +602,15 @@ Audit overhead is minimal:
 ### No audit files generated
 
 **Check:**
+
 1. Is audit profile enabled? (not `off`)
+
    ```bash
    lex-pr execute plan.json --audit basic
    ```
 
 2. Check output directory exists:
+
    ```bash
    ls -la .smartergpt.local/deliverables/weave-*/audit/
    ```
@@ -595,6 +622,7 @@ Audit overhead is minimal:
 **Error:** `HIPAA: encryption key required and must be 64 hex chars`
 
 **Solution:**
+
 ```bash
 # Generate valid key
 export LEX_AUDIT_KEY_HEX=$(openssl rand -hex 32)
@@ -607,6 +635,7 @@ lex-pr execute plan.json --audit hipaa-strict
 **Error:** `HIPAA: encryption failed; scrubbed plaintext and aborting`
 
 **Solution:**
+
 1. Check key is valid 64 hex chars
 2. Ensure sufficient disk space
 3. Check file permissions on audit directory
@@ -614,6 +643,7 @@ lex-pr execute plan.json --audit hipaa-strict
 ### Gate matrix not generated
 
 **Check:**
+
 1. Profile must be `soc2` or `hipaa-strict` (not `basic`)
 2. Verify `gate_finished` events are being emitted:
    ```bash
@@ -623,6 +653,7 @@ lex-pr execute plan.json --audit hipaa-strict
 ### Events not appearing in NDJSON
 
 **Check:**
+
 1. Sampling rate: `--audit-sample 100` (default)
 2. Profile is not `off`
 3. Finalization completed (summary exists)
@@ -651,12 +682,14 @@ Audit manifest signing provides cryptographic proof that audit records haven't b
 ### When to Use KMS
 
 **Recommended for:**
+
 - Production environments
 - SOC 2 / HIPAA compliance requirements
 - Automated CI/CD pipelines
 - Organizations with existing cloud infrastructure
 
 **Benefits:**
+
 - Centralized key management
 - Automatic key rotation
 - Hardware security module (HSM) backing
@@ -664,6 +697,7 @@ Audit manifest signing provides cryptographic proof that audit records haven't b
 - No secret management in CI/CD
 
 **Supported Providers:**
+
 - **AWS KMS**: `arn:aws:kms:REGION:ACCOUNT:key/KEY_ID`
 - **GCP Cloud KMS**: `projects/PROJECT/locations/REGION/keyRings/RING/cryptoKeys/KEY`
 - **Azure Key Vault**: `https://VAULT.vault.azure.net/keys/KEY/VERSION`
@@ -671,18 +705,21 @@ Audit manifest signing provides cryptographic proof that audit records haven't b
 ### When to Use GPG
 
 **Recommended for:**
+
 - Development and testing
 - Organizations without cloud infrastructure
 - Air-gapped environments
 - Legacy systems
 
 **Benefits:**
+
 - Works offline
 - No cloud dependency
 - Standard PGP/GPG tooling
 - Verifiable with public key
 
 **Considerations:**
+
 - Manual key management
 - Private key must be securely stored
 - Key rotation requires pipeline updates
@@ -713,11 +750,7 @@ Create an IAM policy for the CI/CD role:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "kms:Sign",
-        "kms:Verify",
-        "kms:DescribeKey"
-      ],
+      "Action": ["kms:Sign", "kms:Verify", "kms:DescribeKey"],
       "Resource": "arn:aws:kms:us-east-1:123456789012:key/abcd-1234..."
     }
   ]
@@ -877,6 +910,7 @@ gpg --armor --export $GPG_FPR > public-key.asc
 ### 3. Configure CI/CD Secrets
 
 In GitHub Actions secrets, add:
+
 - `GPG_PRIVATE_KEY`: Contents of `private-key.asc`
 - `GPG_PASSPHRASE`: Passphrase (if protected)
 
@@ -973,7 +1007,7 @@ lex-pr audit verify --manifest audit-manifest.json --format json
 - name: Verify audit signature
   run: |
     lex-pr audit verify --manifest .smartergpt.local/deliverables/weave-*/audit/audit-manifest.json
-    
+
 - name: Upload verified manifest
   uses: actions/upload-artifact@v3
   with:
@@ -1018,11 +1052,13 @@ Example SIEM payload:
 ### Public Keys and Verification Data
 
 **Recommended retention:**
+
 - **SOC 2**: 1 year minimum
 - **HIPAA**: 6 years minimum
 - **Financial services**: 7 years typical
 
 **Storage recommendations:**
+
 1. Commit `audit.pubkey.asc` (GPG) to repository
 2. Store KMS key ARNs in compliance documentation
 3. Archive signatures with audit manifests

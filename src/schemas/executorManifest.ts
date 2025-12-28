@@ -18,18 +18,15 @@ import { z, type ZodSafeParseResult } from "zod";
  * Format: "executor-{semver}" e.g., "executor-1.0.0"
  */
 export const ExecutorSchemaVersion = z
-	.string()
-	.regex(
-		/^executor-\d+\.\d+\.\d+$/,
-		"Schema version must be in format 'executor-X.Y.Z'"
-	);
+  .string()
+  .regex(/^executor-\d+\.\d+\.\d+$/, "Schema version must be in format 'executor-X.Y.Z'");
 
 /**
  * Tool limits configuration
  */
 export const ToolLimits = z.object({
-	maxToolCalls: z.number().int().min(1).optional(),
-	maxTokensOut: z.number().int().min(1).optional(),
+  maxToolCalls: z.number().int().min(1).optional(),
+  maxTokensOut: z.number().int().min(1).optional(),
 });
 export type ToolLimits = z.infer<typeof ToolLimits>;
 
@@ -38,9 +35,9 @@ export type ToolLimits = z.infer<typeof ToolLimits>;
  * Specifies which tools the executor can use and under what constraints
  */
 export const ToolBudget = z.object({
-	allowed: z.array(z.string()).default([]),
-	denied: z.array(z.string()).default([]),
-	limits: ToolLimits.optional(),
+  allowed: z.array(z.string()).default([]),
+  denied: z.array(z.string()).default([]),
+  limits: ToolLimits.optional(),
 });
 export type ToolBudget = z.infer<typeof ToolBudget>;
 
@@ -49,8 +46,8 @@ export type ToolBudget = z.infer<typeof ToolBudget>;
  * Controls which paths the executor can access
  */
 export const ScopeGuardrail = z.object({
-	allowedPaths: z.array(z.string()).default([]),
-	deniedPaths: z.array(z.string()).default([]),
+  allowedPaths: z.array(z.string()).default([]),
+  deniedPaths: z.array(z.string()).default([]),
 });
 export type ScopeGuardrail = z.infer<typeof ScopeGuardrail>;
 
@@ -59,20 +56,15 @@ export type ScopeGuardrail = z.infer<typeof ScopeGuardrail>;
  * Specifies required and optional tool dependencies
  */
 export const ToolGuardrail = z.object({
-	required: z.array(z.string()).default([]),
-	optional: z.array(z.string()).default([]),
+  required: z.array(z.string()).default([]),
+  optional: z.array(z.string()).default([]),
 });
 export type ToolGuardrail = z.infer<typeof ToolGuardrail>;
 
 /**
  * Escalation threshold levels
  */
-export const EscalationThreshold = z.enum([
-	"low-risk",
-	"medium-risk",
-	"high-risk",
-	"critical",
-]);
+export const EscalationThreshold = z.enum(["low-risk", "medium-risk", "high-risk", "critical"]);
 export type EscalationThreshold = z.infer<typeof EscalationThreshold>;
 
 /**
@@ -80,8 +72,8 @@ export type EscalationThreshold = z.infer<typeof EscalationThreshold>;
  * Controls uncertainty handling and escalation
  */
 export const EpistemicGuardrail = z.object({
-	allowIDK: z.boolean().default(true),
-	escalationThreshold: EscalationThreshold.optional(),
+  allowIDK: z.boolean().default(true),
+  escalationThreshold: EscalationThreshold.optional(),
 });
 export type EpistemicGuardrail = z.infer<typeof EpistemicGuardrail>;
 
@@ -90,8 +82,8 @@ export type EpistemicGuardrail = z.infer<typeof EpistemicGuardrail>;
  * Controls output formatting requirements
  */
 export const StyleGuardrail = z.object({
-	requirePlan: z.boolean().default(false),
-	requireSummary: z.boolean().default(false),
+  requirePlan: z.boolean().default(false),
+  requireSummary: z.boolean().default(false),
 });
 export type StyleGuardrail = z.infer<typeof StyleGuardrail>;
 
@@ -106,8 +98,8 @@ export type AuditLevel = z.infer<typeof AuditLevel>;
  * Controls logging and frame emission
  */
 export const AuditGuardrail = z.object({
-	level: AuditLevel.default("normal"),
-	frameSchema: z.string().optional(),
+  level: AuditLevel.default("normal"),
+  frameSchema: z.string().optional(),
 });
 export type AuditGuardrail = z.infer<typeof AuditGuardrail>;
 
@@ -118,11 +110,11 @@ export type AuditGuardrail = z.infer<typeof AuditGuardrail>;
  * For full GuardrailProfile specification, see src/types/guardrails.ts
  */
 export const ExecutorGuardrails = z.object({
-	scope: ScopeGuardrail.optional(),
-	tool: ToolGuardrail.optional(),
-	epistemic: EpistemicGuardrail.optional(),
-	style: StyleGuardrail.optional(),
-	audit: AuditGuardrail.optional(),
+  scope: ScopeGuardrail.optional(),
+  tool: ToolGuardrail.optional(),
+  epistemic: EpistemicGuardrail.optional(),
+  style: StyleGuardrail.optional(),
+  audit: AuditGuardrail.optional(),
 });
 export type ExecutorGuardrails = z.infer<typeof ExecutorGuardrails>;
 
@@ -130,8 +122,8 @@ export type ExecutorGuardrails = z.infer<typeof ExecutorGuardrails>;
  * Stochastic phase configuration for Jordan-mode protocol
  */
 export const StochasticPhase = z.object({
-	promptTemplate: z.string(),
-	maxCalls: z.number().int().min(1).default(1),
+  promptTemplate: z.string(),
+  maxCalls: z.number().int().min(1).default(1),
 });
 export type StochasticPhase = z.infer<typeof StochasticPhase>;
 
@@ -140,8 +132,8 @@ export type StochasticPhase = z.infer<typeof StochasticPhase>;
  * Defines what the executor must emit as output
  */
 export const ReceiptPhase = z.object({
-	frameType: z.string(),
-	fields: z.array(z.string()).min(1, "At least one field is required"),
+  frameType: z.string(),
+  fields: z.array(z.string()).min(1, "At least one field is required"),
 });
 export type ReceiptPhase = z.infer<typeof ReceiptPhase>;
 
@@ -154,9 +146,9 @@ export type ReceiptPhase = z.infer<typeof ReceiptPhase>;
  * 3. Receipt phase: emit at least one Frame as a receipt
  */
 export const JordanModeProtocol = z.object({
-	prepPhase: z.array(z.string()).default([]),
-	stochasticPhase: StochasticPhase,
-	receiptPhase: ReceiptPhase,
+  prepPhase: z.array(z.string()).default([]),
+  stochasticPhase: StochasticPhase,
+  receiptPhase: ReceiptPhase,
 });
 export type JordanModeProtocol = z.infer<typeof JordanModeProtocol>;
 
@@ -167,12 +159,12 @@ export type JordanModeProtocol = z.infer<typeof JordanModeProtocol>;
  * Authorities are boolean flags that grant specific capabilities.
  */
 export const ExecutorAuthorities = z.object({
-	/** Can perform code review operations */
-	codeReview: z.boolean().default(false),
-	/** Can persist frames to Lex memory */
-	framePersistence: z.boolean().default(false),
-	/** Can implement keystone issues directly on umbrella branches */
-	keystoneIssues: z.boolean().default(false),
+  /** Can perform code review operations */
+  codeReview: z.boolean().default(false),
+  /** Can persist frames to Lex memory */
+  framePersistence: z.boolean().default(false),
+  /** Can implement keystone issues directly on umbrella branches */
+  keystoneIssues: z.boolean().default(false),
 });
 export type ExecutorAuthorities = z.infer<typeof ExecutorAuthorities>;
 
@@ -184,13 +176,13 @@ export type ExecutorAuthorities = z.infer<typeof ExecutorAuthorities>;
  * and Jordan-mode protocol.
  */
 export const ExecutorManifestSchema = z.object({
-	schemaVersion: ExecutorSchemaVersion,
-	role: z.string().min(1, "Role is required"),
-	description: z.string().optional(),
-	toolBudget: ToolBudget,
-	guardrails: ExecutorGuardrails.optional(),
-	authorities: ExecutorAuthorities.optional(),
-	jordanModeProtocol: JordanModeProtocol,
+  schemaVersion: ExecutorSchemaVersion,
+  role: z.string().min(1, "Role is required"),
+  description: z.string().optional(),
+  toolBudget: ToolBudget,
+  guardrails: ExecutorGuardrails.optional(),
+  authorities: ExecutorAuthorities.optional(),
+  jordanModeProtocol: JordanModeProtocol,
 });
 export type ExecutorManifest = z.infer<typeof ExecutorManifestSchema>;
 
@@ -198,7 +190,7 @@ export type ExecutorManifest = z.infer<typeof ExecutorManifestSchema>;
  * Validate an executor manifest object against the schema
  */
 export function validateExecutorManifest(data: unknown): ExecutorManifest {
-	return ExecutorManifestSchema.parse(data);
+  return ExecutorManifestSchema.parse(data);
 }
 
 /**
@@ -207,8 +199,6 @@ export function validateExecutorManifest(data: unknown): ExecutorManifest {
  * - { success: true, data: ExecutorManifest } on valid input
  * - { success: false, error: ZodError } on invalid input
  */
-export function safeParseExecutorManifest(
-	data: unknown
-): ZodSafeParseResult<ExecutorManifest> {
-	return ExecutorManifestSchema.safeParse(data);
+export function safeParseExecutorManifest(data: unknown): ZodSafeParseResult<ExecutorManifest> {
+  return ExecutorManifestSchema.safeParse(data);
 }

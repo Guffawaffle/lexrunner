@@ -69,10 +69,10 @@ Respond with a structured JSON object:
 
 ## Severity Guidelines
 
-| Severity | When to Use |
-|----------|-------------|
-| `blocker` | Security issue, data loss risk, critical bug |
-| `must-fix` | Logic error, broken functionality, test failure |
-| `should-fix` | Maintainability issue, minor bug risk |
-| `nit` | Style preference, minor improvement |
-| `praise` | Excellent code worth calling out |
+| Severity     | When to Use                                     |
+| ------------ | ----------------------------------------------- |
+| `blocker`    | Security issue, data loss risk, critical bug    |
+| `must-fix`   | Logic error, broken functionality, test failure |
+| `should-fix` | Maintainability issue, minor bug risk           |
+| `nit`        | Style preference, minor improvement             |
+| `praise`     | Excellent code worth calling out                |

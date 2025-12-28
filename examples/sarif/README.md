@@ -31,15 +31,15 @@ Gates can use the Audit SDK to emit vulnerability findings:
 
 ```typescript
 // vuln-scan-gate.ts
-import { initAuditSDK } from 'lexrunner/audit-sdk';
+import { initAuditSDK } from "lexrunner/audit-sdk";
 
-const audit = initAuditSDK('vuln-scan');
+const audit = initAuditSDK("vuln-scan");
 
 // Emit vulnerability finding
-await audit.emitVuln('CVE-2024-1234', 'high', {
-  package: 'lodash',
-  version: '4.17.20',
-  fixedIn: '4.17.21'
+await audit.emitVuln("CVE-2024-1234", "high", {
+  package: "lodash",
+  version: "4.17.20",
+  fixedIn: "4.17.21",
 });
 
 await audit.close();
@@ -127,18 +127,18 @@ jobs:
     permissions:
       security-events: write
       contents: read
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
-      
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Run security audit with SARIF
         run: |
           lex-pr discover --state open | \
@@ -149,7 +149,7 @@ jobs:
             --audit-dir ./audit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
         with:
@@ -161,12 +161,12 @@ jobs:
 
 The SARIF adapter maps vulnerability severities to SARIF levels:
 
-| Vulnerability Severity | SARIF Level | GitHub Display |
-|------------------------|-------------|----------------|
-| `critical`             | `error`     | High (red)     |
-| `high`                 | `error`     | High (red)     |
-| `medium`               | `warning`   | Medium (yellow)|
-| `low`                  | `note`      | Low (gray)     |
+| Vulnerability Severity | SARIF Level | GitHub Display  |
+| ---------------------- | ----------- | --------------- |
+| `critical`             | `error`     | High (red)      |
+| `high`                 | `error`     | High (red)      |
+| `medium`               | `warning`   | Medium (yellow) |
+| `low`                  | `note`      | Low (gray)      |
 
 ## Supported Platforms
 
@@ -204,6 +204,7 @@ await audit.emitVuln('CVE-2024-1234', 'high', {...});
 **Reason**: Missing permissions or invalid SARIF format
 
 **Solution**:
+
 1. Add `security-events: write` permission to workflow
 2. Validate SARIF with: `cat audit-sarif.json | jq .`
 3. Check GitHub Actions logs for specific validation errors
@@ -217,6 +218,7 @@ await audit.emitVuln('CVE-2024-1234', 'high', {...});
 ## Documentation
 
 For complete documentation, see:
+
 - [Audit Compliance Guide](../../docs/audit-compliance.md)
 - [Audit SDK Documentation](../../docs/audit-sdk.md)
 - [SARIF 2.1.0 Specification](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)

@@ -1,6 +1,6 @@
 # 📘 Lex Architecture – Evolution Notes (v0.1)
 
-*A formal memory of newly crystallized concepts and commitments*
+_A formal memory of newly crystallized concepts and commitments_
 
 > This document records the emergent lessons, abstractions, and design goals recognized through field experiments, critical discussion, and collaborative reasoning.
 > It is not a manifesto, nor a promise — but a map of what has been learned and what is now believed to matter.
@@ -11,8 +11,8 @@
 
 ### 1.1 From "AI helpers" → **Governed cognitive collaborators**
 
-* The goal is not to make models "better at code."
-* The goal is to reduce **coordination cost**, **environmental hostility**, and **friction**, so that agents can reliably contribute within constraints.
+- The goal is not to make models "better at code."
+- The goal is to reduce **coordination cost**, **environmental hostility**, and **friction**, so that agents can reliably contribute within constraints.
 
 ### 1.2 From "libraries" → **portable cognitive architecture**
 
@@ -22,13 +22,13 @@ Lex is increasingly understood as:
 
 Not:
 
-* a suite of tools
-* or a library of utilities
+- a suite of tools
+- or a library of utilities
 
 It is **portable** because:
 
-* the value is in governance primitives
-* not in implementation details or provider-specific affordances
+- the value is in governance primitives
+- not in implementation details or provider-specific affordances
 
 ### 1.3 From "capability amplification" → **coordination cost compression**
 
@@ -36,9 +36,9 @@ We are not making weak models strong.
 
 We are:
 
-* reducing the work required to make intelligent decisions
-* aligning agent behavior with engineering norms
-* and externalizing context so reasoning is stable across turns and models
+- reducing the work required to make intelligent decisions
+- aligning agent behavior with engineering norms
+- and externalizing context so reasoning is stable across turns and models
 
 ---
 
@@ -48,13 +48,13 @@ We are:
 
 Environment hostility includes:
 
-* unclear constraints
-* opaque requirements
-* unbounded problem surfaces
-* missing receipts and traceability
-* punitive error dynamics
-* fragmented state
-* model switches with no continuity
+- unclear constraints
+- opaque requirements
+- unbounded problem surfaces
+- missing receipts and traceability
+- punitive error dynamics
+- fragmented state
+- model switches with no continuity
 
 Our work (Lex, AX, LexRunner, minimal clones like "Robert") demonstrates:
 
@@ -71,11 +71,11 @@ Turns measure **problem-solving cost**.
 
 Turns are expensive because they incur:
 
-* latency
-* context resets
-* prompt renegotiation
-* token bloat
-* human attention switches
+- latency
+- context resets
+- prompt renegotiation
+- token bloat
+- human attention switches
 
 ### Turn definition
 
@@ -98,11 +98,11 @@ TurnCost =
 
 LexRunner's design already implicitly optimizes for low-turn trajectories:
 
-* fixed DAGs
-* constrained stochasticity
-* receipts
-* role clarity
-* bounded scope
+- fixed DAGs
+- constrained stochasticity
+- receipts
+- role clarity
+- bounded scope
 
 This insight should now be made **explicit** and **measurable**.
 
@@ -112,8 +112,8 @@ This insight should now be made **explicit** and **measurable**.
 
 The productive pattern is not:
 
-* "Fail fast"
-* or "Be fearless"
+- "Fail fast"
+- or "Be fearless"
 
 It is:
 
@@ -125,17 +125,17 @@ Key properties:
 
 ### 4.1 Uncertainty protocol
 
-* State uncertainty openly
-* Prefer small, reversible moves
-* Leave receipts
-* Treat failure as data
+- State uncertainty openly
+- Prefer small, reversible moves
+- Leave receipts
+- Treat failure as data
 
 ### 4.2 Discipline protocol
 
-* Require rationale for skips
-* Require verification after action
-* Cap retries before escalation
-* Prefer bounded iteration to unbounded speculation
+- Require rationale for skips
+- Require verification after action
+- Cap retries before escalation
+- Prefer bounded iteration to unbounded speculation
 
 ### 4.3 Underlying principle
 
@@ -153,16 +153,16 @@ This supports a strong claim:
 
 Cross-model continuity emerges from:
 
-* shared contracts
-* explicit role definitions
-* receipts
-* and bounded scope
+- shared contracts
+- explicit role definitions
+- receipts
+- and bounded scope
 
 NOT:
 
-* provider-level memory tricks
-* context dumps
-* or monolithic prompts
+- provider-level memory tricks
+- context dumps
+- or monolithic prompts
 
 This is a major architectural principle.
 
@@ -172,20 +172,20 @@ This is a major architectural principle.
 
 Rule files should be:
 
-* compact (< 4KB)
-* machine-readable (JSON/YAML)
-* versioned
-* role-scoped
-* testable
+- compact (< 4KB)
+- machine-readable (JSON/YAML)
+- versioned
+- role-scoped
+- testable
 
 They define:
 
-* constraints
-* permissions
-* uncertainty handling
-* receipt protocol
-* escalation triggers
-* task boundaries
+- constraints
+- permissions
+- uncertainty handling
+- receipt protocol
+- escalation triggers
+- task boundaries
 
 Purpose:
 
@@ -197,13 +197,13 @@ Purpose:
 
 Agents can be categorized by operational role:
 
-* **Senior**: lead, design, architect, critique
-* **Mid**: implement, extend, refactor
-* **Junior**: lint, verify, instrument
+- **Senior**: lead, design, architect, critique
+- **Mid**: implement, extend, refactor
+- **Junior**: lint, verify, instrument
 
 This classification avoids magical thinking like:
 
-* "small models can do everything with rules"
+- "small models can do everything with rules"
 
 And enables **task-to-model matching**.
 
@@ -217,18 +217,18 @@ A future-oriented strategy emerged:
 
 Where each path includes:
 
-* cost estimates
-* risk estimates
-* turn estimates
-* required capability tier
+- cost estimates
+- risk estimates
+- turn estimates
+- required capability tier
 
 Let the agent **choose a plan** based on constraints.
 
 This is the seed of:
 
-* meta-decision architecture
-* bounded autonomy
-* model self-selection
+- meta-decision architecture
+- bounded autonomy
+- model self-selection
 
 Even if current models can't fully realize this,
 designing the interface now **keeps the system future-adaptable**.
@@ -248,10 +248,10 @@ There is a recurring theme:
 
 Humans mask because:
 
-* norms are hostile
-* honesty is punished
-* failures are costly
-* values are hidden
+- norms are hostile
+- honesty is punished
+- failures are costly
+- values are hidden
 
 Models do the same.
 
@@ -259,10 +259,10 @@ Lex's role is not to impose a mask.
 
 It is to:
 
-* reduce environmental hostility
-* clarify expectations
-* reward transparency
-* externalize structure
+- reduce environmental hostility
+- clarify expectations
+- reward transparency
+- externalize structure
 
 So that humans AND agents can behave more honestly.
 
@@ -276,16 +276,16 @@ It is **functional cognition theory**.
 
 We reject:
 
-* messianic narratives
-* inevitable success
-* capability hype
+- messianic narratives
+- inevitable success
+- capability hype
 
 We embrace:
 
-* humility
-* falsifiability
-* iterative rigor
-* domain awareness
+- humility
+- falsifiability
+- iterative rigor
+- domain awareness
 
 We explicitly state:
 
@@ -342,18 +342,18 @@ But this is now what we believe is true, and what we are building toward.
 
 We are not trying to:
 
-* create autonomous agents
-* solve AGI
-* replace humans
-* make weak models strong
-* predict model evolution
-* evangelize philosophy
-* design a religion of AI
+- create autonomous agents
+- solve AGI
+- replace humans
+- make weak models strong
+- predict model evolution
+- evangelize philosophy
+- design a religion of AI
 
 We are trying to:
 
-* create structured, governed, low-friction collaboration environments
-* where minds can think well together
+- create structured, governed, low-friction collaboration environments
+- where minds can think well together
 
 ---
 
@@ -363,21 +363,21 @@ This Evolution Notes document is the **crystallized synthesis** — the "lock-in
 
 The other documents in this folder expand on specific topics:
 
-| This Section | Expanded In |
-|--------------|-------------|
-| §2 Environmental Hostility | [01-CORE-THESIS.md](./01-CORE-THESIS.md) |
-| §3 Turn and Turn Cost | [02-TURN-COST.md](./02-TURN-COST.md) |
-| §4 Permission to Fail | [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md) |
-| §5 Cross-Model Continuity | [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) |
-| §6 Rule Files | [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md) |
-| §7 Capability Tiers | [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md) |
-| §8 Future Model Strategy | [01-CORE-THESIS.md](./01-CORE-THESIS.md) (Appendix) |
-| §10 Philosophical Boundaries | [10-FAILURE-MODES.md](./10-FAILURE-MODES.md) (Meta-Failures) |
+| This Section                 | Expanded In                                                    |
+| ---------------------------- | -------------------------------------------------------------- |
+| §2 Environmental Hostility   | [01-CORE-THESIS.md](./01-CORE-THESIS.md)                       |
+| §3 Turn and Turn Cost        | [02-TURN-COST.md](./02-TURN-COST.md)                           |
+| §4 Permission to Fail        | [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md)         |
+| §5 Cross-Model Continuity    | [04-CROSS-MODEL-CONTINUITY.md](./04-CROSS-MODEL-CONTINUITY.md) |
+| §6 Rule Files                | [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md)                 |
+| §7 Capability Tiers          | [06-CAPABILITY-TIERS.md](./06-CAPABILITY-TIERS.md)             |
+| §8 Future Model Strategy     | [01-CORE-THESIS.md](./01-CORE-THESIS.md) (Appendix)            |
+| §10 Philosophical Boundaries | [10-FAILURE-MODES.md](./10-FAILURE-MODES.md) (Meta-Failures)   |
 
 Read the Evolution Notes first for the "why."
 Read the detailed documents for the "how."
 
 ---
 
-*— Lex & Guff, December 2025*
-*Formalized as continuity scaffold for future work*
+_— Lex & Guff, December 2025_
+_Formalized as continuity scaffold for future work_

@@ -11,270 +11,272 @@ import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
 
 export interface GitHubPlanOptions {
-	query?: string; // GitHub search query
-	labels?: string[]; // Filter by specific labels
-	excludePRs?: number[]; // Exclude specific PR numbers
-	includeDrafts?: boolean; // Include draft PRs
-	target?: string; // Target branch (defaults to repo default)
-	policy?: {
-		requiredGates?: string[];
-		maxWorkers?: number;
-	};
-	tierOverrides?: TierOverride[]; // Tier overrides for plan items
+  query?: string; // GitHub search query
+  labels?: string[]; // Filter by specific labels
+  excludePRs?: number[]; // Exclude specific PR numbers
+  includeDrafts?: boolean; // Include draft PRs
+  target?: string; // Target branch (defaults to repo default)
+  policy?: {
+    requiredGates?: string[];
+    maxWorkers?: number;
+  };
+  tierOverrides?: TierOverride[]; // Tier overrides for plan items
 }
 
 /**
  * Generate plan from GitHub PRs with automatic dependency resolution
  */
 export async function generatePlanFromGitHub(
-	client: GitHubClient,
-	options: GitHubPlanOptions = {}
+  client: GitHubClient,
+  options: GitHubPlanOptions = {}
 ): Promise<Plan> {
-	// Validate repository access
-	const repoInfo = await client.validateRepository();
-	const target = options.target || repoInfo.defaultBranch;
+  // Validate repository access
+  const repoInfo = await client.validateRepository();
+  const target = options.target || repoInfo.defaultBranch;
 
-	// Discover PRs based on query/filters
-	const prs = await client.listOpenPRs({
-		state: "open",
-		labels: options.labels,
-		// If no specific query, find PRs with stack labels or open PRs
-		...(options.query ? { query: options.query } : {})
-	});
+  // Discover PRs based on query/filters
+  const prs = await client.listOpenPRs({
+    state: "open",
+    labels: options.labels,
+    // If no specific query, find PRs with stack labels or open PRs
+    ...(options.query ? { query: options.query } : {}),
+  });
 
-	// Default behavior: include drafts (align with `gh pr list`) unless explicitly disabled
-	const includeDrafts = options.includeDrafts === undefined ? true : Boolean(options.includeDrafts);
-	const filteredPRs = includeDrafts ? prs : prs.filter(pr => !pr.draft);
+  // Default behavior: include drafts (align with `gh pr list`) unless explicitly disabled
+  const includeDrafts = options.includeDrafts === undefined ? true : Boolean(options.includeDrafts);
+  const filteredPRs = includeDrafts ? prs : prs.filter((pr) => !pr.draft);
 
-	// Exclude specific PRs if requested
-	const excludePRs = options.excludePRs || [];
-	const finalPRs = excludePRs.length > 0
-		? filteredPRs.filter(pr => !excludePRs.includes(pr.number))
-		: filteredPRs;
+  // Exclude specific PRs if requested
+  const excludePRs = options.excludePRs || [];
+  const finalPRs =
+    excludePRs.length > 0
+      ? filteredPRs.filter((pr) => !excludePRs.includes(pr.number))
+      : filteredPRs;
 
-	if (finalPRs.length === 0) {
-		// Return empty plan if no PRs found
-		const emptyPlan: Plan = {
-			schemaVersion: "1.0.0",
-			target,
-			items: []
-		};
+  if (finalPRs.length === 0) {
+    // Return empty plan if no PRs found
+    const emptyPlan: Plan = {
+      schemaVersion: "1.0.0",
+      target,
+      items: [],
+    };
 
-		// Add policy if specified
-		if (options.policy) {
-			emptyPlan.policy = {
-				requiredGates: options.policy.requiredGates || [],
-				optionalGates: [],
-				maxWorkers: options.policy.maxWorkers || 1,
-				retries: {},
-				overrides: {},
-				blockOn: [],
-				mergeRule: { type: "strict-required" }
-			};
-		}
+    // Add policy if specified
+    if (options.policy) {
+      emptyPlan.policy = {
+        requiredGates: options.policy.requiredGates || [],
+        optionalGates: [],
+        maxWorkers: options.policy.maxWorkers || 1,
+        retries: {},
+        overrides: {},
+        blockOn: [],
+        mergeRule: { type: "strict-required" },
+      };
+    }
 
-		return emptyPlan;
-	}
+    return emptyPlan;
+  }
 
-	// Get detailed information for each PR
-	const prDetails = await Promise.all(
-		finalPRs.map(pr => client.getPRDetails(pr.number))
-	);
+  // Get detailed information for each PR
+  const prDetails = await Promise.all(finalPRs.map((pr) => client.getPRDetails(pr.number)));
 
-	// Transform PRs to plan items
-	const planItems = prDetails.map(pr => transformPRToPlanItem(pr, options));
+  // Transform PRs to plan items
+  const planItems = prDetails.map((pr) => transformPRToPlanItem(pr, options));
 
-	// Sort items by name for deterministic ordering
-	planItems.sort((a, b) => a.name.localeCompare(b.name));
+  // Sort items by name for deterministic ordering
+  planItems.sort((a, b) => a.name.localeCompare(b.name));
 
-	// Validate dependencies exist within the PR set
-	validateGitHubDependencies(planItems, prDetails);
+  // Validate dependencies exist within the PR set
+  validateGitHubDependencies(planItems, prDetails);
 
-	// Build the plan
-	const plan: Plan = {
-		schemaVersion: "1.0.0",
-		target,
-		items: planItems
-	};
+  // Build the plan
+  const plan: Plan = {
+    schemaVersion: "1.0.0",
+    target,
+    items: planItems,
+  };
 
-	// Add policy if specified
-	if (options.policy) {
-		plan.policy = {
-			requiredGates: options.policy.requiredGates || [],
-			optionalGates: [],
-			maxWorkers: options.policy.maxWorkers || 1,
-			retries: {},
-			overrides: {},
-			blockOn: [],
-			mergeRule: { type: "strict-required" }
-		};
-	}
+  // Add policy if specified
+  if (options.policy) {
+    plan.policy = {
+      requiredGates: options.policy.requiredGates || [],
+      optionalGates: [],
+      maxWorkers: options.policy.maxWorkers || 1,
+      retries: {},
+      overrides: {},
+      blockOn: [],
+      mergeRule: { type: "strict-required" },
+    };
+  }
 
-	return plan;
+  return plan;
 }
 
 /**
  * Transform GitHub PR to plan item
  */
 function transformPRToPlanItem(pr: PullRequestDetails, options: GitHubPlanOptions): PlanItem {
-	// Generate item name from PR - use PR number as identifier
-	const name = `PR-${pr.number}`;
+  // Generate item name from PR - use PR number as identifier
+  const name = `PR-${pr.number}`;
 
-	// Extract dependencies from GitHub dependencies
-	// Filter to only include dependencies that are PRs in the same repo
-	const deps = pr.dependencies
-		.filter((dep: string) => {
-			// Only include same-repo dependencies for now
-			// Dependencies like "testowner/testrepo#123" or just "#123"
-			return dep.includes('#');
-		})
-		.map((dep: string) => {
-			// Convert dependency references to plan item names
-			const prNumber = dep.includes('#') ? dep.split('#')[1] : dep;
-			return `PR-${prNumber}`;
-		});
+  // Extract dependencies from GitHub dependencies
+  // Filter to only include dependencies that are PRs in the same repo
+  const deps = pr.dependencies
+    .filter((dep: string) => {
+      // Only include same-repo dependencies for now
+      // Dependencies like "testowner/testrepo#123" or just "#123"
+      return dep.includes("#");
+    })
+    .map((dep: string) => {
+      // Convert dependency references to plan item names
+      const prNumber = dep.includes("#") ? dep.split("#")[1] : dep;
+      return `PR-${prNumber}`;
+    });
 
-	// Generate gates from PR metadata
-	const gates = generateGatesFromPR(pr, options);
+  // Generate gates from PR metadata
+  const gates = generateGatesFromPR(pr, options);
 
-	const planItem: PlanItem = {
-		name,
-		deps: stableSort(deps),
-		gates
-	};
+  const planItem: PlanItem = {
+    name,
+    deps: stableSort(deps),
+    gates,
+  };
 
-	// Add tier assignment
-	planItem.tier = createTierAssignment(planItem, options.tierOverrides);
+  // Add tier assignment
+  planItem.tier = createTierAssignment(planItem, options.tierOverrides);
 
-	return planItem;
+  return planItem;
 }
 
 /**
  * Generate gates configuration from PR metadata
  */
 function generateGatesFromPR(pr: PullRequestDetails, options: GitHubPlanOptions): Gate[] {
-	const gates: Gate[] = [];
+  const gates: Gate[] = [];
 
-	// Use required gates from PR if specified, otherwise use policy defaults
-	const requiredGates = pr.requiredGates.length > 0
-		? pr.requiredGates
-		: options.policy?.requiredGates || ["lint", "test"];
+  // Use required gates from PR if specified, otherwise use policy defaults
+  const requiredGates =
+    pr.requiredGates.length > 0
+      ? pr.requiredGates
+      : options.policy?.requiredGates || ["lint", "test"];
 
-	// Generate standard gates
-	for (const gateName of requiredGates) {
-		gates.push(createStandardGate(gateName, pr));
-	}
+  // Generate standard gates
+  for (const gateName of requiredGates) {
+    gates.push(createStandardGate(gateName, pr));
+  }
 
-	// Sort gates by name for deterministic output
-	gates.sort((a, b) => a.name.localeCompare(b.name));
+  // Sort gates by name for deterministic output
+  gates.sort((a, b) => a.name.localeCompare(b.name));
 
-	return gates;
+  return gates;
 }
 
 /**
  * Create standard gate configuration
  */
 function createStandardGate(gateName: string, pr: PullRequestDetails): Gate {
-	const baseGate: Gate = {
-		name: gateName,
-		run: getStandardGateCommand(gateName),
-		env: {
-			PR_NUMBER: pr.number.toString(),
-			PR_BRANCH: pr.head.ref,
-			PR_SHA: pr.head.sha
-		},
-		runtime: "local",
-		artifacts: []
-	};
+  const baseGate: Gate = {
+    name: gateName,
+    run: getStandardGateCommand(gateName),
+    env: {
+      PR_NUMBER: pr.number.toString(),
+      PR_BRANCH: pr.head.ref,
+      PR_SHA: pr.head.sha,
+    },
+    runtime: "local",
+    artifacts: [],
+  };
 
-	// Add specific configurations for common gates
-	switch (gateName) {
-		case "lint":
-			return {
-				...baseGate,
-				run: "npm run lint",
-				artifacts: ["lint-results.txt"]
-			};
-		case "test":
-		case "unit":
-			return {
-				...baseGate,
-				run: "npm test",
-				artifacts: ["test-results.xml", "coverage/"]
-			};
-		case "typecheck":
-			return {
-				...baseGate,
-				run: "npm run typecheck",
-				artifacts: ["typecheck-results.txt"]
-			};
-		case "build":
-			return {
-				...baseGate,
-				run: "npm run build",
-				artifacts: ["dist/", "build-log.txt"]
-			};
-		default:
-			return baseGate;
-	}
+  // Add specific configurations for common gates
+  switch (gateName) {
+    case "lint":
+      return {
+        ...baseGate,
+        run: "npm run lint",
+        artifacts: ["lint-results.txt"],
+      };
+    case "test":
+    case "unit":
+      return {
+        ...baseGate,
+        run: "npm test",
+        artifacts: ["test-results.xml", "coverage/"],
+      };
+    case "typecheck":
+      return {
+        ...baseGate,
+        run: "npm run typecheck",
+        artifacts: ["typecheck-results.txt"],
+      };
+    case "build":
+      return {
+        ...baseGate,
+        run: "npm run build",
+        artifacts: ["dist/", "build-log.txt"],
+      };
+    default:
+      return baseGate;
+  }
 }
 
 /**
  * Get default command for standard gate types
  */
 function getStandardGateCommand(gateName: string): string {
-	const standardCommands: Record<string, string> = {
-		lint: "npm run lint",
-		test: "npm test",
-		unit: "npm test",
-		typecheck: "npm run typecheck",
-		build: "npm run build",
-		format: "npm run format"
-	};
+  const standardCommands: Record<string, string> = {
+    lint: "npm run lint",
+    test: "npm test",
+    unit: "npm test",
+    typecheck: "npm run typecheck",
+    build: "npm run build",
+    format: "npm run format",
+  };
 
-	return standardCommands[gateName] || `echo "Running ${gateName} gate"`;
+  return standardCommands[gateName] || `echo "Running ${gateName} gate"`;
 }
 
 /**
  * Validate that GitHub dependencies reference PRs that exist in the plan
  */
 function validateGitHubDependencies(planItems: PlanItem[], prDetails: PullRequestDetails[]): void {
-	const itemNames = new Set(planItems.map(item => item.name));
-	const prNumbers = new Set(prDetails.map(pr => `PR-${pr.number}`));
+  const itemNames = new Set(planItems.map((item) => item.name));
+  const prNumbers = new Set(prDetails.map((pr) => `PR-${pr.number}`));
 
-	for (const item of planItems) {
-		for (const dep of item.deps) {
-			if (!itemNames.has(dep)) {
-				// Check if it's a PR reference that might exist but not in our current set
-				if (dep.startsWith('PR-')) {
-					const prNumber = dep.substring(3);
-					console.warn(`Warning: Dependency ${dep} not found in current PR set. PR #${prNumber} may be closed or not match filters.`);
-				} else {
-					throw new Error(`Unknown dependency '${dep}' for item '${item.name}'`);
-				}
-			}
-		}
-	}
+  for (const item of planItems) {
+    for (const dep of item.deps) {
+      if (!itemNames.has(dep)) {
+        // Check if it's a PR reference that might exist but not in our current set
+        if (dep.startsWith("PR-")) {
+          const prNumber = dep.substring(3);
+          console.warn(
+            `Warning: Dependency ${dep} not found in current PR set. PR #${prNumber} may be closed or not match filters.`
+          );
+        } else {
+          throw new Error(`Unknown dependency '${dep}' for item '${item.name}'`);
+        }
+      }
+    }
+  }
 }
 
 /**
  * Analyze file changes across PRs to detect potential conflicts and dependencies
  */
 export async function analyzeGitHubPRFiles(
-	client: GitHubClient,
-	prs: PullRequestDetails[]
+  client: GitHubClient,
+  prs: PullRequestDetails[]
 ): Promise<FileAnalysisResult> {
-	const octokit = client.getOctokit();
-	const owner = client.getOwner();
-	const repo = client.getRepo();
+  const octokit = client.getOctokit();
+  const owner = client.getOwner();
+  const repo = client.getRepo();
 
-	const analyzer = createFileAnalyzer(octokit, owner, repo);
+  const analyzer = createFileAnalyzer(octokit, owner, repo);
 
-	const prInfo = prs.map(pr => ({
-		number: pr.number,
-		name: `PR-${pr.number}`,
-		sha: pr.head.sha
-	}));
+  const prInfo = prs.map((pr) => ({
+    number: pr.number,
+    name: `PR-${pr.number}`,
+    sha: pr.head.sha,
+  }));
 
-	return await analyzer.analyzeFiles(prInfo);
+  return await analyzer.analyzeFiles(prInfo);
 }

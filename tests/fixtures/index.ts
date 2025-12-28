@@ -1,41 +1,41 @@
 /**
  * Main fixture library exports
- * 
+ *
  * This is the primary entry point for using test fixtures.
  * Import from here to access all fixture types:
- * 
+ *
  * @example
  * import { fixtures } from '../fixtures';
- * 
+ *
  * const plan = fixtures.plans.simple();
  * const pr = fixtures.prs.basic({ number: 100, title: 'Test PR' });
  */
 
 // Plan fixtures
-import * as simple from './plans/simple.js';
-import * as linear from './plans/linear.js';
-import * as diamond from './plans/diamond.js';
-import * as complex from './plans/complex.js';
+import * as simple from "./plans/simple.js";
+import * as linear from "./plans/linear.js";
+import * as diamond from "./plans/diamond.js";
+import * as complex from "./plans/complex.js";
 
 // Invalid plan fixtures
-import * as invalidPlans from './invalid/plans.js';
+import * as invalidPlans from "./invalid/plans.js";
 
 // PR fixtures
-import * as basicPR from './prs/basic.js';
-import * as withDeps from './prs/withDeps.js';
+import * as basicPR from "./prs/basic.js";
+import * as withDeps from "./prs/withDeps.js";
 
 // Gate fixtures
-import * as gateConfigs from './gates/configs.js';
-import * as gateResults from './gates/results.js';
+import * as gateConfigs from "./gates/configs.js";
+import * as gateResults from "./gates/results.js";
 
 // Utility fixtures
-import * as tempDir from './utils/tempDir.js';
-import * as mockGitHub from './utils/mockGitHub.js';
-import * as cleanup from './utils/cleanup.js';
+import * as tempDir from "./utils/tempDir.js";
+import * as mockGitHub from "./utils/mockGitHub.js";
+import * as cleanup from "./utils/cleanup.js";
 
 // Scenario fixtures
-import * as scenarios from './scenarios/mergeWorkflows.js';
-import * as syntheticWeave from './scenarios/syntheticWeave.js';
+import * as scenarios from "./scenarios/mergeWorkflows.js";
+import * as syntheticWeave from "./scenarios/syntheticWeave.js";
 
 /**
  * Organized fixture exports
@@ -49,25 +49,25 @@ export const fixtures = {
     simple: simple.simple,
     /** Simple plan with gates configured */
     simpleWithGates: simple.simpleWithGates,
-    
+
     /** Linear dependency chain A → B → C → D */
     linear: linear.linear,
     /** Linear chain with gates */
     linearWithGates: linear.linearWithGates,
-    
+
     /** Diamond dependency pattern */
     diamond: diamond.diamond,
     /** Extended diamond with additional layer */
     diamondExtended: diamond.diamondExtended,
     /** Double diamond (pyramid) pattern */
     doubleDiamond: diamond.doubleDiamond,
-    
+
     /** Complex realistic plan with 16 PRs */
     complex: complex.complex,
     /** Wide parallel plan (10 independent PRs) */
     wideParallel: complex.wideParallel,
     /** Deep chain (15 sequential PRs) */
-    deepChain: complex.deepChain
+    deepChain: complex.deepChain,
   },
 
   /**
@@ -87,7 +87,7 @@ export const fixtures = {
     /** Missing required gates */
     missingRequiredGates: invalidPlans.missingRequiredGates,
     /** Empty plan */
-    empty: invalidPlans.empty
+    empty: invalidPlans.empty,
   },
 
   /**
@@ -106,7 +106,7 @@ export const fixtures = {
     closed: basicPR.closed,
     /** Create PR with large changeset */
     largeChangeset: basicPR.largeChangeset,
-    
+
     /** Create PR with dependencies */
     withDeps: withDeps.withDeps,
     /** Create blocking PR */
@@ -118,7 +118,7 @@ export const fixtures = {
     /** Create complex dependency graph */
     complex: withDeps.complex,
     /** Create PRs with mixed dependency formats */
-    mixedDependencyFormats: withDeps.mixedDependencyFormats
+    mixedDependencyFormats: withDeps.mixedDependencyFormats,
   },
 
   /**
@@ -139,9 +139,9 @@ export const fixtures = {
       standard: gateConfigs.standard,
       full: gateConfigs.full,
       failing: gateConfigs.failing,
-      passing: gateConfigs.passing
+      passing: gateConfigs.passing,
     },
-    
+
     /** Gate result factories */
     results: {
       pass: gateResults.pass,
@@ -156,8 +156,8 @@ export const fixtures = {
       withArtifacts: gateResults.withArtifacts,
       slowPass: gateResults.slowPass,
       testSuite: gateResults.testSuite,
-      lintResult: gateResults.lintResult
-    }
+      lintResult: gateResults.lintResult,
+    },
   },
 
   /**
@@ -172,22 +172,22 @@ export const fixtures = {
       readFile: tempDir.readFile,
       writeFile: tempDir.writeFile,
       exists: tempDir.exists,
-      listFiles: tempDir.listFiles
+      listFiles: tempDir.listFiles,
     },
-    
+
     /** Mock GitHub API utilities */
     mockGitHub: {
       createMockGitHub: mockGitHub.createMockGitHub,
       createErrorMock: mockGitHub.createErrorMock,
       createRateLimitedMock: mockGitHub.createRateLimitedMock,
-      createSlowMock: mockGitHub.createSlowMock
+      createSlowMock: mockGitHub.createSlowMock,
     },
-    
+
     /** Cleanup utilities */
     cleanup: {
       createCleanupManager: cleanup.createCleanupManager,
-      withCleanup: cleanup.withCleanup
-    }
+      withCleanup: cleanup.withCleanup,
+    },
   },
 
   /**
@@ -203,15 +203,15 @@ export const fixtures = {
     withBlockedPRs: scenarios.withBlockedPRs,
     empty: scenarios.empty,
     syntheticSixPRWeave: syntheticWeave.syntheticSixPRWeave,
-    getFileChangesForPR: syntheticWeave.getFileChangesForPR
-  }
+    getFileChangesForPR: syntheticWeave.getFileChangesForPR,
+  },
 };
 
 // Re-export types for convenience
-export type { MockPR } from './prs/basic.js';
-export type { MockOctokit } from './utils/mockGitHub.js';
-export type { Scenario } from './scenarios/mergeWorkflows.js';
-export type { SyntheticWeaveScenario } from './scenarios/syntheticWeave.js';
+export type { MockPR } from "./prs/basic.js";
+export type { MockOctokit } from "./utils/mockGitHub.js";
+export type { Scenario } from "./scenarios/mergeWorkflows.js";
+export type { SyntheticWeaveScenario } from "./scenarios/syntheticWeave.js";
 
 /**
  * Default export for convenience

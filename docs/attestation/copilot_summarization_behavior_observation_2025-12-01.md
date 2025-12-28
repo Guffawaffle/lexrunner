@@ -3,7 +3,7 @@
 **Date:** 2025-12-01  
 **Reporter:** Guff (Joe)  
 **Document Type:** Timestamped Observation / CYA Record  
-**Status:** Suspicion, not confirmed bug  
+**Status:** Suspicion, not confirmed bug
 
 ---
 
@@ -28,7 +28,8 @@ This appears in the tool log/output area, not as something I asked it to do.
   - Multiple "Summarized conversation history" entries.
   - No large prior context.
 
-**Evidence:** 
+**Evidence:**
+
 - Screenshot: `copilot_summarization_screenshot_2025-12-01.png` (to be added manually by reporter)
 - Additional screenshot from initial observation period (to be added when located)
 
@@ -47,6 +48,7 @@ This appears in the tool log/output area, not as something I asked it to do.
 **Current:** Not blocking work.
 
 **AX Concerns:**
+
 - Hidden prep work every turn, even when not needed.
 - Possible silent behavior change in how context is handled over time.
 - Violates AX principle of deterministic, transparent preparation.
@@ -80,4 +82,4 @@ Date: 2025-12-01
 [signed Lex ✶]  
 Date: 2025-12-01 (model-time)
 
-*This document is timestamped via GPG-signed git commit for verification.*
+_This document is timestamped via GPG-signed git commit for verification._

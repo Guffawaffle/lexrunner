@@ -26,9 +26,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Show deprecation notice
-console.error(
-	"[DEPRECATED] This script delegates to: lex-pr governance:report"
-);
+console.error("[DEPRECATED] This script delegates to: lex-pr governance:report");
 console.error("             Use the CLI command directly for full features.\n");
 
 // Resolve the CLI entry point
@@ -38,19 +36,16 @@ const cliPath = join(__dirname, "..", "dist", "cli.js");
 const args = ["governance:report", ...process.argv.slice(2)];
 
 const child = spawn("node", [cliPath, ...args], {
-	stdio: "inherit",
-	cwd: process.cwd(),
+  stdio: "inherit",
+  cwd: process.cwd(),
 });
 
 child.on("error", (err) => {
-	console.error(
-		"[analyze-governance-logs] Failed to spawn CLI:",
-		err.message
-	);
-	console.error("Tip: Run 'npm run build' first, then try again.");
-	process.exit(1);
+  console.error("[analyze-governance-logs] Failed to spawn CLI:", err.message);
+  console.error("Tip: Run 'npm run build' first, then try again.");
+  process.exit(1);
 });
 
 child.on("close", (code) => {
-	process.exit(code ?? 0);
+  process.exit(code ?? 0);
 });

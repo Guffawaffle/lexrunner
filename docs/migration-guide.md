@@ -7,16 +7,19 @@ This guide helps teams migrate from manual PR merge processes to automated merge
 ### Problems with Manual Merging
 
 **Time Consuming:**
+
 - Manual coordination of PR merge order
 - Waiting for CI to pass on each PR
 - Resolving merge conflicts one by one
 
 **Error Prone:**
+
 - Missing dependencies between PRs
 - Merging PRs in wrong order
 - Breaking builds due to incompatible changes
 
 **Not Scalable:**
+
 - Bottleneck when many PRs are ready
 - Team members blocked waiting for merges
 - Integration issues discovered late
@@ -24,16 +27,19 @@ This guide helps teams migrate from manual PR merge processes to automated merge
 ### Benefits of lexrunner
 
 **Automated:**
+
 - Discovers PRs automatically
 - Computes optimal merge order
 - Executes gates in parallel
 
 **Safe:**
+
 - Dependency-aware execution
 - Quality gates before merge
 - Rollback on failures
 
 **Scalable:**
+
 - Handles 100+ PRs
 - Parallel gate execution
 - CI/CD integration
@@ -161,23 +167,23 @@ lex-pr merge plan.json --execute
 
 ### Manual Process → lexrunner Commands
 
-| Manual Step | lexrunner Equivalent |
-|-------------|--------------------------|
-| List open PRs | `lex-pr discover` |
-| Check PR dependencies | `lex-pr plan --from-github` |
-| Determine merge order | `lex-pr merge-order plan.json` |
-| Run tests on PR | `lex-pr execute plan.json` |
-| Merge PR | `lex-pr merge plan.json --execute` |
-| Check merge status | `lex-pr status` |
+| Manual Step           | lexrunner Equivalent               |
+| --------------------- | ---------------------------------- |
+| List open PRs         | `lex-pr discover`                  |
+| Check PR dependencies | `lex-pr plan --from-github`        |
+| Determine merge order | `lex-pr merge-order plan.json`     |
+| Run tests on PR       | `lex-pr execute plan.json`         |
+| Merge PR              | `lex-pr merge plan.json --execute` |
+| Check merge status    | `lex-pr status`                    |
 
 ### Manual Coordination → Configuration Files
 
-| Manual Coordination | Configuration File |
-|---------------------|-------------------|
-| "This PR depends on #123" | `deps.yml` or PR body syntax |
-| "Only merge PRs with label X" | `scope.yml` filters |
-| "Run tests before merge" | `gates.yml` definitions |
-| "Merge to main" | `scope.yml` target branch |
+| Manual Coordination           | Configuration File           |
+| ----------------------------- | ---------------------------- |
+| "This PR depends on #123"     | `deps.yml` or PR body syntax |
+| "Only merge PRs with label X" | `scope.yml` filters          |
+| "Run tests before merge"      | `gates.yml` definitions      |
+| "Merge to main"               | `scope.yml` target branch    |
 
 ### Example: Before/After
 
@@ -290,6 +296,7 @@ lex-pr merge plan.json --execute
 **Challenge:** Developer has stack of 5 dependent PRs.
 
 **Before (Manual):**
+
 1. Merge PR 1
 2. Wait for CI
 3. Merge PR 2
@@ -300,6 +307,7 @@ lex-pr merge plan.json --execute
 
 ```markdown
 <!-- In each PR body -->
+
 PR 1: (no deps)
 PR 2: Depends-On: #1
 PR 3: Depends-On: #2
@@ -325,23 +333,23 @@ name: Automated PR Merge
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # Every 2 hours
-  workflow_dispatch:  # Manual trigger
+    - cron: "0 */2 * * *" # Every 2 hours
+  workflow_dispatch: # Manual trigger
 
 jobs:
   merge-prs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Run merge automation
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -359,26 +367,26 @@ Add to `Jenkinsfile`:
 ```groovy
 pipeline {
   agent any
-  
+
   stages {
     stage('Install') {
       steps {
         sh 'npm install -g lexrunner'
       }
     }
-    
+
     stage('Plan') {
       steps {
         sh 'lex-pr plan --from-github --out artifacts/'
       }
     }
-    
+
     stage('Execute Gates') {
       steps {
         sh 'lex-pr execute artifacts/plan.json'
       }
     }
-    
+
     stage('Merge') {
       steps {
         sh 'lex-pr merge artifacts/plan.json --execute'

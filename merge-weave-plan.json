@@ -1,56 +1,56 @@
 {
-	"schemaVersion": "1.0.0",
-	"title": "Merge-Weave: CLI Modularization + MCP Alignment",
-	"description": "Integrate command extraction PRs and MCP alignment work on feat/lex-mcp-alignment integration branch",
-	"policy": {
-		"requiredGates": ["lint", "type"],
-		"optionalGates": [],
-		"mergeRule": "strict-required"
-	},
-	"nodes": [
-		{
-			"id": "PR-262",
-			"title": "Add CI dogfooding tests for execute command with plan-defined gates",
-			"branch": "copilot/add-ci-workflow-for-execute-command",
-			"dependsOn": [],
-			"gates": ["lint", "type"]
-		},
-		{
-			"id": "PR-257",
-			"title": "Extract merge command into module (Phase 4.2)",
-			"branch": "copilot/extract-merge-command-module",
-			"dependsOn": ["PR-262"],
-			"gates": ["lint", "type"]
-		},
-		{
-			"id": "PR-258",
-			"title": "Extract autopilot command into module (Phase 4.3)",
-			"branch": "copilot/extract-autopilot-command-module",
-			"dependsOn": ["PR-257"],
-			"gates": ["lint", "type"]
-		},
-		{
-			"id": "PR-259",
-			"title": "Extract doctor command into module (Phase 4.4)",
-			"branch": "copilot/extract-doctor-command-module",
-			"dependsOn": ["PR-258"],
-			"gates": ["lint", "type"]
-		},
-		{
-			"id": "PR-260",
-			"title": "Extract gate-report command into module (Phase 4.5)",
-			"branch": "copilot/extract-gate-report-command",
-			"dependsOn": ["PR-259"],
-			"gates": ["lint", "type"]
-		},
-		{
-			"id": "PR-261",
-			"title": "Add top-level unhandledRejection handler for clean async exits",
-			"branch": "copilot/add-unhandled-rejection-handler",
-			"dependsOn": ["PR-260"],
-			"gates": ["lint", "type"]
-		}
-	],
-	"integrationBranch": "feat/lex-mcp-alignment",
-	"targetBranch": "main"
+  "schemaVersion": "1.0.0",
+  "title": "Merge-Weave: CLI Modularization + MCP Alignment",
+  "description": "Integrate command extraction PRs and MCP alignment work on feat/lex-mcp-alignment integration branch",
+  "policy": {
+    "requiredGates": ["lint", "type"],
+    "optionalGates": [],
+    "mergeRule": "strict-required"
+  },
+  "nodes": [
+    {
+      "id": "PR-262",
+      "title": "Add CI dogfooding tests for execute command with plan-defined gates",
+      "branch": "copilot/add-ci-workflow-for-execute-command",
+      "dependsOn": [],
+      "gates": ["lint", "type"]
+    },
+    {
+      "id": "PR-257",
+      "title": "Extract merge command into module (Phase 4.2)",
+      "branch": "copilot/extract-merge-command-module",
+      "dependsOn": ["PR-262"],
+      "gates": ["lint", "type"]
+    },
+    {
+      "id": "PR-258",
+      "title": "Extract autopilot command into module (Phase 4.3)",
+      "branch": "copilot/extract-autopilot-command-module",
+      "dependsOn": ["PR-257"],
+      "gates": ["lint", "type"]
+    },
+    {
+      "id": "PR-259",
+      "title": "Extract doctor command into module (Phase 4.4)",
+      "branch": "copilot/extract-doctor-command-module",
+      "dependsOn": ["PR-258"],
+      "gates": ["lint", "type"]
+    },
+    {
+      "id": "PR-260",
+      "title": "Extract gate-report command into module (Phase 4.5)",
+      "branch": "copilot/extract-gate-report-command",
+      "dependsOn": ["PR-259"],
+      "gates": ["lint", "type"]
+    },
+    {
+      "id": "PR-261",
+      "title": "Add top-level unhandledRejection handler for clean async exits",
+      "branch": "copilot/add-unhandled-rejection-handler",
+      "dependsOn": ["PR-260"],
+      "gates": ["lint", "type"]
+    }
+  ],
+  "integrationBranch": "feat/lex-mcp-alignment",
+  "targetBranch": "main"
 }

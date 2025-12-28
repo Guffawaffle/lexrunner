@@ -3,7 +3,7 @@ name: Guard wrong tags
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read

@@ -63,13 +63,13 @@ Respond with a structured JSON object:
 
 ## Risk Indicators
 
-| Indicator | Risk Level |
-|-----------|------------|
-| Changes to security-sensitive code | High |
-| Database/schema migrations | High |
-| External API changes | Medium |
-| Large file count (>20 files) | Medium |
-| Test coverage decrease | Medium |
-| New dependencies | Medium |
-| Docs-only changes | Low |
-| Typo fixes | Low |
+| Indicator                          | Risk Level |
+| ---------------------------------- | ---------- |
+| Changes to security-sensitive code | High       |
+| Database/schema migrations         | High       |
+| External API changes               | Medium     |
+| Large file count (>20 files)       | Medium     |
+| Test coverage decrease             | Medium     |
+| New dependencies                   | Medium     |
+| Docs-only changes                  | Low        |
+| Typo fixes                         | Low        |

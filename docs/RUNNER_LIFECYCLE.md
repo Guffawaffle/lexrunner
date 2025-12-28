@@ -29,31 +29,31 @@ Each log entry contains these stable fields:
 ### Usage
 
 ```typescript
-import { createFileLogger } from './src/monitoring/fileLogger.js';
+import { createFileLogger } from "./src/monitoring/fileLogger.js";
 
 const logger = createFileLogger({
-  profileDir: '.smartergpt.local',
-  minLevel: 'info',
-  enabled: true
+  profileDir: ".smartergpt.local",
+  minLevel: "info",
+  enabled: true,
 });
 
 // Log with all fields
-logger.info('Gate completed', {
-  module: 'gates/executor',
-  operation: 'executeGate',
+logger.info("Gate completed", {
+  module: "gates/executor",
+  operation: "executeGate",
   duration_ms: 2341,
   metadata: {
-    gate: 'typecheck',
-    result: 'pass'
-  }
+    gate: "typecheck",
+    result: "pass",
+  },
 });
 
 // Log errors
-logger.error('Gate failed', {
-  module: 'gates/executor',
-  operation: 'executeGate',
-  error: new Error('Test failed'),
-  metadata: { gate: 'lint' }
+logger.error("Gate failed", {
+  module: "gates/executor",
+  operation: "executeGate",
+  error: new Error("Test failed"),
+  metadata: { gate: "lint" },
 });
 
 // Close logger when done
@@ -88,16 +88,15 @@ Locks are stored in `.smartergpt.local/runner/locks/runner.lock` with this struc
 ### Usage
 
 ```typescript
-import { createRunnerLock } from './src/monitoring/lock.js';
+import { createRunnerLock } from "./src/monitoring/lock.js";
 
-const lock = createRunnerLock('.smartergpt.local');
+const lock = createRunnerLock(".smartergpt.local");
 
 try {
   // Acquire lock - throws LockError if another runner is active
   await lock.acquire();
-  
+
   // Do work...
-  
 } finally {
   // Always release lock
   lock.release();
@@ -149,11 +148,11 @@ lex-pr execute --profile-dir .smartergpt.local --keep-cache
 ### Programmatic Usage
 
 ```typescript
-import { purgeCacheIfNeeded, formatCachePurgeResult } from './src/monitoring/cache.js';
+import { purgeCacheIfNeeded, formatCachePurgeResult } from "./src/monitoring/cache.js";
 
 const result = purgeCacheIfNeeded({
-  profileDir: '.smartergpt.local',
-  keepCache: false
+  profileDir: ".smartergpt.local",
+  keepCache: false,
 });
 
 console.log(formatCachePurgeResult(result));
@@ -171,23 +170,22 @@ import {
   initializeFileLogger,
   closeFileLogger,
   purgeCache,
-  cleanupRunnerResources
-} from './src/cli/runnerLifecycle.js';
+  cleanupRunnerResources,
+} from "./src/cli/runnerLifecycle.js";
 
 // Typical usage in a command
 try {
   // 1. Purge cache
   purgeCache(profileDir, keepCache);
-  
+
   // 2. Acquire lock
   await acquireRunnerLock(profileDir);
-  
+
   // 3. Initialize logger
   const logger = initializeFileLogger(profileDir, { enabled: true });
-  
+
   // 4. Do work...
-  logger.info('Work started');
-  
+  logger.info("Work started");
 } finally {
   // 5. Always cleanup
   await cleanupRunnerResources();

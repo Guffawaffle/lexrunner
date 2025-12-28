@@ -10,158 +10,157 @@ import { generateClusteredReport, writeConflictsJson } from "./conflictClusterin
 import type { ConflictReport, PRWithFiles, ClusteredConflictReport } from "./types.js";
 
 export interface PredictConflictsOptions {
-	prs: PRWithFiles[];
-	baseBranch: string;
-	prHeads?: Map<string, string>;
-	workingDir?: string;
-	skipMergeTreeSimulation?: boolean;
-	enableClustering?: boolean;
-	writeWeaveConflicts?: boolean;
+  prs: PRWithFiles[];
+  baseBranch: string;
+  prHeads?: Map<string, string>;
+  workingDir?: string;
+  skipMergeTreeSimulation?: boolean;
+  enableClustering?: boolean;
+  writeWeaveConflicts?: boolean;
 }
 
 /**
  * Predict conflicts and compute safe parallel batches
  */
 export async function predictConflicts(
-	options: PredictConflictsOptions
+  options: PredictConflictsOptions
 ): Promise<ConflictReport & { clusteredReport?: ClusteredConflictReport }> {
-	const { prs, baseBranch, prHeads, workingDir, skipMergeTreeSimulation = false, enableClustering = false, writeWeaveConflicts = false } = options;
+  const {
+    prs,
+    baseBranch,
+    prHeads,
+    workingDir,
+    skipMergeTreeSimulation = false,
+    enableClustering = false,
+    writeWeaveConflicts = false,
+  } = options;
 
-	// 1. Build conflict graph
-	const conflictGraph = buildConflictGraph(prs);
+  // 1. Build conflict graph
+  const conflictGraph = buildConflictGraph(prs);
 
-	// 2. Compute MIS batches
-	const misBatches = computeAllMISBatches(conflictGraph);
+  // 2. Compute MIS batches
+  const misBatches = computeAllMISBatches(conflictGraph);
 
-	// 3. Simulate merges (if not skipped and heads provided)
-	let mergeTreeSimulation: Record<string, any> = {};
-	
-	if (!skipMergeTreeSimulation && prHeads && prHeads.size > 0) {
-		// Simulate merges for all PR pairs with edges in the conflict graph
-		for (const edge of conflictGraph.edges) {
-			const pr1Head = prHeads.get(edge.from);
-			const pr2Head = prHeads.get(edge.to);
+  // 3. Simulate merges (if not skipped and heads provided)
+  let mergeTreeSimulation: Record<string, any> = {};
 
-			if (pr1Head && pr2Head) {
-				const key = `${edge.from}-${edge.to}`;
-				const result = await import("./mergeTreeSimulator.js").then(m =>
-					m.simulateMerge(baseBranch, pr1Head, pr2Head, workingDir)
-				);
-				mergeTreeSimulation[key] = result;
-			}
-		}
+  if (!skipMergeTreeSimulation && prHeads && prHeads.size > 0) {
+    // Simulate merges for all PR pairs with edges in the conflict graph
+    for (const edge of conflictGraph.edges) {
+      const pr1Head = prHeads.get(edge.from);
+      const pr2Head = prHeads.get(edge.to);
 
-		// Also check pairs with no file conflicts (should be clean)
-		for (const batch of misBatches) {
-			if (batch.prs.length > 1) {
-				const batchResults = await simulateBatchMerges(
-					baseBranch,
-					prHeads,
-					batch.prs,
-					workingDir
-				);
-				mergeTreeSimulation = { ...mergeTreeSimulation, ...batchResults };
-			}
-		}
-	}
+      if (pr1Head && pr2Head) {
+        const key = `${edge.from}-${edge.to}`;
+        const result = await import("./mergeTreeSimulator.js").then((m) =>
+          m.simulateMerge(baseBranch, pr1Head, pr2Head, workingDir)
+        );
+        mergeTreeSimulation[key] = result;
+      }
+    }
 
-	// 4. Generate recommendations
-	const recommendations = generateRecommendations(misBatches, mergeTreeSimulation);
+    // Also check pairs with no file conflicts (should be clean)
+    for (const batch of misBatches) {
+      if (batch.prs.length > 1) {
+        const batchResults = await simulateBatchMerges(baseBranch, prHeads, batch.prs, workingDir);
+        mergeTreeSimulation = { ...mergeTreeSimulation, ...batchResults };
+      }
+    }
+  }
 
-	// 5. Optional: Generate clustered conflict report
-	let clusteredReport: ClusteredConflictReport | undefined;
-	
-	if (enableClustering) {
-		// Collect all conflicts from merge-tree simulation
-		const allConflicts = Object.values(mergeTreeSimulation)
-			.filter((result: any) => result.status === 'conflict')
-			.flatMap((result: any) => result.conflicts);
-		
-		if (allConflicts.length > 0) {
-			clusteredReport = await generateClusteredReport(
-				allConflicts,
-				baseBranch,
-				workingDir
-			);
-			
-			// Optionally write to .weave/conflicts.json
-			if (writeWeaveConflicts) {
-				await writeConflictsJson(clusteredReport, workingDir ? `${workingDir}/.weave` : ".weave");
-			}
-		}
-	}
+  // 4. Generate recommendations
+  const recommendations = generateRecommendations(misBatches, mergeTreeSimulation);
 
-	const report: ConflictReport & { clusteredReport?: ClusteredConflictReport } = {
-		analyzedAt: new Date().toISOString(),
-		baseBranch,
-		conflictGraph,
-		misBatches,
-		mergeTreeSimulation,
-		recommendations
-	};
+  // 5. Optional: Generate clustered conflict report
+  let clusteredReport: ClusteredConflictReport | undefined;
 
-	if (clusteredReport) {
-		report.clusteredReport = clusteredReport;
-	}
+  if (enableClustering) {
+    // Collect all conflicts from merge-tree simulation
+    const allConflicts = Object.values(mergeTreeSimulation)
+      .filter((result: any) => result.status === "conflict")
+      .flatMap((result: any) => result.conflicts);
 
-	return report;
+    if (allConflicts.length > 0) {
+      clusteredReport = await generateClusteredReport(allConflicts, baseBranch, workingDir);
+
+      // Optionally write to .weave/conflicts.json
+      if (writeWeaveConflicts) {
+        await writeConflictsJson(clusteredReport, workingDir ? `${workingDir}/.weave` : ".weave");
+      }
+    }
+  }
+
+  const report: ConflictReport & { clusteredReport?: ClusteredConflictReport } = {
+    analyzedAt: new Date().toISOString(),
+    baseBranch,
+    conflictGraph,
+    misBatches,
+    mergeTreeSimulation,
+    recommendations,
+  };
+
+  if (clusteredReport) {
+    report.clusteredReport = clusteredReport;
+  }
+
+  return report;
 }
 
 /**
  * Generate merge recommendations based on MIS batches and simulation results
  */
 function generateRecommendations(
-	misBatches: Array<{ id: string; prs: string[]; reason: string }>,
-	mergeTreeSimulation: Record<string, { status: 'clean' | 'conflict' }>
+  misBatches: Array<{ id: string; prs: string[]; reason: string }>,
+  mergeTreeSimulation: Record<string, { status: "clean" | "conflict" }>
 ): { safeBatch: string[]; sequential: string[] } {
-	const safeBatch: string[] = [];
-	const sequential: string[] = [];
+  const safeBatch: string[] = [];
+  const sequential: string[] = [];
 
-	// First batch with multiple PRs is usually the safe batch
-	if (misBatches.length > 0) {
-		const firstBatch = misBatches[0];
-		
-		if (firstBatch.prs.length > 1) {
-			// Verify with merge-tree simulation if available
-			let allClean = true;
-			
-			for (let i = 0; i < firstBatch.prs.length && allClean; i++) {
-				for (let j = i + 1; j < firstBatch.prs.length; j++) {
-					const key1 = `${firstBatch.prs[i]}-${firstBatch.prs[j]}`;
-					const key2 = `${firstBatch.prs[j]}-${firstBatch.prs[i]}`;
-					
-					const result = mergeTreeSimulation[key1] || mergeTreeSimulation[key2];
-					if (result && result.status === 'conflict') {
-						allClean = false;
-						break;
-					}
-				}
-			}
+  // First batch with multiple PRs is usually the safe batch
+  if (misBatches.length > 0) {
+    const firstBatch = misBatches[0];
 
-			if (allClean) {
-				safeBatch.push(...firstBatch.prs);
-			}
-		}
+    if (firstBatch.prs.length > 1) {
+      // Verify with merge-tree simulation if available
+      let allClean = true;
 
-		// Remaining PRs should be sequential
-		for (let i = safeBatch.length > 0 ? 1 : 0; i < misBatches.length; i++) {
-			sequential.push(...misBatches[i].prs);
-		}
+      for (let i = 0; i < firstBatch.prs.length && allClean; i++) {
+        for (let j = i + 1; j < firstBatch.prs.length; j++) {
+          const key1 = `${firstBatch.prs[i]}-${firstBatch.prs[j]}`;
+          const key2 = `${firstBatch.prs[j]}-${firstBatch.prs[i]}`;
 
-		// If first batch was single PR and clean, add to safe batch
-		if (safeBatch.length === 0 && misBatches[0].prs.length === 1) {
-			safeBatch.push(...misBatches[0].prs);
-			if (misBatches.length > 1) {
-				sequential.push(...misBatches.slice(1).flatMap(b => b.prs));
-			}
-		}
-	}
+          const result = mergeTreeSimulation[key1] || mergeTreeSimulation[key2];
+          if (result && result.status === "conflict") {
+            allClean = false;
+            break;
+          }
+        }
+      }
 
-	// Sort for deterministic output
-	safeBatch.sort((a, b) => parseInt(a) - parseInt(b));
-	sequential.sort((a, b) => parseInt(a) - parseInt(b));
+      if (allClean) {
+        safeBatch.push(...firstBatch.prs);
+      }
+    }
 
-	return { safeBatch, sequential };
+    // Remaining PRs should be sequential
+    for (let i = safeBatch.length > 0 ? 1 : 0; i < misBatches.length; i++) {
+      sequential.push(...misBatches[i].prs);
+    }
+
+    // If first batch was single PR and clean, add to safe batch
+    if (safeBatch.length === 0 && misBatches[0].prs.length === 1) {
+      safeBatch.push(...misBatches[0].prs);
+      if (misBatches.length > 1) {
+        sequential.push(...misBatches.slice(1).flatMap((b) => b.prs));
+      }
+    }
+  }
+
+  // Sort for deterministic output
+  safeBatch.sort((a, b) => parseInt(a) - parseInt(b));
+  sequential.sort((a, b) => parseInt(a) - parseInt(b));
+
+  return { safeBatch, sequential };
 }
 
 // Re-export types

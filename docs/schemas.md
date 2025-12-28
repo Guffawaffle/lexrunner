@@ -38,19 +38,23 @@ The Plan schema defines the structure for `plan.json` files:
 
 ```typescript
 // Core plan structure
-export const Plan = z.object({
-  schemaVersion: SchemaVersion,     // "1.x.y" format
-  target: z.string().default("main"),
-  policy: Policy.optional(),
-  items: z.array(PlanItem).default([])
-}).strict();
+export const Plan = z
+  .object({
+    schemaVersion: SchemaVersion, // "1.x.y" format
+    target: z.string().default("main"),
+    policy: Policy.optional(),
+    items: z.array(PlanItem).default([]),
+  })
+  .strict();
 
 // Plan items with dependency resolution
-export const PlanItem = z.object({
-  name: z.string(),                 // Unique identifier for dependency resolution
-  deps: z.string().array().default([]), // References to other item names
-  gates: z.array(Gate).default([])
-}).strict();
+export const PlanItem = z
+  .object({
+    name: z.string(), // Unique identifier for dependency resolution
+    deps: z.string().array().default([]), // References to other item names
+    gates: z.array(Gate).default([]),
+  })
+  .strict();
 ```
 
 **Key Design Decisions:**
@@ -63,15 +67,17 @@ export const PlanItem = z.object({
 ### Gate Schema
 
 ```typescript
-export const Gate = z.object({
-  name: z.string(),
-  run: z.string(),
-  cwd: z.string().optional(),
-  env: z.record(z.string()).default({}),
-  runtime: z.enum(["local", "container", "ci-service"]).default("local"),
-  container: ContainerSpec.optional(),
-  artifacts: z.array(z.string()).default([])
-}).strict();
+export const Gate = z
+  .object({
+    name: z.string(),
+    run: z.string(),
+    cwd: z.string().optional(),
+    env: z.record(z.string()).default({}),
+    runtime: z.enum(["local", "container", "ci-service"]).default("local"),
+    container: ContainerSpec.optional(),
+    artifacts: z.array(z.string()).default([]),
+  })
+  .strict();
 ```
 
 ### Gate Report Schema
@@ -81,23 +87,26 @@ The Gate Report schema has been enhanced with versioning and artifact support:
 ```typescript
 // Defined in src/schema/gateReport.ts
 export const GateReport = z.object({
-  schemaVersion: z.string().regex(/^1\.\d+\.\d+$/).optional(),
+  schemaVersion: z
+    .string()
+    .regex(/^1\.\d+\.\d+$/)
+    .optional(),
   item: z.string(),
-  gate: z.string(), 
+  gate: z.string(),
   status: z.enum(["pass", "fail"]),
   duration_ms: z.number().min(0),
   started_at: z.string(), // ISO timestamp
   stderr_path: z.string().optional(),
   stdout_path: z.string().optional(),
   meta: z.record(z.string()).optional(),
-  artifacts: z.array(ArtifactMetadata).optional()
+  artifacts: z.array(ArtifactMetadata).optional(),
 });
 
 export const ArtifactMetadata = z.object({
   path: z.string(),
   type: z.string().optional(),
   size: z.number().min(0).optional(),
-  description: z.string().optional()
+  description: z.string().optional(),
 });
 ```
 
@@ -116,27 +125,33 @@ The Behavior Rule schema defines the structure for behavioral rules that provide
 
 ```typescript
 // Rule scope for context filtering
-const RuleScopeSchema = z.object({
-  environment: z.string().optional(),  // "development", "production"
-  project: z.string().optional(),       // Project identifier
-  agentFamily: z.string().optional()    // "copilot", "claude"
-}).strict();
+const RuleScopeSchema = z
+  .object({
+    environment: z.string().optional(), // "development", "production"
+    project: z.string().optional(), // Project identifier
+    agentFamily: z.string().optional(), // "copilot", "claude"
+  })
+  .strict();
 
 // Single behavioral rule
-const BehaviorRuleItemSchema = z.object({
-  id: z.string(),                       // Unique rule identifier
-  title: z.string(),                    // Rule title/name
-  description: z.string(),              // Rule description
-  content: z.string(),                  // Rule content/guidance
-  scope: RuleScopeSchema.optional(),    // Scope metadata
-  priority: z.number().int().min(0).optional() // Priority (higher = more important)
-}).strict();
+const BehaviorRuleItemSchema = z
+  .object({
+    id: z.string(), // Unique rule identifier
+    title: z.string(), // Rule title/name
+    description: z.string(), // Rule description
+    content: z.string(), // Rule content/guidance
+    scope: RuleScopeSchema.optional(), // Scope metadata
+    priority: z.number().int().min(0).optional(), // Priority (higher = more important)
+  })
+  .strict();
 
 // Behavior rules container
-export const BehaviorRuleSchema = z.object({
-  version: z.string().optional(),       // Schema version
-  rules: z.array(BehaviorRuleItemSchema).optional()
-}).strict();
+export const BehaviorRuleSchema = z
+  .object({
+    version: z.string().optional(), // Schema version
+    rules: z.array(BehaviorRuleItemSchema).optional(),
+  })
+  .strict();
 ```
 
 **Key Features:**
@@ -180,7 +195,7 @@ export const BehaviorRuleSchema = z.object({
 Schemas follow semantic versioning principles:
 
 - **Major (1.x.y → 2.x.y)**: Breaking changes to structure or semantics
-- **Minor (1.1.y → 1.2.y)**: Additive required fields with safe defaults  
+- **Minor (1.1.y → 1.2.y)**: Additive required fields with safe defaults
 - **Patch (1.1.1 → 1.1.2)**: Additive optional fields or documentation only
 
 Current supported version: **1.x.y** (major version 1 only)
@@ -195,12 +210,12 @@ The gate report schema supports versioning and migration:
 
 #### Legacy Field Mapping
 
-| Legacy Field | Current Field | Migration Rule |
-|--------------|---------------|----------------|
+| Legacy Field        | Current Field    | Migration Rule |
+| ------------------- | ---------------- | -------------- |
 | `result: "success"` | `status: "pass"` | Direct mapping |
 | `result: "failure"` | `status: "fail"` | Direct mapping |
-| `duration` | `duration_ms` | Field rename |
-| `start_time` | `started_at` | Field rename |
+| `duration`          | `duration_ms`    | Field rename   |
+| `start_time`        | `started_at`     | Field rename   |
 
 #### Migration Commands
 
@@ -231,16 +246,16 @@ if (!result.success) {
 
 ```typescript
 export interface ValidationError {
-  path: string;      // Dot-notation path to invalid field
-  message: string;   // Human-readable error message  
-  code: string;      // Zod error code
+  path: string; // Dot-notation path to invalid field
+  message: string; // Human-readable error message
+  code: string; // Zod error code
 }
 
 export class SchemaValidationError extends Error {
   public readonly issues: z.ZodIssue[];
   public readonly errors: ValidationError[];
-  
-  toJSON(): { valid: false; errors: ValidationError[] }
+
+  toJSON(): { valid: false; errors: ValidationError[] };
 }
 ```
 
@@ -274,11 +289,12 @@ npm run cli -- gate-report validate legacy-report.json --migrate
 ```
 
 Expected JSON output format for plan validation:
+
 ```json
 // Success
 { "valid": true }
 
-// Failure  
+// Failure
 {
   "valid": false,
   "errors": [
@@ -292,6 +308,7 @@ Expected JSON output format for plan validation:
 ```
 
 Expected JSON output format for gate report validation:
+
 ```json
 // Success
 { "valid": true }

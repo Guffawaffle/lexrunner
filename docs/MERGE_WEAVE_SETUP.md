@@ -111,7 +111,7 @@ gates:
 
   - name: test
     run: npm test
-    required: false  # Optional for merge-weave
+    required: false # Optional for merge-weave
     timeout: 300000
 ```
 
@@ -248,26 +248,26 @@ case "$MODE" in
     echo "🔍 Previewing merge operations..."
     lex-pr merge --plan "$PLAN_FILE" --dry-run --json
     ;;
-  
+
   execute)
     echo "🚀 Executing merge pyramid..."
     lex-pr merge --plan "$PLAN_FILE" --execute --json
     ;;
-  
+
   discover)
     echo "📋 Discovering PRs from GitHub..."
     OWNER="${GITHUB_OWNER:-$(git remote get-url origin | sed -E 's|.*github.com[:/]([^/]+)/.*|\1|')}"
     REPO="${GITHUB_REPO:-$(basename $(git remote get-url origin) .git)}"
-    
+
     lex-pr discover \
       --owner "$OWNER" \
       --repo "$REPO" \
       --labels "ready-to-merge" \
       --output "$PLAN_FILE"
-    
+
     echo "✅ Plan generated: $PLAN_FILE"
     ;;
-  
+
   *)
     echo "Usage: $0 [plan.json] [dry-run|execute|discover]"
     exit 1
@@ -366,26 +366,27 @@ cd /path/to/LexRunner
 
 ## Common Flags Reference
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--plan <file>` | Path to plan.json | `--plan ./plans/wave1.json` |
-| `--dry-run` | Preview without executing (default) | `--dry-run` |
-| `--execute` | Actually perform merge operations | `--execute` |
-| `--cleanup` | Remove integration branches after success | `--cleanup` |
-| `--force` | Override lock hash check | `--force` |
-| `--resume [runId]` | Resume from failure | `--resume` or `--resume abc123` |
-| `--json` | Output JSON format | `--json` |
-| `--skip-preflight` | Skip conflict detection | `--skip-preflight` |
-| `--fail-on-preflight-conflict` | Abort if conflicts detected | `--fail-on-preflight-conflict` |
-| `--track-turncost` | Track coordination overhead metrics | `--track-turncost` |
-| `--resolve-policy <policy>` | Conflict resolution: `minimal-hunk`, `ours`, `theirs` | `--resolve-policy ours` |
-| `--branch-prefix <prefix>` | Integration branch name prefix | `--branch-prefix integration/` |
+| Flag                           | Description                                           | Example                         |
+| ------------------------------ | ----------------------------------------------------- | ------------------------------- |
+| `--plan <file>`                | Path to plan.json                                     | `--plan ./plans/wave1.json`     |
+| `--dry-run`                    | Preview without executing (default)                   | `--dry-run`                     |
+| `--execute`                    | Actually perform merge operations                     | `--execute`                     |
+| `--cleanup`                    | Remove integration branches after success             | `--cleanup`                     |
+| `--force`                      | Override lock hash check                              | `--force`                       |
+| `--resume [runId]`             | Resume from failure                                   | `--resume` or `--resume abc123` |
+| `--json`                       | Output JSON format                                    | `--json`                        |
+| `--skip-preflight`             | Skip conflict detection                               | `--skip-preflight`              |
+| `--fail-on-preflight-conflict` | Abort if conflicts detected                           | `--fail-on-preflight-conflict`  |
+| `--track-turncost`             | Track coordination overhead metrics                   | `--track-turncost`              |
+| `--resolve-policy <policy>`    | Conflict resolution: `minimal-hunk`, `ours`, `theirs` | `--resolve-policy ours`         |
+| `--branch-prefix <prefix>`     | Integration branch name prefix                        | `--branch-prefix integration/`  |
 
 ## Conflict Resolution Strategies
 
 ### minimal-hunk (Default, Recommended)
 
 AI-powered conflict resolution that:
+
 - Identifies precise conflict boundaries
 - Merges both sides intelligently
 - Preserves intent from both branches
@@ -422,6 +423,7 @@ lex-pr merge --execute --resolve-policy theirs
 **Cause**: Uncommitted changes in working tree
 
 **Solution**:
+
 ```bash
 # Option 1: Commit changes
 git add .
@@ -442,6 +444,7 @@ git stash pop
 **Cause**: Missing plan.json
 
 **Solution**:
+
 ```bash
 # Generate from GitHub
 lex-pr discover --owner YourOrg --repo your-repo --output plan.json
@@ -454,6 +457,7 @@ lex-pr discover --owner YourOrg --repo your-repo --output plan.json
 **Cause**: Branch name in plan doesn't match remote
 
 **Solution**:
+
 ```bash
 # List remote branches
 git branch -r
@@ -466,6 +470,7 @@ git branch -r
 **Cause**: PR heads changed since last run
 
 **Solution**:
+
 ```bash
 # Remove lock file
 rm weave-lock.json
@@ -485,6 +490,7 @@ lex-pr merge --execute --track-turncost
 ```
 
 Outputs metrics:
+
 - **Latency**: Time spent waiting
 - **Renegotiation**: Number of conflicts
 - **Attention Switches**: Context switches between PRs
@@ -499,6 +505,7 @@ lex-pr merge --execute --emit-frames
 ```
 
 Emits execution frames for:
+
 - State transitions
 - Batch processing
 - Conflict detection
@@ -536,9 +543,9 @@ on:
   workflow_dispatch:
     inputs:
       plan_file:
-        description: 'Path to plan.json'
+        description: "Path to plan.json"
         required: true
-        default: 'plan.json'
+        default: "plan.json"
 
 jobs:
   merge-weave:
@@ -546,11 +553,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history
+          fetch-depth: 0 # Need full history
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install LexRunner
         run: |
@@ -570,26 +577,31 @@ jobs:
 ## Best Practices
 
 1. **Always dry-run first**:
+
    ```bash
    lex-pr merge --dry-run
    ```
 
 2. **Use preflight conflict detection**:
+
    ```bash
    lex-pr merge --fail-on-preflight-conflict
    ```
 
 3. **Track metrics for large merges**:
+
    ```bash
    lex-pr merge --execute --track-turncost
    ```
 
 4. **Enable cleanup for successful merges**:
+
    ```bash
    lex-pr merge --execute --cleanup
    ```
 
 5. **Version control your plans**:
+
    ```bash
    git add plan.json
    git commit -m "Add merge-weave plan for wave 1"

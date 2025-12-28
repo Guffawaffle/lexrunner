@@ -32,6 +32,7 @@ mcp_lexrunner_{category}_{action}
 See [MCP-CONFIG.md](./MCP-CONFIG.md) for complete configuration details and alignment with lex-brain and lex-map.
 
 **Quick MCP Config Entry:**
+
 ```json
 {
   "mcpServers": {
@@ -77,6 +78,7 @@ LEX_PR_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
 ### GitHub Authentication
 
 **Important:** The MCP server requires `GITHUB_TOKEN` to access private repositories. Without it:
+
 - Private repos return "Repository not found" errors
 - API rate limits are severely restricted (60 req/hr vs 5000 authenticated)
 
@@ -119,10 +121,12 @@ Creates a plan from configuration files or auto-discovers from GitHub PRs. This 
 > **Note:** For more granular control, use `pr_list`, `plan_validate`, and `plan_analyze` tools individually.
 
 **Parameters:**
+
 - `json` (boolean, optional): Output plan as JSON to stdout
 - `outDir` (string, optional): Output directory for plan artifacts
 
 **GitHub Auto-Discovery Parameters:**
+
 - `fromGithub` (boolean, optional): Enable auto-discovery of PRs from GitHub API
 - `query` (string, optional): GitHub search query (e.g., 'is:open label:feature')
 - `labels` (array of strings, optional): Filter PRs by labels
@@ -136,6 +140,7 @@ Creates a plan from configuration files or auto-discovers from GitHub PRs. This 
 - `target` (string, optional): Target branch for merging PRs (default: repo default branch)
 
 **Returns:**
+
 ```json
 {
   "plan": { ... },
@@ -144,6 +149,7 @@ Creates a plan from configuration files or auto-discovers from GitHub PRs. This 
 ```
 
 **Example - Traditional Mode (from configuration files):**
+
 ```json
 {
   "name": "mcp_lexrunner_plan_create",
@@ -174,6 +180,7 @@ pin_commits: false
 ```
 
 Then call `mcp_lexrunner_plan_create` without any parameters - it will auto-detect and use GitHub mode:
+
 ```json
 {
   "name": "mcp_lexrunner_plan_create",
@@ -182,6 +189,7 @@ Then call `mcp_lexrunner_plan_create` without any parameters - it will auto-dete
 ```
 
 The tool will:
+
 1. Detect that scope.yml has GitHub filters
 2. Automatically enable GitHub mode
 3. Use filters from scope.yml (`query`, `labels`, `target`)
@@ -190,6 +198,7 @@ The tool will:
 6. Generate plan.json with discovered PRs
 
 **Example - GitHub Auto-Discovery Mode (explicit):**
+
 ```json
 {
   "name": "mcp_lexrunner_plan_create",
@@ -206,6 +215,7 @@ The tool will:
 ```
 
 **Example - Complex GitHub Query:**
+
 ```json
 {
   "name": "mcp_lexrunner_plan_create",
@@ -225,9 +235,10 @@ The tool will:
 Lists pull requests from GitHub without creating a plan. This is a granular tool that allows agents to discover PRs independently before deciding whether to create a plan.
 
 **Parameters:**
+
 - `owner` (string, optional): GitHub repository owner (auto-detected from git remote if not provided)
 - `repo` (string, optional): GitHub repository name (auto-detected from git remote if not provided)
-- `query` (string, optional): GitHub search query (e.g., 'is:open label:stack:*')
+- `query` (string, optional): GitHub search query (e.g., 'is:open label:stack:\*')
 - `labels` (array of strings, optional): Filter PRs by labels
 - `includeDrafts` (boolean, optional): Include draft PRs in results (default: true)
 - `excludePRs` (array of numbers, optional): Exclude specific PR numbers
@@ -235,6 +246,7 @@ Lists pull requests from GitHub without creating a plan. This is a granular tool
 - `state` (string, optional): PR state filter - "open", "closed", or "all" (default: "open")
 
 **Returns:**
+
 ```json
 {
   "pullRequests": [
@@ -256,6 +268,7 @@ Lists pull requests from GitHub without creating a plan. This is a granular tool
 ```
 
 **Example:**
+
 ```json
 {
   "name": "pr_list",
@@ -268,6 +281,7 @@ Lists pull requests from GitHub without creating a plan. This is a granular tool
 ```
 
 **Use Cases:**
+
 - **Pre-flight checks**: List PRs to verify what would be included before creating a plan
 - **Human review**: Show PRs to user for manual selection before plan creation
 - **Custom workflows**: Build multi-step workflows where PR discovery is separate from planning
@@ -277,10 +291,12 @@ Lists pull requests from GitHub without creating a plan. This is a granular tool
 Validates a plan.json file for schema compliance and logical consistency without executing it. This granular tool allows checking plan validity independently of creation or execution.
 
 **Parameters:**
+
 - `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
 - `planContent` (string, optional): JSON string of plan content to validate (alternative to planFile)
 
 **Returns:**
+
 ```json
 {
   "valid": true,
@@ -295,6 +311,7 @@ Validates a plan.json file for schema compliance and logical consistency without
 ```
 
 If validation fails:
+
 ```json
 {
   "valid": false,
@@ -309,6 +326,7 @@ If validation fails:
 ```
 
 **Example (validate existing file):**
+
 ```json
 {
   "name": "plan_validate",
@@ -319,6 +337,7 @@ If validation fails:
 ```
 
 **Example (validate plan content directly):**
+
 ```json
 {
   "name": "plan_validate",
@@ -329,6 +348,7 @@ If validation fails:
 ```
 
 **Use Cases:**
+
 - **Pre-execution validation**: Check a plan before running gates
 - **CI validation**: Validate plans in CI/CD pipelines
 - **Manual plan editing**: Validate hand-edited plan.json files
@@ -338,16 +358,15 @@ If validation fails:
 Analyzes a plan for potential conflicts and dependency issues. Performs dry-run dependency resolution and conflict detection without execution. This granular tool provides detailed analysis of plan structure and dependencies.
 
 **Parameters:**
+
 - `planFile` (string, optional): Path to plan.json file (default: `<profile>/runner/plan.json`)
 
 **Returns:**
+
 ```json
 {
   "valid": true,
-  "mergeOrder": [
-    ["PR-1", "PR-2"],
-    ["PR-3"]
-  ],
+  "mergeOrder": [["PR-1", "PR-2"], ["PR-3"]],
   "conflicts": [],
   "dependencies": {
     "total": 2
@@ -361,6 +380,7 @@ Analyzes a plan for potential conflicts and dependency issues. Performs dry-run 
 ```
 
 If issues are found:
+
 ```json
 {
   "valid": false,
@@ -385,6 +405,7 @@ If issues are found:
 ```
 
 **Example:**
+
 ```json
 {
   "name": "plan_analyze",
@@ -395,6 +416,7 @@ If issues are found:
 ```
 
 **Use Cases:**
+
 - **Dependency validation**: Verify no circular dependencies before execution
 - **Parallelism planning**: Understand maximum parallelism potential
 - **Conflict prediction**: Identify potential merge conflicts early
@@ -406,12 +428,14 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 > **Deprecated alias:** `gates.run`
 
 **Parameters:**
+
 - `planFile` (string, optional): Path to external plan.json file. If not provided, uses internal state from the profile directory.
 - `onlyItem` (string, optional): Run gates for specific item only
 - `onlyGate` (string, optional): Run specific gate only
 - `outDir` (string, optional): Output directory for gate results
 
 **Returns:**
+
 ```json
 {
   "items": [
@@ -431,6 +455,7 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 ```
 
 **Example (using internal plan):**
+
 ```json
 {
   "name": "mcp_lexrunner_gate_run",
@@ -442,6 +467,7 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 ```
 
 **Example (using external plan):**
+
 ```json
 {
   "name": "mcp_lexrunner_gate_run",
@@ -453,6 +479,7 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 ```
 
 **Use Cases:**
+
 - **Internal state**: Run gates on a plan created via `mcp_lexrunner_plan_create` (default behavior)
 - **External orchestration**: Run gates on programmatically-created or externally-managed plan files
 - **Parallel workflows**: Execute gates on multiple independent plans in parallel merge-weave operations
@@ -464,9 +491,11 @@ Applies merge operations with environment-based gating.
 > **Deprecated alias:** `merge.apply`
 
 **Parameters:**
+
 - `dryRun` (boolean, optional): Simulate merge without making changes (default: `true`)
 
 **Returns:**
+
 ```json
 {
   "allowed": false,
@@ -475,6 +504,7 @@ Applies merge operations with environment-based gating.
 ```
 
 **Example:**
+
 ```json
 {
   "name": "mcp_lexrunner_weave_apply",
@@ -489,6 +519,7 @@ Applies merge operations with environment-based gating.
 ### Read-Only by Default
 
 The MCP server is read-only by default:
+
 - `mcp_lexrunner_weave_apply` requires `ALLOW_MUTATIONS=true` for actual merging
 - All operations default to safe, non-destructive behavior
 - Dry-run mode is available for testing merge eligibility
@@ -496,12 +527,14 @@ The MCP server is read-only by default:
 ### Environment Gating
 
 Destructive operations are gated by environment variables:
+
 - `ALLOW_MUTATIONS=false` (default): Only read operations and dry runs
 - `ALLOW_MUTATIONS=true`: Enables actual merge operations
 
 ### Error Handling
 
 The server provides clear error messages for:
+
 - Missing plan files (run `mcp_lexrunner_plan_create` first)
 - Invalid parameters (validated using Zod schemas)
 - Environment restrictions (mutations blocked when disabled)
@@ -515,12 +548,12 @@ The server provides clear error messages for:
 const client = new Client({
   command: "npm",
   args: ["run", "mcp"],
-  cwd: "/path/to/lexrunner"
+  cwd: "/path/to/lexrunner",
 });
 
 // Create a plan from configuration files (traditional mode)
 const planResult = await client.callTool("mcp_lexrunner_plan_create", {
-  outDir: ".smartergpt/runner"
+  outDir: ".smartergpt/runner",
 });
 
 // Create a plan from GitHub PRs (auto-discovery mode)
@@ -530,23 +563,23 @@ const githubPlanResult = await client.callTool("mcp_lexrunner_plan_create", {
   excludePRs: [100, 200],
   requiredGates: ["lint", "test", "security"],
   maxWorkers: 4,
-  outDir: "/tmp/lexrunner-plan"
+  outDir: "/tmp/lexrunner-plan",
 });
 
 // Run gates on internal plan
 const gatesResult = await client.callTool("mcp_lexrunner_gate_run", {
-  outDir: ".smartergpt/runner/gates"
+  outDir: ".smartergpt/runner/gates",
 });
 
 // Or run gates on external plan file
 const externalGatesResult = await client.callTool("mcp_lexrunner_gate_run", {
   planFile: "/tmp/merge-batch/plan.json",
-  outDir: "/tmp/merge-batch/gates"
+  outDir: "/tmp/merge-batch/gates",
 });
 
 // Check merge eligibility (dry run)
 const mergeResult = await client.callTool("mcp_lexrunner_weave_apply", {
-  dryRun: true
+  dryRun: true,
 });
 ```
 
@@ -563,9 +596,9 @@ const externalPlan = {
     {
       name: "batch-item-1",
       deps: [],
-      gates: [{ name: "lint", run: "npm run lint", env: {} }]
-    }
-  ]
+      gates: [{ name: "lint", run: "npm run lint", env: {} }],
+    },
+  ],
 };
 
 // Write to disk
@@ -574,7 +607,7 @@ fs.writeFileSync("/tmp/batch1-plan.json", JSON.stringify(externalPlan));
 // Execute gates on external plan
 const result = await client.callTool("mcp_lexrunner_gate_run", {
   planFile: "/tmp/batch1-plan.json",
-  outDir: "/tmp/batch1-gates"
+  outDir: "/tmp/batch1-gates",
 });
 ```
 
@@ -602,6 +635,7 @@ Create a task snapshot for agent handoff with failure evidence, target files, an
 **Canonical name:** `lexrunner_create_task_snapshot`
 
 **Parameters:**
+
 - `procedure` (required): Procedure identifier (e.g., `"post-merge-fix"`, `"fanout-issue"`)
 - `determinism` (optional): Level `"D1"`, `"D2"`, or `"D3"` (default: `"D1"`)
 - `failureMessage` (required): Short error description
@@ -620,6 +654,7 @@ Create a task snapshot for agent handoff with failure evidence, target files, an
 **Returns:** `TaskSnapshot_v1` JSON with task ID
 
 **Example:**
+
 ```javascript
 const result = await client.callTool("create_task_snapshot", {
   procedure: "post-merge-fix",
@@ -643,11 +678,13 @@ Submit a task receipt after agent completes work. Returns acknowledgment and eng
 **Canonical name:** `lexrunner_submit_task_receipt`
 
 **Parameters:**
+
 - `receipt` (required): `TaskReceipt_v1` JSON object
 
 **Returns:** Verification result with trust gap detection
 
 **Example:**
+
 ```javascript
 const receipt = {
   schema_version: "1.0.0",
@@ -659,9 +696,7 @@ const receipt = {
     files_touched: ["test.ts"],
     rationale: "Updated assertion to match new count",
     confidence: "high",
-    assumptions_made: [
-      { type: "test", text: "No other tests depend on this value" }
-    ],
+    assumptions_made: [{ type: "test", text: "No other tests depend on this value" }],
   },
   search_activity: [],
   cost: { token_usage: { input: 1000, output: 200, total: 1200 } },
@@ -681,11 +716,13 @@ Get current task state including snapshot, receipt, and verification info.
 **Canonical name:** `lexrunner_get_task_status`
 
 **Parameters:**
+
 - `taskId` (required): Unique task identifier
 
 **Returns:** Task status with state, snapshot, receipt, and verification
 
 **Example:**
+
 ```javascript
 const status = await client.callTool("get_task_status", {
   taskId: "01HQXYZ...",
@@ -703,6 +740,7 @@ List pending task snapshots with optional filtering.
 **Canonical name:** `lexrunner_list_pending_tasks`
 
 **Parameters:**
+
 - `procedure` (optional): Filter by procedure identifier
 - `determinism` (optional): Filter by level `"D1"`, `"D2"`, or `"D3"`
 - `limit` (optional): Maximum tasks to return
@@ -710,6 +748,7 @@ List pending task snapshots with optional filtering.
 **Returns:** Array of pending tasks
 
 **Example:**
+
 ```javascript
 const tasks = await client.callTool("list_pending_tasks", {
   procedure: "post-merge-fix",

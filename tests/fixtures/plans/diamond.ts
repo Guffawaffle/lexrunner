@@ -1,4 +1,4 @@
-import type { Plan } from '../../../src/schema.js';
+import type { Plan } from "../../../src/schema.js";
 
 /**
  * Diamond dependency pattern:
@@ -6,30 +6,30 @@ import type { Plan } from '../../../src/schema.js';
  *       \   /
  *        \ /
  *         C
- * 
+ *
  * Use case: Testing parallel dependencies, merge conflicts, topological sort
  */
 export function diamond(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'foundation-a',
+        name: "foundation-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'foundation-b',
+        name: "foundation-b",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'integration',
-        deps: ['foundation-a', 'foundation-b'],
-        gates: []
-      }
-    ]
+        name: "integration",
+        deps: ["foundation-a", "foundation-b"],
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -44,30 +44,30 @@ export function diamond(): Plan {
  */
 export function diamondExtended(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'foundation-a',
+        name: "foundation-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'foundation-b',
+        name: "foundation-b",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'integration',
-        deps: ['foundation-a', 'foundation-b'],
-        gates: []
+        name: "integration",
+        deps: ["foundation-a", "foundation-b"],
+        gates: [],
       },
       {
-        name: 'finalization',
-        deps: ['integration'],
-        gates: []
-      }
-    ]
+        name: "finalization",
+        deps: ["integration"],
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -82,34 +82,34 @@ export function diamondExtended(): Plan {
  */
 export function doubleDiamond(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'foundation-a',
+        name: "foundation-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'foundation-b',
+        name: "foundation-b",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feature-c',
-        deps: ['foundation-a', 'foundation-b'],
-        gates: []
+        name: "feature-c",
+        deps: ["foundation-a", "foundation-b"],
+        gates: [],
       },
       {
-        name: 'feature-d',
-        deps: ['foundation-a', 'foundation-b'],
-        gates: []
+        name: "feature-d",
+        deps: ["foundation-a", "foundation-b"],
+        gates: [],
       },
       {
-        name: 'integration',
-        deps: ['feature-c', 'feature-d'],
-        gates: []
-      }
-    ]
+        name: "integration",
+        deps: ["feature-c", "feature-d"],
+        gates: [],
+      },
+    ],
   };
 }

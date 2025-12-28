@@ -35,6 +35,7 @@ See [Profile Resolution](./docs/profile-resolution.md) and [SmartGPT Structure v
 ## Why are config files at the profile root instead of in a `runner/` subdirectory?
 
 **Actual structure:**
+
 ```
 .smartergpt/
 ├── intent.md              # ✅ Config at root
@@ -50,6 +51,7 @@ See [Profile Resolution](./docs/profile-resolution.md) and [SmartGPT Structure v
 ## What's in the `runner/` directory?
 
 The `runner/` directory contains **working artifacts only**:
+
 - `plan.json` - Generated execution plan
 - `snapshot.md` - Current state snapshot
 - `cache/` - Ephemeral cache data
@@ -66,11 +68,13 @@ The entire `runner/` directory should be gitignored.
 Prompts are template files used for plan generation with token expansion (`{{today}}`, `{{branch}}`, etc.).
 
 **Precedence chain** (highest to lowest):
+
 1. **`LEX_PROMPTS_DIR`** environment variable - Explicit override for cross-repo usage
 2. **`.smartergpt.local/prompts/`** - Local overlay (not tracked)
 3. **`.smartergpt/prompts/`** - Tracked canonical prompts
 
 **Example:**
+
 ```bash
 # Use Lex prompts from another repo
 export LEX_PROMPTS_DIR=/path/to/lex/.smartergpt/prompts
@@ -84,16 +88,19 @@ See [Prompts Configuration](./docs/prompts.md) for complete documentation.
 Three methods:
 
 **1. Environment Variable (Recommended for CI/CD)**
+
 ```bash
 export LEX_PROMPTS_DIR=/path/to/shared/prompts
 ```
 
 **2. Symlink (Recommended for Development)**
+
 ```bash
 ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 ```
 
 **3. Copy (Recommended for Customization)**
+
 ```bash
 cp -r ../lex/.smartergpt/prompts .smartergpt.local/
 ```
@@ -102,18 +109,20 @@ See [examples/profile-setup/cross-repo-prompts/](./examples/profile-setup/cross-
 
 ## What tokens are supported in prompts?
 
-| Token | Description | Example Output |
-|-------|-------------|----------------|
-| `{{today}}` | Current date (YYYY-MM-DD) | `2025-11-13` |
-| `{{now}}` | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
-| `{{repo_root}}` | Git repository root path | `/path/to/repo` |
-| `{{workspace_root}}` | Workspace root path | `/path/to/workspace` |
-| `{{branch}}` | Current git branch | `main` |
-| `{{commit}}` | Current commit SHA | `a1b2c3d4...` |
+| Token                | Description                  | Example Output            |
+| -------------------- | ---------------------------- | ------------------------- |
+| `{{today}}`          | Current date (YYYY-MM-DD)    | `2025-11-13`              |
+| `{{now}}`            | ISO timestamp without colons | `2025-11-13T14-30-45-123` |
+| `{{repo_root}}`      | Git repository root path     | `/path/to/repo`           |
+| `{{workspace_root}}` | Workspace root path          | `/path/to/workspace`      |
+| `{{branch}}`         | Current git branch           | `main`                    |
+| `{{commit}}`         | Current commit SHA           | `a1b2c3d4...`             |
 
 **Example:**
+
 ```markdown
 # Report for {{branch}} - {{today}}
+
 Repository: {{repo_root}}
 ```
 
@@ -127,6 +136,7 @@ Deliverables placement depends on the profile:
 - **`.smartergpt.local/deliverables/`**: Always gitignored, contains timestamped deliverable sets
 
 Deliverables include:
+
 - `analysis.json` - Structured merge analysis
 - `weave-report.md` - Human-readable report
 - `execution-log.md` - Tracking template
@@ -136,6 +146,7 @@ See [Deliverables Management](./docs/deliverables-management.md) for details.
 ## How do I migrate from an old structure where config was in `runner/`?
 
 **Old (incorrect):**
+
 ```
 .smartergpt/
 └── runner/
@@ -145,6 +156,7 @@ See [Deliverables Management](./docs/deliverables-management.md) for details.
 ```
 
 **New (correct):**
+
 ```
 .smartergpt/
 ├── intent.md              # ✅ Config at root
@@ -156,6 +168,7 @@ See [Deliverables Management](./docs/deliverables-management.md) for details.
 ```
 
 **Migration steps:**
+
 ```bash
 cd .smartergpt
 mv runner/intent.md .
@@ -170,6 +183,7 @@ See [SmartGPT Structure v1 Spec - Migration Guide](./docs/specs/smartergpt-struc
 ## How do I generate a plan?
 
 Use GitHub discovery and plan commands:
+
 - `npm run cli -- discover --json`
 - `npm run cli -- plan --from-github --json > plan.json`
 
@@ -184,6 +198,7 @@ Yes. We sort items and keys for stable diffs. The determinism check is described
 ## How do I scan for secrets or vulnerabilities?
 
 Security subcommands:
+
 - `lex-pr security scan-plan plan.json`
 - `lex-pr security check-rotation GITHUB_TOKEN --max-age 90`
 - `lex-pr security validate-secrets GITHUB_TOKEN DATABASE_URL`
@@ -203,6 +218,7 @@ See `CONTRIBUTING.md`. Keep PRs small and deterministic. Include a "How to verif
 Config files (`intent.md`, `scope.yml`, `gates.yml`, etc.) define runner behavior and live at the **profile root** for easy access. The `runner/` directory is reserved for **working artifacts** (plan.json, cache, logs) generated during execution.
 
 **Structure:**
+
 ```
 .smartergpt.local/
 ├── intent.md              # Config at root
@@ -230,6 +246,7 @@ Yes! Prompts use a three-level precedence chain:
 3. **`.smartergpt/prompts/`** - Tracked canonical prompts
 
 **Cross-repo usage example:**
+
 ```bash
 # Point LexRunner to Lex prompts
 export LEX_PROMPTS_DIR=/srv/lex-mcp/lex/.smartergpt/prompts
@@ -242,19 +259,20 @@ lex-pr plan --from-github
 
 Prompts support dynamic token expansion:
 
-| Token | Expands To | Example |
-|-------|------------|---------|
-| `{{today}}` | YYYY-MM-DD | `2025-11-13` |
-| `{{now}}` | ISO timestamp | `2025-11-13T14-30-45` |
-| `{{repo_root}}` | Repo path | `/path/to/repo` |
-| `{{branch}}` | Current branch | `main` |
-| `{{commit}}` | Commit SHA | `a1b2c3d4...` |
+| Token           | Expands To     | Example               |
+| --------------- | -------------- | --------------------- |
+| `{{today}}`     | YYYY-MM-DD     | `2025-11-13`          |
+| `{{now}}`       | ISO timestamp  | `2025-11-13T14-30-45` |
+| `{{repo_root}}` | Repo path      | `/path/to/repo`       |
+| `{{branch}}`    | Current branch | `main`                |
+| `{{commit}}`    | Commit SHA     | `a1b2c3d4...`         |
 
 **See:** `docs/prompts.md` for complete token reference.
 
 ## Why does `.smartergpt/` have a `deliverables/` directory?
 
 This is legacy from early development. In practice:
+
 - **Tracked profiles** (`role: example`) should NOT write deliverables
 - **Local profiles** (`role: development`) write to `.smartergpt.local/deliverables/`
 

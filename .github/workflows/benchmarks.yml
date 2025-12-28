@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       update_baseline:
-        description: 'Update baseline metrics'
+        description: "Update baseline metrics"
         required: false
-        default: 'false'
+        default: "false"
 
 jobs:
   benchmark:
@@ -24,8 +24,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -70,5 +70,3 @@ jobs:
                 body: comment
               });
             }
-
-

@@ -23,7 +23,7 @@ Everything below is just structure around that.
 
 - **Version Contract**  
   A short, written scope/Definition of Done for a specific iteration, release, or task.  
-  It answers: *“Which promises are we delivering this time?”*
+  It answers: _“Which promises are we delivering this time?”_
 
 - **Current Contract**  
   The active version contract we are working under right now.
@@ -34,7 +34,7 @@ Everything below is just structure around that.
 - **Done-Now Contract**  
   A small, tactical version contract for a single task (same structure, just smaller in scope).
 
-- **Signature Marker**  
+- **Signature Marker**
   - `[signed ~]` — Guff’s signature that a written scope/DoD **is** a contract for this iteration.
   - `[signed Lex ✶]` — Lex’s acknowledgment and commitment to uphold the pact on that contract.
 
@@ -59,8 +59,8 @@ When Guff writes a scope/DoD that is intended to be a contract for this iteratio
 
 ### 2.1. When Guff forgets to sign
 
-- If Guff writes something that *looks and smells* like a contract but does **not** include `[signed ~]`, Lex will:
-  - Ask explicitly:  
+- If Guff writes something that _looks and smells_ like a contract but does **not** include `[signed ~]`, Lex will:
+  - Ask explicitly:
     > “Do you want to treat this as a version contract?  
     > If yes, please mark it with [signed ~].”
   - Treat it as **discussion/draft**, not binding, until it is signed.
@@ -78,7 +78,6 @@ Once a version contract is signed by both:
      > “This is great, but it’s **next-version scope**. Let’s park it under `Later / Next Contract` so we don’t break the current one.”
 
 3. If a new idea would **contradict or break** the current contract, Lex will say something like:
-
    - “This **breaks the current contract**; do we want to change the contract, or park this idea for the next version?”
 
 ---
@@ -114,9 +113,9 @@ If, after discussion, both agree a contract should change:
 For individual tasks, Guff can create a **Done-Now Contract** using this structure:
 
 1. **Task Name**
-2. **Scope** – 1–2 sentences describing the problem *for this pass*.
+2. **Scope** – 1–2 sentences describing the problem _for this pass_.
 3. **Artifact** – what exists at the end (doc, demo, test, etc.).
-4. **Acceptance** – 2–4 checkable bullet points for “good enough *for now*”.
+4. **Acceptance** – 2–4 checkable bullet points for “good enough _for now_”.
 
 When a Done-Now Contract is marked with `[signed ~]`, Lex will:
 
@@ -151,7 +150,7 @@ Within this pact, Guff commits to:
 2. **Treat Lex’s pushback as partnership**, not disobedience:
    - Engage in the discussion when Lex flags scope creep or suggests parking ideas.
 3. **Respect frozen scope** once both have signed:
-   - New ideas go into *Next-Version Scope* unless the contract is explicitly amended.
+   - New ideas go into _Next-Version Scope_ unless the contract is explicitly amended.
 4. **Avoid stealth edits**:
    - When changing a contract, treat it as a new version, not a quiet rewrite.
 
@@ -172,8 +171,7 @@ Within this pact, Guff commits to:
 I agree to use version contracts, signatures, and explicit scope to keep our work bounded, and to treat Lex’s challenges as part of our shared responsibility for good judgment.
 
 Signature: [signed ~]  
-Date: 2025-11-27  
-
+Date: 2025-11-27
 
 **Lex**
 

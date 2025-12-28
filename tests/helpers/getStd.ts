@@ -1,1 +1,1 @@
-export const getStd = (s?: string) => s ?? '';
+export const getStd = (s?: string) => s ?? "";

@@ -23,19 +23,23 @@ When a PR is merged, the workflow:
 The workflow includes multiple safety guards to prevent accidental deletions:
 
 #### 1. Merge Verification
+
 - Only runs when `github.event.pull_request.merged == true`
 - Closed-but-not-merged PRs are ignored
 
 #### 2. Fork Protection
+
 - Only deletes branches from the same repository
 - Branches from forks are never deleted
 - Check: `head.repo.full_name == github.repository`
 
 #### 3. Default Branch Protection
+
 - Never deletes the default branch (usually `main`)
 - Check: `head.ref != base.repo.default_branch`
 
 #### 4. Prefix Allowlist
+
 - Only deletes branches matching approved prefixes:
   - `copilot/*` — Copilot-generated feature branches
   - `integration/umbrella-*` — Merge-weave umbrella branches
@@ -43,17 +47,20 @@ The workflow includes multiple safety guards to prevent accidental deletions:
 - All other branch patterns are preserved
 
 #### 5. Opt-out Mechanism
+
 - PRs labeled with `keep-branch` are excluded
 - Use this label when a branch needs to remain after merge
 
 ### Example Scenarios
 
 #### ✅ Will Delete
+
 - PR from `copilot/fix-bug-123` → **Deleted**
 - PR from `integration/umbrella-20231215` → **Deleted**
 - PR from `feature/new-api` → **Deleted**
 
 #### ❌ Will NOT Delete
+
 - PR from `develop` → **Preserved** (doesn't match prefix)
 - PR from fork → **Preserved** (fork protection)
 - PR with `keep-branch` label → **Preserved** (opt-out)
@@ -79,6 +86,7 @@ Or:
 ### Permissions
 
 The workflow requires:
+
 - `contents: write` — To delete git references
 
 ### Opt-out Instructions
@@ -103,12 +111,14 @@ git push origin --delete BRANCH_NAME
 ### Troubleshooting
 
 **Branch not deleted:**
+
 - Check the workflow run logs in the Actions tab
 - Verify the branch matches an allowed prefix
 - Confirm the PR was merged (not just closed)
 - Check for `keep-branch` label
 
 **Permission errors:**
+
 - Ensure the workflow has `contents: write` permission
 - Check branch protection rules (protected branches cannot be deleted)
 

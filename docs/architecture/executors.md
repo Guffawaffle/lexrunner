@@ -5,6 +5,7 @@ This document describes the executor architecture in lexrunner, including the ma
 ## Overview
 
 An **executor** is a small, named, versioned unit that:
+
 - Implements a narrow role (e.g., code review, triage, pattern mining)
 - Fixes its **tool budget** (which tools it may call, under what limits)
 - Binds to a particular **guardrail profile** (scope, tool, epistemic, style, audit)
@@ -17,6 +18,7 @@ An **executor** is a small, named, versioned unit that:
 **Location:** `src/schemas/executorManifest.ts`
 
 The canonical schema for executor manifests, implemented using Zod. Defines:
+
 - Schema versioning (`executor-1.0.0`)
 - Tool budget (allowed/denied tools, limits)
 - Guardrails (scope, tool, epistemic, style, audit)
@@ -34,16 +36,18 @@ The canonical schema for executor manifests, implemented using Zod. Defines:
 **Location:** `tests/fixtures/executors/registry.ts`
 
 The executor registry is currently implemented as a **test fixture** for use in executor lifecycle tests. It provides basic functionality:
+
 - `register(executor)` - Register an executor
 - `load(executorId)` - Load an executor by ID
 - `list()` - List all registered executor IDs
 - `clear()` - Clear registry (for testing)
 
 **Note from code (previous, now corrected):**
+
 ```typescript
 /**
  * Placeholder ExecutorRegistry for Testing
- * 
+ *
  * This is a simplified mock implementation until PR #412 is merged.
  * Real implementation will provide full registry functionality.
  */
@@ -54,6 +58,7 @@ The executor registry is currently implemented as a **test fixture** for use in 
 ### 3. Registry Implementation Status
 
 **What was implemented:**
+
 - ✅ ExecutorManifestSchema (issue #405)
 - ✅ Manifest validation script (PR #583 - `scripts/validate-manifests.ts`)
 - ✅ CI validation pipeline (PR #583 - validates all manifests)
@@ -61,11 +66,12 @@ The executor registry is currently implemented as a **test fixture** for use in 
 - ✅ Test fixtures for executor registry pattern
 
 **What is NOT implemented in production:**
+
 - ❌ Production ExecutorRegistry class in `src/`
 - ❌ Executor loader/discovery system
 - ❌ Runtime executor instantiation from manifests
 
-**Current approach:** 
+**Current approach:**
 The executor system is schema-driven with validation, but actual executor loading/registry is handled via direct imports and test fixtures rather than a centralized registry pattern.
 
 ### 4. Manifest Validation
@@ -75,12 +81,14 @@ The executor system is schema-driven with validation, but actual executor loadin
 **Purpose:** CI gate that validates all executor manifests against the schema
 
 **Features:**
+
 - Schema conformance validation via Zod
 - Tool budget consistency (detects allowed/denied overlaps)
 - Guardrail completeness (ensures required tools are in allowed list)
 - Exits non-zero on any failure with actionable error messages
 
 **Run locally:**
+
 ```bash
 npm run validate:manifests
 ```
@@ -118,12 +126,14 @@ scripts/
 ## Related Issues & PRs
 
 ### Completed
+
 - **#404** - LPR-E-009: Executor Canonicalization (Architecture Redesign)
 - **#405** - LPR-041: Persona Loader & Schema Validation (ExecutorManifestSchema)
 - **#415** - EXE-010: Senior Dev Executor Migration
 - **#583** - Add executor manifest validation to CI pipeline (merged 2025-12-17)
 
 ### Misleading Dependencies
+
 - **#412** - LPR-048: Lex Memory Integration (NOT about Executor Registry)
   - This issue is about integrating Lex memory APIs (`lex recall`, `lex remember`, `lex timeline`)
   - PR #583 incorrectly listed "Depends-on: #412 (Executor Registry)"
@@ -136,12 +146,13 @@ scripts/
 Executors are currently loaded via direct TypeScript imports:
 
 ```typescript
-import { executeReview } from '../executors/seniorDev/core.js';
+import { executeReview } from "../executors/seniorDev/core.js";
 ```
 
 ### Future: Registry Pattern (Not Currently Planned)
 
 A production registry **could** enable:
+
 - Dynamic executor discovery from `executors/` directory
 - Runtime manifest loading and validation
 - Executor lifecycle management
@@ -156,6 +167,7 @@ A production registry **could** enable:
 **Finding:** PR #583's dependency on "#412 (Executor Registry)" is **incorrect**.
 
 **Actual status:**
+
 - ✅ ExecutorManifestSchema exists (`src/schemas/executorManifest.ts`)
 - ✅ Validation script implemented (`scripts/validate-manifests.ts`)
 - ✅ CI integration complete
@@ -163,6 +175,7 @@ A production registry **could** enable:
 - ❌ No production registry in `src/` (only test fixture)
 
 **Recommendation:**
+
 - PR #583 can be considered complete for its stated goal (manifest validation)
 - Update PR #583 description to remove incorrect dependency on #412
 - If a production registry is needed, create a new issue for it

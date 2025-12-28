@@ -1,4 +1,4 @@
-import type { Plan } from '../../../src/schema.js';
+import type { Plan } from "../../../src/schema.js";
 
 /**
  * Plan with circular dependency: A → B → C → A
@@ -6,25 +6,25 @@ import type { Plan } from '../../../src/schema.js';
  */
 export function cycle(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
-        deps: ['feat-c'], // Circular!
-        gates: []
+        name: "feat-a",
+        deps: ["feat-c"], // Circular!
+        gates: [],
       },
       {
-        name: 'feat-b',
-        deps: ['feat-a'],
-        gates: []
+        name: "feat-b",
+        deps: ["feat-a"],
+        gates: [],
       },
       {
-        name: 'feat-c',
-        deps: ['feat-b'],
-        gates: []
-      }
-    ]
+        name: "feat-c",
+        deps: ["feat-b"],
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -35,30 +35,30 @@ export function cycle(): Plan {
  */
 export function complexCycle(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
-        deps: ['feat-d'], // Part of cycle
-        gates: []
+        name: "feat-a",
+        deps: ["feat-d"], // Part of cycle
+        gates: [],
       },
       {
-        name: 'feat-b',
-        deps: ['feat-a'],
-        gates: []
+        name: "feat-b",
+        deps: ["feat-a"],
+        gates: [],
       },
       {
-        name: 'feat-c',
-        deps: ['feat-a'],
-        gates: []
+        name: "feat-c",
+        deps: ["feat-a"],
+        gates: [],
       },
       {
-        name: 'feat-d',
-        deps: ['feat-b', 'feat-c'],
-        gates: []
-      }
-    ]
+        name: "feat-d",
+        deps: ["feat-b", "feat-c"],
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -68,20 +68,20 @@ export function complexCycle(): Plan {
  */
 export function unknownDependency(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feat-b',
-        deps: ['feat-nonexistent'], // Unknown!
-        gates: []
-      }
-    ]
+        name: "feat-b",
+        deps: ["feat-nonexistent"], // Unknown!
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -91,30 +91,30 @@ export function unknownDependency(): Plan {
  */
 export function orphans(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'connected-a',
+        name: "connected-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'connected-b',
-        deps: ['connected-a'],
-        gates: []
+        name: "connected-b",
+        deps: ["connected-a"],
+        gates: [],
       },
       {
-        name: 'orphan-x',
-        deps: ['orphan-y'], // Both orphaned
-        gates: []
+        name: "orphan-x",
+        deps: ["orphan-y"], // Both orphaned
+        gates: [],
       },
       {
-        name: 'orphan-y',
-        deps: ['orphan-x'], // Cycle that's disconnected
-        gates: []
-      }
-    ]
+        name: "orphan-y",
+        deps: ["orphan-x"], // Cycle that's disconnected
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -124,20 +124,20 @@ export function orphans(): Plan {
  */
 export function duplicateNames(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feat-a', // Duplicate!
+        name: "feat-a", // Duplicate!
         deps: [],
-        gates: []
-      }
-    ]
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -147,22 +147,22 @@ export function duplicateNames(): Plan {
  */
 export function missingRequiredGates(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     policy: {
-      requiredGates: ['lint', 'test', 'security'],
-      maxWorkers: 1
+      requiredGates: ["lint", "test", "security"],
+      maxWorkers: 1,
     },
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
         gates: [
-          { name: 'lint', run: 'echo "lint"', env: {} }
+          { name: "lint", run: 'echo "lint"', env: {} },
           // Missing 'test' and 'security'!
-        ]
-      }
-    ]
+        ],
+      },
+    ],
   };
 }
 
@@ -171,8 +171,8 @@ export function missingRequiredGates(): Plan {
  */
 export function empty(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
-    items: []
+    schemaVersion: "1.0.0",
+    target: "main",
+    items: [],
   };
 }

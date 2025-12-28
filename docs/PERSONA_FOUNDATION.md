@@ -46,13 +46,13 @@ Detailed guidance, examples, and context...
 ### Validating a Persona
 
 ```typescript
-import { parsePersona, validatePersona } from './src/schemas/persona.js';
-import { parse as parseYaml } from 'yaml';
-import fs from 'fs';
+import { parsePersona, validatePersona } from "./src/schemas/persona.js";
+import { parse as parseYaml } from "yaml";
+import fs from "fs";
 
 // Load persona file
-const content = fs.readFileSync('.smartergpt/personas/example.md', 'utf-8');
-const [, frontmatter] = content.split('---\n');
+const content = fs.readFileSync(".smartergpt/personas/example.md", "utf-8");
+const [, frontmatter] = content.split("---\n");
 const metadata = parseYaml(frontmatter);
 
 // Validate
@@ -60,7 +60,7 @@ const result = validatePersona(metadata);
 if (result.success) {
   console.log(`✓ ${result.data.name} validated`);
 } else {
-  console.error('Validation errors:', result.errors);
+  console.error("Validation errors:", result.errors);
 }
 ```
 
@@ -76,17 +76,19 @@ if (result.success) {
 This foundation is based on Lex PR #505 (Persona Foundation in Lex).
 
 **Current State:**
+
 - Lex v2.0.2 contains `PersonaSchema` but doesn't export it publicly
 - LexRunner re-implements the schema matching the Lex structure
 - When Lex publishes `@smartergpt/lex/schemas/persona`, replace the re-implementation
 
 **Migration Path:**
+
 ```typescript
 // Current (re-implementation)
-import { PersonaSchema } from './src/schemas/persona.js';
+import { PersonaSchema } from "./src/schemas/persona.js";
 
 // Future (once Lex exports it)
-import { PersonaSchema } from '@smartergpt/lex/schemas/persona';
+import { PersonaSchema } from "@smartergpt/lex/schemas/persona";
 ```
 
 ## Files
@@ -113,6 +115,7 @@ npm test -- tests/schemas/persona-integration.spec.ts
 ## Next Steps
 
 This foundation enables:
+
 - **Advanced persona workflows** — Activation, validation, switching
 - **Dynamic persona loading** — Runtime discovery and validation
 - **Persona-aware orchestration** — Tool-grounded decision-making

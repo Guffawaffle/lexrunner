@@ -40,11 +40,11 @@ When an executor prototype is ready, promote it from `project/` → `executors/`
 
 ## Current Experiments
 
-| Directory | Description | Status |
-|-----------|-------------|--------|
-| `senior-dev/` | Legacy location — now canonical at `executors/senior-dev/` | ✅ Promoted |
-| *(add your experiments here)* | | |
+| Directory                     | Description                                                | Status      |
+| ----------------------------- | ---------------------------------------------------------- | ----------- |
+| `senior-dev/`                 | Legacy location — now canonical at `executors/senior-dev/` | ✅ Promoted |
+| _(add your experiments here)_ |                                                            |             |
 
 ---
 
-*For executor authoring guidelines, see [docs/executor-authoring.md](../docs/executor-authoring.md).*
+_For executor authoring guidelines, see [docs/executor-authoring.md](../docs/executor-authoring.md)._

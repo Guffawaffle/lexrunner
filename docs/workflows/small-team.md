@@ -62,15 +62,15 @@ gates:
   - name: tests
     command: npm test
     timeout: 300
-    
+
   - name: lint
     command: npm run lint
     timeout: 60
-    
+
   - name: build
     command: npm run build
     timeout: 120
-    
+
   # Optional: type check
   - name: typecheck
     command: npm run typecheck
@@ -80,14 +80,17 @@ gates:
 ### 4. Set Up Team Process
 
 **PR Creation Checklist:**
+
 - [ ] Code reviewed by at least one teammate
 - [ ] All CI checks pass
 - [ ] Add "ready-to-merge" label when approved
 - [ ] Add dependency info if needed
 
 **Dependency Syntax in PR Body:**
+
 ```markdown
 ## Dependencies
+
 Depends-On: #123
 Depends-On: #124
 ```
@@ -134,11 +137,13 @@ lex-pr merge plan.json --execute
 ### Scenario 1: Independent Features
 
 **Team State:**
+
 - Alice's PR #101: "Add user profile"
 - Bob's PR #102: "Add search feature"
 - Both ready to merge, no dependencies
 
 **Automation:**
+
 ```bash
 $ lex-pr discover
 Found 2 PRs: #101, #102
@@ -162,10 +167,12 @@ $ lex-pr merge plan.json --execute
 ### Scenario 2: Dependent Features
 
 **Team State:**
+
 - Alice's PR #103: "Add authentication API"
 - Bob's PR #104: "Add auth UI" (depends on #103)
 
 **PR #104 Body:**
+
 ```markdown
 Implements authentication UI.
 
@@ -173,6 +180,7 @@ Depends-On: #103
 ```
 
 **Automation:**
+
 ```bash
 $ lex-pr plan --from-github
 ✓ Detected dependency: #104 → #103
@@ -195,12 +203,14 @@ $ lex-pr merge plan.json --execute
 ### Scenario 3: PR Stack
 
 **Team State:**
+
 - Alice has 3 dependent PRs:
   - PR #105: "Refactor database layer"
   - PR #106: "Add caching" (depends on #105)
   - PR #107: "Optimize queries" (depends on #106)
 
 **Automation:**
+
 ```bash
 $ lex-pr plan --from-github
 ✓ Detected PR stack: #105 → #106 → #107
@@ -226,11 +236,11 @@ name: Auto-Merge Ready PRs
 on:
   schedule:
     # Run every 2 hours during work hours
-    - cron: '0 9-17/2 * * 1-5'
-  
+    - cron: "0 9-17/2 * * 1-5"
+
   # Allow manual trigger
   workflow_dispatch:
-  
+
   # Trigger when PR labeled "ready-to-merge"
   pull_request:
     types: [labeled]
@@ -239,38 +249,38 @@ jobs:
   auto-merge:
     if: github.event.label.name == 'ready-to-merge' || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Discover and plan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           lex-pr plan --from-github --out artifacts/
-      
+
       - name: Execute gates
         run: |
           lex-pr execute artifacts/plan.json
-      
+
       - name: Generate report
         if: always()
         run: |
           lex-pr report gate-results --out md > report.md
-      
+
       - name: Merge PRs
         if: success()
         run: |
           lex-pr merge artifacts/plan.json --execute
-      
+
       - name: Post to Slack
         if: always()
         uses: slackapi/slack-github-action@v1
@@ -318,6 +328,7 @@ curl -X POST $SLACK_WEBHOOK \
 ### Issue: PRs not being discovered
 
 **Check:**
+
 ```bash
 # Verify labels
 lex-pr discover --json | jq '.[] | {number, labels}'
@@ -328,6 +339,7 @@ lex-pr discover --json | jq '.[] | {number, labels}'
 ### Issue: Gate failures blocking merges
 
 **Debug:**
+
 ```bash
 # Check which gate failed
 lex-pr report gate-results --out md
@@ -342,6 +354,7 @@ npm test
 ### Issue: Wrong merge order
 
 **Verify:**
+
 ```bash
 # Check detected dependencies
 lex-pr plan --from-github --json | jq '.items[] | {name, deps}'

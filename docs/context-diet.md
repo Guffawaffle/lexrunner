@@ -23,7 +23,7 @@ Located in `src/github/diffHunks.ts`, this module:
 - Calculates context size metrics
 
 ```typescript
-import { extractDiffHunks, optimizeHunkSize } from './github/diffHunks.js';
+import { extractDiffHunks, optimizeHunkSize } from "./github/diffHunks.js";
 
 const diff = await getPRDiff(prNumber);
 const hunks = extractDiffHunks(diff);
@@ -41,9 +41,9 @@ Located in `src/github/symbolMap.ts`, this module:
 - Works with TypeScript and JavaScript
 
 ```typescript
-import { extractSymbolMap } from './github/symbolMap.js';
+import { extractSymbolMap } from "./github/symbolMap.js";
 
-const symbolMap = extractSymbolMap('src/file.ts', sourceCode);
+const symbolMap = extractSymbolMap("src/file.ts", sourceCode);
 console.log(symbolMap.symbols); // Array of symbols with locations
 ```
 
@@ -57,7 +57,7 @@ Located in `src/github/minimalContext.ts`, this module:
 - Formats as compact text
 
 ```typescript
-import { filterPRMetadata } from './github/minimalContext.js';
+import { filterPRMetadata } from "./github/minimalContext.js";
 
 const minimal = filterPRMetadata(pr);
 // Body is undefined unless PR has 'needs-context' label
@@ -73,11 +73,11 @@ Located in `src/github/contextDiet.ts`, this module:
 - Exports metrics for monitoring
 
 ```typescript
-import { buildMinimalContext } from './github/contextDiet.js';
+import { buildMinimalContext } from "./github/contextDiet.js";
 
 const context = await buildMinimalContext(prs, {
   diff: prDiff,
-  files: sourceFiles
+  files: sourceFiles,
 });
 
 console.log(context.metrics);
@@ -89,12 +89,12 @@ console.log(context.metrics);
 ### Basic Usage - Single PR
 
 ```typescript
-import { getPRMinimalContext } from './github/minimalContextClient.js';
+import { getPRMinimalContext } from "./github/minimalContextClient.js";
 
 // Get minimal context for a single PR
 const context = await getPRMinimalContext(client, 123, {
   includeDiff: true,
-  includeSymbols: true
+  includeSymbols: true,
 });
 
 console.log(`Reduction: ${context.metrics.reductionPercent.toFixed(1)}%`);
@@ -103,23 +103,19 @@ console.log(`Reduction: ${context.metrics.reductionPercent.toFixed(1)}%`);
 ### Multiple PRs
 
 ```typescript
-import { getOpenPRsMinimalContext } from './github/minimalContextClient.js';
+import { getOpenPRsMinimalContext } from "./github/minimalContextClient.js";
 
 // Get minimal context for all open PRs
 const context = await getOpenPRsMinimalContext(client, {
-  labels: ['stack:feature'],
-  excludeDrafts: true
+  labels: ["stack:feature"],
+  excludeDrafts: true,
 });
 ```
 
 ### Custom Processing
 
 ```typescript
-import { 
-  extractDiffHunks,
-  buildSymbolMaps,
-  filterPRsWithMetrics 
-} from './github/index.js';
+import { extractDiffHunks, buildSymbolMaps, filterPRsWithMetrics } from "./github/index.js";
 
 // Manual processing for custom workflows
 const prs = await client.listOpenPRs();
@@ -173,13 +169,14 @@ Example output:
 The context diet feature provides text formatting for AI consumption:
 
 ```typescript
-import { formatCompleteContext } from './github/contextDiet.js';
+import { formatCompleteContext } from "./github/contextDiet.js";
 
 const formatted = formatCompleteContext(context);
 console.log(formatted);
 ```
 
 Output structure:
+
 ```
 # Minimal Context Package
 
@@ -219,6 +216,7 @@ The feature includes comprehensive test coverage:
 - `tests/github-context-diet.spec.ts` - 23 tests for integration
 
 Run tests:
+
 ```bash
 npm test -- tests/github-diff-hunks.spec.ts
 npm test -- tests/github-symbol-map.spec.ts
@@ -235,6 +233,7 @@ Typical reduction percentages:
 - **Combined**: 60-85% total reduction
 
 Example savings for 5 PRs:
+
 - Original: ~50KB (full PR data + full file contents)
 - Minimal: ~10KB (filtered metadata + diff hunks + symbol maps)
 - Savings: ~40KB (80% reduction)
@@ -242,6 +241,7 @@ Example savings for 5 PRs:
 ## API Reference
 
 See source files for detailed API documentation:
+
 - `src/github/diffHunks.ts` - Diff hunk extraction
 - `src/github/symbolMap.ts` - Symbol map generation
 - `src/github/minimalContext.ts` - PR metadata filtering

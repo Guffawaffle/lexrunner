@@ -1,7 +1,8 @@
 # From Calendars to Control Stacks
+
 ## A SmarterGPT Concept for Reducing Meeting Load (v0.1.0)
 
-**Status:** Concept note / future-arc design (3.x+), *not* a 1.0.0 requirement
+**Status:** Concept note / future-arc design (3.x+), _not_ a 1.0.0 requirement
 **Intended home:** LexRunner docs (`docs/`)
 **Audience:** SmarterGPT / Lex / LexRunner design collaborators
 
@@ -37,7 +38,7 @@ When you unpack actual meeting content, most sessions fall into a small set of t
 4. **Planning** – “What’s the plan for this sprint / quarter / project?”
 5. **Brainstorm / alignment** – “Are we even solving the right thing?”
 
-You do *not* need synchronous time for most of 1–4. You need:
+You do _not_ need synchronous time for most of 1–4. You need:
 
 - Shared context and history
 - Structured options and tradeoffs
@@ -112,7 +113,7 @@ A **DecisionMesh** is the graph of decisions, constraints, and dependencies:
 The MeetingAtlas is about **time and people**.
 The DecisionMesh is about **choices, constraints, and consequences**.
 
-Together, they let the control stack answer: *“Do we really need this meeting, or can we move this decision async under policy X?”*
+Together, they let the control stack answer: _“Do we really need this meeting, or can we move this decision async under policy X?”_
 
 ---
 
@@ -135,8 +136,8 @@ type MeetingKind =
 
 interface MeetingFrame {
   frame_type: "meeting";
-  meeting_id: string;          // stable ID for recurring series or unique for one-off
-  occurrence_id: string;       // single instance
+  meeting_id: string; // stable ID for recurring series or unique for one-off
+  occurrence_id: string; // single instance
   kind: MeetingKind;
   title: string;
   schedule: {
@@ -147,15 +148,15 @@ interface MeetingFrame {
   participants: {
     id: string;
     name: string;
-    role?: string;             // "host", "required", "optional"
+    role?: string; // "host", "required", "optional"
   }[];
   purpose?: string;
   agenda_items?: string[];
-  inputs?: string[];           // links to docs/tickets/Frames
-  outcomes?: string[];         // quick summary
-  decisions?: string[];        // FK into DecisionFrames
-  actions?: string[];          // FK into ActionFrames / tickets
-  transcript_refs?: string[];  // logs, recordings, summary frames
+  inputs?: string[]; // links to docs/tickets/Frames
+  outcomes?: string[]; // quick summary
+  decisions?: string[]; // FK into DecisionFrames
+  actions?: string[]; // FK into ActionFrames / tickets
+  transcript_refs?: string[]; // logs, recordings, summary frames
   tags?: string[];
 }
 ```
@@ -169,7 +170,7 @@ interface DecisionFrame {
   frame_type: "decision";
   decision_id: string;
   title: string;
-  context_frames: string[];   // specs, incidents, code Frames, MeetingFrames
+  context_frames: string[]; // specs, incidents, code Frames, MeetingFrames
   options: {
     id: string;
     summary: string;
@@ -179,10 +180,10 @@ interface DecisionFrame {
   }[];
   chosen_option_id?: string;
   status: DecisionStatus;
-  receipts?: string[];        // approval receipts
-  constraints?: string[];     // policy references
+  receipts?: string[]; // approval receipts
+  constraints?: string[]; // policy references
   effective_from_utc?: string;
-  superseded_by?: string;     // new DecisionFrame ID
+  superseded_by?: string; // new DecisionFrame ID
 }
 ```
 
@@ -342,7 +343,7 @@ Focus: **capture** before **control**.
   - “What decisions were made about Y in the last quarter?”
   - “Generate meeting minutes from transcript + chat.”
 - No automated changes to calendars. No meeting budget logic.
-  This is just about enabling *queryable history*.
+  This is just about enabling _queryable history_.
 
 ### 8.2 2.x Era — Assist, Don’t Replace
 
@@ -384,6 +385,7 @@ This concept fits the existing narrative in a clean way:
 Applying the same ideas to meetings does three things:
 
 1. Makes SmarterGPT a **credible customer-zero** story:
+
    > “We run SmarterGPT on SmarterGPT, and it measurably shrinks the time we spend in meetings.”
 
 2. Keeps the **IP boundary** clean: Lex remains a general-purpose memory/policy engine; LexRunner remains the orchestration layer that can operate on code, calendars, or any other domain, as long as it’s framed as structured runs and receipts.

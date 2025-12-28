@@ -5,6 +5,7 @@ This directory demonstrates the structure and contents of a local development pr
 ## Purpose
 
 The local profile (`.smartergpt.local/`) serves as:
+
 - **Development workspace** - Personal or project-specific customizations
 - **Write-enabled profile** - Runner can write artifacts (role: development)
 - **Gitignored overlay** - Overrides tracked profile without conflicts
@@ -49,10 +50,10 @@ The local profile (`.smartergpt.local/`) serves as:
 
 ```yaml
 # Required for local profile
-role: development  # Enables write operations
+role: development # Enables write operations
 name: my-project-local
 version: 1.0.0
-projectType: typescript  # Auto-detected by init-local
+projectType: typescript # Auto-detected by init-local
 
 # Optional metadata
 description: Local development profile
@@ -61,6 +62,7 @@ created: 2025-11-13
 ```
 
 **Key Field:**
+
 - `role: development` - **REQUIRED** to enable write operations
 - Without this, runner will refuse to write artifacts
 
@@ -70,16 +72,19 @@ created: 2025-11-13
 # Local Development Intent
 
 ## Current Focus
+
 - Testing merge-weave with specific PR set
 - Debugging dependency resolution
 - Iterating on prompt templates
 
 ## Local Goals
+
 - Fix CI/CD pipeline issues
 - Add new gate for security scanning
 - Update documentation
 
 ## Notes
+
 - Using Lex prompts via symlink
 - Testing against staging environment
 ```
@@ -90,11 +95,11 @@ created: 2025-11-13
 version: 1
 target: main
 sources:
-  - query: "is:pr is:open author:@me"  # Local: only my PRs
+  - query: "is:pr is:open author:@me" # Local: only my PRs
 selectors:
   include_labels:
     - "ready-to-merge"
-    - "wip"  # Local: include work-in-progress
+    - "wip" # Local: include work-in-progress
   exclude_labels:
     - "do-not-merge"
 defaults:
@@ -112,12 +117,12 @@ gates:
     run: npm run typecheck
     runtime: local
   - name: test
-    run: npm test -- --reporter=verbose  # Local: verbose output
+    run: npm test -- --reporter=verbose # Local: verbose output
     runtime: local
   - name: lint
     run: npm run lint
     runtime: local
-  - name: security  # Local: additional gate
+  - name: security # Local: additional gate
     run: npm audit --audit-level=moderate
     runtime: local
 ```
@@ -272,6 +277,7 @@ vim .smartergpt.local/scope.yml
 ```
 
 This prevents:
+
 - ❌ Accidental commits of personal config
 - ❌ Merge conflicts between developers
 - ❌ Leaking sensitive information
@@ -280,19 +286,22 @@ This prevents:
 ## Write Protection
 
 With `role: development`, the runner can:
+
 - ✅ Write to `runner/` directory (plan.json, cache, logs)
 - ✅ Write to `deliverables/` directory (reports, analysis)
 - ❌ Write to config files (intent.md, scope.yml, etc.) - manual only
 
 If you accidentally set `role: example`:
+
 ```
 WriteProtectionError: Cannot write to profile with role=example
 Operation: write deliverables
 ```
 
 Fix by updating `profile.yml`:
+
 ```yaml
-role: development  # Change from "example"
+role: development # Change from "example"
 ```
 
 ## Customization Workflow

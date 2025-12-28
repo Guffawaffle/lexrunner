@@ -21,6 +21,7 @@ This document clarifies the relationship between **Lex's memory tools** and **Le
 **Purpose:** Long-term episodic memory for AI agents
 
 **Key Tools:**
+
 - `mcp_lex_frame_recall` — Search Frames by reference point with Atlas Frame context
 - `mcp_lex_frame_remember` — Create new Frame with validation
 - `mcp_lex_frame_list` — List recent Frames
@@ -29,6 +30,7 @@ This document clarifies the relationship between **Lex's memory tools** and **Le
 **Storage:** SQLite database in `.lex/memory.db`
 
 **When to use:**
+
 - ✅ General-purpose memory recall across any workflow
 - ✅ Storing architectural decisions and context
 - ✅ Long-term memory that persists across sessions
@@ -41,12 +43,14 @@ This document clarifies the relationship between **Lex's memory tools** and **Le
 **Purpose:** Executor-specific workflow integration
 
 **Key Tools:**
+
 - `executor_recall_context` — Senior Dev workflow recall (delegates to `lex recall` CLI)
 - `executor_capture_frame` — Senior Dev frame capture (delegates to `lex remember` CLI)
 
 **Storage:** Same as Lex (delegates to Lex CLI, which writes to `.lex/memory.db`)
 
 **When to use:**
+
 - ✅ Within Senior Dev executor workflow
 - ✅ When you need executor-specific context preparation
 - ✅ When using other executor tools (prepare_context, capture_frame)
@@ -88,14 +92,14 @@ This document clarifies the relationship between **Lex's memory tools** and **Le
 
 ## Key Differences
 
-| Aspect | Lex MCP Tools | LexRunner Executor Tools |
-|--------|---------------|-------------------------|
-| **Database** | Same (`.lex/memory.db`) | Same (delegates to Lex) |
-| **Protocol** | Direct MCP to Lex | MCP → CLI wrapper → Lex |
-| **Scope** | General-purpose memory | Executor workflow-specific |
-| **Features** | Full Lex feature set | Subset with workflow context |
-| **Performance** | Direct (faster) | CLI wrapper (slight overhead) |
-| **Use Case** | Primary memory access | Executor integration |
+| Aspect          | Lex MCP Tools           | LexRunner Executor Tools      |
+| --------------- | ----------------------- | ----------------------------- |
+| **Database**    | Same (`.lex/memory.db`) | Same (delegates to Lex)       |
+| **Protocol**    | Direct MCP to Lex       | MCP → CLI wrapper → Lex       |
+| **Scope**       | General-purpose memory  | Executor workflow-specific    |
+| **Features**    | Full Lex feature set    | Subset with workflow context  |
+| **Performance** | Direct (faster)         | CLI wrapper (slight overhead) |
+| **Use Case**    | Primary memory access   | Executor integration          |
 
 ---
 
@@ -110,11 +114,12 @@ This document clarifies the relationship between **Lex's memory tools** and **Le
 - ✅ You're storing non-executor context (e.g., architectural decisions, user preferences)
 
 **Example:**
+
 ```typescript
 // Recall all frames about authentication
 const frames = await callTool("mcp_lex_frame_recall", {
   reference_point: "authentication",
-  limit: 10
+  limit: 10,
 });
 ```
 
@@ -126,12 +131,13 @@ const frames = await callTool("mcp_lex_frame_recall", {
 - ✅ You want executor workflow integration
 
 **Example:**
+
 ```typescript
 // Recall frames for a specific module in executor workflow
 const frames = await callTool("executor_recall_context", {
   query_type: "module",
   query: "src/gates",
-  limit: 10
+  limit: 10,
 });
 ```
 
@@ -140,6 +146,7 @@ const frames = await callTool("executor_recall_context", {
 ## Anti-Pattern: Don't Store in One, Recall from Another (Split Brain)
 
 ❌ **Bad:**
+
 ```typescript
 // Store in Lex
 await callTool("mcp_lex_frame_remember", { ... });
@@ -149,6 +156,7 @@ const frames = await callTool("executor_recall_context", { ... });
 ```
 
 ✅ **Good:**
+
 ```typescript
 // If using Lex for storage, use Lex for recall
 await callTool("mcp_lex_frame_remember", { ... });
@@ -167,16 +175,19 @@ const frames = await callTool("executor_recall_context", { ... });
 **Future Direction:** Lex MCP tools are primary; executor tools may be simplified
 
 ### Phase 1 (Current - v0.1.x)
+
 - ✅ Both Lex MCP and LexRunner executor tools available
 - ✅ Documentation clarifies relationship
 - ✅ No deprecation warnings
 
 ### Phase 2 (Planned - v0.2.x)
+
 - Evaluate usage patterns
 - Consider simplifying `executor_recall_context` to just call `mcp_lex_frame_recall`
 - Add deprecation warnings if appropriate
 
 ### Phase 3 (Future - v1.0.x)
+
 - Consolidate to single memory interface
 - Executor tools become thin wrappers or removed
 - Migration guide provided
@@ -191,11 +202,8 @@ const frames = await callTool("executor_recall_context", { ... });
 // executor_recall_context implementation (simplified)
 async function recallSeniorDevContext(input) {
   // Delegates to Lex CLI
-  const result = runCommand("lex", [
-    "recall",
-    `reviews for ${input.query}`
-  ]);
-  
+  const result = runCommand("lex", ["recall", `reviews for ${input.query}`]);
+
   // Parses and returns frames
   return {
     frames: parseFramesFromLexOutput(result.output),
@@ -215,9 +223,9 @@ async function handleRecall(args) {
   // Direct database query
   const frames = await this.frameStore.searchFrames({
     referencePoint: args.reference_point,
-    limit: args.limit
+    limit: args.limit,
   });
-  
+
   // Returns frames with Atlas Frame context
   return { frames, atlasFrame };
 }
@@ -263,6 +271,7 @@ async function handleRecall(args) {
 ## Changelog
 
 ### v1.0.0 (2025-12-20)
+
 - ✅ Initial documentation of memory tools relationship
 - ✅ Clarified Lex vs LexRunner executor tools
 - ✅ Added decision guide and anti-patterns

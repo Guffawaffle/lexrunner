@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { TierAssignment } from "./tiers/schema.js";
-import {
-	AXErrorException,
-	planValidationError,
-	configInvalidError,
-} from "./errors/index.js";
+import { AXErrorException, planValidationError, configInvalidError } from "./errors/index.js";
 
 /**
  * Schema v1 for plan.json - the single frozen runtime input
@@ -23,15 +19,15 @@ export type NodeStatus = z.infer<typeof NodeStatus>;
  * Gate execution result
  */
 export const GateResult = z.object({
-	gate: z.string(),
-	status: GateStatus,
-	exitCode: z.number().optional(),
-	duration: z.number().optional(), // milliseconds
-	stdout: z.string().optional(),
-	stderr: z.string().optional(),
-	artifacts: z.array(z.string()).optional(),
-	attempts: z.number().default(1),
-	lastAttempt: z.string().optional() // ISO timestamp
+  gate: z.string(),
+  status: GateStatus,
+  exitCode: z.number().optional(),
+  duration: z.number().optional(), // milliseconds
+  stdout: z.string().optional(),
+  stderr: z.string().optional(),
+  artifacts: z.array(z.string()).optional(),
+  attempts: z.number().default(1),
+  lastAttempt: z.string().optional(), // ISO timestamp
 });
 export type GateResult = z.infer<typeof GateResult>;
 
@@ -39,11 +35,11 @@ export type GateResult = z.infer<typeof GateResult>;
  * Node execution state
  */
 export const NodeResult = z.object({
-	name: z.string(),
-	status: NodeStatus,
-	gates: z.array(GateResult).default([]),
-	blockedBy: z.array(z.string()).optional(), // names of nodes that blocked this one
-	eligibleForMerge: z.boolean().default(false)
+  name: z.string(),
+  status: NodeStatus,
+  gates: z.array(GateResult).default([]),
+  blockedBy: z.array(z.string()).optional(), // names of nodes that blocked this one
+  eligibleForMerge: z.boolean().default(false),
 });
 export type NodeResult = z.infer<typeof NodeResult>;
 
@@ -53,40 +49,39 @@ export type NodeResult = z.infer<typeof NodeResult>;
  * - Minor: additive required fields with safe defaults
  * - Major: breaking changes to structure or semantics
  */
-export const SchemaVersion = z.string().regex(
-	/^1\.\d+\.\d+$/,
-	"Schema version must be 1.x.y format"
-);
+export const SchemaVersion = z
+  .string()
+  .regex(/^1\.\d+\.\d+$/, "Schema version must be 1.x.y format");
 
 /**
  * Validate schema version compatibility
  */
 export function validateSchemaVersion(version: string): void {
-	const parsed = SchemaVersion.safeParse(version);
-	if (!parsed.success) {
-		const axError = configInvalidError(
-			`Unsupported schema version: ${version}. This runner only supports schema version 1.x.y`,
-			{ version, expected: "1.x.y" }
-		);
-		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
-	}
+  const parsed = SchemaVersion.safeParse(version);
+  if (!parsed.success) {
+    const axError = configInvalidError(
+      `Unsupported schema version: ${version}. This runner only supports schema version 1.x.y`,
+      { version, expected: "1.x.y" }
+    );
+    throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
+  }
 
-	const [major] = version.split('.').map(Number);
-	if (major !== 1) {
-		const axError = configInvalidError(
-			`Incompatible schema major version: ${major}. This runner only supports major version 1.`,
-			{ version, major, expectedMajor: 1 }
-		);
-		throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
-	}
+  const [major] = version.split(".").map(Number);
+  if (major !== 1) {
+    const axError = configInvalidError(
+      `Incompatible schema major version: ${major}. This runner only supports major version 1.`,
+      { version, major, expectedMajor: 1 }
+    );
+    throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
+  }
 }
 
 /**
  * Retry configuration for gates
  */
 export const RetryConfig = z.object({
-	maxAttempts: z.number().int().min(1).default(1),
-	backoffSeconds: z.number().min(0).default(0)
+  maxAttempts: z.number().int().min(1).default(1),
+  backoffSeconds: z.number().min(0).default(0),
 });
 export type RetryConfig = z.infer<typeof RetryConfig>;
 
@@ -94,8 +89,8 @@ export type RetryConfig = z.infer<typeof RetryConfig>;
  * Admin override configuration
  */
 export const AdminOverride = z.object({
-	allowedUsers: z.array(z.string()).optional(),
-	requireReason: z.boolean().default(false)
+  allowedUsers: z.array(z.string()).optional(),
+  requireReason: z.boolean().default(false),
 });
 export type AdminOverride = z.infer<typeof AdminOverride>;
 
@@ -103,61 +98,67 @@ export type AdminOverride = z.infer<typeof AdminOverride>;
  * Merge rule types
  */
 export const MergeRule = z.object({
-	type: z.enum(["strict-required"]).default("strict-required"),
-	// Future: could add "best-effort", "admin-override-allowed", etc.
+  type: z.enum(["strict-required"]).default("strict-required"),
+  // Future: could add "best-effort", "admin-override-allowed", etc.
 });
 export type MergeRule = z.infer<typeof MergeRule>;
 
 /**
  * Performance configuration for scale optimization
  */
-export const PerformanceConfig = z.object({
-	maxMemoryMB: z.number().int().min(128).optional(), // Memory limit in MB
-	batchSize: z.number().int().min(1).default(50), // Batch size for large plans
-	cacheTTLSeconds: z.number().int().min(0).default(3600), // Cache TTL in seconds
-	enableCaching: z.boolean().default(true), // Enable operation caching
-	throttleOnMemory: z.boolean().default(true), // Throttle workers when memory high
-	memoryThresholdPercent: z.number().min(0).max(100).default(80) // Memory threshold %
-}).default(() => ({
-	batchSize: 50,
-	cacheTTLSeconds: 3600,
-	enableCaching: true,
-	throttleOnMemory: true,
-	memoryThresholdPercent: 80
-}));
+export const PerformanceConfig = z
+  .object({
+    maxMemoryMB: z.number().int().min(128).optional(), // Memory limit in MB
+    batchSize: z.number().int().min(1).default(50), // Batch size for large plans
+    cacheTTLSeconds: z.number().int().min(0).default(3600), // Cache TTL in seconds
+    enableCaching: z.boolean().default(true), // Enable operation caching
+    throttleOnMemory: z.boolean().default(true), // Throttle workers when memory high
+    memoryThresholdPercent: z.number().min(0).max(100).default(80), // Memory threshold %
+  })
+  .default(() => ({
+    batchSize: 50,
+    cacheTTLSeconds: 3600,
+    enableCaching: true,
+    throttleOnMemory: true,
+    memoryThresholdPercent: 80,
+  }));
 export type PerformanceConfig = z.infer<typeof PerformanceConfig>;
 
 /**
  * Security policy for vulnerability thresholds in vuln gate
  */
-export const VulnPolicy = z.object({
-	blockCritical: z.boolean().default(true),
-	blockHigh: z.boolean().default(true),
-	maxMedium: z.number().int().min(0).default(5),
-	maxLow: z.number().int().min(0).default(10),
-}).default(() => ({
-	blockCritical: true,
-	blockHigh: true,
-	maxMedium: 5,
-	maxLow: 10,
-}));
+export const VulnPolicy = z
+  .object({
+    blockCritical: z.boolean().default(true),
+    blockHigh: z.boolean().default(true),
+    maxMedium: z.number().int().min(0).default(5),
+    maxLow: z.number().int().min(0).default(10),
+  })
+  .default(() => ({
+    blockCritical: true,
+    blockHigh: true,
+    maxMedium: 5,
+    maxLow: 10,
+  }));
 export type VulnPolicy = z.infer<typeof VulnPolicy>;
 
 /**
  * Policy configuration for the plan execution
  */
 export const Policy = z.object({
-	requiredGates: z.array(z.string()).default([]),
-	optionalGates: z.array(z.string()).default([]),
-	maxWorkers: z.number().int().min(1).default(1),
-	retries: z.record(z.string(), RetryConfig).default(() => ({})),
-	overrides: z.object({
-		adminGreen: AdminOverride.optional()
-	}).default(() => ({})),
-	blockOn: z.array(z.string()).default([]),
-	mergeRule: MergeRule.default({ type: "strict-required" }),
-	performance: PerformanceConfig.optional(), // Performance tuning options
-	security: VulnPolicy.optional() // Security/vulnerability thresholds for vuln gate
+  requiredGates: z.array(z.string()).default([]),
+  optionalGates: z.array(z.string()).default([]),
+  maxWorkers: z.number().int().min(1).default(1),
+  retries: z.record(z.string(), RetryConfig).default(() => ({})),
+  overrides: z
+    .object({
+      adminGreen: AdminOverride.optional(),
+    })
+    .default(() => ({})),
+  blockOn: z.array(z.string()).default([]),
+  mergeRule: MergeRule.default({ type: "strict-required" }),
+  performance: PerformanceConfig.optional(), // Performance tuning options
+  security: VulnPolicy.optional(), // Security/vulnerability thresholds for vuln gate
 });
 export type Policy = z.infer<typeof Policy>;
 
@@ -165,9 +166,9 @@ export type Policy = z.infer<typeof Policy>;
  * Container mount specification
  */
 export const ContainerMount = z.object({
-	source: z.string(),
-	target: z.string(),
-	type: z.enum(["bind", "volume"]).default("bind")
+  source: z.string(),
+  target: z.string(),
+  type: z.enum(["bind", "volume"]).default("bind"),
 });
 export type ContainerMount = z.infer<typeof ContainerMount>;
 
@@ -175,26 +176,28 @@ export type ContainerMount = z.infer<typeof ContainerMount>;
  * Container specification for gate execution
  */
 export const ContainerSpec = z.object({
-	image: z.string(),
-	entrypoint: z.array(z.string()).optional(),
-	mounts: z.array(ContainerMount).optional()
+  image: z.string(),
+  entrypoint: z.array(z.string()).optional(),
+  mounts: z.array(ContainerMount).optional(),
 });
 export type ContainerSpec = z.infer<typeof ContainerSpec>;
 
-export const Gate = z.object({
-	name: z.string(),
-	run: z.string(),
-	cwd: z.string().optional(),
-	env: z.record(z.string(), z.string()).default(() => ({})),
-	// Runtime configuration
-	runtime: z.enum(["local", "container", "ci-service"]).default("local"),
-	// Container spec (only used when runtime is "container")
-	container: ContainerSpec.optional(),
-	// Expected artifact paths (for output collection)
-	artifacts: z.array(z.string()).default([]),
-	// Optional input data for gates that require structured inputs (validated against gate-specific schemas)
-	input: z.record(z.string(), z.unknown()).optional()
-}).strict();
+export const Gate = z
+  .object({
+    name: z.string(),
+    run: z.string(),
+    cwd: z.string().optional(),
+    env: z.record(z.string(), z.string()).default(() => ({})),
+    // Runtime configuration
+    runtime: z.enum(["local", "container", "ci-service"]).default("local"),
+    // Container spec (only used when runtime is "container")
+    container: ContainerSpec.optional(),
+    // Expected artifact paths (for output collection)
+    artifacts: z.array(z.string()).default([]),
+    // Optional input data for gates that require structured inputs (validated against gate-specific schemas)
+    input: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 export type Gate = z.infer<typeof Gate>;
 
 /**
@@ -202,30 +205,34 @@ export type Gate = z.infer<typeof Gate>;
  * Note: Input generator defaults name := id when name is unset.
  * All deps references must match item names in the final plan.
  */
-export const PlanItem = z.object({
-	name: z.string(),
-	deps: z.string().array().default([]), // Dependency references by item name
-	gates: z.array(Gate).default([]),
-	// Tier routing for governance (optional - added during plan generation or execution)
-	tier: TierAssignment.optional()
-}).strict();
+export const PlanItem = z
+  .object({
+    name: z.string(),
+    deps: z.string().array().default([]), // Dependency references by item name
+    gates: z.array(Gate).default([]),
+    // Tier routing for governance (optional - added during plan generation or execution)
+    tier: TierAssignment.optional(),
+  })
+  .strict();
 export type PlanItem = z.infer<typeof PlanItem>;
 
-export const Plan = z.object({
-	schemaVersion: SchemaVersion,
-	target: z.string().default("main"),
-	policy: Policy.optional(),
-	items: z.array(PlanItem).default([])
-}).strict();
+export const Plan = z
+  .object({
+    schemaVersion: SchemaVersion,
+    target: z.string().default("main"),
+    policy: Policy.optional(),
+    items: z.array(PlanItem).default([]),
+  })
+  .strict();
 export type Plan = z.infer<typeof Plan>;
 
 /**
  * Machine-readable validation error
  */
 export interface ValidationError {
-	path: string;
-	message: string;
-	code: string;
+  path: string;
+  message: string;
+  code: string;
 }
 
 /**
@@ -233,70 +240,74 @@ export interface ValidationError {
  * Now extends AXErrorException to provide structured error with nextActions
  */
 export class SchemaValidationError extends AXErrorException {
-	public readonly issues: z.ZodIssue[];
-	public readonly errors: ValidationError[];
+  public readonly issues: z.ZodIssue[];
+  public readonly errors: ValidationError[];
 
-	constructor(issues: z.ZodIssue[]) {
-		const errors = issues.map(issue => ({
-			path: issue.path.join('.'),
-			message: issue.message,
-			code: issue.code
-		}));
+  constructor(issues: z.ZodIssue[]) {
+    const errors = issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+      code: issue.code,
+    }));
 
-		const errorStrings = errors.map(e => `${e.path}: ${e.message}`);
-		const axError = planValidationError({ 
-			errors: errorStrings
-			// planPath is omitted as it's not available in this context
-		});
-		
-		super(axError.code, axError.message, axError.nextActions, axError.context);
-		this.name = "SchemaValidationError";
-		this.issues = issues;
-		this.errors = errors;
-	}
+    const errorStrings = errors.map((e) => `${e.path}: ${e.message}`);
+    const axError = planValidationError({
+      errors: errorStrings,
+      // planPath is omitted as it's not available in this context
+    });
 
-	/**
-	 * Get legacy machine-readable error format for backward compatibility
-	 */
-	toLegacyJSON(): { valid: false; errors: ValidationError[] } {
-		return {
-			valid: false,
-			errors: this.errors
-		};
-	}
+    super(axError.code, axError.message, axError.nextActions, axError.context);
+    this.name = "SchemaValidationError";
+    this.issues = issues;
+    this.errors = errors;
+  }
+
+  /**
+   * Get legacy machine-readable error format for backward compatibility
+   */
+  toLegacyJSON(): { valid: false; errors: ValidationError[] } {
+    return {
+      valid: false,
+      errors: this.errors,
+    };
+  }
 }
 
 /**
  * Validate a plan object against the schema
  */
 export function validatePlan(planData: unknown): Plan {
-	// First validate the basic structure
-	const result = Plan.safeParse(planData);
-	if (!result.success) {
-		throw new SchemaValidationError(result.error.issues);
-	}
+  // First validate the basic structure
+  const result = Plan.safeParse(planData);
+  if (!result.success) {
+    throw new SchemaValidationError(result.error.issues);
+  }
 
-	// Then validate schema version compatibility
-	validateSchemaVersion(result.data.schemaVersion);
+  // Then validate schema version compatibility
+  validateSchemaVersion(result.data.schemaVersion);
 
-	return result.data;
+  return result.data;
 }
 
 /**
  * Load and validate a plan.json file
  */
 export function loadPlan(planContent: string): Plan {
-	try {
-		const planData = JSON.parse(planContent);
-		return validatePlan(planData);
-	} catch (error) {
-		if (error instanceof SyntaxError) {
-			const axError = configInvalidError(
-				`Invalid JSON: ${error.message}`,
-				{ parseError: error.message }
-			);
-			throw new AXErrorException(axError.code, axError.message, axError.nextActions, axError.context);
-		}
-		throw error;
-	}
+  try {
+    const planData = JSON.parse(planContent);
+    return validatePlan(planData);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      const axError = configInvalidError(`Invalid JSON: ${error.message}`, {
+        parseError: error.message,
+      });
+      throw new AXErrorException(
+        axError.code,
+        axError.message,
+        axError.nextActions,
+        axError.context
+      );
+    }
+    throw error;
+  }
 }

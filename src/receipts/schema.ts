@@ -22,33 +22,19 @@ import { z } from "zod";
 /**
  * Confidence level for an action's expected outcome
  */
-export const ConfidenceLevel = z.enum([
-	"high",
-	"medium",
-	"low",
-	"uncertain",
-]);
+export const ConfidenceLevel = z.enum(["high", "medium", "low", "uncertain"]);
 export type ConfidenceLevel = z.infer<typeof ConfidenceLevel>;
 
 /**
  * Reversibility classification for actions
  */
-export const ReversibilityLevel = z.enum([
-	"reversible",
-	"partially-reversible",
-	"irreversible",
-]);
+export const ReversibilityLevel = z.enum(["reversible", "partially-reversible", "irreversible"]);
 export type ReversibilityLevel = z.infer<typeof ReversibilityLevel>;
 
 /**
  * Outcome of an action
  */
-export const Outcome = z.enum([
-	"success",
-	"failure",
-	"partial",
-	"deferred",
-]);
+export const Outcome = z.enum(["success", "failure", "partial", "deferred"]);
 export type Outcome = z.infer<typeof Outcome>;
 
 // =============================================================================
@@ -80,71 +66,71 @@ export type Outcome = z.infer<typeof Outcome>;
  * ```
  */
 export const ActionReceiptSchema = z.object({
-	/** Schema version for forward compatibility */
-	schemaVersion: z.literal("1.0.0"),
+  /** Schema version for forward compatibility */
+  schemaVersion: z.literal("1.0.0"),
 
-	/** Kind identifier for this receipt type */
-	kind: z.literal("ActionReceipt"),
+  /** Kind identifier for this receipt type */
+  kind: z.literal("ActionReceipt"),
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// What (Action Description)
-	// ─────────────────────────────────────────────────────────────────────────
-	/** Human-readable description of the action taken */
-	action: z.string(),
+  // ─────────────────────────────────────────────────────────────────────────
+  // What (Action Description)
+  // ─────────────────────────────────────────────────────────────────────────
+  /** Human-readable description of the action taken */
+  action: z.string(),
 
-	/** Outcome of the action */
-	outcome: Outcome,
+  /** Outcome of the action */
+  outcome: Outcome,
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Why (Decision Rationale)
-	// ─────────────────────────────────────────────────────────────────────────
-	/** Explanation for why this action was taken */
-	rationale: z.string(),
+  // ─────────────────────────────────────────────────────────────────────────
+  // Why (Decision Rationale)
+  // ─────────────────────────────────────────────────────────────────────────
+  /** Explanation for why this action was taken */
+  rationale: z.string(),
 
-	/** Confidence level in the action's success */
-	confidence: ConfidenceLevel,
+  /** Confidence level in the action's success */
+  confidence: ConfidenceLevel,
 
-	/** Notes about sources of uncertainty (when confidence < high) */
-	uncertaintyNotes: z.array(z.string()).optional(),
+  /** Notes about sources of uncertainty (when confidence < high) */
+  uncertaintyNotes: z.array(z.string()).optional(),
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Reversibility (Rollback Support)
-	// ─────────────────────────────────────────────────────────────────────────
-	/** Classification of action reversibility */
-	reversibility: ReversibilityLevel,
+  // ─────────────────────────────────────────────────────────────────────────
+  // Reversibility (Rollback Support)
+  // ─────────────────────────────────────────────────────────────────────────
+  /** Classification of action reversibility */
+  reversibility: ReversibilityLevel,
 
-	/** Human-readable rollback instructions */
-	rollbackPath: z.string().optional(),
+  /** Human-readable rollback instructions */
+  rollbackPath: z.string().optional(),
 
-	/** Actual command to execute for rollback */
-	rollbackCommand: z.string().optional(),
+  /** Actual command to execute for rollback */
+  rollbackCommand: z.string().optional(),
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Recovery (Next Steps)
-	// ─────────────────────────────────────────────────────────────────────────
-	/** Suggested next actions (for success or failure) */
-	nextActions: z.array(z.string()).optional(),
+  // ─────────────────────────────────────────────────────────────────────────
+  // Recovery (Next Steps)
+  // ─────────────────────────────────────────────────────────────────────────
+  /** Suggested next actions (for success or failure) */
+  nextActions: z.array(z.string()).optional(),
 
-	/** Whether human escalation is required */
-	escalationRequired: z.boolean().default(false),
+  /** Whether human escalation is required */
+  escalationRequired: z.boolean().default(false),
 
-	/** Reason for escalation (when escalationRequired is true) */
-	escalationReason: z.string().optional(),
+  /** Reason for escalation (when escalationRequired is true) */
+  escalationReason: z.string().optional(),
 
-	// ─────────────────────────────────────────────────────────────────────────
-	// Metadata
-	// ─────────────────────────────────────────────────────────────────────────
-	/** ISO 8601 timestamp of when the action was taken */
-	timestamp: z.string().datetime(),
+  // ─────────────────────────────────────────────────────────────────────────
+  // Metadata
+  // ─────────────────────────────────────────────────────────────────────────
+  /** ISO 8601 timestamp of when the action was taken */
+  timestamp: z.string().datetime(),
 
-	/** Execution phase (e.g., 'planning', 'apply', 'verify') */
-	phase: z.string().optional(),
+  /** Execution phase (e.g., 'planning', 'apply', 'verify') */
+  phase: z.string().optional(),
 
-	/** Run ID for correlation */
-	runId: z.string().optional(),
+  /** Run ID for correlation */
+  runId: z.string().optional(),
 
-	/** Plan hash for verification */
-	planHash: z.string().optional(),
+  /** Plan hash for verification */
+  planHash: z.string().optional(),
 });
 
 export type ActionReceipt = z.infer<typeof ActionReceiptSchema>;
@@ -177,23 +163,23 @@ export type ActionReceipt = z.infer<typeof ActionReceiptSchema>;
  * ```
  */
 export const UncertaintyMarkerSchema = z.object({
-	/** Operation about to be performed */
-	operation: z.string(),
+  /** Operation about to be performed */
+  operation: z.string(),
 
-	/** Explicit list of known uncertainties */
-	uncertainties: z.array(z.string()),
+  /** Explicit list of known uncertainties */
+  uncertainties: z.array(z.string()),
 
-	/** Mitigations in place for the uncertainties */
-	mitigations: z.array(z.string()),
+  /** Mitigations in place for the uncertainties */
+  mitigations: z.array(z.string()),
 
-	/** Whether proceeding despite uncertainties */
-	proceedingAnyway: z.boolean(),
+  /** Whether proceeding despite uncertainties */
+  proceedingAnyway: z.boolean(),
 
-	/** Reason for proceeding (if proceedingAnyway is true) */
-	reason: z.string().optional(),
+  /** Reason for proceeding (if proceedingAnyway is true) */
+  reason: z.string().optional(),
 
-	/** Timestamp of uncertainty declaration */
-	timestamp: z.string().datetime().optional(),
+  /** Timestamp of uncertainty declaration */
+  timestamp: z.string().datetime().optional(),
 });
 
 export type UncertaintyMarker = z.infer<typeof UncertaintyMarkerSchema>;
@@ -214,32 +200,28 @@ export type UncertaintyMarker = z.infer<typeof UncertaintyMarkerSchema>;
  * These fields are added to the context object.
  */
 export interface GovernanceContext {
-	/** How reversible is this action/error condition? */
-	reversibility?: ReversibilityLevel;
+  /** How reversible is this action/error condition? */
+  reversibility?: ReversibilityLevel;
 
-	/** Rollback instructions (human-readable) */
-	rollbackPath?: string;
+  /** Rollback instructions (human-readable) */
+  rollbackPath?: string;
 
-	/** Actual command to execute for rollback */
-	rollbackCommand?: string;
+  /** Actual command to execute for rollback */
+  rollbackCommand?: string;
 
-	/** Agent confidence before the action was taken */
-	confidence?: ConfidenceLevel;
+  /** Agent confidence before the action was taken */
+  confidence?: ConfidenceLevel;
 
-	/** Source uncertainties that may have contributed to failure */
-	uncertaintyNotes?: string[];
+  /** Source uncertainties that may have contributed to failure */
+  uncertaintyNotes?: string[];
 }
 
 /**
  * Type guard to check if context contains governance fields
  */
 export function hasGovernanceContext(
-	context: Record<string, unknown> | undefined
+  context: Record<string, unknown> | undefined
 ): context is GovernanceContext & Record<string, unknown> {
-	if (!context) return false;
-	return (
-		"reversibility" in context ||
-		"rollbackPath" in context ||
-		"confidence" in context
-	);
+  if (!context) return false;
+  return "reversibility" in context || "rollbackPath" in context || "confidence" in context;
 }

@@ -9,22 +9,22 @@
 
 // Runtime gate for git operations (LEX_GIT_MODE)
 export {
-	getGitMode,
-	isGitEnabled,
-	getDefaultBranch,
-	getDefaultCommit,
-	type GitMode,
+  getGitMode,
+  isGitEnabled,
+  getDefaultBranch,
+  getDefaultCommit,
+  type GitMode,
 } from "./runtime.js";
 
 // Git operation wrappers with safe defaults
 export {
-	runGit,
-	getCurrentBranch,
-	getCurrentCommit,
-	getRemoteUrl,
-	isGitRepository,
-	getRepositoryRoot,
-	isGitDryRun,
-	type GitResult,
-	type RunGitOptions,
+  runGit,
+  getCurrentBranch,
+  getCurrentCommit,
+  getRemoteUrl,
+  isGitRepository,
+  getRepositoryRoot,
+  isGitDryRun,
+  type GitResult,
+  type RunGitOptions,
 } from "./runGit.js";

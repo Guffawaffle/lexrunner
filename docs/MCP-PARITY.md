@@ -10,42 +10,42 @@ This document establishes parity between the CLI interface and MCP server tools 
 
 ### Core Commands
 
-| CLI Command | MCP Tool | Parity | Notes |
-|-------------|----------|--------|-------|
-| `plan` | `plan.create` | ✅ Full | Both support GitHub auto-discovery, labels, gates, target |
-| `execute` | `gates.run` | ✅ Full | MCP accepts external planFile or internal state |
-| `merge` | `merge.apply` | ✅ Full | MCP enforces ALLOW_MUTATIONS for safety |
-| `discover` | `discover` | ✅ Full | Added in AX-004 audit |
-| `status` | `status` | ✅ Full | Added in AX-004 audit |
-| `doctor` | `doctor` | ✅ Full | Added in AX-004 audit |
-| `health` | `health` | ✅ Full | MCP tool, CLI uses `doctor --json` |
-| `merge-order` | `merge-order` | ✅ Full | Added in AX-004 audit |
+| CLI Command   | MCP Tool      | Parity  | Notes                                                     |
+| ------------- | ------------- | ------- | --------------------------------------------------------- |
+| `plan`        | `plan.create` | ✅ Full | Both support GitHub auto-discovery, labels, gates, target |
+| `execute`     | `gates.run`   | ✅ Full | MCP accepts external planFile or internal state           |
+| `merge`       | `merge.apply` | ✅ Full | MCP enforces ALLOW_MUTATIONS for safety                   |
+| `discover`    | `discover`    | ✅ Full | Added in AX-004 audit                                     |
+| `status`      | `status`      | ✅ Full | Added in AX-004 audit                                     |
+| `doctor`      | `doctor`      | ✅ Full | Added in AX-004 audit                                     |
+| `health`      | `health`      | ✅ Full | MCP tool, CLI uses `doctor --json`                        |
+| `merge-order` | `merge-order` | ✅ Full | Added in AX-004 audit                                     |
 
 ### Configuration Commands
 
-| CLI Command | MCP Tool | Parity | Notes |
-|-------------|----------|--------|-------|
-| `init-local` | `local.init` | ✅ Full | Identical semantics |
-| `config show` | `config.show` | ✅ Full | Added in AX-004 audit |
-| n/a | `profile.resolve` | ✅ MCP Only | Internal profile resolution exposed via MCP |
+| CLI Command   | MCP Tool          | Parity      | Notes                                       |
+| ------------- | ----------------- | ----------- | ------------------------------------------- |
+| `init-local`  | `local.init`      | ✅ Full     | Identical semantics                         |
+| `config show` | `config.show`     | ✅ Full     | Added in AX-004 audit                       |
+| n/a           | `profile.resolve` | ✅ MCP Only | Internal profile resolution exposed via MCP |
 
 ### Senior Dev Executor Tools (MCP Only)
 
-| MCP Tool | CLI Equivalent | Notes |
-|----------|----------------|-------|
+| MCP Tool                     | CLI Equivalent               | Notes                          |
+| ---------------------------- | ---------------------------- | ------------------------------ |
 | `senior-dev.prepare-context` | `senior-dev prepare-context` | Full parity via CLI subcommand |
-| `senior-dev.recall-context` | `senior-dev recall-context` | Full parity via CLI subcommand |
-| `senior-dev.capture-frame` | `senior-dev capture-frame` | Full parity via CLI subcommand |
-| `senior-dev.modes` | `senior-dev modes` | Full parity via CLI subcommand |
+| `senior-dev.recall-context`  | `senior-dev recall-context`  | Full parity via CLI subcommand |
+| `senior-dev.capture-frame`   | `senior-dev capture-frame`   | Full parity via CLI subcommand |
+| `senior-dev.modes`           | `senior-dev modes`           | Full parity via CLI subcommand |
 
 ### Run Management Tools
 
-| MCP Tool | CLI Equivalent | Notes |
-|----------|----------------|-------|
-| `lexrunner.startRun` | n/a | MCP orchestration tool |
-| `lexrunner.getStatus` | n/a | MCP orchestration tool |
-| `lexrunner.listRuns` | n/a | MCP orchestration tool |
-| `lexrunner.listArtifacts` | n/a | MCP orchestration tool (mcp-server.mjs only) |
+| MCP Tool                  | CLI Equivalent | Notes                                        |
+| ------------------------- | -------------- | -------------------------------------------- |
+| `lexrunner.startRun`      | n/a            | MCP orchestration tool                       |
+| `lexrunner.getStatus`     | n/a            | MCP orchestration tool                       |
+| `lexrunner.listRuns`      | n/a            | MCP orchestration tool                       |
+| `lexrunner.listArtifacts` | n/a            | MCP orchestration tool (mcp-server.mjs only) |
 
 ## Intentional Gaps
 
@@ -53,30 +53,30 @@ This document establishes parity between the CLI interface and MCP server tools 
 
 These commands are intentionally CLI-only due to their interactive or local-only nature:
 
-| Command | Reason |
-|---------|--------|
-| `init` | Interactive wizard requiring user input |
-| `bootstrap` | Local filesystem bootstrap |
-| `view` | Interactive TUI requiring terminal |
-| `plan-review` | Interactive review with prompts |
-| `completion` | Shell-specific completion scripts |
-| `retry` | Requires local execution state |
-| `query` | Interactive query interface |
-| `plan-diff` | Local file comparison |
-| `idea` | Interactive ideation workflow |
-| `create-project` | Interactive project creation |
+| Command          | Reason                                  |
+| ---------------- | --------------------------------------- |
+| `init`           | Interactive wizard requiring user input |
+| `bootstrap`      | Local filesystem bootstrap              |
+| `view`           | Interactive TUI requiring terminal      |
+| `plan-review`    | Interactive review with prompts         |
+| `completion`     | Shell-specific completion scripts       |
+| `retry`          | Requires local execution state          |
+| `query`          | Interactive query interface             |
+| `plan-diff`      | Local file comparison                   |
+| `idea`           | Interactive ideation workflow           |
+| `create-project` | Interactive project creation            |
 
 ### MCP-Only Tools
 
 These tools are intentionally MCP-only for orchestration purposes:
 
-| Tool | Reason |
-|------|--------|
-| `lexrunner.startRun` | Run lifecycle management for agents |
-| `lexrunner.getStatus` | Agent status queries |
-| `lexrunner.listRuns` | Run enumeration for orchestration |
-| `lexrunner.listArtifacts` | Artifact inspection for agents |
-| `profile.resolve` | Internal resolution exposed for MCP clients |
+| Tool                      | Reason                                      |
+| ------------------------- | ------------------------------------------- |
+| `lexrunner.startRun`      | Run lifecycle management for agents         |
+| `lexrunner.getStatus`     | Agent status queries                        |
+| `lexrunner.listRuns`      | Run enumeration for orchestration           |
+| `lexrunner.listArtifacts` | Artifact inspection for agents              |
+| `profile.resolve`         | Internal resolution exposed for MCP clients |
 
 ## Semantic Equivalence
 
@@ -192,12 +192,12 @@ Both return:
 
 ## Error Handling Parity
 
-| Error Type | CLI Exit Code | MCP Error Code |
-|------------|---------------|----------------|
-| Success | 0 | No error |
-| System error | 1 | -32603 (Internal) |
-| Validation error | 2 | -32602 (Invalid params) |
-| Not found | 1 | -32601 (Method not found) |
+| Error Type       | CLI Exit Code | MCP Error Code            |
+| ---------------- | ------------- | ------------------------- |
+| Success          | 0             | No error                  |
+| System error     | 1             | -32603 (Internal)         |
+| Validation error | 2             | -32602 (Invalid params)   |
+| Not found        | 1             | -32601 (Method not found) |
 
 ## Testing Parity
 
@@ -223,9 +223,9 @@ jq 'keys' /tmp/mcp-discover.json
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2025-12-02 | Initial parity audit (AX-004) |
+| Version | Date       | Changes                       |
+| ------- | ---------- | ----------------------------- |
+| 1.0.0   | 2025-12-02 | Initial parity audit (AX-004) |
 
 ## References
 

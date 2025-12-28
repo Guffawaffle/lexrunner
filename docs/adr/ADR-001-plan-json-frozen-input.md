@@ -11,6 +11,7 @@
 The runner needs to compute dependency order, execute gates, and merge PRs. The question: what should its input be?
 
 Options considered:
+
 1. **Live GitHub API** — Query PRs in real-time
 2. **Issue descriptions** — Parse from GitHub Issues
 3. **Frozen file** — Single JSON file that captures all needed state
@@ -30,7 +31,7 @@ We adopt `plan.json` as the **single frozen runtime input** at integration time.
 
 ```typescript
 // Runner reads only plan.json
-const plan = loadPlan('./plan.json');
+const plan = loadPlan("./plan.json");
 
 // Runner never reads:
 // - GitHub Issues directly

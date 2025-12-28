@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**lexrunner** is a TypeScript CLI tool for parallel PR workflows with dependency management and quality gates. The tagline: *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.*
+**lexrunner** is a TypeScript CLI tool for parallel PR workflows with dependency management and quality gates. The tagline: _Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly._
 
 **Tech Stack**: TypeScript, ESM modules, Node.js 20+, Commander.js, Vitest
 
@@ -44,11 +44,13 @@ npm run generate:schemas
 ### Two-Track Separation (Critical)
 
 **Core Runner** (`src/**`):
+
 - CLI logic, MCP adapter, core library
 - NEVER stores user/work artifacts
 - Contains all runtime code
 
 **Workspace Profile** (`.smartergpt/**`):
+
 - Portable example profile only
 - Track: `intent.md`, `scope.yml`, `deps.yml`, `gates.yml`, `stack.yml`, `pull-request-template.md`
 - Ignore: `.smartergpt/runner/`, `cache/`, `deliverables/`
@@ -57,27 +59,32 @@ npm run generate:schemas
 ### Core Components
 
 **Plan Generator** (`src/core/plan.ts`):
+
 - Transforms configuration into normalized plan
 - Input: `scope.yml`, `deps.yml`, `stack.yml`, or GitHub API
 - Output: `plan.json` (schema-validated)
 - Deterministic: same inputs → identical outputs
 
 **Dependency Resolver** (`src/mergeOrder.ts`):
+
 - Kahn's algorithm for topological sort
 - Cycle detection with clear error messages
 - Alphabetical tiebreaker for deterministic ordering
 
 **Gate Executor** (`src/gates.ts`):
+
 - Runs quality gates (lint, test, typecheck, etc.)
 - Parallel execution where dependencies allow
 - Policy-aware with retry support
 
 **GitHub Integration** (`src/github/`):
+
 - Read-only API client for PR discovery
 - Auto-discovery with label filtering
 - Dependency suggestion with heuristics
 
 **MCP Server** (`src/mcp/server.ts`):
+
 - Optional Model Context Protocol adapter
 - Exposes tools: `plan.create`, `gates.run`, `merge.apply`
 - Read-only resources from `.smartergpt/runner/`
@@ -86,12 +93,14 @@ npm run generate:schemas
 ### CLI Structure
 
 Main CLI (`src/cli.ts`):
+
 - Commander.js-based command structure
 - Modular command registration (see `src/commands/`)
 - JSON output mode for CI/automation (`--json` flag)
 - Exit codes: 0 (success), 2 (validation error), 1 (system error)
 
 Key commands:
+
 - `plan` - Generate merge plan
 - `execute` - Run quality gates
 - `merge` - Execute merge operations
@@ -105,16 +114,19 @@ Key commands:
 Tests use Vitest with per-test isolation:
 
 **Unit tests** (`*.spec.ts`):
+
 - Pure function testing
 - Schema validation
 - Dependency resolution
 
 **Integration tests** (`integration-*.test.ts`):
+
 - CLI commands
 - File operations
 - End-to-end workflows
 
 **Test isolation pattern**:
+
 ```typescript
 const testDir = path.join(os.tmpdir(), `lexrunner-${path.basename(__filename)}`);
 process.chdir(testDir);
@@ -125,12 +137,14 @@ This prevents race conditions when tests run in parallel and change `process.cwd
 ## Configuration Files
 
 **Profile Resolution Precedence**:
+
 1. `--profile-dir <path>` (CLI override)
 2. `LEX_PR_PROFILE_DIR` (environment variable)
 3. `.smartergpt.local/` (local overlay, gitignored)
 4. `.smartergpt/` (example profile, tracked)
 
 **Configuration Files** (in profile directory):
+
 - `stack.yml` - Explicit plan with items/deps (highest priority)
 - `scope.yml` - PR selection criteria (fallback)
 - `deps.yml` - Dependency definitions
@@ -147,6 +161,7 @@ This codebase prioritizes **byte-for-byte deterministic outputs**:
 4. **Cross-platform**: Works identically on Windows, macOS, Linux
 
 Verify determinism:
+
 ```bash
 npm run cli -- plan --out .artifacts1
 npm run cli -- plan --out .artifacts2
@@ -158,12 +173,14 @@ cmp .artifacts1/plan.json .artifacts2/plan.json  # Should be identical
 **Critical ESM Requirements**:
 
 1. **Import extensions required**: Always use `.js` extension in imports
+
    ```typescript
-   import { foo } from "./foo.js";  // ✅ Correct
-   import { foo } from "./foo";     // ❌ Wrong
+   import { foo } from "./foo.js"; // ✅ Correct
+   import { foo } from "./foo"; // ❌ Wrong
    ```
 
 2. **No `__dirname` or `__filename`**: Use ESM equivalents
+
    ```typescript
    import { fileURLToPath } from "node:url";
    import { dirname } from "node:path";
@@ -173,6 +190,7 @@ cmp .artifacts1/plan.json .artifacts2/plan.json  # Should be identical
    ```
 
 3. **Dynamic imports**: Use `await import()` for conditional loading
+
    ```typescript
    const { reviewPlan } = await import("./interactive/planReview.js");
    ```
@@ -187,19 +205,22 @@ cmp .artifacts1/plan.json .artifacts2/plan.json  # Should be identical
 **CRITICAL**: These rules from `.github/copilot-instructions.md` apply to Claude Code as well:
 
 ✅ **Use editing tools for file modifications**:
+
 - Use `Edit` tool for modifying existing files
 - Use `Read` tool before editing to understand context
 - Use `Write` tool only for new files
 
 ❌ **NEVER use shell commands for editing**:
+
 - No `sed -i` or `awk` for in-place edits
 - No `echo > file` or `cat << EOF` for file writes
 - No `git checkout --theirs` followed by shell edits
 
 **Conflict Resolution**: Always use `Edit` tool with exact string matching:
+
 ```typescript
 // Read the conflict first
-Read({ file_path: "src/cli.ts", limit: 100 })
+Read({ file_path: "src/cli.ts", limit: 100 });
 
 // Resolve with Edit tool
 Edit({
@@ -212,8 +233,8 @@ import { baz } from "./baz.js";
 >>>>>>> branch`,
   new_string: `import { foo } from "./foo.js";
 import { bar } from "./bar.js";
-import { baz } from "./baz.js";`
-})
+import { baz } from "./baz.js";`,
+});
 ```
 
 ## Development Patterns
@@ -226,6 +247,7 @@ import { baz } from "./baz.js";`
 4. Update help text if needed
 
 Example:
+
 ```typescript
 // src/commands/mycommand.ts
 import { Command } from "commander";
@@ -261,6 +283,7 @@ registerMyCommand(program, () => jsonModeActive, exitWith);
 4. Add validation tests in `tests/`
 
 Example schema pattern:
+
 ```typescript
 import { z } from "zod";
 
@@ -275,6 +298,7 @@ export type MyType = z.infer<typeof MySchema>;
 ### Working with Profiles
 
 Development workflow:
+
 ```bash
 # Create local overlay (gitignored)
 npm run cli -- init-local
@@ -291,13 +315,15 @@ Production workflow uses `.smartergpt/` tracked profile.
 ## Common Gotchas
 
 1. **Exit codes**: Use `throwExit(code)` not `process.exit(code)` for proper cleanup
+
    ```typescript
    import { throwExit } from "./cli/exitHandler.js";
-   throwExit(2);  // ✅ Validation error
+   throwExit(2); // ✅ Validation error
    process.exit(2); // ❌ Bypasses handlers
    ```
 
 2. **JSON mode**: Check `jsonModeActive` before console.log
+
    ```typescript
    import { writeJsonOutput } from "./cli/output.js";
 
@@ -309,12 +335,14 @@ Production workflow uses `.smartergpt/` tracked profile.
    ```
 
 3. **Profile writes**: Validate write permissions for example/role profiles
+
    ```typescript
    import { validateWriteOperation } from "./config/profileResolver.js";
    validateWriteOperation(profilePath, role, "operation description");
    ```
 
 4. **Test isolation**: Use per-file temp directories to avoid parallel test conflicts
+
    ```typescript
    const testDir = path.join(os.tmpdir(), `lexrunner-test-${path.basename(__filename)}`);
    ```
@@ -378,12 +406,14 @@ scripts/                # TypeScript utility scripts
 ## TypeScript Configuration
 
 **tsconfig.json**:
+
 - Target: ES2020
 - Module: ES2020 (ESM)
 - Strict mode enabled
 - `noEmit: true` (tsup handles builds)
 
 **Build with tsup**:
+
 - Outputs both ESM (`.js`) and CJS (`.cjs`)
 - Generates `.d.ts` type definitions
 - Two entry points: `cli.ts` and `mcp/server.ts`
@@ -391,15 +421,18 @@ scripts/                # TypeScript utility scripts
 ## Git & GitHub Workflow
 
 **Commit Style**:
+
 - Imperative mood: "Add feature" not "Added feature"
 - Optional prefixes: `runner:`, `mcp:`, `schema:`, `tests:`, `ci:`, `docs:`, `workspace:`
 
 **Branch Protection**:
+
 - NEVER modify branch protections
 - NEVER force push to main/master
 - Use `--dry-run` by default for merge operations
 
 **PR Workflow**:
+
 1. Create feature branch
 2. Implement with tests
 3. Verify determinism: `npm run build && git diff --exit-code`
@@ -417,6 +450,7 @@ scripts/                # TypeScript utility scripts
 ## Related Documentation
 
 Key docs to reference:
+
 - `docs/architecture.md` - System design
 - `docs/TERMS.md` - Canonical terminology
 - `docs/quickstart.md` - 5-minute onboarding
@@ -438,6 +472,7 @@ Key docs to reference:
 ## Working with This Codebase
 
 When making changes:
+
 1. **Read architecture first**: Understand two-track separation
 2. **Maintain determinism**: Sort all arrays, use canonical JSON
 3. **Add tests**: Unit + integration tests required

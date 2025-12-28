@@ -10,6 +10,7 @@
 ## Pre-Execution Summary
 
 ### Plan Generation ✅
+
 - **Command**: `npm run cli -- plan --from-github --query "is:open is:pr" --out .smartergpt/runner`
 - **Result**: Successfully generated plan.json with 2 items
 - **Schema**: v1.0.0
@@ -17,17 +18,21 @@
 - **Policy**: requiredGates: [lint, typecheck, test], maxWorkers: 2
 
 ### Merge Order Computation ✅
+
 - **Command**: `npm run cli -- merge-order --plan .smartergpt/runner/plan.json --json`
 - **Result**: Single level `[["PR-70", "PR-71"]]`
 - **Analysis**: PRs are independent (no dependencies)
 
 ### Conflict Analysis ✅
+
 **File Overlap**:
+
 - `src/cli.ts`: Import conflicts (mechanical weave)
 - `src/mcp/server.ts`: Import conflicts + additive changes (mechanical weave)
 - 9 other files: No overlap (trivial merge)
 
 **Predicted Weave Distribution**:
+
 - Trivial: 9 files
 - Mechanical: 2 files
 - Semantic: 0 files
@@ -39,6 +44,7 @@
 ## Issues Found & Fixed During Weave
 
 ### Issue #1: ESM Module Import Resolution
+
 **Problem**: `PRQueryOptions` import failing in `src/github/client.ts`
 **Root Cause**: Mixed type and value imports causing ESM resolution issues in Node.js v22
 **Fix**: Separated `import type` for interfaces from value imports for classes
@@ -46,12 +52,14 @@
 **Status**: ✅ RESOLVED
 
 ### Issue #2: Basic Merge Command Implementation
+
 **Problem**: Current `merge` command is a placeholder (dry-run only shows plan)
 **Analysis**: Doesn't actually execute git operations or detect real conflicts
 **Impact**: Cannot test actual weave execution yet
 **Status**: 🔄 IDENTIFIED (needs implementation)
 
 ### Issue #3: Runtime Artifacts in .gitignore
+
 **Problem**: `.smartergpt/runner/` is git-ignored (by design)
 **Analysis**: Follows two-track separation principle - runtime artifacts shouldn't be committed
 **Resolution**: Create weave documentation in `docs/` instead
@@ -112,11 +120,13 @@
 ## Execution Complete ✅
 
 ### Integration PR Created
+
 - **URL**: https://github.com/Guffawaffle/LexRunner/pull/72
 - **Title**: Integration PR: Merge-Weave PR-70 + PR-71
 - **Status**: Ready for review and merge
 
 ### Final Results
+
 - **PRs Integrated**: 2/2 (100% success rate)
 - **Weave Distribution**: 1 trivial + 1 mechanical (0 semantic needed)
 - **Gate Results**: ALL PASS ✅ (262/262 tests)
@@ -130,6 +140,7 @@
 **We successfully dogfooded lexrunner's own weave process!**
 
 This execution demonstrates that:
+
 1. The GitHub plan generation works correctly
 2. Merge order computation handles independent PRs properly
 3. Conflict analysis predictions were accurate (mechanical weave needed)
@@ -139,4 +150,4 @@ This execution demonstrates that:
 
 ---
 
-*Execution complete. Process documented for future iterations and tooling improvements.*
+_Execution complete. Process documented for future iterations and tooling improvements._

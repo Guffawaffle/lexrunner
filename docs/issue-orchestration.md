@@ -12,11 +12,11 @@ lex-pr orchestrate analyze [options]
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
+| Option                | Description                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------- |
 | `--repo <owner/repo>` | Repository to analyze (format: owner/repo). If not specified, auto-detects from git remote. |
-| `--labels <labels>` | Filter issues by labels (comma-separated). Example: `--labels type:enhancement,priority:P1` |
-| `--json` | Output results in JSON format |
+| `--labels <labels>`   | Filter issues by labels (comma-separated). Example: `--labels type:enhancement,priority:P1` |
+| `--json`              | Output results in JSON format                                                               |
 
 ## Features
 
@@ -79,7 +79,7 @@ Issue Analysis Results
 
 Issues:
 --------------------------------------------------------------------------------
-#      Title                                    Files  Complexity Duration  
+#      Title                                    Files  Complexity Duration
 --------------------------------------------------------------------------------
 #171   Feature 1: Issue Analyzer                5      6.5        13h (high)
 #172   Feature 2: Batch Planner                 3      4.2        8h (medium)
@@ -87,9 +87,9 @@ Issues:
 
 High Overlap Pairs (>30%):
 --------------------------------------------------------------------------------
-Issue 1    Issue 2    Score      Files      Dirs       Labels    
+Issue 1    Issue 2    Score      Files      Dirs       Labels
 --------------------------------------------------------------------------------
-#171       #172       0.456      0.333      0.500      0.667     
+#171       #172       0.456      0.333      0.500      0.667
 
 Parallel Work Groups:
 --------------------------------------------------------------------------------
@@ -136,7 +136,7 @@ Recommendations:
       "issue2": 172,
       "score": 0.456,
       "fileOverlap": 0.333,
-      "directoryOverlap": 0.500,
+      "directoryOverlap": 0.5,
       "labelOverlap": 0.667,
       "authorOverlap": 1
     }
@@ -198,7 +198,7 @@ The analyzer recognizes file paths in multiple formats:
 - Code blocks with file annotations:
   ````markdown
   ```typescript
-  File: src/component.tsx
+  File: src / component.tsx;
   ```
   ````
 

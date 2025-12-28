@@ -71,7 +71,7 @@ import {
   isGitEnabled,
   getDefaultBranch,
   getDefaultCommit,
-  type GitMode
+  type GitMode,
 } from "../shared/git/runtime.js";
 
 // Get current git mode ("off" or "live")
@@ -83,8 +83,8 @@ if (isGitEnabled()) {
 }
 
 // Get fallback values when git is disabled
-const branch = getDefaultBranch();  // "main" or LEX_DEFAULT_BRANCH
-const commit = getDefaultCommit();  // 40 zeros or LEX_DEFAULT_COMMIT
+const branch = getDefaultBranch(); // "main" or LEX_DEFAULT_BRANCH
+const commit = getDefaultCommit(); // 40 zeros or LEX_DEFAULT_COMMIT
 ```
 
 ### runGit (runGit.ts)
@@ -98,7 +98,7 @@ const result: GitResult = runGit(["status", "--short"], {
   cwd: "/path/to/repo",
   timeout: 30000,
   disableGpgSign: true,
-  dryRunFallback: { exitCode: 0, stdout: "", stderr: "" }
+  dryRunFallback: { exitCode: 0, stdout: "", stderr: "" },
 });
 
 if (result.exitCode === 0) {
@@ -108,21 +108,21 @@ if (result.exitCode === 0) {
 
 #### Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `args` | `string[]` | Required | Git command arguments |
-| `options.cwd` | `string` | `process.cwd()` | Working directory |
-| `options.timeout` | `number` | `30000` | Timeout in milliseconds |
-| `options.disableGpgSign` | `boolean` | `true` | Disable GPG signing |
+| Parameter                | Type        | Default                                   | Description                  |
+| ------------------------ | ----------- | ----------------------------------------- | ---------------------------- |
+| `args`                   | `string[]`  | Required                                  | Git command arguments        |
+| `options.cwd`            | `string`    | `process.cwd()`                           | Working directory            |
+| `options.timeout`        | `number`    | `30000`                                   | Timeout in milliseconds      |
+| `options.disableGpgSign` | `boolean`   | `true`                                    | Disable GPG signing          |
 | `options.dryRunFallback` | `GitResult` | `{ exitCode: 0, stdout: "", stderr: "" }` | Return value in dry-run mode |
 
 #### Return Value
 
 ```typescript
 interface GitResult {
-  exitCode: number;  // 0 = success, non-zero = failure
-  stdout: string;    // Standard output
-  stderr: string;    // Standard error
+  exitCode: number; // 0 = success, non-zero = failure
+  stdout: string; // Standard output
+  stderr: string; // Standard error
 }
 ```
 
@@ -216,8 +216,8 @@ const result = runGit(["status"], {
   dryRunFallback: {
     exitCode: 0,
     stdout: "On branch main\nnothing to commit",
-    stderr: ""
-  }
+    stderr: "",
+  },
 });
 // Returns the custom fallback without executing git
 ```

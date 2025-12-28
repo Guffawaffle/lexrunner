@@ -10,42 +10,42 @@ import * as os from "os";
 
 /**
  * Normalize path for current platform
- * 
+ *
  * - Converts backslashes to forward slashes on POSIX
  * - Resolves relative paths to absolute
  * - Expands ~ to home directory
- * 
+ *
  * @param inputPath - Raw path
  * @returns - Normalized absolute path
  */
 export function normalizePath(inputPath: string): string {
-	let normalized = inputPath;
-	
-	// Expand ~ to home directory
-	if (normalized.startsWith('~')) {
-		normalized = path.join(os.homedir(), normalized.slice(1));
-	}
-	
-	// Resolve to absolute path
-	normalized = path.resolve(normalized);
-	
-	// Convert to forward slashes on POSIX (consistent with Git)
-	if (process.platform !== 'win32') {
-		normalized = normalized.replace(/\\/g, '/');
-	}
-	
-	return normalized;
+  let normalized = inputPath;
+
+  // Expand ~ to home directory
+  if (normalized.startsWith("~")) {
+    normalized = path.join(os.homedir(), normalized.slice(1));
+  }
+
+  // Resolve to absolute path
+  normalized = path.resolve(normalized);
+
+  // Convert to forward slashes on POSIX (consistent with Git)
+  if (process.platform !== "win32") {
+    normalized = normalized.replace(/\\/g, "/");
+  }
+
+  return normalized;
 }
 
 /**
  * Normalize path for cross-platform comparison (internal helper)
  * Just converts slashes without resolving paths
- * 
+ *
  * @param inputPath - Path to normalize
  * @returns Path with forward slashes
  */
 function normalizePathForComparison(inputPath: string): string {
-	return inputPath.replace(/\\/g, "/");
+  return inputPath.replace(/\\/g, "/");
 }
 
 /**
@@ -62,40 +62,31 @@ function normalizePathForComparison(inputPath: string): string {
  * @throws Error if path is in a blocked PR artifact directory
  */
 export function isSafeArtifactPath(inputPath: string): boolean {
-	const normalized = normalizePathForComparison(inputPath).toLowerCase();
+  const normalized = normalizePathForComparison(inputPath).toLowerCase();
 
-	// Allowed patterns
-	const allowedPatterns = [
-		".smartergpt.local/deliverables/_session",
-		".smartergpt.local/runner/logs",
-		".smartergpt/deliverables/_session",
-	];
+  // Allowed patterns
+  const allowedPatterns = [
+    ".smartergpt.local/deliverables/_session",
+    ".smartergpt.local/runner/logs",
+    ".smartergpt/deliverables/_session",
+  ];
 
-	const isAllowed = allowedPatterns.some((pattern) =>
-		normalized.includes(pattern.toLowerCase())
-	);
+  const isAllowed = allowedPatterns.some((pattern) => normalized.includes(pattern.toLowerCase()));
 
-	// Blocked patterns
-	const blockedPatterns = [
-		/\/pr-\d+/,
-		/\\pr-\d+/,
-		/\/artifacts\/pr-/,
-		/\\artifacts\\pr-/,
-	];
+  // Blocked patterns
+  const blockedPatterns = [/\/pr-\d+/, /\\pr-\d+/, /\/artifacts\/pr-/, /\\artifacts\\pr-/];
 
-	const isBlocked = blockedPatterns.some((pattern) =>
-		pattern.test(normalized)
-	);
+  const isBlocked = blockedPatterns.some((pattern) => pattern.test(normalized));
 
-	if (isBlocked) {
-		throw new Error(
-			`SAFETY VIOLATION: Cannot write to PR artifact directory\n` +
-				`Blocked path: ${inputPath}\n` +
-				`Use .smartergpt.local/deliverables/_session/ instead`
-		);
-	}
+  if (isBlocked) {
+    throw new Error(
+      `SAFETY VIOLATION: Cannot write to PR artifact directory\n` +
+        `Blocked path: ${inputPath}\n` +
+        `Use .smartergpt.local/deliverables/_session/ instead`
+    );
+  }
 
-	return isAllowed || !isBlocked;
+  return isAllowed || !isBlocked;
 }
 
 /**
@@ -104,14 +95,14 @@ export function isSafeArtifactPath(inputPath: string): boolean {
  * @param dirPath - Directory path to ensure
  */
 export async function ensureDir(dirPath: string): Promise<void> {
-	try {
-		await fs.mkdir(dirPath, { recursive: true });
-	} catch (error) {
-		// Ignore EEXIST errors
-		if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-			throw error;
-		}
-	}
+  try {
+    await fs.mkdir(dirPath, { recursive: true });
+  } catch (error) {
+    // Ignore EEXIST errors
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      throw error;
+    }
+  }
 }
 
 /**
@@ -121,36 +112,36 @@ export async function ensureDir(dirPath: string): Promise<void> {
  * @returns true if path is a WSL path
  */
 export function isWSLPath(inputPath: string): boolean {
-	return inputPath.startsWith("/mnt/");
+  return inputPath.startsWith("/mnt/");
 }
 
 /**
  * Detect if running in WSL environment
- * 
+ *
  * Checks:
  * - WSL_DISTRO_NAME environment variable
  * - /proc/version contains "microsoft" or "WSL"
- * 
+ *
  * @returns true if running in WSL
  */
 export async function isWSLEnvironment(): Promise<boolean> {
-	// Check environment variable first (fastest)
-	if (process.env.WSL_DISTRO_NAME || process.env.WSLENV) {
-		return true;
-	}
-	
-	// Check /proc/version on Linux-like systems
-	if (process.platform === 'linux') {
-		try {
-			const procVersion = await fs.readFile('/proc/version', 'utf-8');
-			return /microsoft|WSL/i.test(procVersion);
-		} catch {
-			// /proc/version doesn't exist or can't be read
-			return false;
-		}
-	}
-	
-	return false;
+  // Check environment variable first (fastest)
+  if (process.env.WSL_DISTRO_NAME || process.env.WSLENV) {
+    return true;
+  }
+
+  // Check /proc/version on Linux-like systems
+  if (process.platform === "linux") {
+    try {
+      const procVersion = await fs.readFile("/proc/version", "utf-8");
+      return /microsoft|WSL/i.test(procVersion);
+    } catch {
+      // /proc/version doesn't exist or can't be read
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -160,18 +151,18 @@ export async function isWSLEnvironment(): Promise<boolean> {
  * @returns Windows path (e.g., C:\Users\...)
  */
 export function wslToWindowsPath(wslPath: string): string {
-	if (!isWSLPath(wslPath)) {
-		return wslPath;
-	}
+  if (!isWSLPath(wslPath)) {
+    return wslPath;
+  }
 
-	const match = wslPath.match(/^\/mnt\/([a-z])(\/.*)?$/);
-	if (!match) {
-		return wslPath;
-	}
+  const match = wslPath.match(/^\/mnt\/([a-z])(\/.*)?$/);
+  if (!match) {
+    return wslPath;
+  }
 
-	const drive = match[1].toUpperCase();
-	const restPath = (match[2] || "\\").replace(/\//g, "\\");
-	return `${drive}:${restPath}`;
+  const drive = match[1].toUpperCase();
+  const restPath = (match[2] || "\\").replace(/\//g, "\\");
+  return `${drive}:${restPath}`;
 }
 
 /**
@@ -181,14 +172,14 @@ export function wslToWindowsPath(wslPath: string): string {
  * @returns WSL path (e.g., /mnt/c/Users/...)
  */
 export function windowsToWSLPath(winPath: string): string {
-	const match = winPath.match(/^([A-Z]):(\\.*)?$/);
-	if (!match) {
-		return winPath;
-	}
+  const match = winPath.match(/^([A-Z]):(\\.*)?$/);
+  if (!match) {
+    return winPath;
+  }
 
-	const drive = match[1].toLowerCase();
-	const restPath = (match[2] || "").replace(/\\/g, "/");
-	return `/mnt/${drive}${restPath}`;
+  const drive = match[1].toLowerCase();
+  const restPath = (match[2] || "").replace(/\\/g, "/");
+  return `/mnt/${drive}${restPath}`;
 }
 
 /**
@@ -202,19 +193,17 @@ export function windowsToWSLPath(winPath: string): string {
  * @throws Error if path is unsafe or parent directory cannot be created
  */
 export async function validateOutputPath(outputPath: string): Promise<void> {
-	const normalized = normalizePath(outputPath);
+  const normalized = normalizePath(outputPath);
 
-	// Check safe artifact path rules
-	isSafeArtifactPath(normalized);
+  // Check safe artifact path rules
+  isSafeArtifactPath(normalized);
 
-	// Check parent directory exists or can be created
-	const parentDir = path.dirname(normalized);
+  // Check parent directory exists or can be created
+  const parentDir = path.dirname(normalized);
 
-	try {
-		await ensureDir(parentDir);
-	} catch (error) {
-		throw new Error(
-			`Cannot create output directory: ${parentDir}\n` + `Error: ${error}`
-		);
-	}
+  try {
+    await ensureDir(parentDir);
+  } catch (error) {
+    throw new Error(`Cannot create output directory: ${parentDir}\n` + `Error: ${error}`);
+  }
 }

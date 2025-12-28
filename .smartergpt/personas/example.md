@@ -29,6 +29,7 @@ gates:
 ## Purpose
 
 This is a minimal example showing how to:
+
 1. Use YAML frontmatter for persona metadata
 2. Structure role, duties, and gates
 3. Validate against the PersonaSchema
@@ -36,28 +37,29 @@ This is a minimal example showing how to:
 ## Usage
 
 ```typescript
-import { parsePersona, validatePersona } from './src/schemas/persona.js';
-import yaml from 'yaml';
-import fs from 'fs';
+import { parsePersona, validatePersona } from "./src/schemas/persona.js";
+import yaml from "yaml";
+import fs from "fs";
 
 // Load persona from markdown file
-const content = fs.readFileSync('.smartergpt/personas/example.md', 'utf-8');
-const [, frontmatter] = content.split('---\n');
+const content = fs.readFileSync(".smartergpt/personas/example.md", "utf-8");
+const [, frontmatter] = content.split("---\n");
 const metadata = yaml.parse(frontmatter);
 
 // Validate
 const result = validatePersona(metadata);
 if (result.success) {
   console.log(`Persona: ${result.data.name}`);
-  console.log(`Triggers: ${result.data.triggers.join(', ')}`);
+  console.log(`Triggers: ${result.data.triggers.join(", ")}`);
 } else {
-  console.error('Validation failed:', result.errors);
+  console.error("Validation failed:", result.errors);
 }
 ```
 
 ## Activation
 
 Say one of the trigger phrases:
+
 - "example mode"
 - "activate example"
 
@@ -66,10 +68,12 @@ The persona should respond with the ritual: **EXAMPLE-PERSONA READY**
 ## Production Personas
 
 For real work, see:
+
 - `.smartergpt/personas/senior-dev.md` — Implementation engineer persona
 - `.smartergpt/personas/eager-pm.md` — Project manager persona
 
 These production personas include:
+
 - Detailed role definitions
 - Comprehensive duty lists
 - File editing rules

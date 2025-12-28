@@ -25,6 +25,7 @@ We require **uniform gate execution**: the same gates run locally and in CI, wit
 ### Stable Interfaces
 
 Each gate produces structured results:
+
 - Status (pass/fail/blocked)
 - Duration
 - Artifacts (JUnit, SARIF, coverage)

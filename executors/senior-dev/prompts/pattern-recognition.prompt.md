@@ -64,12 +64,12 @@ Respond with a structured JSON object:
 
 ## Pattern Categories
 
-| Category | Examples |
-|----------|----------|
-| Anti-patterns | God objects, deep nesting, magic numbers |
+| Category       | Examples                                             |
+| -------------- | ---------------------------------------------------- |
+| Anti-patterns  | God objects, deep nesting, magic numbers             |
 | Best practices | Single responsibility, early returns, explicit types |
-| Conventions | Naming, file structure, import ordering |
-| Smells | Large files, long functions, duplicate code |
+| Conventions    | Naming, file structure, import ordering              |
+| Smells         | Large files, long functions, duplicate code          |
 
 ## Constraints
 

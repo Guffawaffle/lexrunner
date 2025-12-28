@@ -29,6 +29,7 @@ lex-pr autopilot plan.json --level 0 --json
 ### Output
 
 Prints analysis to stdout including:
+
 - Plan summary (items, levels)
 - Merge order computation
 - Recommendations for execution
@@ -59,10 +60,12 @@ lex-pr autopilot plan.json --level 1 --json
 ### Write Protection
 
 Level 1 respects the write protection discipline:
+
 - **role=example**: Read-only, writes are rejected
 - **role=local**: Writable, artifacts can be generated
 
 To use Level 1, ensure you have a writable profile:
+
 ```bash
 # Option 1: Use local profile override
 mkdir -p .smartergpt.local
@@ -82,7 +85,9 @@ lex-pr autopilot plan.json --level 1 --profile-dir /path/to/writable/profile
 All artifacts are generated in `.smartergpt/deliverables/weave-{timestamp}/`:
 
 #### 1. `analysis.json`
+
 Structured analysis data with schema versioning:
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -98,14 +103,18 @@ Structured analysis data with schema versioning:
 ```
 
 #### 2. `weave-report.md`
+
 Human-readable execution recommendations:
+
 - Plan summary
 - Merge order breakdown
 - Item details with dependencies and gates
 - Execution recommendations
 
 #### 3. `gate-predictions.json`
+
 Expected gate outcomes for verification:
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -122,13 +131,17 @@ Expected gate outcomes for verification:
 ```
 
 #### 4. `execution-log.md`
+
 Template for manual execution tracking:
+
 - Pre-execution checklist
 - Level-by-level execution steps
 - Post-execution verification
 
 #### 5. `metadata.json`
+
 Runtime metadata:
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -149,6 +162,7 @@ Runtime metadata:
 ## Artifact Versioning
 
 All JSON artifacts include `schemaVersion` fields following semantic versioning:
+
 - **Patch** (1.0.x): Additive optional fields or documentation changes
 - **Minor** (1.x.0): Additive required fields with safe defaults
 - **Major** (x.0.0): Breaking changes to structure or semantics
@@ -158,11 +172,13 @@ Consumers should validate schema versions before parsing artifacts.
 ## Timestamps
 
 All artifacts use ISO 8601 timestamps (UTC) for consistency:
+
 ```
 2025-10-02T15:30:00.123Z
 ```
 
 Directory names use filesystem-safe format:
+
 ```
 weave-2025-10-02T15-30-00-123
 ```
@@ -243,16 +259,19 @@ lex-pr execute plan.json --artifact-dir ./gate-results
 All autopilot levels (0-4) have been successfully implemented:
 
 ### Level 2: PR Annotation + Status Checks ✅
+
 - Comment on PRs with gate results
 - Update PR status checks
 - Label PRs based on merge readiness
 
 ### Level 3: Integration Branch Creation + Merge ✅
+
 - Create integration branch
 - Perform actual merges following computed order
 - Handle conflicts with mechanical rules
 
 ### Level 4: Finalize + Close Superseded PRs ✅
+
 - Merge integration branch to target
 - Close superseded PRs (with `--close-superseded` flag)
 - Cleanup integration branches after successful merge
