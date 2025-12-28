@@ -1,0 +1,242 @@
+# Frame Emission Quality Gate
+#
+# Validates that Frame emission works correctly during merge-weave operations.
+# Implements LPR-009 / Issue #318: CI gates for Frame emission quality.
+#
+# This gate ensures:
+# 1. Frames are created with correct schema (v2 compliance)
+# 2. Module IDs are resolved via aliases
+# 3. Frame emission doesn't break on regressions
+#
+# Related:
+# - LexRunner#344: Frame schema v2 alignment validation
+# - Lex#88: Frame schema v2 extension
+# - docs/EVENT_SCHEMA.md: Full v2 schema documentation
+
+name: Frame Emission Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "src/frames/**"
+      - "src/hooks/**"
+      - "src/weave/**"
+      - "src/aliases/**"
+      - "tests/frames/**"
+      - "tests/hooks/**"
+      - "docs/EVENT_SCHEMA.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/frames/**"
+      - "src/hooks/**"
+      - "src/weave/**"
+      - "src/aliases/**"
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: "Enable verbose output"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frame-emission-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: UTC
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
+
+jobs:
+  frame-emission-tests:
+    name: Frame Emission Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Frame emitter unit tests
+        run: npx vitest run tests/frames/emitter.spec.ts --reporter=verbose
+
+      - name: Run Frame types tests
+        run: npx vitest run tests/frames/types.spec.ts --reporter=verbose
+
+      - name: Run Frame storage tests
+        run: npx vitest run tests/frames/storage.spec.ts --reporter=verbose
+
+      - name: Run Frame v2 schema integration tests
+        run: npx vitest run tests/frames/v2-schema-integration.spec.ts --reporter=verbose
+
+      - name: Run hooks event tests
+        run: npx vitest run tests/hooks/ --reporter=verbose
+
+      - name: Run alias resolution tests
+        run: npx vitest run tests/aliases/ --reporter=verbose
+
+  frame-schema-validation:
+    name: Frame Schema Validation
+    runs-on: ubuntu-latest
+    needs: frame-emission-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate Frame schema exports
+        run: |
+          node -e "
+            import('./dist/frames/index.js').then(m => {
+              const requiredExports = [
+                'emitMergeWeaveFrame',
+                'emitExecutorFrame',
+                'emitGateFrame',
+                'emitProcedureFrame',
+                'validateExecutionFrame'
+              ];
+              const missing = requiredExports.filter(e => !(e in m));
+              if (missing.length > 0) {
+                console.error('Missing exports:', missing);
+                process.exit(1);
+              }
+              console.log('✅ All Frame exports present');
+            }).catch(err => {
+              console.error('Failed to import frames module:', err);
+              process.exit(1);
+            });
+          "
+
+      - name: Validate hook event schema exports
+        run: |
+          node -e "
+            import('./dist/hooks/events.js').then(m => {
+              const requiredExports = [
+                'validateFanoutEvent',
+                'validateMergeWeaveEvent'
+              ];
+              const missing = requiredExports.filter(e => !(e in m));
+              if (missing.length > 0) {
+                console.error('Missing exports:', missing);
+                process.exit(1);
+              }
+              console.log('✅ All event schema exports present');
+            }).catch(err => {
+              console.error('Failed to import hooks/events module:', err);
+              process.exit(1);
+            });
+          "
+
+  frame-emission-integration:
+    name: Frame Emission Integration
+    runs-on: ubuntu-latest
+    needs: frame-schema-validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test Frame emission in merge-weave context
+        run: |
+          node -e "
+            import { emitMergeWeaveFrame } from './dist/frames/emitter.js';
+
+            async function test() {
+              const result = await emitMergeWeaveFrame({
+                runId: '550e8400-e29b-41d4-a716-446655440000',
+                planHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                mergedPRs: ['#CI-1', '#CI-2'],
+                conflictsResolved: 0,
+                gatesPassed: ['lint', 'typecheck'],
+                durationMs: 1000,
+                outcome: 'success',
+                targetBranch: 'main'
+              });
+
+              if (!result.success) {
+                console.error('Frame emission failed:', result.error);
+                process.exit(1);
+              }
+
+              // Validate v2 fields present
+              const frame = result.frame;
+              if (!frame.metadata?.run_id) {
+                console.error('Missing v2 field: run_id');
+                process.exit(1);
+              }
+              if (!frame.metadata?.plan_hash) {
+                console.error('Missing v2 field: plan_hash');
+                process.exit(1);
+              }
+              if (!frame.module_scope || frame.module_scope.length === 0) {
+                console.error('Missing module_scope');
+                process.exit(1);
+              }
+
+              console.log('✅ Frame emission integration test passed');
+              console.log('   Frame ID:', result.frameId);
+              console.log('   Module scope:', frame.module_scope);
+              console.log('   v2 fields present: runId, planHash');
+            }
+
+            test().catch(err => {
+              console.error('Integration test failed:', err);
+              process.exit(1);
+            });
+          "
+
+  gate-complete:
+    name: Frame Gate Complete
+    runs-on: ubuntu-latest
+    needs: [frame-emission-tests, frame-schema-validation, frame-emission-integration]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.frame-emission-tests.result }}" != "success" ]]; then
+            echo "❌ Frame emission tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.frame-schema-validation.result }}" != "success" ]]; then
+            echo "❌ Frame schema validation failed"
+            exit 1
+          fi
+          if [[ "${{ needs.frame-emission-integration.result }}" != "success" ]]; then
+            echo "❌ Frame emission integration failed"
+            exit 1
+          fi
+          echo "✅ Frame Emission Gate Complete"
