@@ -25,7 +25,7 @@ describe("emitWeaveCompletionFrame", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("should emit successful merge-weave frame", () => {
+  it("should emit successful merge-weave frame", async () => {
     const completedBatch: BatchState = {
       batchNumber: 0,
       items: ["PR-101", "PR-102"],
@@ -53,7 +53,7 @@ describe("emitWeaveCompletionFrame", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context);
+    const result = await emitWeaveCompletionFrame(context);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -64,7 +64,7 @@ describe("emitWeaveCompletionFrame", () => {
     expect(result.frame!.metadata?.plan_hash).toBe("abc123");
   });
 
-  it("should emit failed merge-weave frame", () => {
+  it("should emit failed merge-weave frame", async () => {
     const failedBatch: BatchState = {
       batchNumber: 0,
       items: ["PR-101"],
@@ -96,7 +96,7 @@ describe("emitWeaveCompletionFrame", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context);
+    const result = await emitWeaveCompletionFrame(context);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -105,7 +105,7 @@ describe("emitWeaveCompletionFrame", () => {
     expect(result.frame!.module_scope).toEqual(["PR-101"]);
   });
 
-  it("should emit partial merge-weave frame", () => {
+  it("should emit partial merge-weave frame", async () => {
     const completedBatch: BatchState = {
       batchNumber: 0,
       items: ["PR-101"],
@@ -135,7 +135,7 @@ describe("emitWeaveCompletionFrame", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context);
+    const result = await emitWeaveCompletionFrame(context);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -147,7 +147,7 @@ describe("emitWeaveCompletionFrame", () => {
 });
 
 describe("extractMergedPRs", () => {
-  it("should extract PRs from completed batches only", () => {
+  it("should extract PRs from completed batches only", async () => {
     const context: WeaveContext = {
       runId: "test",
       state: WeaveState.COMPLETED,
@@ -171,7 +171,7 @@ describe("extractMergedPRs", () => {
     expect(prs).toEqual(["PR-1", "PR-2"]);
   });
 
-  it("should return empty array if no completed batches", () => {
+  it("should return empty array if no completed batches", async () => {
     const context: WeaveContext = {
       runId: "test",
       state: WeaveState.FAILED,
@@ -193,7 +193,7 @@ describe("extractMergedPRs", () => {
 });
 
 describe("calculateWeaveDuration", () => {
-  it("should calculate duration from start to completion", () => {
+  it("should calculate duration from start to completion", async () => {
     const context: WeaveContext = {
       runId: "test",
       state: WeaveState.COMPLETED,
@@ -214,7 +214,7 @@ describe("calculateWeaveDuration", () => {
     expect(duration).toBe(60000); // 1 minute
   });
 
-  it("should calculate duration to now if not completed", () => {
+  it("should calculate duration to now if not completed", async () => {
     const now = Date.now();
     const startTime = now - 30000; // 30 seconds ago
 
@@ -251,7 +251,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("should persist Frame to disk when persist=true", () => {
+  it("should persist Frame to disk when persist=true", async () => {
     const batch: BatchState = {
       batchNumber: 0,
       items: ["PR-101", "PR-102"],
@@ -279,7 +279,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
+    const result = await emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
 
     expect(result.success).toBe(true);
     expect(result.frameId).toBeDefined();
@@ -295,7 +295,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
     expect(storedFrame!.stored_at).toBeDefined();
   });
 
-  it("should not persist Frame when persist=false", () => {
+  it("should not persist Frame when persist=false", async () => {
     const batch: BatchState = {
       batchNumber: 0,
       items: ["PR-101"],
@@ -321,7 +321,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: false });
+    const result = await emitWeaveCompletionFrame(context, { baseDir: testDir, persist: false });
 
     expect(result.success).toBe(true);
 
@@ -330,7 +330,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
     expect(frameIds).toHaveLength(0);
   });
 
-  it("should persist by default (persist option not specified)", () => {
+  it("should persist by default (persist option not specified)", async () => {
     const batch: BatchState = {
       batchNumber: 0,
       items: ["PR-201"],
@@ -357,7 +357,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
     };
 
     // Only provide baseDir, no persist option
-    const result = emitWeaveCompletionFrame(context, { baseDir: testDir });
+    const result = await emitWeaveCompletionFrame(context, { baseDir: testDir });
 
     expect(result.success).toBe(true);
 
@@ -366,7 +366,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
     expect(frameIds).toHaveLength(1);
   });
 
-  it("should include Turn Cost data in persisted Frame", () => {
+  it("should include Turn Cost data in persisted Frame", async () => {
     const batch: BatchState = {
       batchNumber: 0,
       items: ["PR-301", "PR-302"],
@@ -405,7 +405,7 @@ describe("emitWeaveCompletionFrame with persistence", () => {
       },
     };
 
-    const result = emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
+    const result = await emitWeaveCompletionFrame(context, { baseDir: testDir, persist: true });
 
     expect(result.success).toBe(true);
 

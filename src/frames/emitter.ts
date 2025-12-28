@@ -3,6 +3,7 @@
  *
  * Utility for emitting Frames capturing workflow execution.
  * Implements AX-005: Frame emission for core workflows.
+ * Implements LPR-019: Module aliasing integration.
  *
  * AX Principle: Memory Is a Feature
  */
@@ -17,6 +18,7 @@ import type {
   FrameOutcome,
 } from "./types.js";
 import { validateExecutionFrame } from "./types.js";
+import { resolveModulePaths, extractCanonicalIds, type ResolveOptions } from "../aliases/index.js";
 
 /**
  * Generate a timestamp string for reference points
@@ -38,9 +40,16 @@ function getUniqueSuffix(): string {
 /**
  * Emit a Frame for merge-weave completion
  *
+ * Module paths in mergedPRs are resolved to canonical module IDs via Lex aliasing system.
+ * PR numbers (e.g., "#123") are passed through as-is.
+ *
+ * @param input - Frame input with PR numbers or file paths
+ * @param resolveOptions - Optional alias resolution options
+ * @returns Promise resolving to frame emit result
+ *
  * @example
  * ```typescript
- * const result = emitMergeWeaveFrame({
+ * const result = await emitMergeWeaveFrame({
  *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
  *   mergedPRs: ["#123", "#124"],
  *   conflictsResolved: 2,
@@ -51,11 +60,18 @@ function getUniqueSuffix(): string {
  * });
  * ```
  */
-export function emitMergeWeaveFrame(input: MergeWeaveFrameInput): FrameEmitResult {
+export async function emitMergeWeaveFrame(
+  input: MergeWeaveFrameInput,
+  resolveOptions?: ResolveOptions
+): Promise<FrameEmitResult> {
   try {
     const timestamp = getTimestampForRef();
     const suffix = getUniqueSuffix();
     const referencePoint = `merge-weave-${timestamp}-${suffix}`;
+
+    // Resolve module paths to canonical IDs (LPR-019)
+    const resolutions = await resolveModulePaths(input.mergedPRs, resolveOptions);
+    const canonicalIds = extractCanonicalIds(resolutions);
 
     const prList = input.mergedPRs.join(", ");
     const summaryCaption =
@@ -86,7 +102,7 @@ export function emitMergeWeaveFrame(input: MergeWeaveFrameInput): FrameEmitResul
       type: "merge-weave",
       reference_point: referencePoint,
       summary_caption: summaryCaption,
-      module_scope: input.mergedPRs,
+      module_scope: canonicalIds, // Use canonical IDs (LPR-019)
       keywords: ["merge-weave", "integration", input.targetBranch],
       outcome: input.outcome,
       next_actions: nextActions,
@@ -122,9 +138,15 @@ export function emitMergeWeaveFrame(input: MergeWeaveFrameInput): FrameEmitResul
 /**
  * Emit a Frame for executor run completion
  *
+ * Module paths in moduleScope are resolved to canonical module IDs via Lex aliasing system.
+ *
+ * @param input - Frame input with module scope paths
+ * @param resolveOptions - Optional alias resolution options
+ * @returns Promise resolving to frame emit result
+ *
  * @example
  * ```typescript
- * const result = emitExecutorFrame({
+ * const result = await emitExecutorFrame({
  *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
  *   procedure: "deploy-staging",
  *   moduleScope: ["src/api", "src/web"],
@@ -134,11 +156,18 @@ export function emitMergeWeaveFrame(input: MergeWeaveFrameInput): FrameEmitResul
  * });
  * ```
  */
-export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
+export async function emitExecutorFrame(
+  input: ExecutorFrameInput,
+  resolveOptions?: ResolveOptions
+): Promise<FrameEmitResult> {
   try {
     const timestamp = getTimestampForRef();
     const suffix = getUniqueSuffix();
     const referencePoint = `executor-${input.procedure}-${timestamp}-${suffix}`;
+
+    // Resolve module paths to canonical IDs (LPR-019)
+    const resolutions = await resolveModulePaths(input.moduleScope, resolveOptions);
+    const canonicalIds = extractCanonicalIds(resolutions);
 
     const scopeList = input.moduleScope.join(", ");
     const summaryCaption =
@@ -165,7 +194,7 @@ export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
       type: "execution",
       reference_point: referencePoint,
       summary_caption: summaryCaption,
-      module_scope: input.moduleScope,
+      module_scope: canonicalIds, // Use canonical IDs (LPR-019)
       keywords: ["executor", input.procedure, "execution"],
       outcome: input.outcome,
       next_actions: nextActions,
@@ -198,7 +227,7 @@ export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
  *
  * @example
  * ```typescript
- * const result = emitGateFrame({
+ * const result = await emitGateFrame({
  *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
  *   gateName: "lint",
  *   itemName: "PR-123",
@@ -208,7 +237,7 @@ export function emitExecutorFrame(input: ExecutorFrameInput): FrameEmitResult {
  * });
  * ```
  */
-export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
+export async function emitGateFrame(input: GateFrameInput): Promise<FrameEmitResult> {
   try {
     const timestamp = getTimestampForRef();
     const suffix = getUniqueSuffix();
@@ -264,9 +293,15 @@ export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
 /**
  * Emit a Frame for procedure execution
  *
+ * Module paths in moduleScope are resolved to canonical module IDs via Lex aliasing system.
+ *
+ * @param input - Frame input with module scope paths
+ * @param resolveOptions - Optional alias resolution options
+ * @returns Promise resolving to frame emit result
+ *
  * @example
  * ```typescript
- * const result = emitProcedureFrame({
+ * const result = await emitProcedureFrame({
  *   runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
  *   procedure: "release-prepare",
  *   moduleScope: ["v1.0.0"],
@@ -276,21 +311,28 @@ export function emitGateFrame(input: GateFrameInput): FrameEmitResult {
  * });
  * ```
  */
-export function emitProcedureFrame(input: {
-  runId: string;
-  procedure: string;
-  moduleScope: string[];
-  durationMs: number;
-  outcome: FrameOutcome;
-  nextActions: string[];
-  artifacts?: string[];
-  error?: string;
-  planHash?: string;
-}): FrameEmitResult {
+export async function emitProcedureFrame(
+  input: {
+    runId: string;
+    procedure: string;
+    moduleScope: string[];
+    durationMs: number;
+    outcome: FrameOutcome;
+    nextActions: string[];
+    artifacts?: string[];
+    error?: string;
+    planHash?: string;
+  },
+  resolveOptions?: ResolveOptions
+): Promise<FrameEmitResult> {
   try {
     const timestamp = getTimestampForRef();
     const suffix = getUniqueSuffix();
     const referencePoint = `procedure-${input.procedure}-${timestamp}-${suffix}`;
+
+    // Resolve module paths to canonical IDs (LPR-019)
+    const resolutions = await resolveModulePaths(input.moduleScope, resolveOptions);
+    const canonicalIds = extractCanonicalIds(resolutions);
 
     const scopeList = input.moduleScope.join(", ");
     const summaryCaption =
@@ -304,7 +346,7 @@ export function emitProcedureFrame(input: {
       type: "procedure",
       reference_point: referencePoint,
       summary_caption: summaryCaption,
-      module_scope: input.moduleScope,
+      module_scope: canonicalIds, // Use canonical IDs (LPR-019)
       keywords: ["procedure", input.procedure],
       outcome: input.outcome,
       next_actions: input.nextActions,

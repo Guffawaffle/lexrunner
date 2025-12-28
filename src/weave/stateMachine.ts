@@ -201,7 +201,17 @@ export class WeaveStateMachine {
       case WeaveState.COMPLETED:
         this.context.completedAt = new Date().toISOString();
         // Emit Frame for successful completion (AX-005)
-        this.lastFrameResult = emitWeaveCompletionFrame(this.context);
+        // Fire-and-forget async call (state transitions can't be async)
+        emitWeaveCompletionFrame(this.context)
+          .then((result) => {
+            this.lastFrameResult = result;
+          })
+          .catch((error) => {
+            // Log error but don't fail the state transition
+            if (process.env.DEBUG) {
+              console.error("[state-machine] Failed to emit completion frame:", error);
+            }
+          });
         break;
 
       case WeaveState.FAILED:
@@ -214,7 +224,17 @@ export class WeaveStateMachine {
           }
         }
         // Emit Frame for failure (AX-005)
-        this.lastFrameResult = emitWeaveCompletionFrame(this.context);
+        // Fire-and-forget async call (state transitions can't be async)
+        emitWeaveCompletionFrame(this.context)
+          .then((result) => {
+            this.lastFrameResult = result;
+          })
+          .catch((error) => {
+            // Log error but don't fail the state transition
+            if (process.env.DEBUG) {
+              console.error("[state-machine] Failed to emit failure frame:", error);
+            }
+          });
         break;
 
       case WeaveState.MERGING:

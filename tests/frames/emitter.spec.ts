@@ -2,7 +2,7 @@
  * Tests for Frame emitter functions
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   emitMergeWeaveFrame,
   emitExecutorFrame,
@@ -15,8 +15,25 @@ import type {
   GateFrameInput,
 } from "../../src/frames/types.js";
 
+// Mock the alias resolver to avoid requiring Lex policy/aliases
+vi.mock("../../src/aliases/index.js", () => ({
+  resolveModulePaths: vi.fn(async (paths: string[]) =>
+    paths.map((path) => ({
+      canonical: path,
+      original: path,
+      resolved: false,
+      confidence: 1.0,
+    }))
+  ),
+  extractCanonicalIds: vi.fn((resolutions: any[]) => resolutions.map((r) => r.canonical)),
+}));
+
 describe("emitMergeWeaveFrame", () => {
-  it("should emit successful merge-weave frame", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should emit successful merge-weave frame", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
       mergedPRs: ["PR-101", "PR-102", "PR-103"],
@@ -28,7 +45,7 @@ describe("emitMergeWeaveFrame", () => {
       planHash: "abc123",
     };
 
-    const result = emitMergeWeaveFrame(input);
+    const result = await emitMergeWeaveFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -52,7 +69,7 @@ describe("emitMergeWeaveFrame", () => {
     expect(frame.metadata?.plan_hash).toBe("abc123");
   });
 
-  it("should emit failed merge-weave frame", () => {
+  it("should emit failed merge-weave frame", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0X",
       mergedPRs: ["PR-101", "PR-102"],
@@ -65,7 +82,7 @@ describe("emitMergeWeaveFrame", () => {
       error: "Merge conflict in src/cli.ts",
     };
 
-    const result = emitMergeWeaveFrame(input);
+    const result = await emitMergeWeaveFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -80,7 +97,7 @@ describe("emitMergeWeaveFrame", () => {
     expect(frame.metadata?.gates_failed).toEqual(["lint"]);
   });
 
-  it("should emit partial merge-weave frame", () => {
+  it("should emit partial merge-weave frame", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0Y",
       mergedPRs: ["PR-101", "PR-102", "PR-103"],
@@ -92,7 +109,7 @@ describe("emitMergeWeaveFrame", () => {
       targetBranch: "develop",
     };
 
-    const result = emitMergeWeaveFrame(input);
+    const result = await emitMergeWeaveFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -105,7 +122,7 @@ describe("emitMergeWeaveFrame", () => {
     expect(frame.next_actions).toContain("Resolve remaining conflicts");
   });
 
-  it("should generate unique reference points", () => {
+  it("should generate unique reference points", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "test",
       mergedPRs: ["PR-1"],
@@ -116,13 +133,13 @@ describe("emitMergeWeaveFrame", () => {
       targetBranch: "main",
     };
 
-    const result1 = emitMergeWeaveFrame(input);
-    const result2 = emitMergeWeaveFrame(input);
+    const result1 = await emitMergeWeaveFrame(input);
+    const result2 = await emitMergeWeaveFrame(input);
 
     expect(result1.frameId).not.toBe(result2.frameId);
   });
 
-  it("should include Turn Cost data when provided", () => {
+  it("should include Turn Cost data when provided", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
       mergedPRs: ["PR-101", "PR-102"],
@@ -146,7 +163,7 @@ describe("emitMergeWeaveFrame", () => {
       },
     };
 
-    const result = emitMergeWeaveFrame(input);
+    const result = await emitMergeWeaveFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -161,7 +178,7 @@ describe("emitMergeWeaveFrame", () => {
 });
 
 describe("emitExecutorFrame", () => {
-  it("should emit successful executor frame", () => {
+  it("should emit successful executor frame", async () => {
     const input: ExecutorFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
       procedure: "senior-dev",
@@ -172,7 +189,7 @@ describe("emitExecutorFrame", () => {
       artifacts: ["/tmp/review-report.md"],
     };
 
-    const result = emitExecutorFrame(input);
+    const result = await emitExecutorFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -192,7 +209,7 @@ describe("emitExecutorFrame", () => {
     expect(frame.metadata?.run_id).toBe("01JFZG7X2T3K4M5N6P7Q8R9S0W");
   });
 
-  it("should emit failed executor frame", () => {
+  it("should emit failed executor frame", async () => {
     const input: ExecutorFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0X",
       procedure: "pr-review",
@@ -203,7 +220,7 @@ describe("emitExecutorFrame", () => {
       error: "Failed to fetch PR metadata",
     };
 
-    const result = emitExecutorFrame(input);
+    const result = await emitExecutorFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -217,7 +234,7 @@ describe("emitExecutorFrame", () => {
 });
 
 describe("emitGateFrame", () => {
-  it("should emit successful gate frame", () => {
+  it("should emit successful gate frame", async () => {
     const input: GateFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
       gateName: "lint",
@@ -228,7 +245,7 @@ describe("emitGateFrame", () => {
       artifacts: ["/tmp/lint-report.json"],
     };
 
-    const result = emitGateFrame(input);
+    const result = await emitGateFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -248,7 +265,7 @@ describe("emitGateFrame", () => {
     expect(frame.metadata?.artifacts).toEqual(["/tmp/lint-report.json"]);
   });
 
-  it("should emit failed gate frame", () => {
+  it("should emit failed gate frame", async () => {
     const input: GateFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0X",
       gateName: "test",
@@ -259,7 +276,7 @@ describe("emitGateFrame", () => {
       error: "3 test cases failed",
     };
 
-    const result = emitGateFrame(input);
+    const result = await emitGateFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -276,7 +293,7 @@ describe("emitGateFrame", () => {
 });
 
 describe("emitProcedureFrame", () => {
-  it("should emit successful procedure frame", () => {
+  it("should emit successful procedure frame", async () => {
     const input = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
       procedure: "merge-weave-main",
@@ -288,7 +305,7 @@ describe("emitProcedureFrame", () => {
       planHash: "def456",
     };
 
-    const result = emitProcedureFrame(input);
+    const result = await emitProcedureFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -307,7 +324,7 @@ describe("emitProcedureFrame", () => {
     expect(frame.metadata?.plan_hash).toBe("def456");
   });
 
-  it("should emit failed procedure frame", () => {
+  it("should emit failed procedure frame", async () => {
     const input = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0X",
       procedure: "pr-review",
@@ -318,7 +335,7 @@ describe("emitProcedureFrame", () => {
       error: "PR not found",
     };
 
-    const result = emitProcedureFrame(input);
+    const result = await emitProcedureFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();
@@ -330,7 +347,7 @@ describe("emitProcedureFrame", () => {
     expect(frame.metadata?.error).toBe("PR not found");
   });
 
-  it("should emit partial procedure frame", () => {
+  it("should emit partial procedure frame", async () => {
     const input = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0Y",
       procedure: "batch-merge",
@@ -340,7 +357,7 @@ describe("emitProcedureFrame", () => {
       nextActions: ["Review partial results", "Continue with remaining items"],
     };
 
-    const result = emitProcedureFrame(input);
+    const result = await emitProcedureFrame(input);
 
     expect(result.success).toBe(true);
     expect(result.frame).toBeDefined();

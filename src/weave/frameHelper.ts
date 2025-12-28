@@ -26,10 +26,10 @@ export interface EmitWeaveFrameOptions {
  * Called when weave execution reaches a terminal state (COMPLETED or FAILED).
  * Optionally persists the Frame to .lexrunner/frames/.
  */
-export function emitWeaveCompletionFrame(
+export async function emitWeaveCompletionFrame(
   context: WeaveContext,
   options?: EmitWeaveFrameOptions
-): FrameEmitResult {
+): Promise<FrameEmitResult> {
   // Determine outcome based on state
   let outcome: FrameOutcome;
   if (context.state === WeaveState.COMPLETED) {
@@ -84,7 +84,7 @@ export function emitWeaveCompletionFrame(
     turnCost: context.turnCost,
   };
 
-  const result = emitMergeWeaveFrame(input);
+  const result = await emitMergeWeaveFrame(input);
 
   // Persist Frame to disk if successful and persistence is enabled (default: true)
   const shouldPersist = options?.persist !== false;
