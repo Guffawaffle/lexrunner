@@ -9,39 +9,39 @@
 
 // Score types and utilities
 export {
-	HostilityComponentSchema,
-	HostilityScoreSchema,
-	HOSTILITY_COMPONENT_NAMES,
-	COMPONENT_LABELS,
-	computeStatus,
-	computeOverallStatus,
-	createComponent,
-	aggregateScore,
-	type HostilityComponent,
-	type HostilityScore,
-	type HostilityStatus,
-	type HostilityComponentName,
+  HostilityComponentSchema,
+  HostilityScoreSchema,
+  HOSTILITY_COMPONENT_NAMES,
+  COMPONENT_LABELS,
+  computeStatus,
+  computeOverallStatus,
+  createComponent,
+  aggregateScore,
+  type HostilityComponent,
+  type HostilityScore,
+  type HostilityStatus,
+  type HostilityComponentName,
 } from "./score.js";
 
 // Individual check functions
 export {
-	checkConstraintClarity,
-	checkRequirementExplicitness,
-	checkProblemBoundedness,
-	checkReceiptCompleteness,
-	checkErrorRecoverability,
-	checkStateCoherence,
-	checkModelContinuity,
-	runAllChecks,
-	type CheckOptions,
+  checkConstraintClarity,
+  checkRequirementExplicitness,
+  checkProblemBoundedness,
+  checkReceiptCompleteness,
+  checkErrorRecoverability,
+  checkStateCoherence,
+  checkModelContinuity,
+  runAllChecks,
+  type CheckOptions,
 } from "./checks.js";
 
 import { runAllChecks, CheckOptions } from "./checks.js";
 import {
-	aggregateScore,
-	HostilityScore,
-	COMPONENT_LABELS,
-	HostilityComponentName,
+  aggregateScore,
+  HostilityScore,
+  COMPONENT_LABELS,
+  HostilityComponentName,
 } from "./score.js";
 
 /**
@@ -51,12 +51,12 @@ import {
  * @returns Complete hostility score with component breakdown
  */
 export function runEnvironmentQualityCheck(options: CheckOptions = {}): HostilityScore {
-	const components = runAllChecks(options);
+  const components = runAllChecks(options);
 
-	// Cast to the expected type shape
-	const typedComponents = components as HostilityScore["components"];
+  // Cast to the expected type shape
+  const typedComponents = components as HostilityScore["components"];
 
-	return aggregateScore(typedComponents);
+  return aggregateScore(typedComponents);
 }
 
 /**
@@ -66,43 +66,43 @@ export function runEnvironmentQualityCheck(options: CheckOptions = {}): Hostilit
  * @returns Formatted report string
  */
 export function formatHostilityReport(score: HostilityScore): string {
-	const lines: string[] = [];
+  const lines: string[] = [];
 
-	lines.push("Environment Quality Report");
-	lines.push("==========================");
-	lines.push("");
+  lines.push("Environment Quality Report");
+  lines.push("==========================");
+  lines.push("");
 
-	// Overall score with status indicator
-	const statusLabel =
-		score.status === "low"
-			? "low - good"
-			: score.status === "medium"
-				? "medium - needs attention"
-				: "high - significant issues";
+  // Overall score with status indicator
+  const statusLabel =
+    score.status === "low"
+      ? "low - good"
+      : score.status === "medium"
+        ? "medium - needs attention"
+        : "high - significant issues";
 
-	lines.push(`Overall Hostility Score: ${score.total.toFixed(2)} (${statusLabel})`);
-	lines.push("");
+  lines.push(`Overall Hostility Score: ${score.total.toFixed(2)} (${statusLabel})`);
+  lines.push("");
 
-	lines.push("Component Breakdown:");
+  lines.push("Component Breakdown:");
 
-	// Format each component
-	const componentNames = Object.keys(score.components) as HostilityComponentName[];
-	for (const name of componentNames) {
-		const component = score.components[name];
-		const icon = component.status === "good" ? "✓" : component.status === "warning" ? "~" : "✗";
-		const label = COMPONENT_LABELS[name] || name;
-		const paddedLabel = label.padEnd(24);
-		lines.push(`  ${icon} ${paddedLabel} ${component.score.toFixed(1)}  ${component.details}`);
-	}
+  // Format each component
+  const componentNames = Object.keys(score.components) as HostilityComponentName[];
+  for (const name of componentNames) {
+    const component = score.components[name];
+    const icon = component.status === "good" ? "✓" : component.status === "warning" ? "~" : "✗";
+    const label = COMPONENT_LABELS[name] || name;
+    const paddedLabel = label.padEnd(24);
+    lines.push(`  ${icon} ${paddedLabel} ${component.score.toFixed(1)}  ${component.details}`);
+  }
 
-	// Add recommendations if any
-	if (score.recommendations.length > 0) {
-		lines.push("");
-		lines.push("Recommendations:");
-		score.recommendations.forEach((rec, idx) => {
-			lines.push(`  ${idx + 1}. ${rec}`);
-		});
-	}
+  // Add recommendations if any
+  if (score.recommendations.length > 0) {
+    lines.push("");
+    lines.push("Recommendations:");
+    score.recommendations.forEach((rec, idx) => {
+      lines.push(`  ${idx + 1}. ${rec}`);
+    });
+  }
 
-	return lines.join("\n");
+  return lines.join("\n");
 }

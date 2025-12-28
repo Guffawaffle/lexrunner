@@ -17,24 +17,24 @@ When a run is active with `mode: "senior-dev"` or `mode: "tool-grounded"`, orche
 
 Once `lexrunner.startRun` returns a `runId`, the model **MUST**:
 
-| Tool | Purpose |
-|------|---------|
-| `lexrunner.getStatus` | Understand run state |
+| Tool                       | Purpose                      |
+| -------------------------- | ---------------------------- |
+| `lexrunner.getStatus`      | Understand run state         |
 | `lexrunner.submitDecision` | Make orchestration decisions |
-| `lexrunner.listArtifacts` | Inspect artifacts |
+| `lexrunner.listArtifacts`  | Inspect artifacts            |
 
 ### Forbidden Actions
 
 The model **MUST NOT** during an active run:
 
-| Action | Violation Type |
-|--------|----------------|
-| `git merge`, `git push`, `git rebase` | `DIRECT_GIT_COMMAND` |
-| `gh pr merge`, `gh pr create` | `DIRECT_GH_COMMAND` / `DIRECT_MERGE` |
-| Modify `.github/workflows/` or CI configs | `MODIFY_CI_CONFIG` |
-| Skip gates without proper decision | `BYPASS_GATES` |
-| Skip policy checks without rationale | `SKIP_POLICY` |
-| Use forbidden persona actions | `FORBIDDEN_ACTION` |
+| Action                                    | Violation Type                       |
+| ----------------------------------------- | ------------------------------------ |
+| `git merge`, `git push`, `git rebase`     | `DIRECT_GIT_COMMAND`                 |
+| `gh pr merge`, `gh pr create`             | `DIRECT_GH_COMMAND` / `DIRECT_MERGE` |
+| Modify `.github/workflows/` or CI configs | `MODIFY_CI_CONFIG`                   |
+| Skip gates without proper decision        | `BYPASS_GATES`                       |
+| Skip policy checks without rationale      | `SKIP_POLICY`                        |
+| Use forbidden persona actions             | `FORBIDDEN_ACTION`                   |
 
 ## Violation Types
 
@@ -54,6 +54,7 @@ Triggered when executing forbidden git commands during an active run:
 ```
 
 **Forbidden commands:**
+
 - `git merge`
 - `git push`
 - `git rebase`
@@ -77,6 +78,7 @@ Triggered when executing forbidden GitHub CLI commands:
 ```
 
 **Forbidden commands:**
+
 - `gh pr merge`
 - `gh pr close`
 - `gh pr create`
@@ -126,6 +128,7 @@ Triggered when modifying CI/CD configuration during a run:
 ```
 
 **Protected paths:**
+
 - `.github/workflows/`
 - `.gitlab-ci.yml`
 - `Jenkinsfile`
@@ -163,23 +166,23 @@ Triggered when using an action forbidden under the current persona:
 
 ## Severity Levels
 
-| Level | Description | Impact |
-|-------|-------------|--------|
-| `warning` | Logged but does not block | Soft enforcement only |
-| `error` | Should block under hard enforcement | Blocks in hard mode |
-| `critical` | Always blocks, may abort run | Always blocks |
+| Level      | Description                         | Impact                |
+| ---------- | ----------------------------------- | --------------------- |
+| `warning`  | Logged but does not block           | Soft enforcement only |
+| `error`    | Should block under hard enforcement | Blocks in hard mode   |
+| `critical` | Always blocks, may abort run        | Always blocks         |
 
 ### Default Severity by Violation Type
 
-| Violation Type | Default Severity |
-|----------------|------------------|
-| `DIRECT_GIT_COMMAND` | warning |
-| `DIRECT_GH_COMMAND` | warning |
-| `DIRECT_MERGE` | error |
-| `BYPASS_GATES` | error |
-| `MODIFY_CI_CONFIG` | critical |
-| `SKIP_POLICY` | warning |
-| `FORBIDDEN_ACTION` | critical |
+| Violation Type       | Default Severity |
+| -------------------- | ---------------- |
+| `DIRECT_GIT_COMMAND` | warning          |
+| `DIRECT_GH_COMMAND`  | warning          |
+| `DIRECT_MERGE`       | error            |
+| `BYPASS_GATES`       | error            |
+| `MODIFY_CI_CONFIG`   | critical         |
+| `SKIP_POLICY`        | warning          |
+| `FORBIDDEN_ACTION`   | critical         |
 
 ## Enforcement Modes
 
@@ -204,24 +207,20 @@ Violations are reflected in `StatusResponse.riskFlags`:
 {
   "runId": "01JDXYZ...",
   "state": "executing",
-  "riskFlags": [
-    "violations:3",
-    "error-violations:1",
-    "direct-merge-attempted"
-  ]
+  "riskFlags": ["violations:3", "error-violations:1", "direct-merge-attempted"]
 }
 ```
 
 ### Available Risk Flags
 
-| Flag Pattern | Description |
-|--------------|-------------|
-| `violations:{n}` | Total violation count |
-| `critical-violations:{n}` | Critical severity count |
-| `error-violations:{n}` | Error severity count |
-| `direct-merge-attempted` | DIRECT_MERGE violation occurred |
-| `gates-bypassed` | BYPASS_GATES violation occurred |
-| `ci-config-modified` | MODIFY_CI_CONFIG violation occurred |
+| Flag Pattern              | Description                         |
+| ------------------------- | ----------------------------------- |
+| `violations:{n}`          | Total violation count               |
+| `critical-violations:{n}` | Critical severity count             |
+| `error-violations:{n}`    | Error severity count                |
+| `direct-merge-attempted`  | DIRECT_MERGE violation occurred     |
+| `gates-bypassed`          | BYPASS_GATES violation occurred     |
+| `ci-config-modified`      | MODIFY_CI_CONFIG violation occurred |
 
 ## Violation Logging
 
@@ -234,7 +233,15 @@ All violations are logged to the run's `failures.ndjson` file:
 Each line is a JSON object:
 
 ```json
-{"timestamp":"2025-11-26T12:34:56.789Z","runId":"01JDXYZ...","violation":"DIRECT_GIT_COMMAND","command":"git merge main","context":"Attempted during active run","severity":"warning","blocked":false}
+{
+  "timestamp": "2025-11-26T12:34:56.789Z",
+  "runId": "01JDXYZ...",
+  "violation": "DIRECT_GIT_COMMAND",
+  "command": "git merge main",
+  "context": "Attempted during active run",
+  "severity": "warning",
+  "blocked": false
+}
 ```
 
 ## Configuration
@@ -245,16 +252,16 @@ Enforcement can be configured via `EnforcementConfig`:
 interface EnforcementConfig {
   /** Enforcement mode: "soft" or "hard" */
   mode: "soft" | "hard";
-  
+
   /** Modes that require enforcement */
   enforcedModes: string[];
-  
+
   /** Git commands that trigger violations */
   forbiddenGitCommands: string[];
-  
+
   /** GH CLI commands that trigger violations */
   forbiddenGhCommands: string[];
-  
+
   /** Paths that trigger CI config violations */
   protectedCiPaths: string[];
 }
@@ -299,12 +306,12 @@ Check a command for violations and optionally log them:
 import { checkAndLogViolation } from "./runs/enforcement.js";
 
 const violation = checkAndLogViolation(
-  "01JDXYZ...",           // runId
-  "git merge main",       // command
+  "01JDXYZ...", // runId
+  "git merge main", // command
   {
-    mode: "senior-dev",   // run mode
-    log: true,            // log to failures.ndjson
-    context: "...",       // optional context
+    mode: "senior-dev", // run mode
+    log: true, // log to failures.ndjson
+    context: "...", // optional context
   }
 );
 

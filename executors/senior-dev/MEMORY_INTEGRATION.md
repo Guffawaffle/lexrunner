@@ -7,6 +7,7 @@ This document describes how the Senior Dev executor integrates with Lex memory f
 ## Overview
 
 The Senior Dev executor uses Lex frames to:
+
 1. **Recall** prior reviews for context
 2. **Capture** new review sessions as frames
 3. **Build** developer and module histories
@@ -48,6 +49,7 @@ lex recall "reviews for src/gates"
 ```
 
 Returns prior reviews of the same module, enabling:
+
 - Consistency with previous decisions
 - Pattern recognition across PRs
 - Teaching point accumulation
@@ -61,6 +63,7 @@ lex recall --keyword "developer:alice"
 ```
 
 Returns reviews involving a specific developer for:
+
 - Mentorship tracking
 - Growth patterns
 - Common issues
@@ -74,6 +77,7 @@ lex list_frames --keyword pattern
 ```
 
 Returns pattern frames that capture recurring issues:
+
 - Anti-patterns to watch for
 - Best practices to encourage
 - Codebase-specific conventions
@@ -101,13 +105,7 @@ const framePayload: FramePayload = {
     next_action: nextAction,
     blockers: blockers.length > 0 ? blockers : undefined,
   },
-  keywords: [
-    "senior-dev",
-    "review",
-    `pr-${pr_number}`,
-    severity,
-    `developer:${developer}`,
-  ],
+  keywords: ["senior-dev", "review", `pr-${pr_number}`, severity, `developer:${developer}`],
   branch: getCurrentBranch(),
   jira: jiraTicket,
 };
@@ -134,12 +132,12 @@ lex recall "PR-42 review src/gates"
 
 ## Keyword Conventions
 
-| Prefix | Purpose | Example |
-|--------|---------|---------|
-| `pr-{n}` | Link to PR number | `pr-42` |
-| `developer:{name}` | Developer association | `developer:alice` |
-| `pattern:{name}` | Pattern classification | `pattern:error-handling` |
-| Severity | Review severity | `blocker`, `must-fix`, `should-fix`, `nit`, `praise` |
+| Prefix             | Purpose                | Example                                              |
+| ------------------ | ---------------------- | ---------------------------------------------------- |
+| `pr-{n}`           | Link to PR number      | `pr-42`                                              |
+| `developer:{name}` | Developer association  | `developer:alice`                                    |
+| `pattern:{name}`   | Pattern classification | `pattern:error-handling`                             |
+| Severity           | Review severity        | `blocker`, `must-fix`, `should-fix`, `nit`, `praise` |
 
 ## Integration with Recall Phase
 
@@ -151,13 +149,13 @@ switch (query_type) {
     frames = await lexRecall(`reviews for ${query}`);
     suggestedPrompt = "prompts/code-review.prompt.md";
     break;
-    
+
   case "developer":
     // Query frames for this developer
     frames = await lexRecall(`--keyword developer:${query}`);
     suggestedPrompt = "prompts/mentorship-feedback.prompt.md";
     break;
-    
+
   case "pattern":
     // Query pattern library
     frames = await lexListFrames("--keyword pattern");
@@ -214,12 +212,14 @@ The Senior Dev executor tools (`executor_recall_context`, `executor_capture_fram
 ### Example: Equivalent Operations
 
 Using executor tools:
+
 ```bash
 # Recall via executor wrapper
 lexrunner senior-dev recall-context --module src/gates
 ```
 
 Using Lex MCP tools directly:
+
 ```bash
 # Recall via Lex CLI (same result, more direct)
 lex recall "reviews for src/gates"

@@ -9,36 +9,36 @@ import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { validateWriteOperation } from "../config/profileResolver.js";
 
 export interface ConflictPrediction {
-	file: string;
-	strategy: "mechanical" | "semantic" | "manual";
-	rule?: string;
+  file: string;
+  strategy: "mechanical" | "semantic" | "manual";
+  rule?: string;
 }
 
 export interface AnalysisData {
-	schemaVersion: string;
-	timestamp: string;
-	plan: {
-		nodes: PlanItem[];
-		policy: any;
-	};
-	mergeOrder: string[][];
-	conflicts: ConflictPrediction[];
-	recommendations: string[];
+  schemaVersion: string;
+  timestamp: string;
+  plan: {
+    nodes: PlanItem[];
+    policy: any;
+  };
+  mergeOrder: string[][];
+  conflicts: ConflictPrediction[];
+  recommendations: string[];
 }
 
 export interface GatePrediction {
-	item: string;
-	gate: string;
-	expectedStatus: "pass" | "fail" | "skip";
-	reason?: string;
+  item: string;
+  gate: string;
+  expectedStatus: "pass" | "fail" | "skip";
+  reason?: string;
 }
 
 export interface ArtifactMetadata {
-	schemaVersion: string;
-	timestamp: string;
-	runnerVersion: string;
-	levelExecuted: number;
-	profilePath: string;
+  schemaVersion: string;
+  timestamp: string;
+  runnerVersion: string;
+  levelExecuted: number;
+  profilePath: string;
 }
 
 /**
@@ -46,239 +46,242 @@ export interface ArtifactMetadata {
  * Handles creation of deliverable artifacts with proper versioning
  */
 export class ArtifactWriter {
-	private outputDir: string;
-	private profilePath: string;
-	private profileRole: string;
-	private timestamp?: string;
+  private outputDir: string;
+  private profilePath: string;
+  private profileRole: string;
+  private timestamp?: string;
 
-	constructor(profilePath: string, profileRole: string, timestamp?: string, customDeliverablesDir?: string) {
-		this.profilePath = profilePath;
-		this.profileRole = profileRole;
-		this.timestamp = timestamp;
+  constructor(
+    profilePath: string,
+    profileRole: string,
+    timestamp?: string,
+    customDeliverablesDir?: string
+  ) {
+    this.profilePath = profilePath;
+    this.profileRole = profileRole;
+    this.timestamp = timestamp;
 
-		// Generate timestamp-based directory name
-		const ts = timestamp || new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
-		const deliverablesRoot = customDeliverablesDir || path.join(profilePath, "deliverables");
-		this.outputDir = path.join(deliverablesRoot, `weave-${ts}`);
-	}
+    // Generate timestamp-based directory name
+    const ts = timestamp || new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
+    const deliverablesRoot = customDeliverablesDir || path.join(profilePath, "deliverables");
+    this.outputDir = path.join(deliverablesRoot, `weave-${ts}`);
+  }
 
-	/**
-	 * Initialize output directory with write protection check
-	 */
-	async initialize(): Promise<void> {
-		// Validate write permissions
-		validateWriteOperation(
-			this.profilePath,
-			this.profileRole,
-			"write autopilot artifacts"
-		);
+  /**
+   * Initialize output directory with write protection check
+   */
+  async initialize(): Promise<void> {
+    // Validate write permissions
+    validateWriteOperation(this.profilePath, this.profileRole, "write autopilot artifacts");
 
-		// Create output directory
-		if (!fs.existsSync(this.outputDir)) {
-			fs.mkdirSync(this.outputDir, { recursive: true });
-		}
-	}
+    // Create output directory
+    if (!fs.existsSync(this.outputDir)) {
+      fs.mkdirSync(this.outputDir, { recursive: true });
+    }
+  }
 
-	/**
-	 * Get timestamp used for this artifact writer
-	 */
-	getTimestamp(): string | undefined {
-		return this.timestamp;
-	}
+  /**
+   * Get timestamp used for this artifact writer
+   */
+  getTimestamp(): string | undefined {
+    return this.timestamp;
+  }
 
-	/**
-	 * Write analysis.json artifact
-	 */
-	async writeAnalysis(data: AnalysisData): Promise<string> {
-		const filepath = path.join(this.outputDir, "analysis.json");
-		const content = canonicalJSONStringify(data);
-		fs.writeFileSync(filepath, content + "\n", "utf-8");
-		return filepath;
-	}
+  /**
+   * Write analysis.json artifact
+   */
+  async writeAnalysis(data: AnalysisData): Promise<string> {
+    const filepath = path.join(this.outputDir, "analysis.json");
+    const content = canonicalJSONStringify(data);
+    fs.writeFileSync(filepath, content + "\n", "utf-8");
+    return filepath;
+  }
 
-	/**
-	 * Write weave-report.md artifact
-	 */
-	async writeWeaveReport(
-		plan: Plan,
-		mergeOrder: string[][],
-		recommendations: string[]
-	): Promise<string> {
-		const filepath = path.join(this.outputDir, "weave-report.md");
+  /**
+   * Write weave-report.md artifact
+   */
+  async writeWeaveReport(
+    plan: Plan,
+    mergeOrder: string[][],
+    recommendations: string[]
+  ): Promise<string> {
+    const filepath = path.join(this.outputDir, "weave-report.md");
 
-		const lines: string[] = [];
-		lines.push("# Merge-Weave Execution Report");
-		lines.push("");
-		lines.push(`Generated: ${new Date().toISOString()}`);
-		lines.push("");
+    const lines: string[] = [];
+    lines.push("# Merge-Weave Execution Report");
+    lines.push("");
+    lines.push(`Generated: ${new Date().toISOString()}`);
+    lines.push("");
 
-		// Plan summary
-		lines.push("## Plan Summary");
-		lines.push("");
-		lines.push(`- **Target Branch**: ${plan.target}`);
-		lines.push(`- **Total Items**: ${plan.items.length}`);
-		lines.push(`- **Merge Levels**: ${mergeOrder.length}`);
-		lines.push("");
+    // Plan summary
+    lines.push("## Plan Summary");
+    lines.push("");
+    lines.push(`- **Target Branch**: ${plan.target}`);
+    lines.push(`- **Total Items**: ${plan.items.length}`);
+    lines.push(`- **Merge Levels**: ${mergeOrder.length}`);
+    lines.push("");
 
-		// Merge order
-		lines.push("## Merge Order");
-		lines.push("");
-		mergeOrder.forEach((level, idx) => {
-			lines.push(`**Level ${idx + 1}**: ${level.join(", ")}`);
-		});
-		lines.push("");
+    // Merge order
+    lines.push("## Merge Order");
+    lines.push("");
+    mergeOrder.forEach((level, idx) => {
+      lines.push(`**Level ${idx + 1}**: ${level.join(", ")}`);
+    });
+    lines.push("");
 
-		// Items detail
-		lines.push("## Items");
-		lines.push("");
-		for (const item of plan.items) {
-			lines.push(`### ${item.name}`);
-			lines.push("");
-			if (item.deps.length > 0) {
-				lines.push(`**Dependencies**: ${item.deps.join(", ")}`);
-			} else {
-				lines.push("**Dependencies**: None");
-			}
-			if (item.gates.length > 0) {
-				lines.push("");
-				lines.push("**Gates**:");
-				for (const gate of item.gates) {
-					lines.push(`- ${gate.name}: \`${gate.run}\``);
-				}
-			}
-			lines.push("");
-		}
+    // Items detail
+    lines.push("## Items");
+    lines.push("");
+    for (const item of plan.items) {
+      lines.push(`### ${item.name}`);
+      lines.push("");
+      if (item.deps.length > 0) {
+        lines.push(`**Dependencies**: ${item.deps.join(", ")}`);
+      } else {
+        lines.push("**Dependencies**: None");
+      }
+      if (item.gates.length > 0) {
+        lines.push("");
+        lines.push("**Gates**:");
+        for (const gate of item.gates) {
+          lines.push(`- ${gate.name}: \`${gate.run}\``);
+        }
+      }
+      lines.push("");
+    }
 
-		// Recommendations
-		if (recommendations.length > 0) {
-			lines.push("## Recommendations");
-			lines.push("");
-			for (const rec of recommendations) {
-				lines.push(`- ${rec}`);
-			}
-			lines.push("");
-		}
+    // Recommendations
+    if (recommendations.length > 0) {
+      lines.push("## Recommendations");
+      lines.push("");
+      for (const rec of recommendations) {
+        lines.push(`- ${rec}`);
+      }
+      lines.push("");
+    }
 
-		// Footer
-		lines.push("---");
-		lines.push(`*Generated by lexrunner v${getPackageVersion()}*`);
-		lines.push("");
+    // Footer
+    lines.push("---");
+    lines.push(`*Generated by lexrunner v${getPackageVersion()}*`);
+    lines.push("");
 
-		const content = lines.join("\n");
-		fs.writeFileSync(filepath, content, "utf-8");
-		return filepath;
-	}
+    const content = lines.join("\n");
+    fs.writeFileSync(filepath, content, "utf-8");
+    return filepath;
+  }
 
-	/**
-	 * Write gate-predictions.json artifact
-	 */
-	async writeGatePredictions(predictions: GatePrediction[]): Promise<string> {
-		const filepath = path.join(this.outputDir, "gate-predictions.json");
-		const data = {
-			schemaVersion: "1.0.0",
-			timestamp: new Date().toISOString(),
-			predictions
-		};
-		const content = canonicalJSONStringify(data);
-		fs.writeFileSync(filepath, content + "\n", "utf-8");
-		return filepath;
-	}
+  /**
+   * Write gate-predictions.json artifact
+   */
+  async writeGatePredictions(predictions: GatePrediction[]): Promise<string> {
+    const filepath = path.join(this.outputDir, "gate-predictions.json");
+    const data = {
+      schemaVersion: "1.0.0",
+      timestamp: new Date().toISOString(),
+      predictions,
+    };
+    const content = canonicalJSONStringify(data);
+    fs.writeFileSync(filepath, content + "\n", "utf-8");
+    return filepath;
+  }
 
-	/**
-	 * Write execution-log.md template
-	 */
-	async writeExecutionLog(plan: Plan, mergeOrder: string[][]): Promise<string> {
-		const filepath = path.join(this.outputDir, "execution-log.md");
+  /**
+   * Write execution-log.md template
+   */
+  async writeExecutionLog(plan: Plan, mergeOrder: string[][]): Promise<string> {
+    const filepath = path.join(this.outputDir, "execution-log.md");
 
-		const lines: string[] = [];
-		lines.push(`# Merge-Weave Execution Log: ${plan.target}`);
-		lines.push("");
-		lines.push(`Generated: ${new Date().toISOString()}`);
-		lines.push("");
+    const lines: string[] = [];
+    lines.push(`# Merge-Weave Execution Log: ${plan.target}`);
+    lines.push("");
+    lines.push(`Generated: ${new Date().toISOString()}`);
+    lines.push("");
 
-		lines.push("## Pre-Execution Summary");
-		lines.push("");
-		lines.push("### Plan Generation ✅");
-		lines.push(`- **Schema**: v${plan.schemaVersion}`);
-		lines.push(`- **Target**: ${plan.target}`);
-		lines.push(`- **Items**: ${plan.items.length}`);
-		if (plan.policy) {
-			lines.push(`- **Policy**: requiredGates: [${plan.policy.requiredGates.join(", ")}], maxWorkers: ${plan.policy.maxWorkers}`);
-		}
-		lines.push("");
+    lines.push("## Pre-Execution Summary");
+    lines.push("");
+    lines.push("### Plan Generation ✅");
+    lines.push(`- **Schema**: v${plan.schemaVersion}`);
+    lines.push(`- **Target**: ${plan.target}`);
+    lines.push(`- **Items**: ${plan.items.length}`);
+    if (plan.policy) {
+      lines.push(
+        `- **Policy**: requiredGates: [${plan.policy.requiredGates.join(", ")}], maxWorkers: ${plan.policy.maxWorkers}`
+      );
+    }
+    lines.push("");
 
-		lines.push("### Merge Order Computation ✅");
-		lines.push(`- **Result**: ${mergeOrder.length} level(s)`);
-		lines.push(`- **Analysis**: ${mergeOrder.map(l => `[${l.join(", ")}]`).join(" → ")}`);
-		lines.push("");
+    lines.push("### Merge Order Computation ✅");
+    lines.push(`- **Result**: ${mergeOrder.length} level(s)`);
+    lines.push(`- **Analysis**: ${mergeOrder.map((l) => `[${l.join(", ")}]`).join(" → ")}`);
+    lines.push("");
 
-		lines.push("## Execution Steps");
-		lines.push("");
-		lines.push("### Level 1 Execution");
-		lines.push("- [ ] Run gates for all items in level 1");
-		lines.push("- [ ] Verify all gates pass");
-		lines.push("- [ ] Merge items in level 1");
-		lines.push("");
+    lines.push("## Execution Steps");
+    lines.push("");
+    lines.push("### Level 1 Execution");
+    lines.push("- [ ] Run gates for all items in level 1");
+    lines.push("- [ ] Verify all gates pass");
+    lines.push("- [ ] Merge items in level 1");
+    lines.push("");
 
-		if (mergeOrder.length > 1) {
-			for (let i = 1; i < mergeOrder.length; i++) {
-				lines.push(`### Level ${i + 1} Execution`);
-				lines.push(`- [ ] Run gates for all items in level ${i + 1}`);
-				lines.push("- [ ] Verify all gates pass");
-				lines.push(`- [ ] Merge items in level ${i + 1}`);
-				lines.push("");
-			}
-		}
+    if (mergeOrder.length > 1) {
+      for (let i = 1; i < mergeOrder.length; i++) {
+        lines.push(`### Level ${i + 1} Execution`);
+        lines.push(`- [ ] Run gates for all items in level ${i + 1}`);
+        lines.push("- [ ] Verify all gates pass");
+        lines.push(`- [ ] Merge items in level ${i + 1}`);
+        lines.push("");
+      }
+    }
 
-		lines.push("## Post-Execution");
-		lines.push("- [ ] Verify target branch is clean");
-		lines.push("- [ ] Tag merge-weave completion");
-		lines.push("- [ ] Update documentation");
-		lines.push("");
+    lines.push("## Post-Execution");
+    lines.push("- [ ] Verify target branch is clean");
+    lines.push("- [ ] Tag merge-weave completion");
+    lines.push("- [ ] Update documentation");
+    lines.push("");
 
-		lines.push("---");
-		lines.push(`*Template generated by lexrunner v${getPackageVersion()}*`);
-		lines.push("");
+    lines.push("---");
+    lines.push(`*Template generated by lexrunner v${getPackageVersion()}*`);
+    lines.push("");
 
-		const content = lines.join("\n");
-		fs.writeFileSync(filepath, content, "utf-8");
-		return filepath;
-	}
+    const content = lines.join("\n");
+    fs.writeFileSync(filepath, content, "utf-8");
+    return filepath;
+  }
 
-	/**
-	 * Write metadata.json artifact
-	 */
-	async writeMetadata(level: number): Promise<string> {
-		const filepath = path.join(this.outputDir, "metadata.json");
-		const metadata: ArtifactMetadata = {
-			schemaVersion: "1.0.0",
-			timestamp: new Date().toISOString(),
-			runnerVersion: getPackageVersion(),
-			levelExecuted: level,
-			profilePath: this.profilePath
-		};
-		const content = canonicalJSONStringify(metadata);
-		fs.writeFileSync(filepath, content + "\n", "utf-8");
-		return filepath;
-	}
+  /**
+   * Write metadata.json artifact
+   */
+  async writeMetadata(level: number): Promise<string> {
+    const filepath = path.join(this.outputDir, "metadata.json");
+    const metadata: ArtifactMetadata = {
+      schemaVersion: "1.0.0",
+      timestamp: new Date().toISOString(),
+      runnerVersion: getPackageVersion(),
+      levelExecuted: level,
+      profilePath: this.profilePath,
+    };
+    const content = canonicalJSONStringify(metadata);
+    fs.writeFileSync(filepath, content + "\n", "utf-8");
+    return filepath;
+  }
 
-	/**
-	 * Get output directory path
-	 */
-	getOutputDir(): string {
-		return this.outputDir;
-	}
+  /**
+   * Get output directory path
+   */
+  getOutputDir(): string {
+    return this.outputDir;
+  }
 }
 
 /**
  * Get package version from package.json
  */
 function getPackageVersion(): string {
-	try {
-		const packageJsonPath = path.resolve(process.cwd(), "package.json");
-		const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-		return packageJson.version || "unknown";
-	} catch {
-		return "unknown";
-	}
+  try {
+    const packageJsonPath = path.resolve(process.cwd(), "package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+    return packageJson.version || "unknown";
+  } catch {
+    return "unknown";
+  }
 }

@@ -6,568 +6,579 @@
 import { Octokit } from "@octokit/rest";
 import { createTokenAuth } from "@octokit/auth-token";
 import type {
-	PullRequest,
-	PullRequestDetails,
-	PRQueryOptions,
-	RepositoryInfo,
-	GitHubIssue,
-	IssueQueryOptions
+  PullRequest,
+  PullRequestDetails,
+  PRQueryOptions,
+  RepositoryInfo,
+  GitHubIssue,
+  IssueQueryOptions,
 } from "./types.js";
-import {
-	GitHubAPIError,
-	GitHubRateLimitError,
-	GitHubAuthError
-} from "./types.js";
+import { GitHubAPIError, GitHubRateLimitError, GitHubAuthError } from "./types.js";
 import { parsePRDescription, normalizeDependencyRef } from "../planner/index.js";
 import { parseRemoteUrl } from "../git/parseRemote.js";
 
-export type { PullRequest, PullRequestDetails, PRQueryOptions, RepositoryInfo, GitHubIssue, IssueQueryOptions };
+export type {
+  PullRequest,
+  PullRequestDetails,
+  PRQueryOptions,
+  RepositoryInfo,
+  GitHubIssue,
+  IssueQueryOptions,
+};
 export { GitHubAPIError, GitHubRateLimitError, GitHubAuthError };
 
 export interface GitHubClient {
-	listOpenPRs(options?: PRQueryOptions): Promise<PullRequest[]>;
-	getPRDetails(number: number): Promise<PullRequestDetails>;
-	getPRDependencies(pr: PullRequest): Promise<string[]>;
-	validateRepository(): Promise<RepositoryInfo>;
-	// Issue operations
-	listIssues(options?: IssueQueryOptions): Promise<GitHubIssue[]>;
-	// File analysis support
-	getOctokit(): any; // Returns Octokit instance for advanced operations
-	getOwner(): string;
-	getRepo(): string;
-	// Minimal context support
-	getPRDiff(prNumber: number): Promise<string>;
-	getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>>;
+  listOpenPRs(options?: PRQueryOptions): Promise<PullRequest[]>;
+  getPRDetails(number: number): Promise<PullRequestDetails>;
+  getPRDependencies(pr: PullRequest): Promise<string[]>;
+  validateRepository(): Promise<RepositoryInfo>;
+  // Issue operations
+  listIssues(options?: IssueQueryOptions): Promise<GitHubIssue[]>;
+  // File analysis support
+  getOctokit(): any; // Returns Octokit instance for advanced operations
+  getOwner(): string;
+  getRepo(): string;
+  // Minimal context support
+  getPRDiff(prNumber: number): Promise<string>;
+  getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>>;
 }
 
 export class GitHubClientImpl implements GitHubClient {
-	private octokit: Octokit;
-	private owner: string;
-	private repo: string;
-	private normalized: boolean = false;
+  private octokit: Octokit;
+  private owner: string;
+  private repo: string;
+  private normalized: boolean = false;
 
-	constructor(options: {
-		token?: string;
-		owner: string;
-		repo: string;
-		octokit?: Octokit;
-	}) {
-		this.owner = options.owner;
-		this.repo = options.repo;
+  constructor(options: { token?: string; owner: string; repo: string; octokit?: Octokit }) {
+    this.owner = options.owner;
+    this.repo = options.repo;
 
-		// Use injected Octokit if provided (for testing)
-		if (options.octokit) {
-			this.octokit = options.octokit;
-		} else if (options.token) {
-			// Initialize Octokit with authentication if token provided
-			this.octokit = new Octokit({
-				auth: options.token
-			});
-		} else {
-			// Try to get token from environment
-			const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-			if (token) {
-				this.octokit = new Octokit({
-					auth: token
-				});
-			} else {
-				// Unauthenticated client (rate limited)
-				this.octokit = new Octokit();
-			}
-		}
-	}
+    // Use injected Octokit if provided (for testing)
+    if (options.octokit) {
+      this.octokit = options.octokit;
+    } else if (options.token) {
+      // Initialize Octokit with authentication if token provided
+      this.octokit = new Octokit({
+        auth: options.token,
+      });
+    } else {
+      // Try to get token from environment
+      const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+      if (token) {
+        this.octokit = new Octokit({
+          auth: token,
+        });
+      } else {
+        // Unauthenticated client (rate limited)
+        this.octokit = new Octokit();
+      }
+    }
+  }
 
-	/**
-	 * Normalize repository owner and name to match GitHub's canonical casing.
-	 * This handles case-insensitive lookups where git remote URLs may have
-	 * different casing than the actual GitHub repository.
-	 */
-	private async normalizeRepositoryName(): Promise<void> {
-		if (this.normalized) {
-			return;
-		}
+  /**
+   * Normalize repository owner and name to match GitHub's canonical casing.
+   * This handles case-insensitive lookups where git remote URLs may have
+   * different casing than the actual GitHub repository.
+   */
+  private async normalizeRepositoryName(): Promise<void> {
+    if (this.normalized) {
+      return;
+    }
 
-		try {
-			const response = await this.octokit.rest.repos.get({
-				owner: this.owner,
-				repo: this.repo
-			});
+    try {
+      const response = await this.octokit.rest.repos.get({
+        owner: this.owner,
+        repo: this.repo,
+      });
 
-			// Update with canonical names from GitHub (defensive null checks)
-			if (response.data.owner?.login) {
-				this.owner = response.data.owner.login;
-			}
-			if (response.data.name) {
-				this.repo = response.data.name;
-			}
-			this.normalized = true;
-		} catch (error: unknown) {
-			// Extract status from error
-			const status = this.extractErrorStatus(error);
-			const message = error instanceof Error ? error.message : String(error);
-			
-			// If normalization fails with 404, throw immediately
-			if (status === 404) {
-				throw new GitHubAPIError(`Repository ${this.owner}/${this.repo} not found. Check repository name and access permissions.`);
-			}
-			// For other errors (auth, rate limit, network), throw immediately
-			// Don't set normalized flag - we want to retry on next call
-			throw new GitHubAPIError(`Failed to normalize repository name: ${message}`, status);
-		}
-	}
+      // Update with canonical names from GitHub (defensive null checks)
+      if (response.data.owner?.login) {
+        this.owner = response.data.owner.login;
+      }
+      if (response.data.name) {
+        this.repo = response.data.name;
+      }
+      this.normalized = true;
+    } catch (error: unknown) {
+      // Extract status from error
+      const status = this.extractErrorStatus(error);
+      const message = error instanceof Error ? error.message : String(error);
 
-	/**
-	 * Extract HTTP status code from error object
-	 */
-	private extractErrorStatus(error: unknown): number | undefined {
-		if (!error || typeof error !== 'object') {
-			return undefined;
-		}
-		
-		if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
-			return (error as { status: number }).status;
-		}
-		
-		return undefined;
-	}
+      // If normalization fails with 404, throw immediately
+      if (status === 404) {
+        throw new GitHubAPIError(
+          `Repository ${this.owner}/${this.repo} not found. Check repository name and access permissions.`
+        );
+      }
+      // For other errors (auth, rate limit, network), throw immediately
+      // Don't set normalized flag - we want to retry on next call
+      throw new GitHubAPIError(`Failed to normalize repository name: ${message}`, status);
+    }
+  }
 
-	async validateRepository(): Promise<RepositoryInfo> {
-		try {
-			const response = await this.octokit.rest.repos.get({
-				owner: this.owner,
-				repo: this.repo
-			});
+  /**
+   * Extract HTTP status code from error object
+   */
+  private extractErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== "object") {
+      return undefined;
+    }
 
-			// Normalize after successful fetch (if data available)
-			if (response.data.owner?.login) {
-				this.owner = response.data.owner.login;
-			}
-			if (response.data.name) {
-				this.repo = response.data.name;
-			}
-			this.normalized = true;
+    if ("status" in error && typeof (error as { status: unknown }).status === "number") {
+      return (error as { status: number }).status;
+    }
 
-			return {
-				owner: this.owner,
-				repo: this.repo,
-				defaultBranch: response.data.default_branch,
-				url: response.data.html_url
-			};
-		} catch (error: any) {
-			if (error.status === 401) {
-				throw new GitHubAuthError("GitHub authentication failed. Please provide a valid token.");
-			}
-			if (error.status === 403 && error.response?.headers?.['x-ratelimit-remaining'] === '0') {
-				const resetTime = new Date(parseInt(error.response.headers['x-ratelimit-reset']) * 1000);
-				throw new GitHubRateLimitError("GitHub API rate limit exceeded", resetTime);
-			}
-			if (error.status === 404) {
-				throw new GitHubAPIError(`Repository ${this.owner}/${this.repo} not found or not accessible`);
-			}
-			throw new GitHubAPIError(`Failed to validate repository: ${error.message}`, error.status);
-		}
-	}
+    return undefined;
+  }
 
-	async listOpenPRs(options: PRQueryOptions = {}): Promise<PullRequest[]> {
-		// Normalize repository name before making API calls
-		await this.normalizeRepositoryName();
+  async validateRepository(): Promise<RepositoryInfo> {
+    try {
+      const response = await this.octokit.rest.repos.get({
+        owner: this.owner,
+        repo: this.repo,
+      });
 
-		try {
-			const params: any = {
-				owner: this.owner,
-				repo: this.repo,
-				state: options.state || "open",
-				sort: options.sort || "created",
-				direction: options.direction || "desc",
-				per_page: options.per_page || 30,
-				page: options.page ?? 1
-			};
+      // Normalize after successful fetch (if data available)
+      if (response.data.owner?.login) {
+        this.owner = response.data.owner.login;
+      }
+      if (response.data.name) {
+        this.repo = response.data.name;
+      }
+      this.normalized = true;
 
-			if (options.base) params.base = options.base;
-			if (options.head) params.head = options.head;
+      return {
+        owner: this.owner,
+        repo: this.repo,
+        defaultBranch: response.data.default_branch,
+        url: response.data.html_url,
+      };
+    } catch (error: any) {
+      if (error.status === 401) {
+        throw new GitHubAuthError("GitHub authentication failed. Please provide a valid token.");
+      }
+      if (error.status === 403 && error.response?.headers?.["x-ratelimit-remaining"] === "0") {
+        const resetTime = new Date(parseInt(error.response.headers["x-ratelimit-reset"]) * 1000);
+        throw new GitHubRateLimitError("GitHub API rate limit exceeded", resetTime);
+      }
+      if (error.status === 404) {
+        throw new GitHubAPIError(
+          `Repository ${this.owner}/${this.repo} not found or not accessible`
+        );
+      }
+      throw new GitHubAPIError(`Failed to validate repository: ${error.message}`, error.status);
+    }
+  }
 
-			// Use octokit.paginate to follow pagination automatically if available
-			let allPRs: any[];
-			if (typeof (this.octokit as any).paginate === 'function') {
-				allPRs = await (this.octokit as any).paginate((this.octokit as any).rest.pulls.list, params);
+  async listOpenPRs(options: PRQueryOptions = {}): Promise<PullRequest[]> {
+    // Normalize repository name before making API calls
+    await this.normalizeRepositoryName();
 
-				// Some test fakes return minimal objects (e.g., [{ number: 1 }]). If items are incomplete
-				// (missing expected fields like 'title'), fallback to a single REST list call which
-				// most mocks provide with full PR objects.
-				if (allPRs.length > 0 && allPRs.some(item => typeof item.title === 'undefined')) {
-					const response = await this.octokit.rest.pulls.list(params as any);
-					allPRs = response.data || [];
-				}
-			} else {
-				// Fallback: single page request
-				const response = await this.octokit.rest.pulls.list(params as any);
-				allPRs = response.data || [];
-			}
+    try {
+      const params: any = {
+        owner: this.owner,
+        repo: this.repo,
+        state: options.state || "open",
+        sort: options.sort || "created",
+        direction: options.direction || "desc",
+        per_page: options.per_page || 30,
+        page: options.page ?? 1,
+      };
 
-			// Filter by labels if specified
-			let prs = allPRs;
-			if (options.labels && options.labels.length > 0) {
-				prs = prs.filter((pr: any) =>
-					options.labels!.some((label: string) =>
-						pr.labels.some((prLabel: any) => prLabel.name === label)
-					)
-				);
-			}
+      if (options.base) params.base = options.base;
+      if (options.head) params.head = options.head;
 
-			return prs.map(this.transformPR);
-		} catch (error: any) {
-			return this.handleAPIError(error);
-		}
-	}
+      // Use octokit.paginate to follow pagination automatically if available
+      let allPRs: any[];
+      if (typeof (this.octokit as any).paginate === "function") {
+        allPRs = await (this.octokit as any).paginate(
+          (this.octokit as any).rest.pulls.list,
+          params
+        );
 
-	async getPRDetails(number: number): Promise<PullRequestDetails> {
-		try {
-			const response = await this.octokit.rest.pulls.get({
-				owner: this.owner,
-				repo: this.repo,
-				pull_number: number
-			});
+        // Some test fakes return minimal objects (e.g., [{ number: 1 }]). If items are incomplete
+        // (missing expected fields like 'title'), fallback to a single REST list call which
+        // most mocks provide with full PR objects.
+        if (allPRs.length > 0 && allPRs.some((item) => typeof item.title === "undefined")) {
+          const response = await this.octokit.rest.pulls.list(params as any);
+          allPRs = response.data || [];
+        }
+      } else {
+        // Fallback: single page request
+        const response = await this.octokit.rest.pulls.list(params as any);
+        allPRs = response.data || [];
+      }
 
-			const pr = this.transformPR(response.data);
-			const dependencies = await this.getPRDependencies(pr);
-			const tags = this.extractTags(pr);
-			const requiredGates = this.extractRequiredGates(pr);
+      // Filter by labels if specified
+      let prs = allPRs;
+      if (options.labels && options.labels.length > 0) {
+        prs = prs.filter((pr: any) =>
+          options.labels!.some((label: string) =>
+            pr.labels.some((prLabel: any) => prLabel.name === label)
+          )
+        );
+      }
 
-			// Parse PR description for additional metadata and gate overrides
-			const parsed = parsePRDescription(pr.number, pr.body, {
-				repository: `${this.owner}/${this.repo}`,
-				partialExtraction: true
-			});
+      return prs.map(this.transformPR);
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
 
-			return {
-				...pr,
-				dependencies,
-				tags,
-				requiredGates,
-				...(parsed.metadata && Object.keys(parsed.metadata).length > 0 ? { metadata: parsed.metadata } : {}),
-				...(parsed.gates ? { gateOverrides: parsed.gates } : {})
-			};
-		} catch (error: any) {
-			return this.handleAPIError(error);
-		}
-	}
+  async getPRDetails(number: number): Promise<PullRequestDetails> {
+    try {
+      const response = await this.octokit.rest.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: number,
+      });
 
-	async getPRDependencies(pr: PullRequest): Promise<string[]> {
-		if (!pr.body) {
-			return [];
-		}
+      const pr = this.transformPR(response.data);
+      const dependencies = await this.getPRDependencies(pr);
+      const tags = this.extractTags(pr);
+      const requiredGates = this.extractRequiredGates(pr);
 
-		// Use the new dependency parser for comprehensive parsing
-		const parsed = parsePRDescription(pr.number, pr.body, {
-			repository: `${this.owner}/${this.repo}`,
-			partialExtraction: true
-		});
+      // Parse PR description for additional metadata and gate overrides
+      const parsed = parsePRDescription(pr.number, pr.body, {
+        repository: `${this.owner}/${this.repo}`,
+        partialExtraction: true,
+      });
 
-		// Normalize all dependencies to full format (owner/repo#123)
-		const normalizedDeps = parsed.dependencies.map(dep =>
-			normalizeDependencyRef(dep, `${this.owner}/${this.repo}`)
-		);
+      return {
+        ...pr,
+        dependencies,
+        tags,
+        requiredGates,
+        ...(parsed.metadata && Object.keys(parsed.metadata).length > 0
+          ? { metadata: parsed.metadata }
+          : {}),
+        ...(parsed.gates ? { gateOverrides: parsed.gates } : {}),
+      };
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
 
-		// Remove duplicates and sort for deterministic output
-		return [...new Set(normalizedDeps)].sort();
-	}
+  async getPRDependencies(pr: PullRequest): Promise<string[]> {
+    if (!pr.body) {
+      return [];
+    }
 
-	async listIssues(options: IssueQueryOptions = {}): Promise<GitHubIssue[]> {
-		try {
-			const params: any = {
-				owner: this.owner,
-				repo: this.repo,
-				state: options.state || "open",
-				per_page: options.per_page || 100,
-				page: options.page || 1,
-				sort: options.sort || "created",
-				direction: options.direction || "desc"
-			};
+    // Use the new dependency parser for comprehensive parsing
+    const parsed = parsePRDescription(pr.number, pr.body, {
+      repository: `${this.owner}/${this.repo}`,
+      partialExtraction: true,
+    });
 
-			if (options.labels && options.labels.length > 0) {
-				params.labels = options.labels.join(",");
-			}
+    // Normalize all dependencies to full format (owner/repo#123)
+    const normalizedDeps = parsed.dependencies.map((dep) =>
+      normalizeDependencyRef(dep, `${this.owner}/${this.repo}`)
+    );
 
-			if (options.assignee) {
-				params.assignee = options.assignee;
-			}
+    // Remove duplicates and sort for deterministic output
+    return [...new Set(normalizedDeps)].sort();
+  }
 
-			if (options.creator) {
-				params.creator = options.creator;
-			}
+  async listIssues(options: IssueQueryOptions = {}): Promise<GitHubIssue[]> {
+    try {
+      const params: any = {
+        owner: this.owner,
+        repo: this.repo,
+        state: options.state || "open",
+        per_page: options.per_page || 100,
+        page: options.page || 1,
+        sort: options.sort || "created",
+        direction: options.direction || "desc",
+      };
 
-			if (options.mentioned) {
-				params.mentioned = options.mentioned;
-			}
+      if (options.labels && options.labels.length > 0) {
+        params.labels = options.labels.join(",");
+      }
 
-			const response = await this.octokit.rest.issues.listForRepo(params);
+      if (options.assignee) {
+        params.assignee = options.assignee;
+      }
 
-			// Filter out pull requests (GitHub API includes PRs in issues endpoint)
-			const issues = response.data.filter((item: any) => !item.pull_request);
+      if (options.creator) {
+        params.creator = options.creator;
+      }
 
-			return issues.map((issue: any) => ({
-				number: issue.number,
-				title: issue.title,
-				body: issue.body,
-				state: issue.state,
-				labels: issue.labels.map((label: any) => ({
-					name: label.name,
-					color: label.color
-				})),
-				user: {
-					login: issue.user.login
-				},
-				assignees: issue.assignees.map((assignee: any) => ({
-					login: assignee.login
-				})),
-				createdAt: issue.created_at,
-				updatedAt: issue.updated_at
-			}));
-		} catch (error: any) {
-			return this.handleAPIError(error);
-		}
-	}
+      if (options.mentioned) {
+        params.mentioned = options.mentioned;
+      }
 
-	private transformPR(prData: any): PullRequest {
-		return {
-			number: prData.number,
-			title: prData.title,
-			body: prData.body,
-			head: {
-				ref: prData.head.ref,
-				sha: prData.head.sha
-			},
-			base: {
-				ref: prData.base.ref,
-				sha: prData.base.sha
-			},
-			state: prData.state,
-			labels: prData.labels.map((label: any) => ({
-				name: label.name,
-				color: label.color
-			})),
-			draft: prData.draft || false,
-			mergeable: prData.mergeable,
-			user: {
-				login: prData.user.login
-			},
-			createdAt: prData.created_at,
-			updatedAt: prData.updated_at
-		};
-	}
+      const response = await this.octokit.rest.issues.listForRepo(params);
 
-	private extractTags(pr: PullRequest): string[] {
-		// Extract tags from labels, filtering for stack-related labels
-		const tags = pr.labels
-			.map(label => label.name)
-			.filter(name => name.startsWith('stack:') || name.startsWith('tag:'))
-			.map(name => name.replace(/^(stack:|tag:)/, ''));
+      // Filter out pull requests (GitHub API includes PRs in issues endpoint)
+      const issues = response.data.filter((item: any) => !item.pull_request);
 
-		return [...new Set(tags)].sort();
-	}
+      return issues.map((issue: any) => ({
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        state: issue.state,
+        labels: issue.labels.map((label: any) => ({
+          name: label.name,
+          color: label.color,
+        })),
+        user: {
+          login: issue.user.login,
+        },
+        assignees: issue.assignees.map((assignee: any) => ({
+          login: assignee.login,
+        })),
+        createdAt: issue.created_at,
+        updatedAt: issue.updated_at,
+      }));
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
 
-	private extractRequiredGates(pr: PullRequest): string[] {
-		const gates: string[] = [];
+  private transformPR(prData: any): PullRequest {
+    return {
+      number: prData.number,
+      title: prData.title,
+      body: prData.body,
+      head: {
+        ref: prData.head.ref,
+        sha: prData.head.sha,
+      },
+      base: {
+        ref: prData.base.ref,
+        sha: prData.base.sha,
+      },
+      state: prData.state,
+      labels: prData.labels.map((label: any) => ({
+        name: label.name,
+        color: label.color,
+      })),
+      draft: prData.draft || false,
+      mergeable: prData.mergeable,
+      user: {
+        login: prData.user.login,
+      },
+      createdAt: prData.created_at,
+      updatedAt: prData.updated_at,
+    };
+  }
 
-		// Extract from labels like "gate:lint", "gate:test"
-		const gateLabels = pr.labels
-			.map(label => label.name)
-			.filter(name => name.startsWith('gate:'))
-			.map(name => name.replace(/^gate:/, ''));
+  private extractTags(pr: PullRequest): string[] {
+    // Extract tags from labels, filtering for stack-related labels
+    const tags = pr.labels
+      .map((label) => label.name)
+      .filter((name) => name.startsWith("stack:") || name.startsWith("tag:"))
+      .map((name) => name.replace(/^(stack:|tag:)/, ""));
 
-		gates.push(...gateLabels);
+    return [...new Set(tags)].sort();
+  }
 
-		// Use the dependency parser to extract gate overrides from PR body
-		if (pr.body) {
-			const parsed = parsePRDescription(pr.number, pr.body, { partialExtraction: true });
-			if (parsed.gates?.required) {
-				gates.push(...parsed.gates.required);
-			}
-		}
+  private extractRequiredGates(pr: PullRequest): string[] {
+    const gates: string[] = [];
 
-		return [...new Set(gates)].sort();
-	}
+    // Extract from labels like "gate:lint", "gate:test"
+    const gateLabels = pr.labels
+      .map((label) => label.name)
+      .filter((name) => name.startsWith("gate:"))
+      .map((name) => name.replace(/^gate:/, ""));
 
-	private handleAPIError(error: any): never {
-		if (error.status === 401) {
-			throw new GitHubAuthError("GitHub authentication failed. Please provide a valid token.");
-		}
-		if (error.status === 403 && error.response?.headers?.['x-ratelimit-remaining'] === '0') {
-			const resetTime = new Date(parseInt(error.response.headers['x-ratelimit-reset']) * 1000);
-			throw new GitHubRateLimitError("GitHub API rate limit exceeded", resetTime);
-		}
-		throw new GitHubAPIError(`GitHub API error: ${error.message}`, error.status);
-	}
+    gates.push(...gateLabels);
 
-	// File analysis support methods
-	getOctokit(): any {
-		return this.octokit;
-	}
+    // Use the dependency parser to extract gate overrides from PR body
+    if (pr.body) {
+      const parsed = parsePRDescription(pr.number, pr.body, { partialExtraction: true });
+      if (parsed.gates?.required) {
+        gates.push(...parsed.gates.required);
+      }
+    }
 
-	getOwner(): string {
-		return this.owner;
-	}
+    return [...new Set(gates)].sort();
+  }
 
-	getRepo(): string {
-		return this.repo;
-	}
+  private handleAPIError(error: any): never {
+    if (error.status === 401) {
+      throw new GitHubAuthError("GitHub authentication failed. Please provide a valid token.");
+    }
+    if (error.status === 403 && error.response?.headers?.["x-ratelimit-remaining"] === "0") {
+      const resetTime = new Date(parseInt(error.response.headers["x-ratelimit-reset"]) * 1000);
+      throw new GitHubRateLimitError("GitHub API rate limit exceeded", resetTime);
+    }
+    throw new GitHubAPIError(`GitHub API error: ${error.message}`, error.status);
+  }
 
-	/**
-	 * Get unified diff for a pull request
-	 */
-	async getPRDiff(prNumber: number): Promise<string> {
-		try {
-			// Use the GitHub API to get the diff in unified format
-			const response = await this.octokit.rest.pulls.get({
-				owner: this.owner,
-				repo: this.repo,
-				pull_number: prNumber,
-				mediaType: {
-					format: 'diff'
-				}
-			});
+  // File analysis support methods
+  getOctokit(): any {
+    return this.octokit;
+  }
 
-			// The response data will be the diff as a string when format is 'diff'
-			return response.data as unknown as string;
-		} catch (error: any) {
-			return this.handleAPIError(error);
-		}
-	}
+  getOwner(): string {
+    return this.owner;
+  }
 
-	/**
-	 * Get files from a pull request with their content
-	 */
-	async getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>> {
-		try {
-			// Get list of files changed in the PR
-			const { data: files } = await this.octokit.rest.pulls.listFiles({
-				owner: this.owner,
-				repo: this.repo,
-				pull_number: prNumber,
-				per_page: 100
-			});
+  getRepo(): string {
+    return this.repo;
+  }
 
-			// Get the PR details to find the head SHA
-			const { data: pr } = await this.octokit.rest.pulls.get({
-				owner: this.owner,
-				repo: this.repo,
-				pull_number: prNumber
-			});
+  /**
+   * Get unified diff for a pull request
+   */
+  async getPRDiff(prNumber: number): Promise<string> {
+    try {
+      // Use the GitHub API to get the diff in unified format
+      const response = await this.octokit.rest.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        mediaType: {
+          format: "diff",
+        },
+      });
 
-			const headSha = pr.head.sha;
+      // The response data will be the diff as a string when format is 'diff'
+      return response.data as unknown as string;
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
 
-			// Fetch content for each file
-			const filesWithContent = await Promise.all(
-				files
-					.filter(file => {
-						// Only fetch TypeScript/JavaScript files for symbol extraction
-						return /\.(ts|tsx|js|jsx)$/.test(file.filename);
-					})
-					.filter(file => {
-						// Skip deleted files
-						return file.status !== 'removed';
-					})
-					.slice(0, 20) // Limit to 20 files to avoid rate limits
-					.map(async (file) => {
-						try {
-							const { data: content } = await this.octokit.rest.repos.getContent({
-								owner: this.owner,
-								repo: this.repo,
-								path: file.filename,
-								ref: headSha
-							});
+  /**
+   * Get files from a pull request with their content
+   */
+  async getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>> {
+    try {
+      // Get list of files changed in the PR
+      const { data: files } = await this.octokit.rest.pulls.listFiles({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        per_page: 100,
+      });
 
-							// Content is base64 encoded
-							if ('content' in content && typeof content.content === 'string') {
-								const decoded = Buffer.from(content.content, 'base64').toString('utf-8');
-								return {
-									path: file.filename,
-									content: decoded
-								};
-							}
-							return null;
-						} catch (error) {
-							// File might not exist or be too large
-							return null;
-						}
-					})
-			);
+      // Get the PR details to find the head SHA
+      const { data: pr } = await this.octokit.rest.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+      });
 
-			return filesWithContent.filter((f): f is { path: string; content: string } => f !== null);
-		} catch (error: any) {
-			return this.handleAPIError(error);
-		}
-	}
+      const headSha = pr.head.sha;
+
+      // Fetch content for each file
+      const filesWithContent = await Promise.all(
+        files
+          .filter((file) => {
+            // Only fetch TypeScript/JavaScript files for symbol extraction
+            return /\.(ts|tsx|js|jsx)$/.test(file.filename);
+          })
+          .filter((file) => {
+            // Skip deleted files
+            return file.status !== "removed";
+          })
+          .slice(0, 20) // Limit to 20 files to avoid rate limits
+          .map(async (file) => {
+            try {
+              const { data: content } = await this.octokit.rest.repos.getContent({
+                owner: this.owner,
+                repo: this.repo,
+                path: file.filename,
+                ref: headSha,
+              });
+
+              // Content is base64 encoded
+              if ("content" in content && typeof content.content === "string") {
+                const decoded = Buffer.from(content.content, "base64").toString("utf-8");
+                return {
+                  path: file.filename,
+                  content: decoded,
+                };
+              }
+              return null;
+            } catch (error) {
+              // File might not exist or be too large
+              return null;
+            }
+          })
+      );
+
+      return filesWithContent.filter((f): f is { path: string; content: string } => f !== null);
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
 }
 
 /**
  * Factory function to create GitHub client with auto-detection of repository info
  */
-export async function createGitHubClient(options: {
-	token?: string;
-	owner?: string;
-	repo?: string;
-	octokit?: Octokit;
-} = {}): Promise<GitHubClient> {
-	let owner = options.owner;
-	let repo = options.repo;
+export async function createGitHubClient(
+  options: {
+    token?: string;
+    owner?: string;
+    repo?: string;
+    octokit?: Octokit;
+  } = {}
+): Promise<GitHubClient> {
+  let owner = options.owner;
+  let repo = options.repo;
 
-	// Auto-detect repository info from git remote if not provided
-	if (!owner || !repo) {
-		try {
-			const { execa } = await import("execa");
+  // Auto-detect repository info from git remote if not provided
+  if (!owner || !repo) {
+    try {
+      const { execa } = await import("execa");
 
-			// Prefer origin; fall back to first push remote from `git remote -v`
-			let remoteUrl: string | undefined;
-			try {
-				const r = await execa("git", ["remote", "get-url", "origin"]);
-				remoteUrl = r.stdout.trim();
-			} catch (e) {
-				// fallback: parse git remote -v for a push url
-				const r = await execa("git", ["remote", "-v"]);
-				const lines = r.stdout.trim().split(/\r?\n/);
-				for (const line of lines) {
-					// format: <name> <url> (fetch|push)
-					const m = line.match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
-					if (m && m[3] === 'push') {
-						remoteUrl = m[2];
-						break;
-					}
-				}
-				// if still not found, try first remote entry
-				if (!remoteUrl && lines.length > 0) {
-					const m = lines[0].match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
-					if (m) remoteUrl = m[2];
-				}
-			}
+      // Prefer origin; fall back to first push remote from `git remote -v`
+      let remoteUrl: string | undefined;
+      try {
+        const r = await execa("git", ["remote", "get-url", "origin"]);
+        remoteUrl = r.stdout.trim();
+      } catch (e) {
+        // fallback: parse git remote -v for a push url
+        const r = await execa("git", ["remote", "-v"]);
+        const lines = r.stdout.trim().split(/\r?\n/);
+        for (const line of lines) {
+          // format: <name> <url> (fetch|push)
+          const m = line.match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
+          if (m && m[3] === "push") {
+            remoteUrl = m[2];
+            break;
+          }
+        }
+        // if still not found, try first remote entry
+        if (!remoteUrl && lines.length > 0) {
+          const m = lines[0].match(/^([^\s]+)\s+([^\s]+)\s+\((fetch|push)\)$/);
+          if (m) remoteUrl = m[2];
+        }
+      }
 
-			if (remoteUrl) {
-				const parsed = parseRemoteUrl(remoteUrl);
-				owner = owner || parsed.owner;
-				repo = repo || parsed.repo;
-			}
-		} catch (error) {
-			// Ignore git command errors - user will need to provide explicit values
-		}
-	}
+      if (remoteUrl) {
+        const parsed = parseRemoteUrl(remoteUrl);
+        owner = owner || parsed.owner;
+        repo = repo || parsed.repo;
+      }
+    } catch (error) {
+      // Ignore git command errors - user will need to provide explicit values
+    }
+  }
 
-	if (!owner || !repo) {
-		throw new GitHubAPIError("Repository owner and name must be provided or detectable from git remote");
-	}
+  if (!owner || !repo) {
+    throw new GitHubAPIError(
+      "Repository owner and name must be provided or detectable from git remote"
+    );
+  }
 
-	// Support test injection via global fake Octokit (for CLI subprocess testing)
-	let octokitToInject = options.octokit;
-	if (!octokitToInject && process.env.LEX_PR_FAKE_OCTOKIT === '1') {
-		const globalFake = (global as any).__FAKE_OCTOKIT;
-		if (globalFake && typeof globalFake === 'object') {
-			octokitToInject = globalFake;
-		}
-	}
+  // Support test injection via global fake Octokit (for CLI subprocess testing)
+  let octokitToInject = options.octokit;
+  if (!octokitToInject && process.env.LEX_PR_FAKE_OCTOKIT === "1") {
+    const globalFake = (global as any).__FAKE_OCTOKIT;
+    if (globalFake && typeof globalFake === "object") {
+      octokitToInject = globalFake;
+    }
+  }
 
-	return new GitHubClientImpl({
-		token: options.token,
-		owner,
-		repo,
-		octokit: octokitToInject
-	});
+  return new GitHubClientImpl({
+    token: options.token,
+    owner,
+    repo,
+    octokit: octokitToInject,
+  });
 }

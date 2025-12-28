@@ -7,7 +7,7 @@
 Merge-weave is LexRunner's workflow for merging multiple parallel PRs into a single integration branch. It:
 
 1. **Discovers** open PRs from GitHub
-2. **Plans** merge order based on dependencies  
+2. **Plans** merge order based on dependencies
 3. **Validates** with quality gates (lint, typecheck, tests)
 4. **Merges** PRs in topological order
 
@@ -32,6 +32,7 @@ lex-pr weave discover
 ```
 
 **Example Output:**
+
 ```
 📋 Discovered 3 Pull Request(s)
 
@@ -39,7 +40,7 @@ lex-pr weave discover
        https://github.com/org/repo/pull/42
        Labels: feature, ready-to-merge
 
-🟢 OPEN #43: Fix navigation bug  
+🟢 OPEN #43: Fix navigation bug
        https://github.com/org/repo/pull/43
        Labels: bugfix, ready-to-merge
 
@@ -66,6 +67,7 @@ lex-pr weave plan --from-github --output plan.json
 ```
 
 **Example Output:**
+
 ```
 ✅ Plan generated successfully
 
@@ -98,6 +100,7 @@ lex-pr weave apply --dry-run
 ```
 
 **Example Output:**
+
 ```
 🔍 Merge-Weave Dry Run
 
@@ -131,6 +134,7 @@ lex-pr weave apply
 ```
 
 **Example Output:**
+
 ```
 🚀 Executing Merge-Weave
 
@@ -169,7 +173,7 @@ For AI assistants using Model Context Protocol:
 const prs = await mcp.call_tool("discover", {
   owner: "myorg",
   repo: "myrepo",
-  state: "open"
+  state: "open",
 });
 ```
 
@@ -180,7 +184,7 @@ const planResult = await mcp.call_tool("plan.create", {
   fromGithub: true,
   owner: "myorg",
   repo: "myrepo",
-  labels: ["ready-to-merge"]
+  labels: ["ready-to-merge"],
 });
 ```
 
@@ -191,17 +195,17 @@ const planResult = await mcp.call_tool("plan.create", {
 const run = await mcp.call_tool("lexrunner.startRun", {
   procedure: "merge-weave-main",
   repo: "myorg/myrepo",
-  mode: "senior-dev"
+  mode: "senior-dev",
 });
 
 // Check status
 const status = await mcp.call_tool("lexrunner.getStatus", {
-  runId: run.runId
+  runId: run.runId,
 });
 
 // List artifacts
 const artifacts = await mcp.call_tool("lexrunner.listArtifacts", {
-  runId: run.runId
+  runId: run.runId,
 });
 ```
 
@@ -245,11 +249,11 @@ gates:
   - name: lint
     run: npm run lint
     required: true
-    
+
   - name: typecheck
     run: npm run typecheck
     required: true
-    
+
   - name: test
     run: npm test
     required: false
@@ -313,6 +317,7 @@ lex-pr plan-review plan.json
 **Cause:** Not in a git repository with GitHub remote.
 
 **Solution:**
+
 ```bash
 # Option 1: Run from git repository
 git remote -v
@@ -326,6 +331,7 @@ lex-pr weave discover --owner myorg --repo myrepo
 **Cause:** No PRs match filters or you don't have permissions.
 
 **Solution:**
+
 ```bash
 # Check PR state filter
 lex-pr weave discover --state all
@@ -339,6 +345,7 @@ echo $GITHUB_TOKEN | cut -c1-10
 **Cause:** Plan not generated or wrong path.
 
 **Solution:**
+
 ```bash
 # Generate plan first
 lex-pr weave plan --from-github --output plan.json
@@ -352,6 +359,7 @@ lex-pr weave apply --plan custom-plan.json
 **Cause:** Missing authentication token.
 
 **Solution:**
+
 ```bash
 # Set token
 export GITHUB_TOKEN=ghp_your_token_here
@@ -363,16 +371,19 @@ echo "GITHUB_TOKEN=ghp_your_token_here" > .env
 ## Best Practices
 
 1. **Always dry-run first:**
+
    ```bash
    lex-pr weave apply --dry-run
    ```
 
 2. **Review plan before execution:**
+
    ```bash
    lex-pr plan-review plan.json
    ```
 
 3. **Use dependency suggestions:**
+
    ```bash
    lex-pr weave discover --suggest
    ```

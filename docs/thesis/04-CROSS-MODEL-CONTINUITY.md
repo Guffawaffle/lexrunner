@@ -22,6 +22,7 @@ This feels like memory. But what actually is it?
 ### Not Latent Vectors
 
 Language models don't maintain persistent hidden state between API calls. Each request is independent. The "memory" you perceive is either:
+
 - Context window (explicit tokens)
 - Provider-specific features (conversation history, memory APIs)
 - Your own re-explanation
@@ -29,6 +30,7 @@ Language models don't maintain persistent hidden state between API calls. Each r
 ### Not Hidden Cache
 
 Some providers offer "memory" features, but these are:
+
 - Provider-specific (not portable)
 - Opaque (you can't inspect or edit them)
 - Fragile (subject to provider changes)
@@ -47,6 +49,7 @@ The model doesn't learn from your session. Your preferences don't update the wei
 ### Shared Language
 
 The vocabulary and concepts you've established:
+
 - "When I say 'module', I mean ESM"
 - "The auth system uses JWT with Redis session store"
 - "`UserService` is the main entry point for user operations"
@@ -54,6 +57,7 @@ The vocabulary and concepts you've established:
 ### Expectations
 
 The implicit and explicit contracts:
+
 - "Always run tests before committing"
 - "Follow the existing code style"
 - "Ask before making breaking changes"
@@ -61,6 +65,7 @@ The implicit and explicit contracts:
 ### Governance Primitives
 
 The rules and constraints:
+
 - "Senior Dev role: implement, don't plan"
 - "Maximum 3 files per PR"
 - "Flag uncertainty above 30%"
@@ -68,6 +73,7 @@ The rules and constraints:
 ### Receipts
 
 The record of what happened:
+
 - "Yesterday we implemented the login flow"
 - "PR #42 added the caching layer"
 - "The migration was rolled back due to timeout"
@@ -123,6 +129,7 @@ Each model inherits the state through explicit artifacts.
 The Robert experiment demonstrated this directly:
 
 ### Setup
+
 - Primary model: GPT-5 High Thinking
 - Secondary models: Claude Sonnet 4.5, Claude Haiku
 - State mechanism: On-disk memory + contracts file
@@ -133,6 +140,7 @@ The Robert experiment demonstrated this directly:
 > "Different models can take turns without full re-explanation when governance is established."
 
 The models weren't sharing memory. They were reading the same:
+
 - Contract definitions
 - Decision receipts
 - Shared vocabulary
@@ -250,7 +258,7 @@ receipts:
     model: "claude-sonnet"
     action: "implement_auth_flow"
     inputs:
-      - "rcpt-001"  # References design receipt
+      - "rcpt-001" # References design receipt
     outputs:
       - "src/auth/flow.ts"
       - "src/auth/flow.test.ts"
@@ -259,7 +267,7 @@ receipts:
     model: "claude-haiku"
     action: "verify_auth_flow"
     inputs:
-      - "rcpt-002"  # References implementation receipt
+      - "rcpt-002" # References implementation receipt
     outputs:
       - ".lex/reports/lint-auth.json"
       - ".lex/reports/test-auth.json"
@@ -276,10 +284,10 @@ When switching models (or sessions), the incoming agent should:
 ```typescript
 async function loadGovernance(): Promise<Governance> {
   return {
-    vocabulary: await loadYaml('.lex/vocabulary.yaml'),
-    contracts: await loadYaml('.lex/contracts/*.yaml'),
-    roles: await loadYaml('.lex/governance/roles.yaml'),
-    currentRole: await determineRole(context)
+    vocabulary: await loadYaml(".lex/vocabulary.yaml"),
+    contracts: await loadYaml(".lex/contracts/*.yaml"),
+    roles: await loadYaml(".lex/governance/roles.yaml"),
+    currentRole: await determineRole(context),
   };
 }
 ```
@@ -289,8 +297,8 @@ async function loadGovernance(): Promise<Governance> {
 ```typescript
 async function loadRecentContext(): Promise<Receipt[]> {
   const recentReceipts = await loadReceipts({
-    since: 'session-start',  // or last N receipts
-    related: context.currentTask
+    since: "session-start", // or last N receipts
+    related: context.currentTask,
   });
   return recentReceipts;
 }
@@ -307,10 +315,10 @@ async function verifyHandoff(governance: Governance, receipts: Receipt[]): Promi
   const checks = [
     verifyVocabulary(summary, governance.vocabulary),
     verifyConstraints(summary, governance.contracts),
-    verifyReceipts(summary, receipts)
+    verifyReceipts(summary, receipts),
   ];
 
-  return checks.every(c => c.passed);
+  return checks.every((c) => c.passed);
 }
 ```
 
@@ -324,9 +332,9 @@ async function acknowledgeHandoff(): Promise<void> {
     understood: {
       vocabulary: vocabularyTermsLoaded,
       contracts: contractsLoaded,
-      recentReceipts: receiptsLoaded
+      recentReceipts: receiptsLoaded,
     },
-    ready: true
+    ready: true,
   });
 }
 ```
@@ -398,6 +406,7 @@ Different models can review each other's work.
 ### Debuggability
 
 When something goes wrong:
+
 - Inspect the contracts
 - Read the receipts
 - Trace the decision chain
@@ -406,6 +415,7 @@ When something goes wrong:
 ### Reproducibility
 
 To reproduce a session:
+
 - Load the same contracts
 - Replay the same receipts
 - Apply the same governance
@@ -413,6 +423,7 @@ To reproduce a session:
 ### Portability
 
 To move to a new provider:
+
 - Export contracts and receipts
 - Import to new environment
 - Continue work
@@ -420,6 +431,7 @@ To move to a new provider:
 ### Auditability
 
 For compliance or review:
+
 - Every decision is recorded
 - Every action has a receipt
 - Every constraint is explicit
@@ -484,6 +496,7 @@ For adding cross-model continuity to a project:
 Session state is not magic — it's explicit artifacts.
 
 **The formula:**
+
 ```
 Session State = Shared Language + Expectations + Governance + Receipts
 ```
@@ -491,6 +504,7 @@ Session State = Shared Language + Expectations + Governance + Receipts
 **Key insight:** Different models can collaborate effectively when they share the same external state artifacts.
 
 **Implementation:**
+
 - Vocabulary registries for shared terms
 - Contracts for expectations
 - Role definitions for governance
@@ -500,4 +514,4 @@ Session State = Shared Language + Expectations + Governance + Receipts
 
 ---
 
-*Next: [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md) — Machine-consumable governance contracts*
+_Next: [05-RULE-FILE-SPEC.md](./05-RULE-FILE-SPEC.md) — Machine-consumable governance contracts_

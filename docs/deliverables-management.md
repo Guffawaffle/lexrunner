@@ -77,6 +77,7 @@ lex-pr autopilot plan.json
 The `latest` pointer uses symlinks on Unix-like systems. On Windows, symlinks require Developer Mode or administrator privileges. If symlink creation fails on Windows, the system automatically falls back to creating a directory copy instead.
 
 **To enable symlinks on Windows:**
+
 - Enable Developer Mode in Windows Settings → Update & Security → For developers
 - Or run the tool with administrator privileges
 
@@ -232,18 +233,21 @@ fi
 ### Example Policies
 
 **Development Environment**:
+
 ```bash
 # Keep last 3 runs
 lex-pr deliverables:cleanup --max-count 3
 ```
 
 **CI Environment**:
+
 ```bash
 # Keep 7 days of deliverables
 lex-pr deliverables:cleanup --max-age 7
 ```
 
 **Production**:
+
 ```bash
 # Keep last 30 deliverables AND remove anything older than 90 days
 lex-pr deliverables:cleanup --max-count 30 --max-age 90
@@ -305,9 +309,9 @@ curl -X POST https://monitoring.example.com/api/autopilot \
 ### TypeScript/JavaScript
 
 ```typescript
-import { DeliverablesManager } from 'lexrunner/autopilot';
+import { DeliverablesManager } from "lexrunner/autopilot";
 
-const manager = new DeliverablesManager('/path/to/.smartergpt');
+const manager = new DeliverablesManager("/path/to/.smartergpt");
 
 // List all deliverables
 const deliverables = await manager.listDeliverables();
@@ -320,7 +324,7 @@ console.log(`Latest: ${latest}`);
 // Cleanup
 const result = await manager.cleanup({
   maxCount: 5,
-  keepLatest: true
+  keepLatest: true,
 });
 console.log(`Removed ${result.removed.length} deliverables`);
 ```
@@ -353,7 +357,7 @@ Set up automated cleanup in CI:
 name: Cleanup Old Deliverables
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly
+    - cron: "0 0 * * 0" # Weekly
 jobs:
   cleanup:
     runs-on: ubuntu-latest

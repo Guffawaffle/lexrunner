@@ -22,6 +22,7 @@ You have 4 PRs that accidentally create a circular dependency:
 4. **PR-103:** Refactor validators (depends on PR-102, but PR-100 also depends on PR-103)
 
 **Dependency graph (INVALID):**
+
 ```
 PR-100 ──► PR-101 ──► PR-102 ──► PR-103
    ▲                                 │
@@ -50,9 +51,11 @@ First, let's understand how cycles happen by creating one.
 Refactor core business logic.
 
 ## Dependencies
+
 Depends-on: #103
 
 ## Changes
+
 - Refactor core.ts
 - Use new validators from PR-103
 ```
@@ -65,9 +68,11 @@ Depends-on: #103
 Update type definitions.
 
 ## Dependencies
+
 Depends-on: #100
 
 ## Changes
+
 - Refactor types.ts
 - Use refactored core from PR-100
 ```
@@ -80,9 +85,11 @@ Depends-on: #100
 Update utility functions.
 
 ## Dependencies
+
 Depends-on: #101
 
 ## Changes
+
 - Refactor utils.ts
 - Use updated types from PR-101
 ```
@@ -95,9 +102,11 @@ Depends-on: #101
 Update validation logic.
 
 ## Dependencies
+
 Depends-on: #102
 
 ## Changes
+
 - Refactor validators.ts
 - Use updated utils from PR-102
 ```
@@ -113,6 +122,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 4 open PRs
@@ -157,6 +167,7 @@ lex-pr plan --from-github --format=dot | dot -Tpng -o cycle.png
 ```
 
 **Output (cycle.png):**
+
 ```
     ┌────────────────────────────┐
     │                            │
@@ -184,6 +195,7 @@ lex-pr plan --suggest-deps --json | jq '.suggestions[] | select(.from == "PR-100
 ```
 
 **Example output:**
+
 ```json
 [
   {
@@ -218,6 +230,7 @@ lex-pr plan --suggest-deps --json | jq '.suggestions[] | select(.from == "PR-100
 ```
 
 **Analysis:**
+
 - All dependencies are **explicit** (confidence 1.0)
 - PR-101, PR-102 have **shared files** (stronger signal)
 - PR-100 → PR-103 has **only explicit** dependency (weaker signal)
@@ -233,20 +246,24 @@ lex-pr plan --suggest-deps --json | jq '.suggestions[] | select(.from == "PR-100
 Remove `Depends-on: #103` from PR-100.
 
 **Updated PR-100 Description:**
+
 ```markdown
 # Refactor Core Module
 
 Refactor core business logic.
 
 ## Dependencies
+
 (None - removed dependency on PR-103)
 
 ## Changes
+
 - Refactor core.ts
 - **Temporarily use old validators** (will update after PR-103 merges)
 ```
 
 **Result:**
+
 ```
 PR-100 (no deps)
    │
@@ -255,6 +272,7 @@ PR-101 ──► PR-102 ──► PR-103
 ```
 
 Now the cycle is broken! The dependency chain is:
+
 - PR-100 (Layer 0, no dependencies)
 - PR-101 → PR-100 (Layer 1)
 - PR-102 → PR-101 (Layer 2)
@@ -306,6 +324,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 4 open PRs
@@ -326,6 +345,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Merge order:**
+
 ```
 Layer 0: PR-100 (core)
 Layer 1: PR-101 (types)
@@ -342,6 +362,7 @@ lex-pr execute --plan plan.json
 ```
 
 **Expected output:**
+
 ```
 📦 Executing plan: 4 items, 4 layers
 
@@ -360,15 +381,18 @@ Layer 3: PR-103 (validators) ✓
 If PR-100 needs to use the new validators from PR-103, create a follow-up PR:
 
 **PR-104 Description:**
+
 ```markdown
 # Update Core to Use New Validators
 
 Update core module to use refactored validators from PR-103.
 
 ## Dependencies
+
 Depends-on: #103
 
 ## Changes
+
 - Replace old validator calls in core.ts
 - Use new validation API
 ```
@@ -416,6 +440,7 @@ PR-A ──explicit──► PR-B
 ```
 
 **Solution:** Increase threshold to filter out the implicit dependency:
+
 ```bash
 lex-pr plan --from-github --threshold=0.8
 ```
@@ -427,6 +452,7 @@ lex-pr plan --from-github --threshold=0.8
 ### 1. Review Dependencies Before Adding
 
 Before adding `Depends-on:`, ask:
+
 - Does the dependency already depend on me (directly or indirectly)?
 - Can I accomplish the work without this dependency?
 - Is this a "convenience" dependency or a hard requirement?
@@ -453,6 +479,7 @@ Easier to reason about and less prone to cycles.
 ### 4. Use Feature Branches for Complex Work
 
 For tightly-coupled changes:
+
 ```bash
 # Create feature branch
 git checkout -b feature/complex-refactor
@@ -473,14 +500,14 @@ const plan = await loadPlan("plan.json");
 const result = validatePlan(plan);
 
 if (!result.valid) {
-  const cycleErrors = result.errors.filter(e => e.type === "cycle");
-  
-  cycleErrors.forEach(err => {
+  const cycleErrors = result.errors.filter((e) => e.type === "cycle");
+
+  cycleErrors.forEach((err) => {
     console.error(`Cycle detected: ${err.message}`);
     console.error(`Path: ${err.details.cyclePath?.join(" → ")}`);
     console.error(`Suggestion: ${err.suggestion}`);
   });
-  
+
   process.exit(1);
 }
 ```

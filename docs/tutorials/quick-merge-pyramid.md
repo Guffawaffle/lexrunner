@@ -25,11 +25,13 @@ lex-pr discover
 ```
 
 **What you'll see:**
+
 - List of open PRs
 - PR titles, numbers, and labels
 - Dependency hints from PR descriptions
 
 **Example output:**
+
 ```
 🔍 Discovering open PRs...
 Found 3 PRs:
@@ -51,12 +53,14 @@ lex-pr plan
 ```
 
 The planner will:
+
 1. Parse PR dependencies from descriptions (e.g., "Depends-On: #42")
 2. Detect dependency cycles and validate relationships
 3. Compute merge order using topological sort
 4. Generate `plan.json` with deterministic output
 
 **Plan structure:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -90,6 +94,7 @@ lex-pr merge-order plan.json
 ```
 
 **Example output:**
+
 ```
 📊 Merge order for 3 items:
 
@@ -104,6 +109,7 @@ Level 2 (depends on Level 1):
 ```
 
 **Understanding levels:**
+
 - **Level 0**: Independent PRs, can merge first
 - **Level 1+**: PRs with dependencies, merge after prerequisites
 - Items at the same level can be processed in parallel
@@ -124,12 +130,14 @@ lex-pr execute plan.json --dry-run
 ```
 
 **What happens:**
+
 1. Gates run in dependency order (Level 0 → Level 1 → ...)
 2. Each item's gates must pass before proceeding
 3. Results saved to `.smartergpt/runner/gate-results/`
 4. Exit code 0 if all gates pass, 1 if any fail
 
 **Gate result example:**
+
 ```json
 {
   "item": "auth-system",
@@ -150,6 +158,7 @@ lex-pr status plan.json
 ```
 
 **Example output:**
+
 ```
 ✅ Eligible for merge:
   → auth-system (all gates passed)
@@ -178,11 +187,13 @@ lex-pr merge --plan plan.json --execute
 ```
 
 **Merge strategies:**
+
 - **`rebase-weave`**: Rebase onto target, then merge (clean linear history)
 - **`merge-weave`**: Merge with merge commit (preserves branch structure)
 - **`squash-weave`**: Squash commits, then merge (single commit per PR)
 
 **What happens:**
+
 1. Merges items in dependency order (Level 0 first)
 2. Waits for each level to complete before proceeding
 3. Updates local and remote branches
@@ -248,21 +259,24 @@ echo "✨ Merge pyramid complete!"
 ### Dependency Management
 
 **In PR descriptions**, use dependency syntax:
+
 ```markdown
 Depends-On: #42
 Depends-On: #43, #44
 ```
 
 **In `stack.yml`**, use explicit deps:
+
 ```yaml
 items:
   - id: api-endpoints
-    deps: ["auth-system"]  # References item name
+    deps: ["auth-system"] # References item name
 ```
 
 ### Gate Configuration
 
 Create `.smartergpt/gates.yml`:
+
 ```yaml
 gates:
   - name: lint
@@ -294,6 +308,7 @@ lex-pr execute plan.json
 ### Error Recovery
 
 If a gate fails:
+
 ```bash
 # Fix the issue in your code, then re-run gates
 lex-pr execute plan.json

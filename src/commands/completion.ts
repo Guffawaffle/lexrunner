@@ -5,45 +5,45 @@
 import { Command } from "commander";
 
 export interface CompletionScript {
-	shell: "bash" | "zsh";
-	script: string;
+  shell: "bash" | "zsh";
+  script: string;
 }
 
 /**
  * Generate shell completion scripts
  */
 export class CompletionGenerator {
-	private programName: string;
-	private commands: string[];
+  private programName: string;
+  private commands: string[];
 
-	constructor(programName: string = "lex-pr") {
-		this.programName = programName;
-		this.commands = [
-			"init",
-			"doctor",
-			"discover",
-			"plan",
-			"execute",
-			"merge",
-			"status",
-			"report",
-			"schema",
-			"merge-order",
-			"autopilot",
-			"bootstrap",
-			"init-local",
-			"view",
-			"query",
-			"retry",
-			"completion",
-		];
-	}
+  constructor(programName: string = "lex-pr") {
+    this.programName = programName;
+    this.commands = [
+      "init",
+      "doctor",
+      "discover",
+      "plan",
+      "execute",
+      "merge",
+      "status",
+      "report",
+      "schema",
+      "merge-order",
+      "autopilot",
+      "bootstrap",
+      "init-local",
+      "view",
+      "query",
+      "retry",
+      "completion",
+    ];
+  }
 
-	/**
-	 * Generate bash completion script
-	 */
-	generateBash(): string {
-		return `# ${this.programName} completion for bash
+  /**
+   * Generate bash completion script
+   */
+  generateBash(): string {
+    return `# ${this.programName} completion for bash
 
 _${this.programName.replace(/-/g, "_")}_completions()
 {
@@ -105,13 +105,13 @@ _${this.programName.replace(/-/g, "_")}_completions()
 
 complete -F _${this.programName.replace(/-/g, "_")}_completions ${this.programName}
 `;
-	}
+  }
 
-	/**
-	 * Generate zsh completion script
-	 */
-	generateZsh(): string {
-		return `#compdef ${this.programName}
+  /**
+   * Generate zsh completion script
+   */
+  generateZsh(): string {
+    return `#compdef ${this.programName}
 
 # ${this.programName} completion for zsh
 
@@ -197,43 +197,41 @@ ${this.commands.map((cmd) => `        '${cmd}:${this.getCommandDescription(cmd)}
 
 _${this.programName.replace(/-/g, "_")} "\$@"
 `;
-	}
+  }
 
-	private getCommandDescription(cmd: string): string {
-		const descriptions: Record<string, string> = {
-			init: "Initialize workspace with interactive setup",
-			doctor: "Validate environment and configuration",
-			discover: "Discover open pull requests from GitHub",
-			plan: "Generate plan from configuration or GitHub PRs",
-			execute: "Execute plan with quality gates",
-			merge: "Execute merge pyramid with git operations",
-			status: "Show current execution status",
-			report: "Aggregate gate reports from directory",
-			schema: "Schema operations",
-			"merge-order": "Compute dependency levels and merge order",
-			autopilot: "Run autopilot analysis and artifact generation",
-			bootstrap: "Create minimal workspace configuration",
-			"init-local": "Initialize local overlay directory",
-			view: "Interactive plan viewer",
-			query: "Advanced query and analysis",
-			retry: "Retry failed gates",
-			completion: "Generate shell completion scripts",
-		};
+  private getCommandDescription(cmd: string): string {
+    const descriptions: Record<string, string> = {
+      init: "Initialize workspace with interactive setup",
+      doctor: "Validate environment and configuration",
+      discover: "Discover open pull requests from GitHub",
+      plan: "Generate plan from configuration or GitHub PRs",
+      execute: "Execute plan with quality gates",
+      merge: "Execute merge pyramid with git operations",
+      status: "Show current execution status",
+      report: "Aggregate gate reports from directory",
+      schema: "Schema operations",
+      "merge-order": "Compute dependency levels and merge order",
+      autopilot: "Run autopilot analysis and artifact generation",
+      bootstrap: "Create minimal workspace configuration",
+      "init-local": "Initialize local overlay directory",
+      view: "Interactive plan viewer",
+      query: "Advanced query and analysis",
+      retry: "Retry failed gates",
+      completion: "Generate shell completion scripts",
+    };
 
-		return descriptions[cmd] || cmd;
-	}
+    return descriptions[cmd] || cmd;
+  }
 
-	/**
-	 * Get installation instructions for the shell
-	 */
-	getInstallInstructions(shell: "bash" | "zsh"): string {
-		const rcFile = shell === "bash" ? "~/.bashrc" : "~/.zshrc";
-		const completionDir =
-			shell === "bash"
-				? "/usr/local/etc/bash_completion.d"
-				: "/usr/local/share/zsh/site-functions";
+  /**
+   * Get installation instructions for the shell
+   */
+  getInstallInstructions(shell: "bash" | "zsh"): string {
+    const rcFile = shell === "bash" ? "~/.bashrc" : "~/.zshrc";
+    const completionDir =
+      shell === "bash" ? "/usr/local/etc/bash_completion.d" : "/usr/local/share/zsh/site-functions";
 
-		return `
+    return `
 To install ${shell} completion:
 
 1. Save the completion script:
@@ -245,45 +243,45 @@ To install ${shell} completion:
 3. Reload your shell:
    source ${rcFile}
 `;
-	}
+  }
 }
 
 /**
  * Register the completion command with Commander program
  */
 export function registerCompletionCommand(
-	program: Command,
-	throwExit: (code: number) => never,
-	exitWith: (error: unknown) => void
+  program: Command,
+  throwExit: (code: number) => never,
+  exitWith: (error: unknown) => void
 ): void {
-	program
-		.command("completion")
-		.description("Generate shell completion scripts")
-		.argument("[shell]", "Shell type: bash, zsh", "bash")
-		.option("--install", "Show installation instructions")
-		.action(async (shell: string, opts) => {
-			try {
-				const generator = new CompletionGenerator(program.name());
+  program
+    .command("completion")
+    .description("Generate shell completion scripts")
+    .argument("[shell]", "Shell type: bash, zsh", "bash")
+    .option("--install", "Show installation instructions")
+    .action(async (shell: string, opts) => {
+      try {
+        const generator = new CompletionGenerator(program.name());
 
-				if (opts.install) {
-					console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
-					return;
-				}
+        if (opts.install) {
+          console.log(generator.getInstallInstructions(shell as "bash" | "zsh"));
+          return;
+        }
 
-				let script = "";
-				if (shell === "zsh") {
-					script = generator.generateZsh();
-				} else if (shell === "bash") {
-					script = generator.generateBash();
-				} else {
-					console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
-					throwExit(1);
-				}
+        let script = "";
+        if (shell === "zsh") {
+          script = generator.generateZsh();
+        } else if (shell === "bash") {
+          script = generator.generateBash();
+        } else {
+          console.error(`Error: unsupported shell '${shell}'. Use 'bash' or 'zsh'`);
+          throwExit(1);
+        }
 
-				console.log(script);
-				return;
-			} catch (error) {
-				exitWith(error);
-			}
-		});
+        console.log(script);
+        return;
+      } catch (error) {
+        exitWith(error);
+      }
+    });
 }

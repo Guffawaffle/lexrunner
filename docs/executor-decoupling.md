@@ -64,6 +64,7 @@ LexRunner's architecture is organized into three distinct layers:
 **Purpose:** Abstract LLM provider details and manage stochastic model calls.
 
 **Responsibilities:**
+
 - Provider abstraction (OpenAI, Anthropic, local models)
 - Prompt template loading and variable substitution
 - Token counting and budget enforcement
@@ -71,6 +72,7 @@ LexRunner's architecture is organized into three distinct layers:
 - Response parsing and structured output extraction
 
 **Does NOT own:**
+
 - Which prompts to use (executor decision)
 - When to call the model (Jordan-mode protocol decides)
 - What to do with the response (executor/orchestration decision)
@@ -80,6 +82,7 @@ LexRunner's architecture is organized into three distinct layers:
 **Purpose:** Encapsulate narrow, versioned operational units that follow the Jordan-mode protocol.
 
 **Responsibilities:**
+
 - **Prep phase:** Deterministically gather and validate inputs
 - **Stochastic phase:** Execute at most one irreducibly stochastic model call
 - **Receipt phase:** Emit at least one Frame as an auditable receipt
@@ -88,6 +91,7 @@ LexRunner's architecture is organized into three distinct layers:
 - Artifact collection and structured output
 
 **Does NOT own:**
+
 - Merge plans or merge order computation
 - Gate orchestration or sequencing
 - Fan-out/fan-in coordination
@@ -122,6 +126,7 @@ export const EXECUTOR_MODES: Record<ExecutorMode, ModeConfig> = {
 **Purpose:** Coordinate multi-PR workflows, enforce policy, and manage the merge pyramid.
 
 **Responsibilities:**
+
 - Merge pyramid construction from `plan.json`
 - Dependency graph computation (topological sort via Kahn's algorithm)
 - Fan-out: Dispatch work across multiple PRs in parallel
@@ -133,6 +138,7 @@ export const EXECUTOR_MODES: Record<ExecutorMode, ModeConfig> = {
 - Integration branch management
 
 **Does NOT own:**
+
 - Individual PR analysis (executor responsibility)
 - Model selection or prompt design (model binding responsibility)
 - Frame schema or memory storage (Lex responsibility)
@@ -144,7 +150,7 @@ Executors follow a three-phase protocol that cleanly separates deterministic and
 ```mermaid
 stateDiagram-v2
     [*] --> Prep: Start
-    
+
     Prep --> Stochastic: Inputs validated
     note right of Prep
         Deterministic:
@@ -152,7 +158,7 @@ stateDiagram-v2
         • Validate inputs
         • Load context
     end note
-    
+
     Stochastic --> Receipt: Model response
     note right of Stochastic
         Irreducibly stochastic:
@@ -160,7 +166,7 @@ stateDiagram-v2
         • Bounded tool budget
         • Prompt template execution
     end note
-    
+
     Receipt --> [*]: Frame emitted
     note right of Receipt
         Deterministic:
@@ -178,28 +184,28 @@ stateDiagram-v2
 
 The following components are **LexRunner intellectual property** and not part of the Lex OSS core:
 
-| Component | Location | Description |
-|-----------|----------|-------------|
-| Merge Pyramid | `src/core/plan.ts`, `src/mergeOrder.ts` | Dependency-ordered merge strategy |
-| Weave State Machine | `src/weave/` | Resumable merge execution |
-| Gate Orchestration | `src/gates.ts` | Quality gate sequencing and policy |
-| Batch Planner | `src/orchestration/batchPlanner.ts` | Kahn's algorithm for layer-based execution |
-| Autopilot Levels | `src/autopilot/` | Graduated automation (0-4) |
-| Fan-out/Fan-in | Orchestration layer | Multi-PR parallel coordination |
-| Executor Manifests | `src/schemas/executorManifest.ts` | Executor I/O contracts and guardrails |
-| CLI Orchestration | `src/cli.ts` | Command orchestration and workflow |
+| Component           | Location                                | Description                                |
+| ------------------- | --------------------------------------- | ------------------------------------------ |
+| Merge Pyramid       | `src/core/plan.ts`, `src/mergeOrder.ts` | Dependency-ordered merge strategy          |
+| Weave State Machine | `src/weave/`                            | Resumable merge execution                  |
+| Gate Orchestration  | `src/gates.ts`                          | Quality gate sequencing and policy         |
+| Batch Planner       | `src/orchestration/batchPlanner.ts`     | Kahn's algorithm for layer-based execution |
+| Autopilot Levels    | `src/autopilot/`                        | Graduated automation (0-4)                 |
+| Fan-out/Fan-in      | Orchestration layer                     | Multi-PR parallel coordination             |
+| Executor Manifests  | `src/schemas/executorManifest.ts`       | Executor I/O contracts and guardrails      |
+| CLI Orchestration   | `src/cli.ts`                            | Command orchestration and workflow         |
 
 ### Lex OSS Core (MIT License)
 
 The following components are part of **Lex** and available under MIT license:
 
-| Component | Repository | Description |
-|-----------|------------|-------------|
-| Frames | `Guffawaffle/lex` | Episodic memory units |
-| Memory Store | `Guffawaffle/lex` | Frame persistence and recall |
-| Policy Engine | `Guffawaffle/lex` | `lexmap.policy.json` enforcement |
-| Module ID Aliasing | `Guffawaffle/lex` | Shorthand-to-canonical resolution |
-| Vocabulary | `Guffawaffle/lex` | Canonical terms and semantic definitions |
+| Component          | Repository        | Description                              |
+| ------------------ | ----------------- | ---------------------------------------- |
+| Frames             | `Guffawaffle/lex` | Episodic memory units                    |
+| Memory Store       | `Guffawaffle/lex` | Frame persistence and recall             |
+| Policy Engine      | `Guffawaffle/lex` | `lexmap.policy.json` enforcement         |
+| Module ID Aliasing | `Guffawaffle/lex` | Shorthand-to-canonical resolution        |
+| Vocabulary         | `Guffawaffle/lex` | Canonical terms and semantic definitions |
 
 ### Boundary Diagram
 
@@ -394,11 +400,11 @@ jordanModeProtocol:
 
 ## Appendix: Executor Contract Summary
 
-| Executor Responsibility | Orchestration Responsibility |
-|------------------------|------------------------------|
-| Validate inputs per schema | Provide inputs from plan |
-| Gather artifacts deterministically | Coordinate which PRs to process |
-| Execute ≤1 stochastic call | Sequence gate execution |
-| Emit Frame receipt | Collect results for merge decision |
-| Respect tool budget | Enforce policy across batches |
-| Bind to guardrail profile | Manage weave state machine |
+| Executor Responsibility            | Orchestration Responsibility       |
+| ---------------------------------- | ---------------------------------- |
+| Validate inputs per schema         | Provide inputs from plan           |
+| Gather artifacts deterministically | Coordinate which PRs to process    |
+| Execute ≤1 stochastic call         | Sequence gate execution            |
+| Emit Frame receipt                 | Collect results for merge decision |
+| Respect tool budget                | Enforce policy across batches      |
+| Bind to guardrail profile          | Manage weave state machine         |

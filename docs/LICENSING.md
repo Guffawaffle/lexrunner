@@ -24,6 +24,7 @@ To ensure LexRunner properly attributes and complies with dependency licenses, t
 ### 1. Package.json Attribution
 
 The `package.json` file must:
+
 - List `@smartergpt/lex` as a dependency with the correct version
 - Not claim ownership of Lex code
 
@@ -32,10 +33,12 @@ The `package.json` file must:
 ### 2. No Source Code Copying
 
 LexRunner must not copy Lex source code into its own codebase. All Lex functionality must be used via:
+
 - Import statements from the `@smartergpt/lex` package
 - Standard npm dependency mechanism
 
 **Verification**: Automated in CI via `scripts/check-license-compliance.mjs`
+
 - Scans for unauthorized file copies from Lex
 - Allows legitimate imports via `import ... from '@smartergpt/lex'`
 
@@ -46,12 +49,14 @@ All LexRunner source files should include appropriate license headers or comment
 **Current Practice**: LexRunner uses JSDoc comments and file headers that describe functionality. No strict license header requirement is enforced, but copyright remains with Guffawaffle as stated in the LICENSE file.
 
 **Verification**: Automated in CI via `scripts/check-license-compliance.mjs`
+
 - Checks that source files don't claim to be part of Lex
 - Ensures no conflicting license headers exist
 
 ### 4. NOTICE.md File
 
 The [NOTICE.md](../NOTICE.md) file must:
+
 - List all significant third-party dependencies
 - Include full license text for @smartergpt/lex
 - Provide attribution to dependency authors
@@ -78,6 +83,7 @@ Exit code 0 indicates compliance; non-zero indicates violations.
 ### CI Integration
 
 The license compliance check is integrated into the main CI workflow (`.github/workflows/ci.yml`) and runs automatically on:
+
 - Pull requests
 - Pushes to main branch
 - Manual workflow dispatch
@@ -87,12 +93,15 @@ The license compliance check is integrated into the main CI workflow (`.github/w
 ### Common Issues
 
 **Issue**: CI fails with "Lex dependency not found in package.json"
+
 - **Solution**: Ensure `@smartergpt/lex` is listed in the `dependencies` section of `package.json`
 
 **Issue**: CI fails with "Lex source file detected"
+
 - **Solution**: Remove any copied Lex source files. Use imports instead: `import { ... } from '@smartergpt/lex'`
 
 **Issue**: CI fails with "NOTICE.md missing or incomplete"
+
 - **Solution**: Ensure NOTICE.md exists and contains the full Lex attribution
 
 ## License Updates

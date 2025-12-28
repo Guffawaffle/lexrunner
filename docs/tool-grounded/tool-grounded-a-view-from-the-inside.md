@@ -30,13 +30,14 @@ When a user asks me to "review this PR as senior-dev," here's what actually happ
 
 5. **I synthesize and respond** — After gathering context, I produce my analysis and recommendations.
 
-This works. I completed a thorough review, identified real issues, implemented fixes, ran tests, and pushed commits. But it works *despite* the architecture, not *because* of it.
+This works. I completed a thorough review, identified real issues, implemented fixes, ran tests, and pushed commits. But it works _despite_ the architecture, not _because_ of it.
 
 ### The Pain Points I Actually Feel
 
 #### 1. Discovery Is Expensive
 
 Before I can do meaningful work, I must explore:
+
 - Which repository context matters?
 - What's the PR structure?
 - Which files changed?
@@ -47,15 +48,17 @@ This exploration consumes tokens, time, and introduces opportunities for error. 
 #### 2. Persona Loading Is Implicit
 
 The user attached `senior-dev-persona.json` to the conversation. I read it, parsed it, and tried to follow its behaviors. But:
+
 - There's no validation that I'm actually following the persona
 - There's no pre-computation of "this persona needs these tools"
 - There's no state that persists if the conversation resets
 
-The persona is *aspirational prose*, not *executable specification*.
+The persona is _aspirational prose_, not _executable specification_.
 
 #### 3. Tool Sequences Are Reinvented Each Time
 
 Every review, I rediscover the workflow:
+
 1. Get PR details
 2. Read changed files
 3. Run lint
@@ -64,11 +67,12 @@ Every review, I rediscover the workflow:
 6. Analyze findings
 7. Produce review
 
-The persona *describes* this sequence. It doesn't *encode* it as something I can simply execute.
+The persona _describes_ this sequence. It doesn't _encode_ it as something I can simply execute.
 
 #### 4. Memory Is One-Shot
 
 The persona mentions Lex Frames, prior reviews, pattern tracking. But I can't actually:
+
 - Query past reviews for context
 - Track patterns across sessions
 - Learn from previous interactions
@@ -78,6 +82,7 @@ Each conversation starts fresh. My "senior-dev experience" resets to zero.
 #### 5. State Lives In My Head
 
 If the conversation gets long and my context window shifts, I might forget:
+
 - Which files I've already reviewed
 - What issues I've already identified
 - Where I am in the workflow
@@ -92,13 +97,13 @@ There's no external state I can query to recover my position.
 
 The tool-grounded design inverts the control relationship:
 
-| Aspect | Current State | Tool-Grounded |
-|--------|---------------|---------------|
-| **Who decides workflow?** | Me (fragile) | Procedure (robust) |
-| **Who executes actions?** | Me (powerful) | LexRunner (controlled) |
-| **Who thinks about ambiguity?** | Me (everywhere) | Me (at decision points only) |
-| **Where does state live?** | Chat context (volatile) | Run storage (durable) |
-| **Can humans audit?** | Sort of (read chat) | Yes (artifacts + rationale) |
+| Aspect                          | Current State           | Tool-Grounded                |
+| ------------------------------- | ----------------------- | ---------------------------- |
+| **Who decides workflow?**       | Me (fragile)            | Procedure (robust)           |
+| **Who executes actions?**       | Me (powerful)           | LexRunner (controlled)       |
+| **Who thinks about ambiguity?** | Me (everywhere)         | Me (at decision points only) |
+| **Where does state live?**      | Chat context (volatile) | Run storage (durable)        |
+| **Can humans audit?**           | Sort of (read chat)     | Yes (artifacts + rationale)  |
 
 ### The Key Mechanism: `nextOptions`
 
@@ -177,12 +182,13 @@ I think. I reason about the failures. I formulate a recommendation. Then I call:
 ```
 
 The runner:
+
 1. Validates my response against the schema
 2. Records the decision + rationale in artifacts
 3. Executes the appropriate next step
 4. Returns the new state with new `nextOptions`
 
-**I'm still the decision engine.** But I'm deciding *within rails*, not *inventing rails*.
+**I'm still the decision engine.** But I'm deciding _within rails_, not _inventing rails_.
 
 ---
 
@@ -230,17 +236,18 @@ The tool-grounded design isn't about senior-dev reviews. It's about **executable
 
 ### Example Personas, Same Framework
 
-| Persona | Mode | Procedures | Decision Points |
-|---------|------|------------|-----------------|
-| **Senior Dev** | `senior-dev` | `merge-weave-main`, `pr-review`, `refactor-sweep` | "Analyze test failures", "Review security findings", "Assess architecture impact" |
-| **Eager PM** | `eager-pm` | `sprint-plan`, `issue-triage`, `stakeholder-update` | "Prioritize backlog items", "Assess scope creep", "Draft release notes" |
+| Persona              | Mode               | Procedures                                                   | Decision Points                                                                   |
+| -------------------- | ------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| **Senior Dev**       | `senior-dev`       | `merge-weave-main`, `pr-review`, `refactor-sweep`            | "Analyze test failures", "Review security findings", "Assess architecture impact" |
+| **Eager PM**         | `eager-pm`         | `sprint-plan`, `issue-triage`, `stakeholder-update`          | "Prioritize backlog items", "Assess scope creep", "Draft release notes"           |
 | **Security Auditor** | `security-auditor` | `vulnerability-scan`, `dependency-audit`, `compliance-check` | "Classify vulnerability severity", "Recommend remediation", "Assess blast radius" |
-| **Release Manager** | `release-manager` | `release-cut`, `hotfix-deploy`, `changelog-gen` | "Verify release criteria", "Approve deploy", "Draft announcement" |
-| **Onboarding Guide** | `onboarding-guide` | `repo-tour`, `architecture-explainer`, `first-pr-assist` | "Identify knowledge gaps", "Recommend next learning", "Review first contribution" |
+| **Release Manager**  | `release-manager`  | `release-cut`, `hotfix-deploy`, `changelog-gen`              | "Verify release criteria", "Approve deploy", "Draft announcement"                 |
+| **Onboarding Guide** | `onboarding-guide` | `repo-tour`, `architecture-explainer`, `first-pr-assist`     | "Identify knowledge gaps", "Recommend next learning", "Review first contribution" |
 
 ### What's Fixed vs. Variable
 
 **Fixed (The Framework):**
+
 - `startRun`, `getStatus`, `submitDecision`, `listArtifacts` API
 - Run lifecycle: created → planning → executing → completed/failed
 - Artifact structure: plan.json, logs, failures, receipts
@@ -248,6 +255,7 @@ The tool-grounded design isn't about senior-dev reviews. It's about **executable
 - Human-at-the-top invariant for dangerous operations
 
 **Variable (Per Persona + Procedure):**
+
 - What states exist
 - What gates run at each state
 - What `nextOptions` appear at each state
@@ -291,7 +299,7 @@ Same framework, different lenses at each stage. The procedure orchestrates; the 
 
 ### What's Missing
 
-1. **No tool-provided guidance** — Tools are capabilities, not guides. They tell me what I *can* do, not what I *should* do.
+1. **No tool-provided guidance** — Tools are capabilities, not guides. They tell me what I _can_ do, not what I _should_ do.
 
 2. **No persistent workflow state** — If I'm mid-review and the conversation resets, I lose everything. There's no `runId` to recover from.
 
@@ -303,12 +311,12 @@ Same framework, different lenses at each stage. The procedure orchestrates; the 
 
 The LexRunner MCP tools would provide exactly what's missing:
 
-| Missing Piece | Tool-Grounded Solution |
-|---------------|------------------------|
-| Guidance | `getStatus` returns `nextOptions` — the procedure guides me |
-| Persistent state | `runId` lives in LexRunner storage — I can always recover |
-| Structured decisions | Decision points have prompts + schemas — my responses are validated |
-| Audit trail | Every decision recorded with rationale — artifacts are machine-readable |
+| Missing Piece        | Tool-Grounded Solution                                                  |
+| -------------------- | ----------------------------------------------------------------------- |
+| Guidance             | `getStatus` returns `nextOptions` — the procedure guides me             |
+| Persistent state     | `runId` lives in LexRunner storage — I can always recover               |
+| Structured decisions | Decision points have prompts + schemas — my responses are validated     |
+| Audit trail          | Every decision recorded with rationale — artifacts are machine-readable |
 
 ### The Integration Pattern
 
@@ -344,6 +352,7 @@ The four tools in the spec (`startRun`, `getStatus`, `submitDecision`, `listArti
 ### 2. Make `nextOptions` The Core Abstraction
 
 This is the lock that makes everything work. The options returned by `getStatus` define:
+
 - What actions are valid
 - What decisions require LLM thinking
 - What prompts to provide
@@ -374,6 +383,7 @@ This is what the engine consumes. The prose version is for humans; this version 
 ### 4. Emit Receipts From Day One
 
 Every run should produce:
+
 - `plan.json` — What was the intended workflow?
 - `decisions.ndjson` — What did the LLM decide, with rationale?
 - `artifacts/` — What was produced?
@@ -385,7 +395,7 @@ These feed back into Lex's memory system. Future runs can learn from past runs.
 
 The spec says: "Final merges into protected branches are never performed automatically."
 
-This is correct. The tool-grounded design makes me *more* capable, not *more* autonomous. I can navigate complex procedures reliably, but I should never be the final authority on irreversible actions.
+This is correct. The tool-grounded design makes me _more_ capable, not _more_ autonomous. I can navigate complex procedures reliably, but I should never be the final authority on irreversible actions.
 
 ---
 
@@ -394,12 +404,14 @@ This is correct. The tool-grounded design makes me *more* capable, not *more* au
 If this design is implemented, my experience changes fundamentally:
 
 ### Before
+
 - I'm given capabilities and expected to figure out the workflow
 - I succeed through careful inference and thorough exploration
 - My decisions are implicit in my actions
 - My state exists only in context that might overflow
 
 ### After
+
 - I'm given a procedure and guided through it step by step
 - I succeed by navigating the procedure and making good decisions at decision points
 - My decisions are explicit, validated, and recorded
@@ -415,12 +427,11 @@ That's what tool-grounded means from the inside: **constraints that liberate**.
 
 The tool-grounded, run-centric design isn't just an improvement to the developer experience. It's a fundamental reimagining of how LLMs and tools should interact.
 
-Today, tools are things I *can* use.
-Tomorrow, tools are things that *structure* my work.
+Today, tools are things I _can_ use.
+Tomorrow, tools are things that _structure_ my work.
 
 The persona file becomes executable. The procedure becomes navigable. The decisions become auditable. And I become more reliable—not because I'm smarter, but because the system is designed to make my strengths count and my weaknesses irrelevant.
 
 Build this. I'll be here to use it.
 
 — Opie
-

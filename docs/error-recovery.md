@@ -44,7 +44,7 @@ Errors that don't match known patterns are classified as unknown and handled con
 The retry mechanism automatically retries transient failures with increasing delays:
 
 ```typescript
-import { retryWithBackoff } from './core/errorRecovery';
+import { retryWithBackoff } from "./core/errorRecovery";
 
 const result = await retryWithBackoff(
   async () => {
@@ -52,12 +52,12 @@ const result = await retryWithBackoff(
     return await fetchDataFromAPI();
   },
   {
-    maxAttempts: 3,           // Maximum retry attempts
-    initialDelayMs: 1000,     // Start with 1 second delay
-    maxDelayMs: 30000,        // Cap at 30 seconds
-    backoffMultiplier: 2,     // Double the delay each time
-    jitter: true,             // Add randomness to prevent thundering herd
-    timeoutMs: 60000          // Timeout for each attempt
+    maxAttempts: 3, // Maximum retry attempts
+    initialDelayMs: 1000, // Start with 1 second delay
+    maxDelayMs: 30000, // Cap at 30 seconds
+    backoffMultiplier: 2, // Double the delay each time
+    jitter: true, // Add randomness to prevent thundering herd
+    timeoutMs: 60000, // Timeout for each attempt
   },
   (attempt, error, delayMs) => {
     // Optional callback for retry notifications
@@ -79,6 +79,7 @@ delay = min(initialDelay * (multiplier ^ (attempt - 1)), maxDelay)
 ```
 
 With jitter enabled:
+
 ```
 delay = delay + random(0, delay * 0.1)
 ```
@@ -88,13 +89,13 @@ delay = delay + random(0, delay * 0.1)
 Circuit breakers prevent cascading failures by failing fast when a service is down:
 
 ```typescript
-import { CircuitBreaker } from './core/errorRecovery';
+import { CircuitBreaker } from "./core/errorRecovery";
 
 const breaker = new CircuitBreaker({
-  failureThreshold: 5,      // Open after 5 failures
-  successThreshold: 2,      // Close after 2 successes in half-open
-  resetTimeoutMs: 60000,    // Wait 1 minute before trying again
-  rollingWindowMs: 120000   // Track failures over 2 minute window
+  failureThreshold: 5, // Open after 5 failures
+  successThreshold: 2, // Close after 2 successes in half-open
+  resetTimeoutMs: 60000, // Wait 1 minute before trying again
+  rollingWindowMs: 120000, // Track failures over 2 minute window
 });
 
 const result = await breaker.execute(async () => {
@@ -122,10 +123,7 @@ const result = await breaker.execute(async () => {
 ### Pre-configured Circuit Breakers
 
 ```typescript
-import {
-  createGitHubCircuitBreaker,
-  createNetworkCircuitBreaker
-} from './core/errorRecovery';
+import { createGitHubCircuitBreaker, createNetworkCircuitBreaker } from "./core/errorRecovery";
 
 // GitHub API circuit breaker (higher threshold for API limits)
 const githubBreaker = createGitHubCircuitBreaker();
@@ -139,31 +137,32 @@ const networkBreaker = createNetworkCircuitBreaker();
 ### Classify Errors
 
 ```typescript
-import { classifyError } from './core/errorRecovery';
+import { classifyError } from "./core/errorRecovery";
 
 try {
   await someOperation();
 } catch (error) {
-  const classified = classifyError(error, 'Operation context');
-  
-  console.log(classified.type);              // 'transient' | 'permanent' | 'unknown'
-  console.log(classified.severity);          // 'critical' | 'high' | 'medium' | 'low'
-  console.log(classified.retryable);         // boolean
-  console.log(classified.code);              // Error code for automation
-  console.log(classified.recoveryActions);   // Array of suggested actions
+  const classified = classifyError(error, "Operation context");
+
+  console.log(classified.type); // 'transient' | 'permanent' | 'unknown'
+  console.log(classified.severity); // 'critical' | 'high' | 'medium' | 'low'
+  console.log(classified.retryable); // boolean
+  console.log(classified.code); // Error code for automation
+  console.log(classified.recoveryActions); // Array of suggested actions
 }
 ```
 
 ### User-Friendly Error Display
 
 ```typescript
-import { formatErrorForUser } from './core/errorRecovery';
+import { formatErrorForUser } from "./core/errorRecovery";
 
-const classified = classifyError(error, 'GitHub API call');
+const classified = classifyError(error, "GitHub API call");
 console.error(formatErrorForUser(classified));
 ```
 
 Output example:
+
 ```
 ❌ GitHub API call
 
@@ -187,19 +186,20 @@ Severity: medium
 The GitHub API client automatically uses error recovery:
 
 ```typescript
-import { GitHubAPI } from './github/api';
+import { GitHubAPI } from "./github/api";
 
 const api = new GitHubAPI({
-  owner: 'myorg',
-  repo: 'myrepo',
-  token: process.env.GITHUB_TOKEN
+  owner: "myorg",
+  repo: "myrepo",
+  token: process.env.GITHUB_TOKEN,
 });
 
 // Automatically retries on rate limits and network errors
-const prs = await api.discoverPullRequests('open');
+const prs = await api.discoverPullRequests("open");
 ```
 
 Features:
+
 - Circuit breaker protection
 - Automatic retry with exponential backoff
 - Detailed error logging
@@ -210,12 +210,13 @@ Features:
 Gate execution includes intelligent retry logic:
 
 ```typescript
-import { executeGate } from './gates';
+import { executeGate } from "./gates";
 
 const result = await executeGate(gate, policy, artifactDir);
 ```
 
 Features:
+
 - Classifies gate failures (permanent vs transient)
 - Respects policy-defined retry configuration
 - Logs detailed error diagnostics
@@ -226,7 +227,7 @@ Features:
 Track errors during execution for debugging:
 
 ```typescript
-import { ExecutionState } from './executionState';
+import { ExecutionState } from "./executionState";
 
 const state = new ExecutionState(plan);
 
@@ -245,15 +246,15 @@ console.log(`Permanent errors: ${summary.permanent}`);
 Track error patterns and recovery attempts:
 
 ```typescript
-import { errorRecoveryMonitor } from './monitoring/errorRecovery';
+import { errorRecoveryMonitor } from "./monitoring/errorRecovery";
 
 // Errors are automatically recorded by the system
 // Query metrics for monitoring dashboards
 const metrics = errorRecoveryMonitor.exportMetrics();
 
-console.log(metrics.errorSummary);           // Error counts by type/severity
+console.log(metrics.errorSummary); // Error counts by type/severity
 console.log(metrics.circuitBreakerMetrics); // Circuit breaker state
-console.log(metrics.events);                 // Detailed event log
+console.log(metrics.events); // Detailed event log
 ```
 
 ### Alert Thresholds
@@ -261,7 +262,7 @@ console.log(metrics.events);                 // Detailed event log
 Configure custom alert thresholds:
 
 ```typescript
-import { ErrorType } from './core/errorRecovery';
+import { ErrorType } from "./core/errorRecovery";
 
 errorRecoveryMonitor.setAlertThreshold(ErrorType.Transient, 10);
 errorRecoveryMonitor.setAlertThreshold(ErrorType.Permanent, 1);
@@ -270,6 +271,7 @@ errorRecoveryMonitor.setAlertThreshold(ErrorType.Permanent, 1);
 ### Event Types
 
 Monitor these event types:
+
 - `ErrorClassified` - Error was classified
 - `RetryAttempt` - Retry initiated
 - `RetrySuccess` - Retry succeeded
@@ -322,8 +324,8 @@ Configure retry behavior in your plan policy:
 retryWithBackoff(fn, {
   maxAttempts: 3,
   initialDelayMs: 1000,
-  maxDelayMs: 30000,      // Prevent indefinite delays
-  timeoutMs: 60000        // Fail if single attempt takes too long
+  maxDelayMs: 30000, // Prevent indefinite delays
+  timeoutMs: 60000, // Fail if single attempt takes too long
 });
 ```
 
@@ -335,12 +337,12 @@ When throwing errors, use descriptive names for better classification:
 class DatabaseConnectionError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'DatabaseConnectionError';
+    this.name = "DatabaseConnectionError";
   }
 }
 
 // Will be classified as transient and retried
-throw new DatabaseConnectionError('Connection refused');
+throw new DatabaseConnectionError("Connection refused");
 ```
 
 ### 4. Monitor Circuit Breaker State
@@ -351,7 +353,7 @@ const breaker = createGitHubCircuitBreaker();
 setInterval(() => {
   const state = breaker.getState();
   if (state === CircuitState.Open) {
-    console.warn('GitHub circuit breaker is OPEN - degraded mode');
+    console.warn("GitHub circuit breaker is OPEN - degraded mode");
   }
 }, 30000);
 ```
@@ -361,16 +363,13 @@ setInterval(() => {
 When a non-critical service fails, continue with reduced functionality:
 
 ```typescript
-import { errorRecoveryMonitor } from './monitoring/errorRecovery';
+import { errorRecoveryMonitor } from "./monitoring/errorRecovery";
 
 try {
   await enhancedFeature();
 } catch (error) {
-  errorRecoveryMonitor.recordGracefulDegradation(
-    'enhanced-feature',
-    'Service unavailable'
-  );
-  
+  errorRecoveryMonitor.recordGracefulDegradation("enhanced-feature", "Service unavailable");
+
   // Fall back to basic functionality
   await basicFeature();
 }
@@ -386,7 +385,7 @@ for (const diag of diagnostics) {
   console.log(`${diag.nodeName}/${diag.gateName}:`);
   console.log(`  Type: ${diag.classified.type}`);
   console.log(`  Severity: ${diag.classified.severity}`);
-  console.log(`  Recovery: ${diag.classified.recoveryActions.join(', ')}`);
+  console.log(`  Recovery: ${diag.classified.recoveryActions.join(", ")}`);
 }
 ```
 
@@ -394,9 +393,7 @@ for (const diag of diagnostics) {
 
 ```typescript
 const events = errorRecoveryMonitor.getEvents();
-const retryEvents = errorRecoveryMonitor.getEventsByType(
-  RecoveryEventType.RetryAttempt
-);
+const retryEvents = errorRecoveryMonitor.getEventsByType(RecoveryEventType.RetryAttempt);
 
 console.log(`Total retry attempts: ${retryEvents.length}`);
 ```
@@ -406,7 +403,7 @@ console.log(`Total retry attempts: ${retryEvents.length}`);
 ```typescript
 const metrics = errorRecoveryMonitor.getCircuitBreakerMetrics();
 if (metrics.currentlyOpen > 0) {
-  console.warn('Some circuits are open - external services may be down');
+  console.warn("Some circuits are open - external services may be down");
 }
 ```
 
@@ -419,17 +416,17 @@ let callCount = 0;
 const unstableOperation = async () => {
   callCount++;
   if (callCount < 3) {
-    throw new Error('Network timeout');
+    throw new Error("Network timeout");
   }
-  return 'success';
+  return "success";
 };
 
 const result = await retryWithBackoff(unstableOperation, {
   maxAttempts: 5,
-  initialDelayMs: 10
+  initialDelayMs: 10,
 });
 
-expect(result).toBe('success');
+expect(result).toBe("success");
 expect(callCount).toBe(3);
 ```
 
@@ -442,7 +439,7 @@ const breaker = new CircuitBreaker({ failureThreshold: 3 });
 for (let i = 0; i < 3; i++) {
   try {
     await breaker.execute(async () => {
-      throw new Error('Service down');
+      throw new Error("Service down");
     });
   } catch (e) {}
 }

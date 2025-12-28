@@ -5,6 +5,7 @@
 ### Executor Canonicalization Track (4 PRs)
 
 **PR #588 - Tool Budget Enforcement** (LPR-043)
+
 - **Status**: Draft
 - **Branch**: Unknown (Copilot-created)
 - **Files**: `src/executors/toolBudget.ts` (24 unit tests)
@@ -12,6 +13,7 @@
 - **Ready**: ✅ Foundation schema exists in codebase
 
 **PR #585 - Frame Emission Enforcement** (LPR-044)
+
 - **Status**: Draft
 - **Branch**: Unknown (Copilot-created)
 - **Files**: `src/executors/frameContract.ts` (26 tests total)
@@ -19,6 +21,7 @@
 - **Ready**: ✅ Foundation schema exists in codebase
 
 **PR #587 - Guardrail Runtime Enforcement** (LPR-047)
+
 - **Status**: Draft
 - **Branch**: Unknown (Copilot-created)
 - **Files**: `src/executors/guardrailEnforcement.ts` (59 integration tests)
@@ -28,6 +31,7 @@
 - **Ready**: ⚠️ Needs PR #588 merged first
 
 **PR #583 - Manifest Validation CI** (LPR-049)
+
 - **Status**: Draft
 - **Branch**: Unknown (Copilot-created)
 - **Files**: `scripts/validate-manifests.ts`, CI workflow updates (10 tests)
@@ -37,6 +41,7 @@
 ### CLI Improvement Track (2 PRs)
 
 **PR #584 - CLI Category-Action Pattern** (ALN-003)
+
 - **Status**: Draft - **BLOCKED by firewall** (GitHub API access denied)
 - **Branch**: Unknown (Copilot-created)
 - **Files**: CLI command refactoring (weave/gate/workspace/fanout categories)
@@ -44,6 +49,7 @@
 - **Ready**: ⚠️ Firewall blocked GitHub API access during Copilot execution
 
 **PR #586 - Universal --json Flag** (ALN-004)
+
 - **Status**: Draft
 - **Branch**: Unknown (Copilot-created)
 - **Files**: `src/cli/jsonEnvelope.ts`, `docs/JSON_OUTPUT_SCHEMAS.md` (13 tests)
@@ -55,14 +61,17 @@
 ## Dependency Order (Topological Sort)
 
 ### Layer 1: No Dependencies (Can merge immediately)
+
 1. **PR #586** - Universal --json flag support
 2. **PR #588** - Tool budget enforcement
 
 ### Layer 2: Depends on Layer 1
+
 3. **PR #585** - Frame emission enforcement (needs schema from main, already there)
 4. **PR #587** - Guardrail enforcement (needs #588)
 
 ### Layer 3: Needs review
+
 5. **PR #583** - Manifest validation (check if #412 is merged)
 6. **PR #584** - CLI refactoring (BLOCKED - needs firewall allowlist fix)
 
@@ -71,11 +80,13 @@
 ## Senior Dev Assessment
 
 ### ✅ Can Proceed
+
 - PRs #586, #588, #585 can be merged sequentially
 - All have foundation schemas already in main
 - All have comprehensive test coverage
 
 ### ⚠️ Needs Attention
+
 - **PR #584**: Firewall blocked GitHub API during Copilot execution
   - Recovery: Add GitHub API domains to Copilot allowlist
   - Or: Re-run locally with proper credentials
@@ -83,6 +94,7 @@
   - If not: Either merge #412 first or adjust dependencies
 
 ### 🚫 Blockers
+
 - No GitHub token available for CLI `discover` command
 - Cannot fetch PR branches without authentication
 - All PRs are in draft status (per user request, we'll proceed anyway)
@@ -92,6 +104,7 @@
 ## Recommended Merge Strategy
 
 ### Option A: Sequential Merge (Safe)
+
 ```bash
 1. Verify #412 status
 2. Merge #586 (--json support)
@@ -103,6 +116,7 @@
 ```
 
 ### Option B: Parallel Tracks (Faster)
+
 ```bash
 Track 1: #586 (standalone)
 Track 2: #588 → #587
@@ -137,17 +151,20 @@ Then: Merge all at once via integration branch
 ## Dogfooding Notes
 
 ### What Worked
+
 - Copilot agent created well-structured PRs with comprehensive tests
 - Dependency declarations in issue descriptions are clear
 - PRs follow naming conventions and include documentation
 
 ### What Needs Improvement
+
 - Firewall configuration for Copilot agents
 - GitHub authentication for CLI tooling
 - Need MCP tools for fetching PR branches directly
 - Could benefit from automated dependency graph visualization
 
 ### Feedback for Tooling
+
 - `mcp_lexrunner_plan_create` needs better error messaging when GitHub auth fails
 - Should detect when foundation schemas are already merged
 - Could suggest which PRs are ready to merge vs blocked

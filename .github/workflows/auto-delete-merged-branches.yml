@@ -9,7 +9,7 @@ on:
     types: [closed]
 
 permissions:
-  contents: write  # Required to delete branches
+  contents: write # Required to delete branches
 
 jobs:
   delete-merged-branch:

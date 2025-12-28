@@ -21,10 +21,10 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### Product Names
 
-| Product | Brand | Repo | License | Notes |
-|---------|-------|------|---------|-------|
+| Product       | Brand       | Repo                    | License     | Notes                                       |
+| ------------- | ----------- | ----------------------- | ----------- | ------------------------------------------- |
 | **LexRunner** | `LexRunner` | `Guffawaffle/LexRunner` | Proprietary | Paid product; merge-weave orchestration CLI |
-| **Lex** | `Lex` | `Guffawaffle/lex` | MIT | OSS core; frames, memory, policy, atlas |
+| **Lex**       | `Lex`       | `Guffawaffle/lex`       | MIT         | OSS core; frames, memory, policy, atlas     |
 
 ### CLI Name
 

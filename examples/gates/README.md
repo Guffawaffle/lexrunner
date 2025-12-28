@@ -9,16 +9,19 @@ This directory contains example gates demonstrating how to use the Audit SDK for
 #### 1. Vulnerability Scanner (`vuln-scanner.ts`)
 
 Demonstrates vulnerability scanning with audit event emission:
+
 - Scans for vulnerabilities using npm audit
 - Emits individual vulnerability findings
 - Provides scan summary with severity breakdown
 
 **Usage:**
+
 ```bash
 tsx examples/gates/vuln-scanner.ts [package.json]
 ```
 
 **With audit enabled:**
+
 ```bash
 export LEX_AUDIT_DROP_DIR=/tmp/audit
 export LEX_AUDIT_SESSION_ID=session-123
@@ -28,11 +31,13 @@ tsx examples/gates/vuln-scanner.ts
 #### 2. Linter Gate (`lint-gate.ts`)
 
 Demonstrates linting with audit logging:
+
 - Runs TypeScript linter
 - Emits lint violations
 - Reports duration and error details
 
 **Usage:**
+
 ```bash
 tsx examples/gates/lint-gate.ts
 ```
@@ -40,11 +45,13 @@ tsx examples/gates/lint-gate.ts
 #### 3. Test Runner (`test-runner.ts`)
 
 Demonstrates test execution with audit events:
+
 - Runs test suite
 - Emits individual test results
 - Reports test summary
 
 **Usage:**
+
 ```bash
 tsx examples/gates/test-runner.ts
 ```
@@ -54,11 +61,13 @@ tsx examples/gates/test-runner.ts
 #### 4. Bash Lint Gate (`lint-gate.sh`)
 
 Demonstrates sidecar pattern in bash:
+
 - Direct NDJSON writing
 - Conditional audit (only when env vars set)
 - Simple event emission
 
 **Usage:**
+
 ```bash
 chmod +x examples/gates/lint-gate.sh
 ./examples/gates/lint-gate.sh
@@ -101,11 +110,13 @@ cat /tmp/audit-drop/vuln.*.ndjson
 ### Sidecar File Format
 
 When audit is enabled, gates write to:
+
 ```
 {LEX_AUDIT_DROP_DIR}/{gateName}.{pid}.ndjson
 ```
 
 **Example content:**
+
 ```json
 {"event":"scan_start","ts":"2024-10-13T12:00:00Z","level":"info","gate":"vuln","payload":{"target":"package.json","scanner":"npm-audit"}}
 {"event":"vuln_found","ts":"2024-10-13T12:00:01Z","level":"warn","gate":"vuln","payload":{"cve":"CVE-2024-1234","severity":"high","package":"lodash","version":"4.17.20","fixedIn":"4.17.21"}}
@@ -139,6 +150,7 @@ rm -rf "$TEMP_AUDIT"
 ## Integration with Runner
 
 In production, the runner:
+
 1. Sets `LEX_AUDIT_DROP_DIR` and `LEX_AUDIT_SESSION_ID`
 2. Runs gates (which write sidecar files)
 3. Periodically ingests sidecar files

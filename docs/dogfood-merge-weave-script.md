@@ -15,6 +15,7 @@ The `scripts/dogfood-merge-weave.sh` script provides a parameterized, repo-agnos
 ## Installation
 
 The script is located at `scripts/dogfood-merge-weave.sh` and requires:
+
 - Bash shell
 - `lexrunner` CLI (installed globally or via npm)
 - `jq` (optional, for enhanced plan summaries)
@@ -28,13 +29,16 @@ The script is located at `scripts/dogfood-merge-weave.sh` and requires:
 ### Options
 
 #### Repository Options
+
 - `--repo <path>` - Path to repository (default: current directory)
 
 #### Plan Source Options (choose one)
+
 - `--plan <path>` - Path to plan.json file
 - `--from-github` - Discover PRs from GitHub using filters
 
 #### GitHub Discovery Options (used with --from-github)
+
 - `--owner <name>` - GitHub repository owner
 - `--repo-name <name>` - GitHub repository name
 - `--base <branch>` - Base branch (default: main)
@@ -42,16 +46,19 @@ The script is located at `scripts/dogfood-merge-weave.sh` and requires:
 - `--query <query>` - Custom GitHub search query
 
 #### Output Options
+
 - `--artifacts <dir>` - Artifacts output directory (default: ./artifacts/dogfood-<timestamp>)
 - `--integration-branch <name>` - Custom integration branch name (default: auto-generated)
 
 #### Execution Options
+
 - `--dry-run` - Preview operations without executing (default)
 - `--execute` - Actually perform merge operations
 - `--cleanup` - Clean up integration branches after execution
 - `--verbose` - Enable verbose output
 
 #### Other Options
+
 - `-h, --help` - Show help message
 
 ## Examples
@@ -196,6 +203,7 @@ In execute mode, the script will stop if merge conflicts occur. Resolve conflict
 ### Permission denied errors
 
 Ensure the script is executable:
+
 ```bash
 chmod +x scripts/dogfood-merge-weave.sh
 ```
@@ -209,6 +217,7 @@ chmod +x scripts/dogfood-merge-weave.sh
 ## Contributing
 
 When modifying the script:
+
 1. Update the help text and this documentation
 2. Add test cases in `tests/dogfood-merge-weave-script.spec.ts`
 3. Test with both plan file and GitHub discovery modes

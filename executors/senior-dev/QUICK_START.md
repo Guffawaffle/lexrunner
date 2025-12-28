@@ -61,12 +61,12 @@ lexrunner senior-dev capture-frame \
 
 The executor supports four modes. Select based on your goal:
 
-| Mode | When to Use |
-|------|-------------|
-| `triage` | Quick scan before deep dive |
-| `deep_review` | Full code review with findings |
-| `pattern_mining` | Looking for recurring issues |
-| `mentorship` | Tracking developer growth |
+| Mode             | When to Use                    |
+| ---------------- | ------------------------------ |
+| `triage`         | Quick scan before deep dive    |
+| `deep_review`    | Full code review with findings |
+| `pattern_mining` | Looking for recurring issues   |
+| `mentorship`     | Tracking developer growth      |
 
 Example with mode selection:
 

@@ -21,6 +21,7 @@ Following the `plan.json` pattern, governance logs should include explicit schem
 ## Schema Version Policy
 
 Follow SemVer for governance log schema:
+
 - **Patch (1.0.x)**: Additive optional fields, docs only
 - **Minor (1.x.0)**: Additive required fields with safe defaults
 - **Major (x.0.0)**: Breaking changes to structure

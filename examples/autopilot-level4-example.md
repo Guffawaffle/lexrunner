@@ -52,18 +52,21 @@ EOF
 ### 3. Test at Lower Levels First
 
 **Level 0 - Report Only:**
+
 ```bash
 # Safe dry-run to validate plan
 lex-pr execute plan.json --max-level 0
 ```
 
 **Level 1 - Artifact Generation:**
+
 ```bash
 # Generate artifacts for review
 lex-pr execute plan.json --max-level 1
 ```
 
 **Level 2 - PR Annotations:**
+
 ```bash
 # Post status comments (requires GITHUB_TOKEN)
 export GITHUB_TOKEN=ghp_xxxxx
@@ -71,6 +74,7 @@ lex-pr execute plan.json --max-level 2 --execute
 ```
 
 **Level 3 - Integration Branches:**
+
 ```bash
 # Create integration branch and run gates
 lex-pr execute plan.json --max-level 3 --execute \

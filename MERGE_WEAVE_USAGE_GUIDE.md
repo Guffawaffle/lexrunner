@@ -47,6 +47,7 @@ Layer 3: EXECUTION
 ## Integration Points: Three Paths to Use This Tool
 
 ### Path 1: CLI (Standalone)
+
 ```bash
 # Using merge-weave via CLI with templates
 lex-pr plan --from-github --labels "feature-ready"
@@ -57,6 +58,7 @@ lex-pr execute plan.json  # Uses templates automatically
 **When**: Manual merge-weave, CI/CD integration, one-time operations
 
 ### Path 2: MCP (For AI Assistants)
+
 ```
 [IDE Chat / Claude / Copilot]
   └─ Call: tools/gates.run (checks gate reasoning cache first)
@@ -67,6 +69,7 @@ lex-pr execute plan.json  # Uses templates automatically
 **When**: AI-driven merge-weave, interactive workflows, token-conscious operations
 
 ### Path 3: Hybrid (CLI + MCP Together)
+
 ```
 1. CLI: Run discovery & create plan
 2. MCP: AI validates & decides on conflicts
@@ -120,21 +123,21 @@ Step 5: FINALIZE
 
 ### Budget Targets Per Operation
 
-| Operation | Without Templates | With Templates | Target |
-|-----------|-------------------|----------------|--------|
-| Conflict resolution | 3000 tokens | 500 tokens | Save 83% |
-| Gate execution | 1900 tokens | 50 tokens | Save 97% |
-| Dependency analysis | 3400 tokens | 200 tokens | Save 94% |
-| Merge execution | 5000 tokens | 2000 tokens | Save 60% |
+| Operation           | Without Templates | With Templates | Target   |
+| ------------------- | ----------------- | -------------- | -------- |
+| Conflict resolution | 3000 tokens       | 500 tokens     | Save 83% |
+| Gate execution      | 1900 tokens       | 50 tokens      | Save 97% |
+| Dependency analysis | 3400 tokens       | 200 tokens     | Save 94% |
+| Merge execution     | 5000 tokens       | 2000 tokens    | Save 60% |
 
 ### Total Budget Per Fanout
 
-| Fanout Size | Budget (No Templates) | Budget (With Templates) | Action |
-|-------------|----------------------|------------------------|--------|
-| 4 PRs | ~42K | ~3.5K | ✅ Proceed |
-| 20 PRs | ~170K | ~17.5K | ⚠️ Monitor tokens |
-| 50 PRs | ~425K | ~43.75K | ⚠️ High cost, split if possible |
-| 100 PRs | ~850K | ~87.5K | ⚠️ Consider splitting into two fanouts |
+| Fanout Size | Budget (No Templates) | Budget (With Templates) | Action                                 |
+| ----------- | --------------------- | ----------------------- | -------------------------------------- |
+| 4 PRs       | ~42K                  | ~3.5K                   | ✅ Proceed                             |
+| 20 PRs      | ~170K                 | ~17.5K                  | ⚠️ Monitor tokens                      |
+| 50 PRs      | ~425K                 | ~43.75K                 | ⚠️ High cost, split if possible        |
+| 100 PRs     | ~850K                 | ~87.5K                  | ⚠️ Consider splitting into two fanouts |
 
 **Rule**: If budget exceeds 50K tokens, split fanout into smaller chunks.
 
@@ -143,12 +146,14 @@ Step 5: FINALIZE
 ## Model-Agnostic Operation (Not Vendor-Locked)
 
 ### Why This Matters
+
 - **Copilot tokens** are expensive ($150/month per user)
 - **Claude tokens** are cheaper but different rate limits
 - **Gemini** offers higher throughput
 - **You want flexibility** to switch based on cost/performance
 
 ### How Templates Enable This
+
 ```
 Same template works across all models:
 
@@ -165,6 +170,7 @@ Cost difference: ZERO. Logic difference: ZERO.
 ```
 
 ### Validation Checklist
+
 - [ ] Template works with Copilot (JavaScript)
 - [ ] Template works with Claude (via API)
 - [ ] Template works with Gemini (via API)
@@ -176,6 +182,7 @@ Cost difference: ZERO. Logic difference: ZERO.
 ## Best Practices for Solid, Robust Implementation
 
 ### DO ✅
+
 1. **Use templates as first check** before full computation
 2. **Cache new patterns** as you discover them (grows smarter over time)
 3. **Log everything** (template matches, cache hits, token usage)
@@ -184,6 +191,7 @@ Cost difference: ZERO. Logic difference: ZERO.
 6. **Track metrics** (token saved, efficiency gains, cache hit rates)
 
 ### DON'T ❌
+
 1. **Don't over-template** (keep it simple: top 10 patterns max)
 2. **Don't break on template mismatches** (always have fallback path)
 3. **Don't ignore new patterns** (update cache regularly)
@@ -221,6 +229,7 @@ Savings: ~38,500 tokens (92% reduction!)
 ## Recommended Starting Point
 
 ### For This Sprint
+
 1. Implement conflict resolution templates (#329)
    - Extract top 5 patterns from recent merges
    - Validate with 2-3 real conflicts
@@ -232,12 +241,14 @@ Savings: ~38,500 tokens (92% reduction!)
    - Justify further investment
 
 ### For Next Sprint
+
 3. Implement gate reasoning cache (#333)
    - Pre-compute for each gate type
    - Link to gates.yml schema
    - Validate against actual results
 
 ### For Month 2
+
 4. Build dependency graph cache (#334)
 5. Design model-agnostic templates RFC (#336)
 6. Optimize everything, measure everything
@@ -305,10 +316,10 @@ Before treating any issue as a keystone:
 
 ### Governance Rules
 
-| Constraint | Value | Description |
-|------------|-------|-------------|
-| `maxPerWave` | 2 | Maximum keystone issues per merge-weave wave |
-| `ideal` | 0 | Target number of keystone issues |
+| Constraint   | Value | Description                                  |
+| ------------ | ----- | -------------------------------------------- |
+| `maxPerWave` | 2     | Maximum keystone issues per merge-weave wave |
+| `ideal`      | 0     | Target number of keystone issues             |
 
 ### Required Documentation
 
@@ -333,18 +344,23 @@ directly on umbrella branch to avoid N-way merge conflicts.
 ## Questions & Troubleshooting
 
 ### Q: What if a template doesn't match?
+
 A: Fall back to full computation. No penalty, just slower that time. Cache result if new pattern.
 
 ### Q: What if two templates could match?
+
 A: Use highest confidence score. Log both matches for future refinement.
 
 ### Q: How often should we update the cache?
+
 A: After each new pattern discovered (merge-weave run). Quarterly comprehensive audit.
 
 ### Q: Can we use this with multiple models in parallel?
+
 A: Yes! Same template works for all models. Send to 3 models, take best result.
 
 ### Q: What if a gate fails on a cached reasoning?
+
 A: Log the mismatch. Update cache reasoning. This is how the system learns!
 
 ---

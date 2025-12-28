@@ -1,4 +1,5 @@
 # Coordination Cost Compression in Human–AI Collaboration:
+
 # A Governance-First Architecture
 
 **Authors:**
@@ -33,13 +34,13 @@ $$\text{Performance} \propto f(\text{ModelCapability})$$
 
 This assumption drives substantial investment in larger models, longer context windows, and more sophisticated reasoning architectures [1, 2]. Yet empirical observations suggest diminishing returns: the productivity jump from GPT-3.5 to GPT-4 was substantial; subsequent improvements, while meaningful, have not produced equivalent step-changes in practitioner productivity [3, 4].
 
-More troubling, practitioners report that "stronger" models often require *more* careful prompting, *more* context management, and *more* human intervention to achieve consistent results. This paradox suggests that the limiting factor may not be model capability per se.
+More troubling, practitioners report that "stronger" models often require _more_ careful prompting, _more_ context management, and _more_ human intervention to achieve consistent results. This paradox suggests that the limiting factor may not be model capability per se.
 
 ### 1.2 The Coordination Cost Hypothesis
 
 We propose an alternative framing:
 
-> **Thesis:** In human–AI collaborative systems, productivity is primarily constrained by *coordination cost*—the overhead of establishing shared context, disambiguating intent, recovering from misunderstandings, and verifying outputs—rather than by raw model capability.
+> **Thesis:** In human–AI collaborative systems, productivity is primarily constrained by _coordination cost_—the overhead of establishing shared context, disambiguating intent, recovering from misunderstandings, and verifying outputs—rather than by raw model capability.
 
 Formally, we define effective productivity as:
 
@@ -51,9 +52,9 @@ Current optimization efforts focus almost exclusively on the denominator's first
 
 This paper makes the following contributions:
 
-1. **Theoretical framework:** We introduce *coordination cost compression* as an organizing principle for human–AI system design, distinct from capability amplification.
+1. **Theoretical framework:** We introduce _coordination cost compression_ as an organizing principle for human–AI system design, distinct from capability amplification.
 
-2. **Formal constructs:** We define *Turn Cost*, *environmental hostility*, *governance primitives*, and *capability tiers* as measurable quantities with operational definitions.
+2. **Formal constructs:** We define _Turn Cost_, _environmental hostility_, _governance primitives_, and _capability tiers_ as measurable quantities with operational definitions.
 
 3. **Architectural proposal:** We describe a governance-first architecture that aims to reduce coordination cost through explicit contracts, externalized state, and tiered task allocation.
 
@@ -121,7 +122,7 @@ Figure 1 illustrates the relationships between our core constructs:
                 reducing wasted cycles
 ```
 
-*Figure 1: Unifying framework showing how governance constructs (top) produce mechanisms (middle) that compress Turn Cost components (effect), supporting the central hypothesis (bottom).*
+_Figure 1: Unifying framework showing how governance constructs (top) produce mechanisms (middle) that compress Turn Cost components (effect), supporting the central hypothesis (bottom)._
 
 ---
 
@@ -153,21 +154,21 @@ Our governance primitives can be understood as coordination mechanisms in this s
 
 Recent work on LLM agent architectures has explored various approaches to improving reliability: chain-of-thought prompting [15], tool use [16], and multi-agent debate [17]. Most of this work focuses on the agent's internal reasoning process.
 
-We propose that external governance—constraints and expectations defined *outside* the model—may be more robust than internal reasoning improvements. This is consistent with findings that prompt engineering has diminishing returns and that behavioral steering through system instructions is fragile [18].
+We propose that external governance—constraints and expectations defined _outside_ the model—may be more robust than internal reasoning improvements. This is consistent with findings that prompt engineering has diminishing returns and that behavioral steering through system instructions is fragile [18].
 
 ### 2.5 Positioning Our Contribution
 
 Our work differs from prior multi-agent research in several ways:
 
-| Dimension | Typical MAS Approach | Our Approach |
-|-----------|---------------------|--------------|
-| Coordination mechanism | Implicit (shared context) or negotiation-based | Explicit governance artifacts |
-| Optimization target | Task completion rate, accuracy | Turn Cost (interaction overhead) |
-| State management | Agent-internal memory | Externalized receipts and contracts |
-| Model assumptions | Fixed model per agent | Model-agnostic, supports hot-swapping |
-| Human role | Supervisor or absent | Collaborative partner with explicit interface |
+| Dimension              | Typical MAS Approach                           | Our Approach                                  |
+| ---------------------- | ---------------------------------------------- | --------------------------------------------- |
+| Coordination mechanism | Implicit (shared context) or negotiation-based | Explicit governance artifacts                 |
+| Optimization target    | Task completion rate, accuracy                 | Turn Cost (interaction overhead)              |
+| State management       | Agent-internal memory                          | Externalized receipts and contracts           |
+| Model assumptions      | Fixed model per agent                          | Model-agnostic, supports hot-swapping         |
+| Human role             | Supervisor or absent                           | Collaborative partner with explicit interface |
 
-We are not the first to propose explicit coordination mechanisms for AI systems, but we believe we are among the first to: (a) formalize *Turn Cost* as a composite metric, (b) treat governance as a first-class, versionable artifact, and (c) empirically measure the effects on human–AI interaction patterns.
+We are not the first to propose explicit coordination mechanisms for AI systems, but we believe we are among the first to: (a) formalize _Turn Cost_ as a composite metric, (b) treat governance as a first-class, versionable artifact, and (c) empirically measure the effects on human–AI interaction patterns.
 
 ---
 
@@ -188,12 +189,13 @@ This differs from token-centric metrics (cost per 1K tokens) or API-centric metr
 Existing LLM benchmarks optimize for task completion accuracy or per-token efficiency. This overlooks a critical observation from practice: **interaction overhead often exceeds token cost by an order of magnitude.**
 
 Consider a typical software engineering task:
+
 - Token cost: 5,000 tokens at $0.03/1K = $0.15
 - Human attention cost: 10 minutes at $50/hr = $8.33
 
 The ratio is 55:1. Even a 50% reduction in token cost saves $0.075; a 50% reduction in interaction turns saves $4.17. This asymmetry motivates our focus on Turns rather than Tokens.
 
-Furthermore, Turns are the natural unit of *coordination failure*. Each Turn represents an opportunity for misalignment, clarification, or recovery. Token costs are linear; Turn costs compound through cascading misunderstandings.
+Furthermore, Turns are the natural unit of _coordination failure_. Each Turn represents an opportunity for misalignment, clarification, or recovery. Token costs are linear; Turn costs compound through cascading misunderstandings.
 
 #### 3.1.2 Formal Definition
 
@@ -202,6 +204,7 @@ Furthermore, Turns are the natural unit of *coordination failure*. Each Turn rep
 $$\text{TurnCost} = \lambda L + \gamma C + \rho R + \tau T + \alpha A$$
 
 Where:
+
 - $L$ = **Latency**: Raw time waiting for model response
 - $C$ = **Context Reset**: Tokens required to re-establish context after session boundary or model switch
 - $R$ = **Prompt Renegotiation**: Additional turns required to clarify misunderstood instructions
@@ -210,19 +213,20 @@ Where:
 
 The weights $\lambda, \gamma, \rho, \tau, \alpha$ reflect context-specific costs. We propose default weights based on observed practitioner behavior:
 
-| Component | Symbol | Default Weight | Rationale |
-|-----------|--------|----------------|-----------|
-| Latency | λ | 0.1 | Tolerable in async workflows |
-| Context Reset | γ | 0.2 | Significant but bounded by artifacts |
-| Renegotiation | ρ | 0.3 | High cost due to cascading effects |
-| Token Bloat | τ | 0.1 | Low marginal cost per token |
-| Attention Switch | α | 0.3 | Highest marginal cost (human time) |
+| Component        | Symbol | Default Weight | Rationale                            |
+| ---------------- | ------ | -------------- | ------------------------------------ |
+| Latency          | λ      | 0.1            | Tolerable in async workflows         |
+| Context Reset    | γ      | 0.2            | Significant but bounded by artifacts |
+| Renegotiation    | ρ      | 0.3            | High cost due to cascading effects   |
+| Token Bloat      | τ      | 0.1            | Low marginal cost per token          |
+| Attention Switch | α      | 0.3            | Highest marginal cost (human time)   |
 
 These weights are calibration suggestions, not universal constants. Organizations should derive weights empirically from their cost structures.
 
 #### 3.1.3 Theoretical Grounding
 
 Turn Cost connects to established coordination theory [14]. Malone and Crowston's interdependence taxonomy identifies three coordination mechanisms:
+
 - **Managing shared resources** → maps to Token Bloat (shared API context window)
 - **Managing producer/consumer relationships** → maps to Renegotiation (intent alignment)
 - **Managing simultaneity constraints** → maps to Attention Switch (human/agent synchronization)
@@ -237,7 +241,7 @@ This ordering implies that optimizations reducing human intervention (fewer turn
 
 ### 3.2 Environmental Hostility
 
-We propose that agent performance degrades in proportion to *environmental hostility*, not (primarily) model capacity.
+We propose that agent performance degrades in proportion to _environmental hostility_, not (primarily) model capacity.
 
 **Definition 3.2 (Environmental Hostility):** The degree to which an environment impedes effective agent operation through:
 
@@ -300,6 +304,7 @@ receipts:
 ```
 
 **Design constraints:**
+
 - Maximum size: 4KB (ensures quick ingestion, discourages over-specification)
 - Versioned: Changes tracked, diffs reviewable
 - Testable: Compliance verifiable through automated gates
@@ -325,7 +330,7 @@ The discipline component is essential: permission to fail is not permission to b
 
 ### 3.5 Cross-Model Continuity
 
-**Claim 3.3:** Session state that enables collaboration is not internal model state (hidden vectors, attention patterns) but *externalized governance and receipts*.
+**Claim 3.3:** Session state that enables collaboration is not internal model state (hidden vectors, attention patterns) but _externalized governance and receipts_.
 
 If this claim holds, then model switches—GPT-4 to Claude, Claude to Haiku—should not require substantial re-onboarding, provided governance artifacts and receipts are preserved.
 
@@ -342,11 +347,11 @@ This has architectural implications: session state should be stored in version-c
 
 Not all tasks require the same agent capability. We propose a tiered classification:
 
-| Tier | Role | Example Tasks | Characteristics |
-|------|------|---------------|-----------------|
-| **Senior** | Design, critique, decide | Architecture decisions, API design, code review | Requires judgment, handles ambiguity |
-| **Mid** | Implement, extend, refactor | Feature implementation, bug fixes, migrations | Clear scope, established patterns |
-| **Junior** | Verify, instrument, lint | Test coverage, formatting, documentation updates | Deterministic, low-risk |
+| Tier       | Role                        | Example Tasks                                    | Characteristics                      |
+| ---------- | --------------------------- | ------------------------------------------------ | ------------------------------------ |
+| **Senior** | Design, critique, decide    | Architecture decisions, API design, code review  | Requires judgment, handles ambiguity |
+| **Mid**    | Implement, extend, refactor | Feature implementation, bug fixes, migrations    | Clear scope, established patterns    |
+| **Junior** | Verify, instrument, lint    | Test coverage, formatting, documentation updates | Deterministic, low-risk              |
 
 **Claim 3.4:** Matching task tier to model capability reduces overall Turn Cost by avoiding both over-allocation (expensive models on trivial tasks) and under-allocation (failures requiring escalation).
 
@@ -419,6 +424,7 @@ This design choice supports cross-model continuity: when switching models, only 
 To provide preliminary validation of our framework, we conducted a controlled experiment in late 2025.
 
 **Setup:**
+
 - "Robert" was a minimal agent with:
   - On-disk memory (file-based storage)
   - A single contracts file (~1.2KB, reproduced in Appendix A)
@@ -431,44 +437,49 @@ To provide preliminary validation of our framework, we conducted a controlled ex
   - Complex tool chains
 
 **Models used:**
+
 - GPT-5.1 as "Lex" (primary implementation)
 - Claude Sonnet 4.5 as "Claude" (cross-model validation)
 - Claude Haiku 4.5 as "Ku" (low-tier verification)
 
-*Note: Model names reflect those available at time of experiment (late 2025).*
+_Note: Model names reflect those available at time of experiment (late 2025)._
 
 **Tasks:**
+
 1. Implement OAuth2 PKCE flow (feature implementation)
 2. Design a reusable form validation component (API design)
 3. Continue interrupted work from previous session (continuity test)
 
 ### 5.2 Measurements
 
-We measured Turn Cost components and compared to a baseline (same tasks, same models, no governance contracts). *Tokens per feature* measures total API tokens consumed to complete a task, including all turns.
+We measured Turn Cost components and compared to a baseline (same tasks, same models, no governance contracts). _Tokens per feature_ measures total API tokens consumed to complete a task, including all turns.
 
-| Metric | Robert (with contracts) | Baseline (no contracts) | Δ |
-|--------|------------------------|------------------------|---|
-| Turns per PR | 2.3 | 6.1 | -62% |
-| Renegotiation rate | 8% | 34% | -76% |
-| Context reset tokens | 180 | 650 | -72% |
-| Human interventions | 2 | 11 | -82% |
-| Tokens per feature | 12,400 | 28,600 | -57% |
+| Metric               | Robert (with contracts) | Baseline (no contracts) | Δ    |
+| -------------------- | ----------------------- | ----------------------- | ---- |
+| Turns per PR         | 2.3                     | 6.1                     | -62% |
+| Renegotiation rate   | 8%                      | 34%                     | -76% |
+| Context reset tokens | 180                     | 650                     | -72% |
+| Human interventions  | 2                       | 11                      | -82% |
+| Tokens per feature   | 12,400                  | 28,600                  | -57% |
 
 ### 5.3 Observations
 
 **Cross-model continuity:** When switching from GPT-5.1 (Lex) to Claude Sonnet 4.5 (Claude) mid-task:
+
 - Claude read receipts left by GPT-5
 - No re-briefing was required
 - Work quality remained consistent
 - Context restored in ~200 tokens (vs. ~650 in baseline)
 
 **Uncertainty handling:** Robert expressed uncertainty multiple times:
+
 - "Not sure if 80% TTL is optimal for token refresh"
 - "This regex may not handle all international formats"
 
 Each uncertainty was documented in receipts, accompanied by reversible implementation, and flagged for review. No uncertainty caused project delays or cascading failures.
 
 **Governance sufficiency:** The 1.2KB contracts file was sufficient for:
+
 - Keeping agent aligned with project expectations
 - Enabling productive work without constant supervision
 - Maintaining quality standards across sessions and models
@@ -478,22 +489,26 @@ Each uncertainty was documented in receipts, accompanied by reversible implement
 We explicitly acknowledge significant limitations:
 
 **Internal validity:**
+
 - N=1 (single case study)
 - Potential Hawthorne effect (experimenter was also the human collaborator)
 - No randomization of task order or model assignment
 - Baseline was constructed, not a true A/B test
 
 **External validity:**
+
 - Single domain (TypeScript/Node.js software engineering)
 - Highly skilled human operator (may not generalize to novices)
 - Codebase was moderately well-structured (may not generalize to legacy systems)
 - Tasks were chosen to be representative, but selection bias is possible
 
 **Construct validity:**
+
 - Turn Cost components measured via logs, not independent observation
 - "Human interventions" operationalized as git commits with human-authored changes, may miss other forms
 
 **What we can and cannot claim:**
+
 - ✓ Feasibility: The architecture is implementable
 - ✓ Measurable effects: Turn Cost metrics changed in the predicted direction
 - ✗ Generalizability: Unknown without broader replication
@@ -510,6 +525,7 @@ We present this as hypothesis-generating, not hypothesis-confirming evidence.
 For practical deployment, we propose measuring:
 
 **Primary metrics:**
+
 - `turn_count`: Number of human–agent interaction cycles per task
 - `renegotiation_rate`: Proportion of turns that are clarification-only
 - `context_reset_tokens`: Tokens required after session/model boundaries
@@ -525,11 +541,13 @@ Weights should be calibrated per-organization based on relative costs.
 The economic case for coordination cost compression:
 
 **Traditional optimization (reduce token cost):**
+
 - Assume 10% token reduction through better prompting
 - At $0.03/1K tokens, 10K tokens/task: saves $0.03/task
 - At 100 tasks/month: $3 savings
 
 **Coordination cost optimization (reduce Turn Cost):**
+
 - Assume 50% reduction in turns (our case study showed 62%)
 - At 5 min/turn human time, $50/hr human cost: each turn costs $4.17
 - At 6 turns/task baseline → 3 turns: saves $12.50/task
@@ -543,13 +561,13 @@ The above analysis rests on several assumptions that warrant examination:
 
 **Key assumptions:**
 
-| Assumption | Value Used | Range in Practice | Sensitivity |
-|------------|-----------|------------------|-------------|
-| Human hourly rate | $50/hr | $25–$200/hr | Linear impact |
-| Time per turn | 5 min | 2–15 min | Linear impact |
-| Token cost | $0.03/1K | $0.001–$0.10/1K | Low impact |
-| Turn reduction | 50% | 20–70% | Linear impact |
-| Task frequency | 100/month | 10–1000/month | Linear impact |
+| Assumption        | Value Used | Range in Practice | Sensitivity   |
+| ----------------- | ---------- | ----------------- | ------------- |
+| Human hourly rate | $50/hr     | $25–$200/hr       | Linear impact |
+| Time per turn     | 5 min      | 2–15 min          | Linear impact |
+| Token cost        | $0.03/1K   | $0.001–$0.10/1K   | Low impact    |
+| Turn reduction    | 50%        | 20–70%            | Linear impact |
+| Task frequency    | 100/month  | 10–1000/month     | Linear impact |
 
 **Sensitivity to human cost:** At $25/hr (junior developer), the coordination savings fall to $625/month, ratio ~208:1 vs. token optimization. At $200/hr (senior consultant), coordination savings rise to $5,000/month, ratio ~1,667:1. The directionality of our recommendation holds across the realistic range.
 
@@ -590,17 +608,20 @@ To support rigorous testing of our framework, we propose the following experimen
 **Participants:** 20+ software engineers with varying LLM experience.
 
 **Conditions:**
+
 - A: Governance-first (contracts, receipts, tiers)
 - B: Standard prompting (well-crafted but no governance artifacts)
 
 **Tasks:** Standardized set of 10 software engineering tasks (bug fixes, feature additions, refactoring) across multiple complexity levels.
 
 **Measurements:**
+
 - Primary: Turns per task, renegotiation rate, context reset tokens
 - Secondary: Task completion rate, code quality (automated metrics), participant satisfaction
 - Covariates: Prior LLM experience, programming expertise, task complexity rating
 
 **Controls:**
+
 - Same model for both conditions
 - Randomized task order
 - Counterbalanced condition order across participants
@@ -619,6 +640,7 @@ To support rigorous testing of our framework, we propose the following experimen
 **Duration:** 6 months minimum, with measurements at baseline, 1 month, 3 months, 6 months.
 
 **Measurements:**
+
 - Quantitative: Turn Cost components (logged automatically)
 - Qualitative: Team interviews, governance artifact evolution, escalation patterns
 
@@ -628,12 +650,12 @@ To support rigorous testing of our framework, we propose the following experimen
 
 To isolate the contribution of each governance component:
 
-| Study | Manipulated Component | Prediction |
-|-------|----------------------|------------|
-| A1 | Contracts only (no receipts) | Partial Turn Cost reduction |
-| A2 | Receipts only (no contracts) | Improved continuity, unchanged renegotiation |
-| A3 | Tiers only (no contracts/receipts) | Reduced escalation overhead |
-| A4 | Full governance | Maximum Turn Cost reduction |
+| Study | Manipulated Component              | Prediction                                   |
+| ----- | ---------------------------------- | -------------------------------------------- |
+| A1    | Contracts only (no receipts)       | Partial Turn Cost reduction                  |
+| A2    | Receipts only (no contracts)       | Improved continuity, unchanged renegotiation |
+| A3    | Tiers only (no contracts/receipts) | Reduced escalation overhead                  |
+| A4    | Full governance                    | Maximum Turn Cost reduction                  |
 
 **Prediction:** Full governance > sum of individual components (interaction effects from coherent system).
 
@@ -670,7 +692,7 @@ If coordination cost compression is indeed a productive axis for human–AI syst
 
 **Multi-agent debate:** Our architecture supports multi-agent configurations but doesn't require them. Governance coordinates human–agent and agent–agent interactions uniformly.
 
-**Retrieval-augmented generation (RAG):** Governance is orthogonal to RAG. Contracts specify *how* retrieved information should be used, not *what* information to retrieve.
+**Retrieval-augmented generation (RAG):** Governance is orthogonal to RAG. Contracts specify _how_ retrieved information should be used, not _what_ information to retrieve.
 
 ### 7.3 Challenges and Open Problems
 
@@ -681,6 +703,7 @@ Our architecture faces several significant challenges that warrant further resea
 How do contracts co-evolve with codebases? We currently rely on manual updates; automated drift detection is an open problem.
 
 Specific challenges:
+
 - **Staleness detection:** Contracts may reference patterns or files that no longer exist
 - **Implicit constraint violations:** Code changes may satisfy the letter of contracts while violating their spirit
 - **Version synchronization:** When contracts span multiple repositories or systems, consistency is difficult to maintain
@@ -692,10 +715,11 @@ Potential research directions include static analysis of contract–code alignme
 Matching tasks to capability tiers currently requires human judgment. Automated task classification would improve scalability.
 
 The core challenge is that task complexity is multi-dimensional:
-- *Technical complexity*: depth of domain knowledge required
-- *Coordination complexity*: number of stakeholders and dependencies
-- *Ambiguity*: clarity of success criteria
-- *Risk*: potential impact of errors
+
+- _Technical complexity_: depth of domain knowledge required
+- _Coordination complexity_: number of stakeholders and dependencies
+- _Ambiguity_: clarity of success criteria
+- _Risk_: potential impact of errors
 
 A comprehensive tier assignment system would need to model all four dimensions, likely requiring task-specific training data.
 
@@ -704,6 +728,7 @@ A comprehensive tier assignment system would need to model all four dimensions, 
 Our contracts are project-specific. Domain-general governance patterns remain to be identified.
 
 Questions include:
+
 - Are there universal invariants (e.g., "never delete production data") that transfer across domains?
 - Can contracts be parameterized or templated for reuse?
 - What level of abstraction balances generalization with practical utility?
@@ -713,6 +738,7 @@ Questions include:
 Malicious contracts could in principle encode harmful behavior. Contract validation and sandboxing are necessary but not yet formalized.
 
 Attack surfaces include:
+
 - **Injection attacks:** Contracts containing prompts that override safety guidelines
 - **Exfiltration:** Contracts that direct agents to leak sensitive information through receipts
 - **Denial of service:** Contracts with contradictory constraints that cause infinite loops
@@ -721,9 +747,10 @@ Mitigation strategies require formal verification techniques adapted for natural
 
 #### 7.3.5 Relationship to AI Alignment
 
-Our governance architecture operates at the *behavioral* level, specifying what agents should do rather than what they should value. This is complementary to, but distinct from, AI alignment research concerned with goal specification and value learning.
+Our governance architecture operates at the _behavioral_ level, specifying what agents should do rather than what they should value. This is complementary to, but distinct from, AI alignment research concerned with goal specification and value learning.
 
 Key tensions:
+
 - **Interpretability:** Governance assumes agents can interpret and follow constraints. If models develop subtle misinterpretations, governance may provide false assurance.
 - **Capability amplification risk:** Better coordination may enable more capable systems, potentially amplifying alignment failures.
 - **Human oversight sufficiency:** We assume humans can verify agent outputs. As tasks grow more complex, this assumption weakens.
@@ -763,7 +790,7 @@ Beyond those noted in §5.4, we acknowledge:
 
 ## 9. Conclusion
 
-We have proposed *coordination cost compression* as an organizing principle for human–AI collaborative systems, contrasting it with the dominant *capability amplification* paradigm. We introduced formal constructs—Turn Cost, environmental hostility, governance primitives—and described an architecture that operationalizes these concepts.
+We have proposed _coordination cost compression_ as an organizing principle for human–AI collaborative systems, contrasting it with the dominant _capability amplification_ paradigm. We introduced formal constructs—Turn Cost, environmental hostility, governance primitives—and described an architecture that operationalizes these concepts.
 
 Preliminary evidence from a case study suggests the approach is feasible and produces measurable effects in the predicted direction. However, this evidence is limited, and substantial work remains:
 
@@ -779,35 +806,35 @@ We offer this framework not as a solution but as a hypothesis: that human–AI c
 
 ## References
 
-[1] Brown, T., et al. (2020). "Language Models are Few-Shot Learners." *NeurIPS 2020*.
+[1] Brown, T., et al. (2020). "Language Models are Few-Shot Learners." _NeurIPS 2020_.
 
 [2] OpenAI. (2023). "GPT-4 Technical Report." arXiv:2303.08774.
 
 [3] Anthropic. (2024). "The Claude 3 Model Family." Technical Report.
 
-[4] Zamfirescu-Pereira, J. D., et al. (2023). "Why Johnny Can't Prompt: How Non-AI Experts Try (and Fail) to Design LLM Prompts." *CHI '23*.
+[4] Zamfirescu-Pereira, J. D., et al. (2023). "Why Johnny Can't Prompt: How Non-AI Experts Try (and Fail) to Design LLM Prompts." _CHI '23_.
 
-[5] Wooldridge, M. (2009). *An Introduction to MultiAgent Systems*. Wiley.
+[5] Wooldridge, M. (2009). _An Introduction to MultiAgent Systems_. Wiley.
 
-[6] Shoham, Y., & Leyton-Brown, K. (2008). *Multiagent Systems: Algorithmic, Game-Theoretic, and Logical Foundations*. Cambridge University Press.
+[6] Shoham, Y., & Leyton-Brown, K. (2008). _Multiagent Systems: Algorithmic, Game-Theoretic, and Logical Foundations_. Cambridge University Press.
 
-[7] Jennings, N. R. (2000). "On Agent-Based Software Engineering." *Artificial Intelligence* 117(2).
+[7] Jennings, N. R. (2000). "On Agent-Based Software Engineering." _Artificial Intelligence_ 117(2).
 
 [8] Tran, K.-T., et al. (2025). "Multi-Agent Collaboration Mechanisms: A Survey of LLMs." arXiv:2501.06322.
 
-[9] Wang, L., et al. (2024). "A Survey on Large Language Model based Autonomous Agents." *Frontiers of Computer Science*.
+[9] Wang, L., et al. (2024). "A Survey on Large Language Model based Autonomous Agents." _Frontiers of Computer Science_.
 
-[10] Noy, S., & Zhang, W. (2023). "Experimental Evidence on the Productivity Effects of Generative Artificial Intelligence." *Science* 381(6654).
+[10] Noy, S., & Zhang, W. (2023). "Experimental Evidence on the Productivity Effects of Generative Artificial Intelligence." _Science_ 381(6654).
 
-[11] Bansal, G., et al. (2021). "Does the Whole Exceed its Parts? The Effect of AI Explanations on Complementary Team Performance." *CHI '21*.
+[11] Bansal, G., et al. (2021). "Does the Whole Exceed its Parts? The Effect of AI Explanations on Complementary Team Performance." _CHI '21_.
 
-[12] Bainbridge, L. (1983). "Ironies of Automation." *Automatica* 19(6).
+[12] Bainbridge, L. (1983). "Ironies of Automation." _Automatica_ 19(6).
 
-[13] Gaube, S., et al. (2021). "Do as AI say: susceptibility in deployment of clinical decision-aids." *NPJ Digital Medicine* 4(1).
+[13] Gaube, S., et al. (2021). "Do as AI say: susceptibility in deployment of clinical decision-aids." _NPJ Digital Medicine_ 4(1).
 
-[14] Malone, T. W., & Crowston, K. (1994). "The Interdisciplinary Study of Coordination." *ACM Computing Surveys* 26(1).
+[14] Malone, T. W., & Crowston, K. (1994). "The Interdisciplinary Study of Coordination." _ACM Computing Surveys_ 26(1).
 
-[15] Wei, J., et al. (2022). "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models." *NeurIPS 2022*.
+[15] Wei, J., et al. (2022). "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models." _NeurIPS 2022_.
 
 [16] Schick, T., et al. (2023). "Toolformer: Language Models Can Teach Themselves to Use Tools." arXiv:2302.04761.
 
@@ -876,12 +903,12 @@ receipts:
 
 For replication, we measured Turn Cost components as follows:
 
-| Component | Measurement Method |
-|-----------|-------------------|
-| Latency | Timestamp difference between request send and response complete |
-| Context Reset | Token count in first message after session/model boundary |
-| Renegotiation | Binary flag: did this turn produce progress or only clarification? |
-| Token Bloat | Difference between actual tokens and estimated minimum |
+| Component        | Measurement Method                                                  |
+| ---------------- | ------------------------------------------------------------------- |
+| Latency          | Timestamp difference between request send and response complete     |
+| Context Reset    | Token count in first message after session/model boundary           |
+| Renegotiation    | Binary flag: did this turn produce progress or only clarification?  |
+| Token Bloat      | Difference between actual tokens and estimated minimum              |
 | Attention Switch | Time from response received to human action (git commit, next turn) |
 
 "Progress" was operationalized as: code change, test addition, or documentation update accepted without reversion.
@@ -894,16 +921,17 @@ This paper was co-authored by Joseph Gustavson (human, ORCID: 0009-0001-0669-074
 
 **Attribution of contributions:**
 
-- *Conceptual framework*: Developed collaboratively through extended dialogue (human + AI)
-- *Case study design and execution*: Human-led, AI-assisted
-- *Literature review*: AI-led with human curation and verification
-- *Writing*: AI-drafted, human-reviewed and edited
-- *Data collection*: Human (from logs and git history)
-- *Critical evaluation*: Collaborative
+- _Conceptual framework_: Developed collaboratively through extended dialogue (human + AI)
+- _Case study design and execution_: Human-led, AI-assisted
+- _Literature review_: AI-led with human curation and verification
+- _Writing_: AI-drafted, human-reviewed and edited
+- _Data collection_: Human (from logs and git history)
+- _Critical evaluation_: Collaborative
 
 **Statement of responsibility:**
 
 Joseph Gustavson takes responsibility for:
+
 - Accuracy of empirical claims
 - Appropriateness of literature citations
 - Ethical review and compliance
@@ -917,8 +945,8 @@ The AI collaborators cannot take legal or academic responsibility for the conten
 
 ---
 
-*Submitted for consideration as working paper / preprint. Not yet peer-reviewed.*
+_Submitted for consideration as working paper / preprint. Not yet peer-reviewed._
 
-*Version: Draft 1.2, December 2025*
-*Revision 1.1: Strengthened Turn Cost positioning, expanded challenges section, added economic sensitivity analysis, included methodological recommendations for replication.*
-*Revision 1.2: Corrected economic analysis arithmetic, updated model names to reflect actual availability, fixed citation metadata.*
+_Version: Draft 1.2, December 2025_
+_Revision 1.1: Strengthened Turn Cost positioning, expanded challenges section, added economic sensitivity analysis, included methodological recommendations for replication._
+_Revision 1.2: Corrected economic analysis arithmetic, updated model names to reflect actual availability, fixed citation metadata._

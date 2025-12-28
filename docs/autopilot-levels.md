@@ -6,19 +6,20 @@ The lexrunner supports graduated automation levels (0-4) for merge-weave executi
 
 Autopilot levels define the degree of automation in merge-weave operations:
 
-| Level | Name | Description | GitHub Operations |
-|-------|------|-------------|-------------------|
-| 0 | Report Only | Generate plans and artifacts only | None |
-| 1 | Artifact Generation | Create integration plans and previews | None |
-| 2 | PR Annotations | Post comments and update status | Read + Comment |
-| 3 | Integration Branches | Create branches and open PRs | Read + Write |
-| 4 | Full Automation | Complete end-to-end merge-weave | Read + Write + Merge |
+| Level | Name                 | Description                           | GitHub Operations    |
+| ----- | -------------------- | ------------------------------------- | -------------------- |
+| 0     | Report Only          | Generate plans and artifacts only     | None                 |
+| 1     | Artifact Generation  | Create integration plans and previews | None                 |
+| 2     | PR Annotations       | Post comments and update status       | Read + Comment       |
+| 3     | Integration Branches | Create branches and open PRs          | Read + Write         |
+| 4     | Full Automation      | Complete end-to-end merge-weave       | Read + Write + Merge |
 
 ## Level 0: Report Only
 
 **Purpose**: Safe plan generation and validation without side effects.
 
 **Capabilities**:
+
 - Generate `plan.json` from configuration
 - Validate dependency graphs
 - Compute merge order (topological sort)
@@ -27,12 +28,14 @@ Autopilot levels define the degree of automation in merge-weave operations:
 - Generate execution reports
 
 **Use Cases**:
+
 - CI/CD validation
 - Development environment testing
 - Plan review before execution
 - Dry-run mode for all operations
 
 **CLI Flags**:
+
 ```bash
 lex-pr execute --max-level 0 --dry-run
 lex-pr merge --max-level 0
@@ -45,6 +48,7 @@ lex-pr merge --max-level 0
 **Purpose**: Create detailed execution plans and merge previews.
 
 **Capabilities** (all Level 0 plus):
+
 - Generate integration branch plans
 - Create merge preview artifacts
 - Write detailed execution logs
@@ -52,12 +56,14 @@ lex-pr merge --max-level 0
 - Produce gate result summaries
 
 **Use Cases**:
+
 - Pre-merge analysis
 - Integration planning
 - Conflict prediction
 - Artifact archiving for audit
 
 **CLI Flags**:
+
 ```bash
 lex-pr execute --max-level 1
 lex-pr merge --max-level 1 --branch-prefix "integration/"
@@ -70,6 +76,7 @@ lex-pr merge --max-level 1 --branch-prefix "integration/"
 **Purpose**: Provide automated status updates and feedback on PRs.
 
 **Capabilities** (all Level 1 plus):
+
 - Post status comments on PRs
 - Update PR status checks
 - Add labels based on gate results
@@ -77,18 +84,21 @@ lex-pr merge --max-level 1 --branch-prefix "integration/"
 - Update PR descriptions with execution status
 
 **Use Cases**:
+
 - Automated PR feedback
 - Status tracking in GitHub
 - Team visibility into gate results
 - Integration with PR workflows
 
 **CLI Flags**:
+
 ```bash
 lex-pr execute --max-level 2 --comment-template /path/to/template.md
 lex-pr merge --max-level 2
 ```
 
 **GitHub Permissions Required**:
+
 - `pull_requests: read`
 - `pull_requests: write` (for comments)
 - `statuses: write` (for status checks)
@@ -100,6 +110,7 @@ lex-pr merge --max-level 2
 **Purpose**: Automated creation of integration branches and PRs.
 
 **Capabilities** (all Level 2 plus):
+
 - Create integration branches
 - Perform merge operations
 - Open integration PRs with `--open-pr`
@@ -107,18 +118,21 @@ lex-pr merge --max-level 2
 - Update integration PR status
 
 **Use Cases**:
+
 - Automated integration testing
 - Merge preview in real branches
 - Pre-merge validation with full CI
 - Parallel integration attempts
 
 **CLI Flags**:
+
 ```bash
 lex-pr merge --max-level 3 --open-pr --branch-prefix "integration/"
 lex-pr execute --max-level 3 --open-pr
 ```
 
 **GitHub Permissions Required**:
+
 - All Level 2 permissions
 - `contents: write` (for branch creation)
 - `pull_requests: write` (for PR creation)
@@ -130,6 +144,7 @@ lex-pr execute --max-level 3 --open-pr
 **Purpose**: Complete end-to-end merge-weave with finalization.
 
 **Capabilities** (all Level 3 plus):
+
 - Finalize successful integrations
 - Merge integration PRs to target branch
 - Close superseded PRs with `--close-superseded`
@@ -137,18 +152,21 @@ lex-pr execute --max-level 3 --open-pr
 - Complete automation pipeline
 
 **Use Cases**:
+
 - Fully automated merge pyramids
 - Continuous integration workflows
 - Scheduled batch processing
 - Production merge automation
 
 **CLI Flags**:
+
 ```bash
 lex-pr merge --max-level 4 --open-pr --close-superseded --execute
 lex-pr execute --max-level 4 --close-superseded
 ```
 
 **GitHub Permissions Required**:
+
 - All Level 3 permissions
 - `contents: write` (for merging)
 - `pull_requests: write` (for closing PRs)
@@ -290,33 +308,33 @@ name: Merge Pyramid
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: "0 */6 * * *" # Every 6 hours
   workflow_dispatch:
     inputs:
       level:
-        description: 'Autopilot level (0-4)'
+        description: "Autopilot level (0-4)"
         required: true
-        default: '2'
+        default: "2"
 
 jobs:
   merge-weave:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Generate plan
         run: npx lex-pr plan --from-github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Execute with autopilot
         run: |
           npx lex-pr execute \
@@ -325,7 +343,7 @@ jobs:
             --artifact-dir ./gate-results
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

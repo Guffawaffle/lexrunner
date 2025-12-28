@@ -9,71 +9,71 @@ The merge-weave execution state machine provides a robust, resumable execution f
 ```mermaid
 stateDiagram-v2
     [*] --> idle
-    
+
     idle --> planning : START
     planning --> computing_order : PLAN_READY
     computing_order --> ready : ORDER_COMPUTED
-    
+
     ready --> merging : BEGIN_MERGE
     merging --> validating : MERGE_SUCCESS
     merging --> failed : MERGE_FAILED
-    
+
     validating --> ready : VALIDATION_PASSED
     validating --> completed : ALL_COMPLETE
     validating --> failed : VALIDATION_FAILED
-    
+
     ready --> paused : PAUSE
     merging --> paused : PAUSE
     validating --> paused : PAUSE
     paused --> ready : RESUME
-    
+
     failed --> idle : RESET
     completed --> idle : RESET
     paused --> idle : RESET
-    
+
     completed --> [*]
     failed --> [*]
-    
+
     note right of idle
         Initial state
         No execution started
     end note
-    
+
     note right of planning
         Analyzing PRs
         Loading dependencies
     end note
-    
+
     note right of computing_order
         Computing merge batches
         Topological sort
     end note
-    
+
     note right of ready
         Ready to execute
         Awaiting next batch
     end note
-    
+
     note right of merging
         Executing git merges
         Batch in progress
     end note
-    
+
     note right of validating
         Running gates
         Checking tests
     end note
-    
+
     note right of paused
         Execution suspended
         Can be resumed
     end note
-    
+
     note right of completed
         All batches done
         Terminal state
     end note
-    
+
     note right of failed
         Execution failed
         Terminal state
@@ -83,82 +83,100 @@ stateDiagram-v2
 ## States
 
 ### `idle`
+
 Initial state before any execution has started. The system is ready to accept a new execution request.
 
 **Available Transitions:**
+
 - `START` → `planning`
 
 ### `planning`
+
 Loading and analyzing the plan, validating PRs, and preparing for execution.
 
 **Available Transitions:**
+
 - `PLAN_READY` → `computing_order`
 
 ### `computing_order`
+
 Computing the topological order of merges and organizing them into batches based on dependencies.
 
 **Available Transitions:**
+
 - `ORDER_COMPUTED` → `ready`
 
 ### `ready`
+
 Ready to execute the next batch of merges. This is a checkpoint state where execution can be paused or continued.
 
 **Available Transitions:**
+
 - `BEGIN_MERGE` → `merging`
 - `PAUSE` → `paused`
 
 ### `merging`
+
 Actively executing git merge operations for the current batch.
 
 **Available Transitions:**
+
 - `MERGE_SUCCESS` → `validating`
 - `MERGE_FAILED` → `failed`
 - `PAUSE` → `paused`
 
 ### `validating`
+
 Running gates (tests, lints, builds) on the merged result to ensure quality.
 
 **Available Transitions:**
+
 - `VALIDATION_PASSED` → `ready` (if more batches remain)
 - `ALL_COMPLETE` → `completed` (if all batches done)
 - `VALIDATION_FAILED` → `failed`
 - `PAUSE` → `paused`
 
 ### `paused`
+
 Execution is suspended. The state is persisted and can be resumed later.
 
 **Available Transitions:**
+
 - `RESUME` → `ready`
 - `RESET` → `idle`
 
 ### `completed`
+
 Terminal state indicating all batches were successfully merged and validated.
 
 **Available Transitions:**
+
 - `RESET` → `idle`
 
 ### `failed`
+
 Terminal state indicating execution failed due to merge conflicts or validation failures.
 
 **Available Transitions:**
+
 - `RESET` → `idle`
 
 ## Events
 
-| Event | Description |
-|-------|-------------|
-| `START` | Begin execution from idle state |
-| `PLAN_READY` | Plan loaded and validated |
-| `ORDER_COMPUTED` | Merge order calculated |
-| `BEGIN_MERGE` | Start merging current batch |
-| `MERGE_SUCCESS` | Batch merged successfully |
-| `MERGE_FAILED` | Merge encountered conflicts |
-| `VALIDATION_PASSED` | Gates passed for current batch |
-| `ALL_COMPLETE` | All batches completed |
-| `VALIDATION_FAILED` | Gates failed for current batch |
-| `PAUSE` | Suspend execution |
-| `RESUME` | Resume from paused state |
-| `RESET` | Return to initial state |
+| Event               | Description                     |
+| ------------------- | ------------------------------- |
+| `START`             | Begin execution from idle state |
+| `PLAN_READY`        | Plan loaded and validated       |
+| `ORDER_COMPUTED`    | Merge order calculated          |
+| `BEGIN_MERGE`       | Start merging current batch     |
+| `MERGE_SUCCESS`     | Batch merged successfully       |
+| `MERGE_FAILED`      | Merge encountered conflicts     |
+| `VALIDATION_PASSED` | Gates passed for current batch  |
+| `ALL_COMPLETE`      | All batches completed           |
+| `VALIDATION_FAILED` | Gates failed for current batch  |
+| `PAUSE`             | Suspend execution               |
+| `RESUME`            | Resume from paused state        |
+| `RESET`             | Return to initial state         |
 
 ## Lock File (weave-lock.json)
 
@@ -168,24 +186,26 @@ The lock file persists execution state and enables resume capability.
 
 ```typescript
 interface WeaveLockFile {
-  schemaVersion: string;        // Lock file format version
-  runId: string;                 // Unique execution ID (ULID)
-  planHash: string;              // SHA-256 hash of plan + PR heads
-  state: WeaveState;             // Current execution state
-  context: WeaveContext;         // Full execution context
-  createdAt: string;             // ISO timestamp
-  updatedAt: string;             // ISO timestamp
+  schemaVersion: string; // Lock file format version
+  runId: string; // Unique execution ID (ULID)
+  planHash: string; // SHA-256 hash of plan + PR heads
+  state: WeaveState; // Current execution state
+  context: WeaveContext; // Full execution context
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
 }
 ```
 
 ### Hash Validation
 
 The `planHash` is computed as:
+
 ```
 SHA-256(canonical_json(plan) + ":" + canonical_json(prHeads))
 ```
 
 This ensures that resuming is only allowed if:
+
 1. The plan.json hasn't changed
 2. No PR heads have been updated (no new commits)
 
@@ -202,6 +222,7 @@ lex-pr merge --plan plan.json --dry-run
 ```
 
 **Output:**
+
 ```json
 {
   "summary": {
@@ -254,6 +275,7 @@ lex-pr merge --plan plan.json --execute
 ```
 
 This will:
+
 1. Create `weave-lock.json` with execution state
 2. Execute merges batch by batch
 3. Update lock file after each batch
@@ -268,6 +290,7 @@ lex-pr merge --plan plan.json --resume <runId>
 ```
 
 The system will:
+
 1. Read `weave-lock.json`
 2. Validate the plan hash
 3. Resume from the last successful state

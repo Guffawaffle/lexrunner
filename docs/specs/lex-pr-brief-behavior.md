@@ -28,19 +28,19 @@ lex-pr brief --interactive
 
 ## Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--issues` | `number[]` | GitHub issue numbers to include |
-| `--prs` | `number[]` | GitHub PR numbers to include |
-| `--discover` | `boolean` | Auto-discover PRs using scope.yml rules |
-| `--state` | `open\|closed\|all` | Filter for discovery (default: open) |
-| `--branch` | `string` | Target branch (default: main) |
-| `--output` | `string` | Output path (default: stdout + save to briefs/) |
-| `--no-save` | `boolean` | Don't save to briefs directory |
-| `--template` | `string` | Custom template path |
-| `--recall` | `boolean` | Include prior decisions from Lex memory |
-| `--json` | `boolean` | Output as JSON instead of markdown |
-| `--interactive` | `boolean` | Prompt for missing fields |
+| Option          | Type                | Description                                     |
+| --------------- | ------------------- | ----------------------------------------------- |
+| `--issues`      | `number[]`          | GitHub issue numbers to include                 |
+| `--prs`         | `number[]`          | GitHub PR numbers to include                    |
+| `--discover`    | `boolean`           | Auto-discover PRs using scope.yml rules         |
+| `--state`       | `open\|closed\|all` | Filter for discovery (default: open)            |
+| `--branch`      | `string`            | Target branch (default: main)                   |
+| `--output`      | `string`            | Output path (default: stdout + save to briefs/) |
+| `--no-save`     | `boolean`           | Don't save to briefs directory                  |
+| `--template`    | `string`            | Custom template path                            |
+| `--recall`      | `boolean`           | Include prior decisions from Lex memory         |
+| `--json`        | `boolean`           | Output as JSON instead of markdown              |
+| `--interactive` | `boolean`           | Prompt for missing fields                       |
 
 ## Processing Pipeline
 
@@ -81,6 +81,7 @@ lex-pr brief --interactive
 ## Scope Resolution
 
 ### From Issues
+
 ```bash
 lex-pr brief --issues 463,464,465
 ```
@@ -91,6 +92,7 @@ lex-pr brief --issues 463,464,465
 4. Aggregate into scope
 
 ### From PRs
+
 ```bash
 lex-pr brief --prs 463,464,465
 ```
@@ -100,6 +102,7 @@ lex-pr brief --prs 463,464,465
 3. Check dependencies (from PR body `Depends-on:` syntax)
 
 ### From Discovery
+
 ```bash
 lex-pr brief --discover --state open
 ```
@@ -112,14 +115,14 @@ lex-pr brief --discover --state open
 
 The command parses natural language for common constraint patterns:
 
-| Pattern | Inferred Constraint |
-|---------|---------------------|
-| "keep tokens low" | `Budget: minimize token usage` |
-| "end of month" | `Budget: minimize CI usage` |
-| "no fan-outs" | `Governance: no new agent assignments` |
-| "quick" / "fast" | `Quality: speed over thoroughness` |
-| "thorough" / "careful" | `Quality: thoroughness over speed` |
-| "rate limited" | `Constraints: batch operations, avoid parallel calls` |
+| Pattern                | Inferred Constraint                                   |
+| ---------------------- | ----------------------------------------------------- |
+| "keep tokens low"      | `Budget: minimize token usage`                        |
+| "end of month"         | `Budget: minimize CI usage`                           |
+| "no fan-outs"          | `Governance: no new agent assignments`                |
+| "quick" / "fast"       | `Quality: speed over thoroughness`                    |
+| "thorough" / "careful" | `Quality: thoroughness over speed`                    |
+| "rate limited"         | `Constraints: batch operations, avoid parallel calls` |
 
 ## Lex Memory Integration
 
@@ -131,6 +134,7 @@ lex recall --branch main --module "src/runs" --limit 5
 ```
 
 Extracts:
+
 - Recent conflict resolutions
 - Naming conventions established
 - Patterns applied
@@ -140,6 +144,7 @@ Formats as `## Prior Decisions` section.
 ## Output Examples
 
 ### Default (stdout + save)
+
 ```bash
 $ lex-pr brief "merge-weave PRs 463-467, keep tokens low"
 
@@ -173,6 +178,7 @@ Merge PRs #463-467 to main, resolve conflicts, verify gates locally.
 ```
 
 ### JSON Mode
+
 ```bash
 $ lex-pr brief --json --prs 463,464,465
 
@@ -213,6 +219,7 @@ $ lex-pr brief --json --prs 463,464,465
 ## Integration with Persona Workflows
 
 ### Eager PM
+
 ```bash
 # Generate brief for fan-out planning
 lex-pr brief --discover --state open --template eager-pm
@@ -221,6 +228,7 @@ lex-pr brief --discover --state open --template eager-pm
 ```
 
 ### Senior Dev
+
 ```bash
 # Generate brief with full context recall
 lex-pr brief --prs 463-467 --recall --template senior-dev
@@ -230,21 +238,21 @@ lex-pr brief --prs 463-467 --recall --template senior-dev
 
 ## Error Handling
 
-| Condition | Behavior |
-|-----------|----------|
-| No PRs/issues found | Error: "No items to include in brief" |
-| GitHub API failure | Warn + continue with partial data |
-| Lex recall failure | Warn + continue without prior decisions |
-| Invalid NL (can't parse) | Prompt interactively or error |
+| Condition                | Behavior                                |
+| ------------------------ | --------------------------------------- |
+| No PRs/issues found      | Error: "No items to include in brief"   |
+| GitHub API failure       | Warn + continue with partial data       |
+| Lex recall failure       | Warn + continue without prior decisions |
+| Invalid NL (can't parse) | Prompt interactively or error           |
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Brief generated successfully |
-| 1 | No items found / invalid input |
-| 2 | GitHub API error (partial brief may exist) |
-| 3 | File write error |
+| Code | Meaning                                    |
+| ---- | ------------------------------------------ |
+| 0    | Brief generated successfully               |
+| 1    | No items found / invalid input             |
+| 2    | GitHub API error (partial brief may exist) |
+| 3    | File write error                           |
 
 ## Future Extensions
 
@@ -256,6 +264,6 @@ lex-pr brief --prs 463-467 --recall --template senior-dev
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 0.1 | 2025-11-27 | Initial draft from Opie/Lex session |
+| Version | Date       | Changes                             |
+| ------- | ---------- | ----------------------------------- |
+| 0.1     | 2025-11-27 | Initial draft from Opie/Lex session |

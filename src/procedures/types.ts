@@ -17,26 +17,26 @@ export type RiskLevel = "low" | "medium" | "high";
  * Decision option within a decision point
  */
 export interface DecisionOption {
-	/** Action identifier */
-	action: string;
-	/** Human-readable description */
-	description: string;
-	/** Risk level for this option */
-	riskLevel?: RiskLevel;
+  /** Action identifier */
+  action: string;
+  /** Human-readable description */
+  description: string;
+  /** Risk level for this option */
+  riskLevel?: RiskLevel;
 }
 
 /**
  * Decision point that may require LLM decision
  */
 export interface DecisionPoint {
-	/** State where this decision point applies */
-	state: string;
-	/** Whether this requires an LLM decision */
-	requiresLLMDecision: boolean;
-	/** Prompt to present to the LLM */
-	prompt: string;
-	/** Available options for this decision */
-	options: DecisionOption[];
+  /** State where this decision point applies */
+  state: string;
+  /** Whether this requires an LLM decision */
+  requiresLLMDecision: boolean;
+  /** Prompt to present to the LLM */
+  prompt: string;
+  /** Available options for this decision */
+  options: DecisionOption[];
 }
 
 /**
@@ -44,20 +44,20 @@ export interface DecisionPoint {
  * on the umbrella branch during merge-weave operations
  */
 export interface KeystonePolicy {
-	/** Maximum keystone issues allowed per wave */
-	maxPerWave: number;
-	/** Ideal number of keystone issues (typically 0) */
-	ideal: number;
-	/** Question to determine if keystone treatment is justified */
-	litmusTest: string;
-	/** Scenarios when keystone treatment is appropriate */
-	whenToUse: string[];
-	/** Scenarios when keystone treatment should NOT be used */
-	whenNotToUse: string[];
-	/** Risks associated with overusing keystone issues */
-	risks: string[];
-	/** Documentation requirements for keystone issues */
-	requiredDocumentation?: string[];
+  /** Maximum keystone issues allowed per wave */
+  maxPerWave: number;
+  /** Ideal number of keystone issues (typically 0) */
+  ideal: number;
+  /** Question to determine if keystone treatment is justified */
+  litmusTest: string;
+  /** Scenarios when keystone treatment is appropriate */
+  whenToUse: string[];
+  /** Scenarios when keystone treatment should NOT be used */
+  whenNotToUse: string[];
+  /** Risks associated with overusing keystone issues */
+  risks: string[];
+  /** Documentation requirements for keystone issues */
+  requiredDocumentation?: string[];
 }
 
 /**
@@ -74,105 +74,105 @@ export type TransitionsDefinition = Record<string, TransitionMap>;
  * Run context for procedure execution
  */
 export interface RunContext {
-	/** Current run identifier */
-	runId: string;
-	/** Current state */
-	state: string;
-	/** Any additional context data */
-	[key: string]: unknown;
+  /** Current run identifier */
+  runId: string;
+  /** Current state */
+  state: string;
+  /** Any additional context data */
+  [key: string]: unknown;
 }
 
 /**
  * Procedure definition as loaded from YAML
  */
 export interface ProcedureDefinition {
-	/** Schema version for the procedure format */
-	schemaVersion: string;
-	/** Unique identifier for this procedure */
-	id: string;
-	/** Human-readable name */
-	name: string;
-	/** Description of what this procedure does */
-	description: string;
-	/** List of all valid states */
-	states: string[];
-	/** Initial state when the procedure starts */
-	initialState: string;
-	/** State transition definitions */
-	transitions: TransitionsDefinition;
-	/** Decision points that may require input */
-	decisionPoints?: DecisionPoint[];
-	/** Gates that must pass for completion */
-	completionGates?: string[];
-	/** Keystone policy for issues implemented directly on umbrella branch */
-	keystonePolicy?: KeystonePolicy;
+  /** Schema version for the procedure format */
+  schemaVersion: string;
+  /** Unique identifier for this procedure */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Description of what this procedure does */
+  description: string;
+  /** List of all valid states */
+  states: string[];
+  /** Initial state when the procedure starts */
+  initialState: string;
+  /** State transition definitions */
+  transitions: TransitionsDefinition;
+  /** Decision points that may require input */
+  decisionPoints?: DecisionPoint[];
+  /** Gates that must pass for completion */
+  completionGates?: string[];
+  /** Keystone policy for issues implemented directly on umbrella branch */
+  keystonePolicy?: KeystonePolicy;
 }
 
 /**
  * Summary information about a procedure
  */
 export interface ProcedureSummary {
-	/** Unique identifier */
-	id: string;
-	/** Human-readable name */
-	name: string;
-	/** Description */
-	description: string;
-	/** File path where the procedure is defined */
-	filePath: string;
+  /** Unique identifier */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Description */
+  description: string;
+  /** File path where the procedure is defined */
+  filePath: string;
 }
 
 /**
  * Result of procedure validation
  */
 export interface ProcedureValidationResult {
-	/** Whether the procedure is valid */
-	valid: boolean;
-	/** List of validation errors if any */
-	errors: ProcedureValidationError[];
+  /** Whether the procedure is valid */
+  valid: boolean;
+  /** List of validation errors if any */
+  errors: ProcedureValidationError[];
 }
 
 /**
  * A single validation error
  */
 export interface ProcedureValidationError {
-	/** Path to the error in the definition */
-	path: string;
-	/** Error message */
-	message: string;
-	/** Error code */
-	code: string;
+  /** Path to the error in the definition */
+  path: string;
+  /** Error message */
+  message: string;
+  /** Error code */
+  code: string;
 }
 
 /**
  * Procedure interface for runtime use
  */
 export interface Procedure {
-	/** Unique identifier */
-	id: string;
-	/** Human-readable name */
-	name: string;
-	/** Description */
-	description: string;
+  /** Unique identifier */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Description */
+  description: string;
 
-	/** Get the initial state for this procedure */
-	getInitialState(): string;
+  /** Get the initial state for this procedure */
+  getInitialState(): string;
 
-	/** Get available options for the current state and context */
-	getNextOptions(state: string, context: RunContext): NextOption[];
+  /** Get available options for the current state and context */
+  getNextOptions(state: string, context: RunContext): NextOption[];
 
-	/** Check if a transition is valid */
-	canTransition(from: string, event: string): boolean;
+  /** Check if a transition is valid */
+  canTransition(from: string, event: string): boolean;
 
-	/** Apply a transition and return the new state */
-	applyTransition(from: string, event: string): string;
+  /** Apply a transition and return the new state */
+  applyTransition(from: string, event: string): string;
 
-	/** Check if a state is terminal (no outgoing transitions) */
-	isTerminal(state: string): boolean;
+  /** Check if a state is terminal (no outgoing transitions) */
+  isTerminal(state: string): boolean;
 
-	/** Get the decision point for a state if any */
-	getDecisionPoint(state: string): DecisionPoint | null;
+  /** Get the decision point for a state if any */
+  getDecisionPoint(state: string): DecisionPoint | null;
 
-	/** Get the list of completion gates */
-	getCompletionGates(): string[];
+  /** Get the list of completion gates */
+  getCompletionGates(): string[];
 }

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Example: Analyze file changes across open PRs
- * 
+ *
  * Usage:
  *   GITHUB_TOKEN=your_token node examples/analyze-pr-files.js
- * 
+ *
  * This example demonstrates:
  * 1. Fetching open PRs from a repository
  * 2. Analyzing file changes across PRs
@@ -18,7 +18,7 @@ async function main() {
   try {
     // Create GitHub client (auto-detects repo from git remote)
     const client = await createGitHubClient({
-      token: process.env.GITHUB_TOKEN
+      token: process.env.GITHUB_TOKEN,
     });
 
     // Validate repository access
@@ -36,9 +36,7 @@ async function main() {
     }
 
     // Get detailed PR information
-    const prDetails = await Promise.all(
-      prs.map(pr => client.getPRDetails(pr.number))
-    );
+    const prDetails = await Promise.all(prs.map((pr) => client.getPRDetails(pr.number)));
 
     console.log("\nAnalyzing file changes...\n");
 
@@ -47,7 +45,7 @@ async function main() {
 
     // Display results
     console.log("=== File Intersection Analysis ===\n");
-    
+
     if (analysis.fileIntersections.length === 0) {
       console.log("No file intersections detected");
     } else {
@@ -60,7 +58,7 @@ async function main() {
     }
 
     console.log("\n=== Dependency Suggestions ===\n");
-    
+
     if (analysis.suggestions.length === 0) {
       console.log("No dependency suggestions");
     } else {
@@ -74,7 +72,7 @@ async function main() {
     }
 
     console.log("\n=== Potential Conflicts ===\n");
-    
+
     if (analysis.conflicts.length === 0) {
       console.log("No potential conflicts detected ✅");
     } else {
@@ -93,7 +91,6 @@ async function main() {
     console.log(`File intersections: ${analysis.fileIntersections.length}`);
     console.log(`Dependency suggestions: ${analysis.suggestions.length}`);
     console.log(`Potential conflicts: ${analysis.conflicts.length}`);
-
   } catch (error) {
     console.error("Error:", error.message);
     process.exit(1);

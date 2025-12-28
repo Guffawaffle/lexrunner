@@ -1,31 +1,31 @@
 {
-	"schema_version": "1.0.0",
-	"task_id": "test-task-001",
-	"snapshot_hash": "sha256:test_snapshot_hash_placeholder",
-	"claims": {
-		"success": true,
-		"patch": "--- a/tests/unit/index.spec.ts\n+++ b/tests/unit/index.spec.ts\n@@ -2,7 +2,7 @@\n describe('test suite', () => {\n   it('should return 42', () => {\n-    expect(result).toBe(41);\n+    expect(result).toBe(42);\n   });\n });",
-		"files_touched": ["tests/unit/index.spec.ts"],
-		"rationale": "Fixed the assertion to match the actual return value of 42",
-		"confidence": "high",
-		"assumptions_made": [
-			{
-				"type": "test",
-				"text": "Only one assertion needs updating",
-				"validated": true,
-				"evidence": "Checked all test files, only one assertion for getAnswer()"
-			}
-		]
-	},
-	"search_activity": [],
-	"cost": {
-		"token_usage": {
-			"input": 800,
-			"output": 150,
-			"total": 950
-		},
-		"tool_calls_count": 2,
-		"elapsed_ms": 3500
-	},
-	"blockers": []
+  "schema_version": "1.0.0",
+  "task_id": "test-task-001",
+  "snapshot_hash": "sha256:test_snapshot_hash_placeholder",
+  "claims": {
+    "success": true,
+    "patch": "--- a/tests/unit/index.spec.ts\n+++ b/tests/unit/index.spec.ts\n@@ -2,7 +2,7 @@\n describe('test suite', () => {\n   it('should return 42', () => {\n-    expect(result).toBe(41);\n+    expect(result).toBe(42);\n   });\n });",
+    "files_touched": ["tests/unit/index.spec.ts"],
+    "rationale": "Fixed the assertion to match the actual return value of 42",
+    "confidence": "high",
+    "assumptions_made": [
+      {
+        "type": "test",
+        "text": "Only one assertion needs updating",
+        "validated": true,
+        "evidence": "Checked all test files, only one assertion for getAnswer()"
+      }
+    ]
+  },
+  "search_activity": [],
+  "cost": {
+    "token_usage": {
+      "input": 800,
+      "output": 150,
+      "total": 950
+    },
+    "tool_calls_count": 2,
+    "elapsed_ms": 3500
+  },
+  "blockers": []
 }

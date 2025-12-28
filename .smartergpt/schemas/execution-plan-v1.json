@@ -89,7 +89,14 @@
   "definitions": {
     "FeatureSpecV0": {
       "type": "object",
-      "required": ["schemaVersion", "title", "description", "acceptanceCriteria", "repo", "createdAt"],
+      "required": [
+        "schemaVersion",
+        "title",
+        "description",
+        "acceptanceCriteria",
+        "repo",
+        "createdAt"
+      ],
       "additionalProperties": false,
       "properties": {
         "schemaVersion": { "type": "string", "const": "0.1.0" },

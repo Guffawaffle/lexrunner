@@ -23,11 +23,13 @@ lex-pr plan
 ```
 
 **Input Files:**
+
 - `scope.yml` - PR discovery rules
 - `deps.yml` - Dependency relationships
 - `gates.yml` - Quality gate configuration
 
 **Output:**
+
 - `plan.json` - Validated execution plan
 - `snapshot.md` - Human-readable summary
 
@@ -119,6 +121,7 @@ lex-pr plan --validate-cycles
 ```
 
 **Example Cycle Error:**
+
 ```
 ❌ Plan validation failed: dependency cycle detected involving: PR-101, PR-102, PR-103
 ```
@@ -142,6 +145,7 @@ lex-pr plan --from-github --optimize
 ```
 
 **Example Output:**
+
 ```
 ✓ Auto-discovered 5 PRs from GitHub
 ✓ Dependency validation passed (no cycles detected)
@@ -216,6 +220,7 @@ lex-pr plan --from-github --out ./artifacts
 ```
 
 **Generated Files:**
+
 - `plan.json` - Canonical execution plan
 - `snapshot.md` - Human-readable summary
 
@@ -228,6 +233,7 @@ lex-pr plan --from-github --json > plan.json
 ```
 
 **Use Cases:**
+
 - Piping to other tools
 - CI/CD integration
 - Programmatic processing
@@ -241,6 +247,7 @@ lex-pr plan --from-github --dry-run
 ```
 
 **Output:**
+
 ```
 Dry run - would generate:
 📁 .smartergpt/runner/plan.json (2431 bytes)
@@ -350,6 +357,7 @@ echo "✅ Plan generated successfully"
 ### Common Issues
 
 **Issue: Circular dependency detected**
+
 ```bash
 # Review dependencies
 lex-pr plan --from-github --optimize --dry-run
@@ -358,6 +366,7 @@ lex-pr plan --from-github --optimize --dry-run
 ```
 
 **Issue: Unknown dependency**
+
 ```bash
 # Check if referenced PR exists
 gh pr list
@@ -366,6 +375,7 @@ gh pr list
 ```
 
 **Issue: No PRs discovered**
+
 ```bash
 # Check query syntax
 lex-pr plan --from-github --query "is:open" --dry-run

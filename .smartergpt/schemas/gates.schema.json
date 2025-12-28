@@ -1,47 +1,47 @@
 {
-	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates.schema.json",
-	"title": "Safety Gates Configuration",
-	"description": "Configuration for safety gates and validation rules",
-	"type": "object",
-	"additionalProperties": false,
-	"properties": {
-		"version": {
-			"type": "string",
-			"description": "Schema version for gates configuration"
-		},
-		"gates": {
-			"type": "array",
-			"description": "Array of safety gate definitions",
-			"items": {
-				"type": "object",
-				"required": ["id", "type", "enabled"],
-				"additionalProperties": false,
-				"properties": {
-					"id": {
-						"type": "string",
-						"description": "Unique identifier for the gate"
-					},
-					"type": {
-						"type": "string",
-						"enum": ["validation", "approval", "check"],
-						"description": "Type of safety gate"
-					},
-					"enabled": {
-						"type": "boolean",
-						"description": "Whether this gate is enabled"
-					},
-					"description": {
-						"type": "string",
-						"description": "Human-readable description of what this gate does"
-					},
-					"config": {
-						"type": "object",
-						"description": "Gate-specific configuration (intentionally loose)",
-						"additionalProperties": true
-					}
-				}
-			}
-		}
-	}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Guffawaffle/LexRunner/schemas/gates.schema.json",
+  "title": "Safety Gates Configuration",
+  "description": "Configuration for safety gates and validation rules",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for gates configuration"
+    },
+    "gates": {
+      "type": "array",
+      "description": "Array of safety gate definitions",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the gate"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["validation", "approval", "check"],
+            "description": "Type of safety gate"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this gate is enabled"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this gate does"
+          },
+          "config": {
+            "type": "object",
+            "description": "Gate-specific configuration (intentionally loose)",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  }
 }

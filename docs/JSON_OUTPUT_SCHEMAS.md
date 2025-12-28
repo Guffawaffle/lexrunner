@@ -11,7 +11,9 @@ All commands that support `--json` output use a consistent envelope structure wi
 ```json
 {
   "success": true,
-  "data": { /* command-specific payload */ },
+  "data": {
+    /* command-specific payload */
+  },
   "meta": {
     "command": "lex-pr <command-name>",
     "timestamp": "<ISO 8601 timestamp>",
@@ -28,7 +30,9 @@ All commands that support `--json` output use a consistent envelope structure wi
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable error message",
-    "details": { /* optional additional context */ }
+    "details": {
+      /* optional additional context */
+    }
   },
   "meta": {
     "command": "lex-pr <command-name>",
@@ -45,6 +49,7 @@ All commands that support `--json` output use a consistent envelope structure wi
 Initializes a new workspace configuration.
 
 **Success:**
+
 ```json
 {
   "success": true,
@@ -61,6 +66,7 @@ Initializes a new workspace configuration.
 ```
 
 **Error Codes:**
+
 - `EINIT`: Configuration already exists
 - `EWRITE_PROTECTED`: Write protection error
 - `EINIT_FAILED`: Initialization failed for other reasons
@@ -72,6 +78,7 @@ Initializes a new workspace configuration.
 Discovers open pull requests from GitHub.
 
 **Success:**
+
 ```json
 {
   "pullRequests": [
@@ -91,6 +98,7 @@ Discovers open pull requests from GitHub.
 ```
 
 **With `--suggest` flag:**
+
 ```json
 {
   "pullRequests": [...],
@@ -117,6 +125,7 @@ Discovers open pull requests from GitHub.
 Generates a merge execution plan.
 
 **Success:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -143,6 +152,7 @@ Generates a merge execution plan.
 Shows current execution status and merge eligibility.
 
 **Success:**
+
 ```json
 {
   "plan": {
@@ -169,6 +179,7 @@ Shows current execution status and merge eligibility.
 Environment and configuration health check.
 
 **Success:**
+
 ```json
 {
   "hasErrors": false,
@@ -205,6 +216,7 @@ Environment and configuration health check.
 Executes gates for a plan.
 
 **Success:**
+
 ```json
 {
   "executionResults": {
@@ -231,13 +243,10 @@ Executes gates for a plan.
 Computes dependency levels and merge order.
 
 **Success:**
+
 ```json
 {
-  "levels": [
-    ["PR-123", "PR-456"],
-    ["PR-789"],
-    ["PR-101"]
-  ]
+  "levels": [["PR-123", "PR-456"], ["PR-789"], ["PR-101"]]
 }
 ```
 
@@ -245,16 +254,16 @@ Computes dependency levels and merge order.
 
 ## Common Error Codes
 
-| Code | Description |
-|------|-------------|
-| `ENOTFOUND` | Required file or resource not found |
-| `ESCHEMA` | Schema validation error |
-| `ECYCLE` | Circular dependency detected |
-| `EUNKNOWN_DEP` | Unknown dependency reference |
-| `EWRITE_PROTECTED` | Write-protected directory or file |
-| `EGITHUB` | GitHub API error |
-| `EGIT` | Git operation error |
-| `EUNKNOWN` | Unknown error |
+| Code               | Description                         |
+| ------------------ | ----------------------------------- |
+| `ENOTFOUND`        | Required file or resource not found |
+| `ESCHEMA`          | Schema validation error             |
+| `ECYCLE`           | Circular dependency detected        |
+| `EUNKNOWN_DEP`     | Unknown dependency reference        |
+| `EWRITE_PROTECTED` | Write-protected directory or file   |
+| `EGITHUB`          | GitHub API error                    |
+| `EGIT`             | Git operation error                 |
+| `EUNKNOWN`         | Unknown error                       |
 
 ## Usage Examples
 
@@ -298,7 +307,7 @@ fi
   run: |
     result=$(lex-pr doctor --json)
     echo "$result" > doctor-report.json
-    
+
     # Parse and use results
     has_errors=$(echo "$result" | jq -r '.hasErrors')
     if [ "$has_errors" = "true" ]; then

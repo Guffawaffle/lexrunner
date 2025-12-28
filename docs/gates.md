@@ -5,6 +5,7 @@ Gates are quality checks that must pass before code can be merged. This document
 ## Overview
 
 Gates in lexrunner execute commands to verify code quality, run tests, perform security scans, and more. Each gate can have:
+
 - A command to execute (`run`)
 - Environment variables (`env`)
 - Input validation schema (`input`)
@@ -43,10 +44,10 @@ Validates linting operations:
 
 ```json
 {
-  "files": ["src/**/*.ts"],      // Required: array of file paths or patterns (min 1 item)
-  "linter": "eslint",             // Required: eslint, tslint, pylint, or ruff
-  "fix": true,                    // Optional: auto-fix violations
-  "config": ".eslintrc.json"      // Optional: path to config file
+  "files": ["src/**/*.ts"], // Required: array of file paths or patterns (min 1 item)
+  "linter": "eslint", // Required: eslint, tslint, pylint, or ruff
+  "fix": true, // Optional: auto-fix violations
+  "config": ".eslintrc.json" // Optional: path to config file
 }
 ```
 
@@ -56,10 +57,10 @@ Validates test execution:
 
 ```json
 {
-  "framework": "vitest",          // Required: vitest, jest, mocha, pytest, or junit
+  "framework": "vitest", // Required: vitest, jest, mocha, pytest, or junit
   "files": ["tests/**/*.spec.ts"], // Required: array of test file patterns (min 1 item)
-  "coverage": true,               // Optional: enable coverage collection
-  "timeout": 30000                // Optional: test timeout in ms
+  "coverage": true, // Optional: enable coverage collection
+  "timeout": 30000 // Optional: test timeout in ms
 }
 ```
 
@@ -69,10 +70,10 @@ Validates build operations:
 
 ```json
 {
-  "command": "npm run build",     // Required: build command
-  "outputDir": "dist",            // Optional: output directory
-  "clean": true,                  // Optional: clean before build
-  "targets": ["main", "worker"]   // Optional: build targets
+  "command": "npm run build", // Required: build command
+  "outputDir": "dist", // Optional: output directory
+  "clean": true, // Optional: clean before build
+  "targets": ["main", "worker"] // Optional: build targets
 }
 ```
 
@@ -82,10 +83,10 @@ Validates security scanning:
 
 ```json
 {
-  "scanner": "npm-audit",         // Required: npm-audit, snyk, trivy, or codeql
-  "severity": "high",             // Optional: critical, high, medium, or low
-  "failOn": "critical",           // Optional: severity to fail on (default: high)
-  "outputFormat": "sarif"         // Optional: sarif, json, or text (default: sarif)
+  "scanner": "npm-audit", // Required: npm-audit, snyk, trivy, or codeql
+  "severity": "high", // Optional: critical, high, medium, or low
+  "failOn": "critical", // Optional: severity to fail on (default: high)
+  "outputFormat": "sarif" // Optional: sarif, json, or text (default: sarif)
 }
 ```
 
@@ -95,11 +96,11 @@ Validates coverage collection:
 
 ```json
 {
-  "tool": "vitest",               // Required: istanbul, nyc, jest, vitest, or pytest-cov
-  "threshold": 80,                // Required: coverage percentage (0-100)
-  "files": ["src/**/*.ts"],       // Optional: files to include
-  "exclude": ["**/*.test.ts"],    // Optional: files to exclude
-  "reportFormat": "lcov"          // Optional: lcov, html, text, or cobertura (default: lcov)
+  "tool": "vitest", // Required: istanbul, nyc, jest, vitest, or pytest-cov
+  "threshold": 80, // Required: coverage percentage (0-100)
+  "files": ["src/**/*.ts"], // Optional: files to include
+  "exclude": ["**/*.test.ts"], // Optional: files to exclude
+  "reportFormat": "lcov" // Optional: lcov, html, text, or cobertura (default: lcov)
 }
 ```
 

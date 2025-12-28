@@ -5,6 +5,7 @@ This document describes the governance metrics export functionality in lexrunner
 ## Overview
 
 The governance model requires observability to be useful. Operators need dashboards to understand:
+
 - Turn Cost trends
 - Tier distribution
 - Failure rates
@@ -17,6 +18,7 @@ The governance model requires observability to be useful. Operators need dashboa
 Total Turn Cost accumulated across merge-weave operations.
 
 **Components tracked:**
+
 - Latency (API response time, gate execution, merge time)
 - Context Reset tokens
 - Renegotiation (conflict resolution retries, clarification turns)
@@ -24,6 +26,7 @@ Total Turn Cost accumulated across merge-weave operations.
 - Attention Switch (human interventions)
 
 **Prometheus example:**
+
 ```
 # HELP lex_turn_cost_total Total Turn Cost accumulated across merge-weave operations
 # TYPE lex_turn_cost_total counter
@@ -37,6 +40,7 @@ Distribution of tasks by capability tier (senior, mid, junior).
 **Labels:** `tier` (senior|mid|junior)
 
 **Prometheus example:**
+
 ```
 # HELP lex_tier_distribution Distribution of tasks by capability tier
 # TYPE lex_tier_distribution gauge
@@ -62,6 +66,7 @@ Rate of tier escalations (0-1). Lower is better.
 Rate of failed gate operations (0-1). Lower is better.
 
 **Prometheus example:**
+
 ```
 # HELP lex_failure_rate Rate of failed gate operations (0-1)
 # TYPE lex_failure_rate gauge
@@ -75,6 +80,7 @@ Remaining budget for tokens and prompts.
 **Labels:** `type` (tokens|prompts)
 
 **Prometheus example:**
+
 ```
 # HELP lex_budget_remaining Remaining budget (tokens or prompts)
 # TYPE lex_budget_remaining gauge
@@ -97,6 +103,7 @@ lex-pr metrics --filter budget
 ```
 
 **Example output:**
+
 ```json
 {
   "timestamp": "2025-01-15T10:30:00.000Z",
@@ -173,6 +180,7 @@ The MCP server exposes a `metrics` tool for AI agents:
 ```
 
 **Parameters:**
+
 - `filter` (optional): Filter metrics by name pattern
 - `format` (optional): Output format - "json" (default) or "prometheus"
 
@@ -183,10 +191,10 @@ import {
   createMetricsCollector,
   getGlobalMetricsCollector,
   resetGlobalMetricsCollector,
-} from 'lexrunner/metrics';
+} from "lexrunner/metrics";
 
 // Create a new collector
-const collector = createMetricsCollector('my-session-id');
+const collector = createMetricsCollector("my-session-id");
 
 // Or use the global singleton
 const global = getGlobalMetricsCollector();
@@ -204,7 +212,7 @@ const snapshot = collector.getSnapshot();
 const prometheus = collector.exportPrometheus();
 
 // Get filtered metrics
-const filtered = collector.getMetricsByName('turn_cost');
+const filtered = collector.getMetricsByName("turn_cost");
 
 // Get individual metric values
 const values = collector.getMetricValues();
@@ -353,6 +361,7 @@ lex-pr metrics --prometheus | curl --data-binary @- http://pushgateway:9091/metr
 ## Session Tracking
 
 Each metrics snapshot includes:
+
 - `timestamp`: ISO 8601 timestamp of the snapshot
 - `sessionId`: Unique identifier (ULID) for the session
 

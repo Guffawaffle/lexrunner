@@ -21,28 +21,28 @@ discovery:
   repos:
     - owner: Guffawaffle
       name: lex
-      priority: 1  # Merged first (foundation)
+      priority: 1 # Merged first (foundation)
     - owner: Guffawaffle
       name: lexsona
-      priority: 2  # Merged second (depends on lex)
+      priority: 2 # Merged second (depends on lex)
     - owner: Guffawaffle
       name: lexrunner
-      priority: 3  # Merged last (depends on both)
+      priority: 3 # Merged last (depends on both)
 
   # PR filtering
   filters:
-    include_drafts: false      # D1: Skip drafts by default
-    include_dependabot: true   # D1: Include dependency updates
-    include_copilot: true      # D1: Include Copilot agent PRs
+    include_drafts: false # D1: Skip drafts by default
+    include_dependabot: true # D1: Include dependency updates
+    include_copilot: true # D1: Include Copilot agent PRs
 
   # Draft handling
   draft_policy:
-    undraft_copilot_prs: true  # D1: Auto-undraft Copilot PRs (they're ready by definition)
-    undraft_with_prefix:       # D2: Undraft if title matches these prefixes
+    undraft_copilot_prs: true # D1: Auto-undraft Copilot PRs (they're ready by definition)
+    undraft_with_prefix: # D2: Undraft if title matches these prefixes
       - "feat:"
       - "fix:"
       - "chore:"
-    require_manual_for:        # D3: Always require human decision for these
+    require_manual_for: # D3: Always require human decision for these
       - "BREAKING:"
       - "security:"
       - "experimental:"
@@ -61,11 +61,11 @@ dependencies:
     cross_repo_chain: true
 
     # D2: Heuristic detection (file overlap, import analysis)
-    heuristic_detection: false  # Off for now - add later for determinism
+    heuristic_detection: false # Off for now - add later for determinism
 
   # Conflict handling
-  on_cycle: fail              # D1: Fail if dependency cycle detected
-  on_missing_dep: warn        # D2: Warn but continue if dep not found
+  on_cycle: fail # D1: Fail if dependency cycle detected
+  on_missing_dep: warn # D2: Warn but continue if dep not found
 
 # =============================================================================
 # QUALITY GATES
@@ -95,7 +95,7 @@ gates:
       - name: local-ci
         command: "npm run local-ci"
         determinism: D1
-        when: available  # Only if script exists
+        when: available # Only if script exists
 
   # Per-PR verification (before merge)
   per_pr:
@@ -106,7 +106,7 @@ gates:
     review_checklist:
       - no_console_log_in_src: true
       - conventional_commit_title: true
-      - test_count_matches: true  # If adding features, tests should exist
+      - test_count_matches: true # If adding features, tests should exist
 
     # D3: Quality assessment (model judgment)
     quality_assessment:
@@ -115,17 +115,17 @@ gates:
         - "Code follows existing patterns"
         - "No obvious bugs or security issues"
         - "Changes are minimal and focused"
-      action_on_concern: warn  # warn | block | auto-fix
+      action_on_concern: warn # warn | block | auto-fix
 
 # =============================================================================
 # MERGE EXECUTION
 # =============================================================================
 merge:
-  method: squash              # D1: Always squash-merge
+  method: squash # D1: Always squash-merge
 
   # Commit message format
   commit_title:
-    use_pr_title: true        # D1: Use PR title as commit title
+    use_pr_title: true # D1: Use PR title as commit title
     validate_conventional: true
 
   # Admin authority (delegated when local CI passes)
@@ -138,7 +138,7 @@ merge:
 
   # Umbrella branch pattern (when main is protected)
   umbrella:
-    enabled: false             # Enable when branch protection blocks direct merge
+    enabled: false # Enable when branch protection blocks direct merge
     branch_pattern: "integration/umbrella-{date}"
     auto_create: true
 
@@ -169,9 +169,9 @@ post_merge:
 
     # D3: Complex fixes require human review
     escalate_on:
-      - semantic_change      # Logic change, not just assertion update
-      - multiple_files       # Affecting > 3 files
-      - security_related     # Anything touching auth/crypto
+      - semantic_change # Logic change, not just assertion update
+      - multiple_files # Affecting > 3 files
+      - security_related # Anything touching auth/crypto
 
   # D1: Commit fixes with admin authority
   commit_fixes:
@@ -247,4 +247,4 @@ model_handoff:
       - determinism_level
       - model_used
       - outcome
-      - could_be_automated  # Human feedback for improvement
+      - could_be_automated # Human feedback for improvement

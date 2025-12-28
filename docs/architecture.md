@@ -5,17 +5,20 @@
 lexrunner is built on three core principles:
 
 ### 1. **Determinism First**
+
 - Same inputs → identical outputs (byte-for-byte)
 - No timestamps, random ordering, or non-deterministic behavior
 - Canonical JSON with stable key ordering
 - Cross-platform portability (Windows, macOS, Linux)
 
 ### 2. **Two-Track Separation**
+
 - **Core Runner** (`src/**`): CLI logic, never stores user/work artifacts
 - **Workspace Profile** (`.smartergpt/**`): Portable configuration and examples
 - Clear boundary prevents mixing code and data
 
 ### 3. **Local-First Operations**
+
 - All operations run locally with no server dependencies
 - Privacy-first: no secrets in artifacts
 - GitHub API calls only for discovery, not execution
@@ -64,6 +67,7 @@ lexrunner is built on three core principles:
 The primary command-line interface built with Commander.js.
 
 **Key Commands:**
+
 - `init` - Initialize workspace
 - `discover` - Find PRs from GitHub
 - `plan` - Generate merge plan
@@ -76,11 +80,13 @@ The primary command-line interface built with Commander.js.
 Creates merge plans from configuration and GitHub data.
 
 **Inputs:**
+
 - `scope.yml` - PR selection criteria
 - `deps.yml` - Dependency definitions
 - GitHub API - Live PR data
 
 **Output:**
+
 - `plan.json` - Structured merge plan with dependency graph
 
 ### Dependency Resolver (`src/mergeOrder.ts`)
@@ -88,6 +94,7 @@ Creates merge plans from configuration and GitHub data.
 Computes topologically sorted merge order using Kahn's algorithm.
 
 **Features:**
+
 - Cycle detection
 - Parallel execution opportunities
 - Deterministic ordering (alphabetical tiebreaker)
@@ -97,6 +104,7 @@ Computes topologically sorted merge order using Kahn's algorithm.
 Runs quality gates with dependency-aware execution.
 
 **Capabilities:**
+
 - Parallel execution where possible
 - Exit code/duration/stdout/stderr capture
 - JSON output with stable schema
@@ -107,6 +115,7 @@ Runs quality gates with dependency-aware execution.
 Read-only GitHub API client for PR discovery.
 
 **Operations:**
+
 - List open pull requests
 - Fetch PR metadata (title, author, labels)
 - Branch information
@@ -117,16 +126,19 @@ Read-only GitHub API client for PR discovery.
 Optional Model Context Protocol adapter.
 
 **Exposed Tools:**
+
 - `plan.create` - Generate merge plan
 - `gates.run` - Execute quality gates
 - `merge.apply` - Perform merge operations
 
 **Resources:**
+
 - `.smartergpt/runner/*` - Read-only access to artifacts
 
 ## Data Flow
 
 ### 1. Discovery Phase
+
 ```
 GitHub API → discover → PRs list
                 ↓
@@ -136,6 +148,7 @@ GitHub API → discover → PRs list
 ```
 
 ### 2. Planning Phase
+
 ```
 Filtered PRs + deps.yml → Plan Generator
                 ↓
@@ -147,6 +160,7 @@ Filtered PRs + deps.yml → Plan Generator
 ```
 
 ### 3. Execution Phase
+
 ```
 plan.json + gates.yml → Gate Executor
                 ↓
@@ -158,6 +172,7 @@ plan.json + gates.yml → Gate Executor
 ```
 
 ### 4. Merge Phase
+
 ```
 plan.json + gate results → Merge Coordinator
                 ↓
@@ -181,13 +196,13 @@ See [profile-resolution.md](./profile-resolution.md) for details.
 
 ### Configuration Files
 
-| File | Purpose | Priority |
-|------|---------|----------|
-| `stack.yml` | Explicit plan with items/deps | Highest |
-| `scope.yml` | PR selection criteria | Fallback |
-| `deps.yml` | Dependency definitions | Supporting |
-| `gates.yml` | Quality gate configuration | Supporting |
-| `profile.yml` | Profile metadata | Metadata |
+| File          | Purpose                       | Priority   |
+| ------------- | ----------------------------- | ---------- |
+| `stack.yml`   | Explicit plan with items/deps | Highest    |
+| `scope.yml`   | PR selection criteria         | Fallback   |
+| `deps.yml`    | Dependency definitions        | Supporting |
+| `gates.yml`   | Quality gate configuration    | Supporting |
+| `profile.yml` | Profile metadata              | Metadata   |
 
 ## Error Handling
 
@@ -262,6 +277,7 @@ gates:
 ### Custom Strategies
 
 Future support for custom merge strategies:
+
 - `rebase-weave` - Rebase with conflict resolution
 - `merge-weave` - Merge with weave contract
 - `squash-weave` - Squash with weave rules

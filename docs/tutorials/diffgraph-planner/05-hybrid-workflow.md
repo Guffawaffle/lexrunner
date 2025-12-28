@@ -39,6 +39,7 @@ lex-pr discover --labels "epic:feature-x"
 ```
 
 **Example output:**
+
 ```
 🔍 Discovering open PRs...
 Found 15 PRs:
@@ -77,12 +78,14 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 ```
 
 **Example output (suggestions.md):**
+
 ```markdown
 # Dependency Suggestions (8 found)
 
 ## High Confidence (≥0.7)
 
 ### PR-102 → PR-100 (Confidence: 0.92)
+
 - **Heuristic:** shared-files
 - **Reason:** Both modify src/validation.ts
 - **Shared files:** src/validation.ts, src/schema.ts
@@ -90,6 +93,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #100` to PR-102
 
 ### PR-103 → PR-102 (Confidence: 0.88)
+
 - **Heuristic:** shared-files + directory-proximity
 - **Reason:** Both modify src/errors/ directory
 - **Shared files:** src/errors/handler.ts, src/errors/types.ts
@@ -97,6 +101,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #102` to PR-103
 
 ### PR-104 → PR-100 (Confidence: 0.85)
+
 - **Heuristic:** test-overlap
 - **Reason:** Tests for core module
 - **Shared files:** tests/core.spec.ts, src/core.ts
@@ -104,6 +109,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #100` to PR-104
 
 ### PR-106 → PR-101 (Confidence: 0.82)
+
 - **Heuristic:** shared-files
 - **Reason:** Both modify src/auth/ directory
 - **Shared files:** src/auth/session.ts
@@ -111,6 +117,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #101` to PR-106
 
 ### PR-111 → PR-101 (Confidence: 0.78)
+
 - **Heuristic:** shared-files
 - **Reason:** Admin UI uses auth service
 - **Shared files:** src/auth/client.ts
@@ -118,6 +125,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #101` to PR-111
 
 ### PR-112 → PR-105 (Confidence: 0.75)
+
 - **Heuristic:** shared-files
 - **Reason:** Reporting UI uses user service
 - **Shared files:** src/users/api.ts
@@ -125,6 +133,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #105` to PR-112
 
 ### PR-113 → PR-110 (Confidence: 0.73)
+
 - **Heuristic:** test-overlap
 - **Reason:** Integration tests for dashboard
 - **Shared files:** tests/integration/dashboard.spec.ts
@@ -132,6 +141,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 - **Recommendation:** ✅ Add `Depends-on: #110` to PR-113
 
 ### PR-114 → PR-100 (Confidence: 0.71)
+
 - **Heuristic:** test-overlap
 - **Reason:** Performance tests for core API
 - **Shared files:** tests/perf/api.bench.ts
@@ -140,6 +150,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 ```
 
 **Analysis:**
+
 - **8 high-confidence suggestions** (≥0.7)
 - All have clear **file overlap** evidence
 - **Recommendations:** Add explicit dependencies for all 8
@@ -169,17 +180,21 @@ For each suggestion, ask:
 ### Example Review: PR-102 → PR-100
 
 **Suggestion:**
+
 ```markdown
 ### PR-102 → PR-100 (Confidence: 0.92)
+
 - Shared files: src/validation.ts, src/schema.ts
 ```
 
 **Check PR-102's changes:**
+
 ```bash
 gh pr diff 102 | grep -A5 "validation.ts"
 ```
 
 **Output:**
+
 ```diff
 --- a/src/validation.ts
 +++ b/src/validation.ts
@@ -206,31 +221,37 @@ Update PR descriptions based on approved suggestions:
 ### PR-102 (Validation Utilities)
 
 **Before:**
+
 ```markdown
 # Validation Utilities
 
 Add validation helpers.
 
 ## Changes
+
 - Add validateInput()
 - Add validateOutput()
 ```
 
 **After:**
+
 ```markdown
 # Validation Utilities
 
 Add validation helpers using schema from PR-100.
 
 ## Dependencies
+
 Depends-on: #100
 
 ## Changes
+
 - Add validateInput()
 - Add validateOutput()
 ```
 
 **Repeat for all approved suggestions:**
+
 - PR-102: Add `Depends-on: #100`
 - PR-103: Add `Depends-on: #102`
 - PR-104: Add `Depends-on: #100`
@@ -251,6 +272,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 15 open PRs
@@ -275,6 +297,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Observations:**
+
 - **13 explicit dependencies** (5 original + 8 from reviewed suggestions)
 - **2 implicit dependencies** (low confidence, <0.7)
 - **5 layers** (reduced from 15, thanks to discovered dependencies)
@@ -290,6 +313,7 @@ lex-pr plan --suggest-deps --threshold=0.3 --json | jq '.suggestions[] | select(
 ```
 
 **Example output:**
+
 ```json
 [
   {
@@ -312,10 +336,12 @@ lex-pr plan --suggest-deps --threshold=0.3 --json | jq '.suggestions[] | select(
 ```
 
 **Analysis:**
+
 - PR-107 → PR-105: Medium confidence (0.52), directory proximity
 - PR-108 → PR-100: Low confidence (0.48), shared utility file
 
 **Decision:**
+
 - **PR-107:** Review manually - might be valid
 - **PR-108:** Likely false positive (common utility file)
 
@@ -330,6 +356,7 @@ lex-pr execute --plan plan.json --max-workers 4
 ```
 
 **Expected output:**
+
 ```
 📦 Executing plan: 15 items, 5 layers
 ⚙️  Max workers: 4 (parallel execution enabled)
@@ -363,6 +390,7 @@ Layer 4 (2 items, parallel):
 ```
 
 **Performance:**
+
 - **Without dependencies:** Would take ~180s (15 PRs × 12s)
 - **With hybrid plan:** ~60s (5 layers × 12s)
 - **Speedup:** 3x faster
@@ -419,6 +447,7 @@ lex-pr plan --suggest-deps --threshold=0.7
 ```
 
 **Guideline:**
+
 - **≥0.8:** Very high confidence, almost always valid
 - **≥0.7:** High confidence, good for hybrid workflow
 - **≥0.5:** Medium confidence, requires manual review
@@ -434,6 +463,7 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 ```
 
 **Team discussion:**
+
 - Which suggestions are valid?
 - Which are false positives?
 - What threshold works best for our codebase?
@@ -444,13 +474,16 @@ lex-pr plan --suggest-deps --threshold=0.7 --format=markdown > suggestions.md
 
 ```markdown
 # ❌ Bad: Rely on file-based suggestions
+
 (No Depends-on in PR description)
 
 # ✅ Good: Make it explicit after review
-Depends-on: #100  # Added from file analysis suggestion
+
+Depends-on: #100 # Added from file analysis suggestion
 ```
 
 **Why:** Explicit dependencies are:
+
 - **Deterministic** - won't change if files change
 - **Documented** - clear intent in PR description
 - **Reviewable** - team can validate

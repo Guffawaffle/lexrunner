@@ -10,10 +10,10 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import {
-	parseTestFixPatterns,
-	safeParseTestFixPatterns,
-	validatePatternIds,
-	type TestFixPatterns,
+  parseTestFixPatterns,
+  safeParseTestFixPatterns,
+  validatePatternIds,
+  type TestFixPatterns,
 } from "./schema.js";
 
 /**
@@ -30,33 +30,33 @@ export const DEFAULT_PATTERNS_PATH = ".smartergpt/test-fix-patterns.yml";
  * @throws Error if file doesn't exist or validation fails
  */
 export function loadTestFixPatterns(
-	workspaceRoot: string,
-	patternsPath: string = DEFAULT_PATTERNS_PATH
+  workspaceRoot: string,
+  patternsPath: string = DEFAULT_PATTERNS_PATH
 ): TestFixPatterns {
-	const fullPath = join(workspaceRoot, patternsPath);
+  const fullPath = join(workspaceRoot, patternsPath);
 
-	let content: string;
-	try {
-		content = readFileSync(fullPath, "utf-8");
-	} catch (err) {
-		throw new Error(
-			`Failed to read test fix patterns from ${fullPath}: ${err instanceof Error ? err.message : String(err)}`
-		);
-	}
+  let content: string;
+  try {
+    content = readFileSync(fullPath, "utf-8");
+  } catch (err) {
+    throw new Error(
+      `Failed to read test fix patterns from ${fullPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
-	let data: unknown;
-	try {
-		data = YAML.parse(content);
-	} catch (err) {
-		throw new Error(
-			`Failed to parse YAML in ${fullPath}: ${err instanceof Error ? err.message : String(err)}`
-		);
-	}
+  let data: unknown;
+  try {
+    data = YAML.parse(content);
+  } catch (err) {
+    throw new Error(
+      `Failed to parse YAML in ${fullPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
-	const patterns = parseTestFixPatterns(data);
-	validatePatternIds(patterns);
+  const patterns = parseTestFixPatterns(data);
+  validatePatternIds(patterns);
 
-	return patterns;
+  return patterns;
 }
 
 /**
@@ -67,50 +67,50 @@ export function loadTestFixPatterns(
  * @returns Success result with patterns or error result with message
  */
 export function safeLoadTestFixPatterns(
-	workspaceRoot: string,
-	patternsPath: string = DEFAULT_PATTERNS_PATH
+  workspaceRoot: string,
+  patternsPath: string = DEFAULT_PATTERNS_PATH
 ): { success: true; patterns: TestFixPatterns } | { success: false; error: string } {
-	const fullPath = join(workspaceRoot, patternsPath);
+  const fullPath = join(workspaceRoot, patternsPath);
 
-	let content: string;
-	try {
-		content = readFileSync(fullPath, "utf-8");
-	} catch (err) {
-		return {
-			success: false,
-			error: `Failed to read ${fullPath}: ${err instanceof Error ? err.message : String(err)}`,
-		};
-	}
+  let content: string;
+  try {
+    content = readFileSync(fullPath, "utf-8");
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to read ${fullPath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
-	let data: unknown;
-	try {
-		data = YAML.parse(content);
-	} catch (err) {
-		return {
-			success: false,
-			error: `Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`,
-		};
-	}
+  let data: unknown;
+  try {
+    data = YAML.parse(content);
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
-	const result = safeParseTestFixPatterns(data);
-	if (!result.success) {
-		return {
-			success: false,
-			error: `Schema validation failed: ${JSON.stringify(result.error.issues)}`,
-		};
-	}
+  const result = safeParseTestFixPatterns(data);
+  if (!result.success) {
+    return {
+      success: false,
+      error: `Schema validation failed: ${JSON.stringify(result.error.issues)}`,
+    };
+  }
 
-	try {
-		validatePatternIds(result.data);
-	} catch (err) {
-		return {
-			success: false,
-			error: err instanceof Error ? err.message : String(err),
-		};
-	}
+  try {
+    validatePatternIds(result.data);
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 
-	return {
-		success: true,
-		patterns: result.data,
-	};
+  return {
+    success: true,
+    patterns: result.data,
+  };
 }

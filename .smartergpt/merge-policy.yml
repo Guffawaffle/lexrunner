@@ -1,11 +1,26 @@
 # Deterministic file-level merge preferences (first match wins).
 rules:
   # Package locks / compiled manifests: prefer *theirs* (incoming PR).
-  - globs: ["**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/poetry.lock", "**/Cargo.lock", "**/Pipfile.lock"]
+  - globs:
+      [
+        "**/package-lock.json",
+        "**/yarn.lock",
+        "**/pnpm-lock.yaml",
+        "**/poetry.lock",
+        "**/Cargo.lock",
+        "**/Pipfile.lock",
+      ]
     resolution: theirs
 
   # Dependency manifests: prefer *theirs*, then format.
-  - globs: ["**/package.json", "**/pyproject.toml", "**/requirements*.txt", "**/Pipfile", "**/Cargo.toml"]
+  - globs:
+      [
+        "**/package.json",
+        "**/pyproject.toml",
+        "**/requirements*.txt",
+        "**/Pipfile",
+        "**/Cargo.toml",
+      ]
     resolution: theirs
     format: true
 

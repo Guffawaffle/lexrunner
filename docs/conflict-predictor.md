@@ -9,7 +9,7 @@ The Conflict Predictor is a core orchestration tool that predicts merge conflict
 The conflict predictor combines three techniques:
 
 1. **Conflict Graph Construction**: Models PRs and file overlaps as an undirected graph
-2. **Maximal Independent Set (MIS)**: Finds maximal sets of PRs with no conflicts  
+2. **Maximal Independent Set (MIS)**: Finds maximal sets of PRs with no conflicts
 3. **git merge-tree Simulation**: Validates predictions with actual merge simulation
 
 ## Mathematical Foundation
@@ -17,14 +17,17 @@ The conflict predictor combines three techniques:
 ### Conflict Graph
 
 **Definition**: An undirected graph `G = (V, E)` where:
+
 - **Vertices (V)**: Pull requests (PRs)
 - **Edges (E)**: Pairs of PRs that modify the same files
 
 **Properties**:
+
 - Edge weight: Number of shared files
 - Deterministic construction: Nodes sorted by PR number, edges by (from, to) pairs
 
 **Example**:
+
 ```
 PRs:
   #166: modifies [src/cli.ts, src/util.ts]
@@ -33,7 +36,7 @@ PRs:
 
 Graph:
   Nodes: [166, 167, 168]
-  Edges: 
+  Edges:
     166 ↔ 167 (shared: src/cli.ts)
     167 ↔ 168 (shared: src/gates.ts)
 ```
@@ -41,10 +44,12 @@ Graph:
 ### Maximal Independent Set (MIS)
 
 **Definition**: A set `S ⊆ V` such that:
+
 1. **Independent**: No two vertices in `S` are adjacent (no edge between them)
 2. **Maximal**: Cannot add any more vertices without violating independence
 
 **Greedy Algorithm** (deterministic):
+
 ```
 1. Sort vertices by degree (ascending), then by PR number
 2. MIS = ∅
@@ -57,8 +62,9 @@ Graph:
 **Time Complexity**: O(|V| + |E|)
 
 **Example** (from above graph):
+
 ```
-Degrees: 
+Degrees:
   166: degree 1 (connected to 167)
   167: degree 2 (connected to 166, 168)
   168: degree 1 (connected to 167)
@@ -82,7 +88,7 @@ import { buildConflictGraph } from "./orchestration/conflictGraph.js";
 
 const prs = [
   { number: 166, files: ["src/cli.ts", "src/util.ts"] },
-  { number: 167, files: ["src/cli.ts", "src/gates.ts"] }
+  { number: 167, files: ["src/cli.ts", "src/gates.ts"] },
 ];
 
 const graph = buildConflictGraph(prs);
@@ -131,10 +137,10 @@ import { predictConflicts } from "./orchestration/index.js";
 const report = await predictConflicts({
   prs: [
     { number: 166, files: ["src/cli.ts"], head: "abc123" },
-    { number: 167, files: ["src/cli.ts"], head: "def456" }
+    { number: 167, files: ["src/cli.ts"], head: "def456" },
   ],
   baseBranch: "main",
-  skipMergeTreeSimulation: false
+  skipMergeTreeSimulation: false,
 });
 
 console.log(report.recommendations.safeBatch);
@@ -159,12 +165,14 @@ lex-pr orchestrate:predict-conflicts --prs 166,167,168 --skip-merge-tree
 ### Output Interpretation
 
 **Human-Readable Output**:
+
 - 📊 **Conflict Graph**: Shows PR pairs with shared files
 - 🔀 **MIS Batches**: Safe parallel groups
 - 🧪 **Merge Simulation**: git merge-tree results (if not skipped)
 - 💡 **Recommendations**: Actionable merge strategy
 
-**JSON Output**: 
+**JSON Output**:
+
 - Structured data for automation
 - Deterministic key ordering (canonical JSON)
 - Includes timestamps and metadata
@@ -176,6 +184,7 @@ lex-pr orchestrate:predict-conflicts --prs 166,167,168 --skip-merge-tree
 **Problem**: Given 10 PRs, which can merge in parallel?
 
 **Solution**:
+
 ```bash
 lex-pr orchestrate:predict-conflicts --prs 100,101,102,103,104,105,106,107,108,109 --json | \
   jq '.recommendations.safeBatch[]'
@@ -188,11 +197,13 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102,103,104,105,106,107,108,1
 **Problem**: Minimize merge pyramid depth by maximizing parallelism.
 
 **Solution**:
+
 1. Run conflict predictor on all PRs
 2. Use MIS batches as Kahn layers
 3. Execute batches in parallel, layers sequentially
 
 **Benefits**:
+
 - Reduces total merge time
 - Minimizes conflict resolution overhead
 - Predictable merge order
@@ -202,12 +213,13 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102,103,104,105,106,107,108,1
 **Problem**: Prevent merge conflicts in automated pipelines.
 
 **Solution**:
+
 ```yaml
 # GitHub Actions example
 - name: Predict Conflicts
   run: |
     lex-pr orchestrate:predict-conflicts --prs ${{ env.PR_NUMBERS }} --json > conflicts.json
-    
+
 - name: Check Safe Merge
   run: |
     SAFE_BATCH=$(jq -r '.recommendations.safeBatch[]' conflicts.json)
@@ -222,6 +234,7 @@ lex-pr orchestrate:predict-conflicts --prs 100,101,102,103,104,105,106,107,108,1
 **Problem**: Detect conflicts before merge attempts.
 
 **Solution**:
+
 ```bash
 # Pre-merge check
 lex-pr orchestrate:predict-conflicts --prs $PR_NUMBER,$TARGET_PR
@@ -239,32 +252,36 @@ lex-pr orchestrate:predict-conflicts --prs $PR_NUMBER,$TARGET_PR
 **Theorem**: The greedy MIS algorithm returns a maximal independent set.
 
 **Proof sketch**:
+
 1. **Independence**: By construction, no two vertices in MIS are adjacent
 2. **Maximality**: Cannot add any vertex without creating an edge to a vertex in MIS
 
-**Note**: MIS is not necessarily *maximum* (largest possible), but is *maximal* (cannot be extended).
+**Note**: MIS is not necessarily _maximum_ (largest possible), but is _maximal_ (cannot be extended).
 
 ### Determinism
 
 **Guaranteed properties**:
+
 - Same input → same output (deterministic sorting)
 - Platform-independent (no time/random-based ordering)
 - Version-stable (algorithm documented and tested)
 
 **Implementation**:
+
 ```typescript
 // Deterministic sorting
 const sorted = [...graph.nodes].sort((a, b) => {
   const degA = neighbors.get(a)!.size;
   const degB = neighbors.get(b)!.size;
-  if (degA !== degB) return degA - degB;  // Degree first
-  return parseInt(a) - parseInt(b);       // PR number second
+  if (degA !== degB) return degA - degB; // Degree first
+  return parseInt(a) - parseInt(b); // PR number second
 });
 ```
 
 ### Performance
 
 **Time Complexity**:
+
 - Conflict graph: O(|V|² × F) where F = avg files per PR
 - MIS computation: O(|V| + |E|)
 - Merge-tree: O(|E| × M) where M = git merge-tree cost
@@ -272,6 +289,7 @@ const sorted = [...graph.nodes].sort((a, b) => {
 **Space Complexity**: O(|V| + |E|)
 
 **Scalability**:
+
 - Tested with 100+ PRs
 - Graph operations dominate (merge-tree optional)
 - Parallelizable merge simulations
@@ -289,6 +307,7 @@ npm test -- --coverage
 ```
 
 **Test categories**:
+
 - Conflict graph construction (8 tests)
 - MIS computation (11 tests)
 - Merge-tree parsing (10 tests)
@@ -297,6 +316,7 @@ npm test -- --coverage
 ### Test Scenarios
 
 **Graph Shapes**:
+
 - Empty graph (no conflicts)
 - Complete graph (all conflict)
 - Star graph (central node conflicts with all)
@@ -304,6 +324,7 @@ npm test -- --coverage
 - Arbitrary graphs
 
 **Edge Cases**:
+
 - Single PR
 - No PRs
 - Identical file lists

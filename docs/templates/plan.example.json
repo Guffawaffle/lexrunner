@@ -3,14 +3,14 @@
   "schemaVersion": "1.0.0",
   "title": "Example Merge-Weave Plan",
   "description": "Template plan for merging multiple PRs with dependencies",
-  
+
   "policy": {
     "requiredGates": ["lint", "typecheck"],
     "optionalGates": ["test"],
     "mergeRule": "strict-required",
     "maxWorkers": 2
   },
-  
+
   "nodes": [
     {
       "id": "pr-123",
@@ -63,10 +63,10 @@
       }
     }
   ],
-  
+
   "integrationBranch": "integration/wave-1",
   "targetBranch": "main",
-  
+
   "metadata": {
     "createdAt": "2024-01-15T10:00:00Z",
     "createdBy": "merge-weave-discover",

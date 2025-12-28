@@ -5,6 +5,7 @@ This guide explains the front-end capture pipeline for lexrunner, which enables 
 ## Overview
 
 The pipeline consists of two commands:
+
 1. **`lex-pr idea`** - Capture ideas, generate Feature Spec v0, create Idea Issues
 2. **`lex-pr create-project`** - Load Feature Spec v0, generate Execution Plan v1, create Epic + Sub-Issues
 
@@ -23,19 +24,23 @@ The pipeline consists of two commands:
 **Purpose:** Capture feature ideas and create Idea Issues
 
 **Inputs:**
+
 - Title, description, acceptance criteria (interactive or flags)
 - Optional: technical context, constraints
 
 **Outputs:**
+
 - Feature Spec v0 JSON (validated)
 - GitHub Idea Issue with fingerprint
 
 **Fingerprinting:**
+
 - Deterministic hash of title + description + acceptance criteria
 - Embedded in Issue body as HTML comment: `<!-- lex-pr-idea-fingerprint: abc123... -->`
 - Used for idempotent updates (only update if fingerprint changes)
 
 **Example:**
+
 ```bash
 lex-pr idea --title "Add webhooks" --description "Allow users to configure webhooks"
 ```
@@ -47,20 +52,24 @@ lex-pr idea --title "Add webhooks" --description "Allow users to configure webho
 **Purpose:** Generate project structure from Feature Spec v0
 
 **Inputs:**
+
 - Feature Spec v0 JSON (from `lex-pr idea`)
 
 **Outputs:**
+
 - Execution Plan v1 JSON (validated)
 - GitHub Epic Issue
 - GitHub Sub-Issues (feature, testing, docs)
 
 **Decomposition Strategy:**
+
 - Epic: Top-level feature description
 - Sub-Issue 1: Core implementation (type: `feature`)
 - Sub-Issue 2: Tests (type: `testing`, depends on feature)
 - Sub-Issue 3: Docs (type: `docs`, depends on feature)
 
 **Example:**
+
 ```bash
 lex-pr create-project --spec .smartergpt.local/deliverables/_session/idea-2025-11-09.json
 ```
@@ -130,10 +139,12 @@ lex-pr idea --title "Add webhooks (revised)" --description "Configure webhooks w
 ### PR Prevention
 
 **Guards:**
+
 - `assertNoCreatePR()` - Detects PR creation in call stack
 - `validateNoCreatePRFlags()` - Rejects PR-related flags
 
 **Blocked operations:**
+
 - `octokit.pulls.create()`
 - `octokit.pulls.merge()`
 - Flags: `--create-pr`, `--pr`, `--pull-request`, `--merge`
@@ -141,27 +152,32 @@ lex-pr idea --title "Add webhooks (revised)" --description "Configure webhooks w
 ### Artifact Path Restrictions
 
 **Allowed paths:**
+
 - `.smartergpt.local/deliverables/_session/`
 - `.smartergpt.local/runner/logs/`
 
 **Blocked paths:**
+
 - `/PR-<number>/`
 - `/artifacts/PR-*/`
 - `/pr-<number>/`
 
 **Validation:**
+
 ```typescript
-isSafeArtifactPath('/path/to/output.json') // throws if unsafe
+isSafeArtifactPath("/path/to/output.json"); // throws if unsafe
 ```
 
 ### Schema Validation
 
 **Pre-flight checks:**
+
 - Feature Spec v0 validated before Issue creation
 - Execution Plan v1 validated before Issue creation
 - Detailed error messages with line numbers
 
 **Example error:**
+
 ```
 Schema validation failed (Feature Spec v0):
   1. title: Required
@@ -177,6 +193,7 @@ Schema validation failed (Feature Spec v0):
 **Cause:** `GITHUB_TOKEN` environment variable not set
 
 **Solution:**
+
 ```bash
 export GITHUB_TOKEN=ghp_...
 lex-pr idea --title "Test"
@@ -187,6 +204,7 @@ lex-pr idea --title "Test"
 **Cause:** Output path targets PR directory
 
 **Solution:**
+
 ```bash
 # ❌ WRONG
 lex-pr idea --output artifacts/PR-123/spec.json
@@ -200,6 +218,7 @@ lex-pr idea --output .smartergpt.local/deliverables/_session/spec.json
 **Cause:** Input data does not conform to schema
 
 **Solution:**
+
 1. Check schema version in JSON file
 2. Review error messages for missing/invalid fields
 3. Validate JSON syntax (use `jq` or JSON linter)
@@ -209,14 +228,17 @@ lex-pr idea --output .smartergpt.local/deliverables/_session/spec.json
 ## Cross-Platform Notes
 
 **Windows:**
+
 - Paths use backslashes (`\`) but are normalized to forward slashes (`/`) internally
 - WSL paths (`/mnt/c/...`) automatically converted
 
 **Linux/macOS:**
+
 - Native forward slashes (`/`)
 - Tilde expansion (`~`) supported
 
 **Git context:**
+
 - Repository auto-detected from `git remote get-url origin`
 - Branch name extracted from `git rev-parse --abbrev-ref HEAD`
 
@@ -239,32 +261,32 @@ See: [Guffawaffle/lex#191](https://github.com/Guffawaffle/lex/issues/191) for sc
 
 ### `lex-pr idea`
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--title <string>` | String | Idea title (interactive if omitted) |
-| `--description <string>` | String | Brief description (interactive if omitted) |
-| `--interactive` | Boolean | Force interactive mode |
-| `--dry-run` | Boolean | Generate spec without creating Issue |
-| `--output <path>` | String | Output path for Feature Spec v0 |
-| `--repo <owner/repo>` | String | Target repository (default: auto-detect) |
-| `--label <label>` | String | Additional labels (repeatable) |
-| `--update-issue <num>` | Number | Update existing Issue (idempotent) |
+| Option                   | Type    | Description                                |
+| ------------------------ | ------- | ------------------------------------------ |
+| `--title <string>`       | String  | Idea title (interactive if omitted)        |
+| `--description <string>` | String  | Brief description (interactive if omitted) |
+| `--interactive`          | Boolean | Force interactive mode                     |
+| `--dry-run`              | Boolean | Generate spec without creating Issue       |
+| `--output <path>`        | String  | Output path for Feature Spec v0            |
+| `--repo <owner/repo>`    | String  | Target repository (default: auto-detect)   |
+| `--label <label>`        | String  | Additional labels (repeatable)             |
+| `--update-issue <num>`   | Number  | Update existing Issue (idempotent)         |
 
 **Default output path:**
 `.smartergpt.local/deliverables/_session/idea-{timestamp}.json`
 
 ### `lex-pr create-project`
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--spec <path>` | String | Feature Spec v0 file (required) |
-| `--dry-run` | Boolean | Generate plan without creating Issues |
-| `--output <path>` | String | Output path for Execution Plan v1 |
-| `--repo <owner/repo>` | String | Target repository (default: from spec) |
-| `--project <name/num>` | String | Link Issues to GitHub Project |
-| `--epic-labels <labels>` | String | Additional Epic labels (comma-separated) |
-| `--issue-labels <labels>` | String | Additional sub-issue labels (comma-separated) |
-| `--no-link` | Boolean | Skip sub-issue linking |
+| Option                    | Type    | Description                                   |
+| ------------------------- | ------- | --------------------------------------------- |
+| `--spec <path>`           | String  | Feature Spec v0 file (required)               |
+| `--dry-run`               | Boolean | Generate plan without creating Issues         |
+| `--output <path>`         | String  | Output path for Execution Plan v1             |
+| `--repo <owner/repo>`     | String  | Target repository (default: from spec)        |
+| `--project <name/num>`    | String  | Link Issues to GitHub Project                 |
+| `--epic-labels <labels>`  | String  | Additional Epic labels (comma-separated)      |
+| `--issue-labels <labels>` | String  | Additional sub-issue labels (comma-separated) |
+| `--no-link`               | Boolean | Skip sub-issue linking                        |
 
 **Default output path:**
 `.smartergpt.local/deliverables/_session/plan-{timestamp}.json`

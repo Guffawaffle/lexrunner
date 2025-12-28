@@ -3,6 +3,7 @@
 This module provides tools for planning and orchestrating batch operations on issues and PRs using graph algorithms.
 
 It includes:
+
 - **Batch Planner**: Kahn's algorithm for dependency-ordered batches
 - **Conflict Predictor**: MIS-based conflict detection and merge simulation
 
@@ -13,22 +14,26 @@ It includes:
 Implements Kahn's algorithm for deterministic topological sorting of dependency graphs.
 
 **Key Features:**
+
 - Stable priority queue with deterministic ordering
 - Cycle detection with helpful error messages
 - SHA256 hash for plan reproducibility
 - Layer-based batching (natural parallelization boundaries)
 
 **Types:**
+
 - `Node` - Issue or PR with dependencies and metadata
 - `Batch` - A layer of nodes that can be processed in parallel
 - `BatchPlan` - Complete plan with algorithm metadata and hash
 
 **Main Function:**
+
 ```typescript
-export function computeBatches(nodes: Node[]): BatchPlan
+export function computeBatches(nodes: Node[]): BatchPlan;
 ```
 
 **Error Handling:**
+
 - `CycleError` - Thrown when dependency graph contains cycles
 - `UnknownDependencyError` - Thrown when dependency references don't exist
 
@@ -37,13 +42,14 @@ export function computeBatches(nodes: Node[]): BatchPlan
 Generic MinHeap implementation with custom comparator for stable priority ordering.
 
 **API:**
+
 ```typescript
 const pq = new MinHeap<T>((a, b) => compareFunction);
 pq.push(value);
-pq.pop();      // Returns minimum element
-pq.peek();     // View minimum without removing
-pq.size();     // Number of elements
-pq.isEmpty();  // Check if empty
+pq.pop(); // Returns minimum element
+pq.peek(); // View minimum without removing
+pq.size(); // Number of elements
+pq.isEmpty(); // Check if empty
 ```
 
 ## Algorithm Details
@@ -73,8 +79,10 @@ const compareFn = (a: Node, b: Node): number => {
     return a.metadata.createdAt.localeCompare(b.metadata.createdAt);
   }
   // Tertiary: number (lower first)
-  return (a.metadata.prNumber || a.metadata.issueNumber || 0) -
-         (b.metadata.prNumber || b.metadata.issueNumber || 0);
+  return (
+    (a.metadata.prNumber || a.metadata.issueNumber || 0) -
+    (b.metadata.prNumber || b.metadata.issueNumber || 0)
+  );
 };
 ```
 
@@ -83,21 +91,21 @@ const compareFn = (a: Node, b: Node): number => {
 ### Basic Example
 
 ```typescript
-import { computeBatches, Node } from './orchestration/batchPlanner.js';
+import { computeBatches, Node } from "./orchestration/batchPlanner.js";
 
 const nodes: Node[] = [
   {
-    id: 'A',
-    type: 'issue',
+    id: "A",
+    type: "issue",
     dependencies: [],
-    metadata: { score: 1.0, createdAt: '2025-10-13T00:00:00Z', issueNumber: 1 }
+    metadata: { score: 1.0, createdAt: "2025-10-13T00:00:00Z", issueNumber: 1 },
   },
   {
-    id: 'B',
-    type: 'issue',
-    dependencies: ['A'],
-    metadata: { score: 0.5, createdAt: '2025-10-13T00:01:00Z', issueNumber: 2 }
-  }
+    id: "B",
+    type: "issue",
+    dependencies: ["A"],
+    metadata: { score: 0.5, createdAt: "2025-10-13T00:01:00Z", issueNumber: 2 },
+  },
 ];
 
 const plan = computeBatches(nodes);
@@ -156,55 +164,67 @@ The implementation follows the principles outlined in `ANALYSIS_deterministic_ma
 This module implements conflict graph construction, Maximal Independent Set (MIS) computation, and git merge-tree simulation for predicting merge conflicts.
 
 ### Conflict Graph (`conflictGraph.ts`)
+
 Builds conflict graphs from PR file lists.
 
 **Key Function**:
+
 ```typescript
 buildConflictGraph(prs: PRWithFiles[]): ConflictGraph
 ```
 
 **Algorithm**:
+
 1. Create nodes for each PR
 2. Add edges for PRs with shared files
 3. Sort for deterministic output
 
 ### `mis.ts`
+
 Computes Maximal Independent Set using greedy algorithm.
 
 **Key Functions**:
+
 ```typescript
 computeMIS(graph: ConflictGraph): string[]
 computeAllMISBatches(graph: ConflictGraph): MISBatch[]
 ```
 
 **Algorithm**:
+
 1. Sort nodes by degree (fewest conflicts first), then by PR number
 2. Greedily select nodes with no conflicts to existing MIS
 3. Return maximal set
 
 ### `mergeTreeSimulator.ts`
+
 Simulates merges using git merge-tree.
 
 **Key Functions**:
+
 ```typescript
 simulateMerge(base: string, pr1: string, pr2: string): Promise<MergeSimulationResult>
 parseMergeTreeOutput(output: string): ConflictDetail[]
 ```
 
 **Algorithm**:
+
 1. Run `git merge-tree <base> <pr1> <pr2>`
 2. Parse output for conflict markers
 3. Return conflict details
 
 ### `conflictPredictor.ts`
+
 Main module combining all prediction techniques.
 
 **Key Function**:
+
 ```typescript
 predictConflicts(options: PredictConflictsOptions): Promise<ConflictReport>
 ```
 
 **Pipeline**:
+
 1. Build conflict graph
 2. Compute MIS batches
 3. Simulate merges (optional)
@@ -230,11 +250,13 @@ See [CLI Reference](../../docs/cli.md#orchestratepredict-conflicts) for details.
 ## Testing
 
 Run tests:
+
 ```bash
 npm test -- tests/conflictGraph.spec.ts tests/mis.spec.ts tests/mergeTreeSimulator.spec.ts tests/conflictPredictor.spec.ts
 ```
 
 **Test Coverage**:
+
 - Conflict graph: 8 tests
 - MIS: 11 tests
 - Merge-tree: 10 tests
@@ -250,9 +272,9 @@ import { predictConflicts } from "./orchestration/index.js";
 const report = await predictConflicts({
   prs: [
     { number: 166, files: ["src/cli.ts"] },
-    { number: 167, files: ["src/cli.ts"] }
+    { number: 167, files: ["src/cli.ts"] },
   ],
-  baseBranch: "main"
+  baseBranch: "main",
 });
 
 console.log(report.recommendations);
@@ -292,6 +314,7 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 **Complexity**: O(n² × f) where n = PRs, f = avg files per PR
 
 **Determinism**:
+
 - Nodes sorted by PR number
 - Edges sorted by (from, to)
 - Shared files sorted alphabetically
@@ -304,6 +327,7 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 **Complexity**: O(n + e) where e = edges
 
 **Properties**:
+
 - Maximal (not necessarily maximum)
 - Deterministic (fixed sort order)
 - Approximation factor: depends on graph structure
@@ -316,6 +340,7 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 **Complexity**: O(git merge-tree)
 
 **Reliability**:
+
 - Exact same algorithm as git merge
 - Detects all actual merge conflicts
 - May have false positives (safe)
@@ -325,15 +350,17 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 ### Why Greedy MIS?
 
 **Alternatives considered**:
+
 1. **Exact MIS** (NP-hard): Too slow for large graphs
 2. **Approximation algorithms**: More complex, similar results
 3. **Greedy**: Fast, simple, deterministic
 
-**Trade-off**: Greedy may not find the *largest* independent set, but finds a *maximal* one quickly and deterministically.
+**Trade-off**: Greedy may not find the _largest_ independent set, but finds a _maximal_ one quickly and deterministically.
 
 ### Why File-Level Granularity?
 
 **Alternatives**:
+
 1. **Line-level**: More accurate but requires patch parsing
 2. **Semantic**: Requires code analysis (imports, etc.)
 3. **File-level**: Fast, simple, good enough
@@ -343,11 +370,13 @@ for (const [pair, result] of Object.entries(report.mergeTreeSimulation)) {
 ### Why Optional Merge-Tree?
 
 **Reasons**:
+
 1. Performance: git merge-tree can be slow
 2. Availability: Requires git repo with all branches
 3. File-based analysis is often sufficient
 
 **Recommendation**: Use merge-tree when:
+
 - Accuracy is critical
 - Git repo is available
 - Performance is acceptable
@@ -376,7 +405,8 @@ Planned features (from Epic #171):
 1. **Issue Analyzer** (Feature 1) - Analyze overlap/risk scores
 2. **Agent Assigner** (Feature 3) - Assign agents to batches
 3. **Integration** - Connect with GitHub API for live data
-```
+
+````
 
 ---
 
@@ -407,21 +437,24 @@ Options:
   --dry-run            Show what would be assigned without actually doing it
   --stagger <seconds>  Wait N seconds between assignments (default: 5)
   --json               Output results as JSON (global flag)
-```
+````
 
 ### Examples
 
 **Basic Assignment:**
+
 ```bash
 lex-pr orchestrate:assign-batch --issues 156,157,160 --repo owner/repo
 ```
 
 **Dry Run:**
+
 ```bash
 lex-pr orchestrate:assign-batch --issues 156,157,160 --repo owner/repo --dry-run
 ```
 
 **JSON Output:**
+
 ```bash
 lex-pr orchestrate:assign-batch --issues 156,157,160 --json
 ```
@@ -431,13 +464,13 @@ lex-pr orchestrate:assign-batch --issues 156,157,160 --json
 See `src/orchestration/agentAssigner.ts` for the core implementation.
 
 **Main Function:**
+
 ```typescript
-export async function assignAgentsToBatch(
-  options: AssignAgentsOptions
-): Promise<AssignmentResult>
+export async function assignAgentsToBatch(options: AssignAgentsOptions): Promise<AssignmentResult>;
 ```
 
 **Error Handling:**
+
 - `AlreadyAssignedError` - Issue already has an agent
 - `RateLimitError` - GitHub API rate limit hit (auto-retry)
 - `UnexpectedError` - Other failures (logged and skipped)

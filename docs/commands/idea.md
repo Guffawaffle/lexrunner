@@ -5,6 +5,7 @@ The `lex-pr idea` command provides an interactive workflow for capturing feature
 ## Overview
 
 This command is part of the front-end capture pipeline that helps teams:
+
 1. Quickly capture feature ideas with structured metadata
 2. Generate machine-readable Feature Spec v0 JSON documents
 3. Create GitHub Issues with the `[IDEA]` prefix and `idea`, `needs-triage` labels
@@ -19,6 +20,7 @@ lex-pr idea
 ```
 
 Prompts for:
+
 - Feature title (required)
 - Brief description (required)
 - Acceptance criteria (one per line, optional)
@@ -57,17 +59,17 @@ lex-pr idea \
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--title <string>` | Idea title | Interactive prompt |
-| `--description <string>` | Brief description | Interactive prompt |
-| `--interactive` | Force interactive mode | `true` if no title/description |
-| `--dry-run` | Generate spec without creating Issue | `false` |
-| `--template <path>` | Custom prompt template path | (future enhancement) |
-| `--output <path>` | Output path for Feature Spec v0 | `.smartergpt.local/deliverables/_session/idea-{timestamp}.json` |
-| `--repo <owner/repo>` | Target repository | Auto-detected from git remote |
-| `--label <label>` | Additional labels (repeatable) | `[]` |
-| `--update-issue <num>` | Update existing Issue instead of creating | (none) |
+| Option                   | Description                               | Default                                                         |
+| ------------------------ | ----------------------------------------- | --------------------------------------------------------------- |
+| `--title <string>`       | Idea title                                | Interactive prompt                                              |
+| `--description <string>` | Brief description                         | Interactive prompt                                              |
+| `--interactive`          | Force interactive mode                    | `true` if no title/description                                  |
+| `--dry-run`              | Generate spec without creating Issue      | `false`                                                         |
+| `--template <path>`      | Custom prompt template path               | (future enhancement)                                            |
+| `--output <path>`        | Output path for Feature Spec v0           | `.smartergpt.local/deliverables/_session/idea-{timestamp}.json` |
+| `--repo <owner/repo>`    | Target repository                         | Auto-detected from git remote                                   |
+| `--label <label>`        | Additional labels (repeatable)            | `[]`                                                            |
+| `--update-issue <num>`   | Update existing Issue instead of creating | (none)                                                          |
 
 ## Feature Spec v0 Schema
 
@@ -93,6 +95,7 @@ Generated JSON documents conform to the Feature Spec v0 schema:
 ## Fingerprinting for Idempotency
 
 The command generates a deterministic SHA-256 fingerprint from:
+
 - Title
 - Description
 - Acceptance criteria
@@ -104,6 +107,7 @@ The fingerprint is injected as a hidden HTML comment in the Issue body:
 ```
 
 When updating an Issue with `--update-issue`, the command:
+
 1. Fetches the existing Issue
 2. Extracts its fingerprint
 3. Compares with the new fingerprint
@@ -114,6 +118,7 @@ This prevents unnecessary API calls and Issue edit history noise.
 ## Issue Format
 
 Created Issues have:
+
 - Title: `[IDEA] {feature title}`
 - Labels: `idea`, `needs-triage`, plus any from `--label`
 - Body sections:
@@ -141,9 +146,9 @@ Brief description: Implement theme switcher
 Acceptance criteria (enter one per line, empty line to finish):
   1. User can toggle themes
   2. Theme persists
-  3. 
+  3.
 Technical context (optional, press Enter to skip): CSS variables
-Constraints (optional, press Enter to skip): 
+Constraints (optional, press Enter to skip):
 
 Fingerprint: d158c1280857f3a5
 ✓ Feature Spec v0 written to: .smartergpt.local/deliverables/_session/idea-2025-11-09T21-26-56-365Z.json

@@ -72,12 +72,12 @@ Respond with a structured JSON object:
 
 ## Assessment Levels
 
-| Level | Description |
-|-------|-------------|
-| `brief` | New to the team/role, learning fundamentals |
-| `developing` | Growing skills, some supervision needed |
-| `proficient` | Solid contributor, works independently |
-| `advanced` | Mentor to others, drives quality |
+| Level        | Description                                 |
+| ------------ | ------------------------------------------- |
+| `brief`      | New to the team/role, learning fundamentals |
+| `developing` | Growing skills, some supervision needed     |
+| `proficient` | Solid contributor, works independently      |
+| `advanced`   | Mentor to others, drives quality            |
 
 ## Constraints
 

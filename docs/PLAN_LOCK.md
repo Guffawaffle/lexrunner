@@ -57,6 +57,7 @@ All audit events (Frames) include the lock hash in the event envelope:
 ```
 
 This enables:
+
 - Correlation of events across retries
 - Detection of duplicate runs
 - Forensic analysis of execution history
@@ -80,11 +81,13 @@ lex-pr merge --json
 ## Lock Hash Display
 
 **Console Output:**
+
 ```
 🔒 Lock Hash: abcdef123456
 ```
 
 **JSON Output:**
+
 ```json
 {
   "mode": "dry-run",

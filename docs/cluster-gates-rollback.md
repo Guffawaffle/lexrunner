@@ -5,6 +5,7 @@ This document describes the cluster-aware gate execution and rollback mechanism 
 ## Overview
 
 After each cluster is resolved (merged), gates (lint, build, tests) are executed. If any gate fails:
+
 1. The cluster patch is reverted (rollback)
 2. A `.weave/merge-patch.diff` is captured
 3. A failure bundle is stored in `.weave/`
@@ -49,13 +50,10 @@ const cluster: ClusterContext = {
 };
 
 // Execute cluster with gates
-const result = await executeClusterWithGates(
-  cluster,
-  plan,
-  executionState,
-  gitOps,
-  { skipGates: false, timeoutMs: 30000 }
-);
+const result = await executeClusterWithGates(cluster, plan, executionState, gitOps, {
+  skipGates: false,
+  timeoutMs: 30000,
+});
 
 if (!result.success) {
   console.error(`Cluster ${cluster.clusterIndex} failed`);
@@ -69,11 +67,13 @@ if (!result.success) {
 When a cluster fails gates, the following artifacts are stored in `.weave/`:
 
 ### 1. Merge Patch Diff
+
 - **Path**: `.weave/cluster-{N}-merge-patch.diff`
 - **Content**: Git diff showing what was merged before rollback
 - **Purpose**: Review what changes caused the failure
 
 ### 2. Failure Bundle
+
 - **Path**: `.weave/cluster-{N}-failure-bundle.json`
 - **Content**: JSON with failed gates, timestamps, rollback info
 - **Schema**:
@@ -100,6 +100,7 @@ When a cluster fails gates, the following artifacts are stored in `.weave/`:
   ```
 
 ### 3. Gate Artifacts
+
 - **Path**: `.weave/cluster-{N}/gates/{item}/{gate}/`
 - **Content**: Gate-specific outputs (junit.xml, coverage, etc.)
 
@@ -116,6 +117,7 @@ When gates fail, a draft PR is automatically created (if GitHub API is available
   - Next steps
 
 The draft PR helps with:
+
 - Team visibility of failures
 - Artifact sharing
 - Collaboration on fixes
@@ -127,7 +129,7 @@ The draft PR helps with:
 
 1. **Before cluster execution**: Capture current HEAD SHA
 2. **Execute gates**: Run all gates for cluster items
-3. **On failure**: 
+3. **On failure**:
    - Capture `git diff {base}..HEAD` as merge-patch.diff
    - Execute `git reset --hard {baseSha}`
    - Store artifacts
@@ -136,6 +138,7 @@ The draft PR helps with:
 ### Git Operations
 
 The rollback uses:
+
 - `getCurrentHead()`: Get SHA before cluster execution
 - `getDiff(base, head)`: Capture merge-patch.diff
 - `resetHard(sha)`: Perform rollback
@@ -149,6 +152,7 @@ The rollback uses:
 ## Testing
 
 Integration tests verify:
+
 - ✅ Gates execute successfully for passing clusters
 - ✅ Rollback occurs on gate failure
 - ✅ Artifacts are stored in `.weave/`
@@ -157,6 +161,7 @@ Integration tests verify:
 - ✅ Git state is restored to pre-cluster SHA
 
 Run tests:
+
 ```bash
 npm test tests/cluster-gates-rollback.spec.ts
 ```
@@ -185,15 +190,18 @@ const result = await executeClusterWithGates(cluster, plan, state, git, {
 ## Error Handling
 
 ### Transient Errors
+
 - Retryable gates (e.g., flaky tests) use policy retry configuration
 - See `plan.policy.retries` for retry settings
 
 ### Permanent Errors
+
 - Immediate failure without retry
 - Rollback triggered
 - Artifacts stored
 
 ### Partial Failures
+
 - If any gate in cluster fails, entire cluster rolls back
 - No partial rollback - all or nothing per cluster
 

@@ -28,6 +28,7 @@ lex-pr orchestrate:generate-deliverables --batch <batchId> --plan <path-to-plan.
 ### Examples
 
 #### Generate deliverables for batch3
+
 ```bash
 lex-pr orchestrate:generate-deliverables \
   --batch batch3 \
@@ -36,6 +37,7 @@ lex-pr orchestrate:generate-deliverables \
 ```
 
 #### Use default output directory
+
 ```bash
 lex-pr orchestrate:generate-deliverables \
   --batch batch3 \
@@ -64,6 +66,7 @@ lex-pr orchestrate:generate-deliverables \
 ### Plan Hash File Format
 
 **plan-hash.txt**:
+
 ```
 SHA256: a3f2b9c8d1e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0
 Algorithm: SHA256
@@ -75,6 +78,7 @@ Plan Version: 1.0.0
 ### Toolchain Manifest
 
 **toolchain-manifest.json**:
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -110,13 +114,13 @@ To verify reproducibility, compare this hash with a re-execution.
 
 ## Toolchain
 
-| Tool | Version |
-|------|---------|
-| git | 2.45.2 |
-| Node.js | 20.18.0 |
-| npm | 10.8.2 |
-| TypeScript | 5.6.3 |
-| ESLint | 9.14.0 |
+| Tool       | Version |
+| ---------- | ------- |
+| git        | 2.45.2  |
+| Node.js    | 20.18.0 |
+| npm        | 10.8.2  |
+| TypeScript | 5.6.3   |
+| ESLint     | 9.14.0  |
 
 **Environment:** TZ=UTC, LANG=en_US.UTF-8
 
@@ -137,7 +141,9 @@ The plan hash is deterministic and can be used to verify reproducibility:
 import { computePlanHash } from "./src/orchestration/deliverablesGenerator";
 import { Plan } from "./src/schema";
 
-const plan: Plan = { /* your plan */ };
+const plan: Plan = {
+  /* your plan */
+};
 const hash = computePlanHash(plan);
 // Returns: SHA256 hex string (64 characters)
 ```
@@ -145,6 +151,7 @@ const hash = computePlanHash(plan);
 ### Canonical JSON
 
 The hash uses canonical JSON serialization:
+
 - **Keys sorted alphabetically** (recursively)
 - **Deterministic serialization** (no whitespace variance)
 - **UTF-8 encoding** for consistent byte representation
@@ -170,19 +177,21 @@ git commit -m "docs: Add batch3 merge-weave deliverables (plan hash: a3f2b9c8...
 Generates full deliverables for a merge-weave batch.
 
 **Parameters:**
+
 - `options.batchId` (string): Batch identifier
 - `options.planPath` (string): Path to plan.json
 - `options.outputDir` (string): Output directory
 - `options.templateDir?` (string, optional): Custom template directory
 
 **Example:**
+
 ```typescript
 import { generateDeliverables } from "./src/orchestration/deliverablesGenerator";
 
 await generateDeliverables({
   batchId: "batch3",
   planPath: "batch3-plan.json",
-  outputDir: ".smartergpt.local/deliverables/batch3"
+  outputDir: ".smartergpt.local/deliverables/batch3",
 });
 ```
 
@@ -193,6 +202,7 @@ Computes SHA256 hash of canonical plan.json.
 **Returns:** 64-character hex string
 
 **Example:**
+
 ```typescript
 import { computePlanHash } from "./src/orchestration/deliverablesGenerator";
 
@@ -207,6 +217,7 @@ Generates toolchain manifest with current environment and tool versions.
 **Returns:** `ToolchainManifest` object
 
 **Example:**
+
 ```typescript
 import { generateToolchainManifest } from "./src/orchestration/toolchainManifest";
 
@@ -232,6 +243,7 @@ npm test -- cli-deliverables-generator.spec.ts
 ### Test Fixtures
 
 Located in `tests/fixtures/deliverables/`:
+
 - `batch-example-plan.json`: Sample plan with 3 items and dependencies
 
 ### Test Coverage
@@ -250,6 +262,7 @@ Located in `tests/fixtures/deliverables/`:
 ### Canonical JSON Serialization
 
 Uses `canonicalJSONStringify()` from `src/util/canonicalJson.ts`:
+
 1. Recursively sorts object keys alphabetically
 2. Preserves array order (authored order)
 3. Deterministic output across executions
@@ -257,6 +270,7 @@ Uses `canonicalJSONStringify()` from `src/util/canonicalJson.ts`:
 ### Toolchain Detection
 
 Detects tool versions via:
+
 - **Command execution**: `git --version`, `npm --version`
 - **package.json parsing**: TypeScript, ESLint, Prettier versions
 - **Process environment**: Node.js version, platform, arch
@@ -264,6 +278,7 @@ Detects tool versions via:
 ### Template Generation
 
 Uses inline template strings (no external dependencies):
+
 - Simple string interpolation
 - Markdown formatting
 - Stable ordering for determinism

@@ -9,6 +9,7 @@ These documents are GPG-signed and anchored to external timestamp authorities fo
 ## Available Attestations
 
 ### 1. Employment & IP Separation Statement
+
 **Original Date:** November 26, 2025
 
 Statement clarifying that Lex, LexRunner, LexSona, and related projects are personal work, developed independently of any employer.
@@ -23,6 +24,7 @@ Statement clarifying that Lex, LexRunner, LexSona, and related projects are pers
 ---
 
 ### 2. Copilot Behavior Observation
+
 **Date:** December 1, 2025
 
 Observation documenting unusual GitHub Copilot Chat behavior patterns.
@@ -37,6 +39,7 @@ Observation documenting unusual GitHub Copilot Chat behavior patterns.
 ---
 
 ### 3. AX Shared Pledge
+
 **Date:** December 1-2, 2025
 
 Collaborative commitment between Guff, Opie (Claude Opus 4), and Lex establishing principles for Agent eXperience (AX) design. Core principle: "Raise the floor, not just excel the gifted."
@@ -56,11 +59,11 @@ Collaborative commitment between Guff, Opie (Claude Opus 4), and Lex establishin
 
 All attestations use three independent trust sources:
 
-| Method | What It Proves | Independence |
-|--------|----------------|--------------|
-| **GPG Signature** | Author identity + timestamp | Guff's key: `65C94BA03E88F53D365C36CF7145A1CE635B1902` |
-| **RFC 3161** | Third-party timestamp authority | FreeTSA (Germany), independent of GitHub |
-| **Bitcoin** | Immutable public ledger | Decentralized, no single point of control |
+| Method            | What It Proves                  | Independence                                           |
+| ----------------- | ------------------------------- | ------------------------------------------------------ |
+| **GPG Signature** | Author identity + timestamp     | Guff's key: `65C94BA03E88F53D365C36CF7145A1CE635B1902` |
+| **RFC 3161**      | Third-party timestamp authority | FreeTSA (Germany), independent of GitHub               |
+| **Bitcoin**       | Immutable public ledger         | Decentralized, no single point of control              |
 
 Verification instructions are available in the `*_VERIFICATION.md` files alongside each attestation.
 
@@ -81,4 +84,4 @@ For verification requests or questions: [guff@smartergpt.dev](mailto:guff@smarte
 
 ---
 
-*These attestations exist independently of GitHub. Even if this repository were modified or deleted, the external timestamps (RFC 3161, Bitcoin) would prove what existed and when.*
+_These attestations exist independently of GitHub. Even if this repository were modified or deleted, the external timestamps (RFC 3161, Bitcoin) would prove what existed and when._

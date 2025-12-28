@@ -189,6 +189,7 @@ lex-pr orchestrate:plan-batch --input tree.json
 ```
 
 Produces 2 batches:
+
 - Batch 1: A
 - Batch 2: B, C (parallel)
 
@@ -199,6 +200,7 @@ lex-pr orchestrate:plan-batch --input diamond.json
 ```
 
 Produces 3 batches:
+
 - Batch 1: A
 - Batch 2: B, C (parallel)
 - Batch 3: D

@@ -4,7 +4,7 @@
 export function parseRemoteUrl(remoteUrl: string): { owner?: string; repo?: string } {
   if (!remoteUrl) return {};
   let url = remoteUrl.trim();
-  if (url.endsWith('.git')) url = url.slice(0, -4);
+  if (url.endsWith(".git")) url = url.slice(0, -4);
 
   // SSH: git@github.com:owner/repo
   const sshMatch = url.match(/^git@github\.com:([^/]+)\/(.+)$/);

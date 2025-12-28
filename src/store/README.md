@@ -8,11 +8,11 @@ This directory contains the RunStore interface and its implementations.
 
 ## Implementations
 
-| Implementation | Status | Use Case |
-|----------------|--------|----------|
-| `inmemory/` | Default | CLI runs, testing |
-| `sqlite/` | Future | Local persistence |
-| `postgres/` | Future | Multi-tenant/hosted |
+| Implementation | Status  | Use Case            |
+| -------------- | ------- | ------------------- |
+| `inmemory/`    | Default | CLI runs, testing   |
+| `sqlite/`      | Future  | Local persistence   |
+| `postgres/`    | Future  | Multi-tenant/hosted |
 
 ## Design Principles
 

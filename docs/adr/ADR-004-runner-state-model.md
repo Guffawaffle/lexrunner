@@ -18,23 +18,25 @@ We adopt a five-state model for plan items:
 
 ### State Definitions
 
-| Status | Meaning | Merge Eligible? |
-|--------|---------|-----------------|
-| `pass` | All required gates passed | ✅ Yes |
-| `fail` | One or more required gates failed | ❌ No |
-| `blocked` | A dependency failed/blocked; node not executed | ❌ No |
-| `skipped` | Policy or config excludes gates for this node | ❌ No |
-| `retrying` | Gate marked retryable; attempt in progress (bounded) | ❌ No |
+| Status     | Meaning                                              | Merge Eligible? |
+| ---------- | ---------------------------------------------------- | --------------- |
+| `pass`     | All required gates passed                            | ✅ Yes          |
+| `fail`     | One or more required gates failed                    | ❌ No           |
+| `blocked`  | A dependency failed/blocked; node not executed       | ❌ No           |
+| `skipped`  | Policy or config excludes gates for this node        | ❌ No           |
+| `retrying` | Gate marked retryable; attempt in progress (bounded) | ❌ No           |
 
 ### Key Distinctions
 
 **`blocked` vs `fail`:**
+
 - `fail` = This node's gates ran and failed
 - `blocked` = This node's gates didn't run because a dependency failed
 
 This distinction prevents cascading noise when an early gate fails.
 
 **`skipped` vs `blocked`:**
+
 - `skipped` = Intentionally excluded by policy
 - `blocked` = Would have run but couldn't
 

@@ -22,8 +22,8 @@ patterns:
       line_pattern: "expect\\(.*tools\\.length.*\\)\\.toBe\\((\\d+)\\)"
     fix:
       action: update_number
-      from_group: 1  # captured expected count
-      to_group: 2    # captured received count from test output
+      from_group: 1 # captured expected count
+      to_group: 2 # captured received count from test output
     priority: 100
     enabled: true
 
@@ -85,7 +85,7 @@ patterns:
       from_group: 1
       to_group: 2
     priority: 50
-    enabled: false  # Disabled by default, enable manually
+    enabled: false # Disabled by default, enable manually
 
   # ==========================================================================
   # STRING ASSERTION UPDATE
@@ -94,7 +94,7 @@ patterns:
     description: "Update string assertions when expected values change"
     determinism: D2
     trigger:
-      test_output: "expected ['\"](.+?)['\"].*received ['\"](.+?)['\"]"
+      test_output: 'expected [''"](.+?)[''"].*received [''"](.+?)[''"]'
     detection:
       file_pattern: "**/*.spec.ts"
       line_pattern: "expect\\(.*\\)\\.toBe\\(['\"](.+?)['\"]\\)"
@@ -103,4 +103,4 @@ patterns:
       from_group: 1
       to_group: 2
     priority: 70
-    enabled: false  # Disabled by default, requires judgment
+    enabled: false # Disabled by default, requires judgment

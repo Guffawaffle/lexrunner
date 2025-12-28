@@ -20,65 +20,80 @@ Following Guff's Option 1 approach from the backlog analysis, this feature:
 ## Workflow Phases
 
 ### 1. Initial
+
 Starting point before any operations.
 
 **Next steps:**
+
 - `plan.create` (required) - Create execution plan
 
 **Recommended action:** `plan.create`
 
 ### 2. Post-Plan-Creation
+
 Plan has been created, ready for validation and gate execution.
 
 **Next steps:**
+
 - `gates.run` (required) - Execute gates to validate PRs
 - `plan.validate` (optional) - Check for schema errors
 - `merge.order` (optional) - Calculate dependency-based merge order
 
 **Common issues:**
+
 - Plan schema validation errors → Use `plan.validate`
 - Unknown dependencies → Check PR dependency declarations
 
 **Recommended action:** `gates.run`
 
 ### 3. Post-Gates-Run
+
 Gates have been executed, check results before merge.
 
 **Next steps:**
+
 - `status` (required) - Check gate execution results
 - `merge.apply` (optional) - Apply merge operations (use dryRun first)
 
 **Common issues:**
+
 - Gate failures → Check `artifacts/PR-XXX/gateName/` for logs
 - PRs blocked from merge → Use `status` tool to see why
 
 **Recommended action:** `status`
 
 ### 4. Pre-Merge
+
 Ready to merge, perform final checks.
 
 **Next steps:**
+
 - `merge.apply` (required) - Apply merge operations
 
 **Common issues:**
+
 - Merge conflicts detected → Resolve manually or use AI conflict resolution
 - Branch protection prevents merge → Ensure status checks pass and approvals obtained
 
 **Recommended action:** `merge.apply`
 
 ### 5. Post-Merge
+
 Merge completed successfully.
 
 **Next steps:** None (workflow complete)
 
 ### 6. Error-Recovery
+
 Error occurred, attempting recovery.
 
 **Next steps:**
+
 - `doctor` (optional) - Run diagnostics
 - `status` (optional) - Check current state
 
 **Common issues:**
+
 - Command execution failed → Check error messages and use `doctor`
 
 ## Usage
@@ -131,29 +146,29 @@ Error occurred, attempting recovery.
 ### Programmatic Usage (TypeScript)
 
 ```typescript
-import { WorkflowStateMachine } from 'lexrunner/src/mcp/workflow/state-machine.js';
+import { WorkflowStateMachine } from "lexrunner/src/mcp/workflow/state-machine.js";
 
 // Create state machine
-const sm = new WorkflowStateMachine('initial');
+const sm = new WorkflowStateMachine("initial");
 
 // Get current guide
 const guide = sm.getGuide();
 console.log(`Recommended: ${guide.recommendedAction}`);
 
 // Complete a step
-sm.completeStep('plan.create');
+sm.completeStep("plan.create");
 
 // Transition to next phase
-sm.transition('post-plan-creation');
+sm.transition("post-plan-creation");
 ```
 
 ### Stateless Helper
 
 ```typescript
-import { createWorkflowGuide } from 'lexrunner/src/mcp/workflow/state-machine.js';
+import { createWorkflowGuide } from "lexrunner/src/mcp/workflow/state-machine.js";
 
 // Get guidance without maintaining state
-const guide = createWorkflowGuide('post-gates-run');
+const guide = createWorkflowGuide("post-gates-run");
 console.log(guide.nextSteps);
 console.log(guide.commonIssues);
 ```
@@ -177,9 +192,9 @@ interface WorkflowGuide {
 
 ```typescript
 interface WorkflowAction {
-  command: string;      // MCP tool command name
-  description: string;  // What this action does
-  required: boolean;    // Must be performed before proceeding
+  command: string; // MCP tool command name
+  description: string; // What this action does
+  required: boolean; // Must be performed before proceeding
 }
 ```
 
@@ -187,8 +202,8 @@ interface WorkflowAction {
 
 ```typescript
 interface CommonIssue {
-  symptom: string;   // Error message or symptom pattern
-  solution: string;  // Recommended solution
+  symptom: string; // Error message or symptom pattern
+  solution: string; // Recommended solution
 }
 ```
 
@@ -234,6 +249,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "wo
 While this implementation provides **stateless guidance** (Option 1 from Guff's analysis), the `GuidedMCPResponse<T>` interface in `guided-response.ts` shows how responses could be enhanced with workflow tracking in the future if needed.
 
 This would enable:
+
 - **Contextual prompts**: AI-generated suggestions based on current state
 - **Decision points**: Branching workflows with multiple options
 - **Progress tracking**: History of completed steps
@@ -252,7 +268,7 @@ This implementation:
 ✅ **Opt-in guidance** - Call `workflow.guide` when needed  
 ✅ **Minimal architectural impact** - No changes to existing tools  
 ✅ **Deterministic** - Same phase always returns same guidance  
-✅ **Testable** - Comprehensive test coverage  
+✅ **Testable** - Comprehensive test coverage
 
 ## Related Documentation
 

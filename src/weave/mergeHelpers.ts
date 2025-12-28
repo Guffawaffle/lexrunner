@@ -3,331 +3,330 @@
  * Provides dry-run output and resume capability
  */
 
-import { Plan } from '../schema.js';
-import { computeMergeOrder } from '../mergeOrder.js';
-import { DryRunOutput, PRHead, WeaveEvent } from '../weave/types.js';
+import { Plan } from "../schema.js";
+import { computeMergeOrder } from "../mergeOrder.js";
+import { DryRunOutput, PRHead, WeaveEvent } from "../weave/types.js";
+import { createWeaveContext, WeaveStateMachine } from "../weave/stateMachine.js";
 import {
-	createWeaveContext,
-	WeaveStateMachine
-} from '../weave/stateMachine.js';
-import {
-	computePlanHash,
-	loadContextFromLockFile,
-	lockFileExists,
-	readLockFile
-} from '../weave/lockFile.js';
-import { simpleGit } from 'simple-git';
-import { detectPreflightConflicts, skipPreflightDetection } from './preflightConflicts.js';
+  computePlanHash,
+  loadContextFromLockFile,
+  lockFileExists,
+  readLockFile,
+} from "../weave/lockFile.js";
+import { simpleGit } from "simple-git";
+import { detectPreflightConflicts, skipPreflightDetection } from "./preflightConflicts.js";
 
 /**
  * Fetch current PR head information from git
  */
 export async function fetchPRHeads(plan: Plan): Promise<PRHead[]> {
-	const git = simpleGit();
-	const prHeads: PRHead[] = [];
+  const git = simpleGit();
+  const prHeads: PRHead[] = [];
 
-	for (const item of plan.items) {
-		try {
-			// Get the SHA for the branch/ref
-			const result = await git.revparse([item.name]);
-			const sha = result.trim();
+  for (const item of plan.items) {
+    try {
+      // Get the SHA for the branch/ref
+      const result = await git.revparse([item.name]);
+      const sha = result.trim();
 
-			prHeads.push({
-				name: item.name,
-				sha,
-				updatedAt: new Date().toISOString()
-			});
-		} catch (error) {
-			// If branch doesn't exist locally, we'll skip it for now
-			// In a real implementation, we'd fetch from remote
-			prHeads.push({
-				name: item.name,
-				sha: 'unknown',
-				updatedAt: new Date().toISOString()
-			});
-		}
-	}
+      prHeads.push({
+        name: item.name,
+        sha,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      // If branch doesn't exist locally, we'll skip it for now
+      // In a real implementation, we'd fetch from remote
+      prHeads.push({
+        name: item.name,
+        sha: "unknown",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
 
-	return prHeads;
+  return prHeads;
 }
 
 /**
  * Generate dry-run output showing planned execution
  */
 export async function generateDryRunOutput(
-	plan: Plan,
-	workingDir: string = process.cwd(),
-	skipPreflight: boolean = false
+  plan: Plan,
+  workingDir: string = process.cwd(),
+  skipPreflight: boolean = false
 ): Promise<DryRunOutput> {
-	const git = simpleGit(workingDir);
+  const git = simpleGit(workingDir);
 
-	// Compute merge order
-	const levels = computeMergeOrder(plan);
+  // Compute merge order
+  const levels = computeMergeOrder(plan);
 
-	// Fetch PR heads
-	const prHeads = await fetchPRHeads(plan);
+  // Fetch PR heads
+  const prHeads = await fetchPRHeads(plan);
 
-	// Check working directory status
-	const status = await git.status();
-	const cleanWorkingDirectory = status.files.length === 0;
+  // Check working directory status
+  const status = await git.status();
+  const cleanWorkingDirectory = status.files.length === 0;
 
-	// Build batches with dependency information
-	const batches = levels.map((level, index) => {
-		// Find dependencies for items in this level
-		const dependencies: string[] = [];
-		for (const itemName of level) {
-			const item = plan.items.find(i => i.name === itemName);
-			if (item && item.deps) {
-				dependencies.push(...item.deps);
-			}
-		}
+  // Build batches with dependency information
+  const batches = levels.map((level, index) => {
+    // Find dependencies for items in this level
+    const dependencies: string[] = [];
+    for (const itemName of level) {
+      const item = plan.items.find((i) => i.name === itemName);
+      if (item && item.deps) {
+        dependencies.push(...item.deps);
+      }
+    }
 
-		// Remove duplicates
-		const uniqueDeps = Array.from(new Set(dependencies));
+    // Remove duplicates
+    const uniqueDeps = Array.from(new Set(dependencies));
 
-		return {
-			batchNumber: index,
-			items: level,
-			dependencies: uniqueDeps,
-			parallelizable: level.length > 1
-		};
-	});
+    return {
+      batchNumber: index,
+      items: level,
+      dependencies: uniqueDeps,
+      parallelizable: level.length > 1,
+    };
+  });
 
-	// Build PR information
-	const prs = prHeads.map(head => ({
-		name: head.name,
-		currentSha: head.sha,
-		status: head.sha === 'unknown' ? 'not-found' : 'ready'
-	}));
+  // Build PR information
+  const prs = prHeads.map((head) => ({
+    name: head.name,
+    currentSha: head.sha,
+    status: head.sha === "unknown" ? "not-found" : "ready",
+  }));
 
-	// Check if target branch exists
-	let branchExists = true;
-	try {
-		await git.revparse([plan.target]);
-	} catch {
-		branchExists = false;
-	}
+  // Check if target branch exists
+  let branchExists = true;
+  try {
+    await git.revparse([plan.target]);
+  } catch {
+    branchExists = false;
+  }
 
-	// Run preflight conflict detection (unless skipped)
-	let preflightResults;
-	if (skipPreflight) {
-		preflightResults = skipPreflightDetection("Preflight detection skipped by flag");
-	} else if (!branchExists) {
-		preflightResults = skipPreflightDetection("Target branch does not exist");
-	} else if (!cleanWorkingDirectory) {
-		preflightResults = skipPreflightDetection("Working directory is not clean");
-	} else {
-		try {
-			preflightResults = await detectPreflightConflicts(plan, workingDir);
-		} catch (error) {
-			// If preflight detection fails, skip it with error reason
-			preflightResults = skipPreflightDetection(
-				`Preflight detection failed: ${error instanceof Error ? error.message : String(error)}`
-			);
-		}
-	}
+  // Run preflight conflict detection (unless skipped)
+  let preflightResults;
+  if (skipPreflight) {
+    preflightResults = skipPreflightDetection("Preflight detection skipped by flag");
+  } else if (!branchExists) {
+    preflightResults = skipPreflightDetection("Target branch does not exist");
+  } else if (!cleanWorkingDirectory) {
+    preflightResults = skipPreflightDetection("Working directory is not clean");
+  } else {
+    try {
+      preflightResults = await detectPreflightConflicts(plan, workingDir);
+    } catch (error) {
+      // If preflight detection fails, skip it with error reason
+      preflightResults = skipPreflightDetection(
+        `Preflight detection failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 
-	return {
-		summary: {
-			totalBatches: batches.length,
-			totalItems: plan.items.length,
-			targetBranch: plan.target,
-			estimatedDuration: undefined // Could add estimation based on history
-		},
-		batches,
-		prs,
-		checks: {
-			cleanWorkingDirectory,
-			branchExists,
-			conflictsPredicted: preflightResults.conflictsDetected
-		},
-		preflight: preflightResults
-	};
+  return {
+    summary: {
+      totalBatches: batches.length,
+      totalItems: plan.items.length,
+      targetBranch: plan.target,
+      estimatedDuration: undefined, // Could add estimation based on history
+    },
+    batches,
+    prs,
+    checks: {
+      cleanWorkingDirectory,
+      branchExists,
+      conflictsPredicted: preflightResults.conflictsDetected,
+    },
+    preflight: preflightResults,
+  };
 }
 
 /**
  * Format dry-run output as human-readable text
  */
 export function formatDryRunOutput(output: DryRunOutput): string {
-	const lines: string[] = [];
+  const lines: string[] = [];
 
-	lines.push('🔍 DRY RUN: Merge Execution Plan');
-	lines.push('');
-	lines.push('## Summary');
-	lines.push(`- Target Branch: ${output.summary.targetBranch}`);
-	lines.push(`- Total Items: ${output.summary.totalItems}`);
-	lines.push(`- Total Batches: ${output.summary.totalBatches}`);
-	if (output.summary.estimatedDuration) {
-		lines.push(`- Estimated Duration: ${output.summary.estimatedDuration}`);
-	}
-	lines.push('');
+  lines.push("🔍 DRY RUN: Merge Execution Plan");
+  lines.push("");
+  lines.push("## Summary");
+  lines.push(`- Target Branch: ${output.summary.targetBranch}`);
+  lines.push(`- Total Items: ${output.summary.totalItems}`);
+  lines.push(`- Total Batches: ${output.summary.totalBatches}`);
+  if (output.summary.estimatedDuration) {
+    lines.push(`- Estimated Duration: ${output.summary.estimatedDuration}`);
+  }
+  lines.push("");
 
-	lines.push('## Batches (Execution Order)');
-	for (const batch of output.batches) {
-		lines.push('');
-		lines.push(`### Batch ${batch.batchNumber + 1}`);
-		lines.push(`- Items: ${batch.items.join(', ')}`);
-		if (batch.dependencies.length > 0) {
-			lines.push(`- Dependencies: ${batch.dependencies.join(', ')}`);
-		}
-		lines.push(`- Parallelizable: ${batch.parallelizable ? 'Yes' : 'No'}`);
-	}
+  lines.push("## Batches (Execution Order)");
+  for (const batch of output.batches) {
+    lines.push("");
+    lines.push(`### Batch ${batch.batchNumber + 1}`);
+    lines.push(`- Items: ${batch.items.join(", ")}`);
+    if (batch.dependencies.length > 0) {
+      lines.push(`- Dependencies: ${batch.dependencies.join(", ")}`);
+    }
+    lines.push(`- Parallelizable: ${batch.parallelizable ? "Yes" : "No"}`);
+  }
 
-	lines.push('');
-	lines.push('## PR Status');
-	const prTable: string[] = [];
-	prTable.push('| PR | SHA | Status |');
-	prTable.push('|----|-----|--------|');
-	for (const pr of output.prs) {
-		const sha = pr.currentSha === 'unknown' ? '—' : pr.currentSha.substring(0, 8);
-		const status = pr.status === 'ready' ? '✓' : '✗';
-		prTable.push(`| ${pr.name} | ${sha} | ${status} |`);
-	}
-	lines.push(...prTable);
+  lines.push("");
+  lines.push("## PR Status");
+  const prTable: string[] = [];
+  prTable.push("| PR | SHA | Status |");
+  prTable.push("|----|-----|--------|");
+  for (const pr of output.prs) {
+    const sha = pr.currentSha === "unknown" ? "—" : pr.currentSha.substring(0, 8);
+    const status = pr.status === "ready" ? "✓" : "✗";
+    prTable.push(`| ${pr.name} | ${sha} | ${status} |`);
+  }
+  lines.push(...prTable);
 
-	lines.push('');
-	lines.push('## Pre-flight Checks');
-	lines.push(`- Clean working directory: ${output.checks.cleanWorkingDirectory ? '✓' : '✗'}`);
-	lines.push(`- Target branch exists: ${output.checks.branchExists ? '✓' : '✗'}`);
-	lines.push(`- Predicted conflicts: ${output.checks.conflictsPredicted}`);
+  lines.push("");
+  lines.push("## Pre-flight Checks");
+  lines.push(`- Clean working directory: ${output.checks.cleanWorkingDirectory ? "✓" : "✗"}`);
+  lines.push(`- Target branch exists: ${output.checks.branchExists ? "✓" : "✗"}`);
+  lines.push(`- Predicted conflicts: ${output.checks.conflictsPredicted}`);
 
-	// Add preflight conflict detection results
-	if (output.preflight) {
-		lines.push('');
-		lines.push('## Preflight Conflict Detection');
-		
-		if (output.preflight.skipped) {
-			lines.push(`⚠️  Skipped: ${output.preflight.skipReason}`);
-		} else if (output.preflight.conflictsDetected === 0) {
-			lines.push('✓ No conflicts detected - all items can merge cleanly');
-		} else {
-			lines.push(`⚠️  ${output.preflight.conflictsDetected} conflict(s) detected across ${output.preflight.items.filter(i => i.hasConflicts).length} item(s)`);
-			lines.push('');
-			
-			for (const item of output.preflight.items) {
-				if (item.hasConflicts) {
-					lines.push(`### ${item.name}`);
-					lines.push(`- Conflicts: ${item.conflicts.length} file(s)`);
-					
-					if (item.conflicts.length > 0) {
-						const conflictTable: string[] = [];
-						conflictTable.push('| File | Type | Lines |');
-						conflictTable.push('|------|------|-------|');
-						
-						for (const conflict of item.conflicts) {
-							const linesStr = conflict.lines || '—';
-							conflictTable.push(`| ${conflict.path} | ${conflict.type} | ${linesStr} |`);
-						}
-						
-						lines.push(...conflictTable);
-					}
-					
-					lines.push('');
-				} else if (item.error) {
-					lines.push(`### ${item.name}`);
-					lines.push(`❌ Error: ${item.error}`);
-					lines.push('');
-				}
-			}
-		}
-	}
+  // Add preflight conflict detection results
+  if (output.preflight) {
+    lines.push("");
+    lines.push("## Preflight Conflict Detection");
 
-	lines.push('');
-	lines.push('---');
-	lines.push('');
-	lines.push('ℹ️  This is a dry run. Use --execute to perform actual merges.');
-	lines.push('ℹ️  Execution state will be saved to weave-lock.json for resume capability.');
+    if (output.preflight.skipped) {
+      lines.push(`⚠️  Skipped: ${output.preflight.skipReason}`);
+    } else if (output.preflight.conflictsDetected === 0) {
+      lines.push("✓ No conflicts detected - all items can merge cleanly");
+    } else {
+      lines.push(
+        `⚠️  ${output.preflight.conflictsDetected} conflict(s) detected across ${output.preflight.items.filter((i) => i.hasConflicts).length} item(s)`
+      );
+      lines.push("");
 
-	return lines.join('\n');
+      for (const item of output.preflight.items) {
+        if (item.hasConflicts) {
+          lines.push(`### ${item.name}`);
+          lines.push(`- Conflicts: ${item.conflicts.length} file(s)`);
+
+          if (item.conflicts.length > 0) {
+            const conflictTable: string[] = [];
+            conflictTable.push("| File | Type | Lines |");
+            conflictTable.push("|------|------|-------|");
+
+            for (const conflict of item.conflicts) {
+              const linesStr = conflict.lines || "—";
+              conflictTable.push(`| ${conflict.path} | ${conflict.type} | ${linesStr} |`);
+            }
+
+            lines.push(...conflictTable);
+          }
+
+          lines.push("");
+        } else if (item.error) {
+          lines.push(`### ${item.name}`);
+          lines.push(`❌ Error: ${item.error}`);
+          lines.push("");
+        }
+      }
+    }
+  }
+
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+  lines.push("ℹ️  This is a dry run. Use --execute to perform actual merges.");
+  lines.push("ℹ️  Execution state will be saved to weave-lock.json for resume capability.");
+
+  return lines.join("\n");
 }
 
 /**
  * Validate resume prerequisites
  */
 export async function validateResume(
-	runId: string | undefined,
-	plan: Plan,
-	workingDir: string = process.cwd()
+  runId: string | undefined,
+  plan: Plan,
+  workingDir: string = process.cwd()
 ): Promise<{ valid: boolean; reason?: string; context?: any }> {
-	// Check if lock file exists
-	if (!lockFileExists(workingDir)) {
-		return {
-			valid: false,
-			reason: 'No lock file found. Cannot resume execution.'
-		};
-	}
+  // Check if lock file exists
+  if (!lockFileExists(workingDir)) {
+    return {
+      valid: false,
+      reason: "No lock file found. Cannot resume execution.",
+    };
+  }
 
-	// Read lock file
-	const lockFile = readLockFile(workingDir);
-	if (!lockFile) {
-		return {
-			valid: false,
-			reason: 'Failed to read lock file.'
-		};
-	}
+  // Read lock file
+  const lockFile = readLockFile(workingDir);
+  if (!lockFile) {
+    return {
+      valid: false,
+      reason: "Failed to read lock file.",
+    };
+  }
 
-	// Validate run ID if provided
-	if (runId && lockFile.runId !== runId) {
-		return {
-			valid: false,
-			reason: `Run ID mismatch. Lock file contains run ID '${lockFile.runId}', but '${runId}' was requested.`
-		};
-	}
+  // Validate run ID if provided
+  if (runId && lockFile.runId !== runId) {
+    return {
+      valid: false,
+      reason: `Run ID mismatch. Lock file contains run ID '${lockFile.runId}', but '${runId}' was requested.`,
+    };
+  }
 
-	// Fetch current PR heads
-	const prHeads = await fetchPRHeads(plan);
+  // Fetch current PR heads
+  const prHeads = await fetchPRHeads(plan);
 
-	// Load and validate context
-	const result = loadContextFromLockFile(plan, prHeads, workingDir);
+  // Load and validate context
+  const result = loadContextFromLockFile(plan, prHeads, workingDir);
 
-	if (!result.valid) {
-		return {
-			valid: false,
-			reason: result.reason || 'Lock file validation failed.'
-		};
-	}
+  if (!result.valid) {
+    return {
+      valid: false,
+      reason: result.reason || "Lock file validation failed.",
+    };
+  }
 
-	// Check if state is resumable
-	const sm = new WeaveStateMachine(result.context);
-	if (!sm.canResume()) {
-		return {
-			valid: false,
-			reason: `Cannot resume from state '${result.context.state}'. Only 'paused' state can be resumed.`
-		};
-	}
+  // Check if state is resumable
+  const sm = new WeaveStateMachine(result.context);
+  if (!sm.canResume()) {
+    return {
+      valid: false,
+      reason: `Cannot resume from state '${result.context.state}'. Only 'paused' state can be resumed.`,
+    };
+  }
 
-	return {
-		valid: true,
-		context: result.context
-	};
+  return {
+    valid: true,
+    context: result.context,
+  };
 }
 
 /**
  * Initialize a new weave execution
  */
 export async function initializeWeaveExecution(
-	plan: Plan,
-	workingDir: string = process.cwd()
+  plan: Plan,
+  workingDir: string = process.cwd()
 ): Promise<{ context: any; stateMachine: WeaveStateMachine }> {
-	// Fetch PR heads
-	const prHeads = await fetchPRHeads(plan);
+  // Fetch PR heads
+  const prHeads = await fetchPRHeads(plan);
 
-	// Compute plan hash
-	const planHash = computePlanHash(plan, prHeads);
+  // Compute plan hash
+  const planHash = computePlanHash(plan, prHeads);
 
-	// Create context
-	const context = createWeaveContext(plan, prHeads, planHash, false);
+  // Create context
+  const context = createWeaveContext(plan, prHeads, planHash, false);
 
-	// Compute merge order and populate batches
-	const levels = computeMergeOrder(plan);
-	context.batches = levels.map((level, index) => ({
-		batchNumber: index,
-		items: level,
-		state: 'pending' as const
-	}));
+  // Compute merge order and populate batches
+  const levels = computeMergeOrder(plan);
+  context.batches = levels.map((level, index) => ({
+    batchNumber: index,
+    items: level,
+    state: "pending" as const,
+  }));
 
-	// Create state machine
-	const stateMachine = new WeaveStateMachine(context);
+  // Create state machine
+  const stateMachine = new WeaveStateMachine(context);
 
-	return { context, stateMachine };
+  return { context, stateMachine };
 }

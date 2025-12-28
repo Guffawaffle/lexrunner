@@ -39,30 +39,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Generate Plan from GitHub
         run: lex-pr plan --from-github > plan.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Run Autopilot Level 1
         run: lex-pr autopilot plan.json --level 1
-      
+
       - name: Upload Deliverables
         uses: actions/upload-artifact@v4
         with:
           name: autopilot-deliverables-${{ github.run_id }}
           path: .smartergpt/deliverables/latest/
           retention-days: 30
-      
+
       - name: Comment PR with Results
         uses: actions/github-script@v7
         with:
@@ -74,14 +74,14 @@ jobs:
             const report = fs.readFileSync(
               '.smartergpt/deliverables/latest/weave-report.md', 'utf8'
             );
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: `## Autopilot Analysis\n\n${report}\n\n---\nPlan Hash: \`${manifest.planHash}\``
             });
-      
+
       - name: Cleanup Old Deliverables
         if: always()
         run: lex-pr deliverables:cleanup --max-age 7
@@ -98,13 +98,13 @@ jobs:
         level: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Run Autopilot Level ${{ matrix.level }}
         run: |
           lex-pr autopilot plan.json \
             --level ${{ matrix.level }} \
             --deliverables-dir ./deliverables/level-${{ matrix.level }}
-      
+
       - name: Upload Level ${{ matrix.level }} Deliverables
         uses: actions/upload-artifact@v4
         with:
@@ -152,9 +152,9 @@ publish-report:
     - |
       MANIFEST=.smartergpt/deliverables/latest/manifest.json
       PLAN_HASH=$(jq -r '.planHash' $MANIFEST)
-      
+
       echo "Plan Hash: $PLAN_HASH"
-      
+
       # Post to merge request
       curl --request POST \
         --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
@@ -176,18 +176,18 @@ cleanup-deliverables:
 ```groovy
 pipeline {
     agent any
-    
+
     environment {
         DELIVERABLES_DIR = "${WORKSPACE}/.smartergpt/deliverables"
     }
-    
+
     stages {
         stage('Setup') {
             steps {
                 sh 'npm install -g lexrunner'
             }
         }
-        
+
         stage('Generate Plan') {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
@@ -195,22 +195,22 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Run Autopilot') {
             steps {
                 sh 'lex-pr autopilot plan.json --level 1'
             }
         }
-        
+
         stage('Archive Results') {
             steps {
                 script {
                     def manifest = readJSON file: "${DELIVERABLES_DIR}/latest/manifest.json"
                     currentBuild.description = "Plan: ${manifest.planHash.take(8)}"
                 }
-                
+
                 archiveArtifacts artifacts: "${DELIVERABLES_DIR}/latest/**/*", fingerprint: true
-                
+
                 publishHTML([
                     reportDir: "${DELIVERABLES_DIR}/latest",
                     reportFiles: 'weave-report.md',
@@ -218,14 +218,14 @@ pipeline {
                 ])
             }
         }
-        
+
         stage('Cleanup') {
             steps {
                 sh 'lex-pr deliverables:cleanup --max-age 14 --max-count 20'
             }
         }
     }
-    
+
     post {
         always {
             sh 'lex-pr deliverables:list --json > deliverables-inventory.json'
@@ -248,31 +248,31 @@ jobs:
       - image: cimg/node:20.0
     steps:
       - checkout
-      
+
       - run:
           name: Install lexrunner
           command: npm install -g lexrunner
-      
+
       - run:
           name: Generate Plan
           command: lex-pr plan --from-github > plan.json
-      
+
       - run:
           name: Run Autopilot
           command: |
             lex-pr autopilot plan.json \
               --deliverables-dir /tmp/deliverables
-      
+
       - store_artifacts:
           path: /tmp/deliverables/latest
           destination: autopilot-deliverables
-      
+
       - run:
           name: Extract Plan Hash
           command: |
             PLAN_HASH=$(jq -r '.planHash' /tmp/deliverables/latest/manifest.json)
             echo "export PLAN_HASH=$PLAN_HASH" >> $BASH_ENV
-      
+
       - persist_to_workspace:
           root: /tmp/deliverables
           paths:
@@ -426,7 +426,7 @@ DELIVERABLES_DIR=.smartergpt/deliverables/latest
 # Verify each artifact
 jq -r '.artifacts[] | "\(.name) \(.hash)"' $MANIFEST | while read name hash; do
     actual_hash=$(sha256sum "$DELIVERABLES_DIR/$name" | cut -d' ' -f1)
-    
+
     if [ "$hash" = "$actual_hash" ]; then
         echo "✓ $name"
     else
@@ -505,7 +505,7 @@ lex-pr autopilot plan.json \
 name: Cleanup Deliverables
 on:
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM
+    - cron: "0 2 * * *" # Daily at 2 AM
 
 jobs:
   cleanup:

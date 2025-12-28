@@ -5,6 +5,7 @@ Complete examples for setting up lexrunner profiles with tracked and local confi
 ## Overview
 
 This directory contains templates and examples for:
+
 - Tracked profile (`.smartergpt/`) - Repository default configuration
 - Local profile (`.smartergpt.local/`) - Development overlay
 - Cross-repository prompts sharing
@@ -62,6 +63,7 @@ EOF
 See [.smartergpt-example/](./.smartergpt-example/) for a complete tracked profile example.
 
 **Key files:**
+
 - `intent.md` - Project goals and scope
 - `scope.yml` - PR discovery rules
 - `deps.yml` - Dependency relationships
@@ -72,6 +74,7 @@ See [.smartergpt-example/](./.smartergpt-example/) for a complete tracked profil
 - `prompts/` - Canonical prompts
 
 **Characteristics:**
+
 - Tracked in git
 - Read-only (role: example)
 - Provides defaults for team
@@ -81,6 +84,7 @@ See [.smartergpt-example/](./.smartergpt-example/) for a complete tracked profil
 See [.smartergpt.local-example/](./.smartergpt.local-example/) for a complete local profile example.
 
 **Key files:**
+
 - `profile.yml` - **REQUIRED** (role: development)
 - All config files from tracked profile (optional overrides)
 - `prompts/` - Custom prompt overlays
@@ -88,6 +92,7 @@ See [.smartergpt.local-example/](./.smartergpt.local-example/) for a complete lo
 - `deliverables/` - Generated outputs (gitignored)
 
 **Characteristics:**
+
 - Gitignored
 - Read-write (role: development)
 - Overrides tracked profile on file-by-file basis
@@ -98,12 +103,12 @@ See [.smartergpt.local-example/](./.smartergpt.local-example/) for a complete lo
 
 ```yaml
 # Minimum configuration
-role: development  # "example" | "development" | "local"
+role: development # "example" | "development" | "local"
 
 # Recommended metadata
 name: my-project
 version: 1.0.0
-projectType: typescript  # Auto-detected by init-local
+projectType: typescript # Auto-detected by init-local
 
 # Optional
 description: My project description
@@ -117,16 +122,19 @@ created: 2025-11-13
 # Project Intent
 
 ## Goals
+
 - Implement feature X
 - Refactor module Y
 - Fix critical bug Z
 
 ## Success Criteria
+
 - All tests pass
 - Code coverage > 80%
 - No security vulnerabilities
 
 ## Out of Scope
+
 - Performance optimization
 - UI redesign
 ```
@@ -336,6 +344,7 @@ lex-pr schema validate .smartergpt.local/runner/plan.json --schema execution-pla
 ### Pattern 1: Team Tracked + Individual Local
 
 **Setup:**
+
 ```bash
 # Team maintains .smartergpt/ in repo
 git add .smartergpt/
@@ -349,6 +358,7 @@ echo "# My custom goals" > .smartergpt.local/intent.md
 ```
 
 **Benefits:**
+
 - Team has consistent defaults
 - Individuals can customize without conflicts
 - No need to coordinate local changes
@@ -356,6 +366,7 @@ echo "# My custom goals" > .smartergpt.local/intent.md
 ### Pattern 2: CI/CD with Custom Profile
 
 **Setup:**
+
 ```yaml
 # .github/workflows/ci.yml
 env:
@@ -376,6 +387,7 @@ steps:
 ```
 
 **Benefits:**
+
 - Isolated CI environment
 - No conflicts with local development
 - Reproducible builds
@@ -383,6 +395,7 @@ steps:
 ### Pattern 3: Multi-Repository with Shared Prompts
 
 **Setup:**
+
 ```bash
 # Lex repo (prompts source)
 git clone https://github.com/org/lex.git
@@ -398,6 +411,7 @@ lex-pr plan --from-github
 ```
 
 **Benefits:**
+
 - Single source of truth for prompts
 - Consistent prompts across projects
 - Easy prompt updates
@@ -407,6 +421,7 @@ lex-pr plan --from-github
 ### Problem: "Profile directory not found"
 
 **Solution:**
+
 ```bash
 # Initialize local profile
 lex-pr init-local
@@ -418,6 +433,7 @@ lex-pr plan --profile-dir .smartergpt
 ### Problem: "Write operation failed: role=example is read-only"
 
 **Solution:**
+
 ```bash
 # Use local profile instead
 lex-pr init-local
@@ -429,6 +445,7 @@ echo "role: development" > .smartergpt/profile.yml  # If you own the tracked pro
 ### Problem: "Prompts directory not found"
 
 **Solution:**
+
 ```bash
 # Create prompts directory
 mkdir -p .smartergpt/prompts
@@ -443,6 +460,7 @@ export LEX_PROMPTS_DIR=/path/to/prompts
 ### Problem: Symlink not working on Windows
 
 **Solution:**
+
 ```powershell
 # Option 1: Enable Developer Mode (Windows 10+)
 # Settings > Update & Security > For Developers > Developer Mode

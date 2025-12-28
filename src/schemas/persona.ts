@@ -17,22 +17,22 @@ import { z } from "zod";
  * Role definition within a persona
  */
 export const PersonaRoleSchema = z.object({
-	/** Job title (e.g., "Senior Implementation Engineer") */
-	title: z.string(),
-	/** Brief scope description */
-	scope: z.string(),
-	/** Primary repository path (optional) */
-	repo: z.string().optional(),
+  /** Job title (e.g., "Senior Implementation Engineer") */
+  title: z.string(),
+  /** Brief scope description */
+  scope: z.string(),
+  /** Primary repository path (optional) */
+  repo: z.string().optional(),
 });
 
 /**
  * Duties (invariants) for a persona
  */
 export const PersonaDutiesSchema = z.object({
-	/** Actions the persona MUST always do */
-	must_do: z.array(z.string()),
-	/** Actions the persona MUST NEVER do */
-	must_not_do: z.array(z.string()),
+  /** Actions the persona MUST always do */
+  must_do: z.array(z.string()),
+  /** Actions the persona MUST NEVER do */
+  must_not_do: z.array(z.string()),
 });
 
 /**
@@ -61,20 +61,20 @@ export const PersonaDutiesSchema = z.object({
  * ```
  */
 export const PersonaSchema = z.object({
-	/** Display name for the persona */
-	name: z.string(),
-	/** Schema version for forwards compatibility */
-	version: z.string().default("1.0.0"),
-	/** Activation trigger phrases (e.g., ["ok senior dev", "senior dev mode"]) */
-	triggers: z.array(z.string()).min(1),
-	/** Role definition */
-	role: PersonaRoleSchema,
-	/** Session ritual to print when activated (e.g., "SENIOR-DEV READY") */
-	ritual: z.string().optional(),
-	/** Duties (must do / must not do) */
-	duties: PersonaDutiesSchema,
-	/** Completion gates (e.g., ["lint", "typecheck", "test"]) */
-	gates: z.array(z.string()).optional(),
+  /** Display name for the persona */
+  name: z.string(),
+  /** Schema version for forwards compatibility */
+  version: z.string().default("1.0.0"),
+  /** Activation trigger phrases (e.g., ["ok senior dev", "senior dev mode"]) */
+  triggers: z.array(z.string()).min(1),
+  /** Role definition */
+  role: PersonaRoleSchema,
+  /** Session ritual to print when activated (e.g., "SENIOR-DEV READY") */
+  ritual: z.string().optional(),
+  /** Duties (must do / must not do) */
+  duties: PersonaDutiesSchema,
+  /** Completion gates (e.g., ["lint", "typecheck", "test"]) */
+  gates: z.array(z.string()).optional(),
 });
 
 /**
@@ -110,16 +110,16 @@ export type PersonaDuties = z.infer<typeof PersonaDutiesSchema>;
  * ```
  */
 export function parsePersona(data: unknown): Persona {
-	return PersonaSchema.parse(data);
+  return PersonaSchema.parse(data);
 }
 
 /**
  * Validation error for persona parsing
  */
 export interface PersonaValidationError {
-	path: string;
-	message: string;
-	code: string;
+  path: string;
+  message: string;
+  code: string;
 }
 
 /**
@@ -138,23 +138,25 @@ export interface PersonaValidationError {
  * }
  * ```
  */
-export function validatePersona(data: unknown): {
-	success: true;
-	data: Persona;
-} | {
-	success: false;
-	errors: PersonaValidationError[];
-} {
-	const result = PersonaSchema.safeParse(data);
-	if (result.success) {
-		return { success: true, data: result.data };
-	}
-	return {
-		success: false,
-		errors: result.error.issues.map(issue => ({
-			path: issue.path.join('.') || 'root',
-			message: issue.message,
-			code: issue.code,
-		})),
-	};
+export function validatePersona(data: unknown):
+  | {
+      success: true;
+      data: Persona;
+    }
+  | {
+      success: false;
+      errors: PersonaValidationError[];
+    } {
+  const result = PersonaSchema.safeParse(data);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return {
+    success: false,
+    errors: result.error.issues.map((issue) => ({
+      path: issue.path.join(".") || "root",
+      message: issue.message,
+      code: issue.code,
+    })),
+  };
 }

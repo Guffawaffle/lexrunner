@@ -42,6 +42,7 @@ lex-pr discover --labels "epic:refactor,ready-to-merge"
 ```
 
 **Expected output:**
+
 ```
 🔍 Discovering open PRs...
 Found 25 PRs matching labels: epic:refactor, ready-to-merge
@@ -81,6 +82,7 @@ Docs Layer:
 ```
 
 **Observation:**
+
 - Only **5 explicit dependencies** declared
 - Many PRs likely have **implicit dependencies** (e.g., tests depend on features)
 
@@ -95,24 +97,28 @@ lex-pr plan --suggest-deps --threshold=0.6 --format=markdown > suggestions.md
 ```
 
 **Expected output (suggestions.md):**
+
 ```markdown
 # Dependency Suggestions (15 found)
 
 ## High Confidence (≥0.7)
 
 ### PR-112 → PR-102 (Confidence: 0.92)
+
 - **Heuristic:** shared-files
 - **Reason:** Both modify src/errors.ts
 - **Shared files:** src/errors.ts, src/error-types.ts
 - **Recommendation:** Add `Depends-on: #102` to PR-112
 
 ### PR-120 → PR-100 (Confidence: 0.88)
+
 - **Heuristic:** test-overlap
 - **Reason:** Tests for schema module
 - **Shared files:** tests/schema.spec.ts, src/schema.ts
 - **Recommendation:** Add `Depends-on: #100` to PR-120
 
 ### PR-121 → PR-101 (Confidence: 0.85)
+
 - **Heuristic:** test-overlap
 - **Reason:** Tests for validation module
 - **Shared files:** tests/validation.spec.ts, src/validation.ts
@@ -123,6 +129,7 @@ lex-pr plan --suggest-deps --threshold=0.6 --format=markdown > suggestions.md
 ## Medium Confidence (0.5-0.7)
 
 ### PR-115 → PR-110 (Confidence: 0.65)
+
 - **Heuristic:** directory-proximity
 - **Reason:** Both modify files in src/batch/
 - **Shared directories:** src/batch
@@ -136,6 +143,7 @@ lex-pr plan --suggest-deps --threshold=0.6 --format=markdown > suggestions.md
 ```
 
 **Analysis:**
+
 - **15 suggestions** found
 - **8 high-confidence** (≥0.7) - should add these
 - **7 medium-confidence** (0.5-0.7) - review manually
@@ -149,31 +157,37 @@ Review each high-confidence suggestion and add explicit dependencies to PR descr
 ### Example: PR-120 (schema tests)
 
 **Before:**
+
 ```markdown
 # Add Schema Tests
 
 Comprehensive test suite for schema module.
 
 ## Changes
+
 - Add unit tests
 - Add integration tests
 ```
 
 **After (add dependency):**
+
 ```markdown
 # Add Schema Tests
 
 Comprehensive test suite for schema module.
 
 ## Dependencies
+
 Depends-on: #100
 
 ## Changes
+
 - Add unit tests
 - Add integration tests
 ```
 
 **Repeat for all high-confidence suggestions:**
+
 - PR-112: Add `Depends-on: #102`
 - PR-120: Add `Depends-on: #100`
 - PR-121: Add `Depends-on: #101`
@@ -194,6 +208,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 25 open PRs
@@ -216,6 +231,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Observations:**
+
 - **6 layers** (not 25, thanks to parallelism)
 - **Layer 1 has 10 items** (feature PRs, can run in parallel)
 - **23 explicit + 2 implicit** dependencies
@@ -229,6 +245,7 @@ lex-pr merge-order plan.json
 ```
 
 **Expected output:**
+
 ```
 📊 Merge order for 25 items (6 layers):
 
@@ -272,6 +289,7 @@ Layer 5 (after Layer 4, 2 items):
 ```
 
 **Performance:**
+
 - **Without parallelism:** ~300 seconds (25 PRs × 12s each)
 - **With parallelism (max 10 workers):** ~72 seconds (6 layers × 12s)
 - **Speedup:** ~4.2x faster
@@ -286,6 +304,7 @@ lex-pr execute --plan plan.json --max-workers 10
 ```
 
 **Expected output:**
+
 ```
 📦 Executing plan: 25 items, 6 layers
 ⚙️  Max workers: 10 (parallel execution enabled)
@@ -323,6 +342,7 @@ All Layer 1 gates passed ✓
 ```
 
 **Execution time:**
+
 - Layer 0: ~12s (5 items in parallel)
 - Layer 1: ~12s (10 items in parallel)
 - Layer 2: ~12s (5 items in parallel)
@@ -357,6 +377,7 @@ lex-pr merge --plan plan.json --execute
 ```
 
 **Recommendation:** For large batches, use **Option A** (layer-by-layer) to:
+
 - Catch integration issues early
 - Allow manual validation between layers
 - Reduce risk of cascading failures
@@ -371,6 +392,7 @@ lex-pr status plan.json
 ```
 
 **Expected output:**
+
 ```
 ✅ Merged (10 items):
   PR-100, PR-101, PR-102, PR-103, PR-104 (Layer 0)
@@ -398,6 +420,7 @@ gh pr edit 120 --add-label "layer:test"
 ```
 
 Then filter:
+
 ```bash
 lex-pr plan --from-github --labels "layer:foundation,layer:feature"
 ```
@@ -444,12 +467,14 @@ lex-pr execute --plan plan.json --max-workers 10
 ### Issue: GitHub API rate limiting
 
 **Symptom:**
+
 ```
 ❌ Error: GitHub API rate limit exceeded
 Remaining: 0/5000
 ```
 
 **Solution:**
+
 ```bash
 # Use authenticated token (higher rate limit)
 export GITHUB_TOKEN=your_token_here
@@ -464,6 +489,7 @@ lex-pr plan --from-github --labels "priority:medium" --output plan-p2.json
 **Symptom:** Plan has 10+ layers.
 
 **Solution:** Add missing dependencies to increase parallelism:
+
 ```bash
 # Generate suggestions to find missing deps
 lex-pr plan --suggest-deps --threshold=0.6
@@ -474,12 +500,14 @@ lex-pr plan --suggest-deps --threshold=0.6
 ### Issue: Large layer sizes (>20 items in one layer)
 
 **Warning:**
+
 ```
 ⚠️  Warning: Large merge layer detected
 Layer 1 contains 22 PRs (threshold: 10)
 ```
 
 **Solution:** This is often valid, but verify:
+
 1. Check if PRs truly have no dependencies
 2. Consider splitting into sub-batches if they do
 

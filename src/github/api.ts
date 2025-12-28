@@ -8,11 +8,11 @@ import { Octokit } from "@octokit/rest";
 import { simpleGit } from "simple-git";
 import { stableSort } from "../util/canonicalJson.js";
 import {
-	retryWithBackoff,
-	createGitHubCircuitBreaker,
-	classifyError,
-	formatErrorForUser,
-	CircuitBreaker
+  retryWithBackoff,
+  createGitHubCircuitBreaker,
+  classifyError,
+  formatErrorForUser,
+  CircuitBreaker,
 } from "../core/errorRecovery.js";
 
 /**
@@ -20,349 +20,370 @@ import {
  * Labels can be returned as plain strings or objects with a `name` property.
  */
 export function extractLabelName(label: any): string {
-	if (!label) return '';
-	if (typeof label === 'string') return label;
-	if (typeof label.name === 'string') return label.name;
-	return '';
+  if (!label) return "";
+  if (typeof label === "string") return label;
+  if (typeof label.name === "string") return label.name;
+  return "";
 }
 
 export interface GitHubPullRequest {
-	number: number;
-	title: string;
-	branch: string;
-	sha: string;
-	state: "open" | "closed" | "merged";
-	labels: string[];
-	author: string;
-	baseBranch: string;
-	createdAt: string;
-	updatedAt: string;
-	mergeable?: boolean;
+  number: number;
+  title: string;
+  branch: string;
+  sha: string;
+  state: "open" | "closed" | "merged";
+  labels: string[];
+  author: string;
+  baseBranch: string;
+  createdAt: string;
+  updatedAt: string;
+  mergeable?: boolean;
 }
 
 export interface GitHubConfig {
-	token?: string;
-	owner: string;
-	repo: string;
+  token?: string;
+  owner: string;
+  repo: string;
 }
 
 /**
  * GitHub API client for PR operations with error recovery
  */
 export class GitHubAPI {
-	private octokit: Octokit;
-	public config: GitHubConfig;
-	private circuitBreaker: CircuitBreaker;
-	private normalized: boolean = false;
+  private octokit: Octokit;
+  public config: GitHubConfig;
+  private circuitBreaker: CircuitBreaker;
+  private normalized: boolean = false;
 
-	constructor(config: GitHubConfig) {
-		this.config = config;
-		this.octokit = new Octokit({
-			auth: config.token || process.env.GITHUB_TOKEN,
-		});
-		this.circuitBreaker = createGitHubCircuitBreaker();
-	}
+  constructor(config: GitHubConfig) {
+    this.config = config;
+    this.octokit = new Octokit({
+      auth: config.token || process.env.GITHUB_TOKEN,
+    });
+    this.circuitBreaker = createGitHubCircuitBreaker();
+  }
 
-	/**
-	 * Normalize repository owner and name to match GitHub's canonical casing.
-	 * This handles case-insensitive lookups where git remote URLs may have
-	 * different casing than the actual GitHub repository.
-	 */
-	private async normalizeRepositoryName(): Promise<void> {
-		if (this.normalized) {
-			return;
-		}
+  /**
+   * Normalize repository owner and name to match GitHub's canonical casing.
+   * This handles case-insensitive lookups where git remote URLs may have
+   * different casing than the actual GitHub repository.
+   */
+  private async normalizeRepositoryName(): Promise<void> {
+    if (this.normalized) {
+      return;
+    }
 
-		try {
-			const { data: repo } = await this.octokit.rest.repos.get({
-				owner: this.config.owner,
-				repo: this.config.repo,
-			});
+    try {
+      const { data: repo } = await this.octokit.rest.repos.get({
+        owner: this.config.owner,
+        repo: this.config.repo,
+      });
 
-			// Update config with canonical names from GitHub (defensive null checks)
-			if (repo.owner?.login) {
-				this.config.owner = repo.owner.login;
-			}
-			if (repo.name) {
-				this.config.repo = repo.name;
-			}
-			this.normalized = true;
-		} catch (error) {
-			// Extract status from error for better error messages
-			const status = this.extractErrorStatus(error);
-			
-			if (status === 404) {
-				throw new GitHubAPIError(
-					`Repository ${this.config.owner}/${this.config.repo} not found. Check repository name and access permissions.`,
-					status
-				);
-			}
-			// For other errors (auth, rate limit, network), throw immediately
-			// Don't set normalized flag - we want to retry on next call
-			throw new GitHubAPIError(
-				`Failed to normalize repository name: ${error instanceof Error ? error.message : String(error)}`,
-				status
-			);
-		}
-	}
+      // Update config with canonical names from GitHub (defensive null checks)
+      if (repo.owner?.login) {
+        this.config.owner = repo.owner.login;
+      }
+      if (repo.name) {
+        this.config.repo = repo.name;
+      }
+      this.normalized = true;
+    } catch (error) {
+      // Extract status from error for better error messages
+      const status = this.extractErrorStatus(error);
 
-	/**
-	 * Extract HTTP status code from error object
-	 */
-	private extractErrorStatus(error: unknown): number | undefined {
-		if (!error || typeof error !== 'object') {
-			return undefined;
-		}
-		
-		if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
-			return (error as { status: number }).status;
-		}
-		
-		return undefined;
-	}
+      if (status === 404) {
+        throw new GitHubAPIError(
+          `Repository ${this.config.owner}/${this.config.repo} not found. Check repository name and access permissions.`,
+          status
+        );
+      }
+      // For other errors (auth, rate limit, network), throw immediately
+      // Don't set normalized flag - we want to retry on next call
+      throw new GitHubAPIError(
+        `Failed to normalize repository name: ${error instanceof Error ? error.message : String(error)}`,
+        status
+      );
+    }
+  }
 
-	/**
-	 * Get the underlying Octokit instance
-	 */
-	getOctokit(): Octokit {
-		return this.octokit;
-	}
+  /**
+   * Extract HTTP status code from error object
+   */
+  private extractErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== "object") {
+      return undefined;
+    }
 
-	/**
-	 * Discover open pull requests with stable ordering and error recovery
-	 */
-	async discoverPullRequests(state: "open" | "closed" | "all" = "open"): Promise<GitHubPullRequest[]> {
-		// Normalize repository name before making API calls
-		await this.normalizeRepositoryName();
+    if ("status" in error && typeof (error as { status: unknown }).status === "number") {
+      return (error as { status: number }).status;
+    }
 
-		return retryWithBackoff(
-			async () => {
-				return this.circuitBreaker.execute(async () => {
-					try {
-						const { data: pulls } = await this.octokit.rest.pulls.list({
-							owner: this.config.owner,
-							repo: this.config.repo,
-							state,
-							sort: "updated",
-							direction: "desc",
-							per_page: 100,
-						});
+    return undefined;
+  }
 
-						// Transform to our interface and sort for deterministic output
-						const pullRequests: GitHubPullRequest[] = pulls.map(pull => ({
-							number: pull.number,
-							title: pull.title,
-							branch: pull.head.ref,
-							sha: pull.head.sha,
-							state: pull.state as "open" | "closed" | "merged",
-							labels: stableSort(pull.labels.map(extractLabelName)),
-							author: pull.user?.login || 'unknown',
-							baseBranch: pull.base.ref,
-							createdAt: pull.created_at,
-							updatedAt: pull.updated_at,
-						}));
+  /**
+   * Get the underlying Octokit instance
+   */
+  getOctokit(): Octokit {
+    return this.octokit;
+  }
 
-						// Sort by PR number for deterministic ordering
-						pullRequests.sort((a, b) => a.number - b.number);
-						return pullRequests;
-					} catch (error) {
-						const classified = classifyError(error, 'Fetching pull requests');
-						console.error(formatErrorForUser(classified));
-						// Extract status from octokit error if available
-						const status = error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
-							? (error as { status: number }).status
-							: undefined;
-						throw new GitHubAPIError(`Failed to fetch pull requests: ${error instanceof Error ? error.message : String(error)}`, status);
-					}
-				});
-			},
-			{
-				maxAttempts: 3,
-				initialDelayMs: 1000,
-				backoffMultiplier: 2
-			},
-			(attempt, error, delayMs) => {
-				console.warn(`Retrying GitHub API call (attempt ${attempt}): ${error.error.message}. Waiting ${delayMs}ms...`);
-			}
-		);
-	}
+  /**
+   * Discover open pull requests with stable ordering and error recovery
+   */
+  async discoverPullRequests(
+    state: "open" | "closed" | "all" = "open"
+  ): Promise<GitHubPullRequest[]> {
+    // Normalize repository name before making API calls
+    await this.normalizeRepositoryName();
 
-	/**
-	 * Get repository information
-	 */
-	async getRepositoryInfo() {
-		// Normalize repository name before making API calls
-		await this.normalizeRepositoryName();
+    return retryWithBackoff(
+      async () => {
+        return this.circuitBreaker.execute(async () => {
+          try {
+            const { data: pulls } = await this.octokit.rest.pulls.list({
+              owner: this.config.owner,
+              repo: this.config.repo,
+              state,
+              sort: "updated",
+              direction: "desc",
+              per_page: 100,
+            });
 
-		try {
-			const { data: repo } = await this.octokit.rest.repos.get({
-				owner: this.config.owner,
-				repo: this.config.repo,
-			});
+            // Transform to our interface and sort for deterministic output
+            const pullRequests: GitHubPullRequest[] = pulls.map((pull) => ({
+              number: pull.number,
+              title: pull.title,
+              branch: pull.head.ref,
+              sha: pull.head.sha,
+              state: pull.state as "open" | "closed" | "merged",
+              labels: stableSort(pull.labels.map(extractLabelName)),
+              author: pull.user?.login || "unknown",
+              baseBranch: pull.base.ref,
+              createdAt: pull.created_at,
+              updatedAt: pull.updated_at,
+            }));
 
-			return {
-				name: repo.name,
-				fullName: repo.full_name,
-				defaultBranch: repo.default_branch,
-				private: repo.private,
-			};
-		} catch (error) {
-			throw new GitHubAPIError(`Failed to fetch repository info: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
+            // Sort by PR number for deterministic ordering
+            pullRequests.sort((a, b) => a.number - b.number);
+            return pullRequests;
+          } catch (error) {
+            const classified = classifyError(error, "Fetching pull requests");
+            console.error(formatErrorForUser(classified));
+            // Extract status from octokit error if available
+            const status =
+              error &&
+              typeof error === "object" &&
+              "status" in error &&
+              typeof (error as { status: unknown }).status === "number"
+                ? (error as { status: number }).status
+                : undefined;
+            throw new GitHubAPIError(
+              `Failed to fetch pull requests: ${error instanceof Error ? error.message : String(error)}`,
+              status
+            );
+          }
+        });
+      },
+      {
+        maxAttempts: 3,
+        initialDelayMs: 1000,
+        backoffMultiplier: 2,
+      },
+      (attempt, error, delayMs) => {
+        console.warn(
+          `Retrying GitHub API call (attempt ${attempt}): ${error.error.message}. Waiting ${delayMs}ms...`
+        );
+      }
+    );
+  }
 
-	/**
-	 * Check if authentication is working
-	 */
-	async checkAuth(): Promise<{ authenticated: boolean; user?: string }> {
-		try {
-			const { data: user } = await this.octokit.rest.users.getAuthenticated();
-			return {
-				authenticated: true,
-				user: user.login,
-			};
-		} catch (error) {
-			return {
-				authenticated: false,
-			};
-		}
-	}
+  /**
+   * Get repository information
+   */
+  async getRepositoryInfo() {
+    // Normalize repository name before making API calls
+    await this.normalizeRepositoryName();
 
-	/**
-	 * Get a specific pull request by number
-	 */
-	async getPullRequest(prNumber: number): Promise<GitHubPullRequest | null> {
-		try {
-			const { data: pull } = await this.octokit.rest.pulls.get({
-				owner: this.config.owner,
-				repo: this.config.repo,
-				pull_number: prNumber,
-			});
+    try {
+      const { data: repo } = await this.octokit.rest.repos.get({
+        owner: this.config.owner,
+        repo: this.config.repo,
+      });
 
-			return {
-				number: pull.number,
-				title: pull.title,
-				branch: pull.head.ref,
-				sha: pull.head.sha,
-				state: pull.state as "open" | "closed" | "merged",
-				labels: stableSort(pull.labels.map(extractLabelName)),
-				author: pull.user?.login || 'unknown',
-				baseBranch: pull.base.ref,
-				createdAt: pull.created_at,
-				updatedAt: pull.updated_at,
-				mergeable: pull.mergeable ?? undefined,
-			};
-		} catch (error) {
-			return null;
-		}
-	}
+      return {
+        name: repo.name,
+        fullName: repo.full_name,
+        defaultBranch: repo.default_branch,
+        private: repo.private,
+      };
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to fetch repository info: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 
-	/**
-	 * Add a label to a pull request
-	 */
-	async addLabel(prNumber: number, label: string): Promise<void> {
-		try {
-			await this.octokit.rest.issues.addLabels({
-				owner: this.config.owner,
-				repo: this.config.repo,
-				issue_number: prNumber,
-				labels: [label],
-			});
-		} catch (error) {
-			throw new GitHubAPIError(`Failed to add label to PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
+  /**
+   * Check if authentication is working
+   */
+  async checkAuth(): Promise<{ authenticated: boolean; user?: string }> {
+    try {
+      const { data: user } = await this.octokit.rest.users.getAuthenticated();
+      return {
+        authenticated: true,
+        user: user.login,
+      };
+    } catch (error) {
+      return {
+        authenticated: false,
+      };
+    }
+  }
 
-	/**
-	 * Remove a label from a pull request
-	 */
-	async removeLabel(prNumber: number, label: string): Promise<void> {
-		try {
-			await this.octokit.rest.issues.removeLabel({
-				owner: this.config.owner,
-				repo: this.config.repo,
-				issue_number: prNumber,
-				name: label,
-			});
-		} catch (error) {
-			throw new GitHubAPIError(`Failed to remove label from PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
+  /**
+   * Get a specific pull request by number
+   */
+  async getPullRequest(prNumber: number): Promise<GitHubPullRequest | null> {
+    try {
+      const { data: pull } = await this.octokit.rest.pulls.get({
+        owner: this.config.owner,
+        repo: this.config.repo,
+        pull_number: prNumber,
+      });
 
-	/**
-	 * Get labels for a pull request
-	 */
-	async getLabels(prNumber: number): Promise<string[]> {
-		try {
-			const { data: issue } = await this.octokit.rest.issues.get({
-				owner: this.config.owner,
-				repo: this.config.repo,
-				issue_number: prNumber,
-			});
+      return {
+        number: pull.number,
+        title: pull.title,
+        branch: pull.head.ref,
+        sha: pull.head.sha,
+        state: pull.state as "open" | "closed" | "merged",
+        labels: stableSort(pull.labels.map(extractLabelName)),
+        author: pull.user?.login || "unknown",
+        baseBranch: pull.base.ref,
+        createdAt: pull.created_at,
+        updatedAt: pull.updated_at,
+        mergeable: pull.mergeable ?? undefined,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
 
-			return stableSort(issue.labels.map(extractLabelName));
-		} catch (error) {
-			throw new GitHubAPIError(`Failed to get labels for PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`);
-		}
-	}
+  /**
+   * Add a label to a pull request
+   */
+  async addLabel(prNumber: number, label: string): Promise<void> {
+    try {
+      await this.octokit.rest.issues.addLabels({
+        owner: this.config.owner,
+        repo: this.config.repo,
+        issue_number: prNumber,
+        labels: [label],
+      });
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to add label to PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Remove a label from a pull request
+   */
+  async removeLabel(prNumber: number, label: string): Promise<void> {
+    try {
+      await this.octokit.rest.issues.removeLabel({
+        owner: this.config.owner,
+        repo: this.config.repo,
+        issue_number: prNumber,
+        name: label,
+      });
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to remove label from PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Get labels for a pull request
+   */
+  async getLabels(prNumber: number): Promise<string[]> {
+    try {
+      const { data: issue } = await this.octokit.rest.issues.get({
+        owner: this.config.owner,
+        repo: this.config.repo,
+        issue_number: prNumber,
+      });
+
+      return stableSort(issue.labels.map(extractLabelName));
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to get labels for PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 export class GitHubAPIError extends Error {
-	public readonly status?: number;
+  public readonly status?: number;
 
-	constructor(message: string, status?: number) {
-		super(message);
-		this.name = "GitHubAPIError";
-		this.status = status;
-	}
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "GitHubAPIError";
+    this.status = status;
+  }
 }
 
 /**
  * Create GitHub API client from environment and config
  */
 export async function createGitHubAPI(): Promise<GitHubAPI | null> {
-	// Try to detect GitHub repository from current directory
-	const repoInfo = await detectGitHubRepository();
-	if (!repoInfo) {
-		return null;
-	}
+  // Try to detect GitHub repository from current directory
+  const repoInfo = await detectGitHubRepository();
+  if (!repoInfo) {
+    return null;
+  }
 
-	return new GitHubAPI({
-		owner: repoInfo.owner,
-		repo: repoInfo.repo,
-		token: process.env.GITHUB_TOKEN,
-	});
+  return new GitHubAPI({
+    owner: repoInfo.owner,
+    repo: repoInfo.repo,
+    token: process.env.GITHUB_TOKEN,
+  });
 }
 
 /**
  * Detect GitHub repository information from git remote
  */
 async function detectGitHubRepository(): Promise<{ owner: string; repo: string } | null> {
-	try {
-		const git = simpleGit();
-		const remotes = await git.getRemotes(true);
+  try {
+    const git = simpleGit();
+    const remotes = await git.getRemotes(true);
 
-		// Look for origin remote first, then any GitHub remote
-		const githubRemote = remotes.find(remote => remote.name === "origin" && remote.refs.fetch.includes("github.com"))
-			|| remotes.find(remote => remote.refs.fetch.includes("github.com"));
+    // Look for origin remote first, then any GitHub remote
+    const githubRemote =
+      remotes.find(
+        (remote) => remote.name === "origin" && remote.refs.fetch.includes("github.com")
+      ) || remotes.find((remote) => remote.refs.fetch.includes("github.com"));
 
-		if (!githubRemote) {
-			return null;
-		}
+    if (!githubRemote) {
+      return null;
+    }
 
-		// Parse GitHub URL (supports both HTTPS and SSH formats)
-		const url = githubRemote.refs.fetch;
-		const match = url.match(/github\.com[\/:]([^\/]+)\/([^\/\.]+)/);
+    // Parse GitHub URL (supports both HTTPS and SSH formats)
+    const url = githubRemote.refs.fetch;
+    const match = url.match(/github\.com[\/:]([^\/]+)\/([^\/\.]+)/);
 
-		if (!match) {
-			return null;
-		}
+    if (!match) {
+      return null;
+    }
 
-		return {
-			owner: match[1],
-			repo: match[2],
-		};
-	} catch {
-		return null;
-	}
+    return {
+      owner: match[1],
+      repo: match[2],
+    };
+  } catch {
+    return null;
+  }
 }

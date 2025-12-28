@@ -15,34 +15,34 @@
 
 // Schema exports
 export {
-	// Enumerated types
-	ConfidenceLevel,
-	ReversibilityLevel,
-	Outcome,
-	// Schemas
-	ActionReceiptSchema,
-	UncertaintyMarkerSchema,
-	// Types
-	type ActionReceipt,
-	type UncertaintyMarker,
-	type GovernanceContext,
-	// Type guards
-	hasGovernanceContext,
+  // Enumerated types
+  ConfidenceLevel,
+  ReversibilityLevel,
+  Outcome,
+  // Schemas
+  ActionReceiptSchema,
+  UncertaintyMarkerSchema,
+  // Types
+  type ActionReceipt,
+  type UncertaintyMarker,
+  type GovernanceContext,
+  // Type guards
+  hasGovernanceContext,
 } from "./schema.js";
 
 // Emission helper exports
 export {
-	// Main emission function
-	emitActionReceipt,
-	// Convenience wrappers
-	emitFailureReceipt,
-	emitDeferredReceipt,
-	// Uncertainty marker
-	emitUncertaintyMarker,
-	// Governance context builder
-	buildGovernanceContext,
-	// Types
-	type EmitReceiptParams,
-	type EmitOptions,
-	type EmitUncertaintyParams,
+  // Main emission function
+  emitActionReceipt,
+  // Convenience wrappers
+  emitFailureReceipt,
+  emitDeferredReceipt,
+  // Uncertainty marker
+  emitUncertaintyMarker,
+  // Governance context builder
+  buildGovernanceContext,
+  // Types
+  type EmitReceiptParams,
+  type EmitOptions,
+  type EmitUncertaintyParams,
 } from "./emit.js";

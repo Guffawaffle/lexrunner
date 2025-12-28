@@ -21,12 +21,14 @@
 ## Key Findings from Dogfooding
 
 ### ✅ What Works Well
+
 - Shadow mode executes without errors (100% success rate)
 - Logs persist correctly to `.smartergpt/runner/governance-logs/`
 - Offline mode degrades gracefully (no Lex DB crashes)
 - Zero impact on existing workflows (truly shadow)
 
 ### 🔧 What Needs Improvement
+
 - **Visibility**: No console feedback during runs (logs are post-hoc only)
 - **Discoverability**: Analysis script hidden outside main CLI
 - **Usability**: Can't filter logs by date/persona/workflow
@@ -38,14 +40,14 @@
 
 ## Created Tickets
 
-| ID | Title | Priority | Effort | Category |
-|----|-------|----------|--------|----------|
-| QOL-003 | Real-time Console Feedback | **High** | 1-2h | DX |
-| QOL-001 | Analysis Script Filtering & Formatting | Medium | 2-3h | DX |
-| QOL-004 | `lex-pr governance:report` CLI | Medium | 3-4h | Integration |
-| QOL-005 | Schema Versioning | Low | 1-2h | Future-proof |
-| QOL-006 | Debug Verbose Mode | Low | 2-3h | Debugging |
-| QOL-002 | Log Retention & Cleanup | Low | 2-4h | Ops Hygiene |
+| ID      | Title                                  | Priority | Effort | Category     |
+| ------- | -------------------------------------- | -------- | ------ | ------------ |
+| QOL-003 | Real-time Console Feedback             | **High** | 1-2h   | DX           |
+| QOL-001 | Analysis Script Filtering & Formatting | Medium   | 2-3h   | DX           |
+| QOL-004 | `lex-pr governance:report` CLI         | Medium   | 3-4h   | Integration  |
+| QOL-005 | Schema Versioning                      | Low      | 1-2h   | Future-proof |
+| QOL-006 | Debug Verbose Mode                     | Low      | 2-3h   | Debugging    |
+| QOL-002 | Log Retention & Cleanup                | Low      | 2-4h   | Ops Hygiene  |
 
 **Total effort**: 13-20 hours depending on scope
 
@@ -56,12 +58,14 @@
 ### 🎯 Quick Win: Implement QOL-003 First
 
 **Why QOL-003 (Real-time Console Feedback)?**
+
 1. **Immediate value**: Makes shadow mode visible during actual runs
 2. **Low effort**: 1-2 hours to implement
 3. **Validates need**: Will show if other tickets are worth doing
 4. **User-facing**: Most impactful for actual usage
 
 **After QOL-003:**
+
 - Run a real merge-weave workflow (5-10 PRs)
 - Observe console feedback in practice
 - Decide if remaining tickets are needed based on real pain points

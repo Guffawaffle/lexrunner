@@ -32,6 +32,7 @@ Suggestion: Remove one of the dependencies in the cycle to break it.
 ### Root Cause
 
 Circular dependencies in the PR graph. This can happen due to:
+
 1. **Explicit cycles** - PR descriptions have circular `Depends-on:` footers
 2. **Implicit cycles** - File-based heuristics create a false circular dependency
 3. **Mixed cycles** - Combination of explicit and implicit dependencies
@@ -41,11 +42,13 @@ Circular dependencies in the PR graph. This can happen due to:
 #### Step 1: Examine the Cycle Path
 
 The error message shows the cycle path. For example:
+
 ```
 PR-100 → PR-101 → PR-102 → PR-100
 ```
 
 This means:
+
 - PR-100 depends on PR-101
 - PR-101 depends on PR-102
 - PR-102 depends on PR-100 (cycle!)
@@ -81,30 +84,39 @@ Look for high-confidence suggestions that might create the cycle.
 If the cycle is due to explicit dependencies, remove the weakest link:
 
 **Before:**
+
 ```markdown
 # PR-100 description
+
 Depends-on: #102
 
 # PR-101 description
+
 Depends-on: #100
 
 # PR-102 description
+
 Depends-on: #101
 ```
 
 **After (break cycle by removing PR-100 → PR-102):**
+
 ```markdown
 # PR-100 description
+
 (no Depends-on)
 
 # PR-101 description
+
 Depends-on: #100
 
 # PR-102 description
+
 Depends-on: #101
 ```
 
 Then regenerate the plan:
+
 ```bash
 lex-pr plan --from-github --output plan.json
 ```
@@ -119,6 +131,7 @@ lex-pr plan --from-github --threshold=0.7 --output plan.json
 ```
 
 Or disable implicit dependencies entirely:
+
 ```bash
 # Only use explicit dependencies
 lex-pr plan --from-github --no-suggestions --output plan.json
@@ -127,6 +140,7 @@ lex-pr plan --from-github --no-suggestions --output plan.json
 #### Option 3: Restructure the Work
 
 If the cycle represents a real circular dependency in the code:
+
 1. **Merge PRs into one** - combine the circular work into a single PR
 2. **Refactor the approach** - break the circular dependency in the code design
 3. **Use a feature branch** - merge all PRs to a feature branch first, then merge to main
@@ -136,11 +150,13 @@ If the cycle represents a real circular dependency in the code:
 **Scenario:** Three PRs refactoring a module create a cycle.
 
 **Before:**
+
 - PR-100: Refactor `core.ts` (depends on PR-102 for types)
 - PR-101: Refactor `utils.ts` (depends on PR-100)
 - PR-102: Refactor `types.ts` (depends on PR-101)
 
 **Solution:** Combine into a single PR or use a feature branch:
+
 ```bash
 # Create feature branch
 git checkout -b refactor/module-cleanup
@@ -180,18 +196,21 @@ These PRs can be merged independently but are not part of any dependency chain.
 ### Root Cause
 
 A PR has:
+
 - **No dependencies** (doesn't depend on other PRs)
 - **No dependents** (no other PRs depend on it)
 
 ### Is This a Problem?
 
 **Often NO** - valid scenarios:
+
 - ✅ Independent hotfixes
 - ✅ Parallel feature work
 - ✅ Refactors with no dependencies
 - ✅ Documentation updates
 
 **Sometimes YES** - missing dependencies:
+
 - ❌ PR is part of a stack but missing `Depends-on:` footer
 - ❌ PR should depend on foundation work but doesn't declare it
 - ❌ Other PRs should depend on this PR but don't declare it
@@ -206,6 +225,7 @@ gh pr view 999 --json title,body,labels
 ```
 
 Ask yourself:
+
 - Is this PR truly independent?
 - Does it build on other work?
 - Do other PRs build on this?
@@ -234,10 +254,12 @@ If the PR should depend on another PR:
 
 ```markdown
 # In PR-999 description, add:
+
 Depends-on: #100
 ```
 
 Then regenerate the plan:
+
 ```bash
 lex-pr plan --from-github --output plan.json
 ```
@@ -269,6 +291,7 @@ lex-pr plan --from-github --labels "stack:feature" --output plan.json
 **PR-999:** Fix XSS vulnerability in input validation
 
 **Analysis:**
+
 - No dependencies (doesn't need other PRs)
 - No dependents (other PRs don't need this)
 - **This is valid!** - Security hotfixes are often independent
@@ -295,6 +318,7 @@ Suggestions have low confidence scores (<0.5):
 ### Root Cause
 
 File overlap is weak or heuristics are uncertain:
+
 - PRs modify different parts of the same directory
 - PRs both modify common utility files (`utils.ts`, `types.ts`)
 - Minimal file overlap (1-2 files)
@@ -303,11 +327,13 @@ File overlap is weak or heuristics are uncertain:
 ### Is This a Problem?
 
 **Usually NO** - low confidence means the relationship is uncertain:
+
 - ✅ Heuristics are working correctly (filtering weak signals)
 - ✅ PRs are likely independent
 - ✅ No action needed in most cases
 
 **Sometimes YES** - legitimate dependency with weak signal:
+
 - ❌ New code with no tests (weak file overlap)
 - ❌ Small changes to critical files
 - ❌ Documentation changes that don't show up in heuristics
@@ -332,6 +358,7 @@ gh pr diff 102 | grep "utils.ts"
 ```
 
 Ask yourself:
+
 - Do these changes actually conflict?
 - Is there a logical dependency?
 - Are they just coincidentally touching the same file?
@@ -352,10 +379,12 @@ If after review you determine there IS a dependency:
 
 ```markdown
 # In PR-102 description, add:
+
 Depends-on: #101
 ```
 
 Then regenerate:
+
 ```bash
 lex-pr plan --from-github --output plan.json
 ```
@@ -393,6 +422,7 @@ cat review.md
 **Suggestion:** `PR-101 → PR-102` (35% confidence)
 
 **Analysis:**
+
 - Both modify `utils.ts` (weak signal)
 - Different functions (no real dependency)
 - No conflict (different parts of file)
@@ -434,6 +464,7 @@ $ diff plan1.json plan2.json
 ### Root Cause
 
 **This should NEVER happen** - it indicates a determinism bug. Possible causes:
+
 1. **Timestamp fields** - non-deterministic timestamps in output
 2. **Random ordering** - items not sorted deterministically
 3. **Network timing** - different GitHub API response order
@@ -452,6 +483,7 @@ diff plan1.json plan2.json
 #### Step 2: Identify the Differences
 
 Check what fields are different:
+
 - **Timestamps?** - Should be excluded from output
 - **Item order?** - Should be deterministically sorted
 - **Dependency order?** - Should be deterministically sorted
@@ -483,6 +515,7 @@ lex-pr plan --from-github --json | jq 'del(.timestamp, .items[].timestamp)' > pl
 If other fields differ:
 
 1. **Capture evidence:**
+
    ```bash
    lex-pr --version > bug-report.txt
    node --version >> bug-report.txt
@@ -548,6 +581,7 @@ gh pr view 999
 ```
 
 If it doesn't exist:
+
 - It was closed/merged
 - The PR number is wrong
 - It's in a different repository
@@ -560,6 +594,7 @@ lex-pr plan --from-github --json | jq '.items[].id'
 ```
 
 If PR-999 exists but isn't in the list:
+
 - It doesn't match the label filters
 - It was excluded by other criteria
 
@@ -571,10 +606,12 @@ If the referenced PR no longer exists:
 
 ```markdown
 # In PR-101 description, remove:
+
 Depends-on: #999
 ```
 
 Then regenerate:
+
 ```bash
 lex-pr plan --from-github --output plan.json
 ```
@@ -600,7 +637,8 @@ If the PR number is wrong:
 
 ```markdown
 # In PR-101 description, fix the number:
-Depends-on: #998  # Was #999
+
+Depends-on: #998 # Was #999
 ```
 
 ### Example
@@ -608,16 +646,20 @@ Depends-on: #998  # Was #999
 **Scenario:** PR-101 depends on PR-100, which was already merged.
 
 **Error:**
+
 ```
 ❌ Invalid reference: #100 (PR does not exist or is closed)
 ```
 
 **Solution:** Remove the dependency since it's already merged:
+
 ```markdown
 # PR-101 description before:
+
 Depends-on: #100
 
 # PR-101 description after:
+
 (remove the Depends-on line)
 ```
 
@@ -656,13 +698,16 @@ Remove the self-dependency:
 
 ```markdown
 # Before:
+
 Depends-on: #100, #101, #102
 
 # After:
+
 Depends-on: #100, #102
 ```
 
 Then regenerate:
+
 ```bash
 lex-pr plan --from-github --output plan.json
 ```
@@ -672,11 +717,13 @@ lex-pr plan --from-github --output plan.json
 **Scenario:** Copy-paste error in PR description.
 
 **Before:**
+
 ```markdown
 Depends-on: #101, #102
 ```
 
 **Fix:**
+
 ```markdown
 Depends-on: #102
 ```
@@ -702,11 +749,13 @@ Too many PRs at the same dependency level (all marked as "ready to merge").
 ### Is This a Problem?
 
 **Sometimes NO** - valid scenarios:
+
 - ✅ Batch refactor with truly independent PRs
 - ✅ Parallel feature work by different teams
 - ✅ Hotfixes and small fixes
 
 **Sometimes YES** - missing dependencies:
+
 - ❌ PRs have implicit dependencies not declared
 - ❌ File-based heuristics didn't catch relationships
 - ❌ Team forgot to add `Depends-on:` footers

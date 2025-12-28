@@ -6,36 +6,32 @@
 import { MinHeap } from "../util/minHeap.js";
 import { createHash } from "crypto";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
-import {
-	AXErrorException,
-	cycleDetectedError,
-	unknownDependencyError,
-} from "../errors/index.js";
+import { AXErrorException, cycleDetectedError, unknownDependencyError } from "../errors/index.js";
 
 export interface Node {
-	id: string;
-	type: 'issue' | 'pr';
-	dependencies: string[];
-	metadata: {
-		score: number;        // from overlap analysis (lower = higher priority)
-		createdAt: string;    // ISO timestamp
-		prNumber?: number;
-		issueNumber?: number;
-	};
+  id: string;
+  type: "issue" | "pr";
+  dependencies: string[];
+  metadata: {
+    score: number; // from overlap analysis (lower = higher priority)
+    createdAt: string; // ISO timestamp
+    prNumber?: number;
+    issueNumber?: number;
+  };
 }
 
 export interface Batch {
-	id: string;
-	layer: number;
-	items: Node[];
+  id: string;
+  layer: number;
+  items: Node[];
 }
 
 export interface BatchPlan {
-	planVersion: string;
-	algorithm: string;
-	deterministic: boolean;
-	planHash: string;      // SHA256 of canonical JSON
-	batches: Batch[];
+  planVersion: string;
+  algorithm: string;
+  deterministic: boolean;
+  planHash: string; // SHA256 of canonical JSON
+  batches: Batch[];
 }
 
 /**
@@ -43,11 +39,11 @@ export interface BatchPlan {
  * Now extends AXErrorException to provide structured error with nextActions
  */
 export class CycleError extends AXErrorException {
-	constructor(cycle: string[]) {
-		const axError = cycleDetectedError({ cycle });
-		super(axError.code, axError.message, axError.nextActions, axError.context);
-		this.name = "CycleError";
-	}
+  constructor(cycle: string[]) {
+    const axError = cycleDetectedError({ cycle });
+    super(axError.code, axError.message, axError.nextActions, axError.context);
+    this.name = "CycleError";
+  }
 }
 
 /**
@@ -55,151 +51,151 @@ export class CycleError extends AXErrorException {
  * Now extends AXErrorException to provide structured error with nextActions
  */
 export class UnknownDependencyError extends AXErrorException {
-	constructor(item: string, dependency: string, availableItems?: string[]) {
-		const axError = unknownDependencyError({ item, dependency, availableItems });
-		super(axError.code, axError.message, axError.nextActions, axError.context);
-		this.name = "UnknownDependencyError";
-	}
+  constructor(item: string, dependency: string, availableItems?: string[]) {
+    const axError = unknownDependencyError({ item, dependency, availableItems });
+    super(axError.code, axError.message, axError.nextActions, axError.context);
+    this.name = "UnknownDependencyError";
+  }
 }
 
 /**
  * Compute batches using Kahn's algorithm with deterministic ordering.
- * 
+ *
  * @param nodes - DAG nodes (PRs/issues)
  * @returns BatchPlan with batches in topological order (layers)
  * @throws {CycleError} If graph contains cycles
  * @throws {UnknownDependencyError} If dependency references don't exist
  */
 export function computeBatches(nodes: Node[]): BatchPlan {
-	// Validate dependencies exist
-	const nodeIds = new Set(nodes.map(n => n.id));
-	for (const node of nodes) {
-		for (const dep of node.dependencies) {
-			if (!nodeIds.has(dep)) {
-				const availableItems = Array.from(nodeIds);
-				throw new UnknownDependencyError(node.id, dep, availableItems);
-			}
-		}
-	}
+  // Validate dependencies exist
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  for (const node of nodes) {
+    for (const dep of node.dependencies) {
+      if (!nodeIds.has(dep)) {
+        const availableItems = Array.from(nodeIds);
+        throw new UnknownDependencyError(node.id, dep, availableItems);
+      }
+    }
+  }
 
-	// Build in-degree map and adjacency list
-	const inDegree = new Map<string, number>();
-	const children = new Map<string, string[]>();
-	const nodeMap = new Map<string, Node>();
+  // Build in-degree map and adjacency list
+  const inDegree = new Map<string, number>();
+  const children = new Map<string, string[]>();
+  const nodeMap = new Map<string, Node>();
 
-	for (const node of nodes) {
-		inDegree.set(node.id, 0);
-		children.set(node.id, []);
-		nodeMap.set(node.id, node);
-	}
+  for (const node of nodes) {
+    inDegree.set(node.id, 0);
+    children.set(node.id, []);
+    nodeMap.set(node.id, node);
+  }
 
-	// Build graph edges
-	for (const node of nodes) {
-		for (const dep of node.dependencies) {
-			children.get(dep)!.push(node.id);
-			inDegree.set(node.id, inDegree.get(node.id)! + 1);
-		}
-	}
+  // Build graph edges
+  for (const node of nodes) {
+    for (const dep of node.dependencies) {
+      children.get(dep)!.push(node.id);
+      inDegree.set(node.id, inDegree.get(node.id)! + 1);
+    }
+  }
 
-	// Create stable priority queue with deterministic ordering
-	const compareFn = (a: Node, b: Node): number => {
-		// Primary: score (lower = higher priority)
-		if (a.metadata.score !== b.metadata.score) {
-			return a.metadata.score - b.metadata.score;
-		}
-		// Secondary: createdAt (older first)
-		if (a.metadata.createdAt !== b.metadata.createdAt) {
-			return a.metadata.createdAt.localeCompare(b.metadata.createdAt);
-		}
-		// Tertiary: number (lower first)
-		const aNum = a.metadata.prNumber || a.metadata.issueNumber || 0;
-		const bNum = b.metadata.prNumber || b.metadata.issueNumber || 0;
-		return aNum - bNum;
-	};
+  // Create stable priority queue with deterministic ordering
+  const compareFn = (a: Node, b: Node): number => {
+    // Primary: score (lower = higher priority)
+    if (a.metadata.score !== b.metadata.score) {
+      return a.metadata.score - b.metadata.score;
+    }
+    // Secondary: createdAt (older first)
+    if (a.metadata.createdAt !== b.metadata.createdAt) {
+      return a.metadata.createdAt.localeCompare(b.metadata.createdAt);
+    }
+    // Tertiary: number (lower first)
+    const aNum = a.metadata.prNumber || a.metadata.issueNumber || 0;
+    const bNum = b.metadata.prNumber || b.metadata.issueNumber || 0;
+    return aNum - bNum;
+  };
 
-	const batches: Batch[] = [];
-	let layer = 0;
+  const batches: Batch[] = [];
+  let layer = 0;
 
-	// Initialize priority queue with 0 in-degree nodes
-	const pq = new MinHeap<Node>(compareFn);
-	for (const [id, degree] of inDegree.entries()) {
-		if (degree === 0) {
-			pq.push(nodeMap.get(id)!);
-		}
-	}
+  // Initialize priority queue with 0 in-degree nodes
+  const pq = new MinHeap<Node>(compareFn);
+  for (const [id, degree] of inDegree.entries()) {
+    if (degree === 0) {
+      pq.push(nodeMap.get(id)!);
+    }
+  }
 
-	let processedCount = 0;
+  let processedCount = 0;
 
-	// Process nodes layer by layer
-	while (!pq.isEmpty()) {
-		const currentBatch: Node[] = [];
+  // Process nodes layer by layer
+  while (!pq.isEmpty()) {
+    const currentBatch: Node[] = [];
 
-		// Collect all nodes at current priority level (same layer)
-		const tempNodes: Node[] = [];
-		while (!pq.isEmpty()) {
-			tempNodes.push(pq.pop()!);
-		}
+    // Collect all nodes at current priority level (same layer)
+    const tempNodes: Node[] = [];
+    while (!pq.isEmpty()) {
+      tempNodes.push(pq.pop()!);
+    }
 
-		// Process current layer
-		for (const node of tempNodes) {
-			currentBatch.push(node);
-			processedCount++;
+    // Process current layer
+    for (const node of tempNodes) {
+      currentBatch.push(node);
+      processedCount++;
 
-			// Update children's in-degrees
-			const nodeChildren = children.get(node.id) || [];
-			for (const childId of nodeChildren) {
-				const newDegree = inDegree.get(childId)! - 1;
-				inDegree.set(childId, newDegree);
-				if (newDegree === 0) {
-					pq.push(nodeMap.get(childId)!);
-				}
-			}
-		}
+      // Update children's in-degrees
+      const nodeChildren = children.get(node.id) || [];
+      for (const childId of nodeChildren) {
+        const newDegree = inDegree.get(childId)! - 1;
+        inDegree.set(childId, newDegree);
+        if (newDegree === 0) {
+          pq.push(nodeMap.get(childId)!);
+        }
+      }
+    }
 
-		// Add batch if not empty
-		if (currentBatch.length > 0) {
-			batches.push({
-				id: `batch${layer + 1}`,
-				layer: layer,
-				items: currentBatch
-			});
-			layer++;
-		}
-	}
+    // Add batch if not empty
+    if (currentBatch.length > 0) {
+      batches.push({
+        id: `batch${layer + 1}`,
+        layer: layer,
+        items: currentBatch,
+      });
+      layer++;
+    }
+  }
 
-	// Check for cycles
-	if (processedCount < nodes.length) {
-		const cycleNodes = Array.from(inDegree.entries())
-			.filter(([, degree]) => degree > 0)
-			.map(([id]) => id);
-		
-		// Create a simple cycle representation showing nodes involved
-		// Note: This creates a basic visual (A → B → A) rather than the exact cycle path,
-		// as determining the precise path would require additional graph traversal
-		const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
-		
-		throw new CycleError(cycle);
-	}
+  // Check for cycles
+  if (processedCount < nodes.length) {
+    const cycleNodes = Array.from(inDegree.entries())
+      .filter(([, degree]) => degree > 0)
+      .map(([id]) => id);
 
-	// Create batch plan
-	const plan: BatchPlan = {
-		planVersion: "1.0.0",
-		algorithm: "kahn_topological_sort",
-		deterministic: true,
-		planHash: "",
-		batches
-	};
+    // Create a simple cycle representation showing nodes involved
+    // Note: This creates a basic visual (A → B → A) rather than the exact cycle path,
+    // as determining the precise path would require additional graph traversal
+    const cycle = cycleNodes.length > 0 ? [...cycleNodes, cycleNodes[0]] : cycleNodes;
 
-	// Compute hash for reproducibility (exclude hash field itself)
-	const hashInput = {
-		planVersion: plan.planVersion,
-		algorithm: plan.algorithm,
-		deterministic: plan.deterministic,
-		batches: plan.batches
-	};
-	plan.planHash = `sha256:${createHash('sha256')
-		.update(canonicalJSONStringify(hashInput))
-		.digest('hex')}`;
+    throw new CycleError(cycle);
+  }
 
-	return plan;
+  // Create batch plan
+  const plan: BatchPlan = {
+    planVersion: "1.0.0",
+    algorithm: "kahn_topological_sort",
+    deterministic: true,
+    planHash: "",
+    batches,
+  };
+
+  // Compute hash for reproducibility (exclude hash field itself)
+  const hashInput = {
+    planVersion: plan.planVersion,
+    algorithm: plan.algorithm,
+    deterministic: plan.deterministic,
+    batches: plan.batches,
+  };
+  plan.planHash = `sha256:${createHash("sha256")
+    .update(canonicalJSONStringify(hashInput))
+    .digest("hex")}`;
+
+  return plan;
 }

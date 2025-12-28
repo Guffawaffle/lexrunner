@@ -75,19 +75,19 @@ Create a `plan.json` file with 2-3 branches. **Important**: Branch names must ma
 
 ### Field Explanations
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `schemaVersion` | Plan schema version (currently "1.0.0") | `"1.0.0"` |
-| `title` | Human-readable plan title | `"Quick Merge-Weave Example"` |
-| `description` | Brief description of the merge operation | `"Merge feature branches into main"` |
-| `policy.requiredGates` | Gates that must pass for all items | `["lint", "typecheck"]` |
-| `policy.mergeRule` | Merge policy: `"strict-required"` or `"best-effort"` | `"strict-required"` |
-| `nodes[].id` | Unique identifier for the item | `"feature-auth"` |
-| `nodes[].branch` | **Exact remote branch name** | `"feature/auth"` |
-| `nodes[].dependsOn` | Array of item IDs this depends on | `["feature-auth"]` |
-| `nodes[].gates` | Gates to run for this item | `["lint", "typecheck"]` |
-| `integrationBranch` | Branch to merge all items into | `"integration/wave-1"` |
-| `targetBranch` | Final merge target (usually `main`) | `"main"` |
+| Field                  | Description                                          | Example                              |
+| ---------------------- | ---------------------------------------------------- | ------------------------------------ |
+| `schemaVersion`        | Plan schema version (currently "1.0.0")              | `"1.0.0"`                            |
+| `title`                | Human-readable plan title                            | `"Quick Merge-Weave Example"`        |
+| `description`          | Brief description of the merge operation             | `"Merge feature branches into main"` |
+| `policy.requiredGates` | Gates that must pass for all items                   | `["lint", "typecheck"]`              |
+| `policy.mergeRule`     | Merge policy: `"strict-required"` or `"best-effort"` | `"strict-required"`                  |
+| `nodes[].id`           | Unique identifier for the item                       | `"feature-auth"`                     |
+| `nodes[].branch`       | **Exact remote branch name**                         | `"feature/auth"`                     |
+| `nodes[].dependsOn`    | Array of item IDs this depends on                    | `["feature-auth"]`                   |
+| `nodes[].gates`        | Gates to run for this item                           | `["lint", "typecheck"]`              |
+| `integrationBranch`    | Branch to merge all items into                       | `"integration/wave-1"`               |
+| `targetBranch`         | Final merge target (usually `main`)                  | `"main"`                             |
 
 ### Concurrency Control
 
@@ -120,13 +120,13 @@ lex-pr execute --plan ./plan.json --artifact-dir ./artifacts --json
 
 ### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--plan <file>` | Path to plan.json | `plan.json` |
-| `--artifact-dir <dir>` | Where to store gate outputs | `.smartergpt.local/runner` |
-| `--json` | Output JSON format (for automation) | `false` |
-| `--dry-run` | Validate plan without running gates | `false` |
-| `--max-workers <n>` | Override `policy.maxWorkers` | From plan |
+| Flag                   | Description                         | Default                    |
+| ---------------------- | ----------------------------------- | -------------------------- |
+| `--plan <file>`        | Path to plan.json                   | `plan.json`                |
+| `--artifact-dir <dir>` | Where to store gate outputs         | `.smartergpt.local/runner` |
+| `--json`               | Output JSON format (for automation) | `false`                    |
+| `--dry-run`            | Validate plan without running gates | `false`                    |
+| `--max-workers <n>`    | Override `policy.maxWorkers`        | From plan                  |
 
 ### Sample JSON Output (Success)
 
@@ -348,22 +348,20 @@ lex-pr merge --plan ./plan.json --json
       }
     ]
   },
-  "warnings": [
-    "feature-ui has 2 potential conflicts. Review and resolve before executing."
-  ]
+  "warnings": ["feature-ui has 2 potential conflicts. Review and resolve before executing."]
 }
 ```
 
 #### Interpreting Dry-Run Output
 
-| Field | Meaning |
-|-------|---------|
-| `lockHash` | Unique hash of plan + PR head commits (idempotency key) |
-| `batches` | Execution order grouped by dependency level |
-| `batches[].level` | Dependency level (0 = no dependencies, 1 = depends on level 0, etc.) |
-| `preflight.enabled` | Whether preflight conflict detection ran |
-| `preflight.conflictsDetected` | Number of items with potential conflicts |
-| `warnings` | Issues to address before executing |
+| Field                         | Meaning                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `lockHash`                    | Unique hash of plan + PR head commits (idempotency key)              |
+| `batches`                     | Execution order grouped by dependency level                          |
+| `batches[].level`             | Dependency level (0 = no dependencies, 1 = depends on level 0, etc.) |
+| `preflight.enabled`           | Whether preflight conflict detection ran                             |
+| `preflight.conflictsDetected` | Number of items with potential conflicts                             |
+| `warnings`                    | Issues to address before executing                                   |
 
 ### Execute Mode (Actual Merge)
 
@@ -375,13 +373,13 @@ lex-pr merge --plan ./plan.json --execute --json
 
 #### Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--execute` | Actually perform merge operations | `false` |
-| `--cleanup` | Remove integration branch after success | `false` |
-| `--force` | Execute even if same lock hash exists | `false` |
-| `--skip-preflight` | Skip preflight conflict detection | `false` |
-| `--fail-on-preflight-conflict` | Abort if conflicts detected | `false` |
+| Flag                           | Description                             | Default |
+| ------------------------------ | --------------------------------------- | ------- |
+| `--execute`                    | Actually perform merge operations       | `false` |
+| `--cleanup`                    | Remove integration branch after success | `false` |
+| `--force`                      | Execute even if same lock hash exists   | `false` |
+| `--skip-preflight`             | Skip preflight conflict detection       | `false` |
+| `--fail-on-preflight-conflict` | Abort if conflicts detected             | `false` |
 
 #### Sample Execute Output (Success)
 
@@ -475,6 +473,7 @@ lex-pr merge --plan ./plan.json --execute --json
 **Solutions**:
 
 1. **Move plan file to `/tmp`**:
+
    ```bash
    # If plan.json is causing dirty status
    mv plan.json /tmp/plan.json
@@ -482,6 +481,7 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 2. **Check git status**:
+
    ```bash
    git status
 
@@ -493,6 +493,7 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 3. **Commit or stash changes**:
+
    ```bash
    # Option 1: Commit changes
    git add .
@@ -521,6 +522,7 @@ lex-pr merge --plan ./plan.json --execute --json
 **Problem**: Merge resulted in conflicts
 
 **What happens**:
+
 - Merge operation pauses in conflicted state
 - `weave-lock.json` is created to track progress
 - Conflicted files are marked in git
@@ -528,6 +530,7 @@ lex-pr merge --plan ./plan.json --execute --json
 **Resolution steps**:
 
 1. **Check conflict status**:
+
    ```bash
    git status
 
@@ -543,6 +546,7 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 2. **View conflicted files**:
+
    ```bash
    git diff --name-only --diff-filter=U
 
@@ -552,6 +556,7 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 3. **Resolve conflicts manually**:
+
    ```bash
    # Edit files to resolve conflicts
    vim src/components/Header.tsx
@@ -565,6 +570,7 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 4. **Or abort the merge**:
+
    ```bash
    # Abort current merge
    git merge --abort
@@ -585,6 +591,7 @@ lex-pr merge --plan ./plan.json --execute --json
 **Solutions**:
 
 1. **List remote branches**:
+
    ```bash
    git branch -r | grep feature
 
@@ -595,12 +602,13 @@ lex-pr merge --plan ./plan.json --execute --json
    ```
 
 2. **Update plan with correct names**:
+
    ```json
    {
      "nodes": [
        {
          "id": "feature-api",
-         "branch": "feature/api-endpoints"  // Updated to match remote
+         "branch": "feature/api-endpoints" // Updated to match remote
        }
      ]
    }
@@ -620,17 +628,20 @@ lex-pr merge --plan ./plan.json --execute --json
 **Solutions**:
 
 1. **Use `--force` to override**:
+
    ```bash
    lex-pr merge --plan ./plan.json --execute --force
    ```
 
 2. **Remove lock file manually**:
+
    ```bash
    rm weave-lock.json
    lex-pr merge --plan ./plan.json --execute
    ```
 
 3. **Check if previous execution completed**:
+
    ```bash
    cat weave-lock.json
 
@@ -690,7 +701,7 @@ name: Merge-Weave Gate
 on:
   pull_request:
     paths:
-      - 'plan.json'
+      - "plan.json"
 
 jobs:
   validate-plan:
@@ -698,11 +709,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history for branch checks
+          fetch-depth: 0 # Need full history for branch checks
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install lexrunner
         run: npm install -g lexrunner
@@ -752,6 +763,7 @@ jobs:
 5. **Automate in CI**: Set up CI gates to validate plans on PR changes
 
 For production use:
+
 - Use `--fail-on-preflight-conflict` in CI to catch conflicts early
 - Store plans in version control for audit trail
 - Use `--track-turncost` to measure coordination overhead

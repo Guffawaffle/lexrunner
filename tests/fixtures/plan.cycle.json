@@ -1,14 +1,14 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"items": [
-		{
-			"name": "feat-a",
-			"deps": ["feat-b"]
-		},
-		{
-			"name": "feat-b",
-			"deps": ["feat-a"]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "feat-a",
+      "deps": ["feat-b"]
+    },
+    {
+      "name": "feat-b",
+      "deps": ["feat-a"]
+    }
+  ]
 }

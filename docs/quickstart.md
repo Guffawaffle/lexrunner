@@ -29,6 +29,7 @@ lex-pr init
 ```
 
 The wizard will:
+
 1. Detect your project type (Node.js, Python, Rust, Go, etc.)
 2. Prompt for GitHub token (optional but recommended)
 3. Validate repository access
@@ -72,11 +73,13 @@ Describe your project goals and scope:
 # Project Intent
 
 ## Goals
+
 - Implement feature X
 - Refactor module Y
 - Fix critical bug Z
 
 ## Success Criteria
+
 - All tests pass
 - Code coverage > 80%
 - No security vulnerabilities
@@ -153,18 +156,21 @@ lex-pr plan --from-github
 Share prompts across repositories using one of three methods:
 
 **Method 1: Environment Variable (Recommended for CI/CD)**
+
 ```bash
 export LEX_PROMPTS_DIR=/path/to/lex/.smartergpt/prompts
 lex-pr plan --from-github
 ```
 
 **Method 2: Symlink (Recommended for Development)**
+
 ```bash
 ln -s ../../lex/.smartergpt/prompts .smartergpt.local/prompts
 lex-pr plan --from-github
 ```
 
 **Method 3: Copy (Recommended for Customization)**
+
 ```bash
 cp -r ../lex/.smartergpt/prompts .smartergpt.local/
 lex-pr plan --from-github
@@ -223,6 +229,7 @@ lex-pr plan --from-github
 ```
 
 **What this does:**
+
 1. Fetches all open PRs matching your scope filters
 2. Parses explicit dependencies from PR descriptions (e.g., `Depends-on: #42`)
 3. Analyzes file changes to suggest implicit dependencies
@@ -231,20 +238,24 @@ lex-pr plan --from-github
 6. Generates `plan.json`
 
 **Example PR description with explicit dependency:**
+
 ```markdown
 # Add Authentication UI
 
 UI components for the auth system.
 
 ## Dependencies
+
 Depends-on: #42
 
 ## Changes
+
 - Add LoginForm component
 - Add LogoutButton component
 ```
 
 **Review dependency suggestions before generating final plan:**
+
 ```bash
 # See file-based dependency suggestions
 lex-pr plan --suggest-deps --threshold=0.7 > suggestions.md
@@ -254,6 +265,7 @@ lex-pr plan --from-github
 ```
 
 See the **[Diffgraph Planner Guide](./diffgraph-planner.md)** for complete documentation on:
+
 - Dependency syntax reference
 - File-change heuristics
 - Validation & troubleshooting
@@ -288,6 +300,7 @@ Create `plan.json` manually for full control:
 ```
 
 **Generated plan structure:**
+
 - Dependency graph
 - Merge order (topologically sorted)
 - Policy configuration
@@ -301,6 +314,7 @@ lex-pr execute plan.json
 ```
 
 Gates run in dependency order, ensuring:
+
 - Dependencies pass before dependents
 - Parallel execution where possible
 - Clear status reporting
@@ -324,22 +338,26 @@ lex-pr merge plan.json
 For automated workflows, use autopilot levels:
 
 ### Level 0: Report Only
+
 ```bash
 lex-pr autopilot plan.json --level 0
 ```
 
 ### Level 1: Artifact Generation
+
 ```bash
 lex-pr autopilot plan.json --level 1
 ```
 
 Generates:
+
 - `analysis.json` - Structured merge analysis
 - `weave-report.md` - Human-readable report
 - `gate-predictions.json` - Expected outcomes
 - `execution-log.md` - Tracking template
 
 ### Level 2: Branch Creation (requires writable profile)
+
 ```bash
 lex-pr autopilot plan.json --level 2 --profile-dir .smartergpt.local/
 ```
@@ -347,6 +365,7 @@ lex-pr autopilot plan.json --level 2 --profile-dir .smartergpt.local/
 ## Common Workflows
 
 ### Workflow 1: Manual Review
+
 ```bash
 lex-pr init
 lex-pr doctor
@@ -359,6 +378,7 @@ lex-pr merge plan.json
 ```
 
 ### Workflow 2: CI/CD Pipeline
+
 ```bash
 #!/bin/bash
 set -e
@@ -380,6 +400,7 @@ fi
 ```
 
 ### Workflow 3: Stack Merging
+
 ```bash
 # For PR stacks with dependencies
 lex-pr plan --from-github --stack
@@ -396,12 +417,14 @@ lex-pr merge plan.json
 ### Configuration Issues
 
 **Problem**: "Configuration already exists"
+
 ```bash
 # Solution: Use --force to overwrite
 lex-pr init --force
 ```
 
 **Problem**: "Write protection error"
+
 ```bash
 # Solution: Use .smartergpt.local instead
 lex-pr init --profile-dir .smartergpt.local
@@ -410,6 +433,7 @@ lex-pr init --profile-dir .smartergpt.local
 ### GitHub Integration Issues
 
 **Problem**: "GitHub authentication failed"
+
 ```bash
 # Solution: Set up GitHub token
 export GITHUB_TOKEN=ghp_your_token_here
@@ -417,6 +441,7 @@ lex-pr init
 ```
 
 **Problem**: "Repository not detected"
+
 ```bash
 # Solution: Ensure you're in a Git repository with GitHub remote
 git remote -v
@@ -425,6 +450,7 @@ git remote -v
 ### Quality Gate Failures
 
 **Problem**: Gates fail unexpectedly
+
 ```bash
 # Solution 1: Run gates locally first
 npm run typecheck
@@ -449,12 +475,14 @@ lex-pr execute plan.json --json
 ## Pro Tips
 
 1. **Use environment variables for tokens**:
+
    ```bash
    export GITHUB_TOKEN=your_token
    export GH_TOKEN=your_token  # Alternative
    ```
 
 2. **Keep `.smartergpt.local/` in .gitignore**:
+
    ```gitignore
    .smartergpt.local/
    .smartergpt/runner/
@@ -466,29 +494,32 @@ lex-pr execute plan.json --json
    - Use `.smartergpt.local/` for local work
 
 4. **Validate before committing**:
+
    ```bash
    lex-pr schema validate plan.json
    lex-pr doctor --bootstrap
    ```
 
 5. **Use JSON mode for automation**:
+
    ```bash
    lex-pr doctor --json | jq '.hasErrors'
    lex-pr execute plan.json --json | jq '.results'
    ```
 
 6. **Power user shortcuts**:
+
    ```bash
    # Interactive plan exploration
    lex-pr view plan.json
-   
+
    # Query and analyze plans
    lex-pr query plan.json --stats
    lex-pr query plan.json "level eq 1"
-   
+
    # Batch operations
    lex-pr merge --batch --levels "1,2" --execute
-   
+
    # Shell completion
    eval "$(lex-pr completion bash)"
    ```
@@ -496,6 +527,7 @@ lex-pr execute plan.json --json
 ## Success! 🎉
 
 You've completed the quickstart guide. You should now be able to:
+
 - ✅ Initialize a workspace
 - ✅ Configure PR discovery and gates
 - ✅ Generate merge plans

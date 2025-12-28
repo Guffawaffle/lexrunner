@@ -13,13 +13,13 @@ Token tracking uses a simple character-based heuristic (chars/4) to estimate tok
 Provides functions to estimate token counts:
 
 ```typescript
-import { estimateTokens, estimateTokensFromFile } from './util/tokenEstimator.js';
+import { estimateTokens, estimateTokensFromFile } from "./util/tokenEstimator.js";
 
 // Estimate from text
-const tokens = estimateTokens('hello world'); // ~3 tokens
+const tokens = estimateTokens("hello world"); // ~3 tokens
 
 // Estimate from file
-const fileTokens = estimateTokensFromFile('/path/to/file.txt', fs);
+const fileTokens = estimateTokensFromFile("/path/to/file.txt", fs);
 ```
 
 ### Token Logger (`src/monitoring/tokenLogger.ts`)
@@ -27,20 +27,20 @@ const fileTokens = estimateTokensFromFile('/path/to/file.txt', fs);
 Writes structured JSONL logs to `.smartergpt.local/runner/logs/token-usage.jsonl`:
 
 ```typescript
-import { createTokenLogger } from './monitoring/tokenLogger.js';
+import { createTokenLogger } from "./monitoring/tokenLogger.js";
 
-const logger = createTokenLogger({ profileDir: '/path/to/profile' });
+const logger = createTokenLogger({ profileDir: "/path/to/profile" });
 
 // Log text content
-logger.logText('load-instruction', 'AGENTS.md', fileContent);
+logger.logText("load-instruction", "AGENTS.md", fileContent);
 
 // Log from file path
-logger.logFile('load-persona', '/path/to/persona.md');
+logger.logFile("load-persona", "/path/to/persona.md");
 
 // Log with metadata
-logger.log('cli-operation', 'merge-weave', 250, { 
-  operation: 'merge',
-  prCount: 5 
+logger.log("cli-operation", "merge-weave", 250, {
+  operation: "merge",
+  prCount: 5,
 });
 
 await logger.close();
@@ -64,37 +64,30 @@ lex-pr token-report --profile-dir /custom/path
 ## Usage Example
 
 ```typescript
-import { createTokenLogger } from './monitoring/tokenLogger.js';
-import * as fs from 'fs';
+import { createTokenLogger } from "./monitoring/tokenLogger.js";
+import * as fs from "fs";
 
 async function trackInstructionLoading(profileDir: string) {
   const logger = createTokenLogger({ profileDir });
-  
+
   // Track instruction file loading
-  const instructionFiles = [
-    'AGENTS.md',
-    '.github/copilot-instructions.md',
-    'CLAUDE.md'
-  ];
-  
+  const instructionFiles = ["AGENTS.md", ".github/copilot-instructions.md", "CLAUDE.md"];
+
   for (const file of instructionFiles) {
     if (fs.existsSync(file)) {
-      logger.logFile('load-instruction', file, { type: 'instruction' });
+      logger.logFile("load-instruction", file, { type: "instruction" });
     }
   }
-  
+
   // Track persona loading
-  const personaFiles = [
-    '.smartergpt/personas/senior-dev.md',
-    '.smartergpt/personas/eager-pm.md'
-  ];
-  
+  const personaFiles = [".smartergpt/personas/senior-dev.md", ".smartergpt/personas/eager-pm.md"];
+
   for (const file of personaFiles) {
     if (fs.existsSync(file)) {
-      logger.logFile('load-persona', file, { type: 'persona' });
+      logger.logFile("load-persona", file, { type: "persona" });
     }
   }
-  
+
   await logger.close();
 }
 ```
@@ -111,6 +104,7 @@ JSONL format (one JSON object per line):
 ## Report Output
 
 Human-readable:
+
 ```
 Token Usage Report
 ============================================================
@@ -149,7 +143,7 @@ JSON format is also available via `--json` flag for programmatic analysis.
 Potential areas to add token tracking:
 
 - Instruction file loading (AGENTS.md, copilot-instructions.md)
-- Persona file loading (.smartergpt/personas/*.md)
+- Persona file loading (.smartergpt/personas/\*.md)
 - Major CLI operations (merge-weave, fanout, etc.)
 - Tool call responses (if metadata available)
 - Context window checkpoints

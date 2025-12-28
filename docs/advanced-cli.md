@@ -49,6 +49,7 @@ field operator value [AND field operator value]
 ```
 
 **Supported Operators:**
+
 - `eq` - Equal to
 - `ne` - Not equal to
 - `contains` - String contains
@@ -330,7 +331,7 @@ lex-pr execute plan.json || exit 1
 # Merge level by level
 for level in $(seq 1 10); do
   items=$(lex-pr query plan.json --level $level --format json | jq -r '.count')
-  
+
   if [ "$items" -gt 0 ]; then
     echo "Merging level $level ($items items)..."
     lex-pr merge plan.json --batch --levels "$level" --execute || break
@@ -392,21 +393,25 @@ lex-pr retry --items "$failed_items"
 ### Common Issues
 
 **Interactive viewer not working:**
+
 - Ensure terminal supports TTY mode
 - Check for conflicting readline configurations
 - Try running in a different terminal emulator
 
 **Query syntax errors:**
+
 - Check operator spelling (eq, ne, contains, etc.)
 - Ensure field names are correct
 - Use quotes for string values with spaces
 
 **Batch operations failing:**
+
 - Verify filter syntax with `--dry-run` first
 - Check that items exist in plan
 - Ensure dependencies are satisfied
 
 **Completion not working:**
+
 - Verify completion script is sourced
 - Check shell configuration file is loaded
 - Restart shell after installation

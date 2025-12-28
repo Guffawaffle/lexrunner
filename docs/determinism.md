@@ -15,13 +15,13 @@ Determinism is critical for reproducible merge-weave operations. When the same i
 
 This project pins the following toolchain versions in `.tool-versions` and `.nvmrc`:
 
-| Tool | Version | Source |
-|------|---------|--------|
-| git | 2.45.2 | `.tool-versions` |
-| Node.js | 20.18.0 | `.nvmrc` + `.tool-versions` |
-| npm | 10.8.2 | `.tool-versions` |
-| TypeScript | 5.6.3 | `package.json` |
-| ESLint | 9.10.0 | `package.json` |
+| Tool       | Version | Source                      |
+| ---------- | ------- | --------------------------- |
+| git        | 2.45.2  | `.tool-versions`            |
+| Node.js    | 20.18.0 | `.nvmrc` + `.tool-versions` |
+| npm        | 10.8.2  | `.tool-versions`            |
+| TypeScript | 5.6.3   | `package.json`              |
+| ESLint     | 9.10.0  | `package.json`              |
 
 **Note**: This project uses `.editorconfig` for formatting (not Prettier).
 
@@ -89,6 +89,7 @@ lex-pr orchestrate:pin-toolchain --verify
 ```
 
 Expected output when everything matches:
+
 ```
 🔧 Toolchain Version Verification
 
@@ -102,6 +103,7 @@ Expected output when everything matches:
 ```
 
 Exit codes:
+
 - `0`: All versions match
 - `1`: Version mismatch detected
 
@@ -109,11 +111,11 @@ Exit codes:
 
 Set these environment variables for consistent behavior:
 
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `TZ` | `UTC` | Consistent timestamps across timezones |
-| `LANG` | `en_US.UTF-8` | Consistent locale for sorting/collation |
-| `LC_ALL` | `en_US.UTF-8` | Override all locale settings |
+| Variable | Value         | Purpose                                 |
+| -------- | ------------- | --------------------------------------- |
+| `TZ`     | `UTC`         | Consistent timestamps across timezones  |
+| `LANG`   | `en_US.UTF-8` | Consistent locale for sorting/collation |
+| `LC_ALL` | `en_US.UTF-8` | Override all locale settings            |
 
 ### Local Setup
 
@@ -179,6 +181,7 @@ git diff --exit-code  # Must be clean
 ```
 
 If this fails, it means:
+
 - Generated files (schemas, types) aren't checked in
 - Formatting isn't consistent
 - Build output varies

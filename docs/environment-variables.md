@@ -26,12 +26,14 @@ Specifies the profile directory to use for execution.
 - **Aliases:** `LEXRUNNER_PROFILE_DIR` (deprecated, will be removed in v2.0.0)
 
 **Example:**
+
 ```bash
 export LEX_PR_PROFILE_DIR=/workspace/.smartergpt.local
 lex-pr plan --from-github
 ```
 
 **CI Usage:**
+
 ```yaml
 # GitHub Actions
 env:
@@ -50,6 +52,7 @@ Controls whether the runner can perform write operations (merge operations, PR u
 - **MCP Server:** Required for merge operations via MCP
 
 **Example:**
+
 ```bash
 # Enable mutations for local development
 export ALLOW_MUTATIONS=true
@@ -60,6 +63,7 @@ lex-pr merge plan.json --dry-run
 ```
 
 **MCP Server:**
+
 ```bash
 # MCP server respects ALLOW_MUTATIONS
 export ALLOW_MUTATIONS=true
@@ -83,6 +87,7 @@ Controls whether git operations are enabled. Default is "off" for safe CI/epheme
 | `live` | Enabled, executes actual git commands | Local development, git-dependent workflows |
 
 **Example:**
+
 ```bash
 # Enable git operations for local development
 export LEX_GIT_MODE=live
@@ -101,6 +106,7 @@ Fallback branch name when git is disabled or unavailable.
 - **Used When:** `LEX_GIT_MODE=off` or git commands fail
 
 **Example:**
+
 ```bash
 export LEX_GIT_MODE=off
 export LEX_DEFAULT_BRANCH=develop
@@ -116,6 +122,7 @@ Fallback commit SHA when git is disabled or unavailable.
 - **Used When:** `LEX_GIT_MODE=off` or git commands fail
 
 **Example:**
+
 ```bash
 export LEX_GIT_MODE=off
 export LEX_DEFAULT_COMMIT=abc123def456789012345678901234567890abcd
@@ -136,12 +143,14 @@ GitHub API authentication token. **Required for CI role profiles**.
 - **CI Role:** Required (validation enforced)
 
 **Example:**
+
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 lex-pr plan --from-github "is:open label:ready"
 ```
 
 **GitHub Actions:**
+
 ```yaml
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -153,8 +162,8 @@ For backward compatibility, lexrunner supports deprecated `LEXRUNNER_*` prefixes
 
 ### Supported Aliases
 
-| Primary Variable | Deprecated Alias | Status |
-|-----------------|------------------|---------|
+| Primary Variable     | Deprecated Alias        | Status                        |
+| -------------------- | ----------------------- | ----------------------------- |
 | `LEX_PR_PROFILE_DIR` | `LEXRUNNER_PROFILE_DIR` | Deprecated, removed in v2.0.0 |
 
 ### Deprecation Behavior
@@ -167,8 +176,9 @@ When a deprecated alias is used:
 4. **Timeline:** Aliases will be removed in v2.0.0
 
 **Example Warning:**
+
 ```
-⚠️  Environment variable LEXRUNNER_PROFILE_DIR is deprecated. 
+⚠️  Environment variable LEXRUNNER_PROFILE_DIR is deprecated.
 Use LEX_PR_PROFILE_DIR instead. Support for LEXRUNNER_PROFILE_DIR will be removed in v2.0.0.
 ```
 
@@ -216,6 +226,7 @@ LEX_PR_PROFILE_DIR=/tmp/test lex-pr plan 2>&1 | grep -i deprecated
 Profiles with `role: ci` in `profile.yml` have enhanced safety mechanisms to prevent accidental mutations in CI/CD environments.
 
 **Profile Manifest Example:**
+
 ```yaml
 # /tmp/ci-profile/profile.yml
 role: ci
@@ -236,6 +247,7 @@ profile.role === 'ci'
 ```
 
 **Explicit Override:**
+
 ```bash
 # Requires explicit override with warning
 export ALLOW_MUTATIONS=true
@@ -245,6 +257,7 @@ export ALLOW_MUTATIONS=true
 ```
 
 **Invalid Values:**
+
 ```bash
 export ALLOW_MUTATIONS=yes
 
@@ -257,6 +270,7 @@ export ALLOW_MUTATIONS=yes
 CI role profiles **require** `GITHUB_TOKEN` or `GH_TOKEN` to be set.
 
 **Validation Error:**
+
 ```bash
 # Missing token in CI role
 lex-pr plan --from-github
@@ -268,6 +282,7 @@ lex-pr plan --from-github
 ```
 
 **Valid Configuration:**
+
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 lex-pr plan --from-github  # ✓ Succeeds
@@ -304,15 +319,15 @@ on:
 jobs:
   merge-weave:
     runs-on: ubuntu-latest
-    
+
     env:
       LEX_PR_PROFILE_DIR: /tmp/ci-profile
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # ALLOW_MUTATIONS not set → defaults to false (safe)
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup CI Profile
         run: |
           mkdir -p /tmp/ci-profile
@@ -322,7 +337,7 @@ jobs:
           name: GitHub Actions CI
           version: 1.0.0
           EOF
-      
+
       - name: Run Gates (Read-Only)
         run: lex-pr gates run plan.json
 ```
@@ -340,15 +355,15 @@ on:
 jobs:
   merge-weave:
     runs-on: ubuntu-latest
-    
+
     env:
       LEX_PR_PROFILE_DIR: /tmp/ci-profile
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      ALLOW_MUTATIONS: true  # Explicit override
-    
+      ALLOW_MUTATIONS: true # Explicit override
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup CI Profile
         run: |
           mkdir -p /tmp/ci-profile
@@ -358,12 +373,13 @@ jobs:
           name: GitHub Actions CI (Mutations)
           version: 1.0.0
           EOF
-      
+
       - name: Execute Merge
         run: lex-pr merge plan.json --execute
 ```
 
 **Output:**
+
 ```
 ⚠️  CI role with ALLOW_MUTATIONS=true (explicit override)
 ❌ CI environment validation failed:
@@ -380,7 +396,7 @@ jobs:
 # .gitlab-ci.yml
 variables:
   LEX_PR_PROFILE_DIR: /tmp/ci-profile
-  GITHUB_TOKEN: $GITHUB_TOKEN  # From CI/CD variables
+  GITHUB_TOKEN: $GITHUB_TOKEN # From CI/CD variables
 
 merge-weave:
   stage: deploy
@@ -400,27 +416,31 @@ merge-weave:
 #### ✅ Recommended
 
 1. **Use CI role for all CI/CD pipelines**
+
    ```yaml
    role: ci
    ```
 
 2. **Never set `ALLOW_MUTATIONS=true` by default**
+
    ```yaml
    # ❌ Bad
    env:
      ALLOW_MUTATIONS: true
-   
+
    # ✅ Good
    # (omit ALLOW_MUTATIONS, defaults to false)
    ```
 
 3. **Set `GITHUB_TOKEN` explicitly**
+
    ```yaml
    env:
      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
    ```
 
 4. **Use dry-run for validation**
+
    ```bash
    lex-pr merge plan.json --dry-run
    ```
@@ -436,18 +456,20 @@ merge-weave:
 #### ❌ Avoid
 
 1. **Setting `ALLOW_MUTATIONS=true` in PR workflows**
+
    ```yaml
    # Dangerous: PR workflows should be read-only
    on:
      pull_request:
    env:
-     ALLOW_MUTATIONS: true  # ❌ Bad
+     ALLOW_MUTATIONS: true # ❌ Bad
    ```
 
 2. **Using non-CI roles in CI/CD**
+
    ```yaml
    # .smartergpt.local/profile.yml
-   role: development  # ❌ Use 'ci' instead
+   role: development # ❌ Use 'ci' instead
    ```
 
 3. **Hardcoding tokens**
@@ -482,6 +504,7 @@ lexrunner-mcp
 ```
 
 **MCP Tool Behavior:**
+
 - `merge.apply` requires `ALLOW_MUTATIONS=true` or `dryRun=true`
 - CI role forces `ALLOW_MUTATIONS=false` unless explicitly overridden
 - `GITHUB_TOKEN` validation enforced for CI role
@@ -497,12 +520,14 @@ lexrunner-mcp
 ### CI Environment Validation Failed
 
 **Problem:**
+
 ```
 ❌ CI environment validation failed:
   - Missing GITHUB_TOKEN (required for CI role)
 ```
 
 **Solution:** Set `GITHUB_TOKEN` or `GH_TOKEN`:
+
 ```bash
 export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 ```
@@ -511,18 +536,21 @@ export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
 **Problem:** Merge operations fail with "Mutations not allowed".
 
-**Solution:** 
+**Solution:**
+
 1. **Recommended:** Use `--dry-run` for validation
 2. **If mutations needed:** Set `ALLOW_MUTATIONS=true` explicitly (with caution)
 
 ### Invalid ALLOW_MUTATIONS Value
 
 **Problem:**
+
 ```
 ⚠️  Invalid ALLOW_MUTATIONS value: "yes" (using false for CI)
 ```
 
 **Solution:** Use `true` or `false`:
+
 ```bash
 export ALLOW_MUTATIONS=true  # or false
 ```
@@ -557,15 +585,15 @@ on:
 jobs:
   gates:
     runs-on: ubuntu-latest
-    
+
     env:
       LEX_PR_PROFILE_DIR: /tmp/ci-profile
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # ALLOW_MUTATIONS not set → defaults to false
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup CI Profile
         run: |
           mkdir -p /tmp/ci-profile
@@ -575,16 +603,16 @@ jobs:
           name: PR Gates CI
           version: 1.0.0
           EOF
-      
+
       - name: Install lexrunner
         run: npm install -g lexrunner
-      
+
       - name: Generate Plan
         run: lex-pr plan --from-github --json > plan.json
-      
+
       - name: Run Gates
         run: lex-pr gates run plan.json
-      
+
       - name: Dry Run Merge
         run: lex-pr merge plan.json --dry-run
 ```

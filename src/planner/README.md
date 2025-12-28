@@ -14,14 +14,17 @@ The file-change analysis engine detects implicit dependencies between PRs by ana
 ## Modules
 
 ### File Analysis (`fileAnalysis.ts`)
+
 Analyzes file changes across PRs to detect dependencies and conflicts.
 
 ### Scope Validation (`scopeValidator.ts`)
+
 **NEW**: Validates that agent edits match declared scope to prevent unintended modifications.
 
 See [Scope Validation Documentation](../../docs/scope-validation.md) for details.
 
 **Key capabilities:**
+
 - Detects global variable writes (`window.*`, `global.*`)
 - Validates function/class modifications match declarations
 - Identifies side effects (module-level vs. global)
@@ -29,16 +32,17 @@ See [Scope Validation Documentation](../../docs/scope-validation.md) for details
 - AST-based analysis for JavaScript/TypeScript
 
 **Quick example:**
+
 ```typescript
 import { validateEditScope } from "./planner/scopeValidator.js";
 
 const declaredPlan = {
-  functions_modified: ['processPayment'],
-  side_effects: 'none',
-  globals_written: []
+  functions_modified: ["processPayment"],
+  side_effects: "none",
+  globals_written: [],
 };
 
-await validateEditScope('/path/to/file.js', declaredPlan);
+await validateEditScope("/path/to/file.js", declaredPlan);
 // Throws ScopeValidationError if actual changes don't match
 ```
 
@@ -54,14 +58,12 @@ import { analyzeGitHubPRFiles } from "./core/githubPlan.js";
 const client = await createGitHubClient({
   token: process.env.GITHUB_TOKEN,
   owner: "your-org",
-  repo: "your-repo"
+  repo: "your-repo",
 });
 
 // Get PR details
 const prs = await client.listOpenPRs();
-const prDetails = await Promise.all(
-  prs.map(pr => client.getPRDetails(pr.number))
-);
+const prDetails = await Promise.all(prs.map((pr) => client.getPRDetails(pr.number)));
 
 // Analyze file changes
 const analysis = await analyzeGitHubPRFiles(client, prDetails);
@@ -84,7 +86,7 @@ const analyzer = createFileAnalyzer(octokit, "owner", "repo");
 // Analyze specific PRs
 const result = await analyzer.analyzeFiles([
   { number: 101, name: "PR-101", sha: "abc123" },
-  { number: 102, name: "PR-102", sha: "def456" }
+  { number: 102, name: "PR-102", sha: "def456" },
 ]);
 ```
 
@@ -173,7 +175,7 @@ import { generatePlanFromGitHub } from "./core/githubPlan.js";
 
 const plan = await generatePlanFromGitHub(client, {
   labels: ["stack:feature"],
-  target: "main"
+  target: "main",
 });
 
 // Optionally analyze file changes to suggest additional dependencies
@@ -205,6 +207,7 @@ npm test -- tests/fileAnalysis.spec.ts
 ```
 
 Tests cover:
+
 - File change fetching and caching
 - Intersection matrix calculation
 - Conflict prediction with severity levels

@@ -10,14 +10,14 @@ Secret rotation is a critical security practice that limits the exposure window 
 
 ### Recommended Schedules
 
-| Secret Type | Recommended Rotation | Maximum Age | Risk Level |
-|-------------|---------------------|-------------|------------|
-| GitHub Personal Access Tokens (PAT) | 90 days | 180 days | High |
-| API Keys (External Services) | 90 days | 180 days | High |
-| Database Credentials | 60 days | 120 days | Critical |
-| Signing Keys (AUDIT_SIGNING_KEY) | 180 days | 365 days | Critical |
-| Service Account Tokens | 90 days | 180 days | High |
-| Development/Testing Secrets | 180 days | 365 days | Medium |
+| Secret Type                         | Recommended Rotation | Maximum Age | Risk Level |
+| ----------------------------------- | -------------------- | ----------- | ---------- |
+| GitHub Personal Access Tokens (PAT) | 90 days              | 180 days    | High       |
+| API Keys (External Services)        | 90 days              | 180 days    | High       |
+| Database Credentials                | 60 days              | 120 days    | Critical   |
+| Signing Keys (AUDIT_SIGNING_KEY)    | 180 days             | 365 days    | Critical   |
+| Service Account Tokens              | 90 days              | 180 days    | High       |
+| Development/Testing Secrets         | 180 days             | 365 days    | Medium     |
 
 ### Compliance Requirements
 
@@ -44,6 +44,7 @@ lex-pr security check-rotation GITHUB_TOKEN --format json
 ```
 
 **Exit codes:**
+
 - `0` - All secrets within policy (no action needed)
 - `1` - Findings detected (rotation needed)
 - `2` - Internal error (investigate)
@@ -57,7 +58,7 @@ Integrate rotation checks into CI/CD pipelines:
 - name: Check Secret Rotation
   run: |
     lex-pr security check-rotation GITHUB_TOKEN --max-age 90
-  continue-on-error: true  # Warn but don't block
+  continue-on-error: true # Warn but don't block
 ```
 
 ### Pattern 3: Scheduled Rotation Script
@@ -144,7 +145,7 @@ export LEX_PR_AUDIT_SIGNING_KEY="base64_key_..."
 The `SecretsManager` supports custom providers:
 
 ```typescript
-import { SecretsManager, SecretProvider } from './src/security/secrets.js';
+import { SecretsManager, SecretProvider } from "./src/security/secrets.js";
 
 // Implement vault provider
 class VaultProvider implements SecretProvider {
@@ -185,17 +186,17 @@ fi
 ### Monitoring Integration
 
 ```typescript
-import { checkRotation } from './src/commands/security.js';
+import { checkRotation } from "./src/commands/security.js";
 
 async function monitorRotation() {
-  const result = await checkRotation(['GITHUB_TOKEN', 'API_KEY'], 90);
-  
-  if (result.status === 'findings') {
+  const result = await checkRotation(["GITHUB_TOKEN", "API_KEY"], 90);
+
+  if (result.status === "findings") {
     // Send to monitoring system
     await sendAlert({
-      severity: 'warning',
+      severity: "warning",
       message: `${result.findings.summary.needsRotation.length} secrets need rotation`,
-      details: result.findings
+      details: result.findings,
     });
   }
 }
@@ -233,6 +234,7 @@ Error: Secret LEX_PR_GITHUB_TOKEN not found
 ```
 
 **Solution:**
+
 ```bash
 # Verify environment variable is set
 echo $LEX_PR_GITHUB_TOKEN
@@ -246,8 +248,9 @@ lex-pr security validate-secrets GITHUB_TOKEN
 If rotation check reports incorrect age:
 
 1. Check secret metadata:
+
    ```typescript
-   const secret = await secretsManager.getSecret('GITHUB_TOKEN');
+   const secret = await secretsManager.getSecret("GITHUB_TOKEN");
    console.log(secret.metadata);
    ```
 
@@ -274,17 +277,17 @@ vault token lookup
 All rotation activities should be logged:
 
 ```typescript
-import { EnterpriseAuditService } from './src/security/compliance.js';
+import { EnterpriseAuditService } from "./src/security/compliance.js";
 
 const audit = new EnterpriseAuditService(process.env.AUDIT_SIGNING_KEY);
 
 audit.logSecure(
-  'secret_rotated',
-  'completed',
+  "secret_rotated",
+  "completed",
   {
-    secretId: 'GITHUB_TOKEN',
-    rotatedBy: 'alice@example.com',
-    rotatedAt: new Date().toISOString()
+    secretId: "GITHUB_TOKEN",
+    rotatedBy: "alice@example.com",
+    rotatedAt: new Date().toISOString(),
   },
   authContext
 );

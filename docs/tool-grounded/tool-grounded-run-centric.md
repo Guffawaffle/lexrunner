@@ -3,6 +3,7 @@
 **Status:** Draft design (0.1.0)
 **Intended home:** `lexrunner/docs/tool-grounded/tool-grounded-run-centric.md`
 **Authors:**
+
 - Joseph Gustavson ("Guffawaffle")
 - Lex (GPT-5.1 Thinking, design partner)
 - Opie (Claude 4.5, senior-dev + Copilot perspective)
@@ -14,6 +15,7 @@
 This document defines a **tool-grounded, run-centric orchestration model** for LexRunner.
 
 The goal is to:
+
 - Give LLMs (Copilot, frontier models) a **structured way** to run complex procedures (merge-weave, PR review, sprint planning, etc.).
 - Move from "LLM invents workflow ad-hoc" to **"LLM navigates a pre-defined procedure"**.
 - Keep **humans at the top** for irreversible operations, while letting models handle repetitive, judgment-heavy steps safely.
@@ -55,8 +57,8 @@ In this design, orchestration is **tool-grounded**:
 
 This is the core shift:
 
-> Today: tools are things the model *can* use.
-> Tool-grounded: tools are things that *structure* the model's work.
+> Today: tools are things the model _can_ use.
+> Tool-grounded: tools are things that _structure_ the model's work.
 
 ---
 
@@ -167,18 +169,18 @@ export interface StatusResponse {
   runId: string;
 
   // core run identity
-  state: string;      // e.g. "planning" | "gated" | "executing" | "completed" | "failed"
-  mode: string;       // persona mode, e.g. "senior-dev"
-  procedure: string;  // procedure id, e.g. "merge-weave-main"
+  state: string; // e.g. "planning" | "gated" | "executing" | "completed" | "failed"
+  mode: string; // persona mode, e.g. "senior-dev"
+  procedure: string; // procedure id, e.g. "merge-weave-main"
 
   // human-readable recap
-  summary: string;    // e.g. "Gates passed. Reviewing 3 changed files in git module."
+  summary: string; // e.g. "Gates passed. Reviewing 3 changed files in git module."
 
   // optional but strongly recommended
   progress?: {
-    completed: string[];    // e.g. ["lint", "typecheck", "test"]
+    completed: string[]; // e.g. ["lint", "typecheck", "test"]
     current: string | null; // e.g. "code-analysis"
-    remaining: string[];    // e.g. ["produce-review", "await-decision"]
+    remaining: string[]; // e.g. ["produce-review", "await-decision"]
   };
 
   // what the model can do next (canonical action set)
@@ -189,7 +191,7 @@ export interface StatusResponse {
 
   // optional safety hints
   riskFlags?: string[]; // e.g. ["protected-branch"]
-  blockers?: string[];  // e.g. ["PR-315 has merge conflicts"]
+  blockers?: string[]; // e.g. ["PR-315 has merge conflicts"]
 
   // snapshot of persona config relevant for this run
   persona?: PersonaSnapshot;
@@ -210,19 +212,19 @@ Each `NextOption` describes a possible next step. Some are simple actions; some 
 
 ```ts
 export interface NextOption {
-  action: string;        // e.g. "merge_next", "abort_run", "analyze_failures"
-  description: string;   // short, verb-first, <= 1 sentence
+  action: string; // e.g. "merge_next", "abort_run", "analyze_failures"
+  description: string; // short, verb-first, <= 1 sentence
 
   // if true, this option requires an LLM decision via submitDecision
   requiresLLMDecision?: boolean;
 
   // present iff requiresLLMDecision === true
-  prompt?: string;           // focused text prompt for this decision
-  responseSchema?: object;   // JSON-schema-ish validation structure
+  prompt?: string; // focused text prompt for this decision
+  responseSchema?: object; // JSON-schema-ish validation structure
 
   // additional guidance for the model
-  objective?: string;        // e.g. "Determine if failures are flaky or real bugs"
-  constraints?: string[];    // e.g. ["Do not recommend rewriting tests"]
+  objective?: string; // e.g. "Determine if failures are flaky or real bugs"
+  constraints?: string[]; // e.g. ["Do not recommend rewriting tests"]
   style?: "brief" | "detailed";
   riskLevel?: "low" | "medium" | "high";
 }
@@ -244,13 +246,13 @@ Personas (modes) should be defined as **machine-readable config**, not just pros
 
 ```ts
 export interface PersonaConfig {
-  mode: string;   // "senior-dev", "eager-pm", ...
+  mode: string; // "senior-dev", "eager-pm", ...
 
   // hard barriers; runner and LLM must both respect these
-  forbidden: string[];   // ["merge to protected branches without human approval", ...]
+  forbidden: string[]; // ["merge to protected branches without human approval", ...]
 
   // gates that must be green before this persona can say "done"
-  completionGates: string[];   // ["lint", "typecheck", "test"]
+  completionGates: string[]; // ["lint", "typecheck", "test"]
 
   // style and behavior knobs that affect recommendations
   decisionStyle?: {
@@ -261,14 +263,14 @@ export interface PersonaConfig {
 
   // hints for exploration when more context is needed
   explorationHints?: {
-    relatedPaths?: string[];    // ["src/shared/**", "tests/**"]
-    ignorePatterns?: string[];  // ["node_modules/**", "dist/**"]
-    configFiles?: string[];     // ["tsconfig.json", "package.json"];
+    relatedPaths?: string[]; // ["src/shared/**", "tests/**"]
+    ignorePatterns?: string[]; // ["node_modules/**", "dist/**"]
+    configFiles?: string[]; // ["tsconfig.json", "package.json"];
   };
 
   // expected output shape for human-readable findings
   outputFormat?: {
-    severityLevels?: string[];          // ["blocker", "must-fix", "should-fix", "nit", "praise"];
+    severityLevels?: string[]; // ["blocker", "must-fix", "should-fix", "nit", "praise"];
     requireSeverityOnFindings?: boolean;
   };
 }
@@ -294,10 +296,10 @@ Failures are treated as **first-class decision points**, not one-off exceptions.
 
 ```ts
 export interface LexrunnerError {
-  code: string;         // "GATE_TIMEOUT", "TOOL_UNAVAILABLE", etc.
+  code: string; // "GATE_TIMEOUT", "TOOL_UNAVAILABLE", etc.
   message: string;
   retryable: boolean;
-  hint?: string;        // concrete suggestion when possible
+  hint?: string; // concrete suggestion when possible
 }
 ```
 
@@ -329,6 +331,7 @@ The LLM sees **another decision point** instead of an unstructured error, and us
 ### 6.3 Failure logs
 
 Every failure should be logged in `failures.ndjson` (or similar) with a shape that corresponds to `failureRecordSchema`, including:
+
 - `timestamp`
 - `gate`
 - `error`

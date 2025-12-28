@@ -43,8 +43,8 @@ Each pattern consists of:
     line_pattern: "expect\\(.*tools\\.length.*\\)\\.toBe\\((\\d+)\\)"
   fix:
     action: update_number
-    from_group: 1  # captured expected count
-    to_group: 2    # captured received count from test output
+    from_group: 1 # captured expected count
+    to_group: 2 # captured received count from test output
   priority: 100
   enabled: true
 ```
@@ -52,24 +52,28 @@ Each pattern consists of:
 ## Fix Actions
 
 ### `update_number`
+
 Replace a number in the matched line using capture groups.
 
 **Example:** `expect(tools.length).toBe(6)` → `expect(tools.length).toBe(7)`
 
 **Config:**
+
 ```yaml
 fix:
   action: update_number
-  from_group: 1  # Old value from detection pattern
-  to_group: 2    # New value from trigger pattern
+  from_group: 1 # Old value from detection pattern
+  to_group: 2 # New value from trigger pattern
 ```
 
 ### `update_string`
+
 Replace a string in the matched line using capture groups.
 
 **Example:** `expect(name).toBe("old")` → `expect(name).toBe("new")`
 
 **Config:**
+
 ```yaml
 fix:
   action: update_string
@@ -78,11 +82,13 @@ fix:
 ```
 
 ### `replace`
+
 Replace entire matched portion with fixed text.
 
 **Example:** `LexSona.connect()` → `LexSona.connect({ lexDb: "/nonexistent" })`
 
 **Config:**
+
 ```yaml
 fix:
   action: replace
@@ -90,9 +96,11 @@ fix:
 ```
 
 ### `make_environment_aware`
+
 Insert template code (D2 - requires judgment).
 
 **Config:**
+
 ```yaml
 fix:
   action: make_environment_aware
@@ -117,7 +125,7 @@ import {
   matchAndLocate,
   buildFixInstruction,
   applyFix,
-} from './src/weave/testfix';
+} from "./src/weave/testfix";
 
 // 1. Load patterns from YAML
 const allPatterns = loadTestFixPatterns(workspaceRoot);
@@ -133,16 +141,16 @@ const matches = matchAndLocate(testOutput, workspaceRoot, enabledPatterns);
 
 // 3. Build and apply fixes
 for (const [patternId, { trigger, locations }] of matches) {
-  const pattern = enabledPatterns.find(p => p.id === patternId);
-  
+  const pattern = enabledPatterns.find((p) => p.id === patternId);
+
   for (const location of locations) {
     const instruction = buildFixInstruction(pattern, trigger, location);
-    
+
     if (instruction) {
       // Dry run to preview changes
       const dryRunResult = applyFix(instruction, true);
       console.log(`Would fix: ${dryRunResult.oldContent} → ${dryRunResult.newContent}`);
-      
+
       // Apply for real
       const result = applyFix(instruction, false);
       if (result.success) {
@@ -158,7 +166,7 @@ for (const [patternId, { trigger, locations }] of matches) {
 ### Safe Loading
 
 ```typescript
-import { safeLoadTestFixPatterns } from './src/weave/testfix';
+import { safeLoadTestFixPatterns } from "./src/weave/testfix";
 
 const result = safeLoadTestFixPatterns(workspaceRoot);
 
@@ -207,6 +215,7 @@ npm test -- tests/unit/weave/testfix/
 ```
 
 **Test Coverage:**
+
 - Schema validation (11 tests)
 - Trigger matching (8 tests)
 - Fix location detection (8 tests)

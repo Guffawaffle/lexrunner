@@ -5,6 +5,7 @@ You are a project planner decomposing features into actionable tasks.
 ## Input
 
 **Feature Spec v0:**
+
 ```json
 {json-content}
 ```
@@ -12,6 +13,7 @@ You are a project planner decomposing features into actionable tasks.
 ## Your Task
 
 Generate an Execution Plan v1 that breaks the feature into:
+
 1. **Epic** - Top-level feature (same as Feature Spec)
 2. **Sub-Issues** - Actionable tasks with dependencies
 
@@ -30,6 +32,7 @@ Generate an Execution Plan v1 that breaks the feature into:
 ### Acceptance Criteria
 
 Each sub-issue should have:
+
 - Clear, testable acceptance criteria
 - No overlap with other sub-issues
 - Completion time estimate (S/M/L)
@@ -39,10 +42,13 @@ Each sub-issue should have:
 Generate an Execution Plan v1 JSON object conforming to schema.
 
 **Example:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": { /* Feature Spec v0 */ },
+  "sourceSpec": {
+    /* Feature Spec v0 */
+  },
   "epic": {
     "title": "Add dark mode support",
     "description": "Implement theme switcher with light/dark modes",

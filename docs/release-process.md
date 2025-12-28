@@ -5,6 +5,7 @@ This document describes the release and distribution pipeline for lexrunner.
 ## Overview
 
 The release process is designed to be:
+
 - **Deterministic**: Reproducible builds and consistent versioning
 - **Auditable**: Signed tags and changelog tracking
 - **Semi-automated**: Critical steps require manual review and approval
@@ -14,6 +15,7 @@ The release process is designed to be:
 ### 1. Canary Releases (Automated)
 
 Triggered automatically on every merge to `main`:
+
 - Published to npm with `@canary` tag
 - Version format: `0.1.0-canary.{commit-sha}`
 - Useful for testing upcoming changes
@@ -22,6 +24,7 @@ Triggered automatically on every merge to `main`:
 ### 2. Stable Releases (Manual)
 
 Triggered manually when ready for a stable release:
+
 - Follows semantic versioning (SemVer)
 - Published to npm with `@latest` tag
 - Includes changelog and signed git tag
@@ -47,6 +50,7 @@ Version bumps are determined automatically from [Conventional Commits](https://w
 ### Prerequisites
 
 1. **GPG key configured** for signing tags:
+
    ```bash
    git config --global user.signingkey YOUR_KEY_ID
    git config --global commit.gpgsign true
@@ -54,6 +58,7 @@ Version bumps are determined automatically from [Conventional Commits](https://w
    ```
 
 2. **npm authentication** configured:
+
    ```bash
    npm login
    ```
@@ -72,6 +77,7 @@ npm run release:prepare
 ```
 
 This script will:
+
 - Analyze commits since the last tag
 - Determine the next version based on conventional commits
 - Update `CHANGELOG.md` with grouped changes
@@ -85,6 +91,7 @@ git diff CHANGELOG.md package.json
 ```
 
 Verify:
+
 - Version number is correct
 - Changelog entries are accurate and complete
 - Breaking changes are clearly marked
@@ -105,6 +112,7 @@ git tag -s vX.Y.Z -m "Release X.Y.Z"
 The tag should be **signed** (`-s` flag) for security and authenticity.
 
 To verify the tag signature:
+
 ```bash
 git tag -v vX.Y.Z
 ```
@@ -119,6 +127,7 @@ git push origin vX.Y.Z
 #### 6. Verify CI Pipeline
 
 The GitHub Actions release workflow will automatically:
+
 - Build the package
 - Run all tests
 - Publish to npm (if configured)
@@ -160,7 +169,7 @@ jobs:
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   release:
@@ -238,8 +247,8 @@ The release workflow requires:
 
 ```yaml
 permissions:
-  contents: write  # For creating releases
-  packages: write  # For publishing packages
+  contents: write # For creating releases
+  packages: write # For publishing packages
 ```
 
 ## Troubleshooting
@@ -275,11 +284,13 @@ npm publish --dry-run
 If the calculated version already exists:
 
 1. Check if there are unreleased commits:
+
    ```bash
    git log $(git describe --tags --abbrev=0)..HEAD --oneline
    ```
 
 2. Manually bump version if needed:
+
    ```bash
    npm version patch --no-git-tag-version
    ```

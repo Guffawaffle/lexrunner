@@ -32,14 +32,14 @@ transitions:
     CONTEXT_FAILED: failed
   analyzing:
     ANALYSIS_COMPLETE: reviewing
-    ANALYSIS_FAILED: decision_findings  # Can proceed with warnings
+    ANALYSIS_FAILED: decision_findings # Can proceed with warnings
   reviewing:
     REVIEW_COMPLETE: decision_findings
     REVIEW_FAILED: failed
   decision_findings:
     APPROVE: completed
     REQUEST_CHANGES: completed
-    NEEDS_MORE_CONTEXT: preparing  # Loop back for more context
+    NEEDS_MORE_CONTEXT: preparing # Loop back for more context
     ABORT: failed
 
 # Decision points requiring LLM or human input

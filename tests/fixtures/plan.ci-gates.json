@@ -1,36 +1,36 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"items": [
-		{
-			"name": "ci-lint",
-			"deps": [],
-			"gates": [
-				{
-					"name": "lint",
-					"run": "npm run lint"
-				}
-			]
-		},
-		{
-			"name": "ci-typecheck",
-			"deps": [],
-			"gates": [
-				{
-					"name": "typecheck",
-					"run": "npm run typecheck"
-				}
-			]
-		},
-		{
-			"name": "ci-test",
-			"deps": ["ci-lint", "ci-typecheck"],
-			"gates": [
-				{
-					"name": "test",
-					"run": "npm test"
-				}
-			]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "items": [
+    {
+      "name": "ci-lint",
+      "deps": [],
+      "gates": [
+        {
+          "name": "lint",
+          "run": "npm run lint"
+        }
+      ]
+    },
+    {
+      "name": "ci-typecheck",
+      "deps": [],
+      "gates": [
+        {
+          "name": "typecheck",
+          "run": "npm run typecheck"
+        }
+      ]
+    },
+    {
+      "name": "ci-test",
+      "deps": ["ci-lint", "ci-typecheck"],
+      "gates": [
+        {
+          "name": "test",
+          "run": "npm test"
+        }
+      ]
+    }
+  ]
 }

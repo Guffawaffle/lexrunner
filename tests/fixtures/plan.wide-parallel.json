@@ -1,99 +1,75 @@
 {
-	"schemaVersion": "1.0.0",
-	"target": "main",
-	"policy": {
-		"requiredGates": ["lint"],
-		"optionalGates": [],
-		"maxWorkers": 8,
-		"retries": {},
-		"overrides": {},
-		"blockOn": [],
-		"mergeRule": { "type": "strict-required" }
-	},
-	"items": [
-		{
-			"name": "pr-1",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-2",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-3",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-4",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-5",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-6",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-7",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-8",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-9",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-10",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-11",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		},
-		{
-			"name": "pr-12",
-			"deps": [],
-			"gates": [
-				{ "name": "lint", "run": "echo 'lint pass'", "env": {} }
-			]
-		}
-	]
+  "schemaVersion": "1.0.0",
+  "target": "main",
+  "policy": {
+    "requiredGates": ["lint"],
+    "optionalGates": [],
+    "maxWorkers": 8,
+    "retries": {},
+    "overrides": {},
+    "blockOn": [],
+    "mergeRule": { "type": "strict-required" }
+  },
+  "items": [
+    {
+      "name": "pr-1",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-2",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-3",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-4",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-5",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-6",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-7",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-8",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-9",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-10",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-11",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    },
+    {
+      "name": "pr-12",
+      "deps": [],
+      "gates": [{ "name": "lint", "run": "echo 'lint pass'", "env": {} }]
+    }
+  ]
 }

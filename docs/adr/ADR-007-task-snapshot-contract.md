@@ -41,6 +41,7 @@ Audit    = learning signal (token cost + trust gaps)
 - Over time, data shows if we can relax engine verification for D1 tasks
 
 **Relaxation criteria (D1 only):** Skip engine verification if:
+
 1. Agent verification passes, AND
 2. Agent's trust_gap rate over last 20 tasks < 5%, AND
 3. Task procedure is in the "verified-stable" set
@@ -49,7 +50,7 @@ Audit    = learning signal (token cost + trust gaps)
 
 **Answer: Agent may search, but must log token impact.**
 
-- Snapshot is a *hint budget*, not exhaustive
+- Snapshot is a _hint budget_, not exhaustive
 - Agent has autonomy to search for related files
 - Must report search activity + cost in receipt
 - Data tells us: "when we provided X, agent used Y fewer tokens"
@@ -60,74 +61,74 @@ Audit    = learning signal (token cost + trust gaps)
 
 ### Provenance
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `repo.id` | MUST | Identifies which repository |
-| `repo.commit_sha` | MUST | Pins exact state for replay |
-| `repo.root` | MUST | Absolute path for file operations |
-| `snapshot_hash` | MUST | SHA256 of canonical snapshot JSON (binds receipt to snapshot) |
-| `source_of_truth.path` | SHOULD | Where the canonical data lives (repo-relative) |
-| `source_of_truth.repo_id` | SHOULD | Repository if cross-repo (defaults to snapshot repo) |
-| `source_of_truth.commit_sha` | SHOULD | Commit if cross-repo (defaults to snapshot commit) |
-| `source_of_truth.excerpt` | SHOULD | Concrete snippet for verification |
-| `source_of_truth.introducing_change` | MAY | Diff hunk that caused the change |
+| Requirement                          | Level  | Rationale                                                     |
+| ------------------------------------ | ------ | ------------------------------------------------------------- |
+| `repo.id`                            | MUST   | Identifies which repository                                   |
+| `repo.commit_sha`                    | MUST   | Pins exact state for replay                                   |
+| `repo.root`                          | MUST   | Absolute path for file operations                             |
+| `snapshot_hash`                      | MUST   | SHA256 of canonical snapshot JSON (binds receipt to snapshot) |
+| `source_of_truth.path`               | SHOULD | Where the canonical data lives (repo-relative)                |
+| `source_of_truth.repo_id`            | SHOULD | Repository if cross-repo (defaults to snapshot repo)          |
+| `source_of_truth.commit_sha`         | SHOULD | Commit if cross-repo (defaults to snapshot commit)            |
+| `source_of_truth.excerpt`            | SHOULD | Concrete snippet for verification                             |
+| `source_of_truth.introducing_change` | MAY    | Diff hunk that caused the change                              |
 
 ### Scope Boundary
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `scope.read_globs` | MUST | What agent can read |
-| `scope.write_globs` | MUST | What agent can modify |
-| `scope.deny_globs` | MUST | Explicit exclusions (even if empty) |
-| `scope.cross_repo_allowed` | MUST | Whether multi-repo operations permitted |
+| Requirement                | Level | Rationale                               |
+| -------------------------- | ----- | --------------------------------------- |
+| `scope.read_globs`         | MUST  | What agent can read                     |
+| `scope.write_globs`        | MUST  | What agent can modify                   |
+| `scope.deny_globs`         | MUST  | Explicit exclusions (even if empty)     |
+| `scope.cross_repo_allowed` | MUST  | Whether multi-repo operations permitted |
 
 ### Failure Evidence
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `failure.message` | MUST | Short error description |
-| `failure.file_rel` | MUST | Repo-relative path to failed file |
-| `failure.line` | SHOULD | Line number if available |
-| `failure.runner_output_snip` | MUST | Actual test runner output |
-| `failure.excerpt` | SHOULD | Code context around failure |
+| Requirement                  | Level  | Rationale                         |
+| ---------------------------- | ------ | --------------------------------- |
+| `failure.message`            | MUST   | Short error description           |
+| `failure.file_rel`           | MUST   | Repo-relative path to failed file |
+| `failure.line`               | SHOULD | Line number if available          |
+| `failure.runner_output_snip` | MUST   | Actual test runner output         |
+| `failure.excerpt`            | SHOULD | Code context around failure       |
 
 ### Targets
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `targets[]` | MUST | Array (support multi-file edits) |
-| `target.path_rel` | MUST | Repo-relative file path (portable, diff-friendly) |
-| `target.hunk` | MUST | Anchored code context (±N lines) |
-| `target.hunk_sha256` | MUST | Drift detection |
-| `target.hint_edit` | MAY | Suggested find/replace |
+| Requirement          | Level | Rationale                                         |
+| -------------------- | ----- | ------------------------------------------------- |
+| `targets[]`          | MUST  | Array (support multi-file edits)                  |
+| `target.path_rel`    | MUST  | Repo-relative file path (portable, diff-friendly) |
+| `target.hunk`        | MUST  | Anchored code context (±N lines)                  |
+| `target.hunk_sha256` | MUST  | Drift detection                                   |
+| `target.hint_edit`   | MAY   | Suggested find/replace                            |
 
 ### Invariants
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `invariants[]` | SHOULD | Behavioral constraints (anti-brittleness) |
-| Semantic over numeric | - | e.g., "Prefer semantic assertion over numeric count" |
-| Scope limits | - | e.g., "Do not change production code" |
-| Ordering constraints | - | e.g., "Keep tool ordering unchanged" |
-| Canonical source | - | e.g., "Registry is source of truth" |
+| Requirement           | Level  | Rationale                                            |
+| --------------------- | ------ | ---------------------------------------------------- |
+| `invariants[]`        | SHOULD | Behavioral constraints (anti-brittleness)            |
+| Semantic over numeric | -      | e.g., "Prefer semantic assertion over numeric count" |
+| Scope limits          | -      | e.g., "Do not change production code"                |
+| Ordering constraints  | -      | e.g., "Keep tool ordering unchanged"                 |
+| Canonical source      | -      | e.g., "Registry is source of truth"                  |
 
 ### Verification Expectations
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `verification.cmd` | MUST | Command to run |
-| `verification.expect.exit_code` | MUST | Expected exit code (usually 0) |
-| `verification.expect.must_include` | SHOULD | Strings that must appear in output |
-| `verification.expect.must_not_include` | SHOULD | Strings that must not appear |
+| Requirement                            | Level  | Rationale                          |
+| -------------------------------------- | ------ | ---------------------------------- |
+| `verification.cmd`                     | MUST   | Command to run                     |
+| `verification.expect.exit_code`        | MUST   | Expected exit code (usually 0)     |
+| `verification.expect.must_include`     | SHOULD | Strings that must appear in output |
+| `verification.expect.must_not_include` | SHOULD | Strings that must not appear       |
 
 ### Truncation Policy
 
-| Requirement | Level | Rationale |
-|-------------|-------|-----------|
-| `budget.max_bytes` | MAY | Token budget hint |
-| `budget.truncated_fields` | MUST | List of fields that were dropped (even if empty) |
-| Fail-fast on required field truncation | MUST | Never truncate MUST fields |
-| Optional fields may drop | MAY | But must be listed in `truncated_fields` |
+| Requirement                            | Level | Rationale                                        |
+| -------------------------------------- | ----- | ------------------------------------------------ |
+| `budget.max_bytes`                     | MAY   | Token budget hint                                |
+| `budget.truncated_fields`              | MUST  | List of fields that were dropped (even if empty) |
+| Fail-fast on required field truncation | MUST  | Never truncate MUST fields                       |
+| Optional fields may drop               | MAY   | But must be listed in `truncated_fields`         |
 
 ---
 
@@ -160,55 +161,56 @@ interface TaskSnapshot_v1 {
   schema_version: "1.0.0";
 
   // Identity
-  task_id: string;                    // Unique identifier
-  procedure: string;                  // "post-merge-fix", "fanout-issue", etc.
+  task_id: string; // Unique identifier
+  procedure: string; // "post-merge-fix", "fanout-issue", etc.
   determinism: "D1" | "D2" | "D3";
-  snapshot_hash: string;              // SHA256 of canonical snapshot (receipt must echo)
+  snapshot_hash: string; // SHA256 of canonical snapshot (receipt must echo)
 
   // Provenance (MUST)
   repo: {
-    id: string;                       // "owner/name"
-    root: string;                     // Absolute path (engine-local, not contract-canonical)
-    commit_sha: string;               // Pinned state
+    id: string; // "owner/name"
+    root: string; // Absolute path (engine-local, not contract-canonical)
+    commit_sha: string; // Pinned state
   };
 
   // Scope boundary (MUST)
   scope: {
-    read_globs: string[];             // What agent can read
-    write_globs: string[];            // What agent can modify
-    deny_globs: string[];             // Explicit exclusions
+    read_globs: string[]; // What agent can read
+    write_globs: string[]; // What agent can modify
+    deny_globs: string[]; // Explicit exclusions
     cross_repo_allowed: boolean;
   };
 
   // Failure evidence (MUST)
   failure: {
-    message: string;                  // Short description
-    file_rel: string;                 // Repo-relative path
-    line?: number;                    // Line number if known
-    runner_output_snip: string;       // Actual output
-    excerpt?: string;                 // Code context
+    message: string; // Short description
+    file_rel: string; // Repo-relative path
+    line?: number; // Line number if known
+    runner_output_snip: string; // Actual output
+    excerpt?: string; // Code context
   };
 
   // Targets (MUST, array)
   targets: Array<{
-    path_rel: string;                 // Repo-relative path (portable)
-    hunk: string;                     // Anchored context
-    hunk_sha256: string;              // Drift detection
-    hint_edit?: {                     // Optional suggestion
+    path_rel: string; // Repo-relative path (portable)
+    hunk: string; // Anchored context
+    hunk_sha256: string; // Drift detection
+    hint_edit?: {
+      // Optional suggestion
       find: string;
       replace: string;
     };
   }>;
 
   // Invariants (SHOULD) - anti-brittleness constraints
-  invariants?: string[];              // e.g., "Prefer semantic assertion over numeric count"
+  invariants?: string[]; // e.g., "Prefer semantic assertion over numeric count"
 
   // Source of truth (SHOULD)
   source_of_truth?: {
     kind: "symbol" | "file" | "registry";
-    path_rel: string;                 // Repo-relative path
-    repo_id?: string;                 // Defaults to snapshot repo if omitted
-    commit_sha?: string;              // Defaults to snapshot commit if omitted
+    path_rel: string; // Repo-relative path
+    repo_id?: string; // Defaults to snapshot repo if omitted
+    commit_sha?: string; // Defaults to snapshot commit if omitted
     excerpt: string;
     lexmap_module_id?: string;
     introducing_change?: {
@@ -230,11 +232,11 @@ interface TaskSnapshot_v1 {
   // Budget/truncation (MUST)
   budget: {
     max_bytes?: number;
-    truncated_fields: string[];       // Empty if nothing truncated
+    truncated_fields: string[]; // Empty if nothing truncated
   };
 
   // Output contract
-  receipt_schema_id: string;          // e.g., "TaskReceipt_v1"
+  receipt_schema_id: string; // e.g., "TaskReceipt_v1"
 }
 ```
 
@@ -249,17 +251,18 @@ interface TaskReceipt_v1 {
 
   // Identity (echo from snapshot)
   task_id: string;
-  snapshot_hash: string;              // MUST echo snapshot's hash (prevents floating receipts)
+  snapshot_hash: string; // MUST echo snapshot's hash (prevents floating receipts)
 
   // Claims (what agent says it did)
   claims: {
     success: boolean;
-    patch?: string;                   // Unified diff
-    files_touched: string[];          // Repo-relative paths
-    rationale: string;                // Why this fix
+    patch?: string; // Unified diff
+    files_touched: string[]; // Repo-relative paths
+    rationale: string; // Why this fix
     confidence: "high" | "medium" | "low";
-    invariants_respected?: string[];  // Which invariants were followed
-    assumptions_made: Array<{         // Structured for learning
+    invariants_respected?: string[]; // Which invariants were followed
+    assumptions_made: Array<{
+      // Structured for learning
       type: "scope" | "codebase" | "env" | "intent" | "dependency" | "test";
       text: string;
       validated?: boolean;
@@ -270,8 +273,8 @@ interface TaskReceipt_v1 {
   // Search activity (if agent searched)
   search_activity: Array<{
     query: string;
-    method?: string;                  // "grep", "ripgrep", "tsserver", "semantic", etc.
-    roots: string[];                  // Where searched (repo-relative)
+    method?: string; // "grep", "ripgrep", "tsserver", "semantic", etc.
+    roots: string[]; // Where searched (repo-relative)
     results_count?: number;
     time_ms?: number;
   }>;
@@ -309,11 +312,11 @@ Separate from receipt—this is the engine's proof.
 interface EngineVerification_v1 {
   // Identity
   task_id: string;
-  timestamp: string;                  // ISO 8601
+  timestamp: string; // ISO 8601
 
   // Hash binding (audit trail)
-  snapshot_hash: string;              // From original snapshot
-  receipt_hash: string;               // SHA256 of receipt JSON
+  snapshot_hash: string; // From original snapshot
+  receipt_hash: string; // SHA256 of receipt JSON
 
   // Verification result
   verified: boolean;
@@ -325,12 +328,12 @@ interface EngineVerification_v1 {
   stderr_snip: string;
 
   // Patch verification
-  patch_hash?: string;                // SHA256 of applied patch bytes (not empty string!)
+  patch_hash?: string; // SHA256 of applied patch bytes (not empty string!)
   patch_applied: boolean;
 
   // Comparison with agent claim
-  agent_claimed: boolean;             // What agent said
-  trust_gap: boolean;                 // agent_claimed !== verified
+  agent_claimed: boolean; // What agent said
+  trust_gap: boolean; // agent_claimed !== verified
 
   // Failures detected
   failures: Array<{
@@ -379,15 +382,17 @@ interface EngineVerification_v1 {
     "Prefer semantic assertion over numeric count when possible",
     "Registry INTERVENTION_CATALOG is source of truth for tool count"
   ],
-  "targets": [{
-    "path_rel": "tests/unit/weave/metrics-schema.spec.ts",
-    "hunk": "describe('tool registry', () => {\n  it('should have correct tool count', () => {\n    expect(tools.length).toBe(6);\n  });\n\n  it('should include validate_remember', () => {",
-    "hunk_sha256": "sha256:def456...PLACEHOLDER",
-    "hint_edit": {
-      "find": "expect(tools.length).toBe(6)",
-      "replace": "expect(tools.length).toBe(7)"
+  "targets": [
+    {
+      "path_rel": "tests/unit/weave/metrics-schema.spec.ts",
+      "hunk": "describe('tool registry', () => {\n  it('should have correct tool count', () => {\n    expect(tools.length).toBe(6);\n  });\n\n  it('should include validate_remember', () => {",
+      "hunk_sha256": "sha256:def456...PLACEHOLDER",
+      "hint_edit": {
+        "find": "expect(tools.length).toBe(6)",
+        "replace": "expect(tools.length).toBe(7)"
+      }
     }
-  }],
+  ],
   "source_of_truth": {
     "kind": "registry",
     "path_rel": "src/weave/metrics/schema.ts",
@@ -429,7 +434,12 @@ interface EngineVerification_v1 {
     "invariants_respected": ["Registry INTERVENTION_CATALOG is source of truth for tool count"],
     "assumptions_made": [
       { "type": "test", "text": "No other tests rely on exact tool count", "validated": false },
-      { "type": "codebase", "text": "validate_remember is the only new tool", "validated": true, "evidence": "git diff shows single addition" }
+      {
+        "type": "codebase",
+        "text": "validate_remember is the only new tool",
+        "validated": true,
+        "evidence": "git diff shows single addition"
+      }
     ]
   },
   "search_activity": [],
@@ -477,6 +487,7 @@ interface EngineVerification_v1 {
 ## Path Convention
 
 All contract paths are **repo-relative** (portable, diff-friendly):
+
 - `failure.file_rel`, `target.path_rel`, `source_of_truth.path_rel`
 - `repo.root` is the only absolute path (engine-local, for resolution)
 - All globs are relative to `repo.root`

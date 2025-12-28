@@ -1,6 +1,7 @@
 # Disciplined Failure Pattern
 
 > **Definition 3.4 (Disciplined Failure):** A failure mode where:
+>
 > 1. Uncertainty is stated explicitly before action
 > 2. Actions taken are reversible (or flagged as non-reversible)
 > 3. Receipts document the decision chain
@@ -24,19 +25,20 @@ The Disciplined Failure pattern enables agents to:
 An ActionReceipt documents every significant action with full context:
 
 ```typescript
-import { emitActionReceipt } from '../src/receipts/index.js';
+import { emitActionReceipt } from "../src/receipts/index.js";
 
 emitActionReceipt({
-  action: 'merge PR-123 to integration',
-  rationale: 'PR dependencies satisfied, gates green',
-  confidence: 'high',
-  reversibility: 'reversible',
-  rollbackPath: 'git reset --hard HEAD~1',
-  phase: 'apply',
+  action: "merge PR-123 to integration",
+  rationale: "PR dependencies satisfied, gates green",
+  confidence: "high",
+  reversibility: "reversible",
+  rollbackPath: "git reset --hard HEAD~1",
+  phase: "apply",
 });
 ```
 
 **Output:**
+
 ```json
 {
   "event": "action_receipt",
@@ -59,20 +61,17 @@ emitActionReceipt({
 Before taking a risky action, declare uncertainty explicitly:
 
 ```typescript
-import { emitUncertaintyMarker } from '../src/receipts/index.js';
+import { emitUncertaintyMarker } from "../src/receipts/index.js";
 
 emitUncertaintyMarker({
-  operation: 'merge PR-456 with active dependencies',
+  operation: "merge PR-456 with active dependencies",
   uncertainties: [
-    'Dependency PR-123 may have untested changes',
-    'Target branch received commits since last check'
+    "Dependency PR-123 may have untested changes",
+    "Target branch received commits since last check",
   ],
-  mitigations: [
-    'Will run full test suite after merge',
-    'Rollback path: git reset --hard HEAD~1'
-  ],
+  mitigations: ["Will run full test suite after merge", "Rollback path: git reset --hard HEAD~1"],
   proceedingAnyway: true,
-  reason: 'Time-sensitive release; risk accepted by policy'
+  reason: "Time-sensitive release; risk accepted by policy",
 });
 ```
 
@@ -81,39 +80,39 @@ emitUncertaintyMarker({
 Extend AXError with governance fields via the context object:
 
 ```typescript
-import { buildGovernanceContext } from '../src/receipts/index.js';
-import { createAXError } from '../src/errors/index.js';
+import { buildGovernanceContext } from "../src/receipts/index.js";
+import { createAXError } from "../src/errors/index.js";
 
 const govCtx = buildGovernanceContext({
-  reversibility: 'reversible',
-  rollbackPath: 'git reset --hard HEAD~1',
-  confidence: 'high',
+  reversibility: "reversible",
+  rollbackPath: "git reset --hard HEAD~1",
+  confidence: "high",
 });
 
 const error = createAXError(
-  'MERGE_CONFLICT',
-  'Merge conflict detected in src/cli.ts',
-  ['Resolve conflicts manually', 'Re-run merge'],
+  "MERGE_CONFLICT",
+  "Merge conflict detected in src/cli.ts",
+  ["Resolve conflicts manually", "Re-run merge"],
   { ...otherContext, ...govCtx }
 );
 ```
 
 ## Reversibility Levels
 
-| Level | Description | Example |
-|-------|-------------|---------|
-| `reversible` | Action can be fully undone | Git merge (can reset) |
-| `partially-reversible` | Some effects persist | Branch creation + commits |
-| `irreversible` | Cannot be undone | Published release |
+| Level                  | Description                | Example                   |
+| ---------------------- | -------------------------- | ------------------------- |
+| `reversible`           | Action can be fully undone | Git merge (can reset)     |
+| `partially-reversible` | Some effects persist       | Branch creation + commits |
+| `irreversible`         | Cannot be undone           | Published release         |
 
 ## Confidence Levels
 
-| Level | Description | When to Use |
-|-------|-------------|-------------|
-| `high` | Strong expectation of success | Dependencies verified, gates green |
-| `medium` | Reasonable expectation | Most dependencies ready |
-| `low` | Uncertain outcome | Some unknowns present |
-| `uncertain` | Unknown outcome | Experimental or new path |
+| Level       | Description                   | When to Use                        |
+| ----------- | ----------------------------- | ---------------------------------- |
+| `high`      | Strong expectation of success | Dependencies verified, gates green |
+| `medium`    | Reasonable expectation        | Most dependencies ready            |
+| `low`       | Uncertain outcome             | Some unknowns present              |
+| `uncertain` | Unknown outcome               | Experimental or new path           |
 
 ## Integration Points
 
@@ -121,27 +120,25 @@ const error = createAXError(
 
 ```typescript
 // In src/weave/execute.ts
-import { emitActionReceipt, emitUncertaintyMarker } from '../receipts/index.js';
+import { emitActionReceipt, emitUncertaintyMarker } from "../receipts/index.js";
 
 // Before merge
 emitUncertaintyMarker({
   operation: `merge ${pr.branch} to integration`,
-  uncertainties: conflicts.length > 0 
-    ? [`${conflicts.length} potential conflicts detected`] 
-    : [],
-  mitigations: ['Pre-flight conflict detection', 'Rollback available'],
+  uncertainties: conflicts.length > 0 ? [`${conflicts.length} potential conflicts detected`] : [],
+  mitigations: ["Pre-flight conflict detection", "Rollback available"],
   proceedingAnyway: true,
-  reason: 'Conflicts can be resolved during merge',
+  reason: "Conflicts can be resolved during merge",
 });
 
 // After merge
 emitActionReceipt({
   action: `merge PR-${pr.number} to integration`,
-  rationale: 'Dependencies satisfied, gates green',
-  confidence: 'high',
-  reversibility: 'reversible',
+  rationale: "Dependencies satisfied, gates green",
+  confidence: "high",
+  reversibility: "reversible",
   rollbackPath: `git reset --hard ${previousHead}`,
-  phase: 'apply',
+  phase: "apply",
   runId: context.runId,
   planHash: context.planHash,
 });
@@ -151,19 +148,17 @@ emitActionReceipt({
 
 ```typescript
 // In src/gates/run.ts
-import { emitActionReceipt } from '../receipts/index.js';
+import { emitActionReceipt } from "../receipts/index.js";
 
 // After gate execution
 emitActionReceipt({
   action: `execute gate: ${gate.name}`,
-  rationale: 'Required by plan policy',
-  confidence: 'high',
-  reversibility: 'reversible',  // Gates don't mutate state
-  outcome: gate.passed ? 'success' : 'failure',
-  nextActions: gate.passed 
-    ? ['Continue to next gate'] 
-    : ['Fix gate failures', 'Re-run gate'],
-  phase: 'verify',
+  rationale: "Required by plan policy",
+  confidence: "high",
+  reversibility: "reversible", // Gates don't mutate state
+  outcome: gate.passed ? "success" : "failure",
+  nextActions: gate.passed ? ["Continue to next gate"] : ["Fix gate failures", "Re-run gate"],
+  phase: "verify",
 });
 ```
 
@@ -171,36 +166,36 @@ emitActionReceipt({
 
 ### ActionReceipt
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `schemaVersion` | `"1.0.0"` | Yes | Schema version |
-| `kind` | `"ActionReceipt"` | Yes | Receipt type |
-| `action` | `string` | Yes | Description of action |
-| `outcome` | `success \| failure \| partial \| deferred` | Yes | Result |
-| `rationale` | `string` | Yes | Why action was taken |
-| `confidence` | `high \| medium \| low \| uncertain` | Yes | Confidence level |
-| `reversibility` | `reversible \| partially-reversible \| irreversible` | Yes | Rollback capability |
-| `rollbackPath` | `string` | No | Rollback instructions |
-| `rollbackCommand` | `string` | No | Actual rollback command |
-| `nextActions` | `string[]` | No | Suggested next steps |
-| `escalationRequired` | `boolean` | Yes (default: false) | Needs human review |
-| `escalationReason` | `string` | No | Why escalation needed |
-| `uncertaintyNotes` | `string[]` | No | Known uncertainties |
-| `timestamp` | `string (ISO 8601)` | Yes | When action occurred |
-| `phase` | `string` | No | Execution phase |
-| `runId` | `string` | No | Correlation ID |
-| `planHash` | `string` | No | Plan verification |
+| Field                | Type                                                 | Required             | Description             |
+| -------------------- | ---------------------------------------------------- | -------------------- | ----------------------- |
+| `schemaVersion`      | `"1.0.0"`                                            | Yes                  | Schema version          |
+| `kind`               | `"ActionReceipt"`                                    | Yes                  | Receipt type            |
+| `action`             | `string`                                             | Yes                  | Description of action   |
+| `outcome`            | `success \| failure \| partial \| deferred`          | Yes                  | Result                  |
+| `rationale`          | `string`                                             | Yes                  | Why action was taken    |
+| `confidence`         | `high \| medium \| low \| uncertain`                 | Yes                  | Confidence level        |
+| `reversibility`      | `reversible \| partially-reversible \| irreversible` | Yes                  | Rollback capability     |
+| `rollbackPath`       | `string`                                             | No                   | Rollback instructions   |
+| `rollbackCommand`    | `string`                                             | No                   | Actual rollback command |
+| `nextActions`        | `string[]`                                           | No                   | Suggested next steps    |
+| `escalationRequired` | `boolean`                                            | Yes (default: false) | Needs human review      |
+| `escalationReason`   | `string`                                             | No                   | Why escalation needed   |
+| `uncertaintyNotes`   | `string[]`                                           | No                   | Known uncertainties     |
+| `timestamp`          | `string (ISO 8601)`                                  | Yes                  | When action occurred    |
+| `phase`              | `string`                                             | No                   | Execution phase         |
+| `runId`              | `string`                                             | No                   | Correlation ID          |
+| `planHash`           | `string`                                             | No                   | Plan verification       |
 
 ### UncertaintyMarker
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `operation` | `string` | Yes | Planned operation |
-| `uncertainties` | `string[]` | Yes | Known unknowns |
-| `mitigations` | `string[]` | Yes | Risk mitigations |
-| `proceedingAnyway` | `boolean` | Yes | Whether to proceed |
-| `reason` | `string` | No | Why proceeding |
-| `timestamp` | `string (ISO 8601)` | No | Declaration time |
+| Field              | Type                | Required | Description        |
+| ------------------ | ------------------- | -------- | ------------------ |
+| `operation`        | `string`            | Yes      | Planned operation  |
+| `uncertainties`    | `string[]`          | Yes      | Known unknowns     |
+| `mitigations`      | `string[]`          | Yes      | Risk mitigations   |
+| `proceedingAnyway` | `boolean`           | Yes      | Whether to proceed |
+| `reason`           | `string`            | No       | Why proceeding     |
+| `timestamp`        | `string (ISO 8601)` | No       | Declaration time   |
 
 ## Best Practices
 

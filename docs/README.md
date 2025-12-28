@@ -53,13 +53,13 @@ New to lexrunner? Start here:
 
 ### File Reference
 
-| File | Purpose | Priority |
-|------|---------|----------|
-| `stack.yml` | Explicit plan with items/deps | Highest |
-| `scope.yml` | PR selection criteria | Fallback |
-| `deps.yml` | Dependency definitions | Supporting |
-| `gates.yml` | Quality gate configuration | Supporting |
-| `profile.yml` | Profile metadata | Metadata |
+| File          | Purpose                       | Priority   |
+| ------------- | ----------------------------- | ---------- |
+| `stack.yml`   | Explicit plan with items/deps | Highest    |
+| `scope.yml`   | PR selection criteria         | Fallback   |
+| `deps.yml`    | Dependency definitions        | Supporting |
+| `gates.yml`   | Quality gate configuration    | Supporting |
+| `profile.yml` | Profile metadata              | Metadata   |
 
 ## 🎓 Learning Resources
 
@@ -164,18 +164,18 @@ New to lexrunner? Start here:
 
 ### Commands
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `init` | Initialize workspace | [CLI Reference](./cli.md#init) |
-| `doctor` | Validate environment | [CLI Reference](./cli.md#doctor) |
-| `discover` | Find PRs | [CLI Reference](./cli.md#discover) |
-| `plan` | Generate merge plan | [CLI Reference](./cli.md#plan) |
-| `execute` | Run quality gates | [CLI Reference](./cli.md#execute) |
-| `merge` | Execute merges | [CLI Reference](./cli.md#merge) |
-| `merge-order` | Show merge order | [CLI Reference](./cli.md#merge-order) |
-| `report` | Aggregate results | [CLI Reference](./cli.md#report) |
-| `status` | Check system status | [CLI Reference](./cli.md#status) |
-| `schema` | Validate schemas | [CLI Reference](./cli.md#schema) |
+| Command       | Description          | Documentation                         |
+| ------------- | -------------------- | ------------------------------------- |
+| `init`        | Initialize workspace | [CLI Reference](./cli.md#init)        |
+| `doctor`      | Validate environment | [CLI Reference](./cli.md#doctor)      |
+| `discover`    | Find PRs             | [CLI Reference](./cli.md#discover)    |
+| `plan`        | Generate merge plan  | [CLI Reference](./cli.md#plan)        |
+| `execute`     | Run quality gates    | [CLI Reference](./cli.md#execute)     |
+| `merge`       | Execute merges       | [CLI Reference](./cli.md#merge)       |
+| `merge-order` | Show merge order     | [CLI Reference](./cli.md#merge-order) |
+| `report`      | Aggregate results    | [CLI Reference](./cli.md#report)      |
+| `status`      | Check system status  | [CLI Reference](./cli.md#status)      |
+| `schema`      | Validate schemas     | [CLI Reference](./cli.md#schema)      |
 
 ### Exit Codes
 
@@ -216,6 +216,7 @@ Found an issue or want to improve docs?
 ### Code Examples
 
 Help others by sharing:
+
 - Configuration examples
 - Custom gate scripts
 - CI/CD pipeline templates
@@ -239,6 +240,7 @@ Help others by sharing:
 ## 📝 Document Index
 
 ### Core Documentation (Already Exists)
+
 - [Quickstart Guide](./quickstart.md) ✅
 - [CLI Reference](./cli.md) ✅
 - [Autopilot](./autopilot.md) ✅
@@ -256,6 +258,7 @@ Help others by sharing:
 - [TERMS](./TERMS.md) ✅
 
 ### New Documentation (C3)
+
 - [Architecture Overview](./architecture.md) ✅
 - [Troubleshooting Guide](./troubleshooting.md) ✅
 - [Migration Guide](./migration-guide.md) ✅

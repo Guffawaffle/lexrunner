@@ -32,7 +32,7 @@
           "name": "test",
           "run": "npm test",
           "env": {
-            "PR_NUMBER": "101", 
+            "PR_NUMBER": "101",
             "PR_BRANCH": "core-utils",
             "PR_SHA": "abc123def456"
           },
@@ -44,7 +44,7 @@
           "run": "npm run typecheck",
           "env": {
             "PR_NUMBER": "101",
-            "PR_BRANCH": "core-utils", 
+            "PR_BRANCH": "core-utils",
             "PR_SHA": "abc123def456"
           },
           "runtime": "local",
@@ -69,7 +69,7 @@
         },
         {
           "name": "test",
-          "run": "npm test", 
+          "run": "npm test",
           "env": {
             "PR_NUMBER": "202",
             "PR_BRANCH": "feature-auth",

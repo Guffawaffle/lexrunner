@@ -15,7 +15,7 @@ The **Frame Contract** enforces that every executor invocation MUST emit at leas
 3. **Memory Integration** — Frames feed into the Lex memory system for context accumulation
 4. **Accountability** — Executors cannot complete without documenting what they did
 
-**Core Principle:** *Frames are receipts, not logs. They prove what happened.*
+**Core Principle:** _Frames are receipts, not logs. They prove what happened._
 
 ---
 
@@ -45,10 +45,10 @@ const validatedFrame = enforceFrameEmission(context, output);
 ```typescript
 import { withFrameContract } from "./src/executors/frameContract.js";
 
-const wrappedExecutor = withFrameContract(
-  myExecutorImplementation,
-  { executorRole: "senior-dev", runId: "run-001" }
-);
+const wrappedExecutor = withFrameContract(myExecutorImplementation, {
+  executorRole: "senior-dev",
+  runId: "run-001",
+});
 
 // Frame emission is automatically enforced
 const result = await wrappedExecutor({ prNumber: "123" });
@@ -69,9 +69,7 @@ const frame = buildFrameFromTemplate({
   nextActions: ["Address review findings", "Merge after CI"],
   inputsHash: "abc123...",
   outputsHash: "def456...",
-  toolCalls: [
-    { tool: "grep_search", timestamp: "2025-12-16T10:00:00Z", success: true }
-  ],
+  toolCalls: [{ tool: "grep_search", timestamp: "2025-12-16T10:00:00Z", success: true }],
   durationMs: 120000,
 });
 ```
@@ -96,17 +94,18 @@ If an executor completes without emitting a Frame, `FrameContractViolationError`
 
 All executor Frames include:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `executor_role` | string | Executor name (e.g., "senior-dev", "eager-pm") |
-| `inputs_hash` | string | SHA-256 hash of input parameters |
-| `outputs_hash` | string | SHA-256 hash of output results |
-| `tool_calls` | ToolCall[] | List of tools called during execution |
-| `tool_calls_count` | number | Number of tools invoked |
-| `duration_ms` | number | Execution duration in milliseconds |
-| `run_id` | string | Run ID for correlation |
+| Field              | Type       | Description                                    |
+| ------------------ | ---------- | ---------------------------------------------- |
+| `executor_role`    | string     | Executor name (e.g., "senior-dev", "eager-pm") |
+| `inputs_hash`      | string     | SHA-256 hash of input parameters               |
+| `outputs_hash`     | string     | SHA-256 hash of output results                 |
+| `tool_calls`       | ToolCall[] | List of tools called during execution          |
+| `tool_calls_count` | number     | Number of tools invoked                        |
+| `duration_ms`      | number     | Execution duration in milliseconds             |
+| `run_id`           | string     | Run ID for correlation                         |
 
 **Why Hashes?** Input and output hashes enable:
+
 - **Idempotency checks** — Detect duplicate executions
 - **Determinism validation** — Same inputs → same outputs
 - **Tamper detection** — Verify frame integrity
@@ -117,15 +116,16 @@ Each tool call includes:
 
 ```typescript
 interface ToolCall {
-  tool: string;           // Tool name
-  timestamp: string;      // ISO 8601 timestamp
-  durationMs?: number;    // Execution time
-  success: boolean;       // Whether the call succeeded
-  error?: string;         // Error message if failed
+  tool: string; // Tool name
+  timestamp: string; // ISO 8601 timestamp
+  durationMs?: number; // Execution time
+  success: boolean; // Whether the call succeeded
+  error?: string; // Error message if failed
 }
 ```
 
 **Example:**
+
 ```typescript
 {
   tool: "grep_search",
@@ -144,17 +144,20 @@ interface ToolCall {
 Validates that executor output includes a Frame.
 
 **Signature:**
+
 ```typescript
 function enforceFrameEmission(
   context: ExecutorInvocationContext,
   output: ExecutorOutput
-): ExecutionFrame
+): ExecutionFrame;
 ```
 
 **Throws:**
+
 - `FrameContractViolationError` if `output.frame` is missing
 
 **Example:**
+
 ```typescript
 try {
   const frame = enforceFrameEmission(context, output);
@@ -173,19 +176,21 @@ try {
 Higher-order function that wraps an executor to enforce Frame emission.
 
 **Signature:**
+
 ```typescript
 function withFrameContract<TInput, TOutput>(
   executor: (inputs: TInput, context: ExecutorInvocationContext) => Promise<TOutput>,
   baseContext: { executorRole: string; runId: string }
-): (inputs: TInput) => Promise<TOutput & { validatedFrame: ExecutionFrame }>
+): (inputs: TInput) => Promise<TOutput & { validatedFrame: ExecutionFrame }>;
 ```
 
 **Example:**
+
 ```typescript
-const safeExecutor = withFrameContract(
-  myExecutor,
-  { executorRole: "senior-dev", runId: "run-001" }
-);
+const safeExecutor = withFrameContract(myExecutor, {
+  executorRole: "senior-dev",
+  runId: "run-001",
+});
 
 const result = await safeExecutor({ prNumber: "123" });
 // result.validatedFrame is guaranteed to exist
@@ -198,6 +203,7 @@ const result = await safeExecutor({ prNumber: "123" });
 Generates Frame metadata from executor invocation.
 
 **Signature:**
+
 ```typescript
 function createFrameMetadata(
   context: ExecutorInvocationContext,
@@ -208,10 +214,11 @@ function createFrameMetadata(
   outputsHash: string;
   toolCalls: ToolCall[];
   durationMs: number;
-}
+};
 ```
 
 **Example:**
+
 ```typescript
 const metadata = createFrameMetadata(context, output);
 console.log(`Inputs hash: ${metadata.inputsHash}`);
@@ -225,11 +232,13 @@ console.log(`Duration: ${metadata.durationMs}ms`);
 Builds a complete ExecutionFrame from an executor template.
 
 **Signature:**
+
 ```typescript
-function buildFrameFromTemplate(template: ExecutorFrameTemplate): ExecutionFrame
+function buildFrameFromTemplate(template: ExecutorFrameTemplate): ExecutionFrame;
 ```
 
 **Template Fields:**
+
 ```typescript
 interface ExecutorFrameTemplate {
   role: string;
@@ -248,6 +257,7 @@ interface ExecutorFrameTemplate {
 ```
 
 **Example:**
+
 ```typescript
 const frame = buildFrameFromTemplate({
   role: "eager-pm",
@@ -270,6 +280,7 @@ const frame = buildFrameFromTemplate({
 Validates that a Frame includes required executor metadata.
 
 **Signature:**
+
 ```typescript
 function validateFrameMetadata(
   frame: ExecutionFrame,
@@ -279,7 +290,7 @@ function validateFrameMetadata(
     outputsHash: string;
     toolCalls: ToolCall[];
   }
-): boolean
+): boolean;
 ```
 
 **Returns:** `true` if Frame has metadata, `false` otherwise.
@@ -293,15 +304,17 @@ function validateFrameMetadata(
 Thrown when an executor does not emit a Frame.
 
 **Properties:**
+
 ```typescript
 class FrameContractViolationError extends Error {
-  executorRole: string;  // Executor that violated the contract
-  runId: string;         // Run ID for correlation
-  message: string;       // Error description
+  executorRole: string; // Executor that violated the contract
+  runId: string; // Run ID for correlation
+  message: string; // Error description
 }
 ```
 
 **Example:**
+
 ```typescript
 catch (error) {
   if (error instanceof FrameContractViolationError) {
@@ -324,6 +337,7 @@ Frames emitted by executors integrate with the Lex memory system:
 3. **Learning** — Patterns emerge from accumulated Frame history
 
 **Example Frame Query:**
+
 ```bash
 lex recall "executor:senior-dev reviews for src/cli.ts"
 ```
@@ -362,7 +376,7 @@ Track every tool invocation in `context.toolCalls`:
 async function myExecutor(inputs, context) {
   const startTime = Date.now();
   const result = await callTool("grep_search", { pattern: "TODO" });
-  
+
   context.toolCalls.push({
     tool: "grep_search",
     timestamp: new Date().toISOString(),
@@ -370,7 +384,7 @@ async function myExecutor(inputs, context) {
     success: result.success,
     error: result.error,
   });
-  
+
   // ... rest of executor logic
 }
 ```
@@ -400,6 +414,7 @@ npm test -- frameContract
 ```
 
 **Test Coverage:**
+
 - ✅ Frame emission enforcement
 - ✅ Input/output hashing
 - ✅ Tool call recording
@@ -421,6 +436,7 @@ npm test -- frameContract
 ## Changelog
 
 ### v1.0.0 (2025-12-16)
+
 - ✅ Initial implementation of Frame contract enforcement
 - ✅ `enforceFrameEmission` validation function
 - ✅ `withFrameContract` HOF wrapper

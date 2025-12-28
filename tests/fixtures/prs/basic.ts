@@ -14,7 +14,7 @@ export interface MockPR {
     changes?: number;
     patch?: string;
   }>;
-  state?: 'open' | 'closed';
+  state?: "open" | "closed";
   merged?: boolean;
   base?: {
     ref: string;
@@ -34,7 +34,7 @@ export interface BasicPROptions {
   title: string;
   body?: string | null;
   files?: string[];
-  state?: 'open' | 'closed';
+  state?: "open" | "closed";
   merged?: boolean;
   baseRef?: string;
   headRef?: string;
@@ -50,11 +50,11 @@ export function basic(options: BasicPROptions): MockPR {
     title,
     body = null,
     files = [],
-    state = 'open',
+    state = "open",
     merged = false,
-    baseRef = 'main',
+    baseRef = "main",
     headRef = `pr-${number}`,
-    labels = []
+    labels = [],
   } = options;
 
   return {
@@ -65,22 +65,22 @@ export function basic(options: BasicPROptions): MockPR {
     merged,
     base: {
       ref: baseRef,
-      sha: `base-sha-${number}`
+      sha: `base-sha-${number}`,
     },
     head: {
       ref: headRef,
-      sha: `head-sha-${number}`
+      sha: `head-sha-${number}`,
     },
-    files: files.map(filename => ({
+    files: files.map((filename) => ({
       filename,
-      status: 'modified',
+      status: "modified",
       additions: 10,
       deletions: 5,
-      changes: 15
+      changes: 15,
     })),
-    labels: labels.map(name => ({ name })),
+    labels: labels.map((name) => ({ name })),
     created_at: new Date(Date.UTC(2024, 0, 1 + number - 100)).toISOString(),
-    updated_at: new Date(Date.UTC(2024, 0, 2 + number - 100)).toISOString()
+    updated_at: new Date(Date.UTC(2024, 0, 2 + number - 100)).toISOString(),
   };
 }
 
@@ -95,8 +95,8 @@ export function batch(count: number): MockPR[] {
       title: `Feature ${i + 1}: Add component ${String.fromCharCode(65 + i)}`,
       files: [
         `src/components/Component${String.fromCharCode(65 + i)}.ts`,
-        `tests/components/Component${String.fromCharCode(65 + i)}.spec.ts`
-      ]
+        `tests/components/Component${String.fromCharCode(65 + i)}.spec.ts`,
+      ],
     });
   });
 }
@@ -109,23 +109,23 @@ export function withFiles(options: {
   title: string;
   files: Array<{
     filename: string;
-    status?: 'added' | 'modified' | 'removed' | 'renamed';
+    status?: "added" | "modified" | "removed" | "renamed";
     additions?: number;
     deletions?: number;
   }>;
 }): MockPR {
   const pr = basic({
     number: options.number,
-    title: options.title
+    title: options.title,
   });
 
-  pr.files = options.files.map(file => ({
+  pr.files = options.files.map((file) => ({
     filename: file.filename,
-    status: file.status ?? 'modified',
+    status: file.status ?? "modified",
     additions: file.additions ?? 10,
     deletions: file.deletions ?? 5,
     changes: (file.additions ?? 10) + (file.deletions ?? 5),
-    patch: file.status === 'added' ? '+' : file.status === 'removed' ? '-' : '~'
+    patch: file.status === "added" ? "+" : file.status === "removed" ? "-" : "~",
   }));
 
   return pr;
@@ -134,13 +134,9 @@ export function withFiles(options: {
 /**
  * Create a PR with specific labels
  */
-export function withLabels(options: {
-  number: number;
-  title: string;
-  labels: string[];
-}): MockPR {
+export function withLabels(options: { number: number; title: string; labels: string[] }): MockPR {
   return basic({
-    ...options
+    ...options,
   });
 }
 
@@ -148,20 +144,16 @@ export function withLabels(options: {
  * Fixed base timestamp for deterministic fixture dates
  * 2024-01-01T00:00:00.000Z
  */
-const FIXTURE_BASE_TIMESTAMP = '2024-01-01T00:00:00.000Z';
+const FIXTURE_BASE_TIMESTAMP = "2024-01-01T00:00:00.000Z";
 
 /**
  * Create a closed/merged PR
  */
-export function closed(options: {
-  number: number;
-  title: string;
-  merged?: boolean;
-}): MockPR {
+export function closed(options: { number: number; title: string; merged?: boolean }): MockPR {
   return basic({
     ...options,
-    state: 'closed',
-    merged: options.merged ?? true
+    state: "closed",
+    merged: options.merged ?? true,
   });
 }
 
@@ -170,13 +162,14 @@ export function closed(options: {
  */
 export function largeChangeset(number: number): MockPR {
   const fileCount = 50;
-  const files = Array.from({ length: fileCount }, (_, i) => 
-    `src/module-${Math.floor(i / 10)}/file-${i}.ts`
+  const files = Array.from(
+    { length: fileCount },
+    (_, i) => `src/module-${Math.floor(i / 10)}/file-${i}.ts`
   );
 
   return basic({
     number,
     title: `Large refactor: Update ${fileCount} files`,
-    files
+    files,
   });
 }

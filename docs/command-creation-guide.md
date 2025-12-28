@@ -5,6 +5,7 @@ This guide shows how to create new commands in the modular lexrunner CLI archite
 ## Overview
 
 The lexrunner CLI uses a **modular command architecture** where:
+
 - Each command lives in its own module under `src/commands/`
 - Commands are registered in `src/cli.ts` using a standard pattern
 - Shared utilities are in `src/cli/` (output, flags, exit handling)
@@ -30,20 +31,20 @@ Use this template as your starting point:
 
 ```typescript
 // src/commands/myCommand.ts
-import { Command } from 'commander';
-import { writeJsonOutput } from '../cli/output.js';
-import { throwExit } from '../cli/exitHandler.js';
+import { Command } from "commander";
+import { writeJsonOutput } from "../cli/output.js";
+import { throwExit } from "../cli/exitHandler.js";
 
 /**
  * Register the my-command command
  */
 export function registerMyCommandCommand(program: Command): void {
   program
-    .command('my-command')
-    .description('Brief description of what this command does')
-    .argument('<required-arg>', 'Description of required argument')
-    .option('-o, --option <value>', 'Description of optional flag')
-    .option('--json', 'Output as JSON')
+    .command("my-command")
+    .description("Brief description of what this command does")
+    .argument("<required-arg>", "Description of required argument")
+    .option("-o, --option <value>", "Description of optional flag")
+    .option("--json", "Output as JSON")
     .action(async (requiredArg, options) => {
       try {
         const result = await executeMyCommand(requiredArg, options);
@@ -69,7 +70,7 @@ async function executeMyCommand(
   // Your implementation here
   return {
     success: true,
-    data: `Processed ${arg} with option ${options.option}`
+    data: `Processed ${arg} with option ${options.option}`,
   };
 }
 
@@ -92,7 +93,7 @@ Add your command to `src/cli.ts`:
 
 ```typescript
 // src/cli.ts
-import { registerMyCommandCommand } from './commands/myCommand.js';
+import { registerMyCommandCommand } from "./commands/myCommand.js";
 
 // ... existing imports ...
 
@@ -108,20 +109,20 @@ Create a test file in `tests/commands/`:
 
 ```typescript
 // tests/commands/myCommand.spec.ts
-import { describe, it, expect } from 'vitest';
-import { registerMyCommandCommand } from '../../src/commands/myCommand.js';
-import { Command } from 'commander';
+import { describe, it, expect } from "vitest";
+import { registerMyCommandCommand } from "../../src/commands/myCommand.js";
+import { Command } from "commander";
 
-describe('myCommand', () => {
-  it('should register command with correct name', () => {
+describe("myCommand", () => {
+  it("should register command with correct name", () => {
     const program = new Command();
     registerMyCommandCommand(program);
 
-    const command = program.commands.find(cmd => cmd.name() === 'my-command');
+    const command = program.commands.find((cmd) => cmd.name() === "my-command");
     expect(command).toBeDefined();
   });
 
-  it('should execute successfully', async () => {
+  it("should execute successfully", async () => {
     // Test your command logic
   });
 });
@@ -132,6 +133,7 @@ describe('myCommand', () => {
 ### Separation of Concerns
 
 ✅ **DO:**
+
 ```typescript
 // Command handler (thin wrapper)
 .action(async (args, options) => {
@@ -146,6 +148,7 @@ async function executeMyCommand(args, options) {
 ```
 
 ❌ **DON'T:**
+
 ```typescript
 // Business logic mixed with CLI handling
 .action(async (args, options) => {
@@ -165,7 +168,7 @@ Always support both human and JSON output:
 
 ```typescript
 if (options.json) {
-  writeJsonOutput(result);  // Use helper from cli/output.js
+  writeJsonOutput(result); // Use helper from cli/output.js
 } else {
   console.log(formatForHuman(result));
 }
@@ -176,12 +179,12 @@ if (options.json) {
 Use `throwExit` for consistent error handling:
 
 ```typescript
-import { throwExit } from '../cli/exitHandler.js';
+import { throwExit } from "../cli/exitHandler.js";
 
 try {
   const result = await riskyOperation();
 } catch (error) {
-  throwExit(error, 1);  // Exit with code 1
+  throwExit(error, 1); // Exit with code 1
 }
 ```
 
@@ -202,6 +205,7 @@ interface MyCommandResult {
 ### Simple Commands
 
 **Characteristics:**
+
 - No complex dependencies
 - Minimal business logic
 - Quick to execute
@@ -213,6 +217,7 @@ interface MyCommandResult {
 ### Complex Commands
 
 **Characteristics:**
+
 - Orchestrate multiple operations
 - May spawn subprocesses
 - Require extensive error handling
@@ -240,12 +245,12 @@ Register command groups:
 
 ```typescript
 // src/commands/orchestrate/index.ts
-import { Command } from 'commander';
-import { registerFanoutCommand } from './fanout.js';
-import { registerMergeCommand } from './merge.js';
+import { Command } from "commander";
+import { registerFanoutCommand } from "./fanout.js";
+import { registerMergeCommand } from "./merge.js";
 
 export function registerOrchestrateCommands(program: Command): void {
-  const orchestrate = program.command('orchestrate').description('Orchestration commands');
+  const orchestrate = program.command("orchestrate").description("Orchestration commands");
 
   registerFanoutCommand(orchestrate);
   registerMergeCommand(orchestrate);
@@ -259,14 +264,14 @@ export function registerOrchestrateCommands(program: Command): void {
 Test your business logic functions directly:
 
 ```typescript
-describe('executeMyCommand', () => {
-  it('should process valid input', async () => {
-    const result = await executeMyCommand('test', { option: 'value' });
+describe("executeMyCommand", () => {
+  it("should process valid input", async () => {
+    const result = await executeMyCommand("test", { option: "value" });
     expect(result.success).toBe(true);
   });
 
-  it('should handle errors gracefully', async () => {
-    await expect(executeMyCommand('', {})).rejects.toThrow();
+  it("should handle errors gracefully", async () => {
+    await expect(executeMyCommand("", {})).rejects.toThrow();
   });
 });
 ```
@@ -276,16 +281,16 @@ describe('executeMyCommand', () => {
 Test the full command flow:
 
 ```typescript
-import { executeCommand } from '../helpers/cli-test-utils.js';
+import { executeCommand } from "../helpers/cli-test-utils.js";
 
-describe('my-command integration', () => {
-  it('should execute via CLI', async () => {
-    const output = await executeCommand('my-command arg --option value');
-    expect(output).toContain('✅');
+describe("my-command integration", () => {
+  it("should execute via CLI", async () => {
+    const output = await executeCommand("my-command arg --option value");
+    expect(output).toContain("✅");
   });
 
-  it('should support JSON output', async () => {
-    const output = await executeCommand('my-command arg --json');
+  it("should support JSON output", async () => {
+    const output = await executeCommand("my-command arg --json");
     const result = JSON.parse(output);
     expect(result.success).toBe(true);
   });
@@ -297,7 +302,7 @@ describe('my-command integration', () => {
 ### Output (`src/cli/output.js`)
 
 ```typescript
-import { writeJsonOutput } from '../cli/output.js';
+import { writeJsonOutput } from "../cli/output.js";
 
 // Write JSON to stdout
 writeJsonOutput({ success: true, data: [] });
@@ -306,19 +311,19 @@ writeJsonOutput({ success: true, data: [] });
 ### Exit Handling (`src/cli/exitHandler.js`)
 
 ```typescript
-import { throwExit, CLIExitSignal } from '../cli/exitHandler.js';
+import { throwExit, CLIExitSignal } from "../cli/exitHandler.js";
 
 // Graceful exit with error message
-throwExit(new Error('Operation failed'), 1);
+throwExit(new Error("Operation failed"), 1);
 
 // Exit with signal
-throw new CLIExitSignal(0, 'Success message');
+throw new CLIExitSignal(0, "Success message");
 ```
 
 ### Global Flags (`src/cli/flags.js`)
 
 ```typescript
-import { parseGlobalFlags } from '../cli/flags.js';
+import { parseGlobalFlags } from "../cli/flags.js";
 
 // Parse global flags if needed in your command
 const globalOpts = parseGlobalFlags(process.argv);
@@ -335,7 +340,7 @@ When adding a new command:
 
 Example JSDoc:
 
-```typescript
+````typescript
 /**
  * Register the my-command command
  *
@@ -353,7 +358,7 @@ Example JSDoc:
 export function registerMyCommandCommand(program: Command): void {
   // ...
 }
-```
+````
 
 ## Checklist
 
@@ -375,20 +380,26 @@ Before submitting a PR with a new command:
 See these existing commands for reference:
 
 ### Simple Command Example
+
 **File:** `src/commands/completion.ts`
+
 - Minimal dependencies
 - Pure output generation
 - ~50 lines of code
 
 ### Medium Command Example
+
 **File:** `src/commands/discover.ts`
+
 - GitHub API integration
 - Option parsing
 - JSON/human output
 - ~150 lines of code
 
 ### Complex Command Example
+
 **File:** `src/commands/execute.ts`
+
 - Multi-stage orchestration
 - Subprocess management
 - Progress reporting
@@ -444,7 +455,7 @@ catch (error) {
 ```typescript
 // BAD: JSON polluted with human messages
 if (options.json) {
-  console.log('Processing...');  // ❌ Non-JSON output
+  console.log("Processing..."); // ❌ Non-JSON output
   writeJsonOutput(result);
 }
 ```
@@ -454,7 +465,7 @@ if (options.json) {
 if (options.json) {
   writeJsonOutput(result);
 } else {
-  console.log('Processing...');
+  console.log("Processing...");
   console.log(formatResult(result));
 }
 ```

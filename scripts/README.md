@@ -80,6 +80,7 @@ A lightweight, parameterized shell script for merging multiple PRs into an umbre
 ```
 
 **Features:**
+
 - Simple command-based interface (discover, preview, execute, resume)
 - Auto-detects GitHub owner/repo from git remote
 - Wraps `lex-pr` CLI for full feature access
@@ -138,6 +139,7 @@ A parameterized, repo-agnostic script for executing merge-weave workflows. This 
 ```
 
 **Features:**
+
 - Load plan from file or discover PRs from GitHub
 - Automated workflow: validation → gates → analysis → merge → report
 - Configurable artifacts directory with timestamps
@@ -276,22 +278,22 @@ items:
     branch: feature-a
     deps: []
     strategy: merge-weave
-  
+
   - id: feature-b
     branch: feature-b
     deps: []
     strategy: merge-weave
-  
+
   - id: feature-c
     branch: feature-c
     deps: [feature-a]
     strategy: merge-weave
-  
+
   - id: bugfix-critical
     branch: bugfix/critical
     deps: [feature-b]
     strategy: merge-weave
-  
+
   - id: feature-d
     branch: feature-d
     deps: [feature-c, bugfix-critical]
@@ -330,6 +332,7 @@ The sample repository includes:
 ### Commit Messages
 
 Each branch has a properly formatted commit message with:
+
 - Conventional commit prefix (`feat:`, `fix:`)
 - Clear description
 - Dependency declaration using `Depends-On:` syntax

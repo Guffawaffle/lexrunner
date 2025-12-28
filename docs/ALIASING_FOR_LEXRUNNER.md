@@ -59,13 +59,13 @@ Frames are stored with canonical IDs, so queries work seamlessly:
 
 Lex aliasing follows a JSON schema defined in [`src/shared/aliases/alias-schema.json`](https://github.com/Guffawaffle/lex/blob/main/src/shared/aliases/alias-schema.json). Key fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `canonical` | `string` | The authoritative module ID from `lexmap.policy.json` |
-| `confidence` | `number` | Confidence score (1.0 for explicit aliases, <1.0 for fuzzy matches) |
-| `reason` | `string` | Human-readable explanation (e.g., "shorthand", "historical rename") |
-| `deprecated` | `boolean` | (Optional) Mark aliases that should trigger warnings |
-| `added_date` | `string` | (Optional) ISO 8601 date when the alias was added |
+| Field        | Type      | Description                                                         |
+| ------------ | --------- | ------------------------------------------------------------------- |
+| `canonical`  | `string`  | The authoritative module ID from `lexmap.policy.json`               |
+| `confidence` | `number`  | Confidence score (1.0 for explicit aliases, <1.0 for fuzzy matches) |
+| `reason`     | `string`  | Human-readable explanation (e.g., "shorthand", "historical rename") |
+| `deprecated` | `boolean` | (Optional) Mark aliases that should trigger warnings                |
+| `added_date` | `string`  | (Optional) ISO 8601 date when the alias was added                   |
 
 See the [canonical alias documentation](https://github.com/Guffawaffle/lex/blob/main/src/shared/aliases/README.md) for complete API details.
 
@@ -115,6 +115,7 @@ When a fanout touches `src/cli/flags.ts`, the Frame is tagged with:
 Even if the developer typed `cli-core` during `/remember`, the Frame stores the canonical ID.
 
 **Benefits**:
+
 - Developers remember "cli-core" instead of full path
 - Policy validation works against `lexmap.policy.json` without modification
 - Frame queries by canonical name always succeed
@@ -163,14 +164,12 @@ The Frame is stored with:
 
 ```json
 {
-  "module_scope": [
-    "external/lex/memory/store",
-    "src/integrations/lex-bridge"
-  ]
+  "module_scope": ["external/lex/memory/store", "src/integrations/lex-bridge"]
 }
 ```
 
 **Benefits**:
+
 - Consistent naming across repositories
 - Frames accurately capture cross-repo dependencies
 - Team members understand "lex-memory" without checking paths
@@ -244,6 +243,7 @@ If explicitly debugging a test failure:
 ```
 
 **Benefits**:
+
 - Reduces noise in Frame tagging (test changes are common but often not the focus)
 - Explicit tagging available when needed
 - Policy can define auto-tagging rules per module type
@@ -383,6 +383,7 @@ If a developer types `cli-core` (lowercase), the alias is not found:
 ```
 
 **Result**:
+
 - Frames tagged with `everything` lose granularity
 - Policy validation is slow (must check all modules)
 - No way to filter by specific subsystem
@@ -391,11 +392,11 @@ If a developer types `cli-core` (lowercase), the alias is not found:
 
 Benchmarks on a 500-module monorepo:
 
-| Alias Strategy | Resolution Time | Policy Check Time |
-|---------------|-----------------|-------------------|
-| Specific aliases (10 entries) | ~0.5ms | ~10ms |
-| Broad wildcards (5 entries) | ~15ms | ~200ms |
-| Overly broad (`src/**/*`) | ~50ms | ~1000ms |
+| Alias Strategy                | Resolution Time | Policy Check Time |
+| ----------------------------- | --------------- | ----------------- |
+| Specific aliases (10 entries) | ~0.5ms          | ~10ms             |
+| Broad wildcards (5 entries)   | ~15ms           | ~200ms            |
+| Overly broad (`src/**/*`)     | ~50ms           | ~1000ms           |
 
 **Resolution**:
 
@@ -439,12 +440,14 @@ Each alias represents a **module-level boundary** in `lexmap.policy.json`, not a
 **Diagnosis Steps**:
 
 1. **Check alias table syntax**:
+
    ```bash
    cat src/shared/aliases/aliases.json | jq .
    # Ensure valid JSON
    ```
 
 2. **Verify alias exists**:
+
    ```bash
    cat src/shared/aliases/aliases.json | jq '.aliases["my-alias"]'
    # Should print the alias entry
@@ -452,16 +455,17 @@ Each alias represents a **module-level boundary** in `lexmap.policy.json`, not a
 
 3. **Check cache**:
    Lex caches the alias table. Clear cache and retry:
+
    ```javascript
    // In a Node.js REPL or script:
-   import { clearAliasTableCache } from './src/shared/aliases/resolver.js';
+   import { clearAliasTableCache } from "./src/shared/aliases/resolver.js";
    clearAliasTableCache();
    ```
 
 4. **Test resolution programmatically**:
    ```javascript
-   import { resolveModuleId } from './src/shared/aliases/resolver.js';
-   const result = await resolveModuleId('my-alias', policy);
+   import { resolveModuleId } from "./src/shared/aliases/resolver.js";
+   const result = await resolveModuleId("my-alias", policy);
    console.log(result);
    // Expected: { canonical: '...', confidence: 1.0, source: 'alias' }
    ```
@@ -469,6 +473,7 @@ Each alias represents a **module-level boundary** in `lexmap.policy.json`, not a
 **Solution**:
 
 If the alias is not found, ensure:
+
 - The alias is defined in `aliases.json`
 - The JSON is valid (no trailing commas, proper escaping)
 - The Lex installation has reloaded the alias table (restart MCP server if applicable)
@@ -490,6 +495,7 @@ The alias resolves correctly, but the canonical ID is not defined in `lexmap.pol
 **Solution**:
 
 1. **Check policy**:
+
    ```bash
    cat policy/policy_spec/lexmap.policy.json | jq '.modules | keys'
    # List all valid module IDs
@@ -531,17 +537,15 @@ This indicates a **bug in the `/remember` implementation**. Frames should **neve
 **Debugging**:
 
 1. **Check validation logic**:
+
    ```typescript
    // In src/memory/mcp_server/server.ts
-   const validationResult = await validateModuleIds(
-     userInput.module_scope,
-     policy
-   );
-   
+   const validationResult = await validateModuleIds(userInput.module_scope, policy);
+
    if (!validationResult.valid) {
      throw new Error(validationResult.error);
    }
-   
+
    // Store canonical IDs, not user input:
    frame.module_scope = validationResult.canonical;
    ```
@@ -554,6 +558,7 @@ This indicates a **bug in the `/remember` implementation**. Frames should **neve
 **Solution**:
 
 If Frames are storing aliases, this is a critical bug. File an issue at [Guffawaffle/lex#issues](https://github.com/Guffawaffle/lex/issues) with:
+
 - The alias used
 - The Frame JSON (from database or `/recall`)
 - Expected canonical module ID
@@ -578,6 +583,7 @@ Substring matching found multiple candidates. This is expected behavior for shor
 **Solution**:
 
 1. **Use full canonical ID**:
+
    ```bash
    /remember module_scope='["services/auth-core"]'
    ```
@@ -604,31 +610,34 @@ Substring matching found multiple candidates. This is expected behavior for shor
 **Diagnosis**:
 
 Alias table is either:
+
 1. Very large (>10,000 entries)
 2. Using complex patterns (regex or wildcards)
 3. Not cached properly
 
 **Performance Expectations**:
 
-| Alias Table Size | Expected Resolution Time |
-|------------------|--------------------------|
-| 1-100 entries    | <1ms                     |
-| 100-1,000 entries | <10ms                   |
-| 1,000-10,000 entries | <100ms               |
+| Alias Table Size     | Expected Resolution Time |
+| -------------------- | ------------------------ |
+| 1-100 entries        | <1ms                     |
+| 100-1,000 entries    | <10ms                    |
+| 1,000-10,000 entries | <100ms                   |
 
 **Solution**:
 
 1. **Check alias table size**:
+
    ```bash
    cat src/shared/aliases/aliases.json | jq '.aliases | length'
    ```
 
 2. **Profile resolution**:
+
    ```javascript
-   import { resolveModuleId } from './src/shared/aliases/resolver.js';
-   console.time('resolution');
-   await resolveModuleId('my-alias', policy);
-   console.timeEnd('resolution');
+   import { resolveModuleId } from "./src/shared/aliases/resolver.js";
+   console.time("resolution");
+   await resolveModuleId("my-alias", policy);
+   console.timeEnd("resolution");
    ```
 
 3. **Optimize alias table**:

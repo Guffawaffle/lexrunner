@@ -9,17 +9,20 @@ The scope validator provides **static analysis** to ensure agents only modify wh
 Agents can currently modify global variables, touch unrelated code, or introduce cross-module side effects without detection. This violates the hermetic edit contract and can cause subtle runtime bugs, especially in legacy codebases with AMD/UMD modules.
 
 **Example vulnerability:**
+
 ```javascript
 // File: src/legacy/paymentProcessor.js (AMD module)
-define(['dep'], function(dep) {
-  window.DEBUG_MODE = true;  // ❌ GLOBAL SIDE EFFECT - not detected
+define(["dep"], function (dep) {
+  window.DEBUG_MODE = true; // ❌ GLOBAL SIDE EFFECT - not detected
 
-  function processPayment(amount) {  // Agent intended to edit this
+  function processPayment(amount) {
+    // Agent intended to edit this
     return amount * 1.1;
   }
 
-  function auditLog(msg) {  // Agent accidentally modified this too
-    console.log('AUDIT:', msg);
+  function auditLog(msg) {
+    // Agent accidentally modified this too
+    console.log("AUDIT:", msg);
   }
 
   return { processPayment, auditLog };
@@ -48,9 +51,9 @@ define(['dep'], function(dep) {
 Analyze a file to extract its scope information:
 
 ```typescript
-import { analyzeFileScope } from './planner/scopeValidator.js';
+import { analyzeFileScope } from "./planner/scopeValidator.js";
 
-const scope = await analyzeFileScope('/path/to/file.ts');
+const scope = await analyzeFileScope("/path/to/file.ts");
 
 console.log(scope);
 // {
@@ -69,22 +72,22 @@ console.log(scope);
 Validate that actual modifications match declared intent:
 
 ```typescript
-import { validateEditScope, ScopeValidationError } from './planner/scopeValidator.js';
+import { validateEditScope, ScopeValidationError } from "./planner/scopeValidator.js";
 
 const declaredPlan = {
-  functions_modified: ['processPayment'],
+  functions_modified: ["processPayment"],
   classes_modified: [],
-  side_effects: 'none',
-  globals_written: []
+  side_effects: "none",
+  globals_written: [],
 };
 
 try {
-  const result = await validateEditScope('/path/to/file.js', declaredPlan);
-  console.log('✅ Validation passed');
+  const result = await validateEditScope("/path/to/file.js", declaredPlan);
+  console.log("✅ Validation passed");
 } catch (error) {
   if (error instanceof ScopeValidationError) {
-    console.error('❌ Scope violations detected:');
-    error.violations?.forEach(v => {
+    console.error("❌ Scope violations detected:");
+    error.violations?.forEach((v) => {
       console.error(`  - ${v.type}: ${v.message} (line ${v.location.line})`);
     });
   }
@@ -112,18 +115,18 @@ The edit plan is defined by `schemas/edit-plan.schema.json`:
 
 ### Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `file` | string | Path to file being edited |
-| `module_system` | enum | Module system: `esm`, `commonjs`, `amd`, `umd`, `iife`, `unknown` |
-| `functions_modified` | string[] | List of function names being modified |
-| `classes_modified` | string[] | List of class names being modified |
-| `variables_modified` | string[] | List of module-level variables being modified |
-| `side_effects` | enum | `none`, `module`, or `global` |
-| `globals_written` | string[] | Global variables written (`window.*`, `global.*`) |
-| `scope_validated` | boolean | Whether validation passed |
-| `validation_method` | enum | AST parser used: `babel-ast`, `typescript-ast`, etc. |
-| `violations` | object[] | List of violations detected (if any) |
+| Field                | Type     | Description                                                       |
+| -------------------- | -------- | ----------------------------------------------------------------- |
+| `file`               | string   | Path to file being edited                                         |
+| `module_system`      | enum     | Module system: `esm`, `commonjs`, `amd`, `umd`, `iife`, `unknown` |
+| `functions_modified` | string[] | List of function names being modified                             |
+| `classes_modified`   | string[] | List of class names being modified                                |
+| `variables_modified` | string[] | List of module-level variables being modified                     |
+| `side_effects`       | enum     | `none`, `module`, or `global`                                     |
+| `globals_written`    | string[] | Global variables written (`window.*`, `global.*`)                 |
+| `scope_validated`    | boolean  | Whether validation passed                                         |
+| `validation_method`  | enum     | AST parser used: `babel-ast`, `typescript-ast`, etc.              |
+| `violations`         | object[] | List of violations detected (if any)                              |
 
 ## Detection Capabilities
 
@@ -139,6 +142,7 @@ The edit plan is defined by `schemas/edit-plan.schema.json`:
 ### Code Analysis
 
 ✅ **Detects:**
+
 - Function declarations
 - Class declarations
 - Global writes (`window.*`, `global.*`)
@@ -146,6 +150,7 @@ The edit plan is defined by `schemas/edit-plan.schema.json`:
 - Module system type
 
 ❌ **Currently NOT detected:**
+
 - Arrow functions assigned to variables
 - Method declarations within classes (tracked via class)
 - Computed property assignments to globals
@@ -161,7 +166,7 @@ Function modified but not declared in edit plan.
 // Declared: functions_modified: ['foo']
 // Actual file contains:
 function foo() {}
-function bar() {}  // ❌ VIOLATION: undeclared_function
+function bar() {} // ❌ VIOLATION: undeclared_function
 ```
 
 ### `undeclared_class`
@@ -172,7 +177,7 @@ Class modified but not declared in edit plan.
 // Declared: classes_modified: ['MyClass']
 // Actual file contains:
 class MyClass {}
-class SecretClass {}  // ❌ VIOLATION: undeclared_class
+class SecretClass {} // ❌ VIOLATION: undeclared_class
 ```
 
 ### `global_write`
@@ -182,7 +187,7 @@ Global variable written but not declared.
 ```typescript
 // Declared: globals_written: []
 // Actual file contains:
-window.DEBUG = true;  // ❌ VIOLATION: global_write
+window.DEBUG = true; // ❌ VIOLATION: global_write
 ```
 
 ### `side_effect`
@@ -192,7 +197,7 @@ Side effects detected but plan declared 'none'.
 ```typescript
 // Declared: side_effects: 'none'
 // Actual file contains:
-window.config = {};  // ❌ VIOLATION: side_effect (global detected)
+window.config = {}; // ❌ VIOLATION: side_effect (global detected)
 ```
 
 ## Error Handling
@@ -204,7 +209,7 @@ Thrown when validation fails. Contains structured violation information.
 ```typescript
 class ScopeValidationError extends Error {
   public readonly violations: Array<{
-    type: 'undeclared_function' | 'undeclared_class' | 'global_write' | 'side_effect';
+    type: "undeclared_function" | "undeclared_class" | "global_write" | "side_effect";
     message: string;
     location: { line: number; column: number };
   }>;
@@ -212,6 +217,7 @@ class ScopeValidationError extends Error {
 ```
 
 **Example error message:**
+
 ```
 Scope validation failed for src/legacy/payment.js:
   - undeclared_function: Function 'auditLog' modified but not declared in edit plan (line 0)
@@ -221,16 +227,16 @@ Scope validation failed for src/legacy/payment.js:
 
 ## Supported File Types
 
-| Extension | Parser | Status |
-|-----------|--------|--------|
-| `.ts` | Babel with TypeScript plugin | ✅ Supported |
-| `.tsx` | Babel with TypeScript + JSX | ✅ Supported |
-| `.js` | Babel (unambiguous mode) | ✅ Supported |
-| `.jsx` | Babel with JSX | ✅ Supported |
-| `.mjs` | Babel (ESM mode) | ✅ Supported |
-| `.cjs` | Babel (CommonJS mode) | ✅ Supported |
-| `.py` | Python AST | ❌ Not yet supported |
-| Other | - | ❌ Throws error |
+| Extension | Parser                       | Status               |
+| --------- | ---------------------------- | -------------------- |
+| `.ts`     | Babel with TypeScript plugin | ✅ Supported         |
+| `.tsx`    | Babel with TypeScript + JSX  | ✅ Supported         |
+| `.js`     | Babel (unambiguous mode)     | ✅ Supported         |
+| `.jsx`    | Babel with JSX               | ✅ Supported         |
+| `.mjs`    | Babel (ESM mode)             | ✅ Supported         |
+| `.cjs`    | Babel (CommonJS mode)        | ✅ Supported         |
+| `.py`     | Python AST                   | ❌ Not yet supported |
+| Other     | -                            | ❌ Throws error      |
 
 ## Examples
 
@@ -244,13 +250,13 @@ export function add(a: number, b: number): number {
 
 // Declared plan:
 const plan = {
-  functions_modified: ['add'],
-  side_effects: 'none',
-  globals_written: []
+  functions_modified: ["add"],
+  side_effects: "none",
+  globals_written: [],
 };
 
 // ✅ Validation passes
-await validateEditScope('src/calculator.ts', plan);
+await validateEditScope("src/calculator.ts", plan);
 ```
 
 ### Example 2: Undeclared Function (Fails)
@@ -282,9 +288,9 @@ function initApp() {
 
 // Declared plan:
 const plan = {
-  functions_modified: ['initApp'],
-  side_effects: 'none',
-  globals_written: []
+  functions_modified: ["initApp"],
+  side_effects: "none",
+  globals_written: [],
 };
 
 // ❌ Throws ScopeValidationError
@@ -297,15 +303,15 @@ const plan = {
 
 ```typescript
 // File: src/legacy/paymentProcessor.js
-define(['dep'], function(dep) {
-  window.DEBUG_MODE = true;  // Global side effect
+define(["dep"], function (dep) {
+  window.DEBUG_MODE = true; // Global side effect
 
   function processPayment(amount) {
     return amount * 1.1;
   }
 
   function auditLog(msg) {
-    console.log('AUDIT:', msg);
+    console.log("AUDIT:", msg);
   }
 
   return { processPayment, auditLog };
@@ -313,9 +319,9 @@ define(['dep'], function(dep) {
 
 // Declared plan:
 const plan = {
-  functions_modified: ['processPayment'],
-  side_effects: 'none',
-  globals_written: []
+  functions_modified: ["processPayment"],
+  side_effects: "none",
+  globals_written: [],
 };
 
 // ❌ Throws ScopeValidationError with 3 violations:
@@ -329,19 +335,21 @@ const plan = {
 ### With FileAnalyzer
 
 ```typescript
-import { FileAnalyzer } from './planner/fileAnalysis.js';
-import { validateEditScope } from './planner/scopeValidator.js';
+import { FileAnalyzer } from "./planner/fileAnalysis.js";
+import { validateEditScope } from "./planner/scopeValidator.js";
 
 // Create analyzer
-const analyzer = new FileAnalyzer(octokit, 'owner', 'repo');
+const analyzer = new FileAnalyzer(octokit, "owner", "repo");
 
 // Analyze file changes for a PR
 const fileChanges = await analyzer.getPRFileChanges(123);
 
 // Validate each change
 for (const file of fileChanges) {
-  if (file.status === 'modified') {
-    const plan = { /* declared edit plan */ };
+  if (file.status === "modified") {
+    const plan = {
+      /* declared edit plan */
+    };
     await validateEditScope(file.filename, plan);
   }
 }
@@ -362,11 +370,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Validate scope
         run: |
           # Extract edit plan from PR description
@@ -383,6 +391,7 @@ npm test -- scopeValidator.spec.ts
 ```
 
 **Test categories:**
+
 - Module system detection (ESM, CommonJS, AMD)
 - Function/class detection
 - Global write detection
@@ -421,6 +430,7 @@ This feature is marked **P0 (Critical)** for security:
 - Protects legacy code from agent modifications
 
 **Best practices:**
+
 - Always validate before applying agent edits
 - Treat validation failures as blocking errors
 - Review violations manually for false positives

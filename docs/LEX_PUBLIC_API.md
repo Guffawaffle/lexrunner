@@ -17,15 +17,15 @@ This document defines the **public API surface** for Lex when consumed by LexRun
 
 ## Part 1: Lex Modules Consumed by LexRunner
 
-| Module | Export Path | Purpose | Status |
-|--------|-------------|---------|--------|
-| **Memory/Frames** | `@smartergpt/lex/types` | Frame types and schemas for execution tracking | ✅ Available |
-| **Errors** | `@smartergpt/lex/errors` | AXError types and error handling utilities | ✅ Available |
-| **Policy** | `@smartergpt/lex/policy` | Policy validation and checking | ✅ Available |
-| **Atlas** | `@smartergpt/lex/atlas` | Code atlas and dependency analysis | ✅ Available |
-| **Store** | `@smartergpt/lex/store` | Memory store for frames and receipts | ✅ Available |
-| **Logger** | `@smartergpt/lex/logger` | Structured logging utilities | ✅ Available |
-| **Aliases** | `@smartergpt/lex/aliases` | Module ID resolution | ✅ Available |
+| Module            | Export Path               | Purpose                                        | Status       |
+| ----------------- | ------------------------- | ---------------------------------------------- | ------------ |
+| **Memory/Frames** | `@smartergpt/lex/types`   | Frame types and schemas for execution tracking | ✅ Available |
+| **Errors**        | `@smartergpt/lex/errors`  | AXError types and error handling utilities     | ✅ Available |
+| **Policy**        | `@smartergpt/lex/policy`  | Policy validation and checking                 | ✅ Available |
+| **Atlas**         | `@smartergpt/lex/atlas`   | Code atlas and dependency analysis             | ✅ Available |
+| **Store**         | `@smartergpt/lex/store`   | Memory store for frames and receipts           | ✅ Available |
+| **Logger**        | `@smartergpt/lex/logger`  | Structured logging utilities                   | ✅ Available |
+| **Aliases**       | `@smartergpt/lex/aliases` | Module ID resolution                           | ✅ Available |
 
 ## Import Path Examples
 
@@ -70,11 +70,7 @@ const validated = validateExecutionFrame(frame);
 
 ```typescript
 // Import error types from Lex
-import {
-  createAXError,
-  AXErrorException,
-  type AXError,
-} from "@smartergpt/lex/errors";
+import { createAXError, AXErrorException, type AXError } from "@smartergpt/lex/errors";
 
 // Create and throw errors
 const error = createAXError(
@@ -115,11 +111,7 @@ const dependencies = queryAtlas(atlas, { module: "src/cli.ts" });
 
 ```typescript
 // Import store functions
-import {
-  storeFrame,
-  readFrame,
-  listFrames,
-} from "@smartergpt/lex/store";
+import { storeFrame, readFrame, listFrames } from "@smartergpt/lex/store";
 
 // Store and retrieve frames
 await storeFrame(frame);
@@ -154,11 +146,11 @@ LexRunner also exports its own modules for external consumption (e.g., by other 
 
 ### Exported Modules
 
-| Module | Export Path | Purpose | Status |
-|--------|-------------|---------|--------|
-| **Frames** | `lexrunner/frames` | Execution frame types and utilities | ✅ Available |
-| **Errors** | `lexrunner/errors` | AXError adapters and LexRunner errors | ✅ Available |
-| **Audit SDK** | `lexrunner/audit-sdk` | Audit and compliance SDK | ✅ Available |
+| Module        | Export Path           | Purpose                               | Status       |
+| ------------- | --------------------- | ------------------------------------- | ------------ |
+| **Frames**    | `lexrunner/frames`    | Execution frame types and utilities   | ✅ Available |
+| **Errors**    | `lexrunner/errors`    | AXError adapters and LexRunner errors | ✅ Available |
+| **Audit SDK** | `lexrunner/audit-sdk` | Audit and compliance SDK              | ✅ Available |
 
 ### Import Examples for LexRunner Exports
 

@@ -22,6 +22,7 @@ mcp-server.mjs (launcher)
 ```
 
 **Issues:**
+
 - Different architecture from LexBrain/LexMap
 - SDK dependency for simple stdio protocol
 - Harder to debug and maintain across projects
@@ -39,6 +40,7 @@ mcp-server.mjs (single file, stdio protocol)
 ```
 
 **Benefits:**
+
 - ✅ Identical pattern to LexBrain/LexMap
 - ✅ Direct stdio JSON-RPC 2.0 (no SDK)
 - ✅ Easier cross-project bug fixes
@@ -81,14 +83,14 @@ mcp-server.mjs (single file, stdio protocol)
 
 All tools work identically before and after:
 
-| Tool | Status | Notes |
-|------|--------|-------|
-| `plan.create` | ✅ Preserved | Creates plan from config files |
-| `gates.run` | ✅ Preserved | Executes gates for plan items |
-| `merge.apply` | ✅ Preserved | Applies merge operations (with ALLOW_MUTATIONS) |
-| `local.init` | ✅ Preserved | Initializes local overlay |
-| `profile.resolve` | ✅ Preserved | Resolves profile directory |
-| `health` | ✅ Preserved | System health check |
+| Tool              | Status       | Notes                                           |
+| ----------------- | ------------ | ----------------------------------------------- |
+| `plan.create`     | ✅ Preserved | Creates plan from config files                  |
+| `gates.run`       | ✅ Preserved | Executes gates for plan items                   |
+| `merge.apply`     | ✅ Preserved | Applies merge operations (with ALLOW_MUTATIONS) |
+| `local.init`      | ✅ Preserved | Initializes local overlay                       |
+| `profile.resolve` | ✅ Preserved | Resolves profile directory                      |
+| `health`          | ✅ Preserved | System health check                             |
 
 ## Protocol Alignment
 
@@ -131,6 +133,7 @@ process.stdin.on("data", async (chunk) => {
 ## Testing
 
 Created `test-mcp.mjs` to verify:
+
 - ✅ Initialize handshake
 - ✅ Tool listing (all 6 tools)
 - ✅ Tool execution (health check)
@@ -177,21 +180,25 @@ Testing lexrunner MCP server...
 ## Environment Variables
 
 ### Before
+
 - `LEX_PR_PROFILE_DIR` - Profile directory
 - `LEX_PR_PLAN` - Plan path (removed, not used)
 - `LEX_PR_WORKSPACE` - Workspace root (removed, uses cwd)
 - `ALLOW_MUTATIONS` - Enable mutations
 
 ### After
+
 - `LEX_PR_PROFILE_DIR` - Profile directory (same)
 - `ALLOW_MUTATIONS` - Enable mutations (same)
 
 ## Dependencies
 
 ### Removed
+
 - `@modelcontextprotocol/sdk` - Can be removed if not used elsewhere
 
 ### Added
+
 None! The new implementation uses only Node.js builtins for the protocol layer.
 
 ## Future Cleanup

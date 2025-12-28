@@ -14,27 +14,27 @@ import { SqliteRunStore } from "./sqlite/index.js";
 
 // Interface and types
 export type {
-	RunStore,
-	RunRecord,
-	StepOutcome,
-	Receipt,
-	RunState,
-	StepStatus,
-	ListRunsOptions,
+  RunStore,
+  RunRecord,
+  StepOutcome,
+  Receipt,
+  RunState,
+  StepStatus,
+  ListRunsOptions,
 } from "./run-store.js";
 
 export {
-	RunRecordSchema,
-	StepOutcomeSchema,
-	ReceiptSchema,
-	RunStateSchema,
-	StepStatusSchema,
-	parseRunRecord,
-	safeParseRunRecord,
-	parseStepOutcome,
-	safeParseStepOutcome,
-	parseReceipt,
-	safeParseReceipt,
+  RunRecordSchema,
+  StepOutcomeSchema,
+  ReceiptSchema,
+  RunStateSchema,
+  StepStatusSchema,
+  parseRunRecord,
+  safeParseRunRecord,
+  parseStepOutcome,
+  safeParseStepOutcome,
+  parseReceipt,
+  safeParseReceipt,
 } from "./run-store.js";
 
 // Implementations
@@ -51,17 +51,17 @@ const DEFAULT_DB_PATH = ".smartergpt/runner/.lexrunner/runs.db";
  * Options for creating a RunStore.
  */
 export interface CreateRunStoreOptions {
-	/**
-	 * Path to SQLite database file.
-	 * Defaults to `.smartergpt/runner/.lexrunner/runs.db` relative to baseDir.
-	 */
-	dbPath?: string;
+  /**
+   * Path to SQLite database file.
+   * Defaults to `.smartergpt/runner/.lexrunner/runs.db` relative to baseDir.
+   */
+  dbPath?: string;
 
-	/**
-	 * Base directory for run storage.
-	 * Defaults to current working directory.
-	 */
-	baseDir?: string;
+  /**
+   * Base directory for run storage.
+   * Defaults to current working directory.
+   */
+  baseDir?: string;
 }
 
 /**
@@ -86,14 +86,14 @@ export interface CreateRunStoreOptions {
  * ```
  */
 export function createRunStore(options: CreateRunStoreOptions = {}): RunStore {
-	const baseDir = options.baseDir ?? process.cwd();
-	const dbPath = options.dbPath ?? path.join(baseDir, DEFAULT_DB_PATH);
+  const baseDir = options.baseDir ?? process.cwd();
+  const dbPath = options.dbPath ?? path.join(baseDir, DEFAULT_DB_PATH);
 
-	// Ensure parent directory exists
-	const dbDir = path.dirname(dbPath);
-	if (!fs.existsSync(dbDir)) {
-		fs.mkdirSync(dbDir, { recursive: true });
-	}
+  // Ensure parent directory exists
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
 
-	return new SqliteRunStore(dbPath);
+  return new SqliteRunStore(dbPath);
 }

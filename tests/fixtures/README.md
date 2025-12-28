@@ -13,10 +13,10 @@ Shared, reusable test fixtures for lexrunner tests. This library provides determ
 ## Quick Start
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
-describe('My feature', () => {
-  it('handles diamond dependencies', async () => {
+describe("My feature", () => {
+  it("handles diamond dependencies", async () => {
     const plan = fixtures.plans.diamond();
     // Use plan in your test
   });
@@ -64,7 +64,7 @@ Pre-built plan configurations with various dependency patterns:
 - **cycle**: Circular dependency (for error testing)
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
 const plan = fixtures.plans.diamond();
 // Returns a valid Plan object with diamond dependency structure
@@ -75,19 +75,19 @@ const plan = fixtures.plans.diamond();
 Factory functions for creating mock PR objects:
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
 // Create a basic PR
 const pr = fixtures.prs.basic({
   number: 100,
-  title: 'Add feature X'
+  title: "Add feature X",
 });
 
 // Create a PR with dependencies
 const prWithDeps = fixtures.prs.withDeps({
   number: 101,
-  title: 'Extend feature X',
-  dependsOn: [100]
+  title: "Extend feature X",
+  dependsOn: [100],
 });
 
 // Get a batch of realistic PRs
@@ -99,13 +99,13 @@ const prs = fixtures.prs.batch(10);
 Gate configuration and result factories:
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
 // Create gate results
-const passing = fixtures.gates.results.allPass(['lint', 'test']);
+const passing = fixtures.gates.results.allPass(["lint", "test"]);
 const failing = fixtures.gates.results.someFail({
-  pass: ['lint'],
-  fail: ['test']
+  pass: ["lint"],
+  fail: ["test"],
 });
 
 // Create gate configurations
@@ -118,13 +118,13 @@ const testGate = fixtures.gates.configs.test();
 Complete end-to-end test scenarios:
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
 // Get a complete merge scenario
 const scenario = fixtures.scenarios.complexMerge({
   prCount: 15,
   maxDependencyDepth: 4,
-  conflictRate: 0.2
+  conflictRate: 0.2,
 });
 
 // scenario contains: { plan, prs, gates, expected }
@@ -140,7 +140,7 @@ const syntheticScenario = fixtures.scenarios.syntheticSixPRWeave();
 // }
 
 // Get file changes for a specific PR in the synthetic scenario
-const changes = fixtures.scenarios.getFileChangesForPR('feature-x');
+const changes = fixtures.scenarios.getFileChangesForPR("feature-x");
 ```
 
 ### Utils (`fixtures.utils`)
@@ -148,9 +148,9 @@ const changes = fixtures.scenarios.getFileChangesForPR('feature-x');
 Helper utilities for test setup and teardown:
 
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 
-describe('My test', () => {
+describe("My test", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -161,7 +161,7 @@ describe('My test', () => {
     await fixtures.utils.tempDir.cleanup(tmpDir);
   });
 
-  it('works with temp directory', async () => {
+  it("works with temp directory", async () => {
     // Use tmpDir for test
   });
 });
@@ -181,25 +181,25 @@ describe('My test', () => {
 ### Basic Plan Test
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { fixtures } from '../fixtures';
-import { generateOrder } from '../../src/mergeOrder';
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../fixtures";
+import { generateOrder } from "../../src/mergeOrder";
 
-describe('Merge order generator', () => {
-  it('handles simple independent PRs', () => {
+describe("Merge order generator", () => {
+  it("handles simple independent PRs", () => {
     const plan = fixtures.plans.simple();
     const result = generateOrder(plan);
-    
+
     expect(result.order).toHaveLength(plan.items.length);
   });
-  
-  it('handles diamond dependencies correctly', () => {
+
+  it("handles diamond dependencies correctly", () => {
     const plan = fixtures.plans.diamond();
     const result = generateOrder(plan);
-    
+
     // Verify topological ordering
-    expect(result.layers[0]).toContain('foundation-a');
-    expect(result.layers[0]).toContain('foundation-b');
+    expect(result.layers[0]).toContain("foundation-a");
+    expect(result.layers[0]).toContain("foundation-b");
   });
 });
 ```
@@ -207,22 +207,22 @@ describe('Merge order generator', () => {
 ### Gate Execution Test
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { fixtures } from '../fixtures';
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../fixtures";
 
-describe('Gate executor', () => {
-  it('handles all passing gates', async () => {
+describe("Gate executor", () => {
+  it("handles all passing gates", async () => {
     const gates = fixtures.gates.configs.allPass();
     const results = await executeGates(gates);
-    
-    expect(results.every(r => r.status === 'pass')).toBe(true);
+
+    expect(results.every((r) => r.status === "pass")).toBe(true);
   });
-  
-  it('retries failed gates', async () => {
+
+  it("retries failed gates", async () => {
     const gate = fixtures.gates.configs.flaky({
-      maxAttempts: 3
+      maxAttempts: 3,
     });
-    
+
     const result = await executeGate(gate);
     expect(result.attempts).toBeGreaterThan(1);
   });
@@ -232,16 +232,16 @@ describe('Gate executor', () => {
 ### PR Factory Test
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { fixtures } from '../fixtures';
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../fixtures";
 
-describe('PR analyzer', () => {
-  it('detects dependencies from PR body', () => {
+describe("PR analyzer", () => {
+  it("detects dependencies from PR body", () => {
     const pr = fixtures.prs.withDeps({
       number: 100,
-      dependsOn: [99]
+      dependsOn: [99],
     });
-    
+
     const deps = parseDependencies(pr.body);
     expect(deps).toContain(99);
   });
@@ -251,19 +251,19 @@ describe('PR analyzer', () => {
 ### Complex Scenario Test
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { fixtures } from '../fixtures';
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../fixtures";
 
-describe('Full merge workflow', () => {
-  it('executes complex merge scenario', async () => {
+describe("Full merge workflow", () => {
+  it("executes complex merge scenario", async () => {
     const scenario = fixtures.scenarios.complexMerge({
       prCount: 20,
       maxDependencyDepth: 5,
-      conflictRate: 0.15
+      conflictRate: 0.15,
     });
-    
+
     const result = await executePlan(scenario.plan);
-    
+
     expect(result.merged).toBe(scenario.expected.merged);
     expect(result.blocked).toBe(scenario.expected.blocked);
   });
@@ -273,25 +273,25 @@ describe('Full merge workflow', () => {
 ### Synthetic 6-PR Weave with Conflicts
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { fixtures } from '../fixtures';
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../fixtures";
 
-describe('E2E: Synthetic 6-PR Weave', () => {
-  it('executes 6-PR pyramid with 2 conflicts', async () => {
+describe("E2E: Synthetic 6-PR Weave", () => {
+  it("executes 6-PR pyramid with 2 conflicts", async () => {
     const scenario = fixtures.scenarios.syntheticSixPRWeave();
-    
+
     // scenario.plan: Complete Plan with 6 items in 4 levels
     // scenario.files: Initial repository files
     // scenario.conflicts: 2 predictable conflicts with resolutions
     // scenario.expectedBudget: { maxPrompts: 3, maxTokens: 5000 }
     // scenario.expected: { totalItems: 6, levels: 4, allGatesPass: true, conflictsResolved: 2 }
-    
+
     // Get file changes for each PR
-    const featureXChanges = fixtures.scenarios.getFileChangesForPR('feature-x');
-    
+    const featureXChanges = fixtures.scenarios.getFileChangesForPR("feature-x");
+
     // Execute the weave workflow with budget tracking
     const result = await executeWeave(scenario.plan);
-    
+
     expect(result.levels).toHaveLength(4);
     expect(result.allGatesGreen).toBe(true);
   });
@@ -314,15 +314,15 @@ Example:
 
 ```typescript
 // tests/fixtures/plans/myNewPattern.ts
-import type { Plan } from '../../../src/schema.js';
+import type { Plan } from "../../../src/schema.js";
 
 export function myNewPattern(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       // Your pattern here
-    ]
+    ],
   };
 }
 ```
@@ -332,11 +332,11 @@ export function myNewPattern(): Plan {
 All fixtures should pass schema validation:
 
 ```typescript
-import { validatePlan } from '../../src/schema.js';
-import { fixtures } from '../fixtures';
+import { validatePlan } from "../../src/schema.js";
+import { fixtures } from "../fixtures";
 
-describe('Fixture validation', () => {
-  it('validates simple plan', () => {
+describe("Fixture validation", () => {
+  it("validates simple plan", () => {
     const plan = fixtures.plans.simple();
     expect(() => validatePlan(plan)).not.toThrow();
   });
@@ -354,6 +354,7 @@ describe('Fixture validation', () => {
 If you have existing inline fixtures, migrate them to this library:
 
 **Before:**
+
 ```typescript
 const plan = {
   schemaVersion: '1.0.0',
@@ -363,8 +364,9 @@ const plan = {
 ```
 
 **After:**
+
 ```typescript
-import { fixtures } from '../fixtures';
+import { fixtures } from "../fixtures";
 const plan = fixtures.plans.simple();
 ```
 

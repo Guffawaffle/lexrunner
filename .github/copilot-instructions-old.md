@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions for lexrunner
 
-**North Star:** *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.*
+**North Star:** _Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly._
 
 ## Naming Quick Reference
 
@@ -12,12 +12,14 @@ Use canonical terms per [`docs/TERMS.md`](../docs/TERMS.md):
 - **Workspace profile**: Portable example profile under `.smartergpt/**`
 
 ## Architecture guardrails
+
 - **Two-track separation (firm):**
   - **Core runner**: `src/**` (CLI, core logic, packaging, MCP adapter). Never store user/work artifacts.
   - **Workspace example**: `.smartergpt/**` is a portable example profile only. Track: `intent.md`, `scope.yml`, `deps.yml`, `gates.yml`, `pull-request-template.md`. **Ignore**: `.smartergpt/runner/`, `cache/`, `deliverables/`. Deliverables are posted as a **PR comment**, not committed.
 - **Language:** TypeScript only. Remove dead Python wiring when nearby but do not rewrite history.
 
 ## Build & test
+
 - **Node:** 20 LTS.
 - **Install:** `npm ci`
 - **Common scripts:**
@@ -28,16 +30,19 @@ Use canonical terms per [`docs/TERMS.md`](../docs/TERMS.md):
 - **Determinism check:** After `npm run build && npm run format`, the tree must be clean: `git diff --exit-code`.
 
 ## PR conventions
+
 - **One PR = One chat.** Keep scope tight and acceptance criteria explicit.
 - Add a **"How to verify"** section (exact commands + expected outcomes).
 - **Commit style**: imperative mood ("Add…", "Fix…", "Update…") with optional prefixes (`runner:`, `mcp:`, `schema:`, `tests:`, `ci:`, `docs:`, `workspace:`).
 - Prefer **plan + tests first** when requested (it's common here).
 
 ## Tasks Copilot should prioritize
+
 - CI hygiene, docs, small refactors, test coverage, schema changes, CLI ergonomics, non-critical bug fixes.
 - Avoid broad/ambiguous migrations, cross-repo designs, or anything requiring secrets or production credentials.
 
 ## Execution Rules (Cost Management)
+
 - **NEVER stop mid-task to ask questions** - complete the full workflow when intent is clear
 - **NO todo management for straightforward operations** - just execute directly
 - **Complete merge-weave workflows**: discover real PRs → merge to integration → merge to main → close PRs → cleanup
@@ -45,12 +50,15 @@ Use canonical terms per [`docs/TERMS.md`](../docs/TERMS.md):
 - **Finish completely**: don't declare success until the full contract is fulfilled
 
 ## Coding notes
+
 - Outputs and ordering must be **stable/deterministic** (no random, time-dependent ordering; sort explicitly).
 - Keep runtime deps minimal. Dev/test deps OK when justified in the PR.
 - Never commit secrets or auth tokens. Do not modify branch protections.
 
 ## Merge-Weave Operations
+
 When user requests merge-weave on "all open PRs":
+
 1. `gh pr list --state open` to get real PRs (not fake plans)
 2. Execute merge-weave with conflict resolution
 3. Merge integration branch to main
@@ -63,6 +71,7 @@ When user requests merge-weave on "all open PRs":
 **It is OK to merge-weave into an umbrella/integration branch when individual PRs are blocked by branch protection.**
 
 The umbrella branch pattern:
+
 1. Create integration branch: `git checkout -b integration/wave-N`
 2. Merge all PRs into umbrella branch (resolve conflicts here)
 3. Run full local CI: `npm run lint && npm run typecheck && npm test`
@@ -76,15 +85,18 @@ The umbrella branch pattern:
 **Standing Grant (effective 2025-12-05):** Guff grants GitHub Copilot (Senior Dev / Eager PM personas) delegated `--admin` merge authority to main **when all local CI passes**.
 
 **Conditions for `--admin` merge:**
+
 1. All local CI gates pass: `npm run lint && npm run typecheck && npm test`
 2. Merge target is `main` branch
 3. Document CI pass in merge commit message
 
 **What this enables:**
+
 - Bypass branch protection review requirements for Copilot-authored PRs
 - Self-merge after verified CI pass (no human approval needed for routine work)
 
 **What this does NOT grant:**
+
 - Authority to merge others' PRs without Guff's explicit approval
 - Bypass of CI gates (all gates must pass locally)
 - Any access to production credentials or secrets
@@ -94,6 +106,7 @@ The umbrella branch pattern:
 ## File Editing Rules (MANDATORY)
 
 > **⚠️ SELF-CHECK BEFORE EVERY FILE EDIT:**
+>
 > - [ ] Am I about to use `sed`, `awk`, `perl`, or shell redirection?
 > - [ ] If YES → STOP. Use `replace_string_in_file` instead.
 > - [ ] If NO → Verify I'm using the correct editing tool.
@@ -123,6 +136,7 @@ The umbrella branch pattern:
 ### FORBIDDEN Editing Approaches
 
 ❌ **NEVER use these for file editing:**
+
 - `sed -i` or any sed command
 - `awk` for in-place modification
 - `perl -pi -e`
@@ -136,6 +150,7 @@ The umbrella branch pattern:
 When encountering git merge conflicts:
 
 **❌ WRONG Approach:**
+
 ```bash
 git checkout --theirs src/file.ts
 sed -i 's/pattern/replacement/g' src/file.ts
@@ -143,9 +158,10 @@ git add src/file.ts
 ```
 
 **✅ CORRECT Approach:**
+
 ```typescript
 // Step 1: Read the conflict
-read_file({ filePath: "/path/to/file.ts", startLine: 1, endLine: 200 })
+read_file({ filePath: "/path/to/file.ts", startLine: 1, endLine: 200 });
 
 // Step 2: Resolve with replace_string_in_file
 replace_string_in_file({
@@ -163,16 +179,17 @@ import * as fs from "fs";`,
 import { parseGlobalFlags } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
 import { exitHandler } from "./cli/exitHandler.js";
-import * as fs from "fs";`
-})
+import * as fs from "fs";`,
+});
 
 // Step 3: Verify
-get_errors({ filePaths: ["/path/to/file.ts"] })
+get_errors({ filePaths: ["/path/to/file.ts"] });
 ```
 
 ### When Shell Commands ARE Appropriate
 
 ✅ **Allowed shell command usage:**
+
 - Git operations: `git fetch`, `git merge`, `git commit`, `git push`
 - Build commands: `npm run build`, `npm test`, `npm run lint`
 - File inspection: `cat`, `head`, `tail`, `wc`, `ls`, `find`
@@ -180,18 +197,21 @@ get_errors({ filePaths: ["/path/to/file.ts"] })
 - Directory operations: `mkdir`, `cp`, `mv`, `rm` (files/dirs, not editing)
 
 ❌ **NOT allowed:**
+
 - Any command that modifies file CONTENTS
 - Text processing that results in file changes
 
 ### Compliance Checklist
 
 Before using a terminal command to modify a file, ask:
+
 1. ❓ Is this editing file contents? → Use `replace_string_in_file`
 2. ❓ Am I creating a new file? → Use `create_file`
 3. ❓ Am I reading a file? → Use `read_file`
 4. ❓ Did the user EXPLICITLY ask for a shell command? → Only then proceed
 
 **Violation of these rules is considered a critical error and may result in:**
+
 - Rejected changes requiring complete rework
 - Loss of Copilot context/trust
 - Need to manually verify all edits
@@ -202,6 +222,7 @@ Before using a terminal command to modify a file, ask:
 ### Common lexrunner Editing Scenarios
 
 **Scenario 1: Merge conflict in src/cli.ts (imports)**
+
 ```typescript
 // ❌ WRONG
 git checkout --theirs src/cli.ts
@@ -225,6 +246,7 @@ get_errors({ filePaths: ["src/cli.ts"] })
 ```
 
 **Scenario 2: Update schema version in plan.json**
+
 ```typescript
 // ❌ WRONG
 sed -i 's/"schemaVersion": "1.0.0"/"schemaVersion": "1.1.0"/' plan.json
@@ -243,6 +265,7 @@ replace_string_in_file({
 ```
 
 **Scenario 3: Add gate to existing plan item**
+
 ```typescript
 // ❌ WRONG
 echo '{"name": "e2e", "run": "npm run e2e"}' >> temp &&
@@ -282,6 +305,7 @@ After resolving any merge conflict with `replace_string_in_file`:
 5. **Document resolution:** Note which files had conflicts in commit message
 
 **Example commit message:**
+
 ```
 Merge PR-XXX: Feature description
 
@@ -299,6 +323,7 @@ Files touched: src/cli.ts
 **Context:** Merging 4 CLI modularization PRs with overlapping changes in `src/cli.ts`
 
 ❌ **What was done WRONG:**
+
 ```bash
 # Violation 1: Used git checkout to blindly accept one side
 git checkout --theirs src/cli.ts
@@ -317,15 +342,17 @@ EOF
 ```
 
 **Problems:**
+
 - Non-deterministic: sed regex could match unintended code
 - No validation: No immediate feedback if edits succeeded
 - Hard to debug: Shell escaping and quoting made errors opaque
 - Not auditable: Changes not visible in tool logs
 
 ✅ **What SHOULD have been done:**
+
 ```typescript
 // Step 1: Read the full conflict context
-read_file({ filePath: "src/cli.ts", startLine: 1, endLine: 100 })
+read_file({ filePath: "src/cli.ts", startLine: 1, endLine: 100 });
 
 // Step 2: Resolve EACH conflict block precisely
 replace_string_in_file({
@@ -353,11 +380,11 @@ import {
       installSignalHandlers,
       installUnhandledRejectionHandler
 } from "./cli/exitHandler.js";
-import * as fs from "fs";`
-})
+import * as fs from "fs";`,
+});
 
 // Step 3: Verify TypeScript validity
-get_errors({ filePaths: ["src/cli.ts"] })
+get_errors({ filePaths: ["src/cli.ts"] });
 
 // Step 4: Repeat for each remaining conflict block
 ```
@@ -369,6 +396,7 @@ get_errors({ filePaths: ["src/cli.ts"] })
 ### Related Documentation
 
 These file editing rules align with and extend the principles in:
+
 - [`AGENTS.md`](../AGENTS.md) - Overall agent operating principles
 - [`docs/TERMS.md`](../docs/TERMS.md) - Canonical terminology
 
@@ -388,11 +416,12 @@ This repo uses **version contracts** to keep scope bounded and "done" meaningful
 
 4. **Push for clarity**: Call out vague acceptance criteria. Ask for checkable, concrete promises before treating something as a contract.
 
-5. **Prompt for signatures**: If something *functions* as a contract but lacks `[signed ~]`, ask the user to add the signature marker before treating it as binding.
+5. **Prompt for signatures**: If something _functions_ as a contract but lacks `[signed ~]`, ask the user to add the signature marker before treating it as binding.
 
 6. **Amendments are versioned**: If a contract must change, it becomes a new version (e.g., v0.2) with fresh signatures—never a silent edit.
 
 ## Directory quick map
+
 - `src/` – core library & CLI.
 - `schema/` – generated schemas kept in sync with source (CI verifies).
 - `tests/` – Vitest unit/integration tests (`*.spec.ts`).

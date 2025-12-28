@@ -9,13 +9,13 @@
  */
 
 import {
-	ActionReceiptSchema,
-	type ActionReceipt,
-	type ConfidenceLevel,
-	type ReversibilityLevel,
-	type Outcome,
-	type UncertaintyMarker,
-	UncertaintyMarkerSchema,
+  ActionReceiptSchema,
+  type ActionReceipt,
+  type ConfidenceLevel,
+  type ReversibilityLevel,
+  type Outcome,
+  type UncertaintyMarker,
+  UncertaintyMarkerSchema,
 } from "./schema.js";
 
 // =============================================================================
@@ -26,61 +26,61 @@ import {
  * Parameters for creating an ActionReceipt
  */
 export interface EmitReceiptParams {
-	/** Human-readable description of the action */
-	action: string;
+  /** Human-readable description of the action */
+  action: string;
 
-	/** Explanation for why this action was taken */
-	rationale: string;
+  /** Explanation for why this action was taken */
+  rationale: string;
 
-	/** Confidence level in the action's success */
-	confidence: ConfidenceLevel;
+  /** Confidence level in the action's success */
+  confidence: ConfidenceLevel;
 
-	/** Classification of action reversibility */
-	reversibility: ReversibilityLevel;
+  /** Classification of action reversibility */
+  reversibility: ReversibilityLevel;
 
-	/** Human-readable rollback instructions */
-	rollbackPath?: string;
+  /** Human-readable rollback instructions */
+  rollbackPath?: string;
 
-	/** Actual command to execute for rollback */
-	rollbackCommand?: string;
+  /** Actual command to execute for rollback */
+  rollbackCommand?: string;
 
-	/** Suggested next actions */
-	nextActions?: string[];
+  /** Suggested next actions */
+  nextActions?: string[];
 
-	/** Execution phase (e.g., 'planning', 'apply', 'verify') */
-	phase?: string;
+  /** Execution phase (e.g., 'planning', 'apply', 'verify') */
+  phase?: string;
 
-	/** Run ID for correlation */
-	runId?: string;
+  /** Run ID for correlation */
+  runId?: string;
 
-	/** Plan hash for verification */
-	planHash?: string;
+  /** Plan hash for verification */
+  planHash?: string;
 
-	/** Notes about sources of uncertainty */
-	uncertaintyNotes?: string[];
+  /** Notes about sources of uncertainty */
+  uncertaintyNotes?: string[];
 
-	/** Whether human escalation is required */
-	escalationRequired?: boolean;
+  /** Whether human escalation is required */
+  escalationRequired?: boolean;
 
-	/** Reason for escalation */
-	escalationReason?: string;
+  /** Reason for escalation */
+  escalationReason?: string;
 
-	/** Override outcome (defaults to 'success') */
-	outcome?: Outcome;
+  /** Override outcome (defaults to 'success') */
+  outcome?: Outcome;
 }
 
 /**
  * Options for receipt emission behavior
  */
 export interface EmitOptions {
-	/** Whether to log the receipt to console (default: true) */
-	log?: boolean;
+  /** Whether to log the receipt to console (default: true) */
+  log?: boolean;
 
-	/** Whether to emit as structured JSON (default: true when logging) */
-	json?: boolean;
+  /** Whether to emit as structured JSON (default: true when logging) */
+  json?: boolean;
 
-	/** Custom logger function (default: console.error) */
-	logger?: (message: string) => void;
+  /** Custom logger function (default: console.error) */
+  logger?: (message: string) => void;
 }
 
 // =============================================================================
@@ -127,53 +127,48 @@ export interface EmitOptions {
  * ```
  */
 export function emitActionReceipt(
-	params: EmitReceiptParams,
-	options: EmitOptions = {}
+  params: EmitReceiptParams,
+  options: EmitOptions = {}
 ): ActionReceipt {
-	// Default to stderr to avoid corrupting stdout in JSON-output mode.
-	const { log = true, json = true, logger = console.error } = options;
+  // Default to stderr to avoid corrupting stdout in JSON-output mode.
+  const { log = true, json = true, logger = console.error } = options;
 
-	// Build the receipt object
-	const receipt: ActionReceipt = {
-		schemaVersion: "1.0.0",
-		kind: "ActionReceipt",
-		action: params.action,
-		outcome: params.outcome ?? "success",
-		rationale: params.rationale,
-		confidence: params.confidence,
-		reversibility: params.reversibility,
-		escalationRequired: params.escalationRequired ?? false,
-		timestamp: new Date().toISOString(),
-	};
+  // Build the receipt object
+  const receipt: ActionReceipt = {
+    schemaVersion: "1.0.0",
+    kind: "ActionReceipt",
+    action: params.action,
+    outcome: params.outcome ?? "success",
+    rationale: params.rationale,
+    confidence: params.confidence,
+    reversibility: params.reversibility,
+    escalationRequired: params.escalationRequired ?? false,
+    timestamp: new Date().toISOString(),
+  };
 
-	// Add optional fields if provided
-	if (params.rollbackPath) receipt.rollbackPath = params.rollbackPath;
-	if (params.rollbackCommand)
-		receipt.rollbackCommand = params.rollbackCommand;
-	if (params.nextActions) receipt.nextActions = params.nextActions;
-	if (params.phase) receipt.phase = params.phase;
-	if (params.runId) receipt.runId = params.runId;
-	if (params.planHash) receipt.planHash = params.planHash;
-	if (params.uncertaintyNotes)
-		receipt.uncertaintyNotes = params.uncertaintyNotes;
-	if (params.escalationReason)
-		receipt.escalationReason = params.escalationReason;
+  // Add optional fields if provided
+  if (params.rollbackPath) receipt.rollbackPath = params.rollbackPath;
+  if (params.rollbackCommand) receipt.rollbackCommand = params.rollbackCommand;
+  if (params.nextActions) receipt.nextActions = params.nextActions;
+  if (params.phase) receipt.phase = params.phase;
+  if (params.runId) receipt.runId = params.runId;
+  if (params.planHash) receipt.planHash = params.planHash;
+  if (params.uncertaintyNotes) receipt.uncertaintyNotes = params.uncertaintyNotes;
+  if (params.escalationReason) receipt.escalationReason = params.escalationReason;
 
-	// Validate against schema
-	const validated = ActionReceiptSchema.parse(receipt);
+  // Validate against schema
+  const validated = ActionReceiptSchema.parse(receipt);
 
-	// Log if requested
-	if (log) {
-		if (json) {
-			logger(JSON.stringify({ event: "action_receipt", ...validated }));
-		} else {
-			logger(
-				`[ActionReceipt] ${validated.action} (${validated.outcome}) - ${validated.rationale}`
-			);
-		}
-	}
+  // Log if requested
+  if (log) {
+    if (json) {
+      logger(JSON.stringify({ event: "action_receipt", ...validated }));
+    } else {
+      logger(`[ActionReceipt] ${validated.action} (${validated.outcome}) - ${validated.rationale}`);
+    }
+  }
 
-	return validated;
+  return validated;
 }
 
 /**
@@ -197,10 +192,10 @@ export function emitActionReceipt(
  * ```
  */
 export function emitFailureReceipt(
-	params: Omit<EmitReceiptParams, "outcome">,
-	options: EmitOptions = {}
+  params: Omit<EmitReceiptParams, "outcome">,
+  options: EmitOptions = {}
 ): ActionReceipt {
-	return emitActionReceipt({ ...params, outcome: "failure" }, options);
+  return emitActionReceipt({ ...params, outcome: "failure" }, options);
 }
 
 /**
@@ -224,10 +219,10 @@ export function emitFailureReceipt(
  * ```
  */
 export function emitDeferredReceipt(
-	params: Omit<EmitReceiptParams, "outcome">,
-	options: EmitOptions = {}
+  params: Omit<EmitReceiptParams, "outcome">,
+  options: EmitOptions = {}
 ): ActionReceipt {
-	return emitActionReceipt({ ...params, outcome: "deferred" }, options);
+  return emitActionReceipt({ ...params, outcome: "deferred" }, options);
 }
 
 // =============================================================================
@@ -238,20 +233,20 @@ export function emitDeferredReceipt(
  * Parameters for creating an UncertaintyMarker
  */
 export interface EmitUncertaintyParams {
-	/** Operation about to be performed */
-	operation: string;
+  /** Operation about to be performed */
+  operation: string;
 
-	/** Explicit list of known uncertainties */
-	uncertainties: string[];
+  /** Explicit list of known uncertainties */
+  uncertainties: string[];
 
-	/** Mitigations in place for the uncertainties */
-	mitigations: string[];
+  /** Mitigations in place for the uncertainties */
+  mitigations: string[];
 
-	/** Whether proceeding despite uncertainties */
-	proceedingAnyway: boolean;
+  /** Whether proceeding despite uncertainties */
+  proceedingAnyway: boolean;
 
-	/** Reason for proceeding (if proceedingAnyway is true) */
-	reason?: string;
+  /** Reason for proceeding (if proceedingAnyway is true) */
+  reason?: string;
 }
 
 /**
@@ -283,36 +278,32 @@ export interface EmitUncertaintyParams {
  * ```
  */
 export function emitUncertaintyMarker(
-	params: EmitUncertaintyParams,
-	options: EmitOptions = {}
+  params: EmitUncertaintyParams,
+  options: EmitOptions = {}
 ): UncertaintyMarker {
-	const { log = true, json = true, logger = console.log } = options;
+  const { log = true, json = true, logger = console.log } = options;
 
-	const marker: UncertaintyMarker = {
-		...params,
-		timestamp: new Date().toISOString(),
-	};
+  const marker: UncertaintyMarker = {
+    ...params,
+    timestamp: new Date().toISOString(),
+  };
 
-	// Validate against schema
-	const validated = UncertaintyMarkerSchema.parse(marker);
+  // Validate against schema
+  const validated = UncertaintyMarkerSchema.parse(marker);
 
-	// Log if requested
-	if (log) {
-		if (json) {
-			logger(
-				JSON.stringify({ event: "uncertainty_marker", ...validated })
-			);
-		} else {
-			const status = validated.proceedingAnyway
-				? "PROCEEDING"
-				: "BLOCKED";
-			logger(
-				`[UncertaintyMarker] ${status}: ${validated.operation} - ${validated.uncertainties.length} uncertainties`
-			);
-		}
-	}
+  // Log if requested
+  if (log) {
+    if (json) {
+      logger(JSON.stringify({ event: "uncertainty_marker", ...validated }));
+    } else {
+      const status = validated.proceedingAnyway ? "PROCEEDING" : "BLOCKED";
+      logger(
+        `[UncertaintyMarker] ${status}: ${validated.operation} - ${validated.uncertainties.length} uncertainties`
+      );
+    }
+  }
 
-	return validated;
+  return validated;
 }
 
 // =============================================================================
@@ -345,19 +336,19 @@ export function emitUncertaintyMarker(
  * ```
  */
 export function buildGovernanceContext(params: {
-	reversibility?: ReversibilityLevel;
-	rollbackPath?: string;
-	rollbackCommand?: string;
-	confidence?: ConfidenceLevel;
-	uncertaintyNotes?: string[];
+  reversibility?: ReversibilityLevel;
+  rollbackPath?: string;
+  rollbackCommand?: string;
+  confidence?: ConfidenceLevel;
+  uncertaintyNotes?: string[];
 }): Record<string, unknown> {
-	const ctx: Record<string, unknown> = {};
+  const ctx: Record<string, unknown> = {};
 
-	if (params.reversibility) ctx.reversibility = params.reversibility;
-	if (params.rollbackPath) ctx.rollbackPath = params.rollbackPath;
-	if (params.rollbackCommand) ctx.rollbackCommand = params.rollbackCommand;
-	if (params.confidence) ctx.confidence = params.confidence;
-	if (params.uncertaintyNotes) ctx.uncertaintyNotes = params.uncertaintyNotes;
+  if (params.reversibility) ctx.reversibility = params.reversibility;
+  if (params.rollbackPath) ctx.rollbackPath = params.rollbackPath;
+  if (params.rollbackCommand) ctx.rollbackCommand = params.rollbackCommand;
+  if (params.confidence) ctx.confidence = params.confidence;
+  if (params.uncertaintyNotes) ctx.uncertaintyNotes = params.uncertaintyNotes;
 
-	return ctx;
+  return ctx;
 }

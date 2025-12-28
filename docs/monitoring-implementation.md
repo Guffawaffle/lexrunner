@@ -52,6 +52,7 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ### Grafana Dashboard
 
 **`src/monitoring/dashboards/grafana-dashboard.json`**
+
 - Plan execution time percentiles (p50, p95, p99)
 - Gate success rate by type
 - Merge success rate
@@ -63,6 +64,7 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ### CLI Integration
 
 **Updated `src/cli.ts`**:
+
 - Added `--log-format <format>` global option
 - Supports 'json' and 'human' formats
 - Environment detection (CI, LOG_FORMAT env var)
@@ -71,6 +73,7 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ### MCP Server Integration
 
 **Updated `src/mcp/server.ts`**:
+
 - Added `health` tool for health checks
 - Returns system status with optional metrics
 - Integrated with health checker module
@@ -92,6 +95,7 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ### Test Coverage
 
 **80 new tests** across 6 test files (all passing):
+
 - `tests/monitoring-logger.spec.ts` - 9 tests
 - `tests/monitoring-metrics.spec.ts` - 12 tests
 - `tests/monitoring-profiler.spec.ts` - 14 tests
@@ -104,18 +108,21 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ## 🎯 Key Metrics Implemented
 
 ### Execution Metrics (Histograms)
+
 - `lex_pr_plan_execution_seconds` - Plan execution time
 - `lex_pr_gate_execution_seconds` - Gate execution time
 - `lex_pr_merge_execution_seconds` - Merge execution time
 - `lex_pr_dependency_resolution_seconds` - Dependency resolution time
 
 ### Success/Failure Rates (Counters)
+
 - `lex_pr_gate_success_total` - Gate successes
 - `lex_pr_gate_failure_total` - Gate failures
 - `lex_pr_merge_success_total` - Merge successes
 - `lex_pr_merge_failure_total` - Merge failures
 
 ### Resource Utilization (Gauges)
+
 - `lex_pr_memory_usage_bytes` - Memory usage
 - `lex_pr_active_workers` - Active worker count
 - `lex_pr_dependency_accuracy_ratio` - Dependency accuracy
@@ -123,11 +130,20 @@ All acceptance criteria have been successfully implemented with comprehensive te
 ## 📊 Output Examples
 
 ### JSON Logging
+
 ```json
-{"timestamp":"2024-10-02T10:30:00Z","level":"info","correlationId":"abc123","event":"gate_start","gateType":"lint","prId":"PR-101"}
+{
+  "timestamp": "2024-10-02T10:30:00Z",
+  "level": "info",
+  "correlationId": "abc123",
+  "event": "gate_start",
+  "gateType": "lint",
+  "prId": "PR-101"
+}
 ```
 
 ### Prometheus Export
+
 ```
 # TYPE lex_pr_gate_execution_seconds histogram
 lex_pr_gate_execution_seconds_bucket{gateType="lint",le="0.5"} 1
@@ -136,6 +152,7 @@ lex_pr_gate_execution_seconds_count{gateType="lint"} 1
 ```
 
 ### Health Check Response
+
 ```json
 {
   "status": "healthy",
@@ -143,14 +160,15 @@ lex_pr_gate_execution_seconds_count{gateType="lint"} 1
   "uptime": 3600,
   "version": "0.1.0",
   "checks": {
-    "memory": {"status": "pass"},
-    "activeOperations": {"status": "pass"},
-    "errorRate": {"status": "pass"}
+    "memory": { "status": "pass" },
+    "activeOperations": { "status": "pass" },
+    "errorRate": { "status": "pass" }
   }
 }
 ```
 
 ### Audit Trail
+
 ```
 [AUDIT] {"timestamp":"2024-10-02T10:30:00Z","operation":"gate_execution","decision":"passed","metadata":{"gateType":"lint","prId":"PR-101"},"correlationId":"abc123"}
 ```
@@ -205,6 +223,7 @@ Test Files  44 passed (44)
 ```
 
 All monitoring tests pass with comprehensive coverage:
+
 - Unit tests for all modules
 - Integration tests for CLI and MCP
 - Edge case handling
@@ -214,6 +233,7 @@ All monitoring tests pass with comprehensive coverage:
 ## 🚀 Ready for Production
 
 The monitoring module is production-ready and provides:
+
 - Complete observability of lexrunner operations
 - Real-time metrics for SLOs/SLAs
 - Comprehensive audit trail for compliance
@@ -224,6 +244,7 @@ The monitoring module is production-ready and provides:
 ## 📝 Future Enhancements (Optional)
 
 While all acceptance criteria are met, potential future additions:
+
 - OpenTelemetry integration for distributed tracing
 - Custom metric aggregation windows
 - Alert rule templates for common scenarios

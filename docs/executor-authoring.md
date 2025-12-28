@@ -9,6 +9,7 @@ This guide explains how to create new executors for lexrunner, from initial prot
 ## Overview
 
 An **executor** is a small, named, versioned unit that:
+
 - Implements a narrow role (e.g., code review, triage, pattern mining)
 - Fixes its **tool budget** (which tools it may call, under what limits)
 - Binds to a particular **guardrail profile** (scope, tool, epistemic, style, audit)
@@ -89,9 +90,9 @@ The executor manifest (`executor-manifest.yaml`) defines the contract for an exe
 schemaVersion: "executor-1.0.0"
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `schemaVersion` | string | ✅ | Format: `executor-X.Y.Z` (semver) |
+| Field           | Type   | Required | Description                       |
+| --------------- | ------ | -------- | --------------------------------- |
+| `schemaVersion` | string | ✅       | Format: `executor-X.Y.Z` (semver) |
 
 ### Role & Description
 
@@ -100,10 +101,10 @@ role: "senior-dev-review"
 description: "Code review with mentorship feedback"
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `role` | string | ✅ | Unique identifier for the executor role |
-| `description` | string | ❌ | Human-readable description |
+| Field         | Type   | Required | Description                             |
+| ------------- | ------ | -------- | --------------------------------------- |
+| `role`        | string | ✅       | Unique identifier for the executor role |
+| `description` | string | ❌       | Human-readable description              |
 
 ### Tool Budget
 
@@ -125,14 +126,15 @@ toolBudget:
     maxTokensOut: 2000
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `toolBudget.allowed` | string[] | ❌ | Tools the executor may call (default: []) |
-| `toolBudget.denied` | string[] | ❌ | Tools explicitly forbidden (default: []) |
-| `toolBudget.limits.maxToolCalls` | integer | ❌ | Maximum number of tool calls (min: 1) |
-| `toolBudget.limits.maxTokensOut` | integer | ❌ | Maximum output tokens (min: 1) |
+| Field                            | Type     | Required | Description                               |
+| -------------------------------- | -------- | -------- | ----------------------------------------- |
+| `toolBudget.allowed`             | string[] | ❌       | Tools the executor may call (default: []) |
+| `toolBudget.denied`              | string[] | ❌       | Tools explicitly forbidden (default: [])  |
+| `toolBudget.limits.maxToolCalls` | integer  | ❌       | Maximum number of tool calls (min: 1)     |
+| `toolBudget.limits.maxTokensOut` | integer  | ❌       | Maximum output tokens (min: 1)            |
 
 **Tool Budget Philosophy:**
+
 - Be explicit about what's allowed; deny-list catches edge cases
 - Read-only executors should deny all write tools
 - Set reasonable limits to prevent runaway execution
@@ -174,46 +176,46 @@ guardrails:
 
 Controls which file paths the executor can access.
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field          | Type     | Description                     |
+| -------------- | -------- | ------------------------------- |
 | `allowedPaths` | string[] | Glob patterns for allowed paths |
-| `deniedPaths` | string[] | Glob patterns for denied paths |
+| `deniedPaths`  | string[] | Glob patterns for denied paths  |
 
 #### Tool Guardrail (`guardrails.tool`)
 
 Specifies tool dependencies.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `required` | string[] | Tools that must be available |
+| Field      | Type     | Description                         |
+| ---------- | -------- | ----------------------------------- |
+| `required` | string[] | Tools that must be available        |
 | `optional` | string[] | Tools that may be used if available |
 
 #### Epistemic Guardrail (`guardrails.epistemic`)
 
 Controls uncertainty handling and escalation.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `allowIDK` | boolean | Whether the executor may respond "I don't know" (default: true) |
-| `escalationThreshold` | enum | When to escalate: `low-risk`, `medium-risk`, `high-risk`, `critical` |
+| Field                 | Type    | Description                                                          |
+| --------------------- | ------- | -------------------------------------------------------------------- |
+| `allowIDK`            | boolean | Whether the executor may respond "I don't know" (default: true)      |
+| `escalationThreshold` | enum    | When to escalate: `low-risk`, `medium-risk`, `high-risk`, `critical` |
 
 #### Style Guardrail (`guardrails.style`)
 
 Controls output formatting requirements.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `requirePlan` | boolean | Must output a plan before execution (default: false) |
-| `requireSummary` | boolean | Must include summary in output (default: false) |
+| Field            | Type    | Description                                          |
+| ---------------- | ------- | ---------------------------------------------------- |
+| `requirePlan`    | boolean | Must output a plan before execution (default: false) |
+| `requireSummary` | boolean | Must include summary in output (default: false)      |
 
 #### Audit Guardrail (`guardrails.audit`)
 
 Controls logging and frame emission.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `level` | enum | Audit level: `minimal`, `normal`, `verbose`, `debug` (default: normal) |
-| `frameSchema` | string | Schema version for emitted frames |
+| Field         | Type   | Description                                                            |
+| ------------- | ------ | ---------------------------------------------------------------------- |
+| `level`       | enum   | Audit level: `minimal`, `normal`, `verbose`, `debug` (default: normal) |
+| `frameSchema` | string | Schema version for emitted frames                                      |
 
 ### Jordan-Mode Protocol
 
@@ -241,11 +243,12 @@ jordanModeProtocol:
 
 Deterministic preparation steps that run before the model call.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `prepPhase` | string[] | ❌ | List of preparation steps (default: []) |
+| Field       | Type     | Required | Description                             |
+| ----------- | -------- | -------- | --------------------------------------- |
+| `prepPhase` | string[] | ❌       | List of preparation steps (default: []) |
 
 Common prep phase steps:
+
 - `load-context` - Load execution context from environment
 - `validate-scope` - Verify paths are within allowed scope
 - `recall-frames` - Query Lex memory for relevant frames
@@ -254,10 +257,10 @@ Common prep phase steps:
 
 The irreducibly stochastic model call.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `stochasticPhase.promptTemplate` | string | ✅ | Path to prompt template file |
-| `stochasticPhase.maxCalls` | integer | ❌ | Maximum model calls (default: 1, min: 1) |
+| Field                            | Type    | Required | Description                              |
+| -------------------------------- | ------- | -------- | ---------------------------------------- |
+| `stochasticPhase.promptTemplate` | string  | ✅       | Path to prompt template file             |
+| `stochasticPhase.maxCalls`       | integer | ❌       | Maximum model calls (default: 1, min: 1) |
 
 **Important:** The stochastic phase should contain exactly one model call. Multiple calls indicate the executor should be split.
 
@@ -265,10 +268,10 @@ The irreducibly stochastic model call.
 
 What the executor must emit as output (the "receipt").
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `receiptPhase.frameType` | string | ✅ | Type identifier for emitted frame |
-| `receiptPhase.fields` | string[] | ✅ | Required fields in the frame (min: 1) |
+| Field                    | Type     | Required | Description                           |
+| ------------------------ | -------- | -------- | ------------------------------------- |
+| `receiptPhase.frameType` | string   | ✅       | Type identifier for emitted frame     |
+| `receiptPhase.fields`    | string[] | ✅       | Required fields in the frame (min: 1) |
 
 ---
 
@@ -347,9 +350,7 @@ async function emitFrame(data: unknown): Promise<string> {
 /**
  * Phase 1: Deterministic preparation
  */
-export async function prepareContext(
-  input: MyExecutorInput
-): Promise<MyExecutorResult> {
+export async function prepareContext(input: MyExecutorInput): Promise<MyExecutorResult> {
   // Validate inputs
   if (!input.target) {
     throw new Error("Target is required");
@@ -392,9 +393,7 @@ export async function executeStochasticPhase(
 /**
  * Phase 3: Emit receipt frame
  */
-export async function captureFrame(
-  stochasticResult: MyExecutorResult
-): Promise<MyExecutorResult> {
+export async function captureFrame(stochasticResult: MyExecutorResult): Promise<MyExecutorResult> {
   // Emit frame to Lex memory
   const frameId = await emitFrame(stochasticResult.data);
 
@@ -421,11 +420,7 @@ Export public API:
 export type { MyExecutorInput, MyExecutorResult } from "./types.js";
 
 // Core functions
-export {
-  prepareContext,
-  executeStochasticPhase,
-  captureFrame,
-} from "./core.js";
+export { prepareContext, executeStochasticPhase, captureFrame } from "./core.js";
 ```
 
 ---
@@ -473,9 +468,9 @@ Respond with a JSON object:
 
 \`\`\`json
 {
-  "decision": "approve | reject | request-changes",
-  "rationale": "Explain your reasoning",
-  "suggestions": ["List", "of", "suggestions"]
+"decision": "approve | reject | request-changes",
+"rationale": "Explain your reasoning",
+"suggestions": ["List", "of", "suggestions"]
 }
 \`\`\`
 
@@ -490,12 +485,12 @@ Respond with a JSON object:
 
 Prompts support template variables:
 
-| Variable | Description |
-|----------|-------------|
-| `{{target}}` | The primary target of the operation |
-| `{{options}}` | Parsed options object |
-| `{{recalled_frames}}` | Frames recalled from Lex memory |
-| `{{context}}` | Full context object from prep phase |
+| Variable              | Description                         |
+| --------------------- | ----------------------------------- |
+| `{{target}}`          | The primary target of the operation |
+| `{{options}}`         | Parsed options object               |
+| `{{recalled_frames}}` | Frames recalled from Lex memory     |
+| `{{context}}`         | Full context object from prep phase |
 
 ---
 
@@ -529,9 +524,11 @@ describe("My Executor", () => {
 
   describe("executeStochasticPhase", () => {
     it("should parse valid model response", async () => {
-      const prepResult = { /* mock */ };
+      const prepResult = {
+        /* mock */
+      };
       const modelResponse = '{"decision": "approve"}';
-      
+
       const result = await executeStochasticPhase(prepResult, modelResponse);
       expect(result.success).toBe(true);
     });
@@ -539,7 +536,9 @@ describe("My Executor", () => {
 
   describe("captureFrame", () => {
     it("should emit frame", async () => {
-      const stochasticResult = { /* mock */ };
+      const stochasticResult = {
+        /* mock */
+      };
       const result = await captureFrame(stochasticResult);
       expect(result.data.frameId).toBeDefined();
     });
@@ -563,10 +562,7 @@ describe("My Executor Integration", () => {
 
     // 2. Stochastic (mock model)
     const mockResponse = '{"decision": "approve"}';
-    const stochasticResult = await executeStochasticPhase(
-      prepResult,
-      mockResponse
-    );
+    const stochasticResult = await executeStochasticPhase(prepResult, mockResponse);
     expect(stochasticResult.success).toBe(true);
 
     // 3. Receipt
@@ -622,12 +618,14 @@ An executor graduates from `project/` → `executors/` when it meets all of the 
 ### IP Separation
 
 Executor documentation should cover:
+
 - ✅ Inputs/outputs
 - ✅ Modes and configuration
 - ✅ Jordan-mode discipline
 - ✅ Frame emission
 
 Executor documentation should NOT cover:
+
 - ❌ Merge plans (LexRunner concern)
 - ❌ Gate orchestration (LexRunner concern)
 - ❌ Fan-out strategies (LexRunner concern)
@@ -730,9 +728,7 @@ export async function recallSeniorDevContext(
  * - Writes review receipt to Lex
  * - Includes severity, blockers, next action
  */
-export async function captureSeniorDevFrame(
-  input: CaptureFrameInput
-): Promise<CaptureFrameResult>;
+export async function captureSeniorDevFrame(input: CaptureFrameInput): Promise<CaptureFrameResult>;
 ```
 
 ### 3. Types
@@ -766,12 +762,12 @@ export interface PrepareContextResult {
 
 The Senior Dev executor supports multiple modes:
 
-| Mode | Purpose | Prompt |
-|------|---------|--------|
-| `triage` | Quick PR assessment | `pr-analysis.prompt.md` |
-| `deep_review` | Detailed code analysis | `code-review.prompt.md` |
+| Mode             | Purpose                   | Prompt                          |
+| ---------------- | ------------------------- | ------------------------------- |
+| `triage`         | Quick PR assessment       | `pr-analysis.prompt.md`         |
+| `deep_review`    | Detailed code analysis    | `code-review.prompt.md`         |
 | `pattern_mining` | Identify recurring issues | `pattern-recognition.prompt.md` |
-| `mentorship` | Developer growth feedback | `mentorship-feedback.prompt.md` |
+| `mentorship`     | Developer growth feedback | `mentorship-feedback.prompt.md` |
 
 ---
 
@@ -832,11 +828,13 @@ Use this checklist when creating a new executor:
 ### When should I create a new executor vs. adding a mode?
 
 Create a new executor when:
+
 - The role is fundamentally different
 - The tool budget differs significantly
 - The guardrail profile is unique
 
 Add a mode when:
+
 - The role is the same, just different focus
 - Tool budget remains similar
 - Guardrails don't change

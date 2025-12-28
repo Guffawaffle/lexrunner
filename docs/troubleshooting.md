@@ -11,6 +11,7 @@ lex-pr doctor
 ```
 
 This validates:
+
 - Node.js and npm versions
 - Git configuration
 - GitHub token (if provided)
@@ -313,6 +314,7 @@ Suggestion: Consider if these items should have dependencies or dependents.
 **Why This Matters:**
 
 Orphan items may indicate:
+
 - Forgotten dependency declarations
 - Features that should be grouped with others
 - Independent work that doesn't need the merge pyramid
@@ -406,7 +408,7 @@ lex-pr discover
 # Before:
 # filters:
 #   labels: ["ready-to-merge", "approved"]
-#   
+#
 # After:
 # filters:
 #   labels: ["ready-to-merge"]
@@ -680,6 +682,7 @@ env | grep LEX_PR
 ### Community Support
 
 1. **GitHub Issues**: Search existing issues
+
    ```bash
    # Search issues
    gh issue list --search "error message"

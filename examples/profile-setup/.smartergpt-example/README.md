@@ -5,6 +5,7 @@ This directory demonstrates the structure and contents of a tracked profile.
 ## Purpose
 
 The tracked profile (`.smartergpt/`) serves as:
+
 - **Repository default configuration** - Provides working defaults for all users
 - **Team canonical example** - Documents team conventions and standards
 - **Read-only reference** - Should not be written to by the runner (role: example)
@@ -52,11 +53,13 @@ description: Example tracked profile for lexrunner
 # Project Intent
 
 ## Goals
+
 - Implement merge-weave functionality
 - Support dependency-aware PR merging
 - Provide quality gates framework
 
 ## Success Criteria
+
 - All tests pass
 - TypeScript compilation succeeds
 - Documentation is up-to-date
@@ -146,6 +149,7 @@ This prevents accidental commits of generated artifacts.
 ## Write Protection
 
 The tracked profile has `role: example` (implicit or explicit in profile.yml), which means:
+
 - ❌ Runner refuses to write artifacts (deliverables, logs, etc.)
 - ✅ Config files can be manually edited and committed
 - ✅ Serves as team default and documentation
@@ -161,11 +165,13 @@ lex-pr init-local
 Don't modify the tracked profile directly for local development. Instead:
 
 1. **Initialize local profile:**
+
    ```bash
    lex-pr init-local
    ```
 
 2. **Override specific files in `.smartergpt.local/`:**
+
    ```bash
    cp .smartergpt/scope.yml .smartergpt.local/
    vim .smartergpt.local/scope.yml

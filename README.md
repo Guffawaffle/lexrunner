@@ -1,7 +1,7 @@
 # LexRunner — Merge-Weave & Fanout CLI (`lex-pr`)
 
 ![Proprietary](https://img.shields.io/badge/License-Proprietary-red)
-![Uses Lex (MIT)](https://img.shields.io/badge/Powered%20by-Lex%20(MIT)-blue)
+![Uses Lex (MIT)](<https://img.shields.io/badge/Powered%20by-Lex%20(MIT)-blue>)
 
 **`lex-pr` powered by LexRunner.** Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.
 
@@ -17,11 +17,11 @@
 
 ### LexRunner (Proprietary) vs Lex (MIT OSS)
 
-| Aspect | **LexRunner** (Paid) | **Lex** (OSS) |
-|--------|---------------------|--------------|
-| **Purpose** | Enterprise merge-weave orchestration CLI | Atlas/Memory/Policy core frameworks |
-| **License** | Proprietary | MIT (open source) |
-| **Repo** | `Guffawaffle/LexRunner` | `Guffawaffle/lex` |
+| Aspect       | **LexRunner** (Paid)                           | **Lex** (OSS)                                   |
+| ------------ | ---------------------------------------------- | ----------------------------------------------- |
+| **Purpose**  | Enterprise merge-weave orchestration CLI       | Atlas/Memory/Policy core frameworks             |
+| **License**  | Proprietary                                    | MIT (open source)                               |
+| **Repo**     | `Guffawaffle/LexRunner`                        | `Guffawaffle/lex`                               |
 | **Audience** | Teams running automated fanout/merge workflows | Developers building on frames/policy primitives |
 
 👉 **Choose Lex if:** You need frames, policy scanning, or atlas functionality independently.
@@ -85,11 +85,11 @@ python3 scripts/gen_mcp_servers.py \
       "args": ["/home/guff/lexrunner/dist/mcp/server.js"],
       "env": {
         "ALLOW_MUTATIONS": "false",
-        "LEX_PR_PROFILE_DIR": "/srv/sites/smartergpt/.smartergpt"
+        "LEX_PR_PROFILE_DIR": "/srv/sites/smartergpt/.smartergpt",
       },
-      "workingDirectory": "/srv/sites/smartergpt"
-    }
-  }
+      "workingDirectory": "/srv/sites/smartergpt",
+    },
+  },
 }
 ```
 
@@ -106,7 +106,8 @@ Workspace variant (`servers.workspace.json`) mirrors entries but forces `ALLOW_M
 
 See `orchestrator-prompt.md` for a supervisory prompt template.
 }
-```
+
+````
 
 Workspace variant (`servers.workspace.json`) mirrors entries but forces `ALLOW_MUTATIONS=false` for all.
 
@@ -143,7 +144,7 @@ npm install -g lexrunner
 
 # Or install in your project
 npm install --save-dev lexrunner
-```
+````
 
 After installation, you'll see a reminder to initialize your workspace:
 
@@ -228,6 +229,7 @@ npx lex-pr merge --plan plan.json --execute --cleanup
 **Complete Setup Guide:** See [docs/MERGE_WEAVE_SETUP.md](docs/MERGE_WEAVE_SETUP.md) for detailed installation instructions, configuration examples, and troubleshooting.
 
 **Convenience Scripts:**
+
 - [`scripts/merge-weave-wrapper.sh`](scripts/merge-weave-wrapper.sh) - Simple wrapper for common operations
 - [`scripts/quick-start-merge-weave.sh`](scripts/quick-start-merge-weave.sh) - Automated setup for new repos
 
@@ -242,6 +244,7 @@ The front-end capture pipeline enables rapid idea-to-project workflows using Git
 Capture feature ideas, generate Feature Spec v0, create/update Idea Issues.
 
 **Usage:**
+
 ```bash
 # Interactive mode (prompts for all inputs)
 lex-pr idea
@@ -271,6 +274,7 @@ lex-pr idea \
 ```
 
 **Options:**
+
 - `--title <string>` - Idea title (interactive if omitted)
 - `--description <string>` - Brief description (interactive if omitted)
 - `--interactive` - Force interactive mode
@@ -281,6 +285,7 @@ lex-pr idea \
 - `--update-issue <num>` - Update existing Issue (idempotent)
 
 **Output:**
+
 - Feature Spec v0 JSON (validated against schema)
 - GitHub Idea Issue with `[IDEA]` prefix and `idea`, `needs-triage` labels
 - Fingerprint for idempotent updates
@@ -292,6 +297,7 @@ lex-pr idea \
 Load Feature Spec v0, generate Execution Plan v1, create Epic + Sub-Issues.
 
 **Usage:**
+
 ```bash
 # Basic usage (requires Feature Spec v0 from lex-pr idea)
 lex-pr create-project \
@@ -320,6 +326,7 @@ lex-pr create-project \
 ```
 
 **Options:**
+
 - `--spec <path>` - Feature Spec v0 file (required)
 - `--dry-run` - Generate plan without creating Issues
 - `--output <path>` - Output path for Execution Plan v1 (default: `.smartergpt.local/deliverables/_session/plan-{timestamp}.json`)
@@ -330,6 +337,7 @@ lex-pr create-project \
 - `--no-link` - Skip sub-issue linking
 
 **Output:**
+
 - Execution Plan v1 JSON (validated against schema)
 - GitHub Epic Issue with `epic` label
 - GitHub Sub-Issues (feature, testing, docs) linked to Epic
@@ -367,16 +375,19 @@ lex-pr create-project \
 ### Safety Mechanisms
 
 **PR Prevention:**
+
 - Commands are Issues-only; no PR creation logic
 - Runtime guards detect accidental PR API calls
 - PR-related flags (`--create-pr`, `--pr`) rejected
 
 **Artifact Path Restrictions:**
+
 - Writes allowed only to `.smartergpt.local/deliverables/_session/`
 - PR directories (`/PR-<number>/`, `/artifacts/PR-*/`) blocked
 - Custom output paths validated before write
 
 **Schema Validation:**
+
 - All inputs/outputs validated against Zod schemas
 - Pre-flight checks before Issue creation
 - Detailed error messages with line numbers
@@ -386,6 +397,7 @@ lex-pr create-project \
 ### Schemas
 
 **Feature Spec v0:**
+
 ```json
 {
   "schemaVersion": "0.1.0",
@@ -404,14 +416,19 @@ lex-pr create-project \
 ```
 
 **Execution Plan v1:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": { /* Feature Spec v0 */ },
+  "sourceSpec": {
+    /* Feature Spec v0 */
+  },
   "epic": {
     "title": "Add dark mode support",
     "description": "Implement theme switcher with light/dark modes",
-    "acceptanceCriteria": [ /* from Feature Spec */ ]
+    "acceptanceCriteria": [
+      /* from Feature Spec */
+    ]
   },
   "subIssues": [
     {
@@ -419,7 +436,9 @@ lex-pr create-project \
       "title": "Implement Add dark mode support",
       "description": "Core implementation of feature",
       "type": "feature",
-      "acceptanceCriteria": [ /* from Feature Spec */ ],
+      "acceptanceCriteria": [
+        /* from Feature Spec */
+      ],
       "dependsOn": []
     },
     {
@@ -452,6 +471,7 @@ Complete documentation and interactive plan review guides
 See the full documentation index: [docs/README.md](docs/README.md)
 
 Quick links:
+
 - **Getting Started**: docs/quickstart.md — 5-minute onboarding
 - **Front-End Capture Pipeline**: docs/front-end-capture-pipeline.md — idea → project workflow (Issues-only)
 - **Merge Pyramid Tutorial**: docs/tutorials/quick-merge-pyramid.md — discover → plan → execute → merge workflow
@@ -516,10 +536,12 @@ lex-pr execute --plan plan.json
 ### Documentation
 
 **Getting Started:**
+
 - [Quickstart Guide](docs/quickstart.md) - Get up and running in 5 minutes
 - [Merge-Weave Quickstart](docs/merge-weave-quickstart.md) - End-to-end merge-weave walkthrough with examples
 
 **Reference:**
+
 - **[Environment Variables](docs/environment-variables.md)** - environment configuration, CI safety, and aliasing
 - **[Profile Resolution](docs/profile-resolution.md)** - profile precedence and configuration
 - **[Complete Guide](docs/diffgraph-planner.md)** - full feature documentation
@@ -590,6 +612,7 @@ lex-pr orchestrate:plan-batch --input analysis.json --json > batch-plan.json
 ```
 
 **Features:**
+
 - Deterministic topological sorting (same input → same output)
 - Stable priority queue (score → createdAt → number)
 - Layer-based batching for parallel execution
@@ -620,9 +643,10 @@ Each gate result file must follow the JSON schema with stable keys:
   "status": "pass|fail",
   "duration_ms": 1000,
   "started_at": "2024-01-15T10:30:00Z",
-  "stderr_path": "/path/to/stderr.log",  // optional
-  "stdout_path": "/path/to/stdout.log",  // optional
-  "meta": {                              // optional
+  "stderr_path": "/path/to/stderr.log", // optional
+  "stdout_path": "/path/to/stdout.log", // optional
+  "meta": {
+    // optional
     "exit_code": "0",
     "command": "npm test"
   }
@@ -648,6 +672,7 @@ Turn Cost = λL + γC + ρR + τT + αA
 ```
 
 Where:
+
 - **L (Latency)**: API response time, gate execution time, merge time
 - **C (Context Reset)**: Tokens required to rebuild context (N/A for deterministic runner)
 - **R (Renegotiation)**: Conflict resolution retries, clarification turns
@@ -659,6 +684,7 @@ Default weights: `λ=0.1, γ=0.1, ρ=0.3, τ=0.2, α=0.3`
 ### Usage
 
 **Execute Command:**
+
 ```bash
 # Enable Turn Cost tracking during gate execution
 lex-pr execute plan.json --track-turncost
@@ -668,6 +694,7 @@ lex-pr execute plan.json --track-turncost --json
 ```
 
 **Merge Command:**
+
 ```bash
 # Track Turn Cost during merge-weave operations
 lex-pr merge --execute --track-turncost
@@ -679,6 +706,7 @@ lex-pr merge --track-turncost
 ### Output Format
 
 **Human-readable:**
+
 ```
 === Turn Cost ===
 Weighted Score: 3.20
@@ -689,6 +717,7 @@ vs Prior Run: -45%
 ```
 
 **JSON:**
+
 ```json
 {
   "turnCost": {
@@ -709,11 +738,11 @@ vs Prior Run: -45%
 
 ### What Gets Tracked
 
-| Operation | Latency | Renegotiation | Attention Switch |
-|-----------|---------|---------------|------------------|
-| Gate execution | ✅ Per-gate timing | ✅ Gate retries | ❌ (future) |
-| Merge operations | ✅ Total merge time | ✅ Conflict retries | ❌ (future) |
-| Conflict resolution | ✅ Resolution time | ✅ Retry attempts | ✅ Manual fixes |
+| Operation           | Latency             | Renegotiation       | Attention Switch |
+| ------------------- | ------------------- | ------------------- | ---------------- |
+| Gate execution      | ✅ Per-gate timing  | ✅ Gate retries     | ❌ (future)      |
+| Merge operations    | ✅ Total merge time | ✅ Conflict retries | ❌ (future)      |
+| Conflict resolution | ✅ Resolution time  | ✅ Retry attempts   | ✅ Manual fixes  |
 
 ### Business Value
 
@@ -722,6 +751,7 @@ From the coordination cost compression thesis:
 > "Token costs are linear; Turn costs compound through cascading misunderstandings."
 
 Turn Cost tracking enables:
+
 - **Measuring actual coordination overhead** (not just API costs)
 - **Identifying high-friction workflows** that need optimization
 - **Optimizing for human attention** (the scarcest resource)
@@ -775,15 +805,15 @@ version: 1
 target: main
 items:
   - id: 1
-    name: auth-system      # Dependencies resolve by 'name' field
+    name: auth-system # Dependencies resolve by 'name' field
     branch: feature/auth-system
     sha: abc123def456
-    deps: []               # Use 'deps' array (references other item names)
+    deps: [] # Use 'deps' array (references other item names)
     strategy: rebase-weave
   - id: 2
-    name: api-endpoints    # Generator defaults: name := id
+    name: api-endpoints # Generator defaults: name := id
     branch: feature/api-endpoints
-    deps: ["auth-system"]  # Depends on item with name="auth-system"
+    deps: ["auth-system"] # Depends on item with name="auth-system"
     strategy: merge-weave
 ```
 
@@ -799,11 +829,11 @@ The CLI follows standard Unix conventions for automation and CI integration:
 
 For `security` subcommands (`check-rotation`, `scan-plan`, `validate-secrets`):
 
-| Code | Meaning | Notes |
-|------|---------|-------|
-| 0 | Success / No findings | Status = ok |
-| 1 | Findings detected | Status = findings (action required) |
-| 2 | Internal error | Status = error (investigate stack) |
+| Code | Meaning               | Notes                               |
+| ---- | --------------------- | ----------------------------------- |
+| 0    | Success / No findings | Status = ok                         |
+| 1    | Findings detected     | Status = findings (action required) |
+| 2    | Internal error        | Status = error (investigate stack)  |
 
 JSON output is deterministic with ordered keys: `command,status,exitCode,findings,timestamp`.
 
@@ -811,6 +841,7 @@ Format flags:
 `--format text|json` (default text), `--no-color` disables ANSI styling in text mode.
 
 **Secret Rotation:**
+
 - See [docs/security/rotation-guide.md](docs/security/rotation-guide.md) for rotation patterns and cadences
 - Example script: `tsx scripts/rotate-secrets-example.ts` (deterministic JSON output)
 
@@ -884,6 +915,7 @@ npm run benchmark:baseline
 ### CI Integration
 
 Benchmarks run automatically on PRs via GitHub Actions. The workflow:
+
 1. Executes all benchmarks
 2. Compares results against committed baseline
 3. Posts performance report as PR comment

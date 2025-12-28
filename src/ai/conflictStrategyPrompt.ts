@@ -1,6 +1,6 @@
 /**
  * AI prompt template for conflict resolution strategy
- * 
+ *
  * Provides the prompt structure for querying an AI model to resolve conflicts.
  * Uses JSON I/O for structured input/output.
  */
@@ -9,7 +9,7 @@ import type { ConflictResolutionInput } from "./conflictStrategySchema.js";
 
 /**
  * System prompt for conflict resolution AI
- * 
+ *
  * Sets the context and rules for the AI's behavior
  */
 export const SYSTEM_PROMPT = `You are a conflict resolution expert for git merge operations.
@@ -50,14 +50,14 @@ Rules:
 
 /**
  * Generate user prompt for specific conflict
- * 
+ *
  * @param input - Conflict resolution input
  * @returns Formatted prompt string
  */
 export function generateConflictPrompt(input: ConflictResolutionInput): string {
-	const inputJson = JSON.stringify(input, null, 2);
-	
-	return `Analyze the following merge conflict and provide a resolution strategy:
+  const inputJson = JSON.stringify(input, null, 2);
+
+  return `Analyze the following merge conflict and provide a resolution strategy:
 
 ${inputJson}
 
@@ -66,63 +66,63 @@ Provide your response as JSON following the output format specified in the syste
 
 /**
  * Parse AI response to extract JSON
- * 
+ *
  * Handles cases where AI includes markdown formatting or extra text
- * 
+ *
  * @param response - Raw AI response
  * @returns Parsed JSON object
  */
 export function parseAIResponse(response: string): unknown {
-	// Try to extract JSON from markdown code blocks
-	const jsonBlockMatch = response.match(/```json\n([\s\S]*?)\n```/);
-	if (jsonBlockMatch) {
-		return JSON.parse(jsonBlockMatch[1]);
-	}
-	
-	// Try to extract JSON from regular code blocks
-	const codeBlockMatch = response.match(/```\n([\s\S]*?)\n```/);
-	if (codeBlockMatch) {
-		return JSON.parse(codeBlockMatch[1]);
-	}
-	
-	// Try to find JSON object in response
-	const jsonMatch = response.match(/\{[\s\S]*\}/);
-	if (jsonMatch) {
-		return JSON.parse(jsonMatch[0]);
-	}
-	
-	// If no JSON found, try parsing the whole response
-	return JSON.parse(response);
+  // Try to extract JSON from markdown code blocks
+  const jsonBlockMatch = response.match(/```json\n([\s\S]*?)\n```/);
+  if (jsonBlockMatch) {
+    return JSON.parse(jsonBlockMatch[1]);
+  }
+
+  // Try to extract JSON from regular code blocks
+  const codeBlockMatch = response.match(/```\n([\s\S]*?)\n```/);
+  if (codeBlockMatch) {
+    return JSON.parse(codeBlockMatch[1]);
+  }
+
+  // Try to find JSON object in response
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+
+  // If no JSON found, try parsing the whole response
+  return JSON.parse(response);
 }
 
 /**
  * Build complete prompt for AI model
- * 
+ *
  * @param input - Conflict resolution input
  * @returns Object with system and user prompts
  */
 export function buildPrompt(input: ConflictResolutionInput): {
-	system: string;
-	user: string;
+  system: string;
+  user: string;
 } {
-	return {
-		system: SYSTEM_PROMPT,
-		user: generateConflictPrompt(input)
-	};
+  return {
+    system: SYSTEM_PROMPT,
+    user: generateConflictPrompt(input),
+  };
 }
 
 /**
  * Estimate token count for prompt (rough approximation)
- * 
+ *
  * Uses ~4 characters per token heuristic
- * 
+ *
  * @param input - Conflict resolution input
  * @returns Estimated token count
  */
 export function estimateTokenCount(input: ConflictResolutionInput): number {
-	const systemTokens = Math.ceil(SYSTEM_PROMPT.length / 4);
-	const userPrompt = generateConflictPrompt(input);
-	const userTokens = Math.ceil(userPrompt.length / 4);
-	
-	return systemTokens + userTokens;
+  const systemTokens = Math.ceil(SYSTEM_PROMPT.length / 4);
+  const userPrompt = generateConflictPrompt(input);
+  const userTokens = Math.ceil(userPrompt.length / 4);
+
+  return systemTokens + userTokens;
 }

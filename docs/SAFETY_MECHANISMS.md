@@ -19,23 +19,26 @@ The safety mechanisms provide three layers of protection:
 Checks the call stack for PR creation methods and throws if found.
 
 **Usage:**
+
 ```typescript
-import { assertNoCreatePR } from './commands/guards.js';
+import { assertNoCreatePR } from "./commands/guards.js";
 
 async function runIdeaCommand(options: IdeaOptions): Promise<void> {
   // Guard against PR creation
-  assertNoCreatePR('lex-pr idea');
-  
+  assertNoCreatePR("lex-pr idea");
+
   // ... rest of command logic
 }
 ```
 
 **Detected Patterns:**
+
 - `createPullRequest`
 - `pulls.create`
 - `mergePullRequest`
 
 **Error Message:**
+
 ```
 SAFETY VIOLATION: lex-pr idea attempted PR creation via createPullRequest
 This command is Issues-only. Remove PR creation logic.
@@ -46,24 +49,27 @@ This command is Issues-only. Remove PR creation logic.
 Validates that command options don't include PR-related flags.
 
 **Usage:**
+
 ```typescript
-import { validateNoCreatePRFlags } from './commands/guards.js';
+import { validateNoCreatePRFlags } from "./commands/guards.js";
 
 async function runIdeaCommand(options: IdeaOptions): Promise<void> {
   // Validate command options
   validateNoCreatePRFlags(options);
-  
+
   // ... rest of command logic
 }
 ```
 
 **Forbidden Flags:**
+
 - `create-pr`
 - `pr`
 - `pull-request`
 - `merge`
 
 **Error Message:**
+
 ```
 SAFETY VIOLATION: Flag --create-pr not allowed in Issues-only commands
 Use GitHub Projects or Issue tracking instead.
@@ -76,26 +82,30 @@ Use GitHub Projects or Issue tracking instead.
 Checks if a path is safe for artifact writes.
 
 **Allowed Patterns:**
+
 - `.smartergpt.local/deliverables/_session/`
 - `.smartergpt.local/runner/logs/`
 - `.smartergpt/deliverables/_session/`
 
 **Blocked Patterns:**
+
 - `/PR-<number>/` (e.g., `/PR-123/`, `/pr-456/`)
 - `/artifacts/PR-*/` (e.g., `/artifacts/PR-789/`)
 
 **Usage:**
-```typescript
-import { isSafeArtifactPath } from '../utils/paths.js';
 
-const outputPath = '.smartergpt.local/deliverables/_session/idea.json';
+```typescript
+import { isSafeArtifactPath } from "../utils/paths.js";
+
+const outputPath = ".smartergpt.local/deliverables/_session/idea.json";
 isSafeArtifactPath(outputPath); // Returns true
 
-const unsafePath = 'artifacts/PR-123/spec.json';
+const unsafePath = "artifacts/PR-123/spec.json";
 isSafeArtifactPath(unsafePath); // Throws error
 ```
 
 **Error Message:**
+
 ```
 SAFETY VIOLATION: Cannot write to PR artifact directory
 Blocked path: artifacts/PR-123/spec.json
@@ -107,10 +117,11 @@ Use .smartergpt.local/deliverables/_session/ instead
 Validates output path and creates parent directories if needed.
 
 **Usage:**
-```typescript
-import { validateOutputPath } from '../utils/paths.js';
 
-const outputPath = '.smartergpt.local/deliverables/_session/idea.json';
+```typescript
+import { validateOutputPath } from "../utils/paths.js";
+
+const outputPath = ".smartergpt.local/deliverables/_session/idea.json";
 await validateOutputPath(outputPath);
 
 // Parent directories are now created
@@ -118,6 +129,7 @@ await fs.writeFile(outputPath, data);
 ```
 
 **Checks:**
+
 1. Path is safe for artifact writes (not in PR directory)
 2. Parent directory exists or can be created
 
@@ -126,10 +138,11 @@ await fs.writeFile(outputPath, data);
 Normalizes paths for cross-platform comparison.
 
 **Usage:**
-```typescript
-import { normalizePath } from '../utils/paths.js';
 
-const windowsPath = 'C:\\path\\to\\file.txt';
+```typescript
+import { normalizePath } from "../utils/paths.js";
+
+const windowsPath = "C:\\path\\to\\file.txt";
 const normalized = normalizePath(windowsPath);
 // Returns: 'C:/path/to/file.txt'
 ```
@@ -141,31 +154,34 @@ const normalized = normalizePath(windowsPath);
 Validates data against a Zod schema with detailed error reporting.
 
 **Usage:**
+
 ```typescript
-import { validateOrThrow } from './commands/validation.js';
-import { z } from 'zod';
+import { validateOrThrow } from "./commands/validation.js";
+import { z } from "zod";
 
 const FeatureSpecSchema = z.object({
   title: z.string(),
   description: z.string(),
-  features: z.array(z.string())
+  features: z.array(z.string()),
 });
 
 const specData = {
-  title: 'New Feature',
-  description: 'Add new feature',
-  features: ['feature1', 'feature2']
+  title: "New Feature",
+  description: "Add new feature",
+  features: ["feature1", "feature2"],
 };
 
-const validatedSpec = validateOrThrow(specData, FeatureSpecSchema, 'Feature Spec v0');
+const validatedSpec = validateOrThrow(specData, FeatureSpecSchema, "Feature Spec v0");
 ```
 
 **Success Output:**
+
 ```
 ✓ Schema validation passed (Feature Spec v0)
 ```
 
 **Error Output:**
+
 ```
 Schema validation failed (Feature Spec v0):
   1. description: Expected string, received number
@@ -178,14 +194,16 @@ Schema validation failed (Feature Spec v0):
 Validates a JSON spec file against a schema before Issue creation.
 
 **Usage:**
-```typescript
-import { preflightSchemaCheck } from './commands/validation.js';
 
-const specPath = '.smartergpt.local/deliverables/_session/feature-spec.json';
-await preflightSchemaCheck(specPath, FeatureSpecV0Schema, 'Feature Spec v0');
+```typescript
+import { preflightSchemaCheck } from "./commands/validation.js";
+
+const specPath = ".smartergpt.local/deliverables/_session/feature-spec.json";
+await preflightSchemaCheck(specPath, FeatureSpecV0Schema, "Feature Spec v0");
 ```
 
 **Output:**
+
 ```
 Pre-flight schema check: Feature Spec v0
 ✓ Schema validation passed (Feature Spec v0)
@@ -196,16 +214,16 @@ Pre-flight schema check: Feature Spec v0
 Here's how to integrate all safety mechanisms into a new Issues-only command:
 
 ```typescript
-import { assertNoCreatePR, validateNoCreatePRFlags } from './commands/guards.js';
-import { validateOutputPath } from '../utils/paths.js';
-import { validateOrThrow, preflightSchemaCheck } from './commands/validation.js';
-import { z } from 'zod';
+import { assertNoCreatePR, validateNoCreatePRFlags } from "./commands/guards.js";
+import { validateOutputPath } from "../utils/paths.js";
+import { validateOrThrow, preflightSchemaCheck } from "./commands/validation.js";
+import { z } from "zod";
 
 // Define schema
 const FeatureSpecSchema = z.object({
   title: z.string(),
   description: z.string(),
-  features: z.array(z.string())
+  features: z.array(z.string()),
 });
 
 interface IdeaOptions {
@@ -217,33 +235,32 @@ interface IdeaOptions {
 
 async function runIdeaCommand(options: IdeaOptions): Promise<void> {
   // Step 1: Guard against PR creation
-  assertNoCreatePR('lex-pr idea');
-  
+  assertNoCreatePR("lex-pr idea");
+
   // Step 2: Validate no PR flags
   validateNoCreatePRFlags(options);
-  
+
   // Step 3: Prepare spec data
   const specData = {
     title: options.title,
     description: options.description,
-    features: [] // populated from user input
+    features: [], // populated from user input
   };
-  
+
   // Step 4: Validate spec against schema
-  const validatedSpec = validateOrThrow(specData, FeatureSpecSchema, 'Feature Spec v0');
-  
+  const validatedSpec = validateOrThrow(specData, FeatureSpecSchema, "Feature Spec v0");
+
   // Step 5: Determine output path
-  const outputPath = options.output || 
-    '.smartergpt.local/deliverables/_session/feature-spec.json';
-  
+  const outputPath = options.output || ".smartergpt.local/deliverables/_session/feature-spec.json";
+
   // Step 6: Validate output path
   await validateOutputPath(outputPath);
-  
+
   // Step 7: Write spec file
   await fs.writeFile(outputPath, JSON.stringify(validatedSpec, null, 2));
-  
+
   console.log(`✓ Feature spec written to ${outputPath}`);
-  
+
   // Step 8: Create GitHub Issue (not implemented in this PR)
   // await createIssue(validatedSpec);
 }
@@ -259,6 +276,7 @@ All safety mechanisms are thoroughly tested:
 - **safety-guards-integration.spec.ts** - 7 integration tests
 
 Run tests:
+
 ```bash
 npm test -- tests/commands/guards.spec.ts
 npm test -- tests/utils/paths.spec.ts
@@ -280,10 +298,10 @@ All safety violations throw descriptive errors:
 
 ```typescript
 try {
-  assertNoCreatePR('lex-pr idea');
+  assertNoCreatePR("lex-pr idea");
   validateNoCreatePRFlags(options);
   await validateOutputPath(outputPath);
-  validateOrThrow(data, schema, 'Feature Spec');
+  validateOrThrow(data, schema, "Feature Spec");
 } catch (error) {
   console.error(error.message);
   process.exit(1);

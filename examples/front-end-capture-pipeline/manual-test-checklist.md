@@ -4,7 +4,7 @@ This checklist provides comprehensive manual testing steps for the front-end cap
 
 ## Prerequisites
 
-- [ ] GITHUB_TOKEN environment variable set (`export GITHUB_TOKEN=ghp_...`)
+- [ ] GITHUB*TOKEN environment variable set (`export GITHUB_TOKEN=ghp*...`)
 - [ ] Test repository available (e.g., `Guffawaffle/test-repo`)
 - [ ] lexrunner built: `npm run build`
 - [ ] Confirm `dist/cli.js` exists
@@ -46,6 +46,7 @@ node dist/cli.js idea \
 ```
 
 **Validation:**
+
 - [ ] Feature Spec v0 file exists
 - [ ] File contains valid JSON
 - [ ] Schema version is "0.1.0"
@@ -69,6 +70,7 @@ node dist/cli.js idea
 ```
 
 **Validation:**
+
 - [ ] Prompts appear for title, description, acceptance criteria
 - [ ] Can enter multiple acceptance criteria lines
 - [ ] Feature Spec v0 generated with correct data
@@ -94,6 +96,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js idea \
 ```
 
 **Validation:**
+
 - [ ] GitHub Issue created successfully
 - [ ] Issue title has `[IDEA]` prefix
 - [ ] Issue has `idea` and `needs-triage` labels
@@ -131,6 +134,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js idea \
 ```
 
 **Validation:**
+
 - [ ] No-op update skips unnecessary API calls
 - [ ] Content update successfully modifies Issue
 - [ ] Fingerprint changes in Issue body
@@ -158,6 +162,7 @@ ls -la /tmp/lex-pr-test/my-spec.json
 ```
 
 **Validation:**
+
 - [ ] File created at specified path
 - [ ] Content is valid Feature Spec v0
 - [ ] No error messages
@@ -184,6 +189,7 @@ node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Execution Plan v1 file exists
 - [ ] File contains valid JSON
 - [ ] Schema version is "1.0.0"
@@ -211,6 +217,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Epic Issue created successfully
 - [ ] Epic has `epic` label
 - [ ] 3 Sub-Issues created (one per type)
@@ -236,6 +243,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Epic has specified custom labels
 - [ ] Sub-Issues have specified custom labels
 - [ ] Default labels still applied (`epic`, etc.)
@@ -262,6 +270,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Default behavior links sub-issues to Epic
 - [ ] `--no-link` flag skips linking
 - [ ] Both modes create all Issues successfully
@@ -285,6 +294,7 @@ node dist/cli.js idea \
 ```
 
 **Validation:**
+
 - [ ] Error message displayed
 - [ ] Command exits with non-zero status
 - [ ] No Issue created
@@ -307,6 +317,7 @@ node dist/cli.js idea \
 ```
 
 **Validation:**
+
 - [ ] Error message displayed
 - [ ] Command exits with non-zero status
 - [ ] No file created
@@ -335,6 +346,7 @@ node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Schema validation error displayed
 - [ ] Detailed error message with field name
 - [ ] Command exits with non-zero status
@@ -367,6 +379,7 @@ GITHUB_TOKEN=ghp_... node dist/cli.js create-project \
 ```
 
 **Validation:**
+
 - [ ] Idea Issue created with correct title
 - [ ] Epic Issue created
 - [ ] 3 Sub-Issues created and linked

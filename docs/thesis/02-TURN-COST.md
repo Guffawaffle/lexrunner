@@ -7,6 +7,7 @@
 ## The Problem with Token-Centric Thinking
 
 The AI industry measures everything in tokens:
+
 - Cost per 1K tokens
 - Context window in tokens
 - Output quality per token
@@ -20,23 +21,25 @@ This made sense when the primary interface was chat. But for IDE-native agents d
 ## Defining "Turn"
 
 A **Turn** is a complete cycle of:
+
 1. Human provides input/context
 2. Agent processes and acts
 3. Human reviews and responds
 
 A Turn is not:
+
 - A single API call (an agent may make many calls per turn)
 - A prompt/response pair (turns have semantic meaning beyond message exchange)
 - A token count (turns can be token-light or token-heavy)
 
 ### Turn Characteristics
 
-| Characteristic | Description |
-|----------------|-------------|
-| **Semantic completeness** | A turn represents a coherent unit of work |
-| **Bidirectional** | Requires both human input and agent output |
-| **Bounded** | Has a clear beginning and end |
-| **Measurable** | Duration, tokens, actions can be counted |
+| Characteristic            | Description                                |
+| ------------------------- | ------------------------------------------ |
+| **Semantic completeness** | A turn represents a coherent unit of work  |
+| **Bidirectional**         | Requires both human input and agent output |
+| **Bounded**               | Has a clear beginning and end              |
+| **Measurable**            | Duration, tokens, actions can be counted   |
 
 ---
 
@@ -49,6 +52,7 @@ TurnCost = Latency + ContextReset + PromptRenegotiation + TokenBloat + Attention
 ### Component Definitions
 
 #### Latency
+
 The raw time waiting for the model to respond.
 
 ```yaml
@@ -62,6 +66,7 @@ latency:
 ```
 
 #### Context Reset
+
 The cost of re-establishing context when switching sessions or models.
 
 ```yaml
@@ -76,6 +81,7 @@ context_reset:
 ```
 
 #### Prompt Renegotiation
+
 The cost of clarifying what you meant when the agent misunderstood.
 
 ```yaml
@@ -90,6 +96,7 @@ prompt_renegotiation:
 ```
 
 #### Token Bloat
+
 Excessive tokens consumed due to poor coordination.
 
 ```yaml
@@ -104,6 +111,7 @@ token_bloat:
 ```
 
 #### Attention Switch
+
 The human cognitive cost of context-switching to manage the agent.
 
 ```yaml
@@ -126,6 +134,7 @@ attention_switch:
 Consider two workflows:
 
 **Workflow A: Low tokens, high turns**
+
 - 10 turns per task
 - 1,000 tokens per turn = 10,000 tokens total
 - Token cost: $0.30 (at $0.03/1K)
@@ -133,6 +142,7 @@ Consider two workflows:
 - Effective cost: $0.30 + ($50/hr × 0.83 hr) = **$41.80**
 
 **Workflow B: High tokens, low turns**
+
 - 2 turns per task
 - 8,000 tokens per turn = 16,000 tokens total
 - Token cost: $0.48 (at $0.03/1K)
@@ -144,12 +154,14 @@ Consider two workflows:
 ### UX Argument
 
 High-turn workflows feel terrible:
+
 - Constant waiting
 - Repeated explanations
 - Endless corrections
 - Mounting frustration
 
 Low-turn workflows feel good:
+
 - Agent works autonomously
 - Human reviews completed chunks
 - Corrections are rare
@@ -189,13 +201,13 @@ interface TurnCostMetrics {
 
 ### Collection Points
 
-| Metric | Collection Point | Method |
-|--------|------------------|--------|
-| Latency | API response | Timer start → Timer end |
-| Context Reset | Session start | Tokens in system prompt |
+| Metric               | Collection Point     | Method                          |
+| -------------------- | -------------------- | ------------------------------- |
+| Latency              | API response         | Timer start → Timer end         |
+| Context Reset        | Session start        | Tokens in system prompt         |
 | Prompt Renegotiation | Conversation history | Count of clarification messages |
-| Token Bloat | Response analysis | Comparison to minimal response |
-| Attention Switch | Human behavior | Idle time, edit frequency |
+| Token Bloat          | Response analysis    | Comparison to minimal response  |
+| Attention Switch     | Human behavior       | Idle time, edit frequency       |
 
 ### Aggregation
 
@@ -207,7 +219,7 @@ function computeTurnCost(metrics: TurnCostMetrics): number {
     contextReset: 0.25,
     promptRenegotiation: 0.3,
     tokenBloat: 0.1,
-    attentionSwitch: 0.15
+    attentionSwitch: 0.15,
   };
 
   return (
@@ -227,6 +239,7 @@ function computeTurnCost(metrics: TurnCostMetrics): number {
 ### Governance Reduces Context Reset
 
 Without governance:
+
 ```
 Turn 1: "I'm working on the auth system. We use OAuth2 with PKCE.
         The token store is in Redis. The API is REST-style..."
@@ -234,6 +247,7 @@ Turn 1: "I'm working on the auth system. We use OAuth2 with PKCE.
 ```
 
 With governance:
+
 ```
 Turn 1: "Continue where we left off."
         [Agent reads Frame memory and contracts]
@@ -245,6 +259,7 @@ Turn 1: "Continue where we left off."
 ### Contracts Reduce Prompt Renegotiation
 
 Without contracts:
+
 ```
 Turn 1: Human: "Add a button"
 Turn 2: Agent: "What kind of button?"
@@ -254,6 +269,7 @@ Turn 5: Human: "Just use our design system"
 ```
 
 With contracts:
+
 ```yaml
 # agent.contract.yaml
 constraints:
@@ -272,6 +288,7 @@ Turn 1: Human: "Add a submit button"
 ### Receipts Reduce Token Bloat
 
 Without receipts:
+
 ```
 Turn 1: Agent: "I've completed the following changes:
         - Modified auth.ts (added login function)
@@ -285,6 +302,7 @@ Turn 1: Agent: "I've completed the following changes:
 ```
 
 With receipts:
+
 ```
 Turn 1: Agent commits changes, creates receipt:
         {
@@ -305,18 +323,23 @@ Turn 1: Agent commits changes, creates receipt:
 Turn Cost is an ideal benchmark metric because it is:
 
 ### Measurable
+
 Every component can be quantified in tokens, time, or counts.
 
 ### Economically Relevant
+
 It directly correlates with real-world productivity costs.
 
 ### UX-Indicative
+
 It captures the subjective experience of working with an agent.
 
 ### Model-Agnostic
+
 Works across providers and model versions.
 
 ### Improvable
+
 Clear optimization targets for each component.
 
 ### Proposed Esobench Dimensions
@@ -397,12 +420,12 @@ const turnCostGate: Gate = {
       return {
         status: "warn",
         message: `Turn cost ${metrics.effectiveTurnCost} exceeds threshold`,
-        data: metrics
+        data: metrics,
       };
     }
 
     return { status: "pass", data: metrics };
-  }
+  },
 };
 ```
 
@@ -434,12 +457,12 @@ function formatTurnCostReport(metrics: TurnCostMetrics): string {
 
 For a typical implementation task:
 
-| Metric | Good | Acceptable | Poor |
-|--------|------|------------|------|
-| Turns per PR | 2-3 | 4-5 | 6+ |
-| Tokens per turn | 2000-4000 | 4000-8000 | 8000+ |
-| Renegotiation rate | <10% | 10-25% | >25% |
-| Context reset | <300 tokens | 300-600 | >600 |
+| Metric             | Good        | Acceptable | Poor  |
+| ------------------ | ----------- | ---------- | ----- |
+| Turns per PR       | 2-3         | 4-5        | 6+    |
+| Tokens per turn    | 2000-4000   | 4000-8000  | 8000+ |
+| Renegotiation rate | <10%        | 10-25%     | >25%  |
+| Context reset      | <300 tokens | 300-600    | >600  |
 
 ### Warning Signs
 
@@ -472,4 +495,4 @@ Turn Cost is the metric that actually matters for agent productivity.
 
 ---
 
-*Next: [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md) — How to encode productive failure*
+_Next: [03-PERMISSION-TO-FAIL.md](./03-PERMISSION-TO-FAIL.md) — How to encode productive failure_

@@ -1,4 +1,4 @@
-import type { Plan } from '../../../src/schema.js';
+import type { Plan } from "../../../src/schema.js";
 
 /**
  * Linear dependency chain: A → B → C → D
@@ -6,30 +6,30 @@ import type { Plan } from '../../../src/schema.js';
  */
 export function linear(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     items: [
       {
-        name: 'feat-a',
+        name: "feat-a",
         deps: [],
-        gates: []
+        gates: [],
       },
       {
-        name: 'feat-b',
-        deps: ['feat-a'],
-        gates: []
+        name: "feat-b",
+        deps: ["feat-a"],
+        gates: [],
       },
       {
-        name: 'feat-c',
-        deps: ['feat-b'],
-        gates: []
+        name: "feat-c",
+        deps: ["feat-b"],
+        gates: [],
       },
       {
-        name: 'feat-d',
-        deps: ['feat-c'],
-        gates: []
-      }
-    ]
+        name: "feat-d",
+        deps: ["feat-c"],
+        gates: [],
+      },
+    ],
   };
 }
 
@@ -38,37 +38,37 @@ export function linear(): Plan {
  */
 export function linearWithGates(): Plan {
   return {
-    schemaVersion: '1.0.0',
-    target: 'main',
+    schemaVersion: "1.0.0",
+    target: "main",
     policy: {
-      requiredGates: ['lint', 'test'],
-      maxWorkers: 1
+      requiredGates: ["lint", "test"],
+      maxWorkers: 1,
     },
     items: [
       {
-        name: 'foundation',
+        name: "foundation",
         deps: [],
         gates: [
-          { name: 'lint', run: 'echo "lint pass"', env: {} },
-          { name: 'test', run: 'echo "test pass"', env: {} }
-        ]
+          { name: "lint", run: 'echo "lint pass"', env: {} },
+          { name: "test", run: 'echo "test pass"', env: {} },
+        ],
       },
       {
-        name: 'feature',
-        deps: ['foundation'],
+        name: "feature",
+        deps: ["foundation"],
         gates: [
-          { name: 'lint', run: 'echo "lint pass"', env: {} },
-          { name: 'test', run: 'echo "test pass"', env: {} }
-        ]
+          { name: "lint", run: 'echo "lint pass"', env: {} },
+          { name: "test", run: 'echo "test pass"', env: {} },
+        ],
       },
       {
-        name: 'polish',
-        deps: ['feature'],
+        name: "polish",
+        deps: ["feature"],
         gates: [
-          { name: 'lint', run: 'echo "lint pass"', env: {} },
-          { name: 'test', run: 'echo "test pass"', env: {} }
-        ]
-      }
-    ]
+          { name: "lint", run: 'echo "lint pass"', env: {} },
+          { name: "test", run: 'echo "test pass"', env: {} },
+        ],
+      },
+    ],
   };
 }

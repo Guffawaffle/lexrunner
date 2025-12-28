@@ -21,6 +21,7 @@ You have 3 open PRs forming a diamond pattern:
 3. **PR-102:** `feature/dashboard-ui` - Add dashboard UI (depends on BOTH PR-100 and PR-101)
 
 **Dependency graph:**
+
 ```
         PR-102 (UI)
         /        \
@@ -47,11 +48,13 @@ You have 3 open PRs forming a diamond pattern:
 # Add Authentication System
 
 Implement core authentication:
+
 - User login/logout
 - Session management
 - Password hashing
 
 ## Changes
+
 - Add auth module
 - Add session store
 - Add security utilities
@@ -65,11 +68,13 @@ Implement core authentication:
 # Add API Endpoints
 
 Implement REST API endpoints:
+
 - GET /api/users
 - POST /api/data
 - DELETE /api/data/:id
 
 ## Changes
+
 - Add API routes
 - Add controllers
 - Add validators
@@ -83,20 +88,24 @@ Implement REST API endpoints:
 # Add Dashboard UI
 
 Implement dashboard interface that uses both auth and API:
+
 - Login-protected dashboard
 - Data visualization
 - User profile display
 
 ## Dependencies
+
 Depends-on: #100, #101
 
 ## Changes
+
 - Add Dashboard component
 - Add DataView component
 - Add UserProfile component
 ```
 
 **Key points:**
+
 - PR-100 and PR-101 have **no dependencies** (parallel work)
 - PR-102 **depends on both** PR-100 and PR-101
 - PR-102 can only merge **after both** dependencies are merged
@@ -110,6 +119,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **Expected output:**
+
 ```
 🔍 Fetching open PRs from GitHub...
 ✓ Found 3 open PRs
@@ -130,6 +140,7 @@ lex-pr plan --from-github --output plan.json
 ```
 
 **What happened:**
+
 - Planner identified 2 **independent** PRs (PR-100, PR-101)
 - Planner identified 1 **dependent** PR (PR-102 depends on both)
 - Computed 2 layers (not 3, because PR-100 and PR-101 are parallel)
@@ -143,6 +154,7 @@ lex-pr merge-order plan.json
 ```
 
 **Expected output:**
+
 ```
 📊 Merge order for 3 items:
 
@@ -155,6 +167,7 @@ Layer 1 (after Layer 0 completes):
 ```
 
 **Key insight:**
+
 - **Layer 0** has **2 items** (PR-100 and PR-101)
 - Both can merge **in any order** or **in parallel**
 - **Layer 1** (PR-102) only merges **after both** Layer 0 items complete
@@ -171,6 +184,7 @@ lex-pr execute --plan plan.json --max-workers 2
 ```
 
 **Expected output:**
+
 ```
 📦 Executing plan: 3 items, 2 layers
 ⚙️  Max workers: 2 (parallel execution enabled)
@@ -207,11 +221,13 @@ All gates passed for PR-102 ✓
 ```
 
 **Observations:**
+
 - PR-100 and PR-101 ran **simultaneously** (Worker 1 and Worker 2)
 - Total time for Layer 0: ~8.2s (not 16s if sequential)
 - PR-102 waited for **both** to complete before starting
 
 **Performance gain:**
+
 - Sequential: 8s + 8s + 12s = **28 seconds**
 - Parallel: max(8s, 8s) + 12s = **20 seconds** (~28% faster)
 
@@ -224,6 +240,7 @@ lex-pr merge --plan plan.json --execute
 ```
 
 **Expected output:**
+
 ```
 🚀 Executing merge plan...
 
@@ -249,6 +266,7 @@ Merging PR-102 (dashboard-ui)...
 ```
 
 **What happened:**
+
 1. PR-100 and PR-101 merged to `main` (order doesn't matter)
 2. PR-102 rebased onto `main` (now includes changes from both PR-100 and PR-101)
 3. PR-102 merged to `main`
@@ -262,6 +280,7 @@ git log --oneline --graph -10
 ```
 
 **Expected output:**
+
 ```
 *   abc1234 Merge PR #102: Add dashboard UI
 |\
@@ -276,6 +295,7 @@ git log --oneline --graph -10
 ```
 
 **Verification:**
+
 - ✅ All 3 PRs merged
 - ✅ PR-102 includes changes from both PR-100 and PR-101
 - ✅ No conflicts occurred
@@ -290,6 +310,7 @@ lex-pr plan --from-github --format=dot | dot -Tpng -o graph.png
 ```
 
 **Output (graph.png):**
+
 ```
     ┌─────────┐
     │ PR-102  │
@@ -311,6 +332,7 @@ lex-pr plan --from-github --format=dot | dot -Tpng -o graph.png
 ### Issue: PR-102 gates fail due to missing dependencies
 
 **Symptom:**
+
 ```
 ❌ test: failed for PR-102
 Error: Cannot connect to auth system
@@ -320,6 +342,7 @@ Error: Cannot connect to auth system
 
 **Solution:**
 This is **expected** in the diamond pattern. The planner will:
+
 1. Merge PR-100 and PR-101 first
 2. Re-run gates for PR-102 (which should now pass)
 3. Merge PR-102
@@ -329,6 +352,7 @@ This is **expected** in the diamond pattern. The planner will:
 ### Issue: Merge conflict when merging PR-102
 
 **Symptom:**
+
 ```
 ❌ Merge conflict in src/dashboard.ts
 ```
@@ -336,6 +360,7 @@ This is **expected** in the diamond pattern. The planner will:
 **Cause:** PR-100 and PR-101 both modified the same file in incompatible ways.
 
 **Solution:**
+
 1. Resolve the conflict manually in PR-102:
    ```bash
    git checkout feature/dashboard-ui
@@ -360,6 +385,7 @@ This is **expected** in the diamond pattern. The planner will:
 ```
 
 PR-103 description:
+
 ```markdown
 Depends-on: #100, #101, #102
 ```
@@ -377,11 +403,13 @@ Result: **3 layers** (Layer 0: 3 items, Layer 1: 1 item)
 ```
 
 PR-102 description:
+
 ```markdown
 Depends-on: #100, #101
 ```
 
 PR-103 description:
+
 ```markdown
 Depends-on: #102
 ```

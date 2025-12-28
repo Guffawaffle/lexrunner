@@ -15,11 +15,13 @@ cd /path/to/lexrunner
 ## Step 1: Discover Open PRs
 
 **Command:**
+
 ```bash
 lex-pr weave discover --owner Guffawaffle --repo lexrunner
 ```
 
 **Expected Output:**
+
 ```
 📋 Discovered N Pull Request(s)
 
@@ -38,6 +40,7 @@ Next step:
 ## Step 2: Generate Merge Plan
 
 **Command:**
+
 ```bash
 lex-pr weave plan --from-github \
   --owner Guffawaffle \
@@ -47,6 +50,7 @@ lex-pr weave plan --from-github \
 ```
 
 **Expected Output:**
+
 ```
 ✅ Plan generated successfully
 
@@ -61,6 +65,7 @@ Next steps:
 ```
 
 **Generated Plan (plan.json):**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -111,11 +116,13 @@ Next steps:
 ## Step 3: Dry-Run Preview
 
 **Command:**
+
 ```bash
 lex-pr weave apply --plan plan.json --dry-run
 ```
 
 **Expected Output:**
+
 ```
 🔍 Merge-Weave Dry Run
 
@@ -143,11 +150,13 @@ To execute:
 ## Step 4: Execute Gates
 
 **Command:**
+
 ```bash
 lex-pr weave apply --plan plan.json
 ```
 
 **Expected Output:**
+
 ```
 🚀 Executing Merge-Weave
 
@@ -171,11 +180,13 @@ Next step:
 ## Step 5: Merge PRs (Optional)
 
 **Command:**
+
 ```bash
 lex-pr merge --plan plan.json --execute
 ```
 
 **Expected Behavior:**
+
 - Creates integration branch (e.g., `integration/weave-2025-12-17`)
 - Merges PRs in topological order
 - Runs final validation
@@ -190,7 +201,7 @@ For AI assistants using the MCP protocol:
 const prs = await tools.call("discover", {
   owner: "Guffawaffle",
   repo: "lexrunner",
-  state: "open"
+  state: "open",
 });
 
 // Step 2: Create Plan
@@ -199,7 +210,7 @@ const plan = await tools.call("plan.create", {
   owner: "Guffawaffle",
   repo: "lexrunner",
   labels: ["ready-to-merge"],
-  outDir: ".smartergpt/runner"
+  outDir: ".smartergpt/runner",
 });
 
 // Step 3: Start Run
@@ -208,19 +219,19 @@ const run = await tools.call("lexrunner.startRun", {
   repo: "Guffawaffle/lexrunner",
   mode: "senior-dev",
   params: {
-    planFile: ".smartergpt/runner/plan.json"
-  }
+    planFile: ".smartergpt/runner/plan.json",
+  },
 });
 
 // Step 4: Check Status
 const status = await tools.call("lexrunner.getStatus", {
-  runId: run.runId
+  runId: run.runId,
 });
 
 // Step 5: List Artifacts
 const artifacts = await tools.call("lexrunner.listArtifacts", {
   runId: run.runId,
-  type: "gate"
+  type: "gate",
 });
 ```
 
@@ -247,6 +258,7 @@ lex-pr status plan.json
 ### Issue: "Could not detect GitHub repository"
 
 **Solution:**
+
 ```bash
 # Verify git remote
 git remote -v
@@ -258,6 +270,7 @@ lex-pr weave discover --owner Guffawaffle --repo lexrunner
 ### Issue: "No pull requests found"
 
 **Solution:**
+
 ```bash
 # Check filters
 lex-pr weave discover --state all
@@ -269,6 +282,7 @@ lex-pr weave plan --from-github --owner Guffawaffle --repo lexrunner
 ### Issue: "Gate failed: lint"
 
 **Solution:**
+
 ```bash
 # Fix linting issues first
 npm run lint

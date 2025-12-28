@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions for lexrunner
 
-**North Star:** *Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.*
+**North Star:** _Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly._
 
 ## Core Mission
 

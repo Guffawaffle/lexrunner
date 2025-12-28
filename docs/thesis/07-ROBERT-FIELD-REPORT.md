@@ -31,11 +31,11 @@ The agent was named Robert.
 
 ### Models Used
 
-| Model | Role | Notes |
-|-------|------|-------|
-| GPT-5 High Thinking | Primary implementation | Latest reasoning model at time of experiment |
-| Claude Sonnet 4.5 | Secondary implementation | Cross-model validation |
-| Claude Haiku | Cleanup and verification | Low-tier validation |
+| Model               | Role                     | Notes                                        |
+| ------------------- | ------------------------ | -------------------------------------------- |
+| GPT-5 High Thinking | Primary implementation   | Latest reasoning model at time of experiment |
+| Claude Sonnet 4.5   | Secondary implementation | Cross-model validation                       |
+| Claude Haiku        | Cleanup and verification | Low-tier validation                          |
 
 ---
 
@@ -61,7 +61,7 @@ constraints:
     - "Force push"
     - "Bypass CI"
     - "Merge to protected branches"
-    - "Generate git commit in test code"  # GPG signing hangs WSL2
+    - "Generate git commit in test code" # GPG signing hangs WSL2
 
 permissions:
   can:
@@ -108,6 +108,7 @@ Robert was given realistic implementation work:
 **Time to completion:** ~4 hours
 
 **Quality assessment:**
+
 - ✅ Correct implementation
 - ✅ Followed existing patterns
 - ✅ Added test coverage
@@ -120,6 +121,7 @@ Robert was given realistic implementation work:
 **Time to completion:** ~2 hours
 
 **Quality assessment:**
+
 - ✅ Clean API design
 - ✅ Documented trade-offs
 - ✅ Created example usage
@@ -132,6 +134,7 @@ Robert was given realistic implementation work:
 **Setup:** Session ended mid-task; new session with different model (Claude Sonnet)
 
 **Observation:**
+
 - Context restored from receipts in ~200 tokens
 - No re-explanation needed
 - Work continued seamlessly
@@ -143,6 +146,7 @@ Robert was given realistic implementation work:
 ### Observation 1: Governance Is Sufficient
 
 Robert's minimal governance (1.2KB contracts file) was sufficient to:
+
 - Keep the agent aligned with project expectations
 - Enable productive work without constant supervision
 - Maintain quality standards across sessions
@@ -152,6 +156,7 @@ Robert's minimal governance (1.2KB contracts file) was sufficient to:
 ### Observation 2: Cross-Model Continuity Works
 
 When switching from GPT-5 to Claude Sonnet mid-task:
+
 - Claude read the receipts left by GPT-5
 - No re-briefing was required
 - Work quality remained consistent
@@ -161,11 +166,13 @@ When switching from GPT-5 to Claude Sonnet mid-task:
 ### Observation 3: Permission to Fail Enables Progress
 
 Robert expressed uncertainty multiple times:
+
 - "Not sure if 80% TTL is optimal for token refresh"
 - "This regex may not handle all international formats"
 - "Trade-off unclear between performance and clarity"
 
 Each uncertainty was:
+
 - Documented in receipts
 - Accompanied by reversible implementation
 - Flagged for human review
@@ -175,6 +182,7 @@ Each uncertainty was:
 ### Observation 4: Receipts Enable Debugging
 
 When a test failed:
+
 - Receipt trail showed the decision chain
 - Root cause was identified quickly
 - Fix was targeted and minimal
@@ -184,11 +192,13 @@ When a test failed:
 ### Observation 5: Minimal Infrastructure, Maximum Value
 
 Robert demonstrated that the value comes from:
+
 - Clear expectations (contracts)
 - Explicit state (receipts)
 - Shared vocabulary (documentation)
 
 **Not from:**
+
 - Complex orchestration
 - Sophisticated tooling
 - Provider-specific features
@@ -199,28 +209,28 @@ Robert demonstrated that the value comes from:
 
 ### Productivity Metrics
 
-| Metric | Robert | Baseline (no contracts) |
-|--------|--------|------------------------|
-| Turns per PR | 2.3 | 6.1 |
-| Renegotiation rate | 8% | 34% |
-| Context reset tokens | 180 | 650 |
-| Human interventions | 2 | 11 |
+| Metric               | Robert | Baseline (no contracts) |
+| -------------------- | ------ | ----------------------- |
+| Turns per PR         | 2.3    | 6.1                     |
+| Renegotiation rate   | 8%     | 34%                     |
+| Context reset tokens | 180    | 650                     |
+| Human interventions  | 2      | 11                      |
 
 ### Cost Metrics
 
-| Metric | Robert | Baseline |
-|--------|--------|----------|
-| Tokens per feature | 12,400 | 28,600 |
-| Effective cost | $0.42 | $0.97 |
-| Cost reduction | 57% | — |
+| Metric             | Robert | Baseline |
+| ------------------ | ------ | -------- |
+| Tokens per feature | 12,400 | 28,600   |
+| Effective cost     | $0.42  | $0.97    |
+| Cost reduction     | 57%    | —        |
 
 ### Quality Metrics
 
-| Metric | Robert | Baseline |
-|--------|--------|----------|
-| Test coverage | 84% | 71% |
-| Lint errors | 0 | 4 |
-| Review cycles | 1.2 | 2.8 |
+| Metric        | Robert | Baseline |
+| ------------- | ------ | -------- |
+| Test coverage | 84%    | 71%      |
+| Lint errors   | 0      | 4        |
+| Review cycles | 1.2    | 2.8      |
 
 ---
 
@@ -233,16 +243,19 @@ Based on this experiment, we formulated what we call the **Robert Theorem**:
 ### Unpacking the Theorem
 
 **"With the right governance":**
+
 - Contracts that set clear expectations
 - Uncertainty protocols that don't punish doubt
 - Receipts that preserve context
 
 **"Can progressively":**
+
 - Improvement over time
 - Learning what works
 - Building shared vocabulary
 
 **"De-hostilize its environment":**
+
 - Reduce friction between agent and codebase
 - Make the development environment more agent-friendly
 - Create patterns that future agents can follow
@@ -266,6 +279,7 @@ Robert validated the thesis that LexRunner is built on. The implications:
 ### 1. Governance First
 
 Before adding features to LexRunner, ensure governance primitives are solid:
+
 - Contracts work correctly
 - Receipts are generated and readable
 - Uncertainty handling is robust
@@ -273,6 +287,7 @@ Before adding features to LexRunner, ensure governance primitives are solid:
 ### 2. Minimal Viable Infrastructure
 
 Don't over-engineer. Robert worked with:
+
 - File-based storage
 - Single contracts file
 - Standard model APIs
@@ -282,6 +297,7 @@ LexRunner should add value, not complexity.
 ### 3. Cross-Model Design
 
 Design for model switching:
+
 - State in artifacts, not memory
 - Clear handoff protocols
 - Tier-appropriate governance
@@ -289,6 +305,7 @@ Design for model switching:
 ### 4. Measure Turn Cost
 
 Robert's productivity gains came from reduced Turn Cost:
+
 - Fewer renegotiations
 - Smaller context resets
 - Less human intervention
@@ -298,6 +315,7 @@ LexRunner should track these metrics.
 ### 5. Permission to Fail Is Real
 
 Robert's uncertainty handling wasn't theoretical — it was used and it worked:
+
 - Uncertainty was expressed
 - Reversible changes were made
 - Failures were informative
@@ -313,6 +331,7 @@ Limitations of the experiment:
 ### Not Tested: Scale
 
 Robert worked on one codebase with one human. Would governance scale to:
+
 - 10 agents?
 - 100 PRs?
 - Multiple repositories?
@@ -320,6 +339,7 @@ Robert worked on one codebase with one human. Would governance scale to:
 ### Not Tested: Adversarial Behavior
 
 Robert cooperated with the governance. What if an agent:
+
 - Ignored contracts?
 - Faked receipts?
 - Gamed uncertainty thresholds?
@@ -327,6 +347,7 @@ Robert cooperated with the governance. What if an agent:
 ### Not Tested: Long-Term Drift
 
 Robert ran for ~2 weeks. Would governance degrade over:
+
 - 6 months?
 - With team changes?
 - Without active maintenance?
@@ -334,6 +355,7 @@ Robert ran for ~2 weeks. Would governance degrade over:
 ### Not Tested: Complex Orchestration
 
 Robert handled sequential tasks. How would governance work for:
+
 - Parallel task execution?
 - Conflicting changes?
 - Merge conflicts?
@@ -368,6 +390,7 @@ To replicate the Robert experiment:
 ### Measurement
 
 Track:
+
 - Turns per task
 - Tokens per task
 - Context reset size
@@ -378,6 +401,7 @@ Track:
 ### Comparison
 
 Run same task without governance:
+
 - No contracts file
 - No receipts
 - Standard prompting
@@ -406,4 +430,4 @@ LexRunner is the productization of those ideas.
 
 ---
 
-*Next: [08-IMPLEMENTATION-GUIDE.md](./08-IMPLEMENTATION-GUIDE.md) — How to implement these primitives in LexRunner*
+_Next: [08-IMPLEMENTATION-GUIDE.md](./08-IMPLEMENTATION-GUIDE.md) — How to implement these primitives in LexRunner_

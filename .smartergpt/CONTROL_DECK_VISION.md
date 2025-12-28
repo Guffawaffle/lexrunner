@@ -17,13 +17,14 @@ The "Control Deck" branding evokes a starship command console — not an AI over
 - **Receipts** are like flight data recorders (black boxes)
 - **Frames** are like navigation waypoints and context markers
 
-LexRunner, in this metaphor, is the **helm system** — it doesn't command, it *orchestrates execution* based on the contracts and guardrails defined by the Control Deck (Lex).
+LexRunner, in this metaphor, is the **helm system** — it doesn't command, it _orchestrates execution_ based on the contracts and guardrails defined by the Control Deck (Lex).
 
 ---
 
 ## Current State (v0.5.0) — Much More Mature Than Expected
 
 ### Test Health
+
 - **3,327 tests passing** (98.5% pass rate)
 - **5 failing tests** (HIPAA encryption edge cases)
 - **23 skipped** (performance/slow tests)
@@ -31,16 +32,17 @@ LexRunner, in this metaphor, is the **helm system** — it doesn't command, it *
 
 ### Open Issues: 54 Total
 
-| Category | Count | Key Issues |
-|----------|-------|------------|
-| **Architecture/Epics** | ~10 | #426 (Tool-Grounded), #404 (Executor), #307 (Bundle Lex) |
-| **Post-0.5.0 Features** | ~15 | #389-390 (Workflows), #355-359 (Idea/Project), #367 (Orchestration) |
-| **Infrastructure** | ~10 | #370-375 (Canon/Loader), #344-345 (Frame alignment) |
-| **Token Optimization** | ~5 | #376 (Token Suite) |
-| **Merge-Weave** | ~8 | #335 (Execute v1), #328-332 (Gates/E2E) |
-| **Housekeeping** | ~6 | #347 (Directory alignment), #340 (Dry-run) |
+| Category                | Count | Key Issues                                                          |
+| ----------------------- | ----- | ------------------------------------------------------------------- |
+| **Architecture/Epics**  | ~10   | #426 (Tool-Grounded), #404 (Executor), #307 (Bundle Lex)            |
+| **Post-0.5.0 Features** | ~15   | #389-390 (Workflows), #355-359 (Idea/Project), #367 (Orchestration) |
+| **Infrastructure**      | ~10   | #370-375 (Canon/Loader), #344-345 (Frame alignment)                 |
+| **Token Optimization**  | ~5    | #376 (Token Suite)                                                  |
+| **Merge-Weave**         | ~8    | #335 (Execute v1), #328-332 (Gates/E2E)                             |
+| **Housekeeping**        | ~6    | #347 (Directory alignment), #340 (Dry-run)                          |
 
 ### What's Already Working
+
 - ✅ MCP server (`mcp-server.mjs`)
 - ✅ Plan validation and topo sort
 - ✅ Gate execution framework
@@ -157,21 +159,25 @@ These are **already in motion** or blocked only by execution:
 ## Recommended Next Steps
 
 ### Today
+
 1. Fix the 5 failing HIPAA tests (or skip with reason)
 2. Merge pending integration branches
 3. Tag v0.5.0 release
 
 ### This Week
+
 1. Close stale issues (mark backlog/wontfix where appropriate)
 2. Triage 54 → ~30 active issues
 3. Prioritize #335 subtasks for 0.6.0
 
 ### This Month
+
 1. Complete Merge-Weave Execute v1
 2. Start Executor Canonicalization
 3. Write ROADMAP.md with versioned milestones
 
 ### This Quarter
+
 1. Ship 0.6.0 (tool-grounded basics, executor infrastructure)
 2. Ship 0.7.0 (Single-Issue Runner, Guided Workflows)
 3. Plan 1.0.0 criteria
@@ -185,12 +191,14 @@ These are **already in motion** or blocked only by execution:
 **Yes — and closer than expected.**
 
 The codebase is much more mature than a stale clone suggested:
+
 - v0.5.0 (not 0.1.0)
 - 3,327 tests passing (not unknown)
 - MCP server working
 - Merge-weave dogfooding in progress
 
 The right move is:
+
 1. **Ship 0.5.0** — it's ready
 2. **Execute Tier 2-3** — foundation before vision
 3. **Use Control Deck as lens** — prioritize what serves the metaphor
@@ -212,8 +220,7 @@ The goal is a stable, well-tested 0.6.0 that earns the "Control Deck" name.
 
 ---
 
-*Document created: 2025-11-28*
-*Author: Copilot (Claude Opus 4.5) during site refresh session*
-*Reviewed by: [pending human review]*
-*Based on: Fresh clone of lexrunner v0.5.0*
-
+_Document created: 2025-11-28_
+_Author: Copilot (Claude Opus 4.5) during site refresh session_
+_Reviewed by: [pending human review]_
+_Based on: Fresh clone of lexrunner v0.5.0_

@@ -12,22 +12,17 @@ import { defineConfig } from "vitest/config";
  * In CI, these are run via a scheduled or manual workflow.
  */
 export default defineConfig({
-	test: {
-		globals: true,
-		environment: "node",
-		include: [
-			// Slow CLI tests with sleep commands for progress indicators
-			// TODO: Consider adopting *.slow.spec.ts naming convention for auto-discovery
-			"**/tests/cli-progress.spec.ts",
-		],
-		exclude: [
-			"**/node_modules/**",
-			"**/dist/**",
-			"**/.smartergpt/**",
-			"**/coverage/**",
-		],
-		// Limit concurrency to prevent resource exhaustion
-		maxWorkers: 1,
-		minWorkers: 1,
-	},
+  test: {
+    globals: true,
+    environment: "node",
+    include: [
+      // Slow CLI tests with sleep commands for progress indicators
+      // TODO: Consider adopting *.slow.spec.ts naming convention for auto-discovery
+      "**/tests/cli-progress.spec.ts",
+    ],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.smartergpt/**", "**/coverage/**"],
+    // Limit concurrency to prevent resource exhaustion
+    maxWorkers: 1,
+    minWorkers: 1,
+  },
 });

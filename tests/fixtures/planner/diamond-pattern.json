@@ -67,11 +67,7 @@
     }
   ],
   "expectedPlan": {
-    "layers": [
-      ["PR-100"],
-      ["PR-101", "PR-102"],
-      ["PR-103"]
-    ],
+    "layers": [["PR-100"], ["PR-101", "PR-102"], ["PR-103"]],
     "orphans": [],
     "warnings": 0
   }

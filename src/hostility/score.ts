@@ -26,10 +26,10 @@ export type HostilityStatus = "good" | "warning" | "critical";
  * Schema for a single hostility component check result.
  */
 export const HostilityComponentSchema = z.object({
-	score: z.number().min(0).max(1),
-	status: z.enum(["good", "warning", "critical"]),
-	details: z.string(),
-	recommendation: z.string().optional(),
+  score: z.number().min(0).max(1),
+  status: z.enum(["good", "warning", "critical"]),
+  details: z.string(),
+  recommendation: z.string().optional(),
 });
 
 export type HostilityComponent = z.infer<typeof HostilityComponentSchema>;
@@ -38,18 +38,18 @@ export type HostilityComponent = z.infer<typeof HostilityComponentSchema>;
  * Schema for the complete hostility score with all component breakdowns.
  */
 export const HostilityScoreSchema = z.object({
-	total: z.number().min(0).max(1),
-	status: z.enum(["low", "medium", "high"]),
-	components: z.object({
-		constraintClarity: HostilityComponentSchema,
-		requirementExplicitness: HostilityComponentSchema,
-		problemBoundedness: HostilityComponentSchema,
-		receiptCompleteness: HostilityComponentSchema,
-		errorRecoverability: HostilityComponentSchema,
-		stateCoherence: HostilityComponentSchema,
-		modelContinuity: HostilityComponentSchema,
-	}),
-	recommendations: z.array(z.string()),
+  total: z.number().min(0).max(1),
+  status: z.enum(["low", "medium", "high"]),
+  components: z.object({
+    constraintClarity: HostilityComponentSchema,
+    requirementExplicitness: HostilityComponentSchema,
+    problemBoundedness: HostilityComponentSchema,
+    receiptCompleteness: HostilityComponentSchema,
+    errorRecoverability: HostilityComponentSchema,
+    stateCoherence: HostilityComponentSchema,
+    modelContinuity: HostilityComponentSchema,
+  }),
+  recommendations: z.array(z.string()),
 });
 
 export type HostilityScore = z.infer<typeof HostilityScoreSchema>;
@@ -58,13 +58,13 @@ export type HostilityScore = z.infer<typeof HostilityScoreSchema>;
  * Component names for iteration and display
  */
 export const HOSTILITY_COMPONENT_NAMES = [
-	"constraintClarity",
-	"requirementExplicitness",
-	"problemBoundedness",
-	"receiptCompleteness",
-	"errorRecoverability",
-	"stateCoherence",
-	"modelContinuity",
+  "constraintClarity",
+  "requirementExplicitness",
+  "problemBoundedness",
+  "receiptCompleteness",
+  "errorRecoverability",
+  "stateCoherence",
+  "modelContinuity",
 ] as const;
 
 export type HostilityComponentName = (typeof HOSTILITY_COMPONENT_NAMES)[number];
@@ -73,13 +73,13 @@ export type HostilityComponentName = (typeof HOSTILITY_COMPONENT_NAMES)[number];
  * Human-readable labels for each component
  */
 export const COMPONENT_LABELS: Record<HostilityComponentName, string> = {
-	constraintClarity: "Constraint Clarity",
-	requirementExplicitness: "Requirement Explicitness",
-	problemBoundedness: "Problem Boundedness",
-	receiptCompleteness: "Receipt Completeness",
-	errorRecoverability: "Error Recoverability",
-	stateCoherence: "State Coherence",
-	modelContinuity: "Model Continuity",
+  constraintClarity: "Constraint Clarity",
+  requirementExplicitness: "Requirement Explicitness",
+  problemBoundedness: "Problem Boundedness",
+  receiptCompleteness: "Receipt Completeness",
+  errorRecoverability: "Error Recoverability",
+  stateCoherence: "State Coherence",
+  modelContinuity: "Model Continuity",
 };
 
 /**
@@ -89,9 +89,9 @@ export const COMPONENT_LABELS: Record<HostilityComponentName, string> = {
  * - critical: score >= 0.6
  */
 export function computeStatus(score: number): HostilityStatus {
-	if (score < 0.3) return "good";
-	if (score < 0.6) return "warning";
-	return "critical";
+  if (score < 0.3) return "good";
+  if (score < 0.6) return "warning";
+  return "critical";
 }
 
 /**
@@ -100,50 +100,44 @@ export function computeStatus(score: number): HostilityStatus {
  * - medium: 0.3 <= total < 0.6
  * - high: total >= 0.6
  */
-export function computeOverallStatus(
-	total: number
-): "low" | "medium" | "high" {
-	if (total < 0.3) return "low";
-	if (total < 0.6) return "medium";
-	return "high";
+export function computeOverallStatus(total: number): "low" | "medium" | "high" {
+  if (total < 0.3) return "low";
+  if (total < 0.6) return "medium";
+  return "high";
 }
 
 /**
  * Create a hostility component result.
  */
 export function createComponent(
-	score: number,
-	details: string,
-	recommendation?: string
+  score: number,
+  details: string,
+  recommendation?: string
 ): HostilityComponent {
-	const clampedScore = Math.max(0, Math.min(1, score));
-	return {
-		score: clampedScore,
-		status: computeStatus(clampedScore),
-		details,
-		recommendation,
-	};
+  const clampedScore = Math.max(0, Math.min(1, score));
+  return {
+    score: clampedScore,
+    status: computeStatus(clampedScore),
+    details,
+    recommendation,
+  };
 }
 
 /**
  * Aggregate component scores into a total hostility score.
  */
-export function aggregateScore(
-	components: HostilityScore["components"]
-): HostilityScore {
-	const componentValues = Object.values(components);
-	const total =
-		componentValues.reduce((sum, c) => sum + c.score, 0) /
-		componentValues.length;
+export function aggregateScore(components: HostilityScore["components"]): HostilityScore {
+  const componentValues = Object.values(components);
+  const total = componentValues.reduce((sum, c) => sum + c.score, 0) / componentValues.length;
 
-	const recommendations = componentValues
-		.filter((c) => c.recommendation)
-		.map((c) => c.recommendation!);
+  const recommendations = componentValues
+    .filter((c) => c.recommendation)
+    .map((c) => c.recommendation!);
 
-	return {
-		total,
-		status: computeOverallStatus(total),
-		components,
-		recommendations,
-	};
+  return {
+    total,
+    status: computeOverallStatus(total),
+    components,
+    recommendations,
+  };
 }

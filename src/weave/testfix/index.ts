@@ -13,17 +13,6 @@ export * from "./matcher.js";
 export * from "./applier.js";
 
 // Re-export key functions for convenience
-export {
-	loadTestFixPatterns,
-	safeLoadTestFixPatterns,
-} from "./loader.js";
-export {
-	matchTriggers,
-	findFixLocations,
-	matchAndLocate,
-} from "./matcher.js";
-export {
-	buildFixInstruction,
-	applyFix,
-	applyFixes,
-} from "./applier.js";
+export { loadTestFixPatterns, safeLoadTestFixPatterns } from "./loader.js";
+export { matchTriggers, findFixLocations, matchAndLocate } from "./matcher.js";
+export { buildFixInstruction, applyFix, applyFixes } from "./applier.js";

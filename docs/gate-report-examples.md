@@ -205,6 +205,7 @@ The `vuln` gate is a special built-in gate that automatically scans for vulnerab
 ### Supported Scanners
 
 Any tool that outputs **SARIF 2.1.0** format or **npm audit JSON**:
+
 - Trivy (`trivy fs --format sarif`)
 - Snyk (`snyk test --sarif`)
 - CodeQL (`codeql database analyze --format=sarif-latest`)
@@ -334,6 +335,7 @@ lex-pr gate-report validate legacy-report.json --migrate
 ### Example Validation Output
 
 **Success:**
+
 ```
 ✓ report.json is valid
 
@@ -345,6 +347,7 @@ lex-pr gate-report validate legacy-report.json --migrate
 ```
 
 **Failure with Suggestions:**
+
 ```
 ❌ Validation failed for report.json:
 

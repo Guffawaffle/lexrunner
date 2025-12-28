@@ -42,6 +42,7 @@ policy:
 ### Promotion
 
 A node is eligible to merge when:
+
 1. All **required gates** pass
 2. **Policy** authorizes (no blockers)
 3. All **dependencies** have merged
@@ -49,6 +50,7 @@ A node is eligible to merge when:
 ### Short-Circuiting
 
 If a dependency fails on required gates:
+
 - **Do not** run dependents
 - Mark dependents as `blocked`
 - Surface which dependency caused the block
@@ -58,6 +60,7 @@ This prevents wasted compute on nodes that can't possibly merge.
 ### Cycle Detection
 
 If the dependency graph contains cycles:
+
 - **Fail fast** — Report the cycle
 - **Do not attempt merge** — Cycles make ordering impossible
 

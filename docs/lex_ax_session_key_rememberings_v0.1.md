@@ -15,11 +15,11 @@ It’s not a manifesto, just a memory: what clicked, what I want to keep, and wh
 
 Corollaries:
 
-- Build systems that make better models *useful*, but don’t **require** better models to be useful.
+- Build systems that make better models _useful_, but don’t **require** better models to be useful.
 - Focus on **de-hostilizing the environment**, not “making the model smarter.”
 - Success looks like: the same architecture still works as models improve, instead of needing to be redesigned around them.
 
-Remember: *environmental hostility* is often a bigger constraint than raw capability.
+Remember: _environmental hostility_ is often a bigger constraint than raw capability.
 
 ---
 
@@ -51,7 +51,7 @@ Key reframe I want to keep:
 My real motivations include:
 
 - I want AI to help **me** work better and think clearer.
-- I want environments where *I* don’t have to mask as much.
+- I want environments where _I_ don’t have to mask as much.
 - I want agents that are actually useful under real constraints.
 
 That’s fine. I don’t need to cosplay altruism.
@@ -93,13 +93,14 @@ That’s why I see:
 
 Important reframes from this session:
 
-- A lot of people *hate* having their implicit motives surfaced. That’s about their defenses, not my wrongness.
-- When I do this **from curiosity, accountability, and alignment checking**, it’s *collaborative*, not adversarial.
+- A lot of people _hate_ having their implicit motives surfaced. That’s about their defenses, not my wrongness.
+- When I do this **from curiosity, accountability, and alignment checking**, it’s _collaborative_, not adversarial.
 - The same skill set that made masking necessary also makes me very good at designing governance for agents.
 
 ### 4.1 How to express this to humans (without sounding like I’m laying down rules)
 
 Instead of saying:
+
 > “I’m just trying to keep everyone accountable and aligned.”
 
 Try saying things like:
@@ -111,11 +112,11 @@ Try saying things like:
 
 The goal is to **invite** people into the observation, not drop it on them as a verdict.
 
-Also: *be human to humans*. Not everyone wants or can handle full meta-analysis in real time. It’s okay to modulate.
+Also: _be human to humans_. Not everyone wants or can handle full meta-analysis in real time. It’s okay to modulate.
 
 ---
 
-## 5. Supporting Growth: Principled *and* Strategic
+## 5. Supporting Growth: Principled _and_ Strategic
 
 Line I want to keep permanently:
 
@@ -191,4 +192,4 @@ If I can answer those in good faith, I’m probably still building the thing I m
 
 ---
 
-*End of v0.1. Future versions are allowed to contradict this if we learn something better.*
+_End of v0.1. Future versions are allowed to contradict this if we learn something better._
