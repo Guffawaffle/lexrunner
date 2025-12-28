@@ -194,7 +194,7 @@ describe("WeaveStateMachine", () => {
       expect(ctx.completedAt).toBeDefined();
     });
 
-    it("should emit Frame on completion (AX-005)", () => {
+    it("should emit Frame on completion (AX-005)", async () => {
       const batch: BatchState = {
         batchNumber: 0,
         items: ["PR-101", "PR-102"],
@@ -214,7 +214,8 @@ describe("WeaveStateMachine", () => {
       sm.transition(WeaveEvent.MERGE_SUCCESS);
       sm.transition(WeaveEvent.ALL_COMPLETE);
 
-      const frameResult = sm.getLastFrameResult();
+      // Wait for async Frame emission to complete
+      const frameResult = await sm.waitForFrameEmission();
       expect(frameResult).toBeDefined();
       expect(frameResult!.success).toBe(true);
       expect(frameResult!.frame).toBeDefined();
@@ -222,7 +223,7 @@ describe("WeaveStateMachine", () => {
       expect(frameResult!.frame!.outcome).toBe("success");
     });
 
-    it("should emit Frame on failure (AX-005)", () => {
+    it("should emit Frame on failure (AX-005)", async () => {
       const batch: BatchState = {
         batchNumber: 0,
         items: ["PR-101"],
@@ -241,7 +242,8 @@ describe("WeaveStateMachine", () => {
       sm.transition(WeaveEvent.BEGIN_MERGE);
       sm.transition(WeaveEvent.MERGE_FAILED);
 
-      const frameResult = sm.getLastFrameResult();
+      // Wait for async Frame emission to complete
+      const frameResult = await sm.waitForFrameEmission();
       expect(frameResult).toBeDefined();
       expect(frameResult!.success).toBe(true);
       expect(frameResult!.frame).toBeDefined();

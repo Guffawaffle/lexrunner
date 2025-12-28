@@ -12,7 +12,7 @@
  * - docs/EVENT_SCHEMA.md: Full v2 schema documentation
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   emitMergeWeaveFrame,
   emitProcedureFrame,
@@ -25,9 +25,26 @@ import {
   type MergeWeaveEvent,
 } from "../../src/hooks/events.js";
 
+// Mock the alias resolver to avoid requiring Lex policy/aliases
+vi.mock("../../src/aliases/index.js", () => ({
+  resolveModulePaths: vi.fn(async (paths: string[]) =>
+    paths.map((path) => ({
+      canonical: path,
+      original: path,
+      resolved: false,
+      confidence: 1.0,
+    }))
+  ),
+  extractCanonicalIds: vi.fn((resolutions: any[]) => resolutions.map((r) => r.canonical)),
+}));
+
 describe("Frame Schema v2 Integration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("v2 Field Validation", () => {
-    it("should emit Frame with all v2 required fields (runId, planHash, spend)", () => {
+    it("should emit Frame with all v2 required fields (runId, planHash, spend)", async () => {
       // Create a v2-compliant Frame with all required fields
       const input: MergeWeaveFrameInput = {
         runId: "550e8400-e29b-41d4-a716-446655440000",
@@ -65,7 +82,7 @@ describe("Frame Schema v2 Integration", () => {
         },
       };
 
-      const result = emitMergeWeaveFrame(input);
+      const result = await emitMergeWeaveFrame(input);
 
       // Verify Frame was created successfully
       expect(result.success).toBe(true);
@@ -112,7 +129,7 @@ describe("Frame Schema v2 Integration", () => {
       expect(frame.metadata?.tier_metrics?.escalationRate).toBe(0.0);
     });
 
-    it("should emit Procedure Frame with v2 fields (runId, planHash)", () => {
+    it("should emit Procedure Frame with v2 fields (runId, planHash)", async () => {
       const input = {
         runId: "660f9511-f3ac-52e5-b827-557766551111",
         planHash: "a7b2c33298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999",
@@ -124,7 +141,7 @@ describe("Frame Schema v2 Integration", () => {
         artifacts: [".lexrunner/releases/v1.0.0.md"],
       };
 
-      const result = emitProcedureFrame(input);
+      const result = await emitProcedureFrame(input);
 
       expect(result.success).toBe(true);
       expect(result.frame).toBeDefined();
@@ -385,7 +402,7 @@ describe("Frame Schema v2 Integration", () => {
   });
 
   describe("Cross-Reference with WeaveLock", () => {
-    it("should document runId source from weave-lock.json", () => {
+    it("should document runId source from weave-lock.json", async () => {
       // This test documents the relationship between Frame emission and WeaveLock
       // Actual integration is validated in weave tests
 
@@ -408,7 +425,7 @@ describe("Frame Schema v2 Integration", () => {
         targetBranch: "main",
       };
 
-      const result = emitMergeWeaveFrame(input);
+      const result = await emitMergeWeaveFrame(input);
 
       expect(result.success).toBe(true);
       expect(result.frame?.metadata?.run_id).toBe(mockRunIdFromWeaveLock);

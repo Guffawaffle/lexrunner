@@ -154,7 +154,7 @@ describe("Public API - Integration Test", () => {
     const { emitMergeWeaveFrame } = await import("../../src/frames/emitter.js");
     const { validateExecutionFrame } = await import("../../src/frames/types.js");
 
-    const result = emitMergeWeaveFrame({
+    const result = await emitMergeWeaveFrame({
       runId: "test-run-123",
       mergedPRs: ["#123", "#124"],
       conflictsResolved: 2,

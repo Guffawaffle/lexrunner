@@ -29,6 +29,14 @@ describe("GitHubClientImpl (pagination & discovery)", () => {
         pulls: {
           list: () => ({ data: prsPage1 }),
         },
+        repos: {
+          get: () => ({
+            data: {
+              default_branch: "main",
+              html_url: "https://github.com/Owner/Repo",
+            },
+          }),
+        },
       },
       paginate: async (_fn: any, _params: any) => {
         return [...prsPage1, ...prsPage2];
@@ -51,6 +59,14 @@ describe("GitHubClientImpl (pagination & discovery)", () => {
     const fakeOctokit = {
       rest: {
         pulls: { list: () => ({ data: [] }) },
+        repos: {
+          get: () => ({
+            data: {
+              default_branch: "main",
+              html_url: "https://github.com/Owner/Repo",
+            },
+          }),
+        },
       },
       paginate: async () => [],
     };

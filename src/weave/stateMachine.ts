@@ -66,6 +66,8 @@ export class WeaveStateMachine {
   private transitions: Map<string, StateTransition>;
   /** Last Frame emit result (for testing/debugging) */
   private lastFrameResult?: FrameEmitResult;
+  /** Pending Frame emission promise (for testing/debugging) */
+  private pendingFrameEmission?: Promise<FrameEmitResult>;
 
   constructor(context: WeaveContext) {
     this.context = context;
@@ -97,6 +99,18 @@ export class WeaveStateMachine {
    */
   getLastFrameResult(): FrameEmitResult | undefined {
     return this.lastFrameResult;
+  }
+
+  /**
+   * Wait for pending Frame emission to complete.
+   * Useful for testing when Frame emission is async.
+   * Returns the Frame result or undefined if no emission is pending.
+   */
+  async waitForFrameEmission(): Promise<FrameEmitResult | undefined> {
+    if (!this.pendingFrameEmission) {
+      return this.lastFrameResult;
+    }
+    return this.pendingFrameEmission;
   }
 
   /**
@@ -202,15 +216,18 @@ export class WeaveStateMachine {
         this.context.completedAt = new Date().toISOString();
         // Emit Frame for successful completion (AX-005)
         // Fire-and-forget async call (state transitions can't be async)
-        emitWeaveCompletionFrame(this.context)
+        this.pendingFrameEmission = emitWeaveCompletionFrame(this.context)
           .then((result) => {
             this.lastFrameResult = result;
+            return result;
           })
           .catch((error) => {
             // Log error but don't fail the state transition
             if (process.env.DEBUG) {
               console.error("[state-machine] Failed to emit completion frame:", error);
             }
+            // Return empty result on error
+            return { success: false, error: String(error) } as FrameEmitResult;
           });
         break;
 
@@ -225,15 +242,18 @@ export class WeaveStateMachine {
         }
         // Emit Frame for failure (AX-005)
         // Fire-and-forget async call (state transitions can't be async)
-        emitWeaveCompletionFrame(this.context)
+        this.pendingFrameEmission = emitWeaveCompletionFrame(this.context)
           .then((result) => {
             this.lastFrameResult = result;
+            return result;
           })
           .catch((error) => {
             // Log error but don't fail the state transition
             if (process.env.DEBUG) {
               console.error("[state-machine] Failed to emit failure frame:", error);
             }
+            // Return empty result on error
+            return { success: false, error: String(error) } as FrameEmitResult;
           });
         break;
 

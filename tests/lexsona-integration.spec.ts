@@ -34,6 +34,7 @@ describe("LexSona Integration", () => {
     it("returns off mode by default", () => {
       delete process.env.LEXSONA_MODE;
       delete process.env.LEXSONA_PERSONA;
+      delete process.env.LEX_DB_PATH;
 
       const config = getLexSonaConfig();
 
