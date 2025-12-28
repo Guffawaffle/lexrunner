@@ -463,6 +463,111 @@ Module aliasing allows you to use shorthand names for modules in Frame tagging:
 
 ---
 
+## Frame Schema Version Expectations
+
+LexRunner v0.1 includes Frame schema v2 support for compatibility with Lex v2.x.
+
+### Frame Schema v2 Features
+
+**Required Fields** (present in all Frames):
+
+- `runId`: UUID v4 format - unique identifier for workflow correlation
+- `planHash`: SHA-256 hash (64 hex chars) - execution plan hash for idempotency
+- `spend.duration`: Milliseconds - total execution duration
+
+**Optional Fields** (v2 extensions):
+
+- `spend.turnCost`: Turn Cost metrics (latency, context resets, token bloat, etc.)
+- `spend.tokenUsage`: Token consumption (input, output, total)
+- `spend.tierMetrics`: Governance tier tracking (senior/mid/junior task distribution)
+
+### Version Compatibility Matrix
+
+| LexRunner | Lex     | Frame Schema | Notes                             |
+| --------- | ------- | ------------ | --------------------------------- |
+| 0.1.x     | 2.0.2+  | v2           | Full v2 field support             |
+| 0.0.x     | < 2.0.0 | v1           | Pre-release (no v2 field support) |
+| 0.2.x+    | 2.x+    | v2           | Future: Lex API ingestion enabled |
+
+### Verifying Frame Schema Compatibility
+
+Check that your Frames include v2 fields:
+
+```bash
+# Enable Frame emission
+export LEX_PR_EMIT_FRAMES=true
+
+# Run a merge-weave
+lex-pr merge plan.json --execute
+
+# Inspect Frame files
+cat .lexrunner/frames/merge-weave-*.json | jq '.metadata | { run_id, plan_hash, duration_ms }'
+```
+
+**Expected output** (v2 schema):
+
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "plan_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "duration_ms": 45000
+}
+```
+
+### Integration Test
+
+LexRunner includes comprehensive v2 schema validation:
+
+```bash
+# Run Frame schema v2 integration test
+npm test -- tests/frames/v2-schema-integration.spec.ts
+```
+
+This test validates:
+
+- ✅ All v2 required fields (runId, planHash, spend.duration)
+- ✅ Optional spend fields (turnCost, tokenUsage, tierMetrics)
+- ✅ UUID v4 format for runId
+- ✅ SHA-256 format for planHash (64 hex chars)
+- ✅ Integration with WeaveLock (runId/planHash source)
+
+### Lex Package Version
+
+LexRunner v0.1 pins Lex version in `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@smartergpt/lex": "^2.0.2"
+  }
+}
+```
+
+**Why pinned?**
+
+- Ensures Frame schema v2 compatibility
+- Guarantees access to Frame ingestion API (Lex#79)
+- Validates cross-repo type compatibility at build time
+
+**Updating Lex version:**
+
+```bash
+# Check current version
+npm list @smartergpt/lex
+
+# Update (carefully - verify schema compatibility)
+npm install @smartergpt/lex@^2.1.0
+npm test  # Run all tests to verify compatibility
+```
+
+### Related Documentation
+
+- [EVENT_SCHEMA.md](./EVENT_SCHEMA.md) - Full v2 schema specification
+- [Lex#88](https://github.com/Guffawaffle/lex/issues/88) - Frame schema v2 extension
+- [LexRunner#344](https://github.com/Guffawaffle/lexrunner/issues/344) - Frame schema v2 alignment (this issue)
+
+---
+
 ## CI/CD Integration
 
 Frame emission works in CI/CD environments:

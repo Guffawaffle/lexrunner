@@ -8,6 +8,12 @@
   },
   "packageManager": "npm@10.0.0",
   "auditSchemaVersion": "1.0.0",
+  "description": "Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Guffawaffle/lexrunner.git"
+  },
+  "license": "UNLICENSED",
   "bin": {
     "lex-pr": "dist/cli.js",
     "lexrunner-mcp": "./mcp-server.mjs"
