@@ -573,12 +573,12 @@ function checkVulnGate(artifactDir: string, policy?: SecurityPolicy): GateResult
  * 1. A Frame for Lex memory (existing behavior)
  * 2. An ActionReceipt for disciplined failure pattern (Wave 3 requirement)
  */
-function emitGateExecutionFrame(
+async function emitGateExecutionFrame(
   gateName: string,
   itemName: string,
   result: GateResult,
   runId?: string
-): FrameEmitResult | undefined {
+): Promise<FrameEmitResult | undefined> {
   // Skip emitting frame for blocked or skipped gates - they didn't actually execute
   if (result.status === "blocked" || result.status === "skipped" || result.status === "retrying") {
     return undefined;
@@ -612,7 +612,7 @@ function emitGateExecutionFrame(
     return undefined;
   }
 
-  return emitGateFrame({
+  return await emitGateFrame({
     runId,
     gateName,
     itemName,
@@ -692,7 +692,7 @@ export async function executeItemGates(
       }
 
       // Emit Frame for gate execution (AX-005)
-      emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
+      await emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
       continue;
     }
 
@@ -728,7 +728,7 @@ export async function executeItemGates(
     }
 
     // Emit Frame for gate execution (AX-005)
-    emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
+    await emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
   }
   return results;
 }

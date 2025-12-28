@@ -533,8 +533,51 @@ const frame = emitMergeWeaveFrame({
 - **LexRunner#323**: Plan lock (idempotency via hash)
 - **LexRunner#327**: Budget guards (token counting and spend tracking)
 - **LexRunner#330**: Frames & metrics implementation
-- **LexRunner#344**: Frame schema v2 alignment validation (this issue)
-- **LexRunner#345**: Module aliasing integration
+- **LexRunner#344**: Frame schema v2 alignment validation ✅
+- **LexRunner#345**: Module aliasing integration ✅
+
+## Module Alias Resolution
+
+LexRunner integrates with Lex's alias resolution system to ensure Frame `module_scope` fields contain **canonical module IDs** rather than file paths or shorthand aliases.
+
+### Resolution Workflow
+
+1. **Frame Emission**: When `emitMergeWeaveFrame`, `emitExecutorFrame`, or `emitProcedureFrame` is called with file paths in `moduleScope`
+2. **Alias Resolution**: LexRunner calls Lex's `resolveModuleId` API for each path
+3. **Canonical Storage**: Resolved canonical IDs are stored in Frame `module_scope`
+4. **Graceful Fallback**: If resolution fails or confidence is low, original path is used with debug warning
+
+### Path Detection
+
+- **File paths** (contain `/` or `.`): Resolved through Lex alias system → `"src/cli.ts"` → `"cli/main"`
+- **PR numbers** (e.g., `"#123"`, `"PR-456"`): Passed through unchanged
+- **Unknown formats**: Passed through with low confidence
+
+### Example
+
+```typescript
+// Input to Frame emitter
+mergedPRs: ["src/frames/emitter.ts", "src/aliases/resolver.ts", "#123"];
+
+// After alias resolution
+module_scope: ["frames/emitter", "aliases/resolver", "#123"];
+```
+
+### Configuration
+
+Alias resolution uses:
+
+- **Alias table**: Loaded from `.smartergpt/aliases.json` (via Lex)
+- **Policy**: Loaded from `.smartergpt/lexmap.policy.json` (via Lex)
+- **Fallback**: Original path if not found (confidence threshold: 0.9)
+
+### Implementation
+
+See:
+
+- `src/aliases/resolver.ts`: Resolution logic
+- `src/frames/emitter.ts`: Integration with Frame emission
+- `tests/aliases/resolver.spec.ts`: Test coverage
 
 ## Version Compatibility
 
@@ -570,14 +613,14 @@ For details, see [CI Version Validation](./ci-version-validation.md).
 
 1. ✅ Implement hook emission logic in Epic B subtasks
 2. ✅ Integrate with Lex Frame API (LexRunner#330)
-3. 🔄 Add aliasing support for module resolution (LexRunner#345)
-4. ✅ Validate v2 field compatibility (LexRunner#344 - this issue)
+3. ✅ Add aliasing support for module resolution (LexRunner#345)
+4. ✅ Validate v2 field compatibility (LexRunner#344)
 
 ## Notes
 
 - All events include `runId` (UUID v4 format) for correlation across distributed workflows
 - `planHash` (SHA-256, 64 hex chars) enables idempotency and change detection
 - `spend` metrics capture both Turn Cost (LexRunner-specific) and standard token usage
-- Module identifiers should use canonical aliasing (see `ALIASING_FOR_RUNNER.md`)
+- **Module identifiers use canonical aliasing** (LexRunner#345)
 - Events are emitted to local storage first, then synced to Lex Frame API asynchronously
 - WeaveLock (`weave-lock.json`) is the single source of truth for runId and planHash during execution

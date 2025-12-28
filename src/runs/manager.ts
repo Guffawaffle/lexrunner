@@ -777,7 +777,7 @@ export class RunManager {
     }
 
     // Emit procedure Frame (AX-005)
-    const frameResult = emitProcedureFrame({
+    const frameResult = await emitProcedureFrame({
       runId,
       procedure: current.procedure,
       moduleScope,

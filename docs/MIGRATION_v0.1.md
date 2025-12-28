@@ -439,22 +439,73 @@ This is an internal error. File a bug report with:
 
 ## Module Aliasing (Lex Integration)
 
-LexRunner v0.1 lays the groundwork for Lex module aliasing integration.
+LexRunner v0.1 lays the groundwork for Lex module aliasing integration. **As of v0.6**, module aliasing is **fully integrated**.
 
 ### What is Module Aliasing?
 
-Module aliasing allows you to use shorthand names for modules in Frame tagging:
+Module aliasing allows LexRunner to resolve file paths to canonical module IDs for Frame tagging. This ensures Frames store canonical IDs (not aliases or file paths) for Atlas lookup.
 
 ```bash
-# Instead of: "src/cli/commands/fanout"
-# Use: "cli-core"
+# File path → Canonical module ID
+"src/cli/commands/fanout.ts" → "cli/commands/fanout"
+
+# PR numbers pass through unchanged
+"#123" → "#123"
 ```
 
-### Current Status (v0.1)
+### Current Status (v0.6)
 
 - **Frame emission**: Available (opt-in via `LEX_PR_EMIT_FRAMES`)
-- **Module aliasing**: Not yet implemented (planned for v0.2+)
-- **Lex API integration**: Not yet implemented (planned for v0.2+)
+- **Module aliasing**: ✅ **Implemented** (LexRunner#345)
+- **Lex API integration**: Available via `@smartergpt/lex/aliases`
+
+### How It Works
+
+1. **Alias Resolution**: When emitting Frames, LexRunner resolves file paths through Lex's alias system
+2. **Canonical Storage**: Only canonical module IDs are stored in Frame `module_scope`
+3. **Graceful Fallback**: If resolution fails, original path is used with debug warning
+4. **PR Number Passthrough**: PR identifiers like `"#123"` or `"PR-456"` are preserved as-is
+
+### Example
+
+```typescript
+// Before aliasing (input)
+await emitMergeWeaveFrame({
+  mergedPRs: ["src/frames/emitter.ts", "#123"],
+  // ...
+});
+
+// After aliasing (stored in Frame)
+{
+  module_scope: ["frames/emitter", "#123"];
+}
+```
+
+### Configuration
+
+Aliasing uses:
+
+- **Alias table**: `.smartergpt/aliases.json` (managed by Lex)
+- **Policy**: `.smartergpt/lexmap.policy.json` (managed by Lex)
+- **Auto-fallback**: Uses original path if alias not found
+
+### Benefits
+
+- **Consistent IDs**: Frames use same module IDs as Atlas
+- **Atlas Integration**: Enables downstream Frame → Atlas lookup
+- **Refactoring Safe**: File moves don't break Frame queries
+- **Backward Compatible**: Existing code continues to work
+
+### Upgrade Notes
+
+If you're upgrading from pre-v0.6:
+
+**No action required**. Alias resolution is automatic when:
+
+1. Frame emission is enabled (`LEX_PR_EMIT_FRAMES=true`)
+2. File paths are provided to Frame emitters
+
+Old code using PR numbers (`["#123", "#456"]`) continues to work unchanged.
 
 ### Related Documentation
 
