@@ -2,6 +2,22 @@
 
 This document defines the event schemas for fanout and merge-weave hooks in LexRunner. These events are designed to integrate with Lex's Frame API, capturing workflow execution data for memory and analytics.
 
+## Schema Version Compatibility
+
+**LexRunner Event Schema**: v2.0 (compatible with Lex Frame Schema v2)  
+**Minimum Lex Version**: 0.4.0 (see package.json: `@smartergpt/lex: ^2.0.2`)  
+**Last Updated**: 2025-12-28
+
+### Version Contract
+
+LexRunner's event emission is guaranteed compatible with:
+
+- **Lex v2.x** (Frame schema v2 with runId, planHash, spend extensions)
+- **Lex Frame API** endpoints (Lex#79: Frame ingestion)
+- **Lex Atlas** rebuild capabilities (Lex#80: On-demand memory refresh)
+
+For version migration guidance, see [MIGRATION_v0.1.md](./MIGRATION_v0.1.md).
+
 ## Overview
 
 LexRunner emits structured events during key workflow operations:
@@ -11,8 +27,8 @@ LexRunner emits structured events during key workflow operations:
 
 These events conform to Lex Frame schema v2 (Lex#88), including:
 
-- `runId`: Unique identifier for correlating events across a workflow execution
-- `planHash`: SHA-256 hash of the execution plan for idempotency
+- `runId`: Unique identifier for correlating events across a workflow execution (UUID v4 format)
+- `planHash`: SHA-256 hash (64 hex chars) of the execution plan for idempotency
 - `spend`: Cost tracking metrics (tokens, latency, turn cost)
 
 ## Event Types
@@ -435,26 +451,131 @@ Events are transformed into Lex Frames using the following mapping:
 
 Event schemas are validated using Zod. See `src/hooks/events.ts` for TypeScript types and validation schemas.
 
+### Integration Test
+
+Comprehensive v2 schema validation is available in:
+
+- `tests/frames/v2-schema-integration.spec.ts`: Tests all v2 fields (runId, planHash, spend)
+- `tests/hooks/events.spec.ts`: Schema validation for FanoutEvent and MergeWeaveEvent
+
+Run tests with:
+
+```bash
+npm test -- tests/frames/v2-schema-integration.spec.ts
+```
+
+## v2 Field Sources & Data Flow
+
+### runId and planHash Capture
+
+Frame emission captures `runId` and `planHash` from the execution context:
+
+1. **Source**: `weave-lock.json` (WeaveLockFile schema)
+   - Located at: `src/schema/weaveLock.ts`
+   - Created by: `src/weave/lockFile.ts` during merge-weave initialization
+2. **Data Flow**:
+
+   ```
+   WeaveLockFile.runId → WeaveContext.runId → Frame.metadata.run_id
+   WeaveLockFile.planHash → WeaveContext.metadata.planHash → Frame.metadata.plan_hash
+   ```
+
+3. **Plan Lock Mechanism** (LexRunner#323):
+   - `planHash` is computed from `hash(plan.json + PR heads)` using SHA-256
+   - Ensures idempotency: same plan + same PR states = same hash
+   - Stored in `weave-lock.json` for resume capability
+
+### Spend Metadata Alignment
+
+Frame spend tracking aligns with LexRunner's budget guards (LexRunner#327):
+
+1. **Turn Cost**: Captured from `src/metrics/turncost.ts`
+   - Tracks latency, context resets, renegotiations, token bloat, attention switches
+   - Weighted score formula enables cross-run comparison
+2. **Token Usage**: Integrated with budget tracker (`src/budget/tracker.ts`)
+   - Input/output token counts
+   - Total consumption tracking
+
+3. **Tier Metrics**: Governance data (Claim 3.4)
+   - Task distribution across senior/mid/junior tiers
+   - Escalation and mismatch tracking
+
+### Example Data Flow
+
+```typescript
+// 1. Lock file created during merge-weave initialization
+const lockFile: WeaveLockFile = {
+  runId: "550e8400-e29b-41d4-a716-446655440000",
+  planHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  // ... other fields
+};
+
+// 2. Frame emitted with v2 fields
+const frame = emitMergeWeaveFrame({
+  runId: lockFile.runId, // From weave-lock.json
+  planHash: lockFile.planHash, // From weave-lock.json
+  turnCost: turnCostData, // From metrics/turncost.ts
+  tierMetrics: governanceData, // From governance tracking
+  // ... other fields
+});
+
+// 3. Frame stored with all v2 fields
+// frame.metadata.run_id === "550e8400-e29b-41d4-a716-446655440000"
+// frame.metadata.plan_hash === "e3b0c44..."
+```
+
 ## Cross-Repository References
 
 - **Lex#88**: Frame schema v2 extension (runId, planHash, spend)
-- **Lex#79**: Frame ingestion API
+- **Lex#79**: Frame ingestion API endpoint
+- **Lex#80**: Atlas rebuild on demand
 - **Lex#82-85**: Aliasing adoption (for module-scope resolution)
+- **LexRunner#323**: Plan lock (idempotency via hash)
+- **LexRunner#327**: Budget guards (token counting and spend tracking)
 - **LexRunner#330**: Frames & metrics implementation
-- **LexRunner#344**: Frame schema v2 alignment validation
+- **LexRunner#344**: Frame schema v2 alignment validation (this issue)
 - **LexRunner#345**: Module aliasing integration
+
+## Version Compatibility
+
+### Lex Dependency Pinning
+
+LexRunner pins Lex version in `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@smartergpt/lex": "^2.0.2"
+  }
+}
+```
+
+This ensures:
+
+- Frame schema v2 compatibility (runId, planHash, spend fields)
+- Access to Frame ingestion API (Lex#79)
+- Atlas rebuild capabilities (Lex#80)
+
+### CI Validation
+
+Cross-repo version validation is performed in CI:
+
+- `npm ci` verifies exact Lex version match via package-lock.json
+- Integration tests validate v2 field compatibility
+- TypeScript compilation ensures type compatibility across versions
 
 ## Next Steps
 
-1. Implement hook emission logic in Epic B subtasks
-2. Integrate with Lex Frame API (LexRunner#330)
-3. Add aliasing support for module resolution (LexRunner#345)
-4. Validate v2 field compatibility (LexRunner#344)
+1. ✅ Implement hook emission logic in Epic B subtasks
+2. ✅ Integrate with Lex Frame API (LexRunner#330)
+3. 🔄 Add aliasing support for module resolution (LexRunner#345)
+4. ✅ Validate v2 field compatibility (LexRunner#344 - this issue)
 
 ## Notes
 
-- All events include `runId` for correlation across distributed workflows
-- `planHash` enables idempotency and change detection
+- All events include `runId` (UUID v4 format) for correlation across distributed workflows
+- `planHash` (SHA-256, 64 hex chars) enables idempotency and change detection
 - `spend` metrics capture both Turn Cost (LexRunner-specific) and standard token usage
 - Module identifiers should use canonical aliasing (see `ALIASING_FOR_RUNNER.md`)
 - Events are emitted to local storage first, then synced to Lex Frame API asynchronously
+- WeaveLock (`weave-lock.json`) is the single source of truth for runId and planHash during execution
