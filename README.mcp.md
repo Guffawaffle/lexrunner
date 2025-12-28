@@ -67,11 +67,36 @@ The MCP server respects these environment variables:
 
 - `LEX_PR_PROFILE_DIR`: Directory containing configuration files (default: auto-resolved via precedence chain)
 - `ALLOW_MUTATIONS`: Enable destructive operations like merging (default: `false`)
+- `GITHUB_TOKEN`: GitHub API token for authenticated access (required for private repos)
 
 ```bash
 # Example with custom configuration
 LEX_PR_PROFILE_DIR=/custom/profile ALLOW_MUTATIONS=true npm run mcp
 ```
+
+### GitHub Authentication
+
+**Important:** The MCP server requires `GITHUB_TOKEN` to access private repositories. Without it:
+- Private repos return "Repository not found" errors
+- API rate limits are severely restricted (60 req/hr vs 5000 authenticated)
+
+Add `GITHUB_TOKEN` to your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "lexrunner": {
+      "command": "node",
+      "args": ["/path/to/mcp-server.mjs"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+The `${GITHUB_TOKEN}` syntax passes through your shell's environment variable. Alternatively, use a literal token value (not recommended for version-controlled configs).
 
 ## Architecture Alignment
 

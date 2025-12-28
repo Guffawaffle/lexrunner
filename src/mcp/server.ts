@@ -2484,8 +2484,16 @@ async function handleDiscover(args: {
 			throwMcpAXError(ErrorCode.InvalidRequest, axError);
 		}
 
-		// Check authentication
+		// Check authentication and warn if not authenticated
 		const authStatus = await githubAPI.checkAuth();
+		if (!authStatus.authenticated) {
+			// Log warning to stderr for MCP clients to surface
+			console.error(
+				"[mcp:discover] Warning: GitHub API not authenticated. Private repos will not be accessible.\n" +
+					"To fix: Add GITHUB_TOKEN to your MCP server config env block.\n" +
+					"See: README.mcp.md#github-authentication"
+			);
+		}
 
 		// Fetch pull requests
 		const state = (args.state || "open") as "open" | "closed" | "all";

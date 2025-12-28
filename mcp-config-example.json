@@ -1,16 +1,14 @@
 {
-  "mcpServers": {
-    "lexrunner": {
-      "command": "wsl",
-      "args": [
-        "--",
-        "/home/guff/lexrunner/lexrunner-launcher.sh"
-      ],
-      "env": {
-        "LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
-        "LEX_PR_WORKSPACE": "/home/guff/lexrunner",
-        "ALLOW_MUTATIONS": "false"
-      }
-    }
-  }
+	"mcpServers": {
+		"lexrunner": {
+			"command": "wsl",
+			"args": ["--", "/home/guff/lexrunner/lexrunner-launcher.sh"],
+			"env": {
+				"LEX_PR_PROFILE_DIR": "/home/guff/lexrunner/.smartergpt",
+				"LEX_PR_WORKSPACE": "/home/guff/lexrunner",
+				"ALLOW_MUTATIONS": "false",
+				"GITHUB_TOKEN": "${GITHUB_TOKEN}"
+			}
+		}
+	}
 }
