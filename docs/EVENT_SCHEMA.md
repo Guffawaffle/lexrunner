@@ -564,6 +564,8 @@ Cross-repo version validation is performed in CI:
 - Integration tests validate v2 field compatibility
 - TypeScript compilation ensures type compatibility across versions
 
+For details, see [CI Version Validation](./ci-version-validation.md).
+
 ## Next Steps
 
 1. ✅ Implement hook emission logic in Epic B subtasks
