@@ -1,7 +1,7 @@
 /**
  * Weave Fanout CLI Commands
  *
- * Commands for managing fanout templates and Yellow Brick pipeline:
+ * Commands for managing fanout templates and replayable analysis pipeline:
  * - weave fanout harvest: D0 - Harvest external state into pinned bundle
  * - weave fanout analyze: D1 - Analyze harvest bundle into facts pool
  * - weave fanout show: Display loaded templates
@@ -67,7 +67,7 @@ function formatTemplatesList(templates: FanoutTemplates): string {
 export function registerFanoutCommands(weaveCommand: Command): void {
   const fanout = weaveCommand
     .command("fanout")
-    .description("Yellow Brick pipeline: harvest → analyze → plan → execute");
+    .description("Replayable analysis pipeline: harvest → analyze → plan → execute");
 
   // D0: Harvest command
   registerHarvestCommand(fanout);

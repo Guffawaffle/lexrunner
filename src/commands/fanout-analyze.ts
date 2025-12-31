@@ -1,13 +1,13 @@
 /**
- * D1 Analyze Command - Yellow Brick Pipeline Phase 1
+ * D1 Analyze Command - Replayable Analysis Pipeline Phase 1
  *
  * Transforms a HarvestBundle into an AnalysisPool containing only facts.
  * This phase is deterministic: same input → identical output.
  *
- * Stone Table invariants enforced:
- * - ST-02 (Determinism before judgment): Pure extraction, no recommendations
- * - ST-03 (Unknown is not False): Preserves confidence levels
- * - ST-05 (MCP/CLI parity): Same logic via both interfaces
+ * Non-negotiable invariants enforced:
+ * - §2 (Determinism before judgment): Pure extraction, no recommendations
+ * - §3 (Unknown is not False): Preserves confidence levels
+ * - §5 (MCP/CLI parity): Same logic via both interfaces
  *
  * @module
  */

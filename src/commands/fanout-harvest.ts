@@ -1,12 +1,12 @@
 /**
- * D0 Harvest Command - Yellow Brick Pipeline Phase 0
+ * D0 Harvest Command - Replayable Analysis Pipeline Phase 0
  *
  * Fetches and normalizes external state into a pinned HarvestBundle.
  * This is the only phase that touches external APIs (GitHub).
  *
- * Stone Table invariants enforced:
- * - ST-04 (Pinned Reality): All SHAs are pinned at fetch time
- * - ST-03 (Unknown is not False): Missing data marked as "unknown" or "unavailable"
+ * Non-negotiable invariants enforced:
+ * - §4 (Pinned Reality): All SHAs are pinned at fetch time
+ * - §3 (Unknown is not False): Missing data marked as "unknown" or "unavailable"
  *
  * @module
  */

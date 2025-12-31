@@ -1,7 +1,7 @@
 /**
- * Yellow Brick D1 Determinism Test
+ * D1 Determinism Test - Replayable Analysis Pipeline
  *
- * Stone Table ST-02: "Determinism before judgment"
+ * Non-negotiable §2: "Determinism before judgment"
  * Same HarvestBundle → identical AnalysisPool, always.
  *
  * This test validates that the D1 analyze phase is pure:
@@ -415,10 +415,10 @@ function analyzeBundle(harvest: HarvestBundle): Omit<AnalysisPool, "timestamp"> 
 // TESTS
 // =============================================================================
 
-describe("Yellow Brick D1 Determinism", () => {
+describe("D1 Determinism - Replayable Analysis", () => {
   it("same HarvestBundle produces identical AnalysisPool", async () => {
     // Load fixture
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest: HarvestBundle = JSON.parse(content);
 
@@ -437,7 +437,7 @@ describe("Yellow Brick D1 Determinism", () => {
   });
 
   it("extracts correct entities from fixture", async () => {
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest: HarvestBundle = JSON.parse(content);
 
@@ -458,7 +458,7 @@ describe("Yellow Brick D1 Determinism", () => {
   });
 
   it("extracts correct relations from fixture", async () => {
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest: HarvestBundle = JSON.parse(content);
 
@@ -486,7 +486,7 @@ describe("Yellow Brick D1 Determinism", () => {
   });
 
   it("extracts correct blockers from fixture", async () => {
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest: HarvestBundle = JSON.parse(content);
 
@@ -504,7 +504,7 @@ describe("Yellow Brick D1 Determinism", () => {
   });
 
   it("extracts correct conflicts from fixture", async () => {
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest: HarvestBundle = JSON.parse(content);
 
@@ -520,7 +520,7 @@ describe("Yellow Brick D1 Determinism", () => {
   });
 
   it("output digest changes when input changes", async () => {
-    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-determinism.json");
+    const fixturePath = path.join(__dirname, "fixtures/harvest-bundle-fixture.json");
     const content = await fs.readFile(fixturePath, "utf-8");
     const harvest1: HarvestBundle = JSON.parse(content);
     const harvest2: HarvestBundle = JSON.parse(content);
