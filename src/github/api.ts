@@ -324,6 +324,90 @@ export class GitHubAPI {
       );
     }
   }
+
+  /**
+   * Get repository info (for harvest)
+   */
+  async getRepository(): Promise<{ default_branch: string; [key: string]: any }> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.repos.get({
+      owner: this.config.owner,
+      repo: this.config.repo,
+    });
+    return data;
+  }
+
+  /**
+   * Get a git reference (branch/tag SHA)
+   */
+  async getRef(ref: string): Promise<{ object: { sha: string } }> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.git.getRef({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      ref,
+    });
+    return data;
+  }
+
+  /**
+   * Get check runs for a commit SHA
+   */
+  async getCheckRuns(sha: string): Promise<{
+    total_count: number;
+    check_runs: Array<{ status: string; conclusion: string | null }>;
+  }> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.checks.listForRef({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      ref: sha,
+    });
+    return data;
+  }
+
+  /**
+   * Get reviews for a pull request
+   */
+  async getReviews(
+    prNumber: number
+  ): Promise<Array<{ user: { login: string } | null; state: string }>> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.pulls.listReviews({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      pull_number: prNumber,
+    });
+    return data;
+  }
+
+  /**
+   * Compare two commits
+   */
+  async compare(base: string, head: string): Promise<{ merge_base_commit?: { sha: string } }> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.repos.compareCommits({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      base,
+      head,
+    });
+    return data;
+  }
+
+  /**
+   * List issues (excluding PRs if filtered by caller)
+   */
+  async listIssues(options: { state: "open" | "closed" | "all" }): Promise<any[]> {
+    await this.normalizeRepositoryName();
+    const { data } = await this.octokit.rest.issues.listForRepo({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      state: options.state,
+      per_page: 100,
+    });
+    return data;
+  }
 }
 
 export class GitHubAPIError extends Error {

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "D0",
+  "timestamp": "2024-01-15T10:00:00.000Z",
+  "inputDigest": "sha256:fixture-input-digest-for-determinism-test-0000000000000000000000000000",
+  "bundle": {
+    "repository": {
+      "owner": "TestOrg",
+      "name": "test-repo",
+      "defaultBranch": "main",
+      "defaultBranchSha": "1111111111111111111111111111111111111111"
+    },
+    "pullRequests": [
+      {
+        "number": 101,
+        "title": "feat: Add user authentication",
+        "state": "open",
+        "draft": false,
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "baseSha": "1111111111111111111111111111111111111111",
+        "mergeBaseSha": "1111111111111111111111111111111111111111",
+        "author": "alice",
+        "labels": ["stack:1", "enhancement"],
+        "ciStatus": "pass",
+        "reviewStatus": "approved",
+        "conflictStatus": "clean",
+        "updatedAt": "2024-01-15T09:00:00.000Z",
+        "body": "Implements user authentication.\n\nCloses #50",
+        "changedFiles": 5,
+        "additions": 200,
+        "deletions": 10
+      },
+      {
+        "number": 102,
+        "title": "feat: Add login page",
+        "state": "open",
+        "draft": false,
+        "headSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "baseSha": "1111111111111111111111111111111111111111",
+        "mergeBaseSha": "1111111111111111111111111111111111111111",
+        "author": "bob",
+        "labels": ["stack:2", "enhancement"],
+        "ciStatus": "pass",
+        "reviewStatus": "pending",
+        "conflictStatus": "clean",
+        "updatedAt": "2024-01-15T09:30:00.000Z",
+        "body": "Adds login page UI.\n\nDepends on #101",
+        "changedFiles": 3,
+        "additions": 150,
+        "deletions": 5
+      },
+      {
+        "number": 103,
+        "title": "fix: Security patch",
+        "state": "open",
+        "draft": true,
+        "headSha": "cccccccccccccccccccccccccccccccccccccccc",
+        "baseSha": "1111111111111111111111111111111111111111",
+        "mergeBaseSha": "unknown",
+        "author": "charlie",
+        "labels": ["security", "bug"],
+        "ciStatus": "fail",
+        "reviewStatus": "changes_requested",
+        "conflictStatus": "conflicted",
+        "updatedAt": "2024-01-15T08:00:00.000Z",
+        "body": "Critical security fix.\n\nBlocked by #101",
+        "changedFiles": 2,
+        "additions": 50,
+        "deletions": 30
+      }
+    ],
+    "issues": [
+      {
+        "number": 50,
+        "title": "Implement authentication system",
+        "state": "open",
+        "author": "product-owner",
+        "labels": ["feature", "priority:high"],
+        "updatedAt": "2024-01-10T12:00:00.000Z",
+        "body": "We need to implement user authentication.",
+        "assignees": ["alice"]
+      }
+    ],
+    "harvestedAt": "2024-01-15T10:00:00.000Z"
+  },
+  "outputDigest": "sha256:expected-output-digest-will-be-computed-by-test-0000000000000000000"
+}
