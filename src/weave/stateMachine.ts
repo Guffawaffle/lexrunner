@@ -320,105 +320,105 @@ export function createStateMachineFromContext(context: WeaveContext): WeaveState
 export function generateMermaidDiagram(): string {
   return `stateDiagram-v2
     [*] --> idle
-    
+
     idle --> planning : START
     planning --> computing_order : PLAN_READY
     computing_order --> ready : ORDER_COMPUTED
-    
+
     ready --> merging : BEGIN_MERGE
     merging --> validating : MERGE_SUCCESS
     merging --> failed : MERGE_FAILED
-    
+
     validating --> ready : VALIDATION_PASSED
     validating --> completed : ALL_COMPLETE
     validating --> failed : VALIDATION_FAILED
     validating --> awaiting_fix : GATE_FAILED
-    
+
     awaiting_fix --> fix_submitted : FIX_SUBMITTED
     fix_submitted --> verifying : BEGIN_VERIFICATION
     verifying --> verified : FIX_VERIFIED
     verifying --> trust_gap : TRUST_GAP_DETECTED
     verified --> validating : VALIDATION_PASSED
     trust_gap --> failed : VALIDATION_FAILED
-    
+
     ready --> paused : PAUSE
     merging --> paused : PAUSE
     validating --> paused : PAUSE
     paused --> ready : RESUME
-    
+
     failed --> idle : RESET
     completed --> idle : RESET
     paused --> idle : RESET
     trust_gap --> idle : RESET
-    
+
     completed --> [*]
     failed --> [*]
-    
+
     note right of idle
         Initial state
         No execution started
     end note
-    
+
     note right of planning
         Analyzing PRs
         Loading dependencies
     end note
-    
+
     note right of computing_order
         Computing merge batches
         Topological sort
     end note
-    
+
     note right of ready
         Ready to execute
         Awaiting next batch
     end note
-    
+
     note right of merging
         Executing git merges
         Batch in progress
     end note
-    
+
     note right of validating
         Running gates
         Checking tests
     end note
-    
+
     note right of awaiting_fix
         Gate failed
         Snapshot generated (ADR-007)
     end note
-    
+
     note right of fix_submitted
         Receipt received
         Ready for verification
     end note
-    
+
     note right of verifying
         Engine verification
         Trust-but-verify pattern
     end note
-    
+
     note right of verified
         Fix verified
         Continuing weave
     end note
-    
+
     note right of trust_gap
         Agent claim != verification
         Human review required
     end note
-    
+
     note right of paused
         Execution suspended
         Can be resumed
     end note
-    
+
     note right of completed
         All batches done
         Terminal state
     end note
-    
+
     note right of failed
         Execution failed
         Terminal state
