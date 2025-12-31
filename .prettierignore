@@ -24,3 +24,5 @@ pnpm-lock.yaml
 # Environment
 .env
 .env.*
+test-mcp-dogfood.mjs
+test-mcp.mjs

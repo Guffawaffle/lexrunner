@@ -15,6 +15,9 @@ export default defineConfig({
       "**/tests/autopilot-e2e-level3-4.spec.ts",
       "**/tests/deterministic-build.test.ts",
       "**/tests/preflightConflicts.spec.ts",
+      "**/tests/e2e-synthetic-6pr-weave.spec.ts",
+      "**/tests/guardrails.spec.ts",
+      "**/tests/promptsResolver.spec.ts",
       // Exclude slow CLI tests (run via test:cli:slow with LEX_ENABLE_SLOW_CLI_TESTS=true)
       "**/tests/cli-progress.spec.ts",
     ],
