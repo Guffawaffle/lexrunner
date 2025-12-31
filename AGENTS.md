@@ -94,8 +94,10 @@ overrides:
   adminGreen:
     allowedUsers: ["repo-admins"]
     requireReason: true
-blockOn:
-  - "security:critical"
+security:
+  # Fix ALL vulnerabilities when patches are available (see §16)
+  blockOnFixableVulnerability: true
+  trackSeverities: ["critical", "high", "moderate", "low"]
 mergeRule:
   # “All required gates green; optional gates ignored unless specified”
   type: "strict-required"
@@ -360,7 +362,38 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 6. **Merge pyramid:** Runner computes topo order, merges eligible nodes.
 7. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
 
-## 16) Environment Stability (WSL2/CI)
+## 16) Security Dependency Policy
+
+**Always fix security vulnerabilities when a fix is available.**
+
+This applies to all severity levels (critical, high, moderate, low). Rationale:
+
+- **No severity is "safe to ignore."** Even low-severity issues can be chained or escalated.
+- **Fixes are cheap.** If `npm audit fix` or equivalent resolves it, do it immediately.
+- **Technical debt compounds.** Deferred security fixes become harder to untangle over time.
+
+### Workflow
+
+1. **Check for vulnerabilities:** `npm audit` (or equivalent for your package manager)
+2. **If fix available:** Apply it (`npm audit fix`) and commit immediately
+3. **If no fix available:** Document in a tracking issue with rationale for deferral
+4. **Dependabot PRs:** Merge promptly when CI passes (or is pending, not failing)
+
+### Policy Configuration (Non-Normative)
+
+```yaml
+security:
+  # Block merges when ANY unfixed vulnerability has an available patch
+  blockOnFixableVulnerability: true
+  # Severity levels to track (all by default)
+  trackSeverities: ["critical", "high", "moderate", "low"]
+  # Auto-merge dependabot PRs when CI is green or pending
+  autoMergeDependabot: true
+```
+
+---
+
+## 17) Environment Stability (WSL2/CI)
 
 - **Resource Limits:** Test runners (Vitest) must be configured with explicit concurrency limits (`maxWorkers: 1`) to prevent resource exhaustion in constrained environments like WSL2 or shared CI runners.
 - **Crash Prevention:** Avoid unbounded recursion or excessive memory allocation in tests.
