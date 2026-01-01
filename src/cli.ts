@@ -210,6 +210,11 @@ program
   )
   .option("--token-budget <number>", "Maximum token budget for operations (default: 5000)", "5000")
   .option("--max-prompts <number>", "Maximum number of prompts allowed (default: 3)", "3")
+  .option(
+    "--emit-frames",
+    "Emit Frames to Lex memory during fanout/merge-weave operations (default: true, env: LEX_PR_EMIT_FRAMES)"
+  )
+  .option("--no-emit-frames", "Disable Frame emission")
   .hook("preAction", (thisCommand) => {
     // Initialize color control based on global flags
     const opts = thisCommand.optsWithGlobals();
