@@ -121,19 +121,12 @@ async function harvestFromGitHub(
   const rawPRs = await githubAPI.discoverPullRequests(options.state);
   const pullRequests: PullRequest[] = await Promise.all(
     rawPRs.map(async (pr: any) => {
-      // Get detailed PR info for merge base
+      // Get merge base SHA using compare API
       let mergeBaseSha: string | "unknown" | "unavailable" = "unknown";
       try {
-        const detailed = await githubAPI.getPullRequest(pr.number);
-        if (detailed.merge_commit_sha) {
-          // Use compare API to get merge base
-          try {
-            const comparison = await githubAPI.compare(detailed.base.sha, detailed.head.sha);
-            mergeBaseSha = comparison.merge_base_commit?.sha ?? "unavailable";
-          } catch {
-            mergeBaseSha = "unavailable";
-          }
-        }
+        // Use the sha from the PR object (which contains both head and base)
+        const comparison = await githubAPI.compare(pr.baseBranch, pr.sha);
+        mergeBaseSha = comparison.merge_base_commit?.sha ?? "unavailable";
       } catch {
         mergeBaseSha = "unavailable";
       }
