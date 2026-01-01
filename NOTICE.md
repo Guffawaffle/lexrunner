@@ -6,7 +6,7 @@ LexRunner includes or depends on third-party software components that are provid
 
 ### @smartergpt/lex
 
-- **Version**: 2.0.2
+- **Version**: 2.1.1
 - **License**: MIT License
 - **Copyright**: Copyright (c) 2025 Guffawaffle
 - **Description**: MIT-licensed memory, policy, and atlas framework with MCP server. For local dev and private automation.
