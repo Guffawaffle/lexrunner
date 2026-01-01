@@ -45,6 +45,8 @@ export interface ResolveOptions {
   warnOnUnresolved?: boolean;
   /** Minimum confidence threshold for acceptance (default: 0.9) */
   minConfidence?: number;
+  /** Base directory for frame storage and other file operations */
+  baseDir?: string;
 }
 
 /**

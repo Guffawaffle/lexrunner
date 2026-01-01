@@ -42,7 +42,7 @@ function getUniqueSuffix(): string {
 
 /**
  * Compute content hash for frame idempotency
- * Hash inputs: event_type, pr_list/module_scope, timestamp_bucket (day), keywords
+ * Hash inputs: event_type, pr_list/module_scope, timestamp_bucket (day), keywords, outcome
  *
  * @internal
  */
@@ -50,13 +50,15 @@ function computeFrameContentHash(
   eventType: string,
   moduleScope: string[],
   timestampBucket: string,
-  keywords: string[]
+  keywords: string[],
+  outcome?: string
 ): string {
   const content = JSON.stringify({
     event_type: eventType,
     module_scope: moduleScope.sort(), // Sort for consistency
     timestamp_bucket: timestampBucket,
     keywords: keywords.sort(), // Sort for consistency
+    outcome: outcome || "unknown", // Include outcome to distinguish success/failure frames
   });
   return sha256(content).slice(0, 16); // Use first 16 chars for brevity
 }
@@ -122,12 +124,14 @@ export async function emitMergeWeaveFrame(
     const resolutions = await resolveModulePaths(input.mergedPRs, resolveOptions);
     const canonicalIds = extractCanonicalIds(resolutions);
 
-    // Compute content hash for idempotency
-    const contentHash = computeFrameContentHash("merge-weave", canonicalIds, timestamp, [
+    // Compute content hash for idempotency (includes outcome to distinguish success/failure)
+    const contentHash = computeFrameContentHash(
       "merge-weave",
-      "integration",
-      input.targetBranch,
-    ]);
+      canonicalIds,
+      timestamp,
+      ["merge-weave", "integration", input.targetBranch],
+      input.outcome
+    );
 
     // Check for duplicate frame
     const duplicate = checkForDuplicateFrame(

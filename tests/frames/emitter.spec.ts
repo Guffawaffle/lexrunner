@@ -143,7 +143,7 @@ describe("emitMergeWeaveFrame", () => {
   it("should include Turn Cost data when provided", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "01JFZG7X2T3K4M5N6P7Q8R9S0W",
-      mergedPRs: ["PR-101", "PR-102"],
+      mergedPRs: ["PR-201", "PR-202"], // Different PRs to avoid hash collision with other tests
       conflictsResolved: 2,
       gatesPassed: ["lint", "test"],
       durationMs: 30000,
