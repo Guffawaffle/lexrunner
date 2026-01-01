@@ -4,6 +4,7 @@
  * Utility for emitting Frames capturing workflow execution.
  * Implements AX-005: Frame emission for core workflows.
  * Implements LPR-019: Module aliasing integration.
+ * Implements LPR-007 Sub B.4: Idempotent frame emission with content-based hashing.
  *
  * AX Principle: Memory Is a Feature
  */
@@ -19,6 +20,8 @@ import type {
 } from "./types.js";
 import { validateExecutionFrame } from "./types.js";
 import { resolveModulePaths, extractCanonicalIds, type ResolveOptions } from "../aliases/index.js";
+import { sha256 } from "../util/hash.js";
+import { readFrame } from "./storage.js";
 
 /**
  * Generate a timestamp string for reference points
@@ -35,6 +38,43 @@ function getTimestampForRef(): string {
  */
 function getUniqueSuffix(): string {
   return ulid().slice(-6).toLowerCase();
+}
+
+/**
+ * Compute content hash for frame idempotency
+ * Hash inputs: event_type, pr_list/module_scope, timestamp_bucket (day), keywords
+ *
+ * @internal
+ */
+function computeFrameContentHash(
+  eventType: string,
+  moduleScope: string[],
+  timestampBucket: string,
+  keywords: string[]
+): string {
+  const content = JSON.stringify({
+    event_type: eventType,
+    module_scope: moduleScope.sort(), // Sort for consistency
+    timestamp_bucket: timestampBucket,
+    keywords: keywords.sort(), // Sort for consistency
+  });
+  return sha256(content).slice(0, 16); // Use first 16 chars for brevity
+}
+
+/**
+ * Check if a frame with the same content hash already exists
+ * Returns existing frame ID if found, null otherwise
+ *
+ * @internal
+ */
+function checkForDuplicateFrame(contentHash: string, baseDir?: string): string | null {
+  // Try to read frame with content hash as suffix
+  // This is a simple implementation - in production, you might want to use a proper index
+  const existingFrame = readFrame(contentHash, baseDir);
+  if (existingFrame) {
+    return contentHash;
+  }
+  return null;
 }
 
 /**
@@ -67,11 +107,33 @@ export async function emitMergeWeaveFrame(
   try {
     const timestamp = getTimestampForRef();
     const suffix = getUniqueSuffix();
-    const referencePoint = `merge-weave-${timestamp}-${suffix}`;
 
     // Resolve module paths to canonical IDs (LPR-019)
     const resolutions = await resolveModulePaths(input.mergedPRs, resolveOptions);
     const canonicalIds = extractCanonicalIds(resolutions);
+
+    // Compute content hash for idempotency
+    const contentHash = computeFrameContentHash("merge-weave", canonicalIds, timestamp, [
+      "merge-weave",
+      "integration",
+      input.targetBranch,
+    ]);
+
+    // Check for duplicate frame
+    const existingFrameId = checkForDuplicateFrame(contentHash, resolveOptions?.baseDir);
+    if (existingFrameId) {
+      // Return existing frame instead of creating duplicate
+      const existingFrame = readFrame(existingFrameId, resolveOptions?.baseDir);
+      if (existingFrame) {
+        return {
+          success: true,
+          frame: existingFrame,
+          frameId: existingFrameId,
+        };
+      }
+    }
+
+    const referencePoint = `merge-weave-${timestamp}-${contentHash}`;
 
     const prList = input.mergedPRs.join(", ");
     const summaryCaption =
