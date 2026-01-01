@@ -286,3 +286,143 @@ export function parseHarvestBundle(data: unknown): HarvestBundle {
 export function safeParseHarvestBundle(data: unknown) {
   return HarvestBundleSchema.safeParse(data);
 }
+
+// =============================================================================
+// D1 ANALYSIS POOL
+// =============================================================================
+
+/**
+ * Issue metadata (computed from harvest)
+ */
+export const IssueAnalysisSchema = z.object({
+  evidenceId: EvidenceIdSchema, // E-ISSUE-{number}
+  issueNumber: z.number(),
+  // Extracted from body
+  affectedFiles: z.array(z.string()),
+  affectedModules: z.array(z.string()), // Mapped via lexmap if available
+  explicitDependencies: z.array(
+    z.object({
+      type: z.enum(["depends-on", "blocks", "blocked-by"]),
+      target: z.string(), // "#123" or "owner/repo#456"
+    })
+  ),
+  // Computed flags
+  hasAcceptanceCriteria: z.boolean(),
+  hasDefinitionOfDone: z.boolean(),
+  hasCopilotAssignment: z.boolean(),
+  // Complexity
+  complexity: z.object({
+    score: z.number().min(0).max(10),
+    estimatedFiles: z.number(),
+    estimatedLines: z.number(),
+    confidence: z.enum(["low", "medium", "high"]),
+  }),
+  // Risk signals
+  judgmentRequired: z.object({
+    required: z.boolean(),
+    reasons: z.array(z.string()), // e.g., "missing AC", "ambiguous scope"
+  }),
+});
+
+export type IssueAnalysis = z.infer<typeof IssueAnalysisSchema>;
+
+/**
+ * Overlap between two issues
+ */
+export const OverlapEvidenceSchema = z.object({
+  evidenceId: EvidenceIdSchema, // E-OVERLAP-{seq}
+  issue1: z.number(),
+  issue2: z.number(),
+  score: z.number().min(0).max(1),
+  breakdown: z.object({
+    fileOverlap: z.number(),
+    directoryOverlap: z.number(),
+    labelOverlap: z.number(),
+    moduleOverlap: z.number(),
+  }),
+  conflictRisk: z.enum(["none", "low", "medium", "high"]),
+});
+
+export type OverlapEvidence = z.infer<typeof OverlapEvidenceSchema>;
+
+/**
+ * Dependency graph node
+ */
+export const DependencyNodeSchema = z.object({
+  issueNumber: z.number(),
+  dependsOn: z.array(z.number()), // Resolved issue numbers
+  blockedBy: z.array(z.number()),
+  layer: z.number(), // Topo layer (0 = no deps, 1 = depends on layer 0, etc.)
+});
+
+export type DependencyNode = z.infer<typeof DependencyNodeSchema>;
+
+/**
+ * Hotspot / churn risk
+ */
+export const HotspotEvidenceSchema = z.object({
+  evidenceId: EvidenceIdSchema, // E-HOTSPOT-{seq}
+  path: z.string(),
+  commitCount30d: z.number().nullable(), // null = not computed
+  authorCount30d: z.number().nullable(),
+  touchedByIssues: z.array(z.number()),
+  riskLevel: z.enum(["low", "medium", "high"]),
+});
+
+export type HotspotEvidence = z.infer<typeof HotspotEvidenceSchema>;
+
+/**
+ * Complete D1 Analysis Pool
+ *
+ * This is the output of the analysis stage (D1), with pure computed facts
+ * and explicit evidence IDs for every computation.
+ */
+export const AnalysisPoolSchema = z.object({
+  schemaVersion: z.literal("1.0.0"),
+  // Provenance linking
+  harvestDigest: z.string(), // SHA256 of input HarvestBundle
+  analyzedAt: z.string().datetime(),
+  toolVersion: z.string(),
+  // Core analysis
+  issues: z.array(IssueAnalysisSchema),
+  overlaps: z.array(OverlapEvidenceSchema),
+  dependencyGraph: z.array(DependencyNodeSchema),
+  hotspots: z.array(HotspotEvidenceSchema),
+  // Layer classification
+  layers: z.record(z.string(), z.array(z.number())), // {"0": [1,2,3], "1": [4,5], ...}
+  readyIssues: z.array(z.number()), // Issues in layer 0 with no blockers
+  // Security posture (from harvest)
+  securityPosture: z.object({
+    source: z.enum(["dependabot", "npm_audit", "none"]),
+    fixableVulnerabilities: z.number().nullable(),
+    totalVulnerabilities: z.number().nullable(),
+  }),
+  // Summary stats (for quick reference, all derived from above)
+  summary: z.object({
+    totalIssues: z.number(),
+    totalPRs: z.number(),
+    highOverlapPairs: z.number(), // count of pairs with score > 0.5
+    maxLayer: z.number(),
+    judgmentRequiredCount: z.number(),
+  }),
+});
+
+export type AnalysisPool = z.infer<typeof AnalysisPoolSchema>;
+
+// =============================================================================
+// ANALYSIS POOL VALIDATION HELPERS
+// =============================================================================
+
+/**
+ * Parse and validate an AnalysisPool from unknown data
+ */
+export function parseAnalysisPool(data: unknown): AnalysisPool {
+  return AnalysisPoolSchema.parse(data);
+}
+
+/**
+ * Safely parse an AnalysisPool, returning result with errors
+ */
+export function safeParseAnalysisPool(data: unknown) {
+  return AnalysisPoolSchema.safeParse(data);
+}
