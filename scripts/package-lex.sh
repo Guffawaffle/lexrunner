@@ -102,11 +102,23 @@ validate_installation() {
     log_info "Checking Lex exports..."
     
     local exports=("errors" "types" "policy" "atlas" "aliases")
+    local pkg_path="node_modules/@smartergpt/lex/package.json"
+    
+    if [ ! -f "$pkg_path" ]; then
+        log_error "Lex package.json not found"
+        return 1
+    fi
+    
+    # Check exports are defined in package.json
     for export in "${exports[@]}"; do
-        if [ -d "node_modules/@smartergpt/lex/dist/shared/${export}" ] || [ -f "node_modules/@smartergpt/lex/dist/shared/${export}/index.js" ]; then
-            log_success "  ${PACKAGE_NAME}/${export} — accessible"
+        if node -p "
+            const pkg = require('./${pkg_path}');
+            const hasExport = pkg.exports && (pkg.exports['./${export}'] || pkg.exports['./' + '${export}']);
+            hasExport ? '1' : '0';
+        " | grep -q "1"; then
+            log_success "  ${PACKAGE_NAME}/${export} — defined in exports"
         else
-            log_error "  ${PACKAGE_NAME}/${export} — not accessible"
+            log_error "  ${PACKAGE_NAME}/${export} — not defined in exports"
             return 1
         fi
     done

@@ -34,7 +34,7 @@ LexRunner consumes Lex as an npm dependency (`@smartergpt/lex`). For details on 
 #### Current Version
 
 - **Package:** `@smartergpt/lex`
-- **Version:** `^2.0.2` (allows compatible updates)
+- **Version:** `^2.1.1` (allows compatible updates)
 - **License:** MIT
 - **Registry:** https://www.npmjs.com/package/@smartergpt/lex
 

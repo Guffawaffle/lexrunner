@@ -42,7 +42,7 @@ LexRunner consumes Lex via standard npm dependency mechanism:
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^2.0.2"
+    "@smartergpt/lex": "^2.1.1"
   }
 }
 ```
@@ -65,7 +65,7 @@ Lex provides modular exports for selective imports:
   - **MAJOR** — Breaking API changes
   - **MINOR** — New features, backward compatible
   - **PATCH** — Bug fixes, backward compatible
-- **LexRunner Pinning:** Use caret range (`^2.0.2`) to allow MINOR/PATCH updates
+- **LexRunner Pinning:** Use caret range (`^2.1.1`) to allow MINOR/PATCH updates
 - **Testing:** CI validates LexRunner against pinned Lex version before merge
 
 ---
@@ -128,7 +128,7 @@ Lex provides modular exports for selective imports:
 
 ### Versioning & Updates
 
-1. **Controlled Updates** — Use caret range (`^2.0.2`) to allow PATCH/MINOR, block MAJOR
+1. **Controlled Updates** — Use caret range (`^2.1.1`) to allow PATCH/MINOR, block MAJOR
 2. **Testing Gate** — CI must pass before merging Lex updates
 3. **Review Process** — PRs with Lex updates require maintainer approval
 4. **Rollback** — Revert package.json change if update breaks LexRunner
@@ -138,7 +138,7 @@ Lex provides modular exports for selective imports:
 If a Lex update breaks LexRunner:
 
 1. **Immediate Rollback** — Revert package.json to previous version
-2. **Lock Specific Version** — Change `^2.0.2` to `2.0.2` to prevent auto-updates
+2. **Lock Specific Version** — Change `^2.1.1` to `2.1.1` to prevent auto-updates
 3. **Root Cause Analysis** — Identify breaking change in Lex
 4. **Upstream Issue** — File issue in Lex repository
 5. **Fix Forward** — Once Lex releases patch, update LexRunner
