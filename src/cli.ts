@@ -77,6 +77,7 @@ import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
 import { registerWeaveCommand } from "./commands/weave.js";
+import { setFrameEmissionEnabled } from "./frames/controller.js";
 import {
   CLIExitSignal,
   throwExit,
@@ -210,6 +211,11 @@ program
   )
   .option("--token-budget <number>", "Maximum token budget for operations (default: 5000)", "5000")
   .option("--max-prompts <number>", "Maximum number of prompts allowed (default: 3)", "3")
+  .option(
+    "--emit-frames",
+    "Emit Frames to Lex memory during fanout/merge-weave operations (default: true, env: LEX_PR_EMIT_FRAMES)"
+  )
+  .option("--no-emit-frames", "Disable Frame emission")
   .hook("preAction", (thisCommand) => {
     // Initialize color control based on global flags
     const opts = thisCommand.optsWithGlobals();
@@ -221,6 +227,12 @@ program
 
     // Initialize color control (--json implies --no-color)
     initColorControl({ noColor, jsonMode });
+
+    // Parse global flags and set frame emission enabled state
+    const globalFlags = parseGlobalFlags(opts);
+    if (globalFlags.emitFrames !== undefined) {
+      setFrameEmissionEnabled(globalFlags.emitFrames);
+    }
   })
   .addHelpText(
     "after",
