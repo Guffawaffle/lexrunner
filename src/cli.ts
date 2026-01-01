@@ -60,6 +60,8 @@ import { registerPredictConflictsCommand } from "./commands/orchestrate/predict-
 import { registerGenerateDeliverablesCommand } from "./commands/orchestrate/generate-deliverables.js";
 import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.js";
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
+import { registerHarvestCommand } from "./commands/fanout-harvest.js";
+import { registerAnalyzeCommand } from "./commands/fanout-analyze.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
@@ -467,18 +469,12 @@ workspaceCmd
 // workspace doctor - Environment validation
 registerDoctorCommand(workspaceCmd, () => jsonModeActive);
 
-// Fanout category - Worker/issue distribution for parallel work
-// NOTE: Full fanout implementation deferred - see note in PR description
-// For now, use legacy orchestrate:analyze-issues and orchestrate:assign-batch commands
-// Future work: Create dedicated fanout analyze and fanout assign commands
-// that don't use the orchestrate: prefix.
-const fanoutCmd = program
-  .command("fanout")
-  .description(
-    "Worker and issue distribution for parallel work (commands coming soon - use orchestrate:* for now)"
-  );
+// Fanout category - Issue discovery, analysis, and planning
+const fanoutCmd = program.command("fanout").description("Issue discovery, analysis, and planning");
 
-// Placeholder - no subcommands yet, users should use orchestrate:analyze-issues and orchestrate:assign-batch
+// Register D0 (harvest) and D1 (analyze) commands
+registerHarvestCommand(fanoutCmd);
+registerAnalyzeCommand(fanoutCmd);
 
 // Gate category - Quality gate execution
 const gateCmd = program.command("gate").description("Quality gate execution");

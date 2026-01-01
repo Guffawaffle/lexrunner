@@ -608,21 +608,37 @@ export function registerAnalyzeCommand(fanoutCommand: Command): void {
   fanoutCommand
     .command("analyze")
     .description("D1: Analyze harvest bundle into facts pool (deterministic)")
-    .requiredOption("--input <file>", "Path to harvest bundle JSON file")
+    .option("--input <file>", "Path to harvest bundle JSON file (default: stdin)")
     .option("--json", "Output JSON format (default)")
     .option("--output <file>", "Write output to file")
     .action(async (opts) => {
       try {
         const fs = await import("node:fs/promises");
 
-        // Load harvest bundle
-        const content = await fs.readFile(opts.input, "utf-8");
+        // Load harvest bundle from file or stdin
+        let content: string;
+        if (opts.input) {
+          content = await fs.readFile(opts.input, "utf-8");
+        } else {
+          // Read from stdin
+          const chunks: Buffer[] = [];
+          for await (const chunk of process.stdin) {
+            chunks.push(chunk);
+          }
+          content = Buffer.concat(chunks).toString("utf-8");
+          if (!content.trim()) {
+            console.error("\n❌ No input provided. Provide JSON via stdin or use --input <file>\n");
+            throwExit(1);
+            return;
+          }
+        }
+
         let harvest: HarvestBundle;
 
         try {
           harvest = JSON.parse(content);
         } catch (e) {
-          console.error(`\n❌ Invalid JSON in ${opts.input}\n`);
+          console.error(`\n❌ Invalid JSON${opts.input ? ` in ${opts.input}` : " from stdin"}\n`);
           throwExit(1);
           return; // TypeScript flow
         }
