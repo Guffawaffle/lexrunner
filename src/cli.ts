@@ -77,6 +77,7 @@ import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
 import { registerWeaveCommand } from "./commands/weave.js";
+import { setFrameEmissionEnabled } from "./frames/controller.js";
 import {
   CLIExitSignal,
   throwExit,
@@ -229,7 +230,6 @@ program
 
     // Parse global flags and set frame emission enabled state
     const globalFlags = parseGlobalFlags(opts);
-    const { setFrameEmissionEnabled } = require("./frames/controller.js");
     if (globalFlags.emitFrames !== undefined) {
       setFrameEmissionEnabled(globalFlags.emitFrames);
     }

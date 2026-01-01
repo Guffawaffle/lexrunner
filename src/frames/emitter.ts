@@ -63,16 +63,26 @@ function computeFrameContentHash(
 
 /**
  * Check if a frame with the same content hash already exists
- * Returns existing frame ID if found, null otherwise
+ * Returns existing frame data if found, null otherwise
  *
  * @internal
  */
-function checkForDuplicateFrame(contentHash: string, baseDir?: string): string | null {
-  // Try to read frame with content hash as suffix
-  // This is a simple implementation - in production, you might want to use a proper index
-  const existingFrame = readFrame(contentHash, baseDir);
+function checkForDuplicateFrame(
+  eventType: string,
+  contentHash: string,
+  timestampBucket: string,
+  baseDir?: string
+): { frameId: string; frame: any } | null {
+  // Construct the expected frame ID pattern
+  const frameIdPrefix = `${eventType}-${timestampBucket}-${contentHash}`;
+
+  // Try to read frame with this exact ID
+  const existingFrame = readFrame(frameIdPrefix, baseDir);
   if (existingFrame) {
-    return contentHash;
+    return {
+      frameId: frameIdPrefix,
+      frame: existingFrame,
+    };
   }
   return null;
 }
@@ -120,17 +130,19 @@ export async function emitMergeWeaveFrame(
     ]);
 
     // Check for duplicate frame
-    const existingFrameId = checkForDuplicateFrame(contentHash, resolveOptions?.baseDir);
-    if (existingFrameId) {
+    const duplicate = checkForDuplicateFrame(
+      "merge-weave",
+      contentHash,
+      timestamp,
+      resolveOptions?.baseDir
+    );
+    if (duplicate) {
       // Return existing frame instead of creating duplicate
-      const existingFrame = readFrame(existingFrameId, resolveOptions?.baseDir);
-      if (existingFrame) {
-        return {
-          success: true,
-          frame: existingFrame,
-          frameId: existingFrameId,
-        };
-      }
+      return {
+        success: true,
+        frame: duplicate.frame,
+        frameId: duplicate.frameId,
+      };
     }
 
     const referencePoint = `merge-weave-${timestamp}-${contentHash}`;
