@@ -56,9 +56,13 @@ function resetEvidenceCounters(): void {
 // TOOL VERSION
 // =============================================================================
 
+/**
+ * Get tool version from package.json
+ * In production, this should read from package.json asynchronously during init.
+ * For now, hardcode to avoid sync file read in pure function.
+ * TODO: Pass version as parameter to analyze() or read during module init
+ */
 function getToolVersion(): string {
-  // In a real implementation, read from package.json
-  // For now, hardcode to avoid sync file read
   return "lexrunner@0.8.0";
 }
 
@@ -348,6 +352,20 @@ function jaccardIndex(set1: Set<string>, set2: Set<string>): number {
 }
 
 /**
+ * Extract all directory paths from a list of files
+ */
+function extractDirectories(files: string[]): Set<string> {
+  const dirs = new Set<string>();
+  for (const file of files) {
+    const parts = file.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      dirs.add(parts.slice(0, i).join("/"));
+    }
+  }
+  return dirs;
+}
+
+/**
  * Compute overlap between two issues
  */
 function computeOverlap(issue1: IssueAnalysis, issue2: IssueAnalysis): OverlapEvidence {
@@ -357,20 +375,8 @@ function computeOverlap(issue1: IssueAnalysis, issue2: IssueAnalysis): OverlapEv
   const fileOverlap = jaccardIndex(new Set(issue1.affectedFiles), new Set(issue2.affectedFiles));
 
   // Directory overlap (from files)
-  const dirs1 = new Set<string>();
-  const dirs2 = new Set<string>();
-  for (const file of issue1.affectedFiles) {
-    const parts = file.split("/");
-    for (let i = 1; i < parts.length; i++) {
-      dirs1.add(parts.slice(0, i).join("/"));
-    }
-  }
-  for (const file of issue2.affectedFiles) {
-    const parts = file.split("/");
-    for (let i = 1; i < parts.length; i++) {
-      dirs2.add(parts.slice(0, i).join("/"));
-    }
-  }
+  const dirs1 = extractDirectories(issue1.affectedFiles);
+  const dirs2 = extractDirectories(issue2.affectedFiles);
   const directoryOverlap = jaccardIndex(dirs1, dirs2);
 
   // Label overlap (not in IssueAnalysis, so set to 0)
