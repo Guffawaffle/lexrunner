@@ -134,7 +134,7 @@ async function harvestFromGitHub(
       // Determine CI status
       let ciStatus: PullRequest["ciStatus"] = "unknown";
       try {
-        const checks = await githubAPI.getCheckRuns(pr.head.sha);
+        const checks = await githubAPI.getCheckRuns(pr.sha);
         if (checks.total_count === 0) {
           ciStatus = "pending";
         } else {
@@ -193,21 +193,21 @@ async function harvestFromGitHub(
       return {
         number: pr.number,
         title: pr.title,
-        state: pr.merged_at ? "merged" : pr.state,
-        draft: pr.draft ?? false,
-        headSha: pr.head.sha,
-        baseSha: pr.base.sha,
+        state: pr.state === "merged" ? "merged" : pr.state,
+        draft: false, // GitHubPullRequest doesn't include draft status
+        headSha: pr.sha,
+        baseSha: "unavailable", // Not available in GitHubPullRequest
         mergeBaseSha,
-        author: pr.user.login,
-        labels: pr.labels.map((l: any) => l.name),
+        author: pr.author,
+        labels: pr.labels,
         ciStatus,
         reviewStatus,
         conflictStatus,
-        updatedAt: pr.updated_at,
+        updatedAt: pr.updatedAt,
         body,
-        changedFiles: pr.changed_files ?? "unknown",
-        additions: pr.additions ?? "unknown",
-        deletions: pr.deletions ?? "unknown",
+        changedFiles: "unknown",
+        additions: "unknown",
+        deletions: "unknown",
       };
     })
   );
