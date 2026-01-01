@@ -226,6 +226,13 @@ program
 
     // Initialize color control (--json implies --no-color)
     initColorControl({ noColor, jsonMode });
+
+    // Parse global flags and set frame emission enabled state
+    const globalFlags = parseGlobalFlags(opts);
+    const { setFrameEmissionEnabled } = require("./frames/controller.js");
+    if (globalFlags.emitFrames !== undefined) {
+      setFrameEmissionEnabled(globalFlags.emitFrames);
+    }
   })
   .addHelpText(
     "after",
