@@ -400,3 +400,56 @@ export interface ListPendingTasksResult {
   }>;
   total: number;
 }
+
+/**
+ * Fanout AX Tools - D0/D1 Pipeline (Epic #654 Layer 2)
+ */
+
+export const FanoutHarvestArgs = z.object({
+  owner: z.string().optional(),
+  repo: z.string().optional(),
+  state: z.enum(["open", "closed", "all"]).optional(),
+  includeIssues: z.boolean().optional(),
+  maxBody: z.number().int().positive().optional(),
+  githubToken: z.string().optional(),
+});
+export type FanoutHarvestArgs = z.infer<typeof FanoutHarvestArgs>;
+
+export const FanoutAnalyzeArgs = z.object({
+  harvestBundle: z.any(), // Accept HarvestBundle JSON object
+  fromFile: z.string().optional(), // Alternative: path to harvest bundle file
+});
+export type FanoutAnalyzeArgs = z.infer<typeof FanoutAnalyzeArgs>;
+
+export interface FanoutHarvestResult {
+  schemaVersion: string;
+  phase: string;
+  timestamp: string;
+  inputDigest: string;
+  bundle: {
+    repository: {
+      owner: string;
+      name: string;
+      defaultBranch: string;
+      defaultBranchSha: string;
+    };
+    pullRequests: Array<object>;
+    issues: Array<object>;
+    harvestedAt: string;
+  };
+  outputDigest: string;
+}
+
+export interface FanoutAnalyzeResult {
+  schemaVersion: string;
+  phase: string;
+  timestamp: string;
+  inputDigest: string;
+  pool: {
+    entities: Array<object>;
+    relations: Array<object>;
+    conflicts: Array<object>;
+    blockers: Array<object>;
+  };
+  outputDigest: string;
+}
