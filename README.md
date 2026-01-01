@@ -27,6 +27,80 @@
 👉 **Choose Lex if:** You need frames, policy scanning, or atlas functionality independently.
 👉 **Choose LexRunner if:** You need the full merge-weave orchestration CLI (built on Lex).
 
+### Lex Dependency Management
+
+LexRunner consumes Lex as an npm dependency (`@smartergpt/lex`). For details on packaging decisions and version management, see [ADR-008: Lex Packaging Strategy](docs/adr/ADR-008-lex-packaging.md).
+
+#### Current Version
+
+- **Package:** `@smartergpt/lex`
+- **Version:** `^2.1.1` (allows compatible updates)
+- **License:** MIT
+- **Registry:** https://www.npmjs.com/package/@smartergpt/lex
+
+#### Managing Lex Updates
+
+Use the provided script to manage Lex dependency:
+
+```bash
+# Check for available updates
+./scripts/package-lex.sh check
+
+# Validate current installation
+./scripts/package-lex.sh validate
+
+# Update to latest compatible version
+./scripts/package-lex.sh update
+
+# Show package information
+./scripts/package-lex.sh info
+```
+
+#### Manual Update Process
+
+To update Lex manually:
+
+```bash
+# 1. Check for updates
+npm outdated @smartergpt/lex
+
+# 2. Update to latest compatible version
+npm update @smartergpt/lex
+
+# 3. Or install specific version
+npm install @smartergpt/lex@2.1.1
+
+# 4. Run tests to validate
+npm test
+
+# 5. Commit if tests pass
+git add package.json package-lock.json
+git commit -m "chore: update @smartergpt/lex to 2.1.1"
+```
+
+#### Versioning Expectations
+
+- **Semantic Versioning:** Lex follows semver strictly
+  - **MAJOR** — Breaking API changes (requires LexRunner code updates)
+  - **MINOR** — New features, backward compatible (safe to update)
+  - **PATCH** — Bug fixes, backward compatible (safe to update)
+- **Caret Range:** `^2.1.1` allows MINOR and PATCH updates, blocks MAJOR
+- **Testing:** Always run tests after updating Lex
+- **CI Integration:** GitHub Dependabot monitors for updates and security issues
+
+#### Licensing
+
+- **Lex License:** MIT (permissive open source)
+- **LexRunner License:** UNLICENSED (proprietary)
+- **Attribution:** See [NOTICE.md](NOTICE.md) for required attributions
+- **Compliance:** Automated via `scripts/check-license-compliance.mjs`
+
+For more details, see:
+
+- [Lex Public API Documentation](docs/LEX_PUBLIC_API.md)
+- [Lex Integration Guide](docs/LEX_INTEGRATION.md)
+- [License Compliance Guide](docs/LICENSING.md)
+
 ---
 
 ## MCP Multi-Repo Integration

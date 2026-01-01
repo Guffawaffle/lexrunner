@@ -16,6 +16,7 @@ This directory contains Architecture Decision Records for LexRunner. Each ADR do
 | 005 | [Merge Pyramid Ordering](./ADR-005-merge-pyramid-ordering.md)            | Accepted | 2025-11-25 |
 | 006 | [Schema Versioning with SemVer](./ADR-006-schema-versioning-semver.md)   | Accepted | 2025-11-25 |
 | 007 | [Task Snapshot Contract](./ADR-007-task-snapshot-contract.md)            | Accepted | 2025-12-19 |
+| 008 | [Lex Packaging Strategy](./ADR-008-lex-packaging.md)                     | Accepted | 2026-01-01 |
 
 ## Conventions
 
