@@ -101,7 +101,7 @@ validate_installation() {
     # Verify exports are accessible
     log_info "Checking Lex exports..."
     
-    local exports=("errors" "types" "policy" "atlas" "aliases")
+    local exports=("errors" "types" "policy" "atlas" "aliases" "logger")
     local pkg_path="node_modules/@smartergpt/lex/package.json"
     
     if [ ! -f "$pkg_path" ]; then

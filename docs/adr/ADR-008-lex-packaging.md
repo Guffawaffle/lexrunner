@@ -32,8 +32,7 @@ We adopt **npm registry publish** as the packaging strategy for Lex.
 Lex is published to the public npm registry as:
 
 - **Package name:** `@smartergpt/lex`
-- **Current version:** `2.1.0` (used by LexRunner)
-- **Latest version:** `2.1.1` (available on npm)
+- **Current version:** `2.1.1` (used by LexRunner)
 - **License:** MIT
 - **Registry:** https://registry.npmjs.org
 

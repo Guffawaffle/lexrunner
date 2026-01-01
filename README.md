@@ -84,7 +84,7 @@ git commit -m "chore: update @smartergpt/lex to 2.1.1"
   - **MAJOR** — Breaking API changes (requires LexRunner code updates)
   - **MINOR** — New features, backward compatible (safe to update)
   - **PATCH** — Bug fixes, backward compatible (safe to update)
-- **Caret Range:** `^2.0.2` allows MINOR and PATCH updates, blocks MAJOR
+- **Caret Range:** `^2.1.1` allows MINOR and PATCH updates, blocks MAJOR
 - **Testing:** Always run tests after updating Lex
 - **CI Integration:** GitHub Dependabot monitors for updates and security issues
 
