@@ -184,16 +184,13 @@ async function harvestFromGitHub(
         conflictStatus = "conflicted";
       }
 
-      // Truncate body if too long
-      let body: string | "truncated" = pr.body ?? "";
-      if (body.length > options.maxBody) {
-        body = "truncated";
-      }
+      // Body is not available in GitHubPullRequest interface
+      let body: string | "truncated" = ""; // Not available in normalized PR type
 
       return {
         number: pr.number,
         title: pr.title,
-        state: pr.state === "merged" ? "merged" : pr.state,
+        state: pr.state,
         draft: false, // GitHubPullRequest doesn't include draft status
         headSha: pr.sha,
         baseSha: "unavailable", // Not available in GitHubPullRequest
