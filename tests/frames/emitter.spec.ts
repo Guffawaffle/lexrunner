@@ -122,7 +122,7 @@ describe("emitMergeWeaveFrame", () => {
     expect(frame.next_actions).toContain("Resolve remaining conflicts");
   });
 
-  it("should generate unique reference points", async () => {
+  it("should generate consistent reference points for idempotency", async () => {
     const input: MergeWeaveFrameInput = {
       runId: "test",
       mergedPRs: ["PR-1"],
@@ -136,7 +136,8 @@ describe("emitMergeWeaveFrame", () => {
     const result1 = await emitMergeWeaveFrame(input);
     const result2 = await emitMergeWeaveFrame(input);
 
-    expect(result1.frameId).not.toBe(result2.frameId);
+    // With idempotency, same content should produce same frame ID
+    expect(result1.frameId).toBe(result2.frameId);
   });
 
   it("should include Turn Cost data when provided", async () => {

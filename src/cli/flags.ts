@@ -15,6 +15,7 @@ export interface GlobalFlags {
   quiet?: boolean;
   tokenBudget?: number;
   maxPrompts?: number;
+  emitFrames?: boolean;
 }
 
 /**
@@ -28,7 +29,12 @@ export function registerGlobalFlags(program: Command): void {
     .option("--verbose", "Enable verbose logging")
     .option("--quiet", "Suppress non-essential output")
     .option("--token-budget <number>", "Maximum token budget (default: 5000)", "5000")
-    .option("--max-prompts <number>", "Maximum number of prompts (default: 3)", "3");
+    .option("--max-prompts <number>", "Maximum number of prompts (default: 3)", "3")
+    .option(
+      "--emit-frames",
+      "Emit Frames to Lex memory during fanout/merge-weave operations (default: true, env: LEX_PR_EMIT_FRAMES)"
+    )
+    .option("--no-emit-frames", "Disable Frame emission");
 }
 
 /**
@@ -70,6 +76,23 @@ export function parseGlobalFlags(opts: any): GlobalFlags {
     return defaultValue;
   };
 
+  // Helper to get flag value with default
+  const getFlagWithDefault = (cliValue: any, envVar: string, defaultValue: boolean): boolean => {
+    // If CLI value is explicitly set (true or false), use it
+    if (cliValue !== undefined) {
+      return cliValue;
+    }
+    // Check environment variable
+    if (process.env[envVar] === "1" || process.env[envVar] === "true") {
+      return true;
+    }
+    if (process.env[envVar] === "0" || process.env[envVar] === "false") {
+      return false;
+    }
+    // Use default
+    return defaultValue;
+  };
+
   return {
     json: getFlag(opts.json, "LEX_PR_JSON"),
     noColor: getFlag(opts.noColor, "NO_COLOR"),
@@ -77,6 +100,7 @@ export function parseGlobalFlags(opts: any): GlobalFlags {
     quiet: opts.quiet ?? false,
     tokenBudget: getNumeric(opts.tokenBudget, "LEX_PR_TOKEN_BUDGET", 5000),
     maxPrompts: getNumeric(opts.maxPrompts, "LEX_PR_MAX_PROMPTS", 3),
+    emitFrames: getFlagWithDefault(opts.emitFrames, "LEX_PR_EMIT_FRAMES", true),
   };
 }
 
