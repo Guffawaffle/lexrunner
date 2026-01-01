@@ -286,7 +286,7 @@ describe("Frame Emission CI Gate", () => {
   });
 
   describe("Atlas Frame Generation Patterns", () => {
-    it("should generate consistent Frame IDs for deterministic tracking", async () => {
+    it("should generate consistent Frame IDs for deterministic tracking (idempotency)", async () => {
       const input: MergeWeaveFrameInput = {
         runId: "atlas-pattern-001",
         planHash: "sha256:atlas-test",
@@ -301,10 +301,10 @@ describe("Frame Emission CI Gate", () => {
       const result1 = await emitMergeWeaveFrame(input);
       const result2 = await emitMergeWeaveFrame(input);
 
-      // Each call should generate a unique Frame ID (for Atlas tracking)
-      expect(result1.frameId).not.toBe(result2.frameId);
+      // With idempotency, same content produces same Frame ID (better for Atlas tracking)
+      expect(result1.frameId).toBe(result2.frameId);
 
-      // But the structure should be consistent
+      // Structure should be consistent
       expect(result1.frame?.type).toBe(result2.frame?.type);
       expect(result1.frame?.module_scope).toEqual(result2.frame?.module_scope);
     });
