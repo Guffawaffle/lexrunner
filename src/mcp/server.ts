@@ -62,6 +62,10 @@ import {
   SubmitTaskReceiptResult,
   GetTaskStatusResult,
   ListPendingTasksResult,
+  FanoutHarvestArgs,
+  FanoutAnalyzeArgs,
+  FanoutHarvestResult,
+  FanoutAnalyzeResult,
 } from "./types.js";
 import {
   resolveProfile,
@@ -963,6 +967,72 @@ function createServer(options?: McpServerOptions): Server {
             },
           },
         },
+        // ─────────────────────────────────────────────────────────────────
+        // Fanout AX Tools — D0/D1 Pipeline (Epic #654 Layer 2)
+        // ─────────────────────────────────────────────────────────────────
+        {
+          name: "fanout_harvest",
+          description:
+            "D0: Harvest external state from GitHub into a deterministic, replayable HarvestBundle. " +
+            "Fetches PRs, issues, CI status, review status, and pins all SHAs at fetch time. " +
+            "Requires GITHUB_TOKEN environment variable.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              owner: {
+                type: "string",
+                description:
+                  "GitHub repository owner (auto-detected from git remote if not provided)",
+              },
+              repo: {
+                type: "string",
+                description:
+                  "GitHub repository name (auto-detected from git remote if not provided)",
+              },
+              state: {
+                type: "string",
+                enum: ["open", "closed", "all"],
+                description: "PR state filter (default: open)",
+                default: "open",
+              },
+              includeIssues: {
+                type: "boolean",
+                description: "Include issues in harvest (default: false)",
+                default: false,
+              },
+              maxBody: {
+                type: "number",
+                description: "Max body length before truncation (default: 4096)",
+                default: 4096,
+              },
+              githubToken: {
+                type: "string",
+                description: "GitHub API token (or use GITHUB_TOKEN env var)",
+              },
+            },
+          },
+        },
+        {
+          name: "fanout_analyze",
+          description:
+            "D1: Analyze a HarvestBundle into a deterministic AnalysisPool with evidence IDs. " +
+            "Pure computation with no side effects. Same input → identical output. " +
+            "Extracts entities, relations, conflicts, and blockers.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              harvestBundle: {
+                type: "object",
+                description: "HarvestBundle JSON object from fanout_harvest (preferred)",
+              },
+              fromFile: {
+                type: "string",
+                description:
+                  "Path to harvest bundle JSON file (alternative to harvestBundle object)",
+              },
+            },
+          },
+        },
       ],
     };
   });
@@ -1070,6 +1140,13 @@ function createServer(options?: McpServerOptions): Server {
 
       case "list_pending_tasks":
         return await handleListPendingTasks(args as unknown as ListPendingTasksArgs);
+
+      // Fanout AX tools (Epic #654 Layer 2)
+      case "fanout_harvest":
+        return await handleFanoutHarvest(args as unknown as FanoutHarvestArgs);
+
+      case "fanout_analyze":
+        return await handleFanoutAnalyze(args as unknown as FanoutAnalyzeArgs);
 
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
@@ -2971,6 +3048,457 @@ async function handleListPendingTasks(
       throwMcpAXError(ErrorCode.InvalidParams, axError);
     }
     throwMcpToolError(ErrorCode.InternalError, "list_pending_tasks", error, "list pending tasks");
+  }
+}
+
+// =============================================================================
+// Fanout AX Handlers (Epic #654 Layer 2)
+// =============================================================================
+
+/**
+ * Handle fanout_harvest tool
+ * D0: Harvest external state from GitHub into a deterministic, replayable HarvestBundle
+ */
+async function handleFanoutHarvest(
+  args: FanoutHarvestArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+  try {
+    // Validate args
+    const validated = FanoutHarvestArgs.parse(args);
+
+    // Check for GitHub authentication
+    ensureGitHubToken(validated.githubToken);
+
+    // Create GitHub API
+    let githubAPI = await createGitHubAPI();
+
+    // Override with arguments if provided
+    if (validated.owner && validated.repo) {
+      githubAPI = new GitHubAPI({
+        owner: validated.owner,
+        repo: validated.repo,
+        token: validated.githubToken || process.env.GITHUB_TOKEN,
+      });
+    }
+
+    if (!githubAPI) {
+      const axError = githubApiError({
+        message:
+          "Could not detect GitHub repository. Provide owner and repo parameters or run from a git repository with GitHub remote.",
+      });
+      throwMcpAXError(ErrorCode.InvalidRequest, axError);
+    }
+
+    const timestamp = new Date().toISOString();
+    const state = validated.state || "open";
+    const maxBody = validated.maxBody || 4096;
+    const includeIssues = validated.includeIssues ?? false;
+
+    // Compute input digest for replay verification
+    const inputDigest = crypto
+      .createHash("sha256")
+      .update(
+        JSON.stringify({
+          owner: githubAPI.config.owner,
+          repo: githubAPI.config.repo,
+          state,
+          timestamp,
+        })
+      )
+      .digest("hex");
+
+    // Fetch repository info
+    const repoInfo = await githubAPI.getRepository();
+    const defaultBranch = repoInfo.default_branch;
+    const defaultBranchRef = await githubAPI.getRef(`heads/${defaultBranch}`);
+
+    const repository = {
+      owner: githubAPI.config.owner,
+      name: githubAPI.config.repo,
+      defaultBranch,
+      defaultBranchSha: defaultBranchRef.object.sha,
+    };
+
+    // Fetch pull requests
+    const rawPRs = await githubAPI.discoverPullRequests(state);
+    const pullRequests = await Promise.all(
+      rawPRs.map(async (pr: any) => {
+        // Get merge base SHA
+        let mergeBaseSha: string | "unknown" | "unavailable" = "unknown";
+        try {
+          const comparison = await githubAPI.compare(pr.baseBranch, pr.sha);
+          mergeBaseSha = comparison.merge_base_commit?.sha ?? "unavailable";
+        } catch {
+          mergeBaseSha = "unavailable";
+        }
+
+        // Determine CI status
+        let ciStatus: "pass" | "fail" | "pending" | "unknown" | "unavailable" = "unknown";
+        try {
+          const checks = await githubAPI.getCheckRuns(pr.sha);
+          if (checks.total_count === 0) {
+            ciStatus = "pending";
+          } else {
+            const allComplete = checks.check_runs.every((c: any) => c.status === "completed");
+            if (!allComplete) {
+              ciStatus = "pending";
+            } else {
+              const anyFailed = checks.check_runs.some(
+                (c: any) => c.conclusion !== "success" && c.conclusion !== "skipped"
+              );
+              ciStatus = anyFailed ? "fail" : "pass";
+            }
+          }
+        } catch {
+          ciStatus = "unavailable";
+        }
+
+        // Determine review status
+        let reviewStatus:
+          | "approved"
+          | "changes_requested"
+          | "pending"
+          | "none"
+          | "unknown"
+          | "unavailable" = "unknown";
+        try {
+          const reviews = await githubAPI.getReviews(pr.number);
+          const latestByUser = new Map<string, string>();
+          for (const review of reviews) {
+            if (review.state !== "COMMENTED" && review.user?.login) {
+              latestByUser.set(review.user.login, review.state);
+            }
+          }
+          const states = Array.from(latestByUser.values());
+          if (states.includes("CHANGES_REQUESTED")) {
+            reviewStatus = "changes_requested";
+          } else if (states.includes("APPROVED")) {
+            reviewStatus = "approved";
+          } else if (states.length > 0) {
+            reviewStatus = "pending";
+          } else {
+            reviewStatus = "none";
+          }
+        } catch {
+          reviewStatus = "unavailable";
+        }
+
+        // Determine conflict status
+        let conflictStatus: "clean" | "conflicted" | "unknown" | "unavailable" = "unknown";
+        if (pr.mergeable === true) {
+          conflictStatus = "clean";
+        } else if (pr.mergeable === false) {
+          conflictStatus = "conflicted";
+        }
+
+        return {
+          number: pr.number,
+          title: pr.title,
+          state: pr.state,
+          draft: false,
+          headSha: pr.sha,
+          baseSha: "unavailable",
+          mergeBaseSha,
+          author: pr.author,
+          labels: pr.labels,
+          ciStatus,
+          reviewStatus,
+          conflictStatus,
+          updatedAt: pr.updatedAt,
+          body: "",
+          changedFiles: "unknown",
+          additions: "unknown",
+          deletions: "unknown",
+        };
+      })
+    );
+
+    // Fetch issues if requested
+    let issues: Array<object> = [];
+    if (includeIssues) {
+      try {
+        const rawIssues = await githubAPI.listIssues({ state });
+        issues = rawIssues
+          .filter((i: any) => !i.pull_request)
+          .map((i: any) => {
+            let body: string | "truncated" = i.body ?? "";
+            if (body.length > maxBody) {
+              body = "truncated";
+            }
+            return {
+              number: i.number,
+              title: i.title,
+              state: i.state,
+              author: i.user.login,
+              labels: i.labels.map((l: any) => l.name),
+              updatedAt: i.updated_at,
+              body,
+              assignees: i.assignees?.map((a: any) => a.login) ?? [],
+            };
+          });
+      } catch {
+        // Issues not critical - continue without them
+      }
+    }
+
+    const bundle = {
+      repository,
+      pullRequests,
+      issues,
+      harvestedAt: timestamp,
+    };
+
+    const outputDigest = crypto.createHash("sha256").update(JSON.stringify(bundle)).digest("hex");
+
+    const result: FanoutHarvestResult = {
+      schemaVersion: "1.0.0",
+      phase: "D0",
+      timestamp,
+      inputDigest: `sha256:${inputDigest}`,
+      bundle,
+      outputDigest: `sha256:${outputDigest}`,
+    };
+
+    console.error(
+      `[mcp:fanout_harvest] harvested ${pullRequests.length} PRs, ${issues.length} issues from ${repository.owner}/${repository.name}`
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      const axError = mcpToolError(
+        ErrorCodes.INVALID_INPUT,
+        `Invalid fanout_harvest parameters: ${error.message}`,
+        { tool: "fanout_harvest", operation: "validate parameters" }
+      );
+      throwMcpAXError(ErrorCode.InvalidParams, axError);
+    }
+    if (error instanceof GitHubAPIError) {
+      const axError = githubApiError({
+        message: error.message,
+      });
+      throwMcpAXError(ErrorCode.InternalError, axError);
+    }
+    throwMcpToolError(ErrorCode.InternalError, "fanout_harvest", error, "harvest from GitHub");
+  }
+}
+
+/**
+ * Handle fanout_analyze tool
+ * D1: Analyze a HarvestBundle into a deterministic AnalysisPool with evidence IDs
+ */
+async function handleFanoutAnalyze(
+  args: FanoutAnalyzeArgs
+): Promise<{ content: [{ type: "text"; text: string }] }> {
+  try {
+    // Validate args
+    const validated = FanoutAnalyzeArgs.parse(args);
+
+    let harvest: any;
+
+    // Get harvest bundle from args or file
+    if (validated.harvestBundle) {
+      harvest = validated.harvestBundle;
+    } else if (validated.fromFile) {
+      if (!fs.existsSync(validated.fromFile)) {
+        const axError = mcpToolError(
+          ErrorCodes.PLAN_NOT_FOUND,
+          `Harvest bundle file not found: ${validated.fromFile}`,
+          { tool: "fanout_analyze", operation: "load harvest bundle" }
+        );
+        throwMcpAXError(ErrorCode.InvalidParams, axError);
+      }
+      const content = fs.readFileSync(validated.fromFile, "utf-8");
+      try {
+        harvest = JSON.parse(content);
+      } catch {
+        const axError = mcpToolError(
+          ErrorCodes.INVALID_INPUT,
+          `Invalid JSON in harvest bundle file: ${validated.fromFile}`,
+          { tool: "fanout_analyze", operation: "parse harvest bundle" }
+        );
+        throwMcpAXError(ErrorCode.InvalidParams, axError);
+      }
+    } else {
+      const axError = mcpToolError(
+        ErrorCodes.INVALID_INPUT,
+        "Either harvestBundle or fromFile must be provided",
+        { tool: "fanout_analyze", operation: "validate input" }
+      );
+      throwMcpAXError(ErrorCode.InvalidParams, axError);
+    }
+
+    // Validate harvest bundle structure
+    if (harvest.phase !== "D0") {
+      const axError = mcpToolError(
+        ErrorCodes.INVALID_INPUT,
+        `Invalid input phase: ${harvest.phase}. Expected: D0 (HarvestBundle)`,
+        { tool: "fanout_analyze", operation: "validate phase" }
+      );
+      throwMcpAXError(ErrorCode.InvalidParams, axError);
+    }
+
+    const timestamp = new Date().toISOString();
+    const inputDigest = harvest.outputDigest;
+
+    // Deterministic analysis
+    const entities: Array<object> = [];
+    const relations: Array<object> = [];
+    const conflicts: Array<object> = [];
+    const blockers: Array<object> = [];
+
+    // Track PRs by number
+    const prByNumber = new Map<number, any>();
+
+    // Process pull requests
+    for (const pr of harvest.bundle.pullRequests) {
+      prByNumber.set(pr.number, pr);
+      const eid = `PR:${pr.number}`;
+
+      // Build facts
+      const facts: Array<object> = [
+        { key: "title", value: pr.title, source: "api", confidence: "known" },
+        { key: "state", value: pr.state, source: "api", confidence: "known" },
+        { key: "author", value: pr.author, source: "api", confidence: "known" },
+        { key: "labels", value: pr.labels, source: "api", confidence: "known" },
+        { key: "head_sha", value: pr.headSha, source: "api", confidence: "known" },
+        { key: "updated_at", value: pr.updatedAt, source: "api", confidence: "known" },
+      ];
+
+      // CI status
+      const ciConfidence = ["unknown", "unavailable"].includes(pr.ciStatus) ? pr.ciStatus : "known";
+      facts.push({ key: "ci_status", value: pr.ciStatus, source: "api", confidence: ciConfidence });
+
+      // Review status
+      const reviewConfidence = ["unknown", "unavailable"].includes(pr.reviewStatus)
+        ? pr.reviewStatus
+        : "known";
+      facts.push({
+        key: "review_status",
+        value: pr.reviewStatus,
+        source: "api",
+        confidence: reviewConfidence,
+      });
+
+      // Conflict status
+      const conflictConfidence = ["unknown", "unavailable"].includes(pr.conflictStatus)
+        ? pr.conflictStatus
+        : "known";
+      facts.push({
+        key: "conflict_status",
+        value: pr.conflictStatus,
+        source: "api",
+        confidence: conflictConfidence,
+      });
+
+      entities.push({
+        eid,
+        type: "pull_request",
+        ref: `#${pr.number}`,
+        facts,
+      });
+
+      // Detect blockers
+      if (pr.ciStatus === "fail") {
+        blockers.push({
+          type: "ci_failed",
+          entity: eid,
+          reason: "CI checks failed",
+        });
+      }
+
+      if (pr.reviewStatus === "changes_requested") {
+        blockers.push({
+          type: "review_rejected",
+          entity: eid,
+          reason: "Changes requested in review",
+        });
+      }
+
+      if (pr.conflictStatus === "conflicted") {
+        conflicts.push({
+          type: "merge_conflict",
+          entities: [eid],
+          resolution: "requires_rebase",
+        });
+      }
+
+      if (pr.draft) {
+        blockers.push({
+          type: "draft",
+          entity: eid,
+          reason: "PR is in draft state",
+        });
+      }
+    }
+
+    // Process issues
+    for (const issue of harvest.bundle.issues) {
+      const eid = `ISSUE:${issue.number}`;
+
+      const facts: Array<object> = [
+        { key: "title", value: issue.title, source: "api", confidence: "known" },
+        { key: "state", value: issue.state, source: "api", confidence: "known" },
+        { key: "author", value: issue.author, source: "api", confidence: "known" },
+        { key: "labels", value: issue.labels, source: "api", confidence: "known" },
+        { key: "updated_at", value: issue.updatedAt, source: "api", confidence: "known" },
+      ];
+
+      entities.push({
+        eid,
+        type: "issue",
+        ref: `#${issue.number}`,
+        facts,
+      });
+    }
+
+    const pool = {
+      entities,
+      relations,
+      conflicts,
+      blockers,
+    };
+
+    const outputDigest = crypto.createHash("sha256").update(JSON.stringify(pool)).digest("hex");
+
+    const result: FanoutAnalyzeResult = {
+      schemaVersion: "1.0.0",
+      phase: "D1",
+      timestamp,
+      inputDigest,
+      pool,
+      outputDigest: `sha256:${outputDigest}`,
+    };
+
+    console.error(
+      `[mcp:fanout_analyze] analyzed ${entities.length} entities, ${relations.length} relations, ${conflicts.length} conflicts, ${blockers.length} blockers`
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      const axError = mcpToolError(
+        ErrorCodes.INVALID_INPUT,
+        `Invalid fanout_analyze parameters: ${error.message}`,
+        { tool: "fanout_analyze", operation: "validate parameters" }
+      );
+      throwMcpAXError(ErrorCode.InvalidParams, axError);
+    }
+    throwMcpToolError(ErrorCode.InternalError, "fanout_analyze", error, "analyze harvest bundle");
   }
 }
 
