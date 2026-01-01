@@ -76,11 +76,11 @@ function extractAffectedFiles(body: string | null): string[] {
 
   // Match file paths (common patterns)
   const patterns = [
-    // src/path/to/file.ts
+    // src/path/to/file.ts or README.md
     /(?:^|\s)([a-zA-Z0-9_\-./]+\.[a-z]{1,4})(?:\s|$)/gm,
     // Markdown code blocks with file paths
     /```[a-z]*\s*\n?(?:File|Path):\s*([^\n]+)/gim,
-    // - src/file.ts or * src/file.ts
+    // - src/file.ts or * src/file.ts or - README.md
     /^[\s*-]+(?:File|Path)?:?\s*([a-zA-Z0-9_\-./]+\.[a-z]{1,4})/gm,
   ];
 
@@ -90,7 +90,7 @@ function extractAffectedFiles(body: string | null): string[] {
       if (match[1]) {
         const file = match[1].trim();
         // Filter out URLs and common non-file patterns
-        if (!file.includes("http") && !file.includes("://") && file.includes("/")) {
+        if (!file.includes("http") && !file.includes("://")) {
           files.add(file);
         }
       }
