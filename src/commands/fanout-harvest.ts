@@ -121,19 +121,12 @@ async function harvestFromGitHub(
   const rawPRs = await githubAPI.discoverPullRequests(options.state);
   const pullRequests: PullRequest[] = await Promise.all(
     rawPRs.map(async (pr: any) => {
-      // Get detailed PR info for merge base
+      // Get merge base SHA using compare API
       let mergeBaseSha: string | "unknown" | "unavailable" = "unknown";
       try {
-        const detailed = await githubAPI.getPullRequest(pr.number);
-        if (detailed.merge_commit_sha) {
-          // Use compare API to get merge base
-          try {
-            const comparison = await githubAPI.compare(detailed.base.sha, detailed.head.sha);
-            mergeBaseSha = comparison.merge_base_commit?.sha ?? "unavailable";
-          } catch {
-            mergeBaseSha = "unavailable";
-          }
-        }
+        // Use the sha from the PR object (which contains both head and base)
+        const comparison = await githubAPI.compare(pr.baseBranch, pr.sha);
+        mergeBaseSha = comparison.merge_base_commit?.sha ?? "unavailable";
       } catch {
         mergeBaseSha = "unavailable";
       }
@@ -141,7 +134,7 @@ async function harvestFromGitHub(
       // Determine CI status
       let ciStatus: PullRequest["ciStatus"] = "unknown";
       try {
-        const checks = await githubAPI.getCheckRuns(pr.head.sha);
+        const checks = await githubAPI.getCheckRuns(pr.sha);
         if (checks.total_count === 0) {
           ciStatus = "pending";
         } else {
@@ -191,30 +184,27 @@ async function harvestFromGitHub(
         conflictStatus = "conflicted";
       }
 
-      // Truncate body if too long
-      let body: string | "truncated" = pr.body ?? "";
-      if (body.length > options.maxBody) {
-        body = "truncated";
-      }
+      // Body is not available in GitHubPullRequest interface
+      let body: string | "truncated" = ""; // Not available in normalized PR type
 
       return {
         number: pr.number,
         title: pr.title,
-        state: pr.merged_at ? "merged" : pr.state,
-        draft: pr.draft ?? false,
-        headSha: pr.head.sha,
-        baseSha: pr.base.sha,
+        state: pr.state,
+        draft: false, // GitHubPullRequest doesn't include draft status
+        headSha: pr.sha,
+        baseSha: "unavailable", // Not available in GitHubPullRequest
         mergeBaseSha,
-        author: pr.user.login,
-        labels: pr.labels.map((l: any) => l.name),
+        author: pr.author,
+        labels: pr.labels,
         ciStatus,
         reviewStatus,
         conflictStatus,
-        updatedAt: pr.updated_at,
+        updatedAt: pr.updatedAt,
         body,
-        changedFiles: pr.changed_files ?? "unknown",
-        additions: pr.additions ?? "unknown",
-        deletions: pr.deletions ?? "unknown",
+        changedFiles: "unknown",
+        additions: "unknown",
+        deletions: "unknown",
       };
     })
   );
