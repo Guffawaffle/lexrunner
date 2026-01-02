@@ -28,6 +28,15 @@ import {
   logTimeoutAdjustment,
 } from "./governance/timeoutAdjustment.js";
 import type { MergeWeaveTurnCost } from "./metrics/turncost.js";
+import {
+  createCounterExampleFromGate,
+  type CounterExampleClassification,
+} from "./learning/counter-example.js";
+import {
+  promptCounterExampleClassification,
+  createAutoRecordClassification,
+} from "./learning/prompts.js";
+import { storeCounterExample } from "./learning/storage.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -639,6 +648,10 @@ export async function executeItemGates(
     runId?: string;
     baseDir?: string;
     turnCostTracker?: MergeWeaveTurnCost;
+    recordFailures?: boolean | "auto" | "interactive";
+    planPath?: string;
+    activeConstraints?: string[];
+    scope?: string[];
   }
 ): Promise<GateResult[]> {
   if (!item.gates || item.gates.length === 0) {
@@ -725,6 +738,9 @@ export async function executeItemGates(
         },
         options.baseDir
       );
+
+      // Prompt for counter-example if enabled
+      await promptCounterExampleIfEnabled(result, options);
     }
 
     // Emit Frame for gate execution (AX-005)
@@ -947,4 +963,60 @@ function findNextEligibleNode(
   }
 
   return null;
+}
+
+/**
+ * Prompt for counter-example recording if enabled
+ */
+async function promptCounterExampleIfEnabled(
+  gateResult: GateResult,
+  options?: {
+    runId?: string;
+    baseDir?: string;
+    recordFailures?: boolean | "auto" | "interactive";
+    planPath?: string;
+    activeConstraints?: string[];
+    scope?: string[];
+  }
+): Promise<void> {
+  // Skip if not enabled
+  if (!options?.recordFailures) {
+    return;
+  }
+
+  const runId = options.runId || "unknown";
+  const planPath = options.planPath || "unknown";
+  const activeConstraints = options.activeConstraints || [];
+  const scope = options.scope || [];
+  const baseDir = options.baseDir || process.cwd();
+
+  let classification: CounterExampleClassification | null = null;
+
+  if (options.recordFailures === "interactive") {
+    // Interactive mode: prompt user for classification
+    classification = await promptCounterExampleClassification(
+      gateResult.gate,
+      gateResult.stderr || "Gate execution failed"
+    );
+  } else if (options.recordFailures === "auto" || options.recordFailures === true) {
+    // Auto mode: record with unknown classification
+    classification = createAutoRecordClassification(gateResult.stderr || "Gate execution failed");
+  }
+
+  // If user chose to skip or classification failed, return
+  if (!classification) {
+    return;
+  }
+
+  // Create and store counter-example
+  const counterExample = createCounterExampleFromGate(
+    gateResult,
+    planPath,
+    runId,
+    classification,
+    activeConstraints,
+    scope
+  );
+
+  storeCounterExample(counterExample, baseDir);
 }

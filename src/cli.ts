@@ -72,6 +72,7 @@ import { registerSeniorDevCommand } from "./commands/seniorDev.js";
 import { registerBudgetCommand } from "./commands/budget.js";
 import { registerMetricsCommand } from "./commands/metrics.js";
 import { registerTokenReportCommand } from "./commands/tokenReport.js";
+import { registerCounterExamplesCommand } from "./commands/counterExamples.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -1037,6 +1038,9 @@ registerRetryCommand(program, () => jsonModeActive, exitWith);
 
 // Completion command
 registerCompletionCommand(program, throwExit, exitWith);
+
+// Counter-examples command
+registerCounterExamplesCommand(program);
 
 // Security operations command
 // Register security subcommands once (modular implementation)
