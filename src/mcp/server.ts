@@ -27,6 +27,7 @@ import { loadPlan, validatePlan } from "../schema.js";
 import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
 import { generatePlanFromGitHub } from "../core/githubPlan.js";
+import { generateMultiRepoPlan } from "../core/multiRepoPlan.js";
 import { createGitHubClient } from "../github/index.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
@@ -289,6 +290,23 @@ function createServer(options?: McpServerOptions): Server {
               repo: {
                 type: "string",
                 description: "GitHub repository name (auto-detected from git remote)",
+              },
+              repos: {
+                type: "array",
+                description:
+                  "Multi-repo mode: array of repositories to discover PRs from. Overrides owner/repo if provided.",
+                items: {
+                  type: "object",
+                  properties: {
+                    owner: { type: "string", description: "Repository owner" },
+                    repo: { type: "string", description: "Repository name" },
+                    priority: {
+                      type: "number",
+                      description: "Priority for merge ordering (default: 1, lower = earlier)",
+                    },
+                  },
+                  required: ["owner", "repo"],
+                },
               },
               requiredGates: {
                 type: "array",
@@ -1224,47 +1242,82 @@ async function handlePlanCreate(
       // Check for GitHub authentication before making API calls
       ensureGitHubToken(args.githubToken);
 
-      // GitHub mode: auto-discover PRs
-      const client = await createGitHubClient({
-        token: args.githubToken,
-        owner: args.owner,
-        repo: args.repo,
-      });
-
       // Parse required gates if provided
       const requiredGates = args.requiredGates || ["lint", "typecheck", "test"];
 
       // Parse max workers if provided
       const maxWorkers = args.maxWorkers || 2;
 
-      // Generate plan from GitHub
-      plan = await generatePlanFromGitHub(client, {
-        query: args.query,
-        labels: args.labels,
-        excludePRs: args.excludePRs,
-        includeDrafts: args.includeDrafts,
-        target: args.target,
-        policy: {
-          requiredGates,
-          maxWorkers,
-        },
-      });
+      // Check for multi-repo mode (issue #677)
+      if (args.repos && args.repos.length > 0) {
+        // Multi-repo mode: discover PRs from multiple repositories
+        console.error(`[mcp:plan.create] Multi-repo mode: ${args.repos.length} repositories`);
 
-      // Log discovery results to stderr
-      const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
-      const filterInfo = args.labels ? ` labels=${args.labels.join(",")}` : "";
-      const queryInfo = args.query ? ` query="${args.query}"` : "";
-      console.error(
-        `[mcp:plan.create] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length} PRs`
-      );
+        plan = await generateMultiRepoPlan(args.repos, {
+          query: args.query,
+          labels: args.labels,
+          excludePRs: args.excludePRs,
+          includeDrafts: args.includeDrafts,
+          target: args.target,
+          githubToken: args.githubToken,
+          policy: {
+            requiredGates,
+            maxWorkers,
+          },
+        });
 
-      if (plan.items.length === 0) {
+        // Log discovery results to stderr
+        const repoList = args.repos.map((r) => `${r.owner}/${r.repo}`).join(", ");
+        const filterInfo = args.labels ? ` labels=${args.labels.join(",")}` : "";
         console.error(
-          `[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`
+          `[mcp:plan.create] repos=[${repoList}]${filterInfo} discovered=${plan.items.length} PRs`
         );
+
+        if (plan.items.length === 0) {
+          console.error(
+            `[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`
+          );
+        } else {
+          const prNames = plan.items.map((item) => item.name).join(", ");
+          console.error(`[mcp:plan.create] PRs included: ${prNames}`);
+        }
       } else {
-        const prNumbers = plan.items.map((item) => item.name).join(", ");
-        console.error(`[mcp:plan.create] PRs included: ${prNumbers}`);
+        // Single-repo mode (backward compatible)
+        const client = await createGitHubClient({
+          token: args.githubToken,
+          owner: args.owner,
+          repo: args.repo,
+        });
+
+        // Generate plan from GitHub
+        plan = await generatePlanFromGitHub(client, {
+          query: args.query,
+          labels: args.labels,
+          excludePRs: args.excludePRs,
+          includeDrafts: args.includeDrafts,
+          target: args.target,
+          policy: {
+            requiredGates,
+            maxWorkers,
+          },
+        });
+
+        // Log discovery results to stderr
+        const repoDiag = `${client.getOwner()}/${client.getRepo()}`;
+        const filterInfo = args.labels ? ` labels=${args.labels.join(",")}` : "";
+        const queryInfo = args.query ? ` query="${args.query}"` : "";
+        console.error(
+          `[mcp:plan.create] repo=${repoDiag}${filterInfo}${queryInfo} discovered=${plan.items.length} PRs`
+        );
+
+        if (plan.items.length === 0) {
+          console.error(
+            `[mcp:plan.create] Warning: No PRs found matching criteria. Check filters and repository state.`
+          );
+        } else {
+          const prNumbers = plan.items.map((item) => item.name).join(", ");
+          console.error(`[mcp:plan.create] PRs included: ${prNumbers}`);
+        }
       }
     } else {
       // Traditional mode: load from configuration files
