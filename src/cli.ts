@@ -46,6 +46,7 @@ import { registerAuditCommands } from "./cli-audit.js";
 import { registerCompletionCommand } from "./commands/completion.js";
 import { registerMergeOrderCommand } from "./commands/mergeOrder.js";
 import { registerMergeCommand } from "./commands/merge.js";
+import { registerPreviewConstraintsCommand } from "./commands/preview-constraints.js";
 import { registerQueryCommand } from "./commands/query.js";
 import { registerPlanDiffCommand } from "./commands/planDiff.js";
 import { registerPlanCommand } from "./commands/plan.js";
@@ -550,6 +551,9 @@ registerMergeCommand(
   () => jsonModeActive,
   () => program.opts()
 );
+
+// Preview Constraints command - Preview constraints for a plan
+registerPreviewConstraintsCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Config command - configuration inspection and debugging
 registerConfigCommand(program, { jsonModeActive: () => jsonModeActive });

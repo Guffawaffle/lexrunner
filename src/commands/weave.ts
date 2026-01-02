@@ -255,6 +255,7 @@ Subcommands:
     .description("Execute merge pyramid with gates and merging")
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .option("--dry-run", "Show what would happen without executing")
+    .option("--no-constraints", "Skip constraint preview in dry-run mode")
     .option("--skip-gates", "Skip gate execution (not recommended)")
     .option("--json", "Output JSON format")
     .action(async (opts) => {
@@ -274,22 +275,41 @@ Subcommands:
         const levels = computeMergeOrder(plan);
 
         if (opts.dryRun) {
-          // Dry-run mode: show execution plan
+          // Dry-run mode: show execution plan with constraint preview
+          const showConstraints = opts.constraints !== false;
+
           if (opts.json || deps.jsonModeActive()) {
-            console.log(
-              canonicalJSONStringify({
-                dryRun: true,
-                levels,
-                totalItems: plan.items?.length || 0,
-                maxParallelism: Math.max(...levels.map((level) => level.length)),
-              })
-            );
+            const output: any = {
+              dryRun: true,
+              levels,
+              totalItems: plan.items?.length || 0,
+              maxParallelism: Math.max(...levels.map((level) => level.length)),
+            };
+
+            // Add constraint preview to JSON output if enabled
+            if (showConstraints) {
+              const { previewConstraints } = await import("../preview/constraints.js");
+              const constraintPreview = await previewConstraints(plan);
+              output.constraints = constraintPreview;
+            }
+
+            console.log(canonicalJSONStringify(output));
           } else {
             console.log(`\n🔍 Merge-Weave Dry Run\n`);
+
+            // Show constraint preview first if enabled
+            if (showConstraints) {
+              const { previewConstraints, formatConstraintPreview } =
+                await import("../preview/constraints.js");
+              const constraintPreview = await previewConstraints(plan);
+              console.log(formatConstraintPreview(constraintPreview));
+            }
+
             console.log(`Plan: ${opts.plan}`);
             console.log(`Items: ${plan.items?.length || 0}`);
             console.log(`Target: ${plan.target || "main"}\n`);
 
+            console.log("📦 Execution Plan\n");
             console.log("Execution Order (topological):\n");
             levels.forEach((level, idx) => {
               console.log(`  Level ${idx + 1}:`);
