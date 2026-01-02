@@ -90,10 +90,17 @@ function saveIndex(index: CounterExampleIndex, baseDir: string = process.cwd()):
 
 /**
  * Generate a filename for a counter-example
+ * Sanitizes the target to prevent path traversal
  */
 function generateFileName(counterExample: CounterExample): string {
   const date = new Date(counterExample.timestamp).toISOString().split("T")[0];
-  const target = counterExample.failure.target.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  // Sanitize target: remove all non-alphanumeric characters except hyphens
+  const target = counterExample.failure.target
+    .replace(/[^a-z0-9-]/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase()
+    .substring(0, 50); // Limit length
   const type = counterExample.failure.type;
   return `${date}-${target}-${type}.json`;
 }
@@ -192,21 +199,29 @@ export function exportCounterExamples(
     return canonicalJSONStringify(index);
   }
 
-  // CSV format
+  // CSV format with proper escaping
   const lines: string[] = [
     "ID,Timestamp,Failure Type,Target,Classification,Should Learn,File Path",
   ];
 
   for (const entry of index.entries) {
+    // Escape CSV fields: quote and escape internal quotes
+    const escapeCsv = (field: string): string => {
+      if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+        return `"${field.replace(/"/g, '""')}"`;
+      }
+      return field;
+    };
+
     lines.push(
       [
-        entry.id,
-        entry.timestamp,
-        entry.failureType,
-        entry.target,
-        entry.classificationType,
+        escapeCsv(entry.id),
+        escapeCsv(entry.timestamp),
+        escapeCsv(entry.failureType),
+        escapeCsv(entry.target),
+        escapeCsv(entry.classificationType),
         entry.shouldLearn.toString(),
-        entry.filePath,
+        escapeCsv(entry.filePath),
       ].join(",")
     );
   }

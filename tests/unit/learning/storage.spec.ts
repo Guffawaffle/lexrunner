@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import {
   storeCounterExample,
   listCounterExamples,
@@ -18,8 +19,8 @@ describe("Counter-Example Storage", () => {
   let testDir: string;
 
   beforeEach(() => {
-    // Create a unique test directory for each test
-    testDir = path.join("/tmp", `counter-examples-test-${Date.now()}`);
+    // Create a unique test directory for each test using os.tmpdir() for cross-platform support
+    testDir = path.join(os.tmpdir(), `counter-examples-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
@@ -136,6 +137,18 @@ describe("Counter-Example Storage", () => {
       const lines = exported.split("\n");
       expect(lines[0]).toContain("ID,Timestamp,Failure Type");
       expect(lines[1]).toContain(counterExample.id);
+    });
+
+    it("should properly escape CSV fields with commas and quotes", () => {
+      const counterExample = createMockCounterExample();
+      counterExample.failure.target = 'test,with"quotes';
+      counterExample.classification.description = "Test with, commas";
+      storeCounterExample(counterExample, testDir);
+
+      const exported = exportCounterExamples("csv", testDir);
+      const lines = exported.split("\n");
+      // Check that fields with special characters are properly escaped
+      expect(lines[1]).toContain('"test,with""quotes"');
     });
   });
 });
