@@ -88,6 +88,14 @@ async function searchAttributions(
   const queryLower = query.toLowerCase();
 
   try {
+    // Check if runs directory exists
+    try {
+      await fs.access(runsDir);
+    } catch {
+      // Directory doesn't exist, return empty results
+      return results;
+    }
+
     const entries = await fs.readdir(runsDir, { withFileTypes: true });
 
     for (const entry of entries) {
