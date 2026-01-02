@@ -183,6 +183,38 @@ export interface WeaveLockFile {
 }
 
 /**
+ * Resolution guidance for conflicts
+ */
+export interface ConflictResolutionGuidance {
+  /** Type of guidance */
+  type: "auto-merge-safe" | "manual-review" | "dependency-order";
+  /** Human-readable guidance message */
+  message: string;
+  /** Confidence level (0-1) */
+  confidence: number;
+  /** Suggested resolution strategy */
+  strategy?: "merge-both" | "accept-first" | "accept-last" | "manual";
+  /** Additional context */
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Inter-PR conflict detected between two items
+ */
+export interface InterPRConflict {
+  /** First item involved */
+  item1: string;
+  /** Second item involved */
+  item2: string;
+  /** Conflicted file paths */
+  files: string[];
+  /** Severity: how likely this will cause a merge conflict */
+  severity: "likely" | "possible" | "unlikely";
+  /** Resolution guidance */
+  guidance?: ConflictResolutionGuidance;
+}
+
+/**
  * Preflight conflict detection result for a single item
  */
 export interface PreflightItemConflict {
@@ -217,6 +249,8 @@ export interface PreflightResults {
   conflictsDetected: number;
   /** Per-item conflict details */
   items: PreflightItemConflict[];
+  /** Inter-PR conflicts (file overlap between PRs) */
+  interPRConflicts?: InterPRConflict[];
   /** Whether preflight detection was skipped */
   skipped?: boolean;
   /** Reason for skipping (if applicable) */
