@@ -229,6 +229,51 @@ export function formatDryRunOutput(output: DryRunOutput): string {
         }
       }
     }
+
+    // Add inter-PR conflict warnings
+    if (output.preflight.interPRConflicts && output.preflight.interPRConflicts.length > 0) {
+      lines.push("");
+      lines.push("## Inter-PR Conflicts (File Overlap)");
+      lines.push("");
+      lines.push(
+        `⚠️  ${output.preflight.interPRConflicts.length} potential conflict(s) between PRs detected`
+      );
+      lines.push("");
+
+      for (const conflict of output.preflight.interPRConflicts) {
+        lines.push(`### ${conflict.item1} ↔ ${conflict.item2}`);
+        lines.push(`- **Severity:** ${conflict.severity}`);
+        lines.push(`- **Overlapping files:** ${conflict.files.join(", ")}`);
+
+        if (conflict.guidance) {
+          lines.push("");
+          lines.push("**Resolution Guidance:**");
+          lines.push(`- Type: ${conflict.guidance.type}`);
+          lines.push(`- Strategy: ${conflict.guidance.strategy || "manual"}`);
+          lines.push(`- Confidence: ${(conflict.guidance.confidence * 100).toFixed(0)}%`);
+          lines.push(`- ${conflict.guidance.message}`);
+
+          if (conflict.guidance.context) {
+            const ctx = conflict.guidance.context;
+            if (ctx.safeMergeStrategy) {
+              lines.push(`- **Safe merge:** ${ctx.safeMergeStrategy}`);
+            }
+            if (ctx.regenerationCommand) {
+              lines.push(`- **Command:** \`${ctx.regenerationCommand}\``);
+            }
+            if (ctx.warning) {
+              lines.push(`- **⚠️ Warning:** ${ctx.warning}`);
+            }
+          }
+        }
+
+        lines.push("");
+      }
+
+      lines.push(
+        "**Recommendation:** Merge PRs in dependency order and resolve conflicts as they arise."
+      );
+    }
   }
 
   lines.push("");

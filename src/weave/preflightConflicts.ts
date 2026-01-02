@@ -5,8 +5,9 @@
 
 import { execa } from "execa";
 import { Plan } from "../schema.js";
-import { PreflightItemConflict, PreflightResults } from "./types.js";
+import { PreflightItemConflict, PreflightResults, InterPRConflict } from "./types.js";
 import { weavePreflightFailedError } from "../errors/index.js";
+import { generateResolutionGuidance, determineConflictSeverity } from "./resolutionGuidance.js";
 
 /**
  * Detect conflicts for all items in a plan by simulating merges sequentially
@@ -38,9 +39,13 @@ export async function detectPreflightConflicts(
     }
   }
 
+  // Detect inter-PR conflicts (file overlap between PRs)
+  const interPRConflicts = await detectInterPRConflicts(plan, items, workingDir);
+
   return {
     conflictsDetected: totalConflicts,
     items,
+    interPRConflicts,
   };
 }
 
@@ -224,12 +229,146 @@ function parseMergeTreeOutput(output: string): Array<{
 }
 
 /**
+ * Detect inter-PR conflicts by analyzing file changes between items
+ */
+async function detectInterPRConflicts(
+  plan: Plan,
+  items: PreflightItemConflict[],
+  workingDir: string
+): Promise<InterPRConflict[]> {
+  const conflicts: InterPRConflict[] = [];
+
+  // Get changed files for each item
+  const itemChanges = new Map<string, string[]>();
+
+  for (const item of plan.items) {
+    try {
+      const changedFiles = await getChangedFiles(plan.target, item.name, workingDir);
+      itemChanges.set(item.name, changedFiles);
+    } catch (error) {
+      // If we can't get changes, skip this item
+      itemChanges.set(item.name, []);
+    }
+  }
+
+  // Compare each pair of items for file overlap
+  const itemNames = Array.from(itemChanges.keys());
+  for (let i = 0; i < itemNames.length; i++) {
+    for (let j = i + 1; j < itemNames.length; j++) {
+      const item1 = itemNames[i];
+      const item2 = itemNames[j];
+      const files1 = itemChanges.get(item1) ?? [];
+      const files2 = itemChanges.get(item2) ?? [];
+
+      // Find overlapping files
+      const overlappingFiles = files1.filter((f) => files2.includes(f));
+
+      if (overlappingFiles.length > 0) {
+        // Determine severity and guidance for each overlapping file
+        const fileGuidance = overlappingFiles.map((file) => ({
+          file,
+          severity: determineConflictSeverity(file, files1, files2),
+          guidance: generateResolutionGuidance(file),
+        }));
+
+        // Use the highest severity
+        const highestSeverity = fileGuidance.some((fg) => fg.severity === "likely")
+          ? "likely"
+          : fileGuidance.some((fg) => fg.severity === "possible")
+            ? "possible"
+            : "unlikely";
+
+        // Use the first available guidance or create a default
+        const guidance =
+          fileGuidance.find((fg) => fg.guidance)?.guidance ||
+          createDefaultGuidance(overlappingFiles);
+
+        conflicts.push({
+          item1,
+          item2,
+          files: overlappingFiles,
+          severity: highestSeverity,
+          guidance,
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+/**
+ * Get list of files changed in an item compared to target branch
+ */
+async function getChangedFiles(
+  targetBranch: string,
+  itemBranch: string,
+  workingDir: string
+): Promise<string[]> {
+  try {
+    // Try with origin/ prefix first
+    let targetRef = `origin/${targetBranch}`;
+    let itemRef = `origin/${itemBranch}`;
+
+    // Check if origin refs exist
+    const { exitCode: targetExists } = await execa("git", ["rev-parse", "--verify", targetRef], {
+      cwd: workingDir,
+      reject: false,
+    });
+
+    if (targetExists !== 0) {
+      targetRef = targetBranch;
+    }
+
+    const { exitCode: itemExists } = await execa("git", ["rev-parse", "--verify", itemRef], {
+      cwd: workingDir,
+      reject: false,
+    });
+
+    if (itemExists !== 0) {
+      itemRef = itemBranch;
+    }
+
+    // Get the list of changed files
+    const { stdout } = await execa("git", ["diff", "--name-only", targetRef, itemRef], {
+      cwd: workingDir,
+    });
+
+    return stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  } catch (error) {
+    // If git commands fail, return empty list
+    return [];
+  }
+}
+
+/**
+ * Create default guidance when no specific pattern matches
+ */
+function createDefaultGuidance(files: string[]): {
+  type: "manual-review" | "dependency-order";
+  message: string;
+  confidence: number;
+  strategy?: "manual" | "merge-both";
+} {
+  return {
+    type: "manual-review",
+    message: `Both PRs modify ${files.length === 1 ? "the same file" : `${files.length} common files`}. Manual review recommended after the first PR merges.`,
+    confidence: 0.5,
+    strategy: "manual",
+  };
+}
+
+/**
  * Skip preflight detection with a reason
  */
 export function skipPreflightDetection(reason: string): PreflightResults {
   return {
     conflictsDetected: 0,
     items: [],
+    interPRConflicts: [],
     skipped: true,
     skipReason: reason,
   };

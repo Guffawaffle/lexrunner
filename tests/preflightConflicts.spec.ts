@@ -29,6 +29,7 @@ describe("Preflight Conflict Detection", () => {
       expect(result).toEqual({
         conflictsDetected: 0,
         items: [],
+        interPRConflicts: [],
         skipped: true,
         skipReason: "Test reason",
       });
