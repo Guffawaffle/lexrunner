@@ -39,6 +39,8 @@ import { registerStatusCommand } from "./commands/status.js";
 import { registerReportCommand } from "./commands/report.js";
 import { registerRetryCommand } from "./commands/retry.js";
 import { registerGateReportCommand } from "./commands/gateReport.js";
+import { registerGateAttestCommand } from "./commands/gateAttest.js";
+import { registerGateImportCommand } from "./commands/gateImport.js";
 import { registerGovernanceReportCommand } from "./commands/governanceReport.js";
 import { registerGovernanceCleanupCommand } from "./commands/governanceCleanup.js";
 import { registerSecurityCommands } from "./cli-security.js";
@@ -502,6 +504,8 @@ registerExecuteCommand(gateCmd, {
   exitWith,
   getProgramOpts: () => program.opts(),
 });
+registerGateAttestCommand(gateCmd);
+registerGateImportCommand(gateCmd);
 
 // ============================================================================
 // Legacy Commands (Deprecated - ALN-003 Phase 2)
@@ -1188,6 +1192,8 @@ export { computeMergeOrder } from "./mergeOrder.js";
 export { createGitHubAPI, GitHubAPI } from "./github/api.js";
 export { createGitHubClient } from "./github/client.js";
 export { generatePlanFromGitHub } from "./core/githubPlan.js";
+export { generateMultiRepoPlan } from "./core/multiRepoPlan.js";
+export type { RepoTarget, MultiRepoPlanOptions } from "./core/multiRepoPlan.js";
 export { generateGitHubSnapshot } from "./core/snapshot.js";
 export { createGitOperations } from "./git/operations.js";
 export {

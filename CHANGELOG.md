@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+
+- **Gate Attestation & Import**: New commands `gate attest` and `gate import` to record gate results from external runs
+  - `lex-pr gate attest` - Manually attest that gates have passed for a PR/item
+  - `lex-pr gate import` - Import gate results from external sources (CI, logs, etc.)
+  - ExecutionState now supports loading gate results from directory
+  - merge_apply MCP handler automatically loads gate results from `.smartergpt/gate-results/`
+  - Fixes issue where manually run gates (e.g., `npm run build && npm test`) weren't tracked
+  - Full documentation in `docs/GATE_ATTESTATION_GUIDE.md`
 
 ---
 

@@ -20,3 +20,5 @@ export {
 } from "./types.js";
 
 export { executeD1Intervention, hasD1Handler, getD1InterventionTypes } from "./d1-executor.js";
+
+export { executeD2Intervention, hasD2Handler, getD2InterventionTypes } from "./d2-executor.js";
