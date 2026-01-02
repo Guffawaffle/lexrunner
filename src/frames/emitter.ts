@@ -194,6 +194,7 @@ export async function emitMergeWeaveFrame(
         error: input.error,
         turn_cost: input.turnCost,
         tier_metrics: input.tierMetrics,
+        governed_by: input.governedBy,
       },
     };
 

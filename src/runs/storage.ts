@@ -268,3 +268,23 @@ export function readRunLog(
 
   return lines.map((line) => JSON.parse(line) as Record<string, unknown>);
 }
+
+/**
+ * Write attributions to a run's attribution log (LR-TSF-001)
+ */
+export function writeAttributions(
+  runId: string,
+  attributions: Array<{
+    timestamp: string;
+    constraintId: string;
+    action: string;
+    target?: string;
+    source: string;
+    statement: string;
+  }>,
+  baseDir: string = process.cwd()
+): void {
+  for (const attribution of attributions) {
+    appendToRunLog(runId, "attributions", attribution, baseDir);
+  }
+}

@@ -77,6 +77,19 @@ export const ExecutionFrameMetadataSchema = z.object({
       escalationRate: z.number(),
     })
     .optional(),
+  /** Constraint attributions (LR-TSF-001) */
+  governed_by: z
+    .array(
+      z.object({
+        /** Constraint identifier */
+        constraintId: z.string(),
+        /** Source of the constraint */
+        source: z.enum(["baseline", "persona", "learned"]),
+        /** Action that was governed */
+        action: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export type ExecutionFrameMetadata = z.infer<typeof ExecutionFrameMetadataSchema>;
@@ -158,6 +171,12 @@ export interface MergeWeaveFrameInput {
     tierMatchRate: number;
     escalationRate: number;
   };
+  /** Constraint attributions (LR-TSF-001) */
+  governedBy?: Array<{
+    constraintId: string;
+    source: "baseline" | "persona" | "learned";
+    action: string;
+  }>;
 }
 
 /**

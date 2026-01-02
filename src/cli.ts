@@ -78,6 +78,7 @@ import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
 import { registerWeaveCommand } from "./commands/weave.js";
+import { registerExplainCommand } from "./commands/explain.js";
 import { setFrameEmissionEnabled } from "./frames/controller.js";
 import {
   CLIExitSignal,
@@ -398,6 +399,9 @@ registerWeaveCommand(program, {
   jsonModeActive: () => jsonModeActive,
   getProgramOpts: () => program.opts(),
 });
+
+// Explain command - LR-TSF-001: Query constraint attributions
+registerExplainCommand(program);
 
 // Workspace category - Local workspace management
 const workspaceCmd = program
