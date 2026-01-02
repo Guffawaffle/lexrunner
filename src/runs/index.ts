@@ -45,6 +45,7 @@ export {
   ensureRunDir,
   appendToRunLog,
   readRunLog,
+  writeAttributions,
 } from "./storage.js";
 
 // Manager
@@ -124,3 +125,17 @@ export {
 } from "./decisions.js";
 
 export type { SubmitDecisionInput, SubmitDecisionOutput, DecisionLogEntry } from "./decisions.js";
+
+// Attribution - LR-TSF-001
+export type {
+  ConstraintSource,
+  ConstraintAttribution,
+  AttributionLogEntry,
+  FrameAttribution,
+} from "./attribution.js";
+
+export { AttributionTracker, createAttributionTracker } from "./attribution.js";
+
+// Context - LR-TSF-001
+export type { ExecutionContext } from "./context.js";
+export { createExecutionContext, logAttribution } from "./context.js";
