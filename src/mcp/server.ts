@@ -1837,8 +1837,18 @@ async function handleMergeApply(
 
     const executionState = new ExecutionState(plan);
 
-    // TODO: Load actual execution results if available
-    // For now, assume we're in read-only mode
+    // Load gate results from directory if available
+    const gateResultsDir = path.join(resolved.path, "gate-results");
+    if (fs.existsSync(gateResultsDir)) {
+      try {
+        const loadedCount = executionState.loadGateResultsFromDirectory(gateResultsDir);
+        console.log(`📊 Loaded ${loadedCount} gate result(s) from ${gateResultsDir}`);
+      } catch (error) {
+        console.warn(
+          `⚠️  Failed to load gate results from ${gateResultsDir}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
 
     const evaluator = new MergeEligibilityEvaluator(plan, executionState);
     const decisions = evaluator.evaluateAllNodes();

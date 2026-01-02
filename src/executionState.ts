@@ -14,6 +14,9 @@ import {
   GateStatus,
 } from "./schema.js";
 import { classifyError, ClassifiedError } from "./core/errorRecovery.js";
+import * as fs from "fs";
+import * as path from "path";
+import { readGateDir } from "./report/aggregate.js";
 
 /**
  * Error diagnostic information
@@ -296,5 +299,58 @@ export class ExecutionState {
       }
     }
     return true;
+  }
+
+  /**
+   * Load gate results from a directory and populate execution state
+   * This allows importing results from external runs (manual gates, CI, etc.)
+   *
+   * @param gateResultsDir Directory containing gate result JSON files
+   * @returns Number of gate results loaded
+   */
+  loadGateResultsFromDirectory(gateResultsDir: string): number {
+    if (!fs.existsSync(gateResultsDir)) {
+      throw new Error(`Gate results directory does not exist: ${gateResultsDir}`);
+    }
+
+    const stat = fs.statSync(gateResultsDir);
+    if (!stat.isDirectory()) {
+      throw new Error(`Path is not a directory: ${gateResultsDir}`);
+    }
+
+    // Use the existing readGateDir function to read and validate gate reports
+    const aggregatedReport = readGateDir(gateResultsDir);
+
+    let loadedCount = 0;
+
+    // Process each item's gate results
+    for (const itemGates of aggregatedReport.items) {
+      const itemName = itemGates.item;
+
+      // Check if this item exists in the plan
+      if (!this.results.has(itemName)) {
+        console.warn(`⚠️  Skipping gate results for unknown item: ${itemName}`);
+        continue;
+      }
+
+      // Convert GateReport to GateResult and load into execution state
+      for (const gateReport of itemGates.gates) {
+        const gateResult: GateResult = {
+          gate: gateReport.gate,
+          status: gateReport.status,
+          duration: gateReport.duration_ms,
+          stdout: gateReport.stdout_path || "",
+          stderr: gateReport.stderr_path || "",
+          artifacts: gateReport.artifacts?.map((a) => a.path) || [],
+          attempts: 1,
+          lastAttempt: gateReport.started_at,
+        };
+
+        this.updateGateResult(itemName, gateResult);
+        loadedCount++;
+      }
+    }
+
+    return loadedCount;
   }
 }
