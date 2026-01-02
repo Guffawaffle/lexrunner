@@ -29,6 +29,7 @@ New to lexrunner? Start here:
 - **[Schemas](./schemas.md)** - Plan and configuration schemas
 - **[Gates](./gates.md)** - Quality gates and input validation
 - **[Error Taxonomy](./errors.md)** - Error codes and handling
+- **[Counter-Examples](./counter-examples.md)** - Failure learning and capture
 
 ### Merge Strategies
 
