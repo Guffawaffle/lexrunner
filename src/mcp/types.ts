@@ -29,6 +29,16 @@ export function getMCPEnvironment(): MCPEnvironment {
  * Validation schemas for MCP tool parameters
  */
 
+/**
+ * Single repository configuration for multi-repo discovery
+ */
+export const RepoTarget = z.object({
+  owner: z.string(),
+  repo: z.string(),
+  priority: z.number().optional().default(1),
+});
+export type RepoTarget = z.infer<typeof RepoTarget>;
+
 export const PlanCreateArgs = z.object({
   json: z.boolean().optional(),
   outDir: z.string().optional(),
@@ -39,8 +49,11 @@ export const PlanCreateArgs = z.object({
   includeDrafts: z.boolean().optional(),
   excludePRs: z.array(z.number()).optional(),
   githubToken: z.string().optional(),
+  // Single repo mode (backward compatible)
   owner: z.string().optional(),
   repo: z.string().optional(),
+  // Multi-repo mode (issue #677)
+  repos: z.array(RepoTarget).optional(),
   requiredGates: z.array(z.string()).optional(),
   maxWorkers: z.number().optional(),
   target: z.string().optional(),

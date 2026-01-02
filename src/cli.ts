@@ -1188,6 +1188,8 @@ export { computeMergeOrder } from "./mergeOrder.js";
 export { createGitHubAPI, GitHubAPI } from "./github/api.js";
 export { createGitHubClient } from "./github/client.js";
 export { generatePlanFromGitHub } from "./core/githubPlan.js";
+export { generateMultiRepoPlan } from "./core/multiRepoPlan.js";
+export type { RepoTarget, MultiRepoPlanOptions } from "./core/multiRepoPlan.js";
 export { generateGitHubSnapshot } from "./core/snapshot.js";
 export { createGitOperations } from "./git/operations.js";
 export {
