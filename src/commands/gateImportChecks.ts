@@ -165,16 +165,23 @@ export function registerGateImportChecksCommand(program: Command): void {
         console.log();
         console.log(`💾 Saving gate results to: ${outDir}`);
         for (const result of gateResults) {
+          // Skip saving gates with 'skipped' status - GateReport only accepts pass/fail
+          if (result.status === "skipped") {
+            console.log(`   ⊘ ${result.gate}: skipped (not saved)`);
+            continue;
+          }
+
           const gateReport: GateReport = {
             schemaVersion: "1.0.0",
             item: itemName,
             gate: result.gate,
-            status: result.status,
+            status: result.status as "pass" | "fail",
             duration_ms: result.duration || 0,
-            started_at: result.lastAttempt || new Date().toISOString(),
+            started_at: new Date().toISOString(), // Use current time since we don't have the actual start time
             meta: {
               source: "github-checks",
               check_url: result.artifacts?.[0] || "",
+              completed_at: result.lastAttempt || "",
             },
           };
 

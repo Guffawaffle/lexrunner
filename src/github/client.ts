@@ -544,7 +544,7 @@ export class GitHubClientImpl implements GitHubClient {
         completed_at: check.completed_at,
         html_url: check.html_url,
         app: {
-          name: check.app?.name || "unknown",
+          name: check.app?.name || "GitHub App",
         },
       }));
     } catch (error: any) {

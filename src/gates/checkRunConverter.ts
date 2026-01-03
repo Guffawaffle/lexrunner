@@ -58,7 +58,7 @@ export function convertCheckRunToGateResult(
     status,
     exitCode: status === "pass" ? 0 : 1,
     duration,
-    stdout: `GitHub check: ${check.name}\nStatus: ${check.status}\nConclusion: ${check.conclusion}`,
+    stdout: `GitHub check: ${check.name}\nStatus: ${check.status}\nConclusion: ${check.conclusion || "unknown"}`,
     stderr: status === "fail" ? `Check failed: ${check.name}` : "",
     artifacts: [check.html_url],
     attempts: 1,

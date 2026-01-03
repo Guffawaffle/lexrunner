@@ -63,9 +63,12 @@ export function loadGateMappingConfig(configPath: string): GateMappingConfig {
  * Map a CI check name to a gate name using the mapping configuration
  */
 export function mapCheckNameToGate(checkName: string, config: GateMappingConfig): string | null {
-  // Try exact match first
+  // Normalize check name for case-insensitive comparison
+  const normalizedCheckName = checkName.toLowerCase();
+
+  // Try exact match first (case-insensitive)
   for (const mapping of config.mappings) {
-    if (mapping.pattern === checkName) {
+    if (mapping.pattern.toLowerCase() === normalizedCheckName) {
       return mapping.gate;
     }
   }
