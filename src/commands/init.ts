@@ -16,6 +16,16 @@ import {
   logProfileMessage,
 } from "../config/profileResolver.js";
 import { createGitHubClient, GitHubAuthError } from "../github/client.js";
+import {
+  detectEnvironment,
+  getAuditProfileConfig,
+  getPolicyTemplateConfig,
+  createEnterpriseWorkspace,
+  generateCopilotInstructions,
+  type EnterpriseConfig,
+  type AuditProfile,
+  type PolicyTemplate,
+} from "../core/enterprise.js";
 
 interface InitOptions {
   force?: boolean;
@@ -23,6 +33,9 @@ interface InitOptions {
   githubToken?: string;
   profileDir?: string;
   jsonMode?: boolean;
+  enterprise?: boolean;
+  auditProfile?: AuditProfile;
+  policyTemplate?: PolicyTemplate;
 }
 
 export interface InitResult {
@@ -82,6 +95,11 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
   const projectType = detectProjectType(baseDir);
   if (!options.jsonMode) {
     console.log(`\n🔍 Detected project type: ${projectType}\n`);
+  }
+
+  // Enterprise setup flow
+  if (options.enterprise) {
+    return await runEnterpriseInit(baseDir, profileDir, options);
   }
 
   // Interactive setup
@@ -236,4 +254,161 @@ function getPRTemplateContent(): string {
 ## Notes
 <!-- Any additional context or notes -->
 `;
+}
+
+/**
+ * Run enterprise initialization workflow
+ */
+async function runEnterpriseInit(
+  baseDir: string,
+  profileDir: string,
+  options: InitOptions
+): Promise<InitResult> {
+  if (!options.jsonMode) {
+    console.log("\n🏢 Enterprise Setup Wizard\n");
+  }
+
+  // Detect environment
+  const envDetection = detectEnvironment(baseDir);
+
+  if (!options.jsonMode) {
+    console.log("📊 Environment Detection:");
+    console.log(`   Project structure: ${envDetection.projectStructure}`);
+    console.log(`   CI provider: ${envDetection.ciProvider}`);
+    console.log(`   Detected CI: ${envDetection.detectedCI.join(", ") || "none"}\n`);
+  }
+
+  // Determine audit profile
+  const auditProfile: AuditProfile = options.auditProfile || "soc2";
+
+  // Determine policy template
+  const policyTemplate: PolicyTemplate = options.policyTemplate || "enterprise-standard";
+
+  const enterpriseConfig: EnterpriseConfig = {
+    audit: getAuditProfileConfig(auditProfile),
+    policy: getPolicyTemplateConfig(policyTemplate),
+    environment: {
+      projectStructure: envDetection.projectStructure,
+      ciProvider: envDetection.ciProvider,
+    },
+  };
+
+  if (!options.jsonMode) {
+    console.log("⚙️  Configuration:");
+    console.log(`   Audit profile: ${auditProfile}`);
+    console.log(`   Policy template: ${policyTemplate}`);
+    console.log(`   Required gates: ${enterpriseConfig.policy.requiredGates.join(", ")}`);
+    if (enterpriseConfig.policy.approvalRules) {
+      console.log(
+        `   Min approvers: ${enterpriseConfig.policy.approvalRules.minApprovers || "N/A"}`
+      );
+      console.log(
+        `   Require code owner: ${enterpriseConfig.policy.approvalRules.requireCodeOwner ? "Yes" : "No"}`
+      );
+    }
+    console.log("");
+  }
+
+  // Create workspace structure
+  try {
+    // Ensure profile directory exists and has proper manifest
+    if (!fs.existsSync(profileDir)) {
+      fs.mkdirSync(profileDir, { recursive: true });
+    }
+
+    // Ensure runner/ subdirectory exists for working artifacts
+    const runnerDir = path.join(profileDir, "runner");
+    fs.mkdirSync(runnerDir, { recursive: true });
+
+    // Create or update profile manifest
+    const manifestPath = path.join(profileDir, "profile.yml");
+    if (!fs.existsSync(manifestPath)) {
+      const manifestContent = `role: local
+name: Enterprise Development Profile
+description: Auto-generated enterprise workspace with audit and compliance
+`;
+      fs.writeFileSync(manifestPath, manifestContent);
+    }
+
+    // Create basic workspace first
+    createMinimalWorkspace(baseDir, profileDir);
+
+    // Create enterprise workspace additions
+    createEnterpriseWorkspace(baseDir, profileDir, enterpriseConfig);
+
+    // Create pull-request-template.md at profile root
+    const templatePath = path.join(profileDir, "pull-request-template.md");
+    if (!fs.existsSync(templatePath)) {
+      const templateContent = getPRTemplateContent();
+      fs.writeFileSync(templatePath, templateContent);
+    }
+
+    // Update gates.yml with enterprise gates
+    const gatesPath = path.join(profileDir, "gates.yml");
+    const gatesContent = `version: 1
+levels:
+  default:
+${enterpriseConfig.policy.requiredGates
+  .map(
+    (gate) => `    - name: ${gate}
+      run: "npm run ${gate}"`
+  )
+  .join("\n")}
+`;
+    fs.writeFileSync(gatesPath, gatesContent);
+
+    // Only show console output if not in JSON mode
+    if (!options.jsonMode) {
+      console.log(`\n✅ Enterprise workspace initialized successfully!\n`);
+      console.log(`📂 Profile directory: ${profileDir}`);
+      console.log(`\n📝 Created structure:`);
+      console.log(`   ${profileDir}/`);
+      console.log(`   ├── .lexrunner/`);
+      console.log(`   │   ├── config.yaml (enterprise configuration)`);
+      console.log(`   │   ├── gate-mapping.yaml (CI integration)`);
+      console.log(`   │   ├── personas/ (team personas)`);
+      if (enterpriseConfig.audit.profile !== "off") {
+        console.log(`   │   └── audit/ (audit logs)`);
+      }
+      console.log(`   ├── intent.md (project goals)`);
+      console.log(`   ├── scope.yml (PR discovery rules)`);
+      console.log(`   ├── deps.yml (dependency relationships)`);
+      console.log(`   ├── gates.yml (quality gates - updated)`);
+      console.log(`   └── runner/ (working artifacts)`);
+
+      if (enterpriseConfig.environment.ciProvider === "github-actions") {
+        console.log(`\n   .github/`);
+        console.log(`   ├── copilot-instructions.md (GitHub Copilot setup)`);
+        console.log(`   └── workflows/`);
+        console.log(`       └── merge-weave.yaml (CI workflow template)`);
+      }
+
+      console.log(`\n📚 Next steps:`);
+      console.log(`   1. Review enterprise configuration in ${profileDir}/.lexrunner/config.yaml`);
+      console.log(`   2. Configure gate mapping in ${profileDir}/.lexrunner/gate-mapping.yaml`);
+      if (enterpriseConfig.environment.ciProvider === "github-actions") {
+        console.log(`   3. Review GitHub Copilot instructions in .github/copilot-instructions.md`);
+        console.log(`   4. Customize CI workflow in .github/workflows/merge-weave.yaml`);
+      }
+      console.log(`   5. Run 'lex-pr doctor' to verify your setup`);
+      console.log(`   6. Run 'lex-pr discover' to find open PRs\n`);
+
+      console.log(`💡 Tip: You can customize personas in ${profileDir}/.lexrunner/personas/\n`);
+    }
+
+    return {
+      success: true,
+      profileDir,
+      message: "Enterprise workspace initialized successfully",
+    };
+  } catch (error) {
+    if (error instanceof WriteProtectionError) {
+      return {
+        success: false,
+        profileDir,
+        message: `Write protection error: ${error.message}`,
+      };
+    }
+    throw error;
+  }
 }
