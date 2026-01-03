@@ -186,10 +186,128 @@ lex-pr execute plan.json
 lex-pr execute plan.json --skip-input-validation
 ```
 
+### Import Gate Results from GitHub Checks
+
+Starting in v0.6.0, you can automatically import gate results from GitHub check runs, reducing manual work when gates are already running in CI.
+
+#### Quick Start
+
+```bash
+# Import checks for a PR
+lex-pr gate import-checks --ref 123
+
+# Import checks for a specific commit
+lex-pr gate import-checks --ref abc123def
+
+# Create default gate mapping configuration
+lex-pr gate import-checks --create-mapping
+```
+
+#### Gate Mapping Configuration
+
+Create a `.lexrunner/gate-mapping.yaml` file to map CI check names to gate names:
+
+```yaml
+version: "1.0.0"
+mappings:
+  - pattern: "CI / build"
+    gate: build
+  - pattern: "CI / test"
+    gate: test
+  - pattern: "lint"
+    gate: lint
+  - pattern: "typecheck"
+    gate: typecheck
+  - pattern: "security-scan"
+    gate: vuln
+```
+
+Patterns support wildcards:
+
+```yaml
+mappings:
+  - pattern: "test*"
+    gate: test
+  - pattern: "*lint*"
+    gate: lint
+```
+
+#### Command Options
+
+```bash
+lex-pr gate import-checks --ref <ref> [options]
+
+Options:
+  --ref <ref>           Git reference (commit SHA, branch, or PR number) [required]
+  --item <name>         Item name (defaults to ref value)
+  --out-dir <dir>       Output directory for gate results (default: .smartergpt/gate-results)
+  --mapping <file>      Path to gate mapping config (default: .lexrunner/gate-mapping.yaml)
+  --owner <owner>       GitHub repository owner (auto-detected if not provided)
+  --repo <repo>         GitHub repository name (auto-detected if not provided)
+  --token <token>       GitHub token (uses GITHUB_TOKEN env var if not provided)
+  --create-mapping      Create default gate mapping configuration file and exit
+```
+
+#### How It Works
+
+1. Fetches check runs from GitHub for the specified commit/PR
+2. Filters to completed checks only
+3. Maps check names to gate names using the mapping configuration
+4. Converts check results to gate results format
+5. Saves gate results to the output directory
+
+#### Status Mapping
+
+GitHub check conclusions are mapped to gate statuses:
+
+| GitHub Conclusion | Gate Status |
+| ----------------- | ----------- |
+| `success`         | `pass`      |
+| `failure`         | `fail`      |
+| `skipped`         | `skipped`   |
+| `neutral`         | `skipped`   |
+| `timed_out`       | `fail`      |
+| `cancelled`       | `fail`      |
+| `action_required` | `fail`      |
+
+#### Example Workflow
+
+```bash
+# 1. Create gate mapping configuration
+lex-pr gate import-checks --create-mapping
+
+# 2. Edit .lexrunner/gate-mapping.yaml to match your CI check names
+
+# 3. Import checks for a PR
+lex-pr gate import-checks --ref 123
+
+# 4. Verify imported gate results
+ls .smartergpt/gate-results/
+# Output:
+# 123-build.json
+# 123-test.json
+# 123-lint.json
+```
+
+#### Integration with Merge Eligibility
+
+Imported gate results are automatically used in merge eligibility evaluation:
+
+```bash
+# After importing checks
+lex-pr weave status
+
+# Output will include imported gate results:
+# ✅ build: pass (imported from GitHub)
+# ❌ test: fail (imported from GitHub)
+# ✅ lint: pass (imported from GitHub)
+```
+
 ### Help
 
 ```bash
 lex-pr execute --help
+lex-pr gate import-checks --help
 ```
 
 ## Related Documentation
@@ -198,3 +316,4 @@ lex-pr execute --help
 - [Schema Documentation](./schemas.md) - Overall schema architecture
 - [CLI Reference](./cli.md) - Complete CLI documentation
 - [Error Handling](./errors.md) - Error taxonomy and recovery
+- [CI/CD Integration](./ci-cd-integration.md) - Integrating with GitHub Actions and other CI systems
