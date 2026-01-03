@@ -73,6 +73,7 @@ import { registerConfigValidateCommand } from "./commands/config/validate.js";
 import { registerIdeaCommand } from "./commands/idea.js";
 import { registerCreateProjectCommand } from "./commands/create-project.js";
 import { registerSeniorDevCommand } from "./commands/seniorDev.js";
+import { registerIssuesCommand } from "./commands/issues.js";
 import { registerBudgetCommand } from "./commands/budget.js";
 import { registerMetricsCommand } from "./commands/metrics.js";
 import { registerTokenReportCommand } from "./commands/tokenReport.js";
@@ -586,6 +587,9 @@ registerConfigValidateCommand(program, () => jsonModeActive);
 
 // Idea command - feature idea capture
 registerIdeaCommand(program);
+
+// Issues command - Check status of GitHub issues
+registerIssuesCommand(program);
 
 // Senior Dev executor commands
 registerSeniorDevCommand(program, () => jsonModeActive);
