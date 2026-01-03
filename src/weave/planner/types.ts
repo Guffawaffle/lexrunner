@@ -35,9 +35,12 @@ export type InterventionType =
   // Post-merge phase
   | "pull_changes"
   | "verify_gates"
+  | "run_post_merge_checks"
   | "detect_failure_pattern"
   | "auto_fix"
   | "commit_fix"
+  // Recovery phase
+  | "revert_merge"
   // Fanout phase
   | "detect_fanout_trigger"
   | "create_issue"
@@ -59,7 +62,9 @@ export const INTERVENTION_DETERMINISM: Record<InterventionType, DeterminismLevel
   execute_merge: "D1",
   pull_changes: "D1",
   verify_gates: "D1",
+  run_post_merge_checks: "D1",
   commit_fix: "D1",
+  revert_merge: "D1",
 
   // D2: Bounded judgment
   undraft_copilot: "D2",
