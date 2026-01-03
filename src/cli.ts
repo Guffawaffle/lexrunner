@@ -420,6 +420,17 @@ workspaceCmd
   .option("--github-token <token>", "GitHub token for authentication")
   .option("--profile-dir <dir>", "Profile directory (default: .smartergpt.local)")
   .option("--json", "Output JSON format")
+  .option("--enterprise", "Enable enterprise setup with audit and compliance features")
+  .option(
+    "--audit-profile <profile>",
+    "Audit profile for enterprise setup: off|basic|soc2|hipaa-strict",
+    "soc2"
+  )
+  .option(
+    "--policy-template <template>",
+    "Policy template for enterprise setup: basic|enterprise-standard|strict",
+    "enterprise-standard"
+  )
   .action(async (opts) => {
     // Delegate to the init command handler (imported from runInit)
     const isJsonMode = opts.json || jsonModeActive;
@@ -431,6 +442,9 @@ workspaceCmd
         githubToken: opts.githubToken,
         profileDir: opts.profileDir,
         jsonMode: isJsonMode,
+        enterprise: opts.enterprise,
+        auditProfile: opts.auditProfile,
+        policyTemplate: opts.policyTemplate,
       });
 
       if (isJsonMode) {
