@@ -263,6 +263,58 @@ const handleCheckAdminAuthority: InterventionHandler<"check_admin_authority"> = 
 };
 
 /**
+ * Handler: update_pr_branch
+ * Update PR branch with latest from base branch
+ */
+const handleUpdatePRBranch: InterventionHandler<"update_pr_branch"> = async (intervention, ctx) => {
+  const start = Date.now();
+  const startedAt = new Date().toISOString();
+
+  try {
+    const { owner, repo, prNumber } = intervention.params as {
+      owner: string;
+      repo: string;
+      prNumber: number;
+    };
+
+    if (ctx.dryRun) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: true,
+        output: { dryRun: true, prNumber },
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    // Update the PR branch with latest from base
+    await ctx.github.updatePullRequestBranch(owner, repo, prNumber);
+
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: true,
+      output: { updated: true, prNumber },
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  }
+};
+
+/**
  * Handler: execute_merge
  * Merge a PR
  */
@@ -518,6 +570,7 @@ const D1_HANDLERS: Partial<Record<InterventionType, InterventionHandler<any>>> =
   check_ci_status: handleCheckCIStatus,
   compute_merge_order: handleComputeMergeOrder,
   check_admin_authority: handleCheckAdminAuthority,
+  update_pr_branch: handleUpdatePRBranch,
   execute_merge: handleExecuteMerge,
   pull_changes: handlePullChanges,
   verify_gates: handleVerifyGates,
