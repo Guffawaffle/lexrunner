@@ -216,9 +216,10 @@ export async function mergeWeaveUmbrella(
     updateFailed: [],
   };
 
-  // First, merge all PRs into the umbrella PR's branch
-  // This would require changing the base branch of each PR to the umbrella PR's branch
-  // For now, we just do sequential merge and note this needs more implementation
+  // NOTE: Full umbrella strategy would require modifying PR base branches dynamically
+  // to target the umbrella PR's branch instead of main. Current implementation merges
+  // PRs to main and updates umbrella PR after each merge as a simplified approach.
+  // TODO: Implement true umbrella merge with dynamic base branch retargeting
 
   // Update umbrella PR after each merge
   for (let i = 0; i < prs.length; i++) {

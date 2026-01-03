@@ -120,9 +120,11 @@ describe("Sequential Merge-Weave Executor", () => {
 
       (mockGitHub.mergePullRequest as any).mockResolvedValue(true);
 
-      (mockGitHub.getPullRequest as any).mockResolvedValue({
-        number: 2,
-        mergeable_state: "behind",
+      (mockGitHub.getPullRequest as any).mockImplementation((_, __, prNumber) => {
+        return Promise.resolve({
+          number: prNumber,
+          mergeable_state: "behind",
+        });
       });
 
       // Update fails

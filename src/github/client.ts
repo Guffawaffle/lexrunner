@@ -565,7 +565,7 @@ export class GitHubClientImpl implements GitHubClient {
         pull_number: prNumber,
       });
     } catch (error: any) {
-      return this.handleAPIError(error);
+      this.handleAPIError(error);
     }
   }
 }
