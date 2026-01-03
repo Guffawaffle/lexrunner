@@ -123,6 +123,12 @@ export interface DiscoveredPR {
   labels: string[];
   headRef: string;
   baseRef: string;
+  /** PR body/description (for checklist detection) */
+  body?: string | null;
+  /** Whether a review has been requested */
+  reviewRequested?: boolean;
+  /** Timestamp of last commit (ISO 8601) */
+  lastCommitDate?: string | null;
 }
 
 /**

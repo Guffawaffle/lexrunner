@@ -38,6 +38,9 @@ export interface GitHubPullRequest {
   createdAt: string;
   updatedAt: string;
   mergeable?: boolean;
+  body?: string | null;
+  draft?: boolean;
+  reviewRequested?: boolean;
 }
 
 export interface GitHubConfig {
@@ -162,6 +165,11 @@ export class GitHubAPI {
               baseBranch: pull.base.ref,
               createdAt: pull.created_at,
               updatedAt: pull.updated_at,
+              body: pull.body || null,
+              draft: pull.draft ?? false,
+              reviewRequested:
+                (pull.requested_reviewers?.length ?? 0) > 0 ||
+                (pull.requested_teams?.length ?? 0) > 0,
             }));
 
             // Sort by PR number for deterministic ordering
@@ -264,9 +272,36 @@ export class GitHubAPI {
         createdAt: pull.created_at,
         updatedAt: pull.updated_at,
         mergeable: pull.mergeable ?? undefined,
+        body: pull.body || null,
+        draft: pull.draft ?? false,
+        reviewRequested:
+          (pull.requested_reviewers?.length ?? 0) > 0 || (pull.requested_teams?.length ?? 0) > 0,
       };
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Update a pull request (e.g., to undraft it)
+   */
+  async updatePullRequest(
+    owner: string,
+    repo: string,
+    prNumber: number,
+    updates: { draft?: boolean; title?: string; body?: string }
+  ): Promise<void> {
+    try {
+      await this.octokit.rest.pulls.update({
+        owner,
+        repo,
+        pull_number: prNumber,
+        ...updates,
+      });
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to update PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
