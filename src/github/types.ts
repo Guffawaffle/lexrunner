@@ -130,3 +130,37 @@ export interface IssueQueryOptions {
   per_page?: number;
   page?: number;
 }
+
+/**
+ * GitHub Check Run representation
+ */
+export interface GitHubCheckRun {
+  id: number;
+  name: string;
+  status: "queued" | "in_progress" | "completed";
+  conclusion:
+    | "success"
+    | "failure"
+    | "neutral"
+    | "cancelled"
+    | "skipped"
+    | "timed_out"
+    | "action_required"
+    | null;
+  started_at: string | null;
+  completed_at: string | null;
+  html_url: string;
+  app: {
+    name: string;
+  };
+}
+
+/**
+ * Options for querying check runs
+ */
+export interface CheckRunsOptions {
+  ref?: string; // Git reference (commit SHA, branch, or tag)
+  check_name?: string; // Filter by specific check name
+  status?: "queued" | "in_progress" | "completed";
+  filter?: "latest" | "all";
+}

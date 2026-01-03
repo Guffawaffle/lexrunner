@@ -12,6 +12,8 @@ import type {
   RepositoryInfo,
   GitHubIssue,
   IssueQueryOptions,
+  GitHubCheckRun,
+  CheckRunsOptions,
 } from "./types.js";
 import { GitHubAPIError, GitHubRateLimitError, GitHubAuthError } from "./types.js";
 import { parsePRDescription, normalizeDependencyRef } from "../planner/index.js";
@@ -24,6 +26,8 @@ export type {
   RepositoryInfo,
   GitHubIssue,
   IssueQueryOptions,
+  GitHubCheckRun,
+  CheckRunsOptions,
 };
 export { GitHubAPIError, GitHubRateLimitError, GitHubAuthError };
 
@@ -41,6 +45,8 @@ export interface GitHubClient {
   // Minimal context support
   getPRDiff(prNumber: number): Promise<string>;
   getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>>;
+  // Check runs support
+  getCheckRuns(ref: string, options?: CheckRunsOptions): Promise<GitHubCheckRun[]>;
 }
 
 export class GitHubClientImpl implements GitHubClient {
@@ -501,6 +507,46 @@ export class GitHubClientImpl implements GitHubClient {
       );
 
       return filesWithContent.filter((f): f is { path: string; content: string } => f !== null);
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
+
+  /**
+   * Get check runs for a specific Git reference (commit SHA, branch, or tag)
+   */
+  async getCheckRuns(ref: string, options?: CheckRunsOptions): Promise<GitHubCheckRun[]> {
+    try {
+      const params: any = {
+        owner: this.owner,
+        repo: this.repo,
+        ref,
+      };
+
+      if (options?.check_name) {
+        params.check_name = options.check_name;
+      }
+      if (options?.status) {
+        params.status = options.status;
+      }
+      if (options?.filter) {
+        params.filter = options.filter;
+      }
+
+      const response = await this.octokit.rest.checks.listForRef(params);
+
+      return response.data.check_runs.map((check: any) => ({
+        id: check.id,
+        name: check.name,
+        status: check.status,
+        conclusion: check.conclusion,
+        started_at: check.started_at,
+        completed_at: check.completed_at,
+        html_url: check.html_url,
+        app: {
+          name: check.app?.name || "unknown",
+        },
+      }));
     } catch (error: any) {
       return this.handleAPIError(error);
     }
