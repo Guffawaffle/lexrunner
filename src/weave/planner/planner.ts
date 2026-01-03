@@ -79,8 +79,9 @@ function planDiscoveryPhase(policy: MergeWeavePolicy, prs: DiscoveredPR[]): Base
       }
 
       // Check if the Copilot PR is complete using heuristics
-      // Note: We use updatedAt as a fallback for lastCommitDate since it's a reasonable
-      // proxy for when the agent last made changes to the PR
+      // Note: lastCommitDate is typically null (not populated by GitHub API to avoid extra calls),
+      // so we use updatedAt as a proxy for when the agent last made changes to the PR.
+      // This is an acceptable heuristic since PR updates correlate closely with commit activity.
       return isCopilotPRComplete({
         body: pr.body,
         reviewRequested: pr.reviewRequested ?? false,

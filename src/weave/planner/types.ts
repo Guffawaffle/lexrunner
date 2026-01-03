@@ -127,9 +127,13 @@ export interface DiscoveredPR {
   body?: string | null;
   /** Whether a review has been requested */
   reviewRequested?: boolean;
-  /** Timestamp of last commit (ISO 8601) */
+  /**
+   * Timestamp of last commit (ISO 8601)
+   * NOTE: Currently not populated by GitHub API (would require additional API call per PR).
+   * Falls back to updatedAt which is a reasonable proxy for agent activity.
+   */
   lastCommitDate?: string | null;
-  /** Timestamp when PR was last updated (ISO 8601) - fallback for lastCommitDate */
+  /** Timestamp when PR was last updated (ISO 8601) - used as commit age proxy */
   updatedAt?: string;
 }
 
