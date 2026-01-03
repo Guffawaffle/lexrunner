@@ -22,7 +22,7 @@ export function registerGateImportChecksCommand(program: Command): void {
   program
     .command("import-checks")
     .description("Import gate results from GitHub check runs")
-    .requiredOption("--ref <ref>", "Git reference (commit SHA, branch, or PR number)")
+    .option("--ref <ref>", "Git reference (commit SHA, branch, or PR number)")
     .option("--item <name>", "Item name (defaults to ref value)")
     .option("--out-dir <dir>", "Output directory for gate results", ".smartergpt/gate-results")
     .option(
@@ -44,6 +44,16 @@ export function registerGateImportChecksCommand(program: Command): void {
           console.log();
           console.log("Edit this file to customize check name to gate name mappings.");
           return;
+        }
+
+        // Validate required options when not creating mapping
+        if (!opts.ref) {
+          console.error("❌ Error: --ref is required when not using --create-mapping");
+          console.error();
+          console.error("Usage:");
+          console.error("  lex-pr gate import-checks --ref <ref>");
+          console.error("  lex-pr gate import-checks --create-mapping");
+          throwExit(1);
         }
 
         const ref = opts.ref;
