@@ -24,6 +24,9 @@ import { registerReportCommand } from "./report.js";
 import { registerMergeOrderCommand } from "./mergeOrder.js";
 import { registerPolicyCommands } from "./weave-policy.js";
 import { registerFanoutCommands } from "./weave-fanout.js";
+import { registerCheckpointCommands } from "./weave-checkpoints.js";
+import { loadCheckpoint, getLatestCheckpoint } from "../weave/checkpoint/storage.js";
+import { validateCheckpointForResume } from "../weave/checkpoint/utils.js";
 import fs from "fs";
 import path from "path";
 
@@ -52,10 +55,21 @@ Examples:
   # One-liner workflow
   $ lex-pr weave discover && lex-pr weave plan --from-github --output plan.json && lex-pr weave apply
 
+  # Resume from checkpoint (after interruption)
+  $ lex-pr weave resume --latest           # Resume most recent run
+  $ lex-pr weave resume --run-id <id>      # Resume specific run
+
+  # Checkpoint management
+  $ lex-pr weave checkpoints list          # List all checkpoints
+  $ lex-pr weave checkpoints show <id>     # Show checkpoint details
+  $ lex-pr weave checkpoints clean         # Clean up old checkpoints
+
 Subcommands:
-  discover   Find open PRs from GitHub
-  plan       Generate merge plan from PRs
-  apply      Execute merge pyramid with gates
+  discover     Find open PRs from GitHub
+  plan         Generate merge plan from PRs
+  apply        Execute merge pyramid with gates
+  resume       Resume from checkpoint after interruption
+  checkpoints  Manage execution checkpoints
 `
     );
 
@@ -418,4 +432,87 @@ Subcommands:
 
   // weave fanout - Fanout templates for follow-up issue creation
   registerFanoutCommands(weave);
+
+  // weave resume - Resume from checkpoint
+  weave
+    .command("resume")
+    .description("Resume merge-weave execution from a checkpoint")
+    .option("--run-id <id>", "Resume from specific run ID")
+    .option("--latest", "Resume from most recent checkpoint")
+    .option("--json", "Output JSON format")
+    .action(async (opts) => {
+      try {
+        // Determine which checkpoint to load
+        let checkpoint;
+        let runId: string;
+
+        if (opts.runId) {
+          runId = opts.runId;
+          checkpoint = await loadCheckpoint(runId, { validatePlanHash: false });
+        } else if (opts.latest) {
+          checkpoint = await getLatestCheckpoint();
+          if (!checkpoint) {
+            console.error("\n❌ No checkpoints found\n");
+            console.error("Start a new weave execution with:");
+            console.error("  lex-pr weave apply --plan plan.json\n");
+            throwExit(1);
+          }
+          runId = checkpoint.runId;
+        } else {
+          console.error("\n❌ Error: Must specify either --run-id or --latest\n");
+          console.error("Examples:");
+          console.error("  lex-pr weave resume --latest");
+          console.error("  lex-pr weave resume --run-id <run-id>\n");
+          throwExit(1);
+        }
+
+        // Validate checkpoint is resumable
+        const validation = validateCheckpointForResume(checkpoint);
+        if (!validation.valid) {
+          console.error(`\n❌ Cannot resume: ${validation.reason}\n`);
+          throwExit(1);
+        }
+
+        if (opts.json || deps.jsonModeActive()) {
+          console.log(
+            canonicalJSONStringify({
+              action: "resume",
+              runId,
+              phase: checkpoint.phase,
+              state: checkpoint.state,
+              progress: {
+                completed: checkpoint.completedItems.length,
+                pending: checkpoint.pendingItems.length,
+                failed: checkpoint.failedItems.length,
+              },
+            })
+          );
+        } else {
+          console.log("\n🔄 Resuming merge-weave execution\n");
+          console.log(`Run ID: ${runId}`);
+          console.log(`Phase: ${checkpoint.phase}`);
+          console.log(`State: ${checkpoint.state}`);
+          console.log(
+            `Progress: ${checkpoint.currentBatchIndex + 1}/${checkpoint.totalBatches} batches\n`
+          );
+          console.log(`Completed: ${checkpoint.completedItems.length} items`);
+          console.log(`Pending: ${checkpoint.pendingItems.length} items`);
+          console.log(`Failed: ${checkpoint.failedItems.length} items\n`);
+
+          // Note: Actual resume implementation would restore execution state
+          // For now, show the plan file that should be used
+          console.log("⚠️  Resume functionality is not yet fully implemented.\n");
+          console.log("To continue manually:");
+          console.log(`  1. Review checkpoint: lex-pr weave checkpoints show ${runId}`);
+          console.log(`  2. Continue execution with remaining items\n`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`\n❌ Resume failed: ${message}\n`);
+        throwExit(1);
+      }
+    });
+
+  // weave checkpoints - Checkpoint management
+  registerCheckpointCommands(weave, { jsonModeActive: deps.jsonModeActive });
 }
