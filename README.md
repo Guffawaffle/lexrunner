@@ -696,6 +696,43 @@ lex-pr orchestrate:plan-batch --input analysis.json --json > batch-plan.json
 
 See [`docs/orchestration.md`](docs/orchestration.md) for detailed documentation.
 
+### Agent Stall Detection
+
+Monitor Copilot agent PRs for activity and automatically nudge or escalate when agents stall:
+
+```bash
+# Check PR status once
+lex-pr fanout monitor --prs 123,456
+
+# Watch PRs continuously with auto-nudge
+lex-pr fanout monitor --prs 123,456,789 --watch --interval 5m --action nudge
+
+# Custom thresholds and auto-escalation
+lex-pr fanout monitor --prs 123 \
+  --warning-threshold 5m \
+  --stall-threshold 15m \
+  --action escalate
+
+# JSON output for automation
+lex-pr fanout monitor --prs 123,456 --json
+```
+
+**Features:**
+
+- Automatic stall detection (configurable thresholds: 10m warning, 20m stall)
+- Auto-nudge stalled agents with GitHub comments
+- Auto-escalate for human intervention
+- Watch mode for continuous monitoring
+- JSON output for CI/CD integration
+
+**Detection States:**
+
+- **Active** - Recent commits, no action needed
+- **Stalled** - No commits >= threshold, auto-nudge/escalate
+- **Complete** - PR ready for review
+
+See [`docs/agent-stall-detection.md`](docs/agent-stall-detection.md) for complete documentation and examples.
+
 ### Gate Report Aggregation
 
 The `report` command aggregates gate results from a directory of JSON files:

@@ -66,6 +66,7 @@ import { registerAssignBatchCommand } from "./commands/orchestrate/assign-batch.
 import { registerAnalyzeIssuesCommand } from "./commands/orchestrate/analyze-issues.js";
 import { registerHarvestCommand } from "./commands/fanout-harvest.js";
 import { registerAnalyzeCommand } from "./commands/fanout-analyze.js";
+import { registerMonitorCommand } from "./commands/fanout-monitor.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerConfigCommand } from "./commands/config.js";
 import { registerConfigValidateCommand } from "./commands/config/validate.js";
@@ -496,6 +497,7 @@ const fanoutCmd = program.command("fanout").description("Issue discovery, analys
 // Register D0 (harvest) and D1 (analyze) commands
 registerHarvestCommand(fanoutCmd);
 registerAnalyzeCommand(fanoutCmd);
+registerMonitorCommand(fanoutCmd);
 
 // Gate category - Quality gate execution
 const gateCmd = program.command("gate").description("Quality gate execution");
