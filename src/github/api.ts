@@ -26,6 +26,16 @@ export function extractLabelName(label: any): string {
   return "";
 }
 
+/**
+ * Check if a PR has review requested based on requested_reviewers and requested_teams
+ */
+function hasReviewRequested(pull: {
+  requested_reviewers?: any[] | null;
+  requested_teams?: any[] | null;
+}): boolean {
+  return (pull.requested_reviewers?.length ?? 0) > 0 || (pull.requested_teams?.length ?? 0) > 0;
+}
+
 export interface GitHubPullRequest {
   number: number;
   title: string;
@@ -167,9 +177,7 @@ export class GitHubAPI {
               updatedAt: pull.updated_at,
               body: pull.body || null,
               draft: pull.draft ?? false,
-              reviewRequested:
-                (pull.requested_reviewers?.length ?? 0) > 0 ||
-                (pull.requested_teams?.length ?? 0) > 0,
+              reviewRequested: hasReviewRequested(pull),
             }));
 
             // Sort by PR number for deterministic ordering
@@ -274,8 +282,7 @@ export class GitHubAPI {
         mergeable: pull.mergeable ?? undefined,
         body: pull.body || null,
         draft: pull.draft ?? false,
-        reviewRequested:
-          (pull.requested_reviewers?.length ?? 0) > 0 || (pull.requested_teams?.length ?? 0) > 0,
+        reviewRequested: hasReviewRequested(pull),
       };
     } catch (error) {
       return null;

@@ -79,6 +79,8 @@ function planDiscoveryPhase(policy: MergeWeavePolicy, prs: DiscoveredPR[]): Base
       }
 
       // Check if the Copilot PR is complete using heuristics
+      // Note: We use updatedAt as a fallback for lastCommitDate since it's a reasonable
+      // proxy for when the agent last made changes to the PR
       return isCopilotPRComplete({
         body: pr.body,
         reviewRequested: pr.reviewRequested ?? false,

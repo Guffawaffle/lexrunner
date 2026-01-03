@@ -24,15 +24,16 @@ export function hasAllChecklistItemsChecked(prBody: string | null | undefined): 
   }
 
   // Match checklist items: - [ ] or - [x] (with optional leading whitespace)
-  const checklistPattern = /^\s*-\s*\[([ x])\]/gim;
-  const matches = prBody.match(checklistPattern);
+  // Capture the checkbox state (space or x)
+  const checklistPattern = /^\s*-\s*\[( |x)\]/gim;
+  const matches = [...prBody.matchAll(checklistPattern)];
 
-  if (!matches || matches.length === 0) {
+  if (matches.length === 0) {
     return true; // No checklist items found, vacuously complete
   }
 
-  // Check if all items are checked
-  return matches.every((match) => match.includes("[x]"));
+  // Check if all items are checked (captured group === 'x')
+  return matches.every((match) => match[1] === "x");
 }
 
 /**
