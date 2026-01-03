@@ -71,7 +71,9 @@ describe("D1 Executor", () => {
       expect(hasD1Handler("execute_merge")).toBe(true);
       expect(hasD1Handler("pull_changes")).toBe(true);
       expect(hasD1Handler("verify_gates")).toBe(true);
+      expect(hasD1Handler("run_post_merge_checks")).toBe(true);
       expect(hasD1Handler("commit_fix")).toBe(true);
+      expect(hasD1Handler("revert_merge")).toBe(true);
     });
 
     it("returns false for D2 intervention types", () => {
@@ -101,8 +103,10 @@ describe("D1 Executor", () => {
       expect(types).toContain("execute_merge");
       expect(types).toContain("pull_changes");
       expect(types).toContain("verify_gates");
+      expect(types).toContain("run_post_merge_checks");
       expect(types).toContain("commit_fix");
-      expect(types.length).toBe(12);
+      expect(types).toContain("revert_merge");
+      expect(types.length).toBe(14);
     });
   });
 
