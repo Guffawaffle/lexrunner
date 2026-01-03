@@ -606,6 +606,7 @@ lex-pr execute --plan plan.json
 - **Confidence scoring** - ranks suggestions by reliability (0.0-1.0)
 - **Multiple heuristics** - shared files, directory proximity, test overlap
 - **Hybrid workflow** - combine explicit + implicit dependencies
+- **GitHub CI integration** - automatically import gate results from GitHub check runs (v0.6.0+)
 
 ### Documentation
 

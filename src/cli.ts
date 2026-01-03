@@ -41,6 +41,7 @@ import { registerRetryCommand } from "./commands/retry.js";
 import { registerGateReportCommand } from "./commands/gateReport.js";
 import { registerGateAttestCommand } from "./commands/gateAttest.js";
 import { registerGateImportCommand } from "./commands/gateImport.js";
+import { registerGateImportChecksCommand } from "./commands/gateImportChecks.js";
 import { registerGovernanceReportCommand } from "./commands/governanceReport.js";
 import { registerGovernanceCleanupCommand } from "./commands/governanceCleanup.js";
 import { registerSecurityCommands } from "./cli-security.js";
@@ -522,6 +523,7 @@ registerExecuteCommand(gateCmd, {
 });
 registerGateAttestCommand(gateCmd);
 registerGateImportCommand(gateCmd);
+registerGateImportChecksCommand(gateCmd);
 
 // ============================================================================
 // Legacy Commands (Deprecated - ALN-003 Phase 2)
