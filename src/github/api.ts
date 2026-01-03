@@ -64,6 +64,14 @@ export class GitHubAPI {
   }
 
   /**
+   * Get the underlying Octokit instance for advanced operations
+   * Use with caution - prefer using typed methods when available
+   */
+  getOctokit(): Octokit {
+    return this.octokit;
+  }
+
+  /**
    * Normalize repository owner and name to match GitHub's canonical casing.
    * This handles case-insensitive lookups where git remote URLs may have
    * different casing than the actual GitHub repository.
@@ -119,13 +127,6 @@ export class GitHubAPI {
     }
 
     return undefined;
-  }
-
-  /**
-   * Get the underlying Octokit instance
-   */
-  getOctokit(): Octokit {
-    return this.octokit;
   }
 
   /**

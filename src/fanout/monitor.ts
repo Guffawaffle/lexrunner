@@ -237,8 +237,8 @@ export async function createMonitor(
 export async function nudgePR(githubAPI: GitHubAPI, prNumber: number): Promise<void> {
   const message = `@copilot please continue with the implementation`;
 
-  // Use octokit directly to create comment
-  const octokit = (githubAPI as any).octokit;
+  // Use octokit via public method to create comment
+  const octokit = githubAPI.getOctokit();
   const config = githubAPI.config;
 
   await octokit.rest.issues.createComment({
@@ -266,8 +266,8 @@ Possible actions:
 - Manually continue the work
 - Close and reassign to a new agent`;
 
-  // Use octokit directly to create comment
-  const octokit = (githubAPI as any).octokit;
+  // Use octokit via public method to create comment
+  const octokit = githubAPI.getOctokit();
   const config = githubAPI.config;
 
   await octokit.rest.issues.createComment({
