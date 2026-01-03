@@ -73,6 +73,9 @@ export type { AuditLoggerOptions, LogInterventionOptions } from "./metrics/index
 
 export { WeaveStateMachine } from "./stateMachine.js";
 
+// Checkpoint and resume support
+export * from "./checkpoint/index.js";
+
 // ADR-007: Task snapshot contract integration
 export {
   GateFailureHandler,
