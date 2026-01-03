@@ -17,6 +17,7 @@ import {
   type PlannedIntervention,
   type PlanningContext,
 } from "./types.js";
+import { isCopilotPRComplete } from "../utils/copilot-completion.js";
 
 // =============================================================================
 // PLANNER
@@ -71,7 +72,23 @@ function planDiscoveryPhase(policy: MergeWeavePolicy, prs: DiscoveredPR[]): Base
 
   // 3. Undraft Copilot PRs if policy allows
   if (policy.discovery.draft_policy?.undraft_copilot_prs) {
-    const copilotDrafts = prs.filter((pr) => pr.isDraft && pr.isCopilot);
+    // Filter to only Copilot draft PRs that are complete
+    const copilotDrafts = prs.filter((pr) => {
+      if (!pr.isDraft || !pr.isCopilot) {
+        return false;
+      }
+
+      // Check if the Copilot PR is complete using heuristics
+      // Note: lastCommitDate is typically null (not populated by GitHub API to avoid extra calls),
+      // so we use updatedAt as a proxy for when the agent last made changes to the PR.
+      // This is an acceptable heuristic since PR updates correlate closely with commit activity.
+      return isCopilotPRComplete({
+        body: pr.body,
+        reviewRequested: pr.reviewRequested ?? false,
+        lastCommitDate: pr.lastCommitDate ?? pr.updatedAt ?? null,
+      });
+    });
+
     for (const pr of copilotDrafts) {
       interventions.push(
         createIntervention(
