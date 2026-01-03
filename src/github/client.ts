@@ -47,6 +47,8 @@ export interface GitHubClient {
   getPRFiles(prNumber: number): Promise<Array<{ path: string; content: string }>>;
   // Check runs support
   getCheckRuns(ref: string, options?: CheckRunsOptions): Promise<GitHubCheckRun[]>;
+  // PR branch operations
+  updatePullRequestBranch(prNumber: number): Promise<void>;
 }
 
 export class GitHubClientImpl implements GitHubClient {
@@ -547,6 +549,21 @@ export class GitHubClientImpl implements GitHubClient {
           name: check.app?.name || "GitHub App",
         },
       }));
+    } catch (error: any) {
+      return this.handleAPIError(error);
+    }
+  }
+
+  /**
+   * Update a pull request's branch with the latest changes from the base branch
+   */
+  async updatePullRequestBranch(prNumber: number): Promise<void> {
+    try {
+      await this.octokit.rest.pulls.updateBranch({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+      });
     } catch (error: any) {
       return this.handleAPIError(error);
     }

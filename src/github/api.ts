@@ -451,6 +451,74 @@ export class GitHubAPI {
     });
     return data;
   }
+
+  /**
+   * Update a pull request's branch with the latest changes from the base branch
+   * This is typically used after merging another PR to keep branches up to date
+   */
+  async updatePullRequestBranch(owner: string, repo: string, prNumber: number): Promise<void> {
+    try {
+      await this.octokit.rest.pulls.updateBranch({
+        owner,
+        repo,
+        pull_number: prNumber,
+      });
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to update PR #${prNumber} branch: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Merge a pull request
+   */
+  async mergePullRequest(
+    owner: string,
+    repo: string,
+    prNumber: number,
+    options: { method: "squash" | "merge" | "rebase"; commitTitle?: string }
+  ): Promise<boolean> {
+    try {
+      await this.octokit.rest.pulls.merge({
+        owner,
+        repo,
+        pull_number: prNumber,
+        merge_method: options.method,
+        commit_title: options.commitTitle,
+      });
+      return true;
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to merge PR #${prNumber}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Get commit status for a SHA
+   */
+  async getCommitStatus(
+    owner: string,
+    repo: string,
+    ref: string
+  ): Promise<{ state: string; statuses: any[] }> {
+    try {
+      const { data } = await this.octokit.rest.repos.getCombinedStatusForRef({
+        owner,
+        repo,
+        ref,
+      });
+      return {
+        state: data.state,
+        statuses: data.statuses,
+      };
+    } catch (error) {
+      throw new GitHubAPIError(
+        `Failed to get commit status for ${ref}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 export class GitHubAPIError extends Error {
