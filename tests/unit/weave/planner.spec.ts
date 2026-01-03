@@ -60,6 +60,10 @@ describe("Intervention Planner", () => {
     labels: [],
     headRef: "feature/test",
     baseRef: "main",
+    body: null,
+    reviewRequested: true,
+    lastCommitDate: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
+    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     ...overrides,
   });
 

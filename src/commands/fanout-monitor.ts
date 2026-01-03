@@ -22,6 +22,7 @@ interface MonitorOptions {
   json?: boolean;
   warningThreshold?: string;
   stallThreshold?: string;
+  watch?: boolean;
 }
 
 /**
