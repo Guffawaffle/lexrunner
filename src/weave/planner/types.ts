@@ -129,6 +129,8 @@ export interface DiscoveredPR {
   reviewRequested?: boolean;
   /** Timestamp of last commit (ISO 8601) */
   lastCommitDate?: string | null;
+  /** Timestamp when PR was last updated (ISO 8601) - fallback for lastCommitDate */
+  updatedAt?: string;
 }
 
 /**
