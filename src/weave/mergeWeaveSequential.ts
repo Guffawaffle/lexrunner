@@ -121,6 +121,8 @@ export async function mergeWeaveSequential(
     try {
       if (dryRun) {
         console.log(`[DRY RUN] Would merge PR #${pr.number}`);
+        // In dry run, simulate successful merge for auto-update logic
+        result.merged.push(pr.number);
       } else {
         const success = await github.mergePullRequest(owner, repo, pr.number, {
           method: mergeMethod,
@@ -227,7 +229,9 @@ export async function mergeWeaveUmbrella(
 
     try {
       if (dryRun) {
-        console.log(`[DRY RUN] Would merge PR #${pr.number} into umbrella #${umbrellaPR.number}`);
+        console.log(`[DRY RUN] Would merge PR #${pr.number} to main`);
+        // In dry run, simulate successful merge for auto-update logic
+        result.merged.push(pr.number);
       } else {
         const success = await github.mergePullRequest(owner, repo, pr.number, {
           method: mergeMethod,
@@ -235,7 +239,7 @@ export async function mergeWeaveUmbrella(
 
         if (success) {
           result.merged.push(pr.number);
-          console.log(`✓ Merged PR #${pr.number} into umbrella`);
+          console.log(`✓ Merged PR #${pr.number}`);
         } else {
           result.failed.push({
             number: pr.number,
