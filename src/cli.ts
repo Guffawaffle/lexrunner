@@ -422,7 +422,7 @@ workspaceCmd
   .option("--json", "Output JSON format")
   .option("--enterprise", "Enable enterprise setup with audit and compliance features")
   .option(
-    "--audit-profile <profile>",
+    "--enterprise-audit-profile <profile>",
     "Audit profile for enterprise setup: off|basic|soc2|hipaa-strict",
     "soc2"
   )
@@ -443,7 +443,7 @@ workspaceCmd
         profileDir: opts.profileDir,
         jsonMode: isJsonMode,
         enterprise: opts.enterprise,
-        auditProfile: opts.auditProfile,
+        auditProfile: opts.enterpriseAuditProfile,
         policyTemplate: opts.policyTemplate,
       });
 
