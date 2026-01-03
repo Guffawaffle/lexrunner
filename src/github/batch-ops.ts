@@ -128,18 +128,19 @@ export async function batchGetIssues(
   // Fetch all issues in parallel (with internal rate limiting handled by client)
   await Promise.all(
     Array.from(byRepo.entries()).map(async ([repoKey, repoRefs]) => {
-      // For cross-repo fetches, we'll need to create separate clients
-      // For now, assume same repo or client can handle it via getIssue
-      for (const ref of repoRefs) {
-        try {
-          const issue = await getIssue(client, ref.owner, ref.repo, ref.number);
-          if (issue) {
-            issues.set(ref.key, issue);
+      // Fetch all issues in this repo in parallel
+      await Promise.all(
+        repoRefs.map(async (ref) => {
+          try {
+            const issue = await getIssue(client, ref.owner, ref.repo, ref.number);
+            if (issue) {
+              issues.set(ref.key, issue);
+            }
+          } catch (error) {
+            errors.set(ref.key, error instanceof Error ? error : new Error(String(error)));
           }
-        } catch (error) {
-          errors.set(ref.key, error instanceof Error ? error : new Error(String(error)));
-        }
-      }
+        })
+      );
     })
   );
 
@@ -196,7 +197,7 @@ async function getIssue(
         color: typeof label === "string" ? "" : label.color,
       })),
       user: {
-        login: issue.user.login,
+        login: issue.user?.login || "unknown",
       },
       assignees: issue.assignees.map((assignee: any) => ({
         login: assignee.login,

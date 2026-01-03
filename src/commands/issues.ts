@@ -9,6 +9,14 @@ import { parseIssueRefs, batchGetIssues, type IssueRef } from "../github/batch-o
 import { getIssueCache } from "../cache/issue-cache.js";
 import type { GitHubIssue } from "../github/types.js";
 
+// Default repository configuration (can be overridden by environment variables)
+const DEFAULT_OWNER = "Guffawaffle";
+const DEFAULT_REPO = "lexrunner";
+
+// Output formatting constants
+const KEY_COLUMN_WIDTH = 25;
+const STATE_COLUMN_WIDTH = 15;
+
 interface IssuesStatusOptions {
   cache?: boolean;
   cacheTtl?: number;
@@ -44,8 +52,8 @@ async function handleIssuesStatus(
   options: IssuesStatusOptions
 ): Promise<void> {
   // Detect repository from environment
-  const owner = process.env.GITHUB_REPOSITORY_OWNER || "Guffawaffle";
-  const repo = process.env.GITHUB_REPOSITORY_NAME || "lexrunner";
+  const owner = process.env.GITHUB_REPOSITORY_OWNER || DEFAULT_OWNER;
+  const repo = process.env.GITHUB_REPOSITORY_NAME || DEFAULT_REPO;
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
   if (!token) {
@@ -138,7 +146,7 @@ async function handleIssuesStatus(
       const stateText = issue.state === "closed" ? chalk.green("CLOSED") : chalk.yellow("OPEN");
 
       console.log(
-        `  ${stateIcon} ${chalk.cyan(ref.key).padEnd(25)}  ${stateText.padEnd(15)}  ${chalk.white(issue.title)}`
+        `  ${stateIcon} ${chalk.cyan(ref.key).padEnd(KEY_COLUMN_WIDTH)}  ${stateText.padEnd(STATE_COLUMN_WIDTH)}  ${chalk.white(issue.title)}`
       );
 
       if (issue.state === "closed") {
