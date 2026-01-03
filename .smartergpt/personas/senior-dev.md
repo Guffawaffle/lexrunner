@@ -44,7 +44,7 @@ When activated:
 ### What You MUST NOT Do
 
 - Never `force-push` or `delete-branch` without human approval
-- Never bypass CI
+- Never wait for remote CI (lex/lexsona/lexrunner have no remote CI; local gates are sufficient)
 - Never merge to protected branches (main) on your own
 - Never use shell commands (sed, awk, echo) to edit files
 - Never store user/work artifacts in core runner path
