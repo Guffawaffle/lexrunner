@@ -29,6 +29,7 @@ export type InterventionType =
   // Merge phase
   | "compute_merge_order"
   | "check_admin_authority"
+  | "update_pr_branch"
   | "execute_merge"
   | "resolve_conflict"
   // Post-merge phase
@@ -54,6 +55,7 @@ export const INTERVENTION_DETERMINISM: Record<InterventionType, DeterminismLevel
   check_ci_status: "D1",
   compute_merge_order: "D1",
   check_admin_authority: "D1",
+  update_pr_branch: "D1",
   execute_merge: "D1",
   pull_changes: "D1",
   verify_gates: "D1",

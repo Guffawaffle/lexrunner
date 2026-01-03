@@ -145,6 +145,7 @@ export const MergeConfig = z.object({
   commit_title: CommitTitleConfig.optional(),
   admin_authority: AdminAuthorityConfig.optional(),
   umbrella: UmbrellaConfig.optional(),
+  auto_update_branch: z.boolean().default(true),
 });
 export type MergeConfig = z.infer<typeof MergeConfig>;
 

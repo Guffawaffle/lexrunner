@@ -128,6 +128,11 @@ merge:
     use_pr_title: true # D1: Use PR title as commit title
     validate_conventional: true
 
+  # Auto-update PR branches before merge (Wave 3 improvement)
+  # When true, automatically updates PR branch with latest from base before merging
+  # This prevents merge conflicts when base branch has moved forward after previous merges
+  auto_update_branch: true # D1: Auto-update branches (default: true)
+
   # Admin authority (delegated when local CI passes)
   admin_authority:
     enabled: true

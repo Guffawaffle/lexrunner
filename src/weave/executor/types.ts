@@ -65,6 +65,7 @@ export interface GitHubAPI {
     number: number,
     data: Record<string, unknown>
   ): Promise<void>;
+  updatePullRequestBranch(owner: string, repo: string, number: number): Promise<void>;
   getCommitStatus(owner: string, repo: string, ref: string): Promise<CIStatus>;
 }
 

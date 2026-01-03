@@ -195,6 +195,19 @@ function planMergePhase(
           prNumber: pr.number,
         })
       );
+      prevMergeId = interventions[interventions.length - 1].id;
+    }
+
+    // Update PR branch if policy allows (auto-update after first merge)
+    if (mergeConfig?.auto_update_branch !== false) {
+      interventions.push(
+        createIntervention("update_pr_branch", "merge", prTarget, [prevMergeId], {
+          owner: pr.owner,
+          repo: pr.repo,
+          prNumber: pr.number,
+        })
+      );
+      prevMergeId = interventions[interventions.length - 1].id;
     }
 
     // Execute merge
