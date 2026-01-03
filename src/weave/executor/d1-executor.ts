@@ -685,7 +685,20 @@ const handleRevertMerge: InterventionHandler<"revert_merge"> = async (interventi
       };
     }
 
-    // Create revert commit
+    // Validate commit SHA format (40 hex characters for full SHA, 7-40 for short)
+    if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: false,
+        error: `Invalid commit SHA format: ${commitSha}`,
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    // Create revert commit using validated SHA
     const result = await ctx.shell.run(`git revert --no-edit ${commitSha}`, {
       cwd: repoPath,
       timeout: 30000,

@@ -44,6 +44,10 @@ export interface ResumeResult {
  *
  * This creates a revert commit for the most recently merged PR,
  * allowing the weave to continue without the problematic merge.
+ *
+ * NOTE: This is a simplified placeholder implementation. In production,
+ * this would use the GitOperations interface to perform actual git revert
+ * operations via the configured git client.
  */
 export async function revertLastMerge(
   context: WeaveContext,
@@ -74,8 +78,7 @@ export async function revertLastMerge(
     const itemNames = lastBatch.items.join(", ");
 
     // Create a revert commit using git revert
-    // Note: This is a simplified implementation
-    // In production, this would use the GitOperations interface
+    // NOTE: Placeholder - in production this would call git.revert() or similar
     const revertMessage = `Revert merge of ${itemNames}\n\nReverting due to post-merge check failure.`;
 
     // For now, we'll track that a revert is needed
@@ -189,6 +192,10 @@ export interface AbortResult {
 
 /**
  * Abort the weave
+ *
+ * NOTE: This is a simplified placeholder implementation. In production,
+ * the revert operations would use the GitOperations interface to perform
+ * actual git revert operations via the configured git client.
  */
 export async function abortWeave(
   context: WeaveContext,
@@ -205,8 +212,8 @@ export async function abortWeave(
 
       for (const batch of completedBatches) {
         if (batch.mergeSha) {
-          // In a real implementation, this would call git.revert
-          // For now, we just count
+          // NOTE: In production, this would call git.revert() or similar
+          // For now, we just count the batches that would be reverted
           mergesReverted++;
         }
       }
