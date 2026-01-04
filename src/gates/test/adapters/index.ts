@@ -16,3 +16,8 @@ export {
   clearAdapters,
   getAdapterCount,
 } from "./registry.js";
+
+// Adapter implementations
+export { vitestJsonAdapter } from "./vitest-json.js";
+export { jestJsonAdapter } from "./jest-json.js";
+export { junitXmlAdapter } from "./junit-xml.js";

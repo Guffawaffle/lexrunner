@@ -1,0 +1,84 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 1,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 2,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1704369600000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["User API", "GET /users"],
+          "duration": 120,
+          "failureDetails": [
+            {
+              "matcherResult": {
+                "actual": null,
+                "expected": {
+                  "id": 1,
+                  "name": "John"
+                },
+                "message": "Cannot read property 'id' of null",
+                "name": "toEqual",
+                "pass": false
+              }
+            }
+          ],
+          "failureMessages": [
+            "TypeError: Cannot read property 'id' of null\n    at Object.<anonymous> (/home/user/project/src/api.test.js:25:30)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+          ],
+          "fullName": "User API GET /users returns user data",
+          "location": {
+            "column": 5,
+            "line": 22
+          },
+          "status": "failed",
+          "title": "returns user data"
+        },
+        {
+          "ancestorTitles": ["User API", "GET /users"],
+          "duration": 85,
+          "failureMessages": [],
+          "fullName": "User API GET /users handles errors",
+          "location": {
+            "column": 5,
+            "line": 30
+          },
+          "status": "passed",
+          "title": "handles errors"
+        }
+      ],
+      "endTime": 1704369601000,
+      "message": "  ● User API › GET /users › returns user data\n\n    TypeError: Cannot read property 'id' of null\n\n      22 |     it('returns user data', async () => {\n      23 |       const user = await fetchUser(1);\n    > 25 |       expect(user.id).toEqual(1);\n         |                  ^\n      26 |     });\n",
+      "name": "/home/user/project/src/api.test.js",
+      "startTime": 1704369600000,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}

@@ -1,0 +1,98 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 5,
+  "numPassedTests": 3,
+  "numFailedTests": 2,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1704380000000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["UserService"],
+          "fullName": "UserService creates user successfully",
+          "status": "passed",
+          "title": "creates user successfully",
+          "duration": 5.2,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["UserService"],
+          "fullName": "UserService validates email format",
+          "status": "failed",
+          "title": "validates email format",
+          "duration": 2.8,
+          "failureMessages": [
+            "AssertionError: expected 'invalid-email' to match email pattern\n    at src/services/user.spec.ts:15:25\n    at file:///node_modules/@vitest/runner/dist/index.js:145:11\n    at file:///node_modules/@vitest/runner/dist/index.js:915:26"
+          ],
+          "meta": {}
+        }
+      ],
+      "startTime": 1704380000100,
+      "endTime": 1704380000108,
+      "status": "failed",
+      "message": "",
+      "name": "src/services/user.spec.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Database", "Connection"],
+          "fullName": "Database Connection connects successfully",
+          "status": "passed",
+          "title": "connects successfully",
+          "duration": 10.5,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Database", "Connection"],
+          "fullName": "Database Connection handles timeout",
+          "status": "failed",
+          "title": "handles timeout",
+          "duration": 5002.3,
+          "failureMessages": [
+            "TimeoutError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n    at src/db/connection.spec.ts:25:10\n    at Timeout._onTimeout (node:timers:502:18)"
+          ],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Database", "Queries"],
+          "fullName": "Database Queries fetches data",
+          "status": "passed",
+          "title": "fetches data",
+          "duration": 8.1,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1704380000200,
+      "endTime": 1704380005212,
+      "status": "failed",
+      "message": "",
+      "name": "src/db/connection.spec.ts"
+    }
+  ]
+}

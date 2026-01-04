@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="UserService" tests="5" failures="1" errors="0" skipped="1" time="0.523">
+  <testcase classname="UserService" name="should create new user" file="tests/user-service.spec.ts" line="10" time="0.123">
+  </testcase>
+  <testcase classname="UserService" name="should update existing user" file="tests/user-service.spec.ts" line="20" time="0.089">
+  </testcase>
+  <testcase classname="UserService" name="should delete user" file="tests/user-service.spec.ts" line="30" time="0.056">
+    <failure message="Expected user to be deleted" type="AssertionError">AssertionError: Expected user to be deleted
+    at Context.&lt;anonymous&gt; (tests/user-service.spec.ts:35:7)
+    at processImmediate (node:internal/timers:478:21)</failure>
+  </testcase>
+  <testcase classname="UserService" name="should find user by email" file="tests/user-service.spec.ts" line="40" time="0.145">
+  </testcase>
+  <testcase classname="UserService" name="should handle missing user" file="tests/user-service.spec.ts" line="50" time="0.110">
+    <skipped message="Not implemented yet"/>
+  </testcase>
+</testsuite>

@@ -1,0 +1,98 @@
+{
+  "numTotalTestSuites": 1,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 6,
+  "numPassedTests": 4,
+  "numFailedTests": 2,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1704380000000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["API", "Users", "GET /users"],
+          "fullName": "API Users GET /users returns all users",
+          "status": "passed",
+          "title": "returns all users",
+          "duration": 12.3,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["API", "Users", "GET /users"],
+          "fullName": "API Users GET /users handles pagination",
+          "status": "passed",
+          "title": "handles pagination",
+          "duration": 8.7,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["API", "Users", "POST /users"],
+          "fullName": "API Users POST /users creates new user",
+          "status": "passed",
+          "title": "creates new user",
+          "duration": 15.2,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["API", "Users", "POST /users"],
+          "fullName": "API Users POST /users validates required fields",
+          "status": "failed",
+          "title": "validates required fields",
+          "duration": 3.1,
+          "failureMessages": [
+            "TypeError: Cannot read properties of undefined (reading 'email')\n    at src/api/users.spec.ts:45:32\n    at src/api/users.ts:102:15\n    at file:///node_modules/@vitest/runner/dist/index.js:145:11"
+          ],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["API", "Products", "Search"],
+          "fullName": "API Products Search finds products by name",
+          "status": "passed",
+          "title": "finds products by name",
+          "duration": 6.8,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["API", "Products", "Search"],
+          "fullName": "API Products Search handles special characters",
+          "status": "failed",
+          "title": "handles special characters",
+          "duration": 2.4,
+          "failureMessages": [
+            "Error: ECONNREFUSED: Connection refused\n    at src/api/products.spec.ts:78:20\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)"
+          ],
+          "meta": {}
+        }
+      ],
+      "startTime": 1704380000100,
+      "endTime": 1704380000149,
+      "status": "failed",
+      "message": "",
+      "name": "tests/api/integration.spec.ts"
+    }
+  ]
+}

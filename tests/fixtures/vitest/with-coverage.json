@@ -1,0 +1,97 @@
+{
+  "numTotalTestSuites": 1,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 2,
+  "numPassedTests": 2,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1704380000000,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Coverage test"],
+          "fullName": "Coverage test covers main path",
+          "status": "passed",
+          "title": "covers main path",
+          "duration": 2.1,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Coverage test"],
+          "fullName": "Coverage test covers edge cases",
+          "status": "passed",
+          "title": "covers edge cases",
+          "duration": 1.9,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1704380000100,
+      "endTime": 1704380000104,
+      "status": "passed",
+      "message": "",
+      "name": "tests/coverage.spec.ts"
+    }
+  ],
+  "coverageMap": {
+    "src/utils.ts": {
+      "path": "src/utils.ts",
+      "statementMap": {},
+      "fnMap": {},
+      "branchMap": {},
+      "s": {},
+      "f": {},
+      "b": {}
+    }
+  },
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 100,
+        "covered": 85,
+        "skipped": 0,
+        "pct": 85
+      },
+      "statements": {
+        "total": 120,
+        "covered": 102,
+        "skipped": 0,
+        "pct": 85
+      },
+      "functions": {
+        "total": 20,
+        "covered": 18,
+        "skipped": 0,
+        "pct": 90
+      },
+      "branches": {
+        "total": 40,
+        "covered": 30,
+        "skipped": 0,
+        "pct": 75
+      }
+    }
+  }
+}

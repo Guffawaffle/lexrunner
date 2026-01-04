@@ -1,0 +1,100 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 2,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 1,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 3,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1704369600000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Math operations"],
+          "duration": 12,
+          "failureDetails": [
+            {
+              "matcherResult": {
+                "actual": 5,
+                "expected": 4,
+                "message": "expected 5 to equal 4",
+                "name": "toEqual",
+                "pass": false
+              }
+            }
+          ],
+          "failureMessages": [
+            "Error: expect(received).toEqual(expected)\n\nExpected: 4\nReceived: 5\n    at Object.<anonymous> (/home/user/project/src/math.test.js:10:23)\n    at Promise.then.completed (/home/user/project/node_modules/jest-circus/build/utils.js:333:28)"
+          ],
+          "fullName": "Math operations addition works correctly",
+          "location": {
+            "column": 3,
+            "line": 8
+          },
+          "status": "failed",
+          "title": "addition works correctly"
+        },
+        {
+          "ancestorTitles": ["Math operations"],
+          "duration": 8,
+          "failureMessages": [],
+          "fullName": "Math operations subtraction works correctly",
+          "location": {
+            "column": 3,
+            "line": 14
+          },
+          "status": "passed",
+          "title": "subtraction works correctly"
+        },
+        {
+          "ancestorTitles": ["Math operations"],
+          "duration": 15003,
+          "failureDetails": [
+            {
+              "message": "Timeout - Async callback was not invoked within the 5000 ms timeout specified by jest.setTimeout"
+            }
+          ],
+          "failureMessages": [
+            "Error: Timeout - Async callback was not invoked within the 5000 ms timeout specified by jest.setTimeout.Timeout - Async callback was not invoked within the 5000 ms timeout specified by jest.setTimeout.Error: \n    at Timeout._onTimeout (/home/user/project/node_modules/jest-runner/build/runTest.js:362:16)\n    at listOnTimeout (node:internal/timers:573:17)"
+          ],
+          "fullName": "Math operations async operation completes",
+          "location": {
+            "column": 3,
+            "line": 20
+          },
+          "status": "failed",
+          "title": "async operation completes"
+        }
+      ],
+      "endTime": 1704369616000,
+      "message": "  ● Math operations › addition works correctly\n\n    expect(received).toEqual(expected)\n\n    Expected: 4\n    Received: 5\n\n      8 |   it('addition works correctly', () => {\n      9 |     const result = add(2, 3);\n    > 10 |     expect(result).toEqual(4);\n        |                    ^\n     11 |   });\n     12 | \n     13 |   it('subtraction works correctly', () => {\n\n  ● Math operations › async operation completes\n\n    Timeout - Async callback was not invoked within the 5000 ms timeout specified by jest.setTimeout.\n\n     20 |   it('async operation completes', async () => {\n     21 |     await slowOperation();\n        |\n",
+      "name": "/home/user/project/src/math.test.js",
+      "startTime": 1704369600000,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}
