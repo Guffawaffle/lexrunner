@@ -290,7 +290,7 @@ function formatDuration(ms: number): string {
  * Does not escape periods as they're common in error messages and paths
  */
 function escapeMarkdown(text: string): string {
-  // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
-  // All special chars are explicitly escaped
-  return text.replace(/([*_\[\]()#!|\-])/g, "\\$1");
+  // Escape markdown special chars except backticks and periods: \, *, _, [, ], (, ), #, !, |, -
+  // Backslash must be escaped first to prevent double-escaping
+  return text.replace(/([\\*_\[\]()#!|\-])/g, "\\$1");
 }
