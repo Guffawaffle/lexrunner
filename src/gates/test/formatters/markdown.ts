@@ -292,6 +292,6 @@ function formatDuration(ms: number): string {
  */
 function escapeMarkdown(text: string): string {
   // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
-  // Hyphen at end of character class is treated as literal (not a range)
-  return text.replace(/([*_[\]()#!|-])/g, "\\$1");
+  // Square brackets are escaped; hyphen at end is treated as literal
+  return text.replace(/([*_\[\]()#!|-])/g, "\\$1");
 }
