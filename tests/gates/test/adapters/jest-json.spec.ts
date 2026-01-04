@@ -5,13 +5,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { jestJsonAdapter } from "../../../../src/gates/test/adapters/jest-json.js";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Helper to load fixture files
  */
 function loadFixture(name: string): string {
-  const fixturePath = join(import.meta.dirname, "../../../fixtures/jest", name);
+  const fixturePath = join(__dirname, "../../../fixtures/jest", name);
   return readFileSync(fixturePath, "utf-8");
 }
 
