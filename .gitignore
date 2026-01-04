@@ -59,6 +59,7 @@ test-plan.json
 tmp-*
 test-results.json
 ax-summary.json
+test-summary.md
 
 # Keep only live deliverable in VCS
 !.smartergpt/deliverables/.live.md
