@@ -267,9 +267,7 @@ export function parseAXTestResult(input: unknown): AXTestResult {
  * Safely parse an AXTestResult from unknown input.
  * Returns a Zod SafeParseResult with success/error.
  */
-export function safeParseAXTestResult(
-  input: unknown
-): z.SafeParseReturnType<unknown, AXTestResult> {
+export function safeParseAXTestResult(input: unknown) {
   return AXTestResultSchema.safeParse(input);
 }
 
