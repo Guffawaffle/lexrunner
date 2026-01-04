@@ -13,10 +13,16 @@ function canonicalizeMessage(message: string): string {
 
   let canonical = message;
 
-  // Remove timestamps (various formats)
+  // Remove UUIDs first (before other patterns that might match parts)
+  canonical = canonical.replace(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+    "UUID"
+  );
+
+  // Remove timestamps (various formats) - limited to realistic ranges
   canonical = canonical.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?/g, "TIMESTAMP");
   canonical = canonical.replace(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/g, "TIMESTAMP");
-  canonical = canonical.replace(/\d{13,}/g, "TIMESTAMP"); // Unix ms timestamps
+  canonical = canonical.replace(/\d{13,16}\b/g, "TIMESTAMP"); // Unix ms timestamps (13-16 digits)
 
   // Remove ports
   canonical = canonical.replace(/:\d{4,5}\b/g, ":PORT");
@@ -26,11 +32,7 @@ function canonicalizeMessage(message: string): string {
   canonical = canonical.replace(/\bpid[:\s]+\d+/gi, "pid PID");
   canonical = canonical.replace(/\bprocess[:\s]+\d+/gi, "process PID");
 
-  // Remove random-looking strings (UUIDs, hashes)
-  canonical = canonical.replace(
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
-    "UUID"
-  );
+  // Remove hex hashes (32+ chars)
   canonical = canonical.replace(/\b[0-9a-f]{32,}\b/gi, "HASH");
 
   // Remove memory addresses

@@ -20,10 +20,10 @@ export function generateSignature(message: string): string {
   // Remove hex hashes (32+ chars) BEFORE timestamps
   sig = sig.replace(/\b[0-9a-f]{32,}\b/gi, "<hash>");
 
-  // Remove timestamps (various formats)
+  // Remove timestamps (various formats) - limited to realistic ranges
   sig = sig.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?/g, "<timestamp>");
   sig = sig.replace(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/g, "<timestamp>");
-  sig = sig.replace(/\d{10,13}\b/g, "<timestamp>"); // Unix timestamps
+  sig = sig.replace(/\d{13,16}\b/g, "<timestamp>"); // Unix timestamps (13-16 digits)
 
   // Remove ports
   sig = sig.replace(/:\d{4,5}\b/g, ":<port>");

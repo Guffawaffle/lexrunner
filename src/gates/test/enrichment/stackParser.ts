@@ -142,10 +142,8 @@ function shouldFilterFrame(frame: StackFrame, config: Required<StackParserConfig
     return true;
   }
 
-  // Filter frames with <anonymous> function name (but keep the file if it's real)
-  if (frame.function === "<anonymous>") {
-    return true;
-  }
+  // Note: We keep frames with <anonymous> function names as they may have valuable file/line info
+  // Only filter if the function is <anonymous> AND we have no useful file information
 
   return false;
 }

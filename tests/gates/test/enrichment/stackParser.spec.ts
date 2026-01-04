@@ -150,9 +150,11 @@ describe("parseStackFrames", () => {
 
     const frames = parseStackFrames(stack, { filterPatterns: [] });
 
-    // <anonymous> file should be filtered
-    expect(frames).toHaveLength(1);
-    expect(frames[0].function).toBe("testFunction");
+    // Anonymous frames with real file paths are kept for debugging value
+    expect(frames).toHaveLength(2);
+    expect(frames[0].function).toBe("<anonymous>");
+    expect(frames[0].file).toBe("/path/to/file.ts");
+    expect(frames[1].function).toBe("testFunction");
   });
 
   it("should handle real Node.js stack trace", () => {
