@@ -1,0 +1,319 @@
+{
+  "numTotalTestSuites": 13,
+  "numPassedTestSuites": 13,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 31,
+  "numPassedTests": 31,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1767527943555,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["AXTestResult Schema", "SCHEMA_VERSION"],
+          "fullName": "AXTestResult Schema SCHEMA_VERSION is 1.0.0",
+          "status": "passed",
+          "title": "is 1.0.0",
+          "duration": 1.663201000000015,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXNextActionSchema"],
+          "fullName": "AXTestResult Schema AXNextActionSchema accepts valid structured action",
+          "status": "passed",
+          "title": "accepts valid structured action",
+          "duration": 2.1001759999999763,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXNextActionSchema"],
+          "fullName": "AXTestResult Schema AXNextActionSchema accepts action without cmd",
+          "status": "passed",
+          "title": "accepts action without cmd",
+          "duration": 0.3930949999999598,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXNextActionSchema"],
+          "fullName": "AXTestResult Schema AXNextActionSchema rejects invalid kind",
+          "status": "passed",
+          "title": "rejects invalid kind",
+          "duration": 1.769920999999954,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXNextActionSchema"],
+          "fullName": "AXTestResult Schema AXNextActionSchema rejects missing note",
+          "status": "passed",
+          "title": "rejects missing note",
+          "duration": 0.5083290000000034,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema accepts valid failure with minimal fields",
+          "status": "passed",
+          "title": "accepts valid failure with minimal fields",
+          "duration": 2.4894519999999716,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema accepts failure with all optional fields",
+          "status": "passed",
+          "title": "accepts failure with all optional fields",
+          "duration": 2.019775999999979,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema accepts mixed string and structured nextActions",
+          "status": "passed",
+          "title": "accepts mixed string and structured nextActions",
+          "duration": 0.3667279999999664,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema rejects missing failureId",
+          "status": "passed",
+          "title": "rejects missing failureId",
+          "duration": 0.5152219999999943,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema rejects negative line number",
+          "status": "passed",
+          "title": "rejects negative line number",
+          "duration": 0.5454359999999951,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestFailureSchema"],
+          "fullName": "AXTestResult Schema AXTestFailureSchema rejects non-integer line number",
+          "status": "passed",
+          "title": "rejects non-integer line number",
+          "duration": 0.3984360000000038,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema accepts valid result with minimal fields",
+          "status": "passed",
+          "title": "accepts valid result with minimal fields",
+          "duration": 1.5581809999999905,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema accepts result with all optional fields",
+          "status": "passed",
+          "title": "accepts result with all optional fields",
+          "duration": 1.0708139999999844,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema rejects wrong schemaVersion",
+          "status": "passed",
+          "title": "rejects wrong schemaVersion",
+          "duration": 0.5417100000000232,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema rejects invalid timestamp",
+          "status": "passed",
+          "title": "rejects invalid timestamp",
+          "duration": 0.47525699999999915,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema rejects coverage outside 0-100 range",
+          "status": "passed",
+          "title": "rejects coverage outside 0-100 range",
+          "duration": 0.43200100000001385,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "AXTestResultSchema"],
+          "fullName": "AXTestResult Schema AXTestResultSchema accepts empty failures array",
+          "status": "passed",
+          "title": "accepts empty failures array",
+          "duration": 0.21427599999998392,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "parseAXTestResult"],
+          "fullName": "AXTestResult Schema parseAXTestResult returns validated result for valid input",
+          "status": "passed",
+          "title": "returns validated result for valid input",
+          "duration": 0.2339579999999728,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "parseAXTestResult"],
+          "fullName": "AXTestResult Schema parseAXTestResult throws for invalid input",
+          "status": "passed",
+          "title": "throws for invalid input",
+          "duration": 0.49379799999996976,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "safeParseAXTestResult"],
+          "fullName": "AXTestResult Schema safeParseAXTestResult returns success for valid input",
+          "status": "passed",
+          "title": "returns success for valid input",
+          "duration": 0.3398520000000076,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "safeParseAXTestResult"],
+          "fullName": "AXTestResult Schema safeParseAXTestResult returns error for invalid input",
+          "status": "passed",
+          "title": "returns error for invalid input",
+          "duration": 0.25069500000000744,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "isValidAXTestResult"],
+          "fullName": "AXTestResult Schema isValidAXTestResult returns true for valid input",
+          "status": "passed",
+          "title": "returns true for valid input",
+          "duration": 0.2452289999999948,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "isValidAXTestResult"],
+          "fullName": "AXTestResult Schema isValidAXTestResult returns false for invalid input",
+          "status": "passed",
+          "title": "returns false for invalid input",
+          "duration": 0.20242100000001528,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "isValidAXTestResult"],
+          "fullName": "AXTestResult Schema isValidAXTestResult narrows type correctly",
+          "status": "passed",
+          "title": "narrows type correctly",
+          "duration": 0.18517099999996844,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "parseAXTestFailure"],
+          "fullName": "AXTestResult Schema parseAXTestFailure returns validated failure",
+          "status": "passed",
+          "title": "returns validated failure",
+          "duration": 0.16197599999998147,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "isValidAXTestFailure"],
+          "fullName": "AXTestResult Schema isValidAXTestFailure returns true for valid failure",
+          "status": "passed",
+          "title": "returns true for valid failure",
+          "duration": 0.2003599999999892,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "isValidAXTestFailure"],
+          "fullName": "AXTestResult Schema isValidAXTestFailure returns false for invalid failure",
+          "status": "passed",
+          "title": "returns false for invalid failure",
+          "duration": 0.2559089999999742,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "createAXTestResult"],
+          "fullName": "AXTestResult Schema createAXTestResult creates result with schemaVersion and timestamp",
+          "status": "passed",
+          "title": "creates result with schemaVersion and timestamp",
+          "duration": 0.478888999999981,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "createAXTestResult"],
+          "fullName": "AXTestResult Schema createAXTestResult allows overriding timestamp",
+          "status": "passed",
+          "title": "allows overriding timestamp",
+          "duration": 0.13459599999998773,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "createAXTestFailure"],
+          "fullName": "AXTestResult Schema createAXTestFailure creates failure with default empty nextActions",
+          "status": "passed",
+          "title": "creates failure with default empty nextActions",
+          "duration": 0.14827900000000227,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["AXTestResult Schema", "createAXTestFailure"],
+          "fullName": "AXTestResult Schema createAXTestFailure allows providing nextActions",
+          "status": "passed",
+          "title": "allows providing nextActions",
+          "duration": 0.11554799999998977,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1767527943933,
+      "endTime": 1767527943955.1155,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/lexrunner/lexrunner/src/gates/test/schema.spec.ts"
+    }
+  ]
+}
