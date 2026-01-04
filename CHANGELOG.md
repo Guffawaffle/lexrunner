@@ -6,15 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+---
+
+## [1.0.0] - 2026-01-04
+
+### 🎉 First Stable Release
+
+LexRunner reaches 1.0.0 with comprehensive merge-weave automation, enterprise onboarding, and robust gate execution.
+
 ### Added
 
-- **Gate Attestation & Import**: New commands `gate attest` and `gate import` to record gate results from external runs
-  - `lex-pr gate attest` - Manually attest that gates have passed for a PR/item
-  - `lex-pr gate import` - Import gate results from external sources (CI, logs, etc.)
-  - ExecutionState now supports loading gate results from directory
-  - merge_apply MCP handler automatically loads gate results from `.smartergpt/gate-results/`
-  - Fixes issue where manually run gates (e.g., `npm run build && npm test`) weren't tracked
-  - Full documentation in `docs/GATE_ATTESTATION_GUIDE.md`
+- **Post-merge Type Check Gate** - Catch integration breaks early with automatic type checking after merges
+- **Auto-update PR Branches** (#693) - Automatically update PR branches during sequential merge-weave
+- **Batch Issue State Checking** - Parallel API calls with TTL caching for faster state checks
+- **Enterprise Onboarding Wizard** (#692) - Unified setup experience for new users
+- **Import Gate Results from GitHub** (#691) - Import check run results as gate attestations
+- **Auto-undraft Copilot Agent PRs** (#690) - Automatically mark Copilot PRs ready when complete
+- **Agent Stall Detection** (#689) - Automatic nudging when agents stall
+- **Checkpoint and Resume** (#688) - Resume interrupted merge-weave operations
+- **Inter-PR Conflict Detection** (#681) - Detection and resolution guidance for PR conflicts
+- **Gate Attestation and Import** (#680) - Record external gate runs
+- **D2 Executor** (#675, #677) - Draft promotion and multi-repo plan support
+- **Counter-example Capture** (LR-TSF-003) - Capture gate failure examples for learning
+- **Constraint Preview in Dry-run** (LR-TSF-002) - Preview constraints before execution
+- **Constraint Attribution** (LR-TSF-001) - Track which rules produced which constraints
+- **Fanout Harvest/Analyze Tools** (Epic #654) - MCP tools for Copilot agent fanout
+
+### Removed
+
+- All deprecated `lexrunner_*` MCP tool aliases (use canonical names)
 
 ---
 
