@@ -15,12 +15,13 @@ import type { AXTestResult } from "../schema.js";
  * Adapters convert runner-specific test output (JSON, XML, TAP, etc.)
  * into the standardized AXTestResult format.
  *
- * Naming convention: {runner}-{format} (e.g., "vitest-json", "junit-xml")
+ * Naming convention: {runner}-{format} for runner-specific adapters,
+ * or {format}-{type} for universal formats (e.g., "vitest-json", "junit-xml")
  */
 export interface TestAdapter {
   /**
-   * Adapter name following convention: {runner}-{format}
-   * Examples: "vitest-json", "jest-json", "junit-xml", "node-tap"
+   * Adapter name following convention: {runner}-{format} or {format}-{type}
+   * Examples: "vitest-json", "jest-json", "junit-xml", "node-tap", "pytest-json"
    */
   name: string;
 

@@ -218,30 +218,32 @@ describe("TestAdapter Registry", () => {
     });
 
     it("should include suggestions when no adapters registered", () => {
+      let error: AdapterNotFoundError | null = null;
       try {
         requireAdapter("unknown");
-        expect.fail("Should have thrown");
       } catch (err) {
-        expect(err).toBeInstanceOf(AdapterNotFoundError);
-        const error = err as AdapterNotFoundError;
-        expect(error.suggestions).toContain("No adapters registered");
+        error = err as AdapterNotFoundError;
       }
+
+      expect(error).toBeInstanceOf(AdapterNotFoundError);
+      expect(error?.suggestions).toContain("No adapters registered");
     });
 
     it("should include available adapters in suggestions", () => {
       registerAdapter(createMockAdapter("vitest-json"));
       registerAdapter(createMockAdapter("jest-json"));
 
+      let error: AdapterNotFoundError | null = null;
       try {
         requireAdapter("unknown");
-        expect.fail("Should have thrown");
       } catch (err) {
-        expect(err).toBeInstanceOf(AdapterNotFoundError);
-        const error = err as AdapterNotFoundError;
-        expect(error.suggestions).toHaveLength(1);
-        expect(error.suggestions[0]).toContain("vitest-json");
-        expect(error.suggestions[0]).toContain("jest-json");
+        error = err as AdapterNotFoundError;
       }
+
+      expect(error).toBeInstanceOf(AdapterNotFoundError);
+      expect(error?.suggestions).toHaveLength(1);
+      expect(error?.suggestions[0]).toContain("vitest-json");
+      expect(error?.suggestions[0]).toContain("jest-json");
     });
 
     it("should return adapter when found", () => {
@@ -268,16 +270,18 @@ describe("TestAdapter Registry", () => {
 
       const content = "unknown content";
 
+      let error: AdapterNotFoundError | null = null;
       try {
         requireDetectedAdapter(content);
-        expect.fail("Should have thrown");
       } catch (err) {
-        expect(err).toBeInstanceOf(AdapterNotFoundError);
-        const error = err as AdapterNotFoundError;
-        expect(error.suggestions.length).toBeGreaterThanOrEqual(1);
-        expect(error.suggestions.some((s) => s.includes("vitest-json"))).toBe(true);
-        expect(error.suggestions.some((s) => s.includes("--adapter"))).toBe(true);
+        error = err as AdapterNotFoundError;
       }
+
+      expect(error).toBeInstanceOf(AdapterNotFoundError);
+      expect(error?.suggestions.length).toBeGreaterThanOrEqual(2);
+      expect(error?.suggestions.some((s) => s.includes("vitest-json"))).toBe(true);
+      expect(error?.suggestions.some((s) => s.includes("--adapter"))).toBe(true);
+      expect(error?.suggestions.some((s) => s.includes("valid test output"))).toBe(true);
     });
 
     it("should return detected adapter", () => {

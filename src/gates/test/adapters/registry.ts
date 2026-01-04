@@ -117,11 +117,12 @@ export function requireDetectedAdapter(content: string): TestAdapter {
   if (!adapter) {
     const available = Array.from(adapters.keys());
     throw new AdapterNotFoundError(
-      "No adapter detected for the provided content",
+      "No adapter detected for the provided content. Content may not be valid test output or format may not be supported.",
       available.length > 0
         ? [
             `Registered adapters: ${available.join(", ")}`,
             "Try specifying an adapter explicitly with --adapter",
+            "Verify the content is valid test output from a supported runner",
           ]
         : ["No adapters registered"]
     );
