@@ -123,6 +123,7 @@ export const vitestJsonAdapter: TestAdapter = {
           linesPct: vitestOutput.coverage.total.lines?.pct ?? 0,
           branchesPct: vitestOutput.coverage.total.branches?.pct ?? 0,
           functionsPct: vitestOutput.coverage.total.functions?.pct ?? 0,
+          // statementsPct is optional in schema - undefined is valid when not present
           statementsPct: vitestOutput.coverage.total.statements?.pct,
         }
       : undefined;
