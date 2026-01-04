@@ -1,0 +1,66 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 0,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 1,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": true,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 1,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 1,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 1,
+    "updated": 0
+  },
+  "startTime": 1704369600000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Component rendering"],
+          "duration": 45,
+          "failureDetails": [
+            {
+              "matcherResult": {
+                "message": "Snapshot mismatch",
+                "pass": false
+              }
+            }
+          ],
+          "failureMessages": [
+            "Error: expect(received).toMatchSnapshot()\n\nReceived value does not match stored snapshot \"Component rendering renders header correctly 1\".\n\n- Snapshot  - 1\n+ Received  + 1\n\n  <div>\n-   <h1>Welcome</h1>\n+   <h1>Welcome User</h1>\n  </div>\n    at Object.<anonymous> (/home/user/project/src/component.test.js:15:25)\n    at Promise.then.completed (/home/user/project/node_modules/jest-circus/build/utils.js:333:28)"
+          ],
+          "fullName": "Component rendering renders header correctly",
+          "location": {
+            "column": 3,
+            "line": 12
+          },
+          "status": "failed",
+          "title": "renders header correctly"
+        }
+      ],
+      "endTime": 1704369601000,
+      "message": "  ● Component rendering › renders header correctly\n\n    expect(received).toMatchSnapshot()\n\n    Received value does not match stored snapshot \"Component rendering renders header correctly 1\".\n\n    - Snapshot  - 1\n    + Received  + 1\n\n      <div>\n    -   <h1>Welcome</h1>\n    +   <h1>Welcome User</h1>\n      </div>\n\n      12 |   it('renders header correctly', () => {\n      13 |     const component = render(<Header />);\n    > 15 |     expect(component).toMatchSnapshot();\n         |                       ^\n      16 |   });\n",
+      "name": "/home/user/project/src/component.test.js",
+      "startTime": 1704369600000,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}

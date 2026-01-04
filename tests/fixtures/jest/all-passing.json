@@ -1,0 +1,71 @@
+{
+  "numFailedTestSuites": 0,
+  "numFailedTests": 0,
+  "numPassedTestSuites": 1,
+  "numPassedTests": 3,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 3,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1704369600000,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Calculator"],
+          "duration": 5,
+          "failureMessages": [],
+          "fullName": "Calculator adds two numbers",
+          "location": null,
+          "status": "passed",
+          "title": "adds two numbers"
+        },
+        {
+          "ancestorTitles": ["Calculator"],
+          "duration": 3,
+          "failureMessages": [],
+          "fullName": "Calculator subtracts two numbers",
+          "location": null,
+          "status": "passed",
+          "title": "subtracts two numbers"
+        },
+        {
+          "ancestorTitles": ["Calculator"],
+          "duration": 2,
+          "failureMessages": [],
+          "fullName": "Calculator multiplies two numbers",
+          "location": null,
+          "status": "passed",
+          "title": "multiplies two numbers"
+        }
+      ],
+      "endTime": 1704369601000,
+      "message": "",
+      "name": "/home/user/project/src/calculator.test.js",
+      "startTime": 1704369600500,
+      "status": "passed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}
