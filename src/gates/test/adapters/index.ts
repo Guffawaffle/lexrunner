@@ -16,3 +16,4 @@ export {
   clearAdapters,
   getAdapterCount,
 } from "./registry.js";
+export { vitestJsonAdapter } from "./vitest-json.js";
