@@ -118,6 +118,7 @@ export const junitXmlAdapter: TestAdapter = {
     } catch (error) {
       throw new AdapterParseError(
         `Failed to parse JUnit XML: ${error instanceof Error ? error.message : String(error)}`,
+        "junit-xml",
         content
       );
     }
@@ -153,11 +154,14 @@ function parseTestFailure(
   // Generate failure ID
   const failureId = generateFailureId(file, name, errorType, message);
 
-  // Parse stack frames
+  // Parse stack frames and filter to only those with line numbers
   const stackFrames = parseStackFrames(stackTrace, {
     maxFrames: 5,
     filterNodeModules: true,
-  });
+  }).filter(
+    (frame): frame is { file: string; line: number; column?: number; function?: string } =>
+      frame.line !== undefined
+  );
 
   // Generate next actions using generic patterns
   const nextActions = generateNextActionsForFailure(message, errorType, stackTrace);

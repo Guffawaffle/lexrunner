@@ -163,11 +163,14 @@ function parseVitestFailure(filePath: string, assertion: VitestAssertionResult):
   const messageParts = failureMessage.split("\n");
   const errorMessage = messageParts[0] || failureMessage;
 
-  // Parse stack frames from the failure message
+  // Parse stack frames from the failure message and filter to only those with line numbers
   const stackFrames = parseStackFrames(failureMessage, {
     maxFrames: 5,
     filterNodeModules: true,
-  });
+  }).filter(
+    (frame): frame is { file: string; line: number; column?: number; function?: string } =>
+      frame.line !== undefined
+  );
 
   // Extract file location from first stack frame or use file path
   let line = 1;
