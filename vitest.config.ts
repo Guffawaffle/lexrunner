@@ -1,6 +1,14 @@
 import { defineConfig } from "vitest/config";
+import { resolve as pathResolve } from "path";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Allow importing .ts files with .js extension (TypeScript ESM pattern)
+      "~/src": pathResolve(__dirname, "src"),
+    },
+    extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
+  },
   test: {
     globals: true,
     environment: "node",
