@@ -289,5 +289,5 @@ function formatDuration(ms: number): string {
 function escapeMarkdown(text: string): string {
   // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
   // Hyphen at end to avoid being interpreted as range
-  return text.replace(/([*_[\]()#!|-])/g, "\\$1");
+  return text.replace(/([*_[\]()#!|\-])/g, "\\$1");
 }
