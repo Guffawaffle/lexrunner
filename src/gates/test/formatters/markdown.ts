@@ -194,7 +194,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
     case "github":
       if (opts.repository) {
         // GitHub only supports line numbers in URL fragments, not columns.
-        // Column information from failure.column is intentionally omitted.
+        // Column information is preserved in plain format for local tooling.
         const lineRef = `L${line}`;
         return `[${file}:${line}](https://github.com/${opts.repository}/blob/${opts.ref}/${file}#${lineRef})`;
       }
@@ -203,6 +203,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
 
     case "gitlab":
       if (opts.repository) {
+        // GitLab also only supports line numbers in URL fragments
         const lineRef = `L${line}`;
         return `[${file}:${line}](https://gitlab.com/${opts.repository}/-/blob/${opts.ref}/${file}#${lineRef})`;
       }
@@ -211,6 +212,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
 
     case "plain":
     default:
+      // Plain format includes column for local tooling (e.g., editors, grep output)
       return failure.column ? `${file}:${line}:${failure.column}` : `${file}:${line}`;
   }
 }
@@ -290,6 +292,6 @@ function formatDuration(ms: number): string {
  */
 function escapeMarkdown(text: string): string {
   // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
-  // Hyphen is explicitly escaped for clarity (could also be placed at start/end of class)
-  return text.replace(/([*_[\]()#!|\-])/g, "\\$1");
+  // Hyphen at end of character class is treated as literal (not a range)
+  return text.replace(/([*_[\]()#!|-])/g, "\\$1");
 }
