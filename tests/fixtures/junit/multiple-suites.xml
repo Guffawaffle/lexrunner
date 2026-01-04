@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="8" failures="2" errors="0" skipped="1" time="1.234">
+  <testsuite name="AuthService" tests="3" failures="1" errors="0" skipped="0" time="0.456">
+    <testcase classname="AuthService" name="should login with valid credentials" file="tests/auth-service.spec.ts" line="12" time="0.234">
+    </testcase>
+    <testcase classname="AuthService" name="should reject invalid credentials" file="tests/auth-service.spec.ts" line="24" time="0.112">
+      <failure message="Expected 401 status code" type="AssertionError">AssertionError: Expected 401 status code
+    at Object.&lt;anonymous&gt; (tests/auth-service.spec.ts:28:5)
+    at Promise.then.completed (node:internal/timers:390:7)</failure>
+    </testcase>
+    <testcase classname="AuthService" name="should generate JWT token" file="tests/auth-service.spec.ts" line="35" time="0.110">
+    </testcase>
+  </testsuite>
+  <testsuite name="PaymentService" tests="5" failures="1" errors="0" skipped="1" time="0.778">
+    <testcase classname="PaymentService" name="should process valid payment" file="tests/payment-service.spec.ts" line="8" time="0.234">
+    </testcase>
+    <testcase classname="PaymentService" name="should reject insufficient funds" file="tests/payment-service.spec.ts" line="18" time="0.156">
+      <failure message="TypeError: Cannot read property 'balance' of undefined" type="TypeError">TypeError: Cannot read property 'balance' of undefined
+    at PaymentService.processPayment (src/payment-service.ts:45:18)
+    at Context.&lt;anonymous&gt; (tests/payment-service.spec.ts:22:12)</failure>
+    </testcase>
+    <testcase classname="PaymentService" name="should refund payment" file="tests/payment-service.spec.ts" line="28" time="0.188">
+    </testcase>
+    <testcase classname="PaymentService" name="should handle payment timeout" file="tests/payment-service.spec.ts" line="38" time="0.145">
+    </testcase>
+    <testcase classname="PaymentService" name="should integrate with Stripe" file="tests/payment-service.spec.ts" line="48" time="0.055">
+      <skipped message="Stripe integration not configured"/>
+    </testcase>
+  </testsuite>
+</testsuites>

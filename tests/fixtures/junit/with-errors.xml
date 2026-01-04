@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="DatabaseService" tests="4" failures="1" errors="2" skipped="0" time="0.678">
+  <testcase classname="DatabaseService" name="should connect to database" file="tests/db-service.spec.ts" line="10" time="0.234">
+  </testcase>
+  <testcase classname="DatabaseService" name="should execute query" file="tests/db-service.spec.ts" line="18" time="0.145">
+    <error message="Connection timeout" type="TimeoutError">TimeoutError: Connection timeout
+    at Database.connect (src/database.ts:56:11)
+    at Context.&lt;anonymous&gt; (tests/db-service.spec.ts:22:5)</error>
+  </testcase>
+  <testcase classname="DatabaseService" name="should handle transaction" file="tests/db-service.spec.ts" line="28" time="0.189">
+    <failure message="Transaction rolled back unexpectedly" type="AssertionError">AssertionError: Transaction rolled back unexpectedly
+    at Context.&lt;anonymous&gt; (tests/db-service.spec.ts:35:7)</failure>
+  </testcase>
+  <testcase classname="DatabaseService" name="should close connection" file="tests/db-service.spec.ts" line="42" time="0.110">
+    <error message="ECONNRESET: Connection reset by peer" type="Error">Error: ECONNRESET: Connection reset by peer
+    at Socket.&lt;anonymous&gt; (net.js:678:23)
+    at Context.&lt;anonymous&gt; (tests/db-service.spec.ts:46:5)</error>
+  </testcase>
+</testsuite>

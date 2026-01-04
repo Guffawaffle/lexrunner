@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="FeatureFlags" tests="6" failures="0" errors="0" skipped="3" time="0.345">
+  <testcase classname="FeatureFlags" name="should enable feature for user" file="tests/feature-flags.spec.ts" line="8" time="0.123">
+  </testcase>
+  <testcase classname="FeatureFlags" name="should disable feature for user" file="tests/feature-flags.spec.ts" line="16" time="0.089">
+  </testcase>
+  <testcase classname="FeatureFlags" name="should check beta features" file="tests/feature-flags.spec.ts" line="24" time="0.067">
+    <skipped message="Beta features not enabled in test environment"/>
+  </testcase>
+  <testcase classname="FeatureFlags" name="should handle premium features" file="tests/feature-flags.spec.ts" line="32" time="0.033">
+    <skipped/>
+  </testcase>
+  <testcase classname="FeatureFlags" name="should rollout gradually" file="tests/feature-flags.spec.ts" line="40" time="0.022">
+    <skipped message="Gradual rollout tests temporarily disabled"/>
+  </testcase>
+  <testcase classname="FeatureFlags" name="should cache flag values" file="tests/feature-flags.spec.ts" line="48" time="0.011">
+  </testcase>
+</testsuite>

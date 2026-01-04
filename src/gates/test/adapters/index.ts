@@ -16,3 +16,6 @@ export {
   clearAdapters,
   getAdapterCount,
 } from "./registry.js";
+
+// Export adapters
+export { junitXmlAdapter } from "./junit-xml.js";

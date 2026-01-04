@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ValidationService" tests="3" failures="2" errors="0" skipped="0" time="0.456">
+  <testcase classname="ValidationService" name="should validate email format" file="tests/validation.spec.ts" line="10" time="0.145">
+    <failure message="Invalid email format" type="ValidationError"><![CDATA[ValidationError: Invalid email format
+Expected: user@example.com
+Received: user@invalid
+    at Validator.checkEmail (src/validator.ts:23:11)
+    at Context.<anonymous> (tests/validation.spec.ts:14:5)]]></failure>
+  </testcase>
+  <testcase classname="ValidationService" name="should validate JSON schema" file="tests/validation.spec.ts" line="20" time="0.189">
+    <failure message="Schema validation failed" type="SchemaError"><![CDATA[SchemaError: Schema validation failed
+
+Errors:
+  - /name: must be string, got number
+  - /email: required field missing
+  - /age: must be >= 0, got -5
+
+Input:
+{
+  "name": 123,
+  "age": -5
+}
+
+    at Validator.validateSchema (src/validator.ts:67:11)
+    at Context.<anonymous> (tests/validation.spec.ts:28:5)]]></failure>
+  </testcase>
+  <testcase classname="ValidationService" name="should sanitize HTML input" file="tests/validation.spec.ts" line="35" time="0.122">
+  </testcase>
+</testsuite>
