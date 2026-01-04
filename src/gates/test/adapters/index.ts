@@ -16,3 +16,6 @@ export {
   clearAdapters,
   getAdapterCount,
 } from "./registry.js";
+
+// Adapter implementations
+export { jestJsonAdapter } from "./jest-json.js";
