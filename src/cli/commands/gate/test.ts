@@ -28,8 +28,7 @@ function isCI(): boolean {
     process.env.CI === "true" ||
     process.env.GITHUB_ACTIONS === "true" ||
     process.env.GITLAB_CI === "true" ||
-    process.env.CIRCLECI === "true" ||
-    !!process.env.CI
+    process.env.CIRCLECI === "true"
   );
 }
 
