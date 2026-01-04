@@ -83,3 +83,7 @@ export {
   type GateFailureHandlingResult,
   type ReceiptProcessingResult,
 } from "./gateFailureHandler.js";
+
+// Post-merge checks and recovery
+export * from "./post-merge-checks.js";
+export * from "./recovery.js";

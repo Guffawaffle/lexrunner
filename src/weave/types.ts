@@ -157,9 +157,22 @@ export interface WeaveContext {
     integrationBranch?: string;
     /** Dry run mode */
     dryRun: boolean;
+    /** Skip post-merge checks */
+    skipPostMergeChecks?: boolean;
   };
   /** Turn Cost tracking summary (when enabled) */
   turnCost?: TurnCostSummary;
+  /** Last post-merge check failure details (if any) */
+  lastPostMergeCheckFailure?: {
+    /** Type of check that failed */
+    checkType: string;
+    /** Error message */
+    error: string;
+    /** Batch number where failure occurred */
+    batchNumber: number;
+    /** Timestamp of failure */
+    failedAt: string;
+  };
 }
 
 /**

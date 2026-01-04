@@ -551,6 +551,193 @@ const handleCommitFix: InterventionHandler<"commit_fix"> = async (intervention, 
   }
 };
 
+/**
+ * Handler: run_post_merge_checks
+ * Execute post-merge validation checks
+ */
+const handleRunPostMergeChecks: InterventionHandler<"run_post_merge_checks"> = async (
+  intervention,
+  ctx
+) => {
+  const start = Date.now();
+  const startedAt = new Date().toISOString();
+
+  try {
+    const { checks, owner, name } = intervention.params as {
+      checks: Array<{ type: string; command: string; required: boolean; timeout: number }>;
+      owner: string;
+      name: string;
+    };
+    const repoPath = ctx.repoPaths.get(`${owner}/${name}`) ?? ctx.workspaceRoot;
+
+    if (ctx.dryRun) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: true,
+        output: { dryRun: true, checksCount: checks.length },
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    // Run checks sequentially
+    const results = [];
+    let firstFailure: { type: string; error: string } | undefined;
+
+    for (const check of checks) {
+      const checkStart = Date.now();
+
+      try {
+        const result = await ctx.shell.run(check.command, {
+          cwd: repoPath,
+          timeout: check.timeout,
+        });
+
+        const checkResult = {
+          type: check.type,
+          success: result.exitCode === 0,
+          exitCode: result.exitCode,
+          durationMs: Date.now() - checkStart,
+        };
+
+        results.push(checkResult);
+
+        if (!checkResult.success && check.required && !firstFailure) {
+          firstFailure = {
+            type: check.type,
+            error: result.stderr || `Check failed with exit code ${result.exitCode}`,
+          };
+          // Stop on first required check failure
+          break;
+        }
+      } catch (error) {
+        const checkResult = {
+          type: check.type,
+          success: false,
+          exitCode: -1,
+          durationMs: Date.now() - checkStart,
+          error: error instanceof Error ? error.message : String(error),
+        };
+
+        results.push(checkResult);
+
+        if (check.required && !firstFailure) {
+          firstFailure = {
+            type: check.type,
+            error: error instanceof Error ? error.message : String(error),
+          };
+          break;
+        }
+      }
+    }
+
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: !firstFailure,
+      output: {
+        results,
+        firstFailure,
+        checksRun: results.length,
+      },
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  }
+};
+
+/**
+ * Handler: revert_merge
+ * Revert a merge commit
+ */
+const handleRevertMerge: InterventionHandler<"revert_merge"> = async (intervention, ctx) => {
+  const start = Date.now();
+  const startedAt = new Date().toISOString();
+
+  try {
+    const { commitSha, repoPath } = intervention.params as {
+      commitSha: string;
+      repoPath: string;
+    };
+
+    if (ctx.dryRun) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: true,
+        output: { dryRun: true, commitSha },
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    // Validate commit SHA format (40 hex characters for full SHA, 7-40 for short)
+    if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: false,
+        error: `Invalid commit SHA format: ${commitSha}`,
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    // Create revert commit using validated SHA
+    const result = await ctx.shell.run(`git revert --no-edit ${commitSha}`, {
+      cwd: repoPath,
+      timeout: 30000,
+    });
+
+    if (result.exitCode !== 0) {
+      return {
+        interventionId: intervention.id,
+        type: intervention.type,
+        success: false,
+        error: `Failed to revert commit: ${result.stderr}`,
+        durationMs: Date.now() - start,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: true,
+      output: { reverted: true, commitSha },
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      interventionId: intervention.id,
+      type: intervention.type,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - start,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  }
+};
+
 // =============================================================================
 // D1 HANDLER REGISTRY
 // =============================================================================
@@ -574,7 +761,9 @@ const D1_HANDLERS: Partial<Record<InterventionType, InterventionHandler<any>>> =
   execute_merge: handleExecuteMerge,
   pull_changes: handlePullChanges,
   verify_gates: handleVerifyGates,
+  run_post_merge_checks: handleRunPostMergeChecks,
   commit_fix: handleCommitFix,
+  revert_merge: handleRevertMerge,
 };
 
 /**
