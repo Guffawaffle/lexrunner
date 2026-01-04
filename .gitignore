@@ -57,6 +57,8 @@ plan-*.json
 # Test files (temporary)
 test-plan.json
 tmp-*
+test-results.json
+ax-summary.json
 
 # Keep only live deliverable in VCS
 !.smartergpt/deliverables/.live.md
