@@ -49,3 +49,6 @@ export {
   createAXTestResult,
   createAXTestFailure,
 } from "./schema.js";
+
+// Formatter exports
+export { formatAsMarkdown, type MarkdownOptions } from "./formatters/markdown.js";
