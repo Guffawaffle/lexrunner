@@ -438,7 +438,7 @@ describe("Markdown Formatter", () => {
       expect(markdown).toContain("<!-- 1 more failure omitted -->");
     });
 
-    it("should format GitHub file links", () => {
+    it("should format GitHub file links (column ignored in URL)", () => {
       const failure = createAXTestFailure({
         failureId: "abc123",
         file: "src/handlers.ts",
@@ -471,8 +471,9 @@ describe("Markdown Formatter", () => {
         ref: "main",
       });
 
+      // GitHub doesn't support column in URL fragments
       expect(markdown).toContain(
-        "[src/handlers.ts:42](https://github.com/owner/repo/blob/main/src/handlers.ts#L42C10)"
+        "[src/handlers.ts:42](https://github.com/owner/repo/blob/main/src/handlers.ts#L42)"
       );
     });
 

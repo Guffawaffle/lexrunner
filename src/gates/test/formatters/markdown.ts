@@ -188,12 +188,13 @@ function formatFailureDetails(failure: AXTestFailure): string {
  * Format file link based on link style
  */
 function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>): string {
-  const { file, line, column } = failure;
+  const { file, line } = failure;
 
   switch (opts.linkFormat) {
     case "github":
       if (opts.repository) {
-        const lineRef = column ? `L${line}C${column}` : `L${line}`;
+        // GitHub only supports line numbers in URL fragments, not columns
+        const lineRef = `L${line}`;
         return `[${file}:${line}](https://github.com/${opts.repository}/blob/${opts.ref}/${file}#${lineRef})`;
       }
       // Fallback to plain if no repo
@@ -209,7 +210,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
 
     case "plain":
     default:
-      return column ? `${file}:${line}:${column}` : `${file}:${line}`;
+      return failure.column ? `${file}:${line}:${failure.column}` : `${file}:${line}`;
   }
 }
 
@@ -288,6 +289,6 @@ function formatDuration(ms: number): string {
  */
 function escapeMarkdown(text: string): string {
   // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
-  // Hyphen at end to avoid being interpreted as range
+  // Hyphen is positioned at the end of the character class where it's treated as a literal
   return text.replace(/([*_[\]()#!|\-])/g, "\\$1");
 }
