@@ -193,8 +193,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
   switch (opts.linkFormat) {
     case "github":
       if (opts.repository) {
-        // GitHub only supports line numbers in URL fragments, not columns.
-        // Column information is preserved in plain format for local tooling.
+        // GitHub URL fragments only support line numbers, not columns
         const lineRef = `L${line}`;
         return `[${file}:${line}](https://github.com/${opts.repository}/blob/${opts.ref}/${file}#${lineRef})`;
       }
@@ -203,7 +202,7 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
 
     case "gitlab":
       if (opts.repository) {
-        // GitLab also only supports line numbers in URL fragments
+        // GitLab URL fragments only support line numbers, not columns
         const lineRef = `L${line}`;
         return `[${file}:${line}](https://gitlab.com/${opts.repository}/-/blob/${opts.ref}/${file}#${lineRef})`;
       }
