@@ -193,7 +193,8 @@ function formatFileLink(failure: AXTestFailure, opts: Required<MarkdownOptions>)
   switch (opts.linkFormat) {
     case "github":
       if (opts.repository) {
-        // GitHub only supports line numbers in URL fragments, not columns
+        // GitHub only supports line numbers in URL fragments, not columns.
+        // Column information from failure.column is intentionally omitted.
         const lineRef = `L${line}`;
         return `[${file}:${line}](https://github.com/${opts.repository}/blob/${opts.ref}/${file}#${lineRef})`;
       }
@@ -289,6 +290,6 @@ function formatDuration(ms: number): string {
  */
 function escapeMarkdown(text: string): string {
   // Escape markdown special chars except backticks and periods: *, _, [, ], (, ), #, !, |, -
-  // Hyphen is positioned at the end of the character class where it's treated as a literal
+  // Hyphen is explicitly escaped for clarity (could also be placed at start/end of class)
   return text.replace(/([*_[\]()#!|\-])/g, "\\$1");
 }
