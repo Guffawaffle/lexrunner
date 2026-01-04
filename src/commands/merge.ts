@@ -96,6 +96,7 @@ export function registerMergeCommand(
     )
     .option("--ai-assist <mode>", "AI assistance mode: auto (default), none, required", "auto")
     .option("--emit-frames", "Emit execution frames for observability and debugging")
+    .option("--no-auto-update", "Disable automatic PR branch updates during sequential merge-weave")
     .addHelpText(
       "after",
       `
@@ -115,6 +116,7 @@ Examples:
   $ lex-pr merge --execute --resolve-policy ours    # Use "ours" conflict resolution
   $ lex-pr merge --execute --ai-assist required     # Require AI assistance for conflicts
   $ lex-pr merge --execute --emit-frames            # Enable frame emission
+  $ lex-pr merge --execute --no-auto-update         # Disable auto PR branch updates
 
 State Management:
   • Dry-run shows planned batches and execution order
@@ -126,6 +128,13 @@ Idempotency:
   • Lock hash computed from plan.json + PR head commits
   • Duplicate runs are skipped unless --force is used
   • Lock hash included in all logs and audit events
+
+Auto-Update PR Branches:
+  • Enabled by default during sequential merge-weave
+  • After merging PR N, remaining PRs are checked for 'behind' status
+  • Behind PRs are automatically updated via GitHub API
+  • Update failures are logged but don't block the weave
+  • Use --no-auto-update to disable this behavior
 
 Conflict Resolution Policies:
   • minimal-hunk (default): AI-powered minimal edit resolution with precise conflict boundaries
