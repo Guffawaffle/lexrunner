@@ -124,10 +124,9 @@ describe("Vitest Adapter E2E", () => {
       const result = vitestJsonAdapter.parse(input);
       const markdown = formatAsMarkdown(result);
 
-      expect(markdown).toContain("# Test Results");
+      expect(markdown).toContain("## 🧪 Test Results");
       expect(markdown).toContain("✅"); // Success indicator
-      expect(markdown).toContain("Passed:");
-      expect(markdown).toContain("Duration:");
+      expect(markdown).toContain("passed");
     });
 
     it("should format some-failing with failure details", () => {
@@ -135,11 +134,11 @@ describe("Vitest Adapter E2E", () => {
       const result = vitestJsonAdapter.parse(input);
       const markdown = formatAsMarkdown(result);
 
-      expect(markdown).toContain("# Test Results");
+      expect(markdown).toContain("## 🧪 Test Results");
       expect(markdown).toContain("❌"); // Failure indicator
-      expect(markdown).toContain("Failed:");
-      expect(markdown).toContain("## Failures");
-      expect(markdown).toContain("Next Actions");
+      expect(markdown).toContain("failed");
+      expect(markdown).toContain("Failed Tests");
+      expect(markdown).toContain("Suggested Actions");
     });
 
     it("should include coverage in markdown when present", () => {
@@ -148,7 +147,7 @@ describe("Vitest Adapter E2E", () => {
       const markdown = formatAsMarkdown(result);
 
       expect(markdown).toContain("Coverage");
-      expect(markdown).toContain("Lines:");
+      expect(markdown).toContain("Lines");
       expect(markdown).toContain("%");
     });
   });

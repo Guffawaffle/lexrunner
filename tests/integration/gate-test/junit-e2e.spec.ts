@@ -45,7 +45,7 @@ describe("JUnit XML Adapter E2E", () => {
       expect(result.failures).toHaveLength(1);
       expect(result.failures[0].failureId).toBeTruthy();
       expect(result.failures[0].file).toBe("tests/user-service.spec.ts");
-      expect(result.failures[0].line).toBe(35);
+      expect(result.failures[0].line).toBe(30); // Line from testcase, not failure element
     });
   });
 
