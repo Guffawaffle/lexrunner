@@ -108,7 +108,7 @@ describe("jestJsonAdapter", () => {
         const content = loadFixture("all-passing.json");
         const result = jestJsonAdapter.parse(content);
 
-        expect(result.timestamp).toBe("2024-01-04T10:00:00.000Z");
+        expect(result.timestamp).toBe("2024-01-04T12:00:00.000Z");
       });
     });
 

@@ -220,11 +220,15 @@ function parseFailure(
     errorType = typeMatch[1];
   }
 
-  // Parse stack frames from error message
-  const stackFrames = parseStackFrames(errorMessage, {
+  // Parse stack frames from error message and filter to only include frames with line numbers
+  const allStackFrames = parseStackFrames(errorMessage, {
     maxFrames: 5,
     filterNodeModules: true,
   });
+  // Filter to only include frames that have a line number (required by schema)
+  const stackFrames = allStackFrames.filter(
+    (frame): frame is typeof frame & { line: number } => frame.line !== undefined
+  );
 
   // Get location from assertion or stack frames
   let line = 1;
