@@ -240,6 +240,54 @@ throwMcpAXError(
 
 ---
 
+## Test Output Adapters (ADR-009)
+
+LexRunner includes AX-compliant test output adapters for normalizing test results:
+
+### Available Adapters
+
+| Adapter       | Runner               | Input Format  | Status      |
+| ------------- | -------------------- | ------------- | ----------- |
+| `vitest-json` | Vitest               | JSON reporter | ✅ Complete |
+| `jest-json`   | Jest                 | JSON reporter | ✅ Complete |
+| `junit-xml`   | Any JUnit-compatible | JUnit XML     | ✅ Complete |
+
+### CLI Usage
+
+```bash
+# Auto-detect adapter from content
+vitest run --reporter=json | lex-pr gate test --format json
+
+# Explicit adapter
+cat junit-report.xml | lex-pr gate test --adapter junit-xml --format markdown
+
+# Strict mode for CI (fail if ambiguous)
+lex-pr gate test --input results.json --strict --format json
+```
+
+### Output Format
+
+All adapters emit `AXTestResult` schema:
+
+```typescript
+interface AXTestResult {
+  schemaVersion: "1.0.0";
+  timestamp: string;
+  summary: { total: number; passed: number; failed: number; skipped?: number; durationMs?: number };
+  failures: AXTestFailure[];
+  coverage?: { lines: number; branches: number; functions: number };
+  adapter: { name: string; version: string };
+}
+```
+
+Each failure includes:
+
+- **`failureId`** — Deterministic ID for tracking across runs
+- **`stackFrames`** — Parsed, relevant stack frames
+- **`nextActions`** — Recovery suggestions with confidence levels
+
+---
+
 ## Testing AX Compliance
 
 ```bash
@@ -265,5 +313,5 @@ lex-pr weave apply --plan nonexistent.json --json 2>&1 | jq .error
 
 ---
 
-_Last updated: 2025-01-04_
-_Audit: LexRunner v0.6.0 → v1.0.1_
+_Last updated: 2026-01-19_
+_Audit: LexRunner v1.0.1 — AX test adapters verified working_
