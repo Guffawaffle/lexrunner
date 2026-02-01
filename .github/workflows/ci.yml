@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write # For posting test failure comments
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -111,7 +112,56 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
       - run: npm run build
-      - run: npm test
+      - name: Run tests with JSON output
+        run: npm test
+        continue-on-error: true
+        id: test-run
+      - name: Generate AX-compliant test summary
+        if: always() && steps.test-run.outcome != 'skipped'
+        run: |
+          node dist/cli.js gate test \
+            --adapter=vitest-json \
+            --input=test-results.json \
+            --output=ax-summary.json \
+            --include-raw
+        continue-on-error: true
+      - name: Upload AX test summary
+        if: always() && steps.test-run.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ax-test-summary
+          path: ax-summary.json
+          if-no-files-found: warn
+      - name: Generate markdown summary for failures
+        if: always() && steps.test-run.outcome == 'failure'
+        run: |
+          node dist/cli.js gate test \
+            --adapter=vitest-json \
+            --input=test-results.json \
+            --format=markdown \
+            --output=test-summary.md
+        continue-on-error: true
+      - name: Comment PR with test failures
+        if: always() && steps.test-run.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('test-summary.md')) {
+              console.log('No test summary found, skipping comment');
+              return;
+            }
+            const summary = fs.readFileSync('test-summary.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+        continue-on-error: true
+      - name: Fail if tests failed
+        if: steps.test-run.outcome == 'failure'
+        run: exit 1
       - run: npm run validate:manifests
 
   # Full gates: determinism + license (only on workflow_dispatch with level == full)
