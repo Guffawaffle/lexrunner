@@ -13,12 +13,8 @@ import {
   requireAdapter,
   requireDetectedAdapter,
   listAdapters,
-  registerAdapter,
   AdapterNotFoundError,
   AdapterParseError,
-  vitestJsonAdapter,
-  jestJsonAdapter,
-  junitXmlAdapter,
 } from "../../../gates/test/adapters/index.js";
 import { formatAsMarkdown } from "../../../gates/test/formatters/markdown.js";
 import type { AXTestResult } from "../../../gates/test/schema.js";
@@ -74,10 +70,8 @@ function writeOutput(content: string, outputPath?: string): void {
  * Register the gate test command
  */
 export function registerGateTestCommand(program: Command): void {
-  // Register built-in adapters
-  registerAdapter(vitestJsonAdapter);
-  registerAdapter(jestJsonAdapter);
-  registerAdapter(junitXmlAdapter);
+  // Built-in adapters are auto-registered by the adapters barrel (index.ts)
+  // on first import — no explicit registration needed here.
 
   program
     .command("test")

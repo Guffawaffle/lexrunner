@@ -10,6 +10,17 @@ _No unreleased changes._
 
 ---
 
+## [1.1.0] - 2026-02-08
+
+### Fixed
+
+- **SQLite package alignment** - Replaced `better-sqlite3` with `better-sqlite3-multiple-ciphers` ^12.6.2 (#730)
+  - LexRunner can now open encrypted Lex databases (cipher support via `pragma key`)
+  - Aligns all ecosystem repos (lex, lexsona, lexrunner) on the same SQLite package
+  - Drop-in replacement — no API changes, same `@types/better-sqlite3` types
+
+---
+
 ## [1.0.0] - 2026-01-04
 
 ### 🎉 First Stable Release
