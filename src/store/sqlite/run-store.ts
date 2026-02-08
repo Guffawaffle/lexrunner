@@ -2,7 +2,7 @@
  * SqliteRunStore — SQLite-based persistence for RunStore interface.
  *
  * This implementation provides durable, file-based persistence for run lifecycle
- * using SQLite via the better-sqlite3 package.
+ * using SQLite via the better-sqlite3-multiple-ciphers package.
  *
  * Key Features:
  * - Schema auto-creation on first use
@@ -14,8 +14,8 @@
  * @module store/sqlite/run-store
  */
 
-import Database from "better-sqlite3";
-import type { Database as DatabaseType } from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
+import type { Database as DatabaseType } from "better-sqlite3-multiple-ciphers";
 import type {
   RunStore,
   RunRecord,
@@ -175,7 +175,7 @@ export class SqliteRunStore implements RunStore {
 				appliedAt TEXT NOT NULL
 			);
 
-			INSERT OR IGNORE INTO schema_version (version, appliedAt) 
+			INSERT OR IGNORE INTO schema_version (version, appliedAt)
 			VALUES ('1.0.0', datetime('now'));
 		`;
   }
