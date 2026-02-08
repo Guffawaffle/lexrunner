@@ -5,9 +5,9 @@ on:
     branches:
       - main
     tags:
-      # Stable releases on lexrunner version tags
-      # Tag format: lexrunner-v*.*.* (e.g., lexrunner-v0.1.0, lexrunner-v1.0.0)
-      - "lexrunner-v*.*.*"
+      # Stable releases on version tags
+      # Tag format: v*.*.* (e.g., v0.1.0, v1.0.0)
+      - "v*.*.*"
 
   # Manual release trigger
   workflow_dispatch:
@@ -99,11 +99,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> ⚠️ Canary releases are for testing only. Use stable releases for production." >> $GITHUB_STEP_SUMMARY
 
-  # Stable release job - runs on lexrunner version tags
+  # Stable release job - runs on version tags
   stable-release:
     name: Stable Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/lexrunner-v')
+    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout code
@@ -114,8 +114,8 @@ jobs:
       - name: Verify tag format
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          if ! [[ "$TAG_NAME" =~ ^lexrunner-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Tag must follow format: lexrunner-v*.*.* (e.g., lexrunner-v1.2.3)"
+          if ! [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Tag must follow format: v*.*.* (e.g., v1.2.3)"
             exit 1
           fi
           echo "✅ Tag format is valid: $TAG_NAME"
