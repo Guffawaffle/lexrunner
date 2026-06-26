@@ -16,7 +16,7 @@
     "access": "restricted",
     "registry": "https://registry.npmjs.org/"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE.md",
   "bin": {
     "lex-pr": "dist/cli.js",
     "lexrunner-mcp": "./mcp-server.mjs"

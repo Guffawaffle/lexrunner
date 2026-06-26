@@ -1,6 +1,6 @@
 # LexRunner — Merge-Weave & Fanout CLI (`lex-pr`)
 
-![Proprietary](https://img.shields.io/badge/License-Proprietary-red)
+![Source Available](https://img.shields.io/badge/License-Source--Available-orange)
 ![Uses Lex (MIT)](<https://img.shields.io/badge/Powered%20by-Lex%20(MIT)-blue>)
 
 **`lex-pr` powered by LexRunner.** Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.
@@ -9,18 +9,18 @@
 
 ## Branding & Licensing
 
-**LexRunner** is a proprietary product built on top of **Lex**, the MIT-licensed OSS core. See [ADR-000](docs/adr/ADR-000-product-naming-and-branding.md) for naming and branding decisions.
+**LexRunner** is a source-available product built on top of **Lex**, the MIT-licensed OSS core. See [ADR-000](docs/adr/ADR-000-product-naming-and-branding.md) for naming and branding decisions.
 
-- **Product:** LexRunner (proprietary, merged pyramid & fanout orchestration)
+- **Product:** LexRunner (source-available, merge pyramid & fanout orchestration)
 - **CLI:** `lex-pr` (command-line interface)
 - **OSS Core:** [Lex](https://github.com/Guffawaffle/lex) (MIT license, frames & policy)
 
-### LexRunner (Proprietary) vs Lex (MIT OSS)
+### LexRunner (Source-Available) vs Lex (MIT OSS)
 
 | Aspect       | **LexRunner** (Paid)                           | **Lex** (OSS)                                   |
 | ------------ | ---------------------------------------------- | ----------------------------------------------- |
 | **Purpose**  | Enterprise merge-weave orchestration CLI       | Atlas/Memory/Policy core frameworks             |
-| **License**  | Proprietary                                    | MIT (open source)                               |
+| **License**  | Source-available personal use                  | MIT (open source)                               |
 | **Repo**     | `Guffawaffle/LexRunner`                        | `Guffawaffle/lex`                               |
 | **Audience** | Teams running automated fanout/merge workflows | Developers building on frames/policy primitives |
 
@@ -91,7 +91,7 @@ git commit -m "chore: update @smartergpt/lex to 2.1.1"
 #### Licensing
 
 - **Lex License:** MIT (permissive open source)
-- **LexRunner License:** UNLICENSED (proprietary)
+- **LexRunner License:** SmarterGPT Source-Available Personal Use License
 - **Attribution:** See [NOTICE.md](NOTICE.md) for required attributions
 - **Compliance:** Automated via `scripts/check-license-compliance.mjs`
 
