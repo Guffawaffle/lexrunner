@@ -6,7 +6,7 @@ This document describes LexRunner's licensing approach and compliance requiremen
 
 LexRunner is source-available, not open source. See [LICENSE.md](../LICENSE.md) for the full license text.
 
-You may view, fork, modify, and run LexRunner for personal, non-commercial use under the SmarterGPT Source-Available Personal Use License. Commercial use, organizational use, employer/client use, production use, hosted-service use, redistribution, sublicensing, or embedding in another product or platform requires a separate written license from Joseph Guff / Guffawaffle / SmarterGPT.
+You may view, fork, modify, and run LexRunner for personal, non-commercial use under the SmarterGPT Source-Available Personal Use License. Commercial use, organizational use, employer/client use, production use, hosted-service use, redistribution, sublicensing, or embedding in another product or platform requires a separate written license from Joseph Gustavson / Guffawaffle / SmarterGPT.
 
 ## Third-Party Dependencies
 
