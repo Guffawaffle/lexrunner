@@ -10,7 +10,7 @@
 
 The lexrunner project serves two audiences with distinct personas:
 
-1. **Paid Product (Proprietary):** Enterprise teams using the merge-weave CLI and merge pyramid orchestration.
+1. **Source-Available Product:** Enterprise teams using the merge-weave CLI and merge pyramid orchestration under an appropriate written license.
 2. **Open Source Core (MIT):** Community developers building on architectural policy, frames, and episodic memory.
 
 The current naming conflates both, making it unclear which product is which and which license applies to each component.
@@ -21,16 +21,16 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### Product Names
 
-| Product       | Brand       | Repo                    | License     | Notes                                       |
-| ------------- | ----------- | ----------------------- | ----------- | ------------------------------------------- |
-| **LexRunner** | `LexRunner` | `Guffawaffle/LexRunner` | Proprietary | Paid product; merge-weave orchestration CLI |
-| **Lex**       | `Lex`       | `Guffawaffle/lex`       | MIT         | OSS core; frames, memory, policy, atlas     |
+| Product       | Brand       | Repo                    | License                       | Notes                                                             |
+| ------------- | ----------- | ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| **LexRunner** | `LexRunner` | `Guffawaffle/lexrunner` | Source-available personal use | Commercial/organizational use requires a separate written license |
+| **Lex**       | `Lex`       | `Guffawaffle/lex`       | MIT                           | OSS core; frames, memory, policy, atlas                           |
 
 ### CLI Name
 
 - **CLI binary/command:** `lex-pr` remains unchanged (backward compatible).
 - **Tagline:** `lex-pr` (powered by LexRunner).
-- **Package name (npm, future):** `@guffawaffle/lexrunner` (for the paid product).
+- **Package name (npm, future):** `@guffawaffle/lexrunner` (for the LexRunner product).
 
 ### Repository Names
 
@@ -47,7 +47,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 ## Rationale
 
-1. **Clarity:** Distinguishes the paid orchestration layer (LexRunner) from the OSS foundations (Lex).
+1. **Clarity:** Distinguishes the source-available orchestration layer (LexRunner) from the OSS foundations (Lex).
 2. **Portability:** Lex can be adopted independently; LexRunner is built on top of Lex.
 3. **Legal/Licensing:** Clear separation eases compliance and customer communication.
 4. **Brand Consistency:** "LexRunner" projects a premium, purpose-built identity; "Lex" projects open-source accessibility.
@@ -61,7 +61,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 1. Update `lexrunner/README.md` with LexRunner branding.
 2. Update `lex/README.md` with Lex (MIT) branding and cross-reference.
-3. Add badges: "Proprietary • Paid" (LexRunner), "MIT • OSS" (Lex).
+3. Add badges: "Source Available" (LexRunner), "MIT • OSS" (Lex).
 4. Create `.github/workflows/release.yml` trigger on `lexrunner-v*` tags.
 
 ### Near-Term (Phase 2)
@@ -74,7 +74,7 @@ The current naming conflates both, making it unclear which product is which and 
 
 1. npm package `@guffawaffle/lexrunner` (currently undefined; may remain as-is).
 2. Branding assets: logos, website, marketing materials.
-3. User documentation split (paid vs. OSS guides).
+3. User documentation split (commercial-use vs. OSS guides).
 
 ---
 

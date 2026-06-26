@@ -13,7 +13,7 @@ LexRunner depends on Lex (MIT-licensed core) for memory, policy, atlas, and erro
 1. **Stable versioning** — Predictable updates and rollback capability
 2. **Security** — Supply chain integrity and provenance
 3. **Developer experience** — Simple installation and updates
-4. **Licensing clarity** — MIT (Lex) vs. Proprietary (LexRunner) boundaries
+4. **Licensing clarity** — MIT (Lex) vs. source-available (LexRunner) boundaries
 
 Options considered:
 
@@ -194,12 +194,13 @@ Automated update (via Dependabot):
 - **Attribution:** Required (see NOTICE.md)
 - **Repository:** https://github.com/Guffawaffle/lex
 
-### LexRunner (Proprietary)
+### LexRunner (Source-Available)
 
 - **Package:** `lexrunner`
-- **License:** UNLICENSED (proprietary)
+- **License:** SmarterGPT Source-Available Personal Use License
 - **Attribution:** Uses Lex (MIT) as dependency
 - **Repository:** https://github.com/Guffawaffle/lexrunner
+- **Commercial/organizational use:** Requires a separate written license
 
 ### License Compliance
 

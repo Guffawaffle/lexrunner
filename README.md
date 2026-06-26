@@ -17,7 +17,7 @@
 
 ### LexRunner (Source-Available) vs Lex (MIT OSS)
 
-| Aspect       | **LexRunner** (Paid)                           | **Lex** (OSS)                                   |
+| Aspect       | **LexRunner** (Source-Available)               | **Lex** (OSS)                                   |
 | ------------ | ---------------------------------------------- | ----------------------------------------------- |
 | **Purpose**  | Enterprise merge-weave orchestration CLI       | Atlas/Memory/Policy core frameworks             |
 | **License**  | Source-available personal use                  | MIT (open source)                               |

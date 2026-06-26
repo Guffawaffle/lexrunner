@@ -18,7 +18,7 @@ Version 0.1.0 marks the first official release of **LexRunner**, establishing cl
 ### What's New in v0.1
 
 1. **Product Branding & Naming Clarity**
-   - Clear separation between LexRunner (proprietary) and Lex (MIT OSS)
+   - Clear separation between LexRunner (source-available) and Lex (MIT OSS)
    - New release tag format: `lexrunner-v*.*.*`
    - Updated README and documentation with branding
 
@@ -259,10 +259,10 @@ ls .lexrunner/frames/
 
 **After v0.1:**
 
-- **Product**: LexRunner (proprietary)
+- **Product**: LexRunner (source-available)
 - **CLI**: `lex-pr` (unchanged)
 - **OSS Core**: Lex (separate repository)
-- Clear licensing: LexRunner (Proprietary), Lex (MIT)
+- Clear licensing: LexRunner (source-available personal use), Lex (MIT)
 
 ### Example 3: Release Tags
 
@@ -353,8 +353,8 @@ lex-pr merge plan.json --execute
 
 | Term          | Meaning                                       |
 | ------------- | --------------------------------------------- |
-| **LexRunner** | Product name (proprietary paid product)       |
-| **lexrunner** | Repository name (unchanged)                   |
+| **LexRunner** | Source-available product name                 |
+| **lexrunner** | Repository name                               |
 | **lex-pr**    | CLI command (unchanged)                       |
 | **Lex**       | OSS core library (MIT license, separate repo) |
 
@@ -362,7 +362,7 @@ lex-pr merge plan.json --execute
 
 - CLI command: `lex-pr`
 - npm package name: `lexrunner`
-- Repository URL: `Guffawaffle/LexRunner`
+- Repository URL: `Guffawaffle/lexrunner`
 
 **What changed:**
 

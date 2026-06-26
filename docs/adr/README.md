@@ -2,7 +2,7 @@
 
 This directory contains Architecture Decision Records for LexRunner. Each ADR documents a significant decision, its context, and consequences.
 
-> **IP Boundary Note:** ADRs in this directory contain proprietary implementation details specific to LexRunner. Public, engine-agnostic decisions live in [Lex's ADR directory](https://github.com/smartergpt/lex/docs/adr/).
+> **IP Boundary Note:** ADRs in this directory contain LexRunner-specific implementation details. Public, engine-agnostic decisions live in [Lex's ADR directory](https://github.com/smartergpt/lex/docs/adr/).
 
 ## Index
 
