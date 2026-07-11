@@ -4,8 +4,13 @@
 
 - **lexrunner (project/repo)**: The repository you're reading.
 - **Runner CLI (core runner)**: TypeScript command-line app under `src/**`. Shorthand: "the runner".
-- **MCP server (adapter)**: Optional read-only adapter at `src/mcp/server.ts`. Shorthand: "lex-pr MCP".
-- **Workspace profile**: Portable example profile under `.smartergpt/**`. Not the app; it's inputs the runner consumes.
+- **MCP server (adapter)**: Optional adapter that exposes selected runner operations over MCP. Shorthand:
+  "lex-pr MCP".
+- **Workspace profile**: Portable examples and developer tooling under `.smartergpt/**`. It is not the app,
+  is never a core-runner runtime dependency, and is not an editor workspace, project root, or execution root.
+- **Project root**: Repository root that owns the task, policy, and run state.
+- **Execution root**: Runtime-local path where an operation executes. A single project root may have different
+  Windows, WSL, container, or remote execution roots.
 - **Merge pyramid**: The plan → gates → weave/merge process the runner executes.
 
 ## Process & Artifacts
@@ -15,6 +20,29 @@
 - **Stack**: User-authored prioritization/dependency hints (e.g., `.smartergpt/stack.yml`).
 - **Item**: A unit in the plan (often a PR).
 - **Integration branch**: Temporary branch used to weave/verify a batch of items before merging to `main`.
+
+## Agent Work & Control
+
+- **WorkItem**: Source-neutral, normalized statement of requested work and acceptance criteria.
+- **Run**: LexRunner's coordinated effort to deliver one WorkItem. Exactly one active controller lease may
+  advance a Run.
+- **Attempt**: One bounded worker try within a Run. A retry normally creates a new Attempt.
+- **Controller lease**: Exclusive, expiring authority for one controller instance to advance a Run.
+- **Workspace lease**: Exclusive ownership of one branch and worktree by one live Attempt. It does not grant
+  authority over GitHub, releases, credentials, or external runtime state.
+- **AgentTaskPacket**: Portable, immutable, canonically hashed instructions for an Attempt. It contains no
+  machine-local absolute paths.
+- **ExecutionEnvelope**: Attempt-local execution details such as execution root, branch, workspace lease,
+  worker runtime, and sandbox policy. It is not part of the portable task-packet hash.
+- **WorkerSession**: Runtime-specific handle for a worker process or native background agent.
+- **AgentTaskReceipt**: Attempt-bound claims about what a worker did. A receipt is evidence to inspect, not
+  operational truth.
+- **EngineVerification**: LexRunner-owned evidence collected independently from worker claims. Verification
+  may pass, fail, be inconclusive, encounter infrastructure failure, or be cancelled.
+- **Delivery**: Coordinator-owned creation and publication of verified work, including final commits, signing,
+  pushing, PR operations, gates, weave, and merge under explicit authority policy.
+- **Assisted control**: A foreground developer-chat controller dispatches native background agents.
+- **Headless control**: A supervised CLI controller dispatches and recovers external worker runtimes.
 
 ## Repo Rules (Firm)
 
