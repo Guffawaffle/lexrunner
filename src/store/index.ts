@@ -41,6 +41,28 @@ export {
 export { InMemoryRunStore, InMemoryRunStoreOptions } from "./inmemory/index.js";
 export { SqliteRunStore } from "./sqlite/index.js";
 
+// Controller coordination is intentionally separate from the frozen RunStore contract.
+export type {
+  JsonPrimitive,
+  JsonValue,
+  ControllerLease,
+  ControllerLeaseCredential,
+  RunCoordinationRecord,
+  AcquireControllerLeaseInput,
+  RenewControllerLeaseInput,
+  ReleaseControllerLeaseInput,
+  CompareAndSetRunStateInput,
+  RunCoordinationEventInput,
+  RunCoordinationEvent,
+  AcquireControllerLeaseResult,
+  RenewControllerLeaseResult,
+  ReleaseControllerLeaseResult,
+  CompareAndSetRunStateResult,
+  CoordinationStore,
+} from "./coordination-store.js";
+export { InMemoryCoordinationStore } from "./inmemory/index.js";
+export { SqliteCoordinationStore } from "./sqlite/index.js";
+
 /**
  * Default database path relative to baseDir.
  * Runtime artifacts live under .smartergpt/runner/.
