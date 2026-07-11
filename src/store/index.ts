@@ -54,6 +54,7 @@ export type {
   CompareAndSetRunStateInput,
   RunCoordinationEventInput,
   RunCoordinationEvent,
+  LeaseFailureReason,
   AcquireControllerLeaseResult,
   RenewControllerLeaseResult,
   ReleaseControllerLeaseResult,
