@@ -3,14 +3,17 @@ import {
   AGENT_WORK_CONTRACT_VERSION,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v1,
+  Attempt_v1,
   ControllerLease_v1,
   AgentEngineVerification_v1,
   ExecutionEnvelope_v1,
   HumanActionReceipt_v1,
   HumanActionRequest_v1,
+  Run_v1,
   WorkItem_v1,
   WorkerSession_v1,
   WorkspaceLease_v1,
+  WorkspaceAllocation_v1,
   computeAgentTaskPacketHash,
   createAgentTaskPacket,
   validateAgentTaskReceiptBinding,
@@ -94,8 +97,10 @@ function workspaceLease() {
     run_id: taskPacket.run_id,
     run_revision: 8,
     work_item_id: taskPacket.work_item.work_item_id,
+    work_item_revision: taskPacket.work_item.revision,
     attempt_id: taskPacket.attempt_id,
     controller_lease_id: "controller-lease-1",
+    controller_fence: 42,
     packet_id: taskPacket.packet_id,
     packet_hash: taskPacket.packet_hash,
     repository: {
@@ -169,6 +174,80 @@ function agentReceipt() {
   });
 }
 
+function runRecord() {
+  return {
+    schema_version: AGENT_WORK_CONTRACT_VERSION,
+    run_id: "run-1",
+    revision: 8,
+    work_item_id: "LEX-390",
+    work_item_revision: 3,
+    control_mode: "assisted" as const,
+    authority_ceiling: packetInput().authority,
+    status: "executing" as const,
+    active_controller_lease_id: "controller-lease-1",
+    attempt_ids: ["attempt-1"],
+    current_attempt_id: "attempt-1",
+    created_at: PACKET_CREATED_AT,
+    updated_at: NOW,
+  };
+}
+
+function attemptRecord() {
+  const taskPacket = packet();
+  return {
+    schema_version: AGENT_WORK_CONTRACT_VERSION,
+    attempt_id: taskPacket.attempt_id,
+    revision: 2,
+    run_id: taskPacket.run_id,
+    run_revision: 8,
+    work_item_id: taskPacket.work_item.work_item_id,
+    work_item_revision: taskPacket.work_item.revision,
+    packet_id: taskPacket.packet_id,
+    packet_hash: taskPacket.packet_hash,
+    base_sha: taskPacket.repository.base_sha,
+    workspace_lease_id: "workspace-lease-1",
+    status: "running" as const,
+    created_at: PACKET_CREATED_AT,
+    updated_at: NOW,
+  };
+}
+
+function workspaceAllocation() {
+  return {
+    schema_version: AGENT_WORK_CONTRACT_VERSION,
+    allocation_id: "allocation-1",
+    revision: 2,
+    run_id: "run-1",
+    attempt_id: "attempt-1",
+    workspace_lease_id: "workspace-lease-1",
+    repository: {
+      id: "Guffawaffle/lexrunner",
+      remote_url: "https://github.com/Guffawaffle/lexrunner.git",
+      default_branch: "main",
+    },
+    base_sha: BASE_SHA,
+    branch: "agent/attempt-workspace-persistence",
+    host_id: "devbox-1",
+    git_runtime: "wsl-git",
+    paths: {
+      project_root: "/srv/lex-mcp/lexrunner",
+      worktree_root: "/srv/lex-mcp/lexrunner-agent-worktrees/attempt-1",
+      repository_git_common_dir: "/srv/lex-mcp/lexrunner/.git",
+      worktree_git_dir: "/srv/lex-mcp/lexrunner/.git/worktrees/attempt-1",
+    },
+    status: "active" as const,
+    observation: {
+      registration: "registered" as const,
+      cleanliness: "clean" as const,
+      observed_branch: "agent/attempt-workspace-persistence",
+      observed_head_sha: BASE_SHA,
+      observed_at: NOW,
+    },
+    allocated_at: PACKET_CREATED_AT,
+    updated_at: NOW,
+  };
+}
+
 describe("agent work protocol contracts", () => {
   it("validates a source-neutral work item", () => {
     expect(
@@ -197,6 +276,80 @@ describe("agent work protocol contracts", () => {
         dependencies: [],
       }).source.kind
     ).toBe("jira");
+  });
+
+  it("models a strict coordinated Run without embedding legacy RunState", () => {
+    const run = Run_v1.parse(runRecord());
+    expect(run.current_attempt_id).toBe("attempt-1");
+
+    expect(
+      Run_v1.safeParse({
+        ...runRecord(),
+        status: "paused",
+      }).success
+    ).toBe(false);
+    expect(
+      Run_v1.safeParse({
+        ...runRecord(),
+        status: "paused",
+        resume_status: "executing",
+      }).success
+    ).toBe(true);
+    expect(
+      Run_v1.safeParse({
+        ...runRecord(),
+        status: "completed",
+      }).success
+    ).toBe(false);
+    expect(
+      Run_v1.safeParse({
+        ...runRecord(),
+        status: "completed",
+        completed_at: LATER,
+        updated_at: LATER,
+      }).success
+    ).toBe(true);
+  });
+
+  it("binds lifecycle Attempts to a packet and requires state evidence", () => {
+    expect(Attempt_v1.parse(attemptRecord()).status).toBe("running");
+
+    const { workspace_lease_id: _leaseId, ...prepared } = attemptRecord();
+    expect(Attempt_v1.safeParse({ ...prepared, status: "prepared" }).success).toBe(true);
+    expect(Attempt_v1.safeParse({ ...prepared, status: "leased" }).success).toBe(false);
+
+    expect(
+      Attempt_v1.safeParse({
+        ...attemptRecord(),
+        status: "accepted",
+        completed_at: LATER,
+      }).success
+    ).toBe(false);
+    expect(
+      Attempt_v1.safeParse({
+        ...attemptRecord(),
+        status: "accepted",
+        receipt_id: "receipt-1",
+        verification_id: "verification-1",
+        completed_at: LATER,
+        updated_at: LATER,
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects impossible Run and Attempt timestamp orderings", () => {
+    expect(
+      Run_v1.safeParse({
+        ...runRecord(),
+        updated_at: "2026-07-11T11:59:00.000Z",
+      }).success
+    ).toBe(false);
+    expect(
+      Attempt_v1.safeParse({
+        ...attemptRecord(),
+        updated_at: "2026-07-11T11:59:00.000Z",
+      }).success
+    ).toBe(false);
   });
 
   it("constructs and validates a canonically bound portable task packet", () => {
@@ -287,6 +440,80 @@ describe("agent work protocol contracts", () => {
     expect(controller.fence).toBe(42);
     expect(ControllerLease_v1.safeParse({ ...controller, fence: 0 }).success).toBe(false);
     expect(workspaceLease().controller_lease_id).toBe(controller.lease_id);
+    expect(workspaceLease().controller_fence).toBe(controller.fence);
+  });
+
+  it("couples finalized workspace leases to timestamps and cleanup disposition", () => {
+    const lease = workspaceLease();
+    expect(WorkspaceLease_v1.safeParse({ ...lease, status: "reserved" }).success).toBe(true);
+    expect(
+      WorkspaceLease_v1.safeParse({
+        ...lease,
+        status: "quarantined",
+        released_at: LATER,
+        cleanup_disposition: "preserved",
+      }).success
+    ).toBe(true);
+    expect(
+      WorkspaceLease_v1.safeParse({
+        ...lease,
+        status: "quarantined",
+        cleanup_disposition: "discarded",
+      }).success
+    ).toBe(false);
+    expect(
+      WorkspaceLease_v1.safeParse({
+        ...lease,
+        heartbeat_at: "2026-07-11T12:07:00.000Z",
+      }).success
+    ).toBe(false);
+  });
+
+  it("keeps runtime-native workspace identity in a machine-local allocation", () => {
+    const allocation = WorkspaceAllocation_v1.parse(workspaceAllocation());
+    expect(allocation.paths.worktree_git_dir).toContain(".git/worktrees");
+    expect(allocation.host_id).toBe("devbox-1");
+
+    expect(
+      WorkspaceAllocation_v1.safeParse({
+        ...workspaceAllocation(),
+        paths: { ...workspaceAllocation().paths, worktree_root: "relative/worktree" },
+      }).success
+    ).toBe(false);
+  });
+
+  it("requires inspection evidence only for quarantined allocations", () => {
+    const allocation = workspaceAllocation();
+    expect(
+      WorkspaceAllocation_v1.safeParse({
+        ...allocation,
+        status: "quarantined",
+        quarantine_reason: "dirty",
+        quarantine_evidence: ["git status reported uncommitted changes"],
+        quarantined_at: LATER,
+        observation: {
+          ...allocation.observation,
+          cleanliness: "dirty",
+          observed_at: LATER,
+        },
+        updated_at: LATER,
+      }).success
+    ).toBe(true);
+    expect(
+      WorkspaceAllocation_v1.safeParse({
+        ...allocation,
+        status: "quarantined",
+        quarantined_at: LATER,
+      }).success
+    ).toBe(false);
+    expect(
+      WorkspaceAllocation_v1.safeParse({
+        ...allocation,
+        quarantine_reason: "dirty",
+        quarantine_evidence: ["unexpected changes"],
+        quarantined_at: LATER,
+      }).success
+    ).toBe(false);
   });
 
   it("binds a worker receipt to one packet, lease revision, session, and base SHA", () => {
