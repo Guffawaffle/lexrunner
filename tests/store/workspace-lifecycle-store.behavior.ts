@@ -741,6 +741,122 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       });
     });
 
+    it("requires an active workspace before launching an attempt", async () => {
+      await createAttempt();
+      await acquire();
+
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "launch-reserved",
+          now: T2,
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 1,
+          status: "launching",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "workspace_not_active" });
+    });
+
+    it("rejects launch at the workspace expiry boundary", async () => {
+      await createAttempt();
+      await acquire({ ttlMs: 1_000, observation: observation() });
+
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "launch-expired",
+          now: T2,
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 1,
+          status: "launching",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "workspace_expired" });
+    });
+
+    it("requires the current controller to resume a workspace before launch", async () => {
+      await createAttempt();
+      await acquire({ ttlMs: 20_000, observation: observation() });
+      const takeover = await store.acquireControllerLease({
+        runId: "run-1",
+        controllerId: "controller-2",
+        leaseId: "controller-lease-2",
+        now: T_LATE,
+        ttlMs: 10_000,
+        initialState: {},
+      });
+      if (!takeover.acquired) throw new Error("controller takeover failed");
+
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller: credential(takeover.lease),
+          expectedRunRevision: 0,
+          mutationId: "launch-before-resume",
+          now: T_LATE,
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 1,
+          status: "launching",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "stale_fence" });
+    });
+
+    it.each([
+      ["wrong HEAD", observation({ headSha: "c".repeat(40) })],
+      ["broker warning", observation({ reason: "ambiguous worktree ownership" })],
+    ])("rejects launch from active workspace evidence with %s", async (_label, observed) => {
+      await createAttempt();
+      await acquire({ observation: observed });
+
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "launch-unsafe-evidence",
+          now: T2,
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 1,
+          status: "launching",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+    });
+
+    it("rejects launch from a dirty workspace heartbeat", async () => {
+      await createAttempt();
+      await acquire();
+      const heartbeat = await store.heartbeatWorkspace({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "activate-dirty",
+        now: T2,
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 1,
+        expectedWorkspaceLeaseRevision: 0,
+        ttlMs: 5_000,
+        observation: observation({ cleanliness: "dirty", dirtyPaths: ["unfinished.txt"] }),
+      });
+      expect(heartbeat).toMatchObject({ updated: true, workspaceLease: { status: "active" } });
+
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "launch-dirty",
+          now: T3,
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 2,
+          status: "launching",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+    });
+
     it("releases a clean matching workspace with one authoritative event", async () => {
       await createAttempt();
       await acquire({ observation: observation() });

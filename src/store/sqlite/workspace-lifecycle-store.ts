@@ -227,8 +227,21 @@ export class SqliteWorkspaceLifecycleStore
       }
       if (requiresLiveWorkspace(input.status)) {
         const lease = attempt!.workspaceLeaseId ? this.lease(attempt!.workspaceLeaseId) : null;
-        if (!lease || (lease.status !== "active" && lease.status !== "reserved")) {
+        if (!lease || lease.status !== "active") {
           return this.failure("workspace_not_active", attempt!, lease ?? undefined);
+        }
+        if (
+          lease.controllerId !== input.controller.controllerId ||
+          lease.controllerLeaseId !== input.controller.leaseId ||
+          lease.fencingToken !== input.controller.fencingToken
+        ) {
+          return this.failure("stale_fence", attempt!, lease);
+        }
+        if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+          return this.failure("workspace_expired", attempt!, lease);
+        }
+        if (input.status === "launching" && !isLaunchReadyWorkspace(lease)) {
+          return this.failure("evidence_mismatch", attempt!, lease);
         }
       }
       const evidence = bindEvidence(attempt!, input);
@@ -488,13 +501,13 @@ export class SqliteWorkspaceLifecycleStore
           }
         | undefined;
       if (!coordination?.controllerId) return this.failure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken)
+        return this.failure("stale_fence");
       if (
         coordination.controllerId !== input.controller.controllerId ||
         coordination.leaseId !== input.controller.leaseId
       )
         return this.failure("lease_mismatch");
-      if (coordination.fencingToken !== input.controller.fencingToken)
-        return this.failure("stale_fence");
       if (coordination.revision !== input.expectedRunRevision)
         return this.failure("stale_run_revision", undefined, undefined, coordination.revision);
       if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now"))
@@ -783,6 +796,19 @@ function sameIdentity(expected: WorkspaceIdentity, observed: WorkspaceObservatio
     expected.branch === observed.branch &&
     expected.worktreePath === observed.worktreePath &&
     expected.attemptId === observed.attemptId
+  );
+}
+
+function isLaunchReadyWorkspace(lease: WorkspaceLifecycleLeaseRecord): boolean {
+  const observed = lease.lastObservation;
+  return Boolean(
+    observed &&
+    observed.exists &&
+    observed.registered &&
+    sameIdentity(lease, observed) &&
+    observed.cleanliness === "clean" &&
+    observed.headSha === lease.baseSha &&
+    observed.reason === undefined
   );
 }
 
