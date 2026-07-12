@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AGENT_WORK_CONTRACT_VERSION,
+  AGENT_TASK_RECEIPT_PATCH_PROFILE,
+  AGENT_TASK_RECEIPT_V2_VERSION,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v1,
+  AgentTaskReceipt_v2,
   Attempt_v1,
   ControllerLease_v1,
   AgentEngineVerification_v1,
@@ -16,7 +19,9 @@ import {
   WorkspaceAllocation_v1,
   computeAgentTaskPacketHash,
   createAgentTaskPacket,
+  parseAgentTaskReceiptV2,
   validateAgentTaskReceiptBinding,
+  validateAgentTaskReceiptV2Binding,
   validateHumanActionReceiptBinding,
   type AgentTaskPacketHashInput,
 } from "../../../src/schemas/agent-work.js";
@@ -27,6 +32,7 @@ const HEAD_SHA = "b".repeat(40);
 const PACKET_CREATED_AT = "2026-07-11T12:00:00.000Z";
 const NOW = "2026-07-11T12:01:00.000Z";
 const LATER = "2026-07-11T12:06:00.000Z";
+const SUBMITTED = "2026-07-11T12:07:00.000Z";
 
 function packetInput(): AgentTaskPacketHashInput {
   return {
@@ -143,6 +149,15 @@ function workerSession() {
   });
 }
 
+function completedWorkerSession() {
+  return WorkerSession_v1.parse({
+    ...workerSession(),
+    status: "completed",
+    heartbeat_at: LATER,
+    ended_at: LATER,
+  });
+}
+
 function agentReceipt() {
   const taskPacket = packet();
   const lease = workspaceLease();
@@ -171,6 +186,43 @@ function agentReceipt() {
     human_action_request_ids: [],
     cost: { tool_calls: 12, elapsed_ms: 1000 },
     submitted_at: LATER,
+  });
+}
+
+function agentReceiptV2(overrides: Record<string, unknown> = {}) {
+  const taskPacket = packet();
+  const lease = workspaceLease();
+  const session = workerSession();
+  return parseAgentTaskReceiptV2({
+    schema_version: AGENT_TASK_RECEIPT_V2_VERSION,
+    receipt_id: "agent-receipt-v2-1",
+    run_id: taskPacket.run_id,
+    work_item_id: taskPacket.work_item.work_item_id,
+    work_item_revision: taskPacket.work_item.revision,
+    attempt_id: taskPacket.attempt_id,
+    packet_id: taskPacket.packet_id,
+    packet_hash: taskPacket.packet_hash,
+    workspace_lease_id: lease.lease_id,
+    workspace_lease_revision: session.workspace_lease_revision,
+    worker_runtime: "codex-native",
+    worker_session_id: session.session_id,
+    observed_base_sha: BASE_SHA,
+    final_head_sha: HEAD_SHA,
+    outcome: "completed",
+    exit_reason: "work_complete",
+    summary: "Added and tested the complete receipt claims contract.",
+    files_touched: ["src/schemas/agent-work.ts", "tests/unit/schemas/agent-work.spec.ts"],
+    commits: [HEAD_SHA],
+    acceptance_criteria_addressed: ["ac-1"],
+    claimed_checks: [{ id: "unit", outcome: "pass", exit_code: 0 }],
+    assumptions: [],
+    blockers: [],
+    human_action_request_ids: [],
+    cost: { tool_calls: 12, elapsed_ms: 1000 },
+    worker_started_at: NOW,
+    worker_completed_at: LATER,
+    submitted_at: SUBMITTED,
+    ...overrides,
   });
 }
 
@@ -538,6 +590,257 @@ describe("agent work protocol contracts", () => {
       expect.stringContaining("workspace_lease_revision mismatch"),
       expect.stringContaining("base_sha mismatch"),
     ]);
+  });
+
+  it("represents committed and uncommitted v2 result claims with canonical hashes", () => {
+    const committed = agentReceiptV2();
+    const uncommitted = agentReceiptV2({
+      receipt_id: "agent-receipt-v2-uncommitted",
+      final_head_sha: undefined,
+      patch_hash: `sha256:${"c".repeat(64)}`,
+      commits: [],
+    });
+    const both = agentReceiptV2({
+      receipt_id: "agent-receipt-v2-both",
+      patch_hash: `sha256:${"d".repeat(64)}`,
+    });
+
+    expect(committed.schema_version).toBe("2.0.0");
+    expect(AGENT_TASK_RECEIPT_PATCH_PROFILE).toBe("git-diff-binary-v1");
+    expect(uncommitted.patch_hash).toBe(`sha256:${"c".repeat(64)}`);
+    expect(both.final_head_sha).toBe(HEAD_SHA);
+    expect(computeCanonicalHash(parseAgentTaskReceiptV2(committed))).toBe(
+      computeCanonicalHash(committed)
+    );
+    expect(computeCanonicalHash(uncommitted)).not.toBe(computeCanonicalHash(committed));
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...committed,
+        final_head_sha: undefined,
+        patch_hash: undefined,
+      }).success
+    ).toBe(false);
+  });
+
+  it("enforces v2 decisive evidence and worker timestamp ordering", () => {
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        outcome: "blocked",
+        blockers: [],
+      }).success
+    ).toBe(false);
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        worker_completed_at: "2026-07-11T12:00:00.000Z",
+      }).success
+    ).toBe(false);
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        submitted_at: NOW,
+      }).success
+    ).toBe(false);
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        files_touched: ["src/../outside.ts"],
+      }).success
+    ).toBe(false);
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        observed_base_sha: BASE_SHA.toUpperCase(),
+      }).success
+    ).toBe(false);
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        final_head_sha: HEAD_SHA.toUpperCase(),
+        commits: [HEAD_SHA.toUpperCase()],
+      }).success
+    ).toBe(false);
+  });
+
+  it("accepts canonical slash-separated v2 touched paths", () => {
+    expect(
+      AgentTaskReceipt_v2.safeParse({
+        ...agentReceiptV2(),
+        files_touched: ["src/schemas/agent-work.ts", "tests/fixtures/result.bin"],
+      }).success
+    ).toBe(true);
+  });
+
+  it.each([
+    ["NUL", "src/bad\0path.ts"],
+    ["UNC", "\\\\server\\share\\file.ts"],
+    ["backslash", "src\\schemas\\agent-work.ts"],
+    ["dot segment", "./src/agent-work.ts"],
+    ["internal dot segment", "src/./agent-work.ts"],
+    ["double slash", "src//agent-work.ts"],
+    ["trailing slash", "src/"],
+  ])("rejects noncanonical v2 touched path form %s", (_form, path) => {
+    expect(
+      AgentTaskReceipt_v2.safeParse({ ...agentReceiptV2(), files_touched: [path] }).success
+    ).toBe(false);
+  });
+
+  it("leaves legacy v1 touched-path spelling unchanged", () => {
+    expect(
+      AgentTaskReceipt_v1.safeParse({
+        ...agentReceipt(),
+        files_touched: ["src\\legacy.ts"],
+      }).success
+    ).toBe(true);
+  });
+
+  it("binds v2 claims to work revision, packet, lease, runtime, session, and base", () => {
+    const context = {
+      packet: packet(),
+      lease: workspaceLease(),
+      session: completedWorkerSession(),
+      workerRuntime: "codex-native",
+    };
+    expect(validateAgentTaskReceiptV2Binding(context, agentReceiptV2())).toEqual({
+      valid: true,
+      errors: [],
+    });
+
+    const mismatched = agentReceiptV2({
+      work_item_revision: 4,
+      packet_hash: `sha256:${"e".repeat(64)}`,
+      workspace_lease_revision: 9,
+      worker_runtime: "other-runtime",
+      worker_session_id: "other-session",
+      observed_base_sha: "c".repeat(40),
+    });
+    const binding = validateAgentTaskReceiptV2Binding(context, mismatched);
+    expect(binding.valid).toBe(false);
+    expect(binding.errors).toEqual([
+      expect.stringContaining("work_item_revision mismatch"),
+      expect.stringContaining("packet_hash mismatch"),
+      expect.stringContaining("workspace_lease_revision mismatch"),
+      expect.stringContaining("worker_runtime mismatch"),
+      expect.stringContaining("worker_session_id mismatch"),
+      expect.stringContaining("observed_base_sha mismatch"),
+    ]);
+
+    expect(
+      validateAgentTaskReceiptV2Binding(
+        context,
+        agentReceiptV2({
+          worker_started_at: "2026-07-11T12:02:00.000Z",
+          worker_completed_at: "2026-07-11T12:05:00.000Z",
+        })
+      )
+    ).toEqual({ valid: true, errors: [] });
+    expect(
+      validateAgentTaskReceiptV2Binding(
+        context,
+        agentReceiptV2({
+          worker_started_at: "2026-07-11T07:01:00.000-05:00",
+          worker_completed_at: "2026-07-11T07:06:00.000-05:00",
+          submitted_at: "2026-07-11T07:07:00.000-05:00",
+        })
+      )
+    ).toEqual({ valid: true, errors: [] });
+
+    const startsEarly = validateAgentTaskReceiptV2Binding(
+      context,
+      agentReceiptV2({
+        worker_started_at: "2026-07-11T12:00:00.000Z",
+        worker_completed_at: "2026-07-11T12:05:00.000Z",
+      })
+    );
+    expect(startsEarly.errors).toEqual([expect.stringContaining("worker_started_at precedes")]);
+
+    const endsLate = validateAgentTaskReceiptV2Binding(
+      context,
+      agentReceiptV2({ worker_completed_at: "2026-07-11T12:06:30.000Z" })
+    );
+    expect(endsLate.errors).toEqual([expect.stringContaining("worker_completed_at follows")]);
+
+    const missingEnd = validateAgentTaskReceiptV2Binding(
+      { ...context, session: { ...completedWorkerSession(), ended_at: undefined } },
+      agentReceiptV2()
+    );
+    expect(missingEnd.errors).toEqual([expect.stringContaining("ended_at is required")]);
+
+    const nonterminal = validateAgentTaskReceiptV2Binding(
+      {
+        ...context,
+        session: { ...completedWorkerSession(), status: "running" as const },
+      },
+      agentReceiptV2()
+    );
+    expect(nonterminal.errors).toEqual([expect.stringContaining("status is not terminal")]);
+
+    const invalidSessionWindow = validateAgentTaskReceiptV2Binding(
+      {
+        ...context,
+        session: WorkerSession_v1.parse({
+          ...completedWorkerSession(),
+          started_at: LATER,
+          ended_at: NOW,
+        }),
+      },
+      agentReceiptV2()
+    );
+    expect(invalidSessionWindow.errors).toEqual([
+      expect.stringContaining("worker_session time window is invalid"),
+    ]);
+  });
+
+  it("rejects incoherent authoritative v2 binding context", () => {
+    const taskPacket = packet();
+    const lease = workspaceLease();
+    const session = completedWorkerSession();
+    const binding = validateAgentTaskReceiptV2Binding(
+      {
+        packet: taskPacket,
+        lease: {
+          ...lease,
+          run_id: "other-run",
+          work_item_id: "other-work",
+          work_item_revision: lease.work_item_revision + 1,
+          attempt_id: "other-attempt",
+          packet_id: "other-packet",
+          packet_hash: `sha256:${"c".repeat(64)}`,
+          repository: { ...lease.repository, id: "other/repository" },
+          base_sha: "c".repeat(40),
+        },
+        session: {
+          ...session,
+          run_id: "session-run",
+          attempt_id: "session-attempt",
+          packet_id: "session-packet",
+          packet_hash: `sha256:${"d".repeat(64)}`,
+          workspace_lease_id: "session-lease",
+        },
+        workerRuntime: "codex-native",
+      },
+      agentReceiptV2()
+    );
+
+    expect(binding.valid).toBe(false);
+    expect(binding.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("context.lease.run_id mismatch"),
+        expect.stringContaining("context.lease.work_item_id mismatch"),
+        expect.stringContaining("context.lease.work_item_revision mismatch"),
+        expect.stringContaining("context.lease.attempt_id mismatch"),
+        expect.stringContaining("context.lease.packet_id mismatch"),
+        expect.stringContaining("context.lease.packet_hash mismatch"),
+        expect.stringContaining("context.lease.repository.id mismatch"),
+        expect.stringContaining("context.lease.base_sha mismatch"),
+        expect.stringContaining("context.session.run_id mismatch"),
+        expect.stringContaining("context.session.attempt_id mismatch"),
+        expect.stringContaining("context.session.packet_id mismatch"),
+        expect.stringContaining("context.session.packet_hash mismatch"),
+        expect.stringContaining("context.session.workspace_lease_id mismatch"),
+      ])
+    );
   });
 
   it.each(["pass", "fail", "inconclusive", "infrastructure_error", "cancelled"] as const)(

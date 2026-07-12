@@ -185,6 +185,32 @@ worker session. Receipt submission MUST be idempotent by receipt hash. A late
 receipt after lease revocation is retained as audit evidence but cannot advance
 the run without an explicit recovery decision.
 
+`AgentTaskReceipt_v2.patch_hash` uses the named `git-diff-binary-v1` profile. It
+is produced with this exact recipe:
+
+1. Create a new temporary index path and set `GIT_INDEX_FILE` to it for every
+   command in this recipe.
+2. Run `git read-tree <observed_base_sha>`.
+3. Select only non-ignored untracked paths declared in
+   `receipt.files_touched` with
+   `git --literal-pathspecs ls-files --others --exclude-standard -z -- <path args>`.
+   The path arguments are the individually supplied, validated repository-relative
+   receipt paths; neither the shell nor Git reparses them as patterns.
+4. Feed those exact NUL-delimited bytes to
+   `git --literal-pathspecs add -N --pathspec-from-file=- --pathspec-file-nul`,
+   using the same `GIT_INDEX_FILE`. Ignored and unlisted untracked files are
+   excluded.
+5. With that same index, run exactly
+   `git -c core.quotePath=true diff --no-color --no-ext-diff --no-textconv
+--no-relative --binary --full-index --no-renames --src-prefix=a/
+--dst-prefix=b/ <observed_base_sha> --`.
+6. Compute SHA-256 over the exact stdout bytes without decoding, line-ending
+   conversion, or trailing-newline normalization.
+
+The patch hash is a worker claim about result identity. It is distinct from
+`receipt_hash`, which is the canonical hash of the complete validated receipt,
+and neither is engine verification.
+
 #### EngineVerification
 
 `EngineVerification` is evidence collected by LexRunner or a policy-authorized
@@ -437,15 +463,24 @@ General work introduces contracts alongside them:
 WorkItem_v1
 AgentTaskPacket_v1
 ExecutionEnvelope_v1
-AgentTaskReceipt_v1
+AgentTaskReceipt_v1 (legacy general-work claim)
+AgentTaskReceipt_v2 (durable general-work ingestion claim)
 AgentEngineVerification_v1
 ```
 
-The new receipt extends ADR-007's epistemic model—snapshot as contract, receipt
-as claims, engine as verifier—while binding claims to Run, Attempt,
-WorkspaceLease, WorkerSession, packet, and base SHA. Existing `task` commands
-may remain compatibility aliases for ADR-007 repair flows; `work`, `run`, and
+`AgentTaskReceipt_v1` remains readable for compatibility but is not accepted by
+the durable general-work ingestion path. `AgentTaskReceipt_v2` extends ADR-007's
+epistemic model—snapshot as contract, receipt as claims, engine as verifier—while
+binding claims to Run, Attempt, WorkspaceLease, WorkerSession, packet, base SHA,
+and a committed and/or uncommitted result identity. Existing `task` commands may
+remain compatibility aliases for ADR-007 repair flows; `work`, `run`, and
 `attempt` are the durable orchestration nouns.
+
+`AgentEngineVerification_v1` can identify only an optional verified HEAD; it
+cannot represent a verified patch hash. Independent verification of a patch-only
+`AgentTaskReceipt_v2` therefore requires a later, explicitly versioned
+verification-contract evolution; receipt v2 does not silently broaden
+verification v1.
 
 ---
 

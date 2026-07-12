@@ -13,6 +13,10 @@ import { z } from "zod";
 import { computeCanonicalHash, RepoRelativePath, SHA256Hash } from "./task-contract.js";
 
 export const AGENT_WORK_CONTRACT_VERSION = "1.0.0" as const;
+/** Breaking receipt-only evolution; the surrounding agent-work v1 contracts remain unchanged. */
+export const AGENT_TASK_RECEIPT_V2_VERSION = "2.0.0" as const;
+/** Reproducible patch-byte profile used by AgentTaskReceipt_v2.patch_hash claims. */
+export const AGENT_TASK_RECEIPT_PATCH_PROFILE = "git-diff-binary-v1" as const;
 
 const Id = z.string().min(1);
 const Timestamp = z.string().datetime();
@@ -43,6 +47,12 @@ export const GitObjectId = z
   .regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i, "Must be a full SHA-1 or SHA-256 Git object ID");
 export type GitObjectId = z.infer<typeof GitObjectId>;
 
+/** Canonical persisted Git identity for receipt v2. */
+const CanonicalGitObjectId = z
+  .string()
+  .regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/, "Must be a lowercase full Git object ID");
+const ReceiptTimestampV2 = z.string().datetime({ offset: true });
+
 const PortableRepository = z
   .object({
     id: Id,
@@ -65,6 +75,17 @@ const AgentRepoRelativePath = RepoRelativePath.min(1).refine(
   (value) => !value.split(/[\\/]/u).includes(".."),
   { message: "Path must not escape repo root" }
 );
+
+/** Canonical slash-only Git repository path used by receipt v2 persistence. */
+const CanonicalAgentRepoPathV2 = AgentRepoRelativePath.refine((value) => !value.includes("\0"), {
+  message: "Path must not contain NUL bytes",
+})
+  .refine((value) => !value.includes("\\"), {
+    message: "Path must use forward-slash separators",
+  })
+  .refine((value) => value.split("/").every((segment) => segment.length > 0 && segment !== "."), {
+    message: "Path must not contain empty or dot segments",
+  });
 
 const PortableScope = z
   .object({
@@ -905,6 +926,85 @@ export const AgentTaskReceipt_v1 = z
   });
 export type AgentTaskReceipt_v1 = z.infer<typeof AgentTaskReceipt_v1>;
 
+/**
+ * Complete general-work receipt claim for durable ingestion.
+ *
+ * Every result carries a content identity even when the coordinator, rather
+ * than the worker, owns Git commits. Claimed checks and result hashes remain
+ * worker assertions; only AgentEngineVerification may establish truth.
+ */
+export const AgentTaskReceipt_v2 = z
+  .object({
+    schema_version: z.literal(AGENT_TASK_RECEIPT_V2_VERSION),
+    receipt_id: Id,
+    run_id: Id,
+    work_item_id: Id,
+    work_item_revision: Revision,
+    attempt_id: Id,
+    packet_id: Id,
+    packet_hash: SHA256Hash,
+    workspace_lease_id: Id,
+    workspace_lease_revision: Revision,
+    worker_runtime: Id,
+    worker_session_id: Id,
+    observed_base_sha: CanonicalGitObjectId,
+    final_head_sha: CanonicalGitObjectId.optional(),
+    /**
+     * Claimed SHA-256 of git-diff-binary-v1 bytes. With one new GIT_INDEX_FILE,
+     * read-tree observed_base_sha; intent-to-add only non-ignored untracked
+     * files_touched paths using NUL-safe --literal-pathspecs commands; then run
+     * the configuration-independent diff profile specified by ADR-010. Hash
+     * stdout bytes unchanged. This differs from receipt_hash and remains a claim.
+     */
+    patch_hash: SHA256Hash.optional(),
+    outcome: z.enum(["completed", "blocked", "failed", "cancelled"]),
+    exit_reason: Id,
+    summary: z.string().min(1),
+    files_touched: z.array(CanonicalAgentRepoPathV2),
+    commits: z.array(CanonicalGitObjectId),
+    acceptance_criteria_addressed: z.array(Id),
+    claimed_checks: z.array(ClaimedCheck),
+    assumptions: z.array(z.string()),
+    blockers: z.array(z.string()),
+    human_action_request_ids: z.array(Id),
+    cost: z
+      .object({
+        input_tokens: z.number().int().nonnegative().optional(),
+        output_tokens: z.number().int().nonnegative().optional(),
+        tool_calls: z.number().int().nonnegative().optional(),
+        elapsed_ms: z.number().int().nonnegative().optional(),
+      })
+      .strict(),
+    worker_started_at: ReceiptTimestampV2,
+    worker_completed_at: ReceiptTimestampV2,
+    submitted_at: ReceiptTimestampV2,
+  })
+  .strict()
+  .superRefine((receipt, ctx) => {
+    if (receipt.final_head_sha === undefined && receipt.patch_hash === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["final_head_sha"],
+        message: "A receipt must identify its result with final_head_sha and/or patch_hash",
+      });
+    }
+    if (receipt.outcome === "blocked" && receipt.blockers.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["blockers"],
+        message: "A blocked receipt must include at least one blocker",
+      });
+    }
+    requireTimestampOrder(
+      receipt.worker_started_at,
+      receipt.worker_completed_at,
+      "worker_completed_at",
+      ctx
+    );
+    requireTimestampOrder(receipt.worker_completed_at, receipt.submitted_at, "submitted_at", ctx);
+  });
+export type AgentTaskReceipt_v2 = z.infer<typeof AgentTaskReceipt_v2>;
+
 export const VerificationOutcome = z.enum([
   "pass",
   "fail",
@@ -959,6 +1059,14 @@ export interface AgentTaskReceiptBindingContext {
   session: WorkerSession_v1;
 }
 
+export interface AgentTaskReceiptV2BindingContext {
+  packet: AgentTaskPacket_v1;
+  lease: WorkspaceLease_v1;
+  session: WorkerSession_v1;
+  /** Runtime identity persisted with the exact WorkerSession attachment. */
+  workerRuntime: string;
+}
+
 /** Verify that a worker receipt belongs to one exact attempt and workspace. */
 export function validateAgentTaskReceiptBinding(
   context: AgentTaskReceiptBindingContext,
@@ -985,6 +1093,93 @@ export function validateAgentTaskReceiptBinding(
     );
 
   return { valid: errors.length === 0, errors };
+}
+
+/** Validate v2 claim identity only; this deliberately does not verify result truth. */
+export function validateAgentTaskReceiptV2Binding(
+  context: AgentTaskReceiptV2BindingContext,
+  receipt: AgentTaskReceipt_v2
+): { valid: boolean; errors: string[] } {
+  const { packet, lease, session } = context;
+  const errors: string[] = [];
+  const contextExpected: Array<[string, unknown, unknown]> = [
+    ["context.lease.run_id", packet.run_id, lease.run_id],
+    ["context.lease.work_item_id", packet.work_item.work_item_id, lease.work_item_id],
+    ["context.lease.work_item_revision", packet.work_item.revision, lease.work_item_revision],
+    ["context.lease.attempt_id", packet.attempt_id, lease.attempt_id],
+    ["context.lease.packet_id", packet.packet_id, lease.packet_id],
+    ["context.lease.packet_hash", packet.packet_hash, lease.packet_hash],
+    ["context.lease.repository.id", packet.repository.id, lease.repository.id],
+    [
+      "context.lease.base_sha",
+      packet.repository.base_sha.toLowerCase(),
+      lease.base_sha.toLowerCase(),
+    ],
+    ["context.session.run_id", packet.run_id, session.run_id],
+    ["context.session.attempt_id", packet.attempt_id, session.attempt_id],
+    ["context.session.packet_id", packet.packet_id, session.packet_id],
+    ["context.session.packet_hash", packet.packet_hash, session.packet_hash],
+    ["context.session.workspace_lease_id", lease.lease_id, session.workspace_lease_id],
+  ];
+  errors.push(...mismatchErrors(contextExpected));
+
+  const expected: Array<[string, unknown, unknown]> = [
+    ["run_id", packet.run_id, receipt.run_id],
+    ["attempt_id", packet.attempt_id, receipt.attempt_id],
+    ["work_item_id", packet.work_item.work_item_id, receipt.work_item_id],
+    ["work_item_revision", packet.work_item.revision, receipt.work_item_revision],
+    ["packet_id", packet.packet_id, receipt.packet_id],
+    ["packet_hash", packet.packet_hash, receipt.packet_hash],
+    ["workspace_lease_id", lease.lease_id, receipt.workspace_lease_id],
+    [
+      "workspace_lease_revision",
+      session.workspace_lease_revision,
+      receipt.workspace_lease_revision,
+    ],
+    ["worker_runtime", context.workerRuntime, receipt.worker_runtime],
+    ["worker_session_id", session.session_id, receipt.worker_session_id],
+    ["observed_base_sha", packet.repository.base_sha.toLowerCase(), receipt.observed_base_sha],
+  ];
+  errors.push(...mismatchErrors(expected));
+
+  const terminalSession = new Set<WorkerSession_v1["status"]>([
+    "completed",
+    "failed",
+    "cancelled",
+    "lost",
+  ]);
+  if (!terminalSession.has(session.status)) {
+    errors.push(`worker_session status is not terminal: actual=${session.status}`);
+  }
+  if (session.ended_at === undefined) {
+    errors.push("worker_session ended_at is required for receipt binding");
+  } else {
+    const sessionStarted = timestampMillis(session.started_at);
+    const sessionEnded = timestampMillis(session.ended_at);
+    const receiptStarted = timestampMillis(receipt.worker_started_at);
+    const receiptCompleted = timestampMillis(receipt.worker_completed_at);
+    if (sessionStarted > sessionEnded) {
+      errors.push("worker_session time window is invalid: ended_at precedes started_at");
+    } else {
+      if (receiptStarted < sessionStarted) {
+        errors.push("worker_started_at precedes the authoritative WorkerSession start");
+      }
+      if (receiptCompleted > sessionEnded) {
+        errors.push("worker_completed_at follows the authoritative WorkerSession end");
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function mismatchErrors(values: Array<[string, unknown, unknown]>): string[] {
+  return values
+    .filter(([, expectedValue, actualValue]) => expectedValue !== actualValue)
+    .map(
+      ([field, expectedValue, actualValue]) =>
+        `${field} mismatch: expected=${String(expectedValue)}, actual=${String(actualValue)}`
+    );
 }
 
 // =============================================================================
@@ -1121,6 +1316,10 @@ export function parseWorkerSession(data: unknown): WorkerSession_v1 {
 
 export function parseAgentTaskReceipt(data: unknown): AgentTaskReceipt_v1 {
   return AgentTaskReceipt_v1.parse(data);
+}
+
+export function parseAgentTaskReceiptV2(data: unknown): AgentTaskReceipt_v2 {
+  return AgentTaskReceipt_v2.parse(data);
 }
 
 export function parseAgentEngineVerification(data: unknown): AgentEngineVerification_v1 {
