@@ -44,8 +44,49 @@ try {
   process.exit(1);
 }
 
+const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
+
 // MCP Tool implementations
 const tools = {
+  start_attempt: {
+    description:
+      "Start or safely resume an ADR-010 agent-work Attempt (requires ALLOW_MUTATIONS=true)",
+    inputSchema: core.AttemptStartRequestJsonSchema,
+    call: async (args) => {
+      if (!config.allowMutations) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: core.canonicalJSONStringify({
+                ok: false,
+                error: {
+                  code: "mutations_disabled",
+                  message: "Mutations not allowed. Set ALLOW_MUTATIONS=true to start an Attempt.",
+                },
+              }),
+            },
+          ],
+        };
+      }
+      const result = await attemptLifecycleHandlers.start(args);
+      return {
+        content: [{ type: "text", text: core.canonicalJSONStringify(result) }],
+      };
+    },
+  },
+
+  get_attempt_status: {
+    description: "Get bounded, read-only status for an ADR-010 agent-work Attempt",
+    inputSchema: core.AttemptStatusInputJsonSchema,
+    call: async (args) => {
+      const result = await attemptLifecycleHandlers.status(args);
+      return {
+        content: [{ type: "text", text: core.canonicalJSONStringify(result) }],
+      };
+    },
+  },
+
   "plan.create": {
     description: "Create a plan from configuration files or auto-discover from GitHub PRs",
     inputSchema: {

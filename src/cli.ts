@@ -79,6 +79,7 @@ import { registerBudgetCommand } from "./commands/budget.js";
 import { registerMetricsCommand } from "./commands/metrics.js";
 import { registerTokenReportCommand } from "./commands/tokenReport.js";
 import { registerCounterExamplesCommand } from "./commands/counterExamples.js";
+import { registerAttemptCommand } from "./commands/attempt.js";
 import { runMigrateProfile } from "./commands/migrateProfile.js";
 import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
@@ -1070,6 +1071,9 @@ registerCompletionCommand(program, throwExit, exitWith);
 // Counter-examples command
 registerCounterExamplesCommand(program);
 
+// ADR-010 Stage 2 agent-work Attempt lifecycle.
+registerAttemptCommand(program, { jsonModeActive: () => jsonModeActive });
+
 // Security operations command
 // Register security subcommands once (modular implementation)
 registerSecurityCommands(program);
@@ -1210,6 +1214,11 @@ export {
 
 // Run management exports for MCP tools
 export { createRunManager } from "./runs/index.js";
+export {
+  AttemptStartRequestJsonSchema,
+  AttemptStatusInputJsonSchema,
+  createAttemptLifecycleHandlers,
+} from "./runs/index.js";
 
 // AX-004: MCP/CLI parity exports
 export { computeMergeOrder } from "./mergeOrder.js";

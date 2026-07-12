@@ -97,17 +97,30 @@ interface CoordinationEventRow {
   createdAt: string;
 }
 
+export interface SqliteCoordinationStoreOptions {
+  readOnly?: boolean;
+}
+
 /** SQLite implementation with transactionally serialized lease and CAS operations. */
 export class SqliteCoordinationStore implements CoordinationStore {
   /** Shared connection for additive stores whose mutations must share this transaction boundary. */
   protected readonly db: DatabaseType;
   private closed = false;
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma("foreign_keys = ON");
-    this.db.pragma("busy_timeout = 5000");
-    this.applyCoordinationMigration();
+  constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
+    this.db = new Database(
+      dbPath,
+      options.readOnly ? { readonly: true, fileMustExist: true } : undefined
+    );
+    try {
+      this.db.pragma("foreign_keys = ON");
+      this.db.pragma("busy_timeout = 5000");
+      if (!options.readOnly) this.applyCoordinationMigration();
+    } catch (error) {
+      this.db.close();
+      this.closed = true;
+      throw error;
+    }
   }
 
   async acquireControllerLease(

@@ -60,7 +60,7 @@ export {
   ProcedureUnavailableError,
 } from "./coordinated-manager.js";
 
-export { AgentWorkLifecycleService } from "./agent-work-lifecycle-service.js";
+export { AgentWorkLifecycleService, readAgentWorkStatus } from "./agent-work-lifecycle-service.js";
 export type {
   AgentWorkLifecycleFailure,
   AgentWorkLifecycleResult,
@@ -73,6 +73,27 @@ export type {
   LifecyclePhase,
   StartAttemptInput,
 } from "./agent-work-lifecycle-service.js";
+export {
+  AttemptStartInputSchema,
+  AttemptStartRequestJsonSchema,
+  AttemptStartRequestSchema,
+  AttemptStatusInputJsonSchema,
+  AttemptStatusInputSchema,
+  createAttemptLifecycleHandlers,
+} from "./agent-work-adapters.js";
+export type {
+  AdapterInputError,
+  AdapterOperationError,
+  AdapterError,
+  AgentWorkHandlerResult,
+  AgentWorkRuntimeBinding,
+  AttemptLifecycleHandlers,
+  AttemptStartHandlerInput,
+  AttemptStartRequest,
+  AttemptStatusHandlerInput,
+} from "./agent-work-adapters.js";
+export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
+export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {
   RunProjection,
   ProcedureResolver,

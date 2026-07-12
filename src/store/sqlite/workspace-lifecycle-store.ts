@@ -21,7 +21,10 @@ import type {
   WorkspaceMutationResult,
   WorkspaceObservation,
 } from "../workspace-lifecycle-store.js";
-import { SqliteCoordinationStore } from "./coordination-store.js";
+import {
+  SqliteCoordinationStore,
+  type SqliteCoordinationStoreOptions,
+} from "./coordination-store.js";
 
 type MutationInput =
   | CreateAttemptInput
@@ -174,9 +177,16 @@ export class SqliteWorkspaceLifecycleStore
   extends SqliteCoordinationStore
   implements WorkspaceLifecycleStore
 {
-  constructor(dbPath: string) {
-    super(dbPath);
-    this.applyWorkspaceMigration();
+  constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
+    super(dbPath, options);
+    if (!options.readOnly) {
+      try {
+        this.applyWorkspaceMigration();
+      } catch (error) {
+        this.db.close();
+        throw error;
+      }
+    }
   }
 
   async createAttempt(input: CreateAttemptInput): Promise<WorkspaceMutationResult> {
