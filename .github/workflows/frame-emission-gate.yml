@@ -173,7 +173,7 @@ jobs:
       - name: Test Frame emission in merge-weave context
         run: |
           node -e "
-            import { emitMergeWeaveFrame } from './dist/frames/emitter.js';
+            import { emitMergeWeaveFrame } from './dist/frames/index.js';
 
             async function test() {
               const result = await emitMergeWeaveFrame({
