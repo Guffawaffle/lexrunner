@@ -362,7 +362,7 @@ describe("Comprehensive E2E Automation Pipeline", () => {
         expect.fail("Should have failed due to unknown dependency");
       } catch (error: any) {
         expect(error.stderr).toContain("nonexistent");
-        expect(error.stderr).toContain("dependency");
+        expect(error.stderr).toContain("depends on unknown item");
       }
     });
 
