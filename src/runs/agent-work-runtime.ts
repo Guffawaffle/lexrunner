@@ -7,6 +7,7 @@ import { NodeGitWorktreeBroker } from "../workspaces/node-git-worktree-broker.js
 import type { GitWorktreeBroker } from "../workspaces/git-worktree-broker.js";
 import { WorkspaceCoordinator } from "../workspaces/workspace-coordinator.js";
 import { AgentWorkLifecycleService } from "./agent-work-lifecycle-service.js";
+import { AgentWorkWorkerSessionService } from "./agent-work-worker-session-service.js";
 
 const required = z
   .string()
@@ -43,6 +44,7 @@ export interface AgentWorkRuntime {
   config: Readonly<AgentWorkRuntimeConfig>;
   observeWorkspace: GitWorktreeBroker["observe"];
   service: AgentWorkLifecycleService;
+  workerSessions: AgentWorkWorkerSessionService;
   close(): Promise<void>;
 }
 
@@ -67,10 +69,15 @@ export function createAgentWorkRuntime(input: unknown): AgentWorkRuntime {
       store,
       new WorkspaceCoordinator(store, broker)
     );
+    const observeWorkspace = broker.observe.bind(broker);
     return {
       config: Object.freeze({ ...config }),
-      observeWorkspace: broker.observe.bind(broker),
+      observeWorkspace,
       service,
+      workerSessions: new AgentWorkWorkerSessionService(store, {
+        config: Object.freeze({ ...config }),
+        observeWorkspace,
+      }),
       close: () => store.close(),
     };
   } catch (error) {

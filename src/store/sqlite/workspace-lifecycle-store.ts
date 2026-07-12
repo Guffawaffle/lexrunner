@@ -1,12 +1,20 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
+import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type { JsonValue } from "../coordination-store.js";
 import type {
   AcquireWorkspaceInput,
+  AttachWorkerSessionInput,
   AttemptRecord,
+  BindLaunchEnvelopeInput,
   CreateAttemptInput,
+  EndWorkerSessionInput,
+  HeartbeatWorkerSessionInput,
+  LaunchEnvelopeBindingRecord,
+  LaunchEnvelopeBindingResult,
+  LaunchEnvelopeBindingStore,
   HeartbeatWorkspaceInput,
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
@@ -20,6 +28,12 @@ import type {
   WorkspaceMutationFailureReason,
   WorkspaceMutationResult,
   WorkspaceObservation,
+  WorkerSessionEvent,
+  WorkerSessionEventType,
+  WorkerSessionMutationFailureReason,
+  WorkerSessionMutationResult,
+  WorkerSessionRecord,
+  WorkerSessionStore,
 } from "../workspace-lifecycle-store.js";
 import {
   SqliteCoordinationStore,
@@ -83,6 +97,52 @@ CREATE TABLE IF NOT EXISTS workspace_lifecycle_mutations (
  REFERENCES workspace_lifecycle_events(runId,mutationId) ON DELETE CASCADE);
 INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(2,'attempt-workspace-lifecycle',datetime('now'));
+CREATE TABLE IF NOT EXISTS worker_sessions (
+ sessionId TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
+ runId TEXT NOT NULL, attemptId TEXT NOT NULL, packetId TEXT NOT NULL, packetHash TEXT NOT NULL,
+ workspaceLeaseId TEXT NOT NULL, workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ executionEnvelopeId TEXT NOT NULL, executionEnvelopeHash TEXT NOT NULL,
+ hostId TEXT NOT NULL, workerRuntime TEXT NOT NULL,
+ gitRuntime TEXT NOT NULL, backend TEXT NOT NULL, workerId TEXT NOT NULL, model TEXT,
+ status TEXT NOT NULL, startedAt TEXT NOT NULL, heartbeatAt TEXT NOT NULL, endedAt TEXT,
+ exitReason TEXT, exitCode INTEGER, exitSummary TEXT,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT);
+CREATE TABLE IF NOT EXISTS launch_envelope_bindings (
+ attemptId TEXT PRIMARY KEY, runId TEXT NOT NULL, workspaceLeaseId TEXT NOT NULL,
+ attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0),
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ authorizationMutationId TEXT NOT NULL, envelopeId TEXT NOT NULL UNIQUE,
+ envelopeHash TEXT NOT NULL, envelopeJson TEXT NOT NULL, controllerId TEXT NOT NULL,
+ controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ createdAt TEXT NOT NULL,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
+ FOREIGN KEY(runId,authorizationMutationId)
+ REFERENCES workspace_lifecycle_events(runId,mutationId) ON DELETE RESTRICT);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_sessions_one_nonterminal_attempt ON worker_sessions(attemptId)
+ WHERE status IN ('starting','running','awaiting_human');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_sessions_one_live_native_identity
+ ON worker_sessions(hostId,backend,workerId)
+ WHERE status IN ('starting','running','awaiting_human');
+CREATE TABLE IF NOT EXISTS worker_session_events (
+ runId TEXT NOT NULL, attemptId TEXT NOT NULL, sessionId TEXT NOT NULL, mutationId TEXT NOT NULL,
+ sequence INTEGER NOT NULL CHECK(sequence>0), attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0),
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ sessionRevision INTEGER NOT NULL CHECK(sessionRevision>=0), controllerId TEXT NOT NULL,
+ controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ type TEXT NOT NULL, payloadJson TEXT NOT NULL, createdAt TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(sessionId) REFERENCES worker_sessions(sessionId) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS worker_session_mutations (
+ runId TEXT NOT NULL, mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL, resultJson TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), FOREIGN KEY(runId,mutationId)
+ REFERENCES worker_session_events(runId,mutationId) ON DELETE CASCADE);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+ VALUES(3,'worker-session-lifecycle',datetime('now'));
 `;
 
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId"> {
@@ -133,6 +193,21 @@ interface EventRow {
   createdAt: string;
 }
 
+interface WorkerSessionRow extends Omit<
+  WorkerSessionRecord,
+  "model" | "endedAt" | "exitReason" | "exitCode" | "exitSummary"
+> {
+  model: string | null;
+  endedAt: string | null;
+  exitReason: string | null;
+  exitCode: number | null;
+  exitSummary: string | null;
+}
+
+interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload"> {
+  payloadJson: string;
+}
+
 const LIVE_ATTEMPTS = new Set<AttemptRecord["status"]>([
   "prepared",
   "leased",
@@ -175,7 +250,7 @@ const TRANSITIONS: Record<AttemptRecord["status"], AttemptRecord["status"][]> = 
 /** SQLite attempt/workspace store sharing the authoritative controller transaction. */
 export class SqliteWorkspaceLifecycleStore
   extends SqliteCoordinationStore
-  implements WorkspaceLifecycleStore
+  implements WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -490,6 +565,528 @@ export class SqliteWorkspaceLifecycleStore
     return rows.map(toEvent);
   }
 
+  async bindLaunchEnvelope(input: BindLaunchEnvelopeInput): Promise<LaunchEnvelopeBindingResult> {
+    if (!Number.isFinite(Date.parse(input.createdAt)))
+      return { bound: false, reason: "invalid_time" };
+    if (input.controller.runId !== input.runId) return { bound: false, reason: "lease_mismatch" };
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return sqliteLaunchFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return sqliteLaunchFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return sqliteLaunchFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return {
+          ...sqliteLaunchFailure("stale_run_revision"),
+          currentRunRevision: coordination.revision,
+        };
+      }
+      if (
+        parseInstant(coordination.expiresAt!, "expiresAt") <=
+        parseInstant(input.createdAt, "createdAt")
+      ) {
+        return sqliteLaunchFailure("lease_expired");
+      }
+      const attempt = this.attempt(input.attemptId);
+      const lease = this.lease(input.workspaceLeaseId);
+      const existing = this.launchEnvelopeBinding(input.attemptId);
+      if (existing) {
+        return sameLaunchBinding(existing, input)
+          ? { bound: true, binding: existing, idempotentReplay: true }
+          : sqliteLaunchFailure("mutation_conflict", attempt ?? undefined, lease ?? undefined);
+      }
+      const failure = sqliteLaunchBindingFailure(input, attempt, lease);
+      if (failure) return failure;
+      const envelopeIdConflict = this.db
+        .prepare(`SELECT 1 FROM launch_envelope_bindings WHERE envelopeId = ?`)
+        .get(input.envelopeId);
+      if (envelopeIdConflict) {
+        return sqliteLaunchFailure("mutation_conflict", attempt!, lease!);
+      }
+      const eventRow = this.db
+        .prepare(`SELECT * FROM workspace_lifecycle_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.authorizationMutationId) as EventRow | undefined;
+      const event = eventRow ? toEvent(eventRow) : undefined;
+      if (!isMatchingLaunchAuthorization(event, input)) {
+        return sqliteLaunchFailure("evidence_mismatch", attempt!, lease!);
+      }
+      if (!validateCanonicalEnvelope(input, attempt!, lease!)) {
+        return sqliteLaunchFailure("evidence_mismatch", attempt!, lease!);
+      }
+      const createdAt = instant(input.createdAt);
+      this.db
+        .prepare(
+          `INSERT INTO launch_envelope_bindings (attemptId, runId, workspaceLeaseId,
+           attemptRevision, workspaceLeaseRevision, authorizationMutationId, envelopeId,
+           envelopeHash, envelopeJson, controllerId, controllerLeaseId, fencingToken, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          input.attemptId,
+          input.runId,
+          input.workspaceLeaseId,
+          input.expectedAttemptRevision,
+          input.expectedWorkspaceLeaseRevision,
+          input.authorizationMutationId,
+          input.envelopeId,
+          input.envelopeHash,
+          input.envelopeJson,
+          input.controller.controllerId,
+          input.controller.leaseId,
+          input.controller.fencingToken,
+          createdAt
+        );
+      return {
+        bound: true,
+        binding: this.requireLaunchEnvelopeBinding(input.attemptId),
+        idempotentReplay: false,
+      };
+    });
+  }
+
+  async getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null> {
+    return this.hasTable("launch_envelope_bindings") ? this.launchEnvelopeBinding(attemptId) : null;
+  }
+
+  async attachWorkerSession(input: AttachWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+    return this.mutateWorker(input, () => {
+      const validated = this.validateWorkerBinding(input);
+      if (!validated.valid) return validated.failure;
+      const { attempt, lease } = validated;
+      const existing = this.workerSessionForAttempt(input.attemptId, false);
+      if (existing || this.workerSession(input.sessionId)) {
+        return this.workerFailure("worker_session_conflict", attempt, lease, existing ?? undefined);
+      }
+      const nativeIdentityConflict = this.workerSessionForNativeIdentity(
+        input.hostId,
+        input.backend,
+        input.workerId
+      );
+      if (nativeIdentityConflict) {
+        return this.workerFailure(
+          "worker_session_conflict",
+          attempt,
+          lease,
+          nativeIdentityConflict
+        );
+      }
+      if (attempt.status !== "launching") {
+        return this.workerFailure("invalid_attempt_transition", attempt, lease);
+      }
+      if (input.packetId !== attempt.packetId || input.packetHash !== attempt.packetHash) {
+        return this.workerFailure("identity_mismatch", attempt, lease);
+      }
+      const envelope = this.launchEnvelopeBinding(input.attemptId);
+      if (
+        !envelope ||
+        envelope.envelopeId !== input.executionEnvelopeId ||
+        envelope.envelopeHash !== input.executionEnvelopeHash
+      ) {
+        return this.workerFailure("identity_mismatch", attempt, lease);
+      }
+      if (boundWorkerRuntime(envelope) !== input.workerRuntime) {
+        return this.workerFailure("identity_mismatch", attempt, lease);
+      }
+      if (input.hostId !== lease.hostId || input.gitRuntime !== lease.gitRuntime) {
+        return this.workerFailure("identity_mismatch", attempt, lease);
+      }
+      if (!Number.isFinite(Date.parse(input.startedAt))) {
+        return this.workerFailure("invalid_time", attempt, lease);
+      }
+      const now = instant(input.now);
+      const startedAt = instant(input.startedAt);
+      if (
+        parseInstant(startedAt, "startedAt") <
+          parseInstant(envelope.createdAt, "envelope.createdAt") ||
+        parseInstant(startedAt, "startedAt") > parseInstant(now, "now")
+      ) {
+        return this.workerFailure("invalid_time", attempt, lease);
+      }
+      this.db
+        .prepare(
+          `INSERT INTO worker_sessions (sessionId, revision, runId, attemptId, packetId, packetHash,
+           workspaceLeaseId, workspaceLeaseRevision, executionEnvelopeId, executionEnvelopeHash,
+           hostId, workerRuntime,
+           gitRuntime, backend, workerId, model, status, startedAt, heartbeatAt)
+           VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', ?, ?)`
+        )
+        .run(
+          input.sessionId,
+          input.runId,
+          input.attemptId,
+          input.packetId,
+          input.packetHash,
+          input.workspaceLeaseId,
+          input.expectedWorkspaceLeaseRevision,
+          input.executionEnvelopeId,
+          input.executionEnvelopeHash,
+          input.hostId,
+          input.workerRuntime,
+          input.gitRuntime,
+          input.backend,
+          input.workerId,
+          input.model ?? null,
+          startedAt,
+          now
+        );
+      this.db
+        .prepare(
+          `UPDATE attempts SET revision = revision + 1, status = 'running', updatedAt = ?
+           WHERE attemptId = ?`
+        )
+        .run(now, input.attemptId);
+      const session = this.requireWorkerSession(input.sessionId);
+      return this.recordWorker(
+        input,
+        this.requireAttempt(input.attemptId),
+        lease,
+        session,
+        "worker_session_attached",
+        {
+          backend: session.backend,
+          workerId: session.workerId,
+          executionEnvelopeId: session.executionEnvelopeId,
+        }
+      );
+    });
+  }
+
+  async heartbeatWorkerSession(
+    input: HeartbeatWorkerSessionInput
+  ): Promise<WorkerSessionMutationResult> {
+    return this.mutateWorker(input, () => {
+      const validated = this.validateWorkerBinding(input);
+      if (!validated.valid) return validated.failure;
+      const { attempt, lease } = validated;
+      const session = this.workerSession(input.sessionId);
+      const failure = this.validateSession(session, input, attempt, lease);
+      if (failure) return failure;
+      const now = instant(input.now);
+      if (parseInstant(now, "now") < parseInstant(session!.heartbeatAt, "heartbeatAt")) {
+        return this.workerFailure("invalid_time", attempt, lease, session!);
+      }
+      this.db
+        .prepare(
+          `UPDATE worker_sessions SET revision = revision + 1, status = ?, heartbeatAt = ?
+           WHERE sessionId = ?`
+        )
+        .run(input.status ?? session!.status, now, input.sessionId);
+      return this.recordWorker(
+        input,
+        attempt,
+        lease,
+        this.requireWorkerSession(input.sessionId),
+        "worker_session_heartbeat",
+        { status: input.status ?? session!.status }
+      );
+    });
+  }
+
+  async endWorkerSession(input: EndWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+    return this.mutateWorker(input, () => {
+      const validated = this.validateWorkerBinding(input);
+      if (!validated.valid) return validated.failure;
+      const { attempt, lease } = validated;
+      const session = this.workerSession(input.sessionId);
+      const failure = this.validateSession(session, input, attempt, lease);
+      if (failure) return failure;
+      if (!validExitMetadata(input)) {
+        return this.workerFailure("evidence_mismatch", attempt, lease, session!);
+      }
+      const now = instant(input.now);
+      if (parseInstant(now, "now") < parseInstant(session!.heartbeatAt, "heartbeatAt")) {
+        return this.workerFailure("invalid_time", attempt, lease, session!);
+      }
+      this.db
+        .prepare(
+          `UPDATE worker_sessions SET revision = revision + 1, status = ?, heartbeatAt = ?, endedAt = ?,
+           exitReason = ?, exitCode = ?, exitSummary = ? WHERE sessionId = ?`
+        )
+        .run(
+          input.status,
+          now,
+          now,
+          input.exitReason ?? null,
+          input.exitCode ?? null,
+          input.exitSummary ?? null,
+          input.sessionId
+        );
+      if (input.status !== "completed") {
+        this.db
+          .prepare(
+            `UPDATE attempts SET revision = revision + 1, status = ?, updatedAt = ?, completedAt = ?
+             WHERE attemptId = ?`
+          )
+          .run(input.status === "cancelled" ? "cancelled" : "failed", now, now, input.attemptId);
+      }
+      return this.recordWorker(
+        input,
+        this.requireAttempt(input.attemptId),
+        lease,
+        this.requireWorkerSession(input.sessionId),
+        "worker_session_ended",
+        {
+          status: input.status,
+          exitReason: input.exitReason ?? null,
+          exitCode: input.exitCode ?? null,
+          exitSummary: input.exitSummary ?? null,
+        }
+      );
+    });
+  }
+
+  async getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null> {
+    return this.hasTable("worker_sessions") ? this.workerSession(sessionId) : null;
+  }
+
+  async getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null> {
+    return this.hasTable("worker_sessions") ? this.workerSessionForAttempt(attemptId, false) : null;
+  }
+
+  async listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]> {
+    if (!this.hasTable("worker_session_events")) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM worker_session_events WHERE runId = ? ORDER BY sequence`)
+      .all(runId) as WorkerEventRow[];
+    return rows.map(toWorkerEvent);
+  }
+
+  private mutateWorker(
+    input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput,
+    action: () => WorkerSessionMutationResult
+  ): WorkerSessionMutationResult {
+    if (!Number.isFinite(Date.parse(input.now))) return this.workerFailure("invalid_time");
+    if (input.controller.runId !== input.runId) return this.workerFailure("lease_mismatch");
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return this.workerFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return this.workerFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return this.workerFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return this.workerFailure(
+          "stale_run_revision",
+          undefined,
+          undefined,
+          undefined,
+          coordination.revision
+        );
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.workerFailure("lease_expired");
+      }
+
+      const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
+      const workspaceClaim = this.db
+        .prepare(`SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId);
+      if (workspaceClaim) return this.workerFailure("mutation_conflict");
+      const prior = this.db
+        .prepare(
+          `SELECT fingerprint, resultJson FROM worker_session_mutations
+           WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId) as
+        | { fingerprint: string; resultJson: string }
+        | undefined;
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) return this.workerFailure("mutation_conflict");
+        return {
+          ...(JSON.parse(prior.resultJson) as Extract<
+            WorkerSessionMutationResult,
+            { updated: true }
+          >),
+          idempotentReplay: true,
+        };
+      }
+      const result = action();
+      if (result.updated) {
+        this.db
+          .prepare(
+            `INSERT INTO worker_session_mutations (runId, mutationId, fingerprint, resultJson)
+             VALUES (?, ?, ?, ?)`
+          )
+          .run(input.runId, input.mutationId, fingerprint, json(result));
+      }
+      return result;
+    });
+  }
+
+  private validateWorkerBinding(
+    input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput
+  ):
+    | { valid: true; attempt: AttemptRecord; lease: WorkspaceLifecycleLeaseRecord }
+    | { valid: false; failure: WorkerSessionMutationResult } {
+    const attempt = this.attempt(input.attemptId);
+    if (!attempt || attempt.runId !== input.runId) {
+      return { valid: false, failure: this.workerFailure("not_found") };
+    }
+    const lease = this.lease(input.workspaceLeaseId);
+    if (!lease || lease.attemptId !== attempt.attemptId) {
+      return { valid: false, failure: this.workerFailure("not_found", attempt) };
+    }
+    if (attempt.revision !== input.expectedAttemptRevision) {
+      return {
+        valid: false,
+        failure: this.workerFailure("stale_attempt_revision", attempt, lease),
+      };
+    }
+    if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+      return {
+        valid: false,
+        failure: this.workerFailure("stale_workspace_revision", attempt, lease),
+      };
+    }
+    if (lease.status !== "active") {
+      return { valid: false, failure: this.workerFailure("workspace_not_active", attempt, lease) };
+    }
+    if (
+      lease.controllerId !== input.controller.controllerId ||
+      lease.controllerLeaseId !== input.controller.leaseId ||
+      lease.fencingToken !== input.controller.fencingToken
+    ) {
+      return { valid: false, failure: this.workerFailure("stale_fence", attempt, lease) };
+    }
+    if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+      return { valid: false, failure: this.workerFailure("workspace_expired", attempt, lease) };
+    }
+    if (
+      parseInstant(input.now, "now") < parseInstant(attempt.updatedAt, "attempt.updatedAt") ||
+      parseInstant(input.now, "now") < parseInstant(lease.heartbeatAt, "lease.heartbeatAt")
+    ) {
+      return { valid: false, failure: this.workerFailure("invalid_time", attempt, lease) };
+    }
+    return { valid: true, attempt, lease };
+  }
+
+  private validateSession(
+    session: WorkerSessionRecord | null,
+    input: HeartbeatWorkerSessionInput | EndWorkerSessionInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord
+  ): WorkerSessionMutationResult | null {
+    if (attempt.status !== "running") {
+      return this.workerFailure("invalid_attempt_transition", attempt, lease, session ?? undefined);
+    }
+    if (
+      !session ||
+      session.runId !== input.runId ||
+      session.attemptId !== input.attemptId ||
+      session.workspaceLeaseId !== input.workspaceLeaseId
+    ) {
+      return this.workerFailure("not_found", attempt, lease);
+    }
+    if (session.revision !== input.expectedSessionRevision) {
+      return this.workerFailure("stale_session_revision", attempt, lease, session);
+    }
+    if (isTerminalWorkerSession(session.status)) {
+      return this.workerFailure("worker_session_not_active", attempt, lease, session);
+    }
+    return null;
+  }
+
+  private recordWorker(
+    input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord,
+    session: WorkerSessionRecord,
+    type: WorkerSessionEventType,
+    payload: JsonRecord
+  ): WorkerSessionMutationResult {
+    const sequence = (
+      this.db
+        .prepare(
+          `SELECT COALESCE(MAX(sequence), 0) + 1 AS value
+           FROM worker_session_events WHERE runId = ?`
+        )
+        .get(input.runId) as { value: number }
+    ).value;
+    this.db
+      .prepare(
+        `INSERT INTO worker_session_events (runId, attemptId, sessionId, mutationId, sequence,
+         attemptRevision, workspaceLeaseRevision, sessionRevision, controllerId,
+         controllerLeaseId, fencingToken, type, payloadJson, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.runId,
+        attempt.attemptId,
+        session.sessionId,
+        input.mutationId,
+        sequence,
+        attempt.revision,
+        lease.revision,
+        session.revision,
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        type,
+        json(payload),
+        instant(input.now)
+      );
+    const event = toWorkerEvent(
+      this.db
+        .prepare(`SELECT * FROM worker_session_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId) as WorkerEventRow
+    );
+    return { updated: true, attempt, workerSession: session, event, idempotentReplay: false };
+  }
+
+  private workerFailure(
+    reason: WorkerSessionMutationFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): WorkerSessionMutationResult {
+    return {
+      updated: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
   private mutate(
     input: MutationInput,
     action: () => WorkspaceMutationResult
@@ -524,6 +1121,10 @@ export class SqliteWorkspaceLifecycleStore
         return this.failure("lease_expired");
 
       const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
+      const workerClaim = this.db
+        .prepare(`SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId);
+      if (workerClaim) return this.failure("mutation_conflict");
       const prior = this.db
         .prepare(
           `SELECT fingerprint, resultJson FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?`
@@ -765,6 +1366,67 @@ export class SqliteWorkspaceLifecycleStore
     return value;
   }
 
+  private workerSession(id: string): WorkerSessionRecord | null {
+    const row = this.db.prepare(`SELECT * FROM worker_sessions WHERE sessionId = ?`).get(id) as
+      | WorkerSessionRow
+      | undefined;
+    return row ? toWorkerSession(row) : null;
+  }
+
+  private launchEnvelopeBinding(attemptId: string): LaunchEnvelopeBindingRecord | null {
+    return (
+      (this.db
+        .prepare(`SELECT * FROM launch_envelope_bindings WHERE attemptId = ?`)
+        .get(attemptId) as LaunchEnvelopeBindingRecord | undefined) ?? null
+    );
+  }
+
+  private requireLaunchEnvelopeBinding(attemptId: string): LaunchEnvelopeBindingRecord {
+    const binding = this.launchEnvelopeBinding(attemptId);
+    if (!binding) throw new Error(`Launch envelope binding for Attempt '${attemptId}' disappeared`);
+    return binding;
+  }
+
+  private hasTable(name: string): boolean {
+    return Boolean(
+      this.db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(name)
+    );
+  }
+
+  private requireWorkerSession(id: string): WorkerSessionRecord {
+    const session = this.workerSession(id);
+    if (!session) throw new Error(`Worker session '${id}' disappeared`);
+    return session;
+  }
+
+  private workerSessionForAttempt(
+    attemptId: string,
+    nonterminalOnly: boolean
+  ): WorkerSessionRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM worker_sessions WHERE attemptId = ?
+         ${nonterminalOnly ? "AND status IN ('starting','running','awaiting_human')" : ""}
+         ORDER BY startedAt DESC, sessionId DESC LIMIT 1`
+      )
+      .get(attemptId) as WorkerSessionRow | undefined;
+    return row ? toWorkerSession(row) : null;
+  }
+
+  private workerSessionForNativeIdentity(
+    hostId: string,
+    backend: WorkerSessionRecord["backend"],
+    workerId: string
+  ): WorkerSessionRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM worker_sessions WHERE hostId = ? AND backend = ? AND workerId = ?
+         AND status IN ('starting','running','awaiting_human') LIMIT 1`
+      )
+      .get(hostId, backend, workerId) as WorkerSessionRow | undefined;
+    return row ? toWorkerSession(row) : null;
+  }
+
   private bumpAttempt(id: string, now: string): void {
     this.db
       .prepare(`UPDATE attempts SET revision = revision + 1, updatedAt = ? WHERE attemptId = ?`)
@@ -774,10 +1436,13 @@ export class SqliteWorkspaceLifecycleStore
   private applyWorkspaceMigration(): void {
     let sql = INLINE_WORKSPACE_MIGRATION;
     try {
-      const path = fileURLToPath(
+      const workspacePath = fileURLToPath(
         new URL("./migrations/002-attempt-workspace-lifecycle.sql", import.meta.url)
       );
-      sql = readFileSync(path, "utf8");
+      const workerPath = fileURLToPath(
+        new URL("./migrations/003-worker-session-lifecycle.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -875,4 +1540,205 @@ function toEvent(row: EventRow): WorkspaceLifecycleEvent {
     payload: JSON.parse(row.payloadJson) as JsonValue,
     createdAt: row.createdAt,
   };
+}
+
+function toWorkerSession(row: WorkerSessionRow): WorkerSessionRecord {
+  return {
+    sessionId: row.sessionId,
+    revision: row.revision,
+    runId: row.runId,
+    attemptId: row.attemptId,
+    packetId: row.packetId,
+    packetHash: row.packetHash,
+    workspaceLeaseId: row.workspaceLeaseId,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    executionEnvelopeId: row.executionEnvelopeId,
+    executionEnvelopeHash: row.executionEnvelopeHash,
+    hostId: row.hostId,
+    workerRuntime: row.workerRuntime,
+    gitRuntime: row.gitRuntime,
+    backend: row.backend,
+    workerId: row.workerId,
+    ...(row.model ? { model: row.model } : {}),
+    status: row.status,
+    startedAt: row.startedAt,
+    heartbeatAt: row.heartbeatAt,
+    ...(row.endedAt ? { endedAt: row.endedAt } : {}),
+    ...(row.exitReason ? { exitReason: row.exitReason } : {}),
+    ...(row.exitCode !== null ? { exitCode: row.exitCode } : {}),
+    ...(row.exitSummary ? { exitSummary: row.exitSummary } : {}),
+  };
+}
+
+function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
+  return {
+    runId: row.runId,
+    attemptId: row.attemptId,
+    sessionId: row.sessionId,
+    mutationId: row.mutationId,
+    sequence: row.sequence,
+    attemptRevision: row.attemptRevision,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    sessionRevision: row.sessionRevision,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    type: row.type,
+    payload: JSON.parse(row.payloadJson) as JsonValue,
+    createdAt: row.createdAt,
+  };
+}
+
+function isTerminalWorkerSession(status: WorkerSessionRecord["status"]): boolean {
+  return ["completed", "failed", "cancelled", "lost"].includes(status);
+}
+
+function validExitMetadata(input: EndWorkerSessionInput): boolean {
+  return (
+    (input.exitReason === undefined || Buffer.byteLength(input.exitReason, "utf8") <= 128) &&
+    (input.exitSummary === undefined || Buffer.byteLength(input.exitSummary, "utf8") <= 4_096) &&
+    (input.exitCode === undefined || Number.isSafeInteger(input.exitCode))
+  );
+}
+
+function sqliteLaunchBindingFailure(
+  input: BindLaunchEnvelopeInput,
+  attempt: AttemptRecord | null,
+  lease: WorkspaceLifecycleLeaseRecord | null
+): LaunchEnvelopeBindingResult | null {
+  if (
+    !attempt ||
+    attempt.runId !== input.runId ||
+    !lease ||
+    lease.attemptId !== attempt.attemptId
+  ) {
+    return sqliteLaunchFailure("not_found", attempt ?? undefined, lease ?? undefined);
+  }
+  if (attempt.revision !== input.expectedAttemptRevision) {
+    return sqliteLaunchFailure("stale_attempt_revision", attempt, lease);
+  }
+  if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+    return sqliteLaunchFailure("stale_workspace_revision", attempt, lease);
+  }
+  if (attempt.status !== "launching") {
+    return sqliteLaunchFailure("invalid_attempt_transition", attempt, lease);
+  }
+  if (lease.status !== "active") {
+    return sqliteLaunchFailure("workspace_not_active", attempt, lease);
+  }
+  if (
+    lease.controllerId !== input.controller.controllerId ||
+    lease.controllerLeaseId !== input.controller.leaseId ||
+    lease.fencingToken !== input.controller.fencingToken
+  ) {
+    return sqliteLaunchFailure("stale_fence", attempt, lease);
+  }
+  if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.createdAt, "createdAt")) {
+    return sqliteLaunchFailure("workspace_expired", attempt, lease);
+  }
+  return null;
+}
+
+function sqliteLaunchFailure(
+  reason: WorkspaceMutationFailureReason,
+  attempt?: AttemptRecord,
+  lease?: WorkspaceLifecycleLeaseRecord
+): LaunchEnvelopeBindingResult {
+  return {
+    bound: false,
+    reason,
+    ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+    ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+  };
+}
+
+function isMatchingLaunchAuthorization(
+  event: WorkspaceLifecycleEvent | undefined,
+  input: BindLaunchEnvelopeInput
+): boolean {
+  if (!event || !isJsonRecord(event.payload)) return false;
+  return (
+    event.runId === input.runId &&
+    event.attemptId === input.attemptId &&
+    event.type === "attempt_transitioned" &&
+    event.attemptRevision === input.expectedAttemptRevision &&
+    event.workspaceLeaseRevision === input.expectedWorkspaceLeaseRevision &&
+    event.controllerId === input.controller.controllerId &&
+    event.controllerLeaseId === input.controller.leaseId &&
+    event.fencingToken === input.controller.fencingToken &&
+    event.payload.status === "launching" &&
+    parseInstant(event.createdAt, "authorization.createdAt") <=
+      parseInstant(input.createdAt, "createdAt")
+  );
+}
+
+function validateCanonicalEnvelope(
+  input: BindLaunchEnvelopeInput,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord
+): JsonRecord | null {
+  if (Buffer.byteLength(input.envelopeJson, "utf8") > 256 * 1024) return null;
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(input.envelopeJson);
+  } catch {
+    return null;
+  }
+  if (!isJsonRecord(envelope) || canonicalJSONStringify(envelope) !== input.envelopeJson)
+    return null;
+  if (input.envelopeHash !== computeCanonicalHash(envelope)) return null;
+  const runtime = envelope.runtime;
+  const paths = envelope.paths;
+  if (!isJsonRecord(runtime) || !isJsonRecord(paths)) return null;
+  return envelope.envelope_id === input.envelopeId &&
+    envelope.run_id === input.runId &&
+    envelope.attempt_id === input.attemptId &&
+    envelope.packet_id === attempt.packetId &&
+    envelope.packet_hash === attempt.packetHash &&
+    envelope.workspace_lease_id === input.workspaceLeaseId &&
+    envelope.workspace_lease_revision === input.expectedWorkspaceLeaseRevision &&
+    envelope.expected_head_sha === attempt.baseSha &&
+    envelope.branch === lease.branch &&
+    envelope.created_at === input.createdAt &&
+    runtime.host_id === lease.hostId &&
+    runtime.git_runtime === lease.gitRuntime &&
+    paths.worktree_root === lease.worktreePath
+    ? envelope
+    : null;
+}
+
+function sameLaunchBinding(
+  existing: LaunchEnvelopeBindingRecord,
+  input: BindLaunchEnvelopeInput
+): boolean {
+  return (
+    existing.runId === input.runId &&
+    existing.workspaceLeaseId === input.workspaceLeaseId &&
+    existing.attemptRevision === input.expectedAttemptRevision &&
+    existing.workspaceLeaseRevision === input.expectedWorkspaceLeaseRevision &&
+    existing.authorizationMutationId === input.authorizationMutationId &&
+    existing.envelopeId === input.envelopeId &&
+    existing.envelopeHash === input.envelopeHash &&
+    existing.envelopeJson === input.envelopeJson &&
+    existing.controllerId === input.controller.controllerId &&
+    existing.controllerLeaseId === input.controller.leaseId &&
+    existing.fencingToken === input.controller.fencingToken &&
+    existing.createdAt === instant(input.createdAt)
+  );
+}
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function boundWorkerRuntime(binding: LaunchEnvelopeBindingRecord): string | null {
+  try {
+    const envelope = JSON.parse(binding.envelopeJson) as unknown;
+    if (!isJsonRecord(envelope) || !isJsonRecord(envelope.runtime)) return null;
+    return typeof envelope.runtime.worker_runtime === "string"
+      ? envelope.runtime.worker_runtime
+      : null;
+  } catch {
+    return null;
+  }
 }

@@ -45,9 +45,40 @@ try {
 }
 
 const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
+const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
 
 // MCP Tool implementations
 const tools = {
+  attach_attempt_worker: {
+    description: "Attach a native worker session to an authorized Attempt",
+    inputSchema: core.AttemptWorkerAttachRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("attach an Attempt worker", () => attemptWorkerHandlers.attach(args)),
+  },
+
+  heartbeat_attempt_worker: {
+    description: "Record a fenced heartbeat for an attached Attempt worker",
+    inputSchema: core.AttemptWorkerHeartbeatRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("heartbeat an Attempt worker", () => attemptWorkerHandlers.heartbeat(args)),
+  },
+
+  end_attempt_worker: {
+    description: "End an attached Attempt worker session",
+    inputSchema: core.AttemptWorkerEndRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("end an Attempt worker", () => attemptWorkerHandlers.end(args)),
+  },
+
+  get_attempt_worker: {
+    description: "Get bounded, read-only status for an attached Attempt worker",
+    inputSchema: core.AttemptWorkerStatusRequestJsonSchema,
+    call: async (args) => {
+      const result = await attemptWorkerHandlers.status(args);
+      return canonicalToolResult(result);
+    },
+  },
+
   prepare_attempt: {
     description:
       "Prepare an ADR-010 assisted launch packet and envelope (requires ALLOW_MUTATIONS=true)",
@@ -1132,6 +1163,25 @@ const tools = {
     },
   },
 };
+
+function canonicalToolResult(result) {
+  return {
+    content: [{ type: "text", text: core.canonicalJSONStringify(result) }],
+  };
+}
+
+async function mutationToolCall(action, call) {
+  if (!config.allowMutations) {
+    return canonicalToolResult({
+      ok: false,
+      error: {
+        code: "mutations_disabled",
+        message: `Mutations not allowed. Set ALLOW_MUTATIONS=true to ${action}.`,
+      },
+    });
+  }
+  return canonicalToolResult(await call());
+}
 
 // MCP Protocol handler - JSON-RPC 2.0 over stdio
 async function handleRequest(request) {

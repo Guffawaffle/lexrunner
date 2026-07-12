@@ -1220,6 +1220,13 @@ export {
   AttemptStatusInputJsonSchema,
   createAttemptLifecycleHandlers,
 } from "./runs/index.js";
+export {
+  AttemptWorkerAttachRequestJsonSchema,
+  AttemptWorkerEndRequestJsonSchema,
+  AttemptWorkerHeartbeatRequestJsonSchema,
+  AttemptWorkerStatusRequestJsonSchema,
+  createAttemptWorkerHandlers,
+} from "./runs/index.js";
 
 // AX-004: MCP/CLI parity exports
 export { computeMergeOrder } from "./mergeOrder.js";

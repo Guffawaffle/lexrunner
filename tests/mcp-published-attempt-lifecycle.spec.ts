@@ -23,7 +23,15 @@ describe("published MCP Attempt lifecycle", () => {
     const start = tools.find((tool) => tool.name === "start_attempt");
     const prepare = tools.find((tool) => tool.name === "prepare_attempt");
     const status = tools.find((tool) => tool.name === "get_attempt_status");
+    const workerAttach = tools.find((tool) => tool.name === "attach_attempt_worker");
+    const workerHeartbeat = tools.find((tool) => tool.name === "heartbeat_attempt_worker");
+    const workerEnd = tools.find((tool) => tool.name === "end_attempt_worker");
+    const workerStatus = tools.find((tool) => tool.name === "get_attempt_worker");
 
+    expect(workerAttach?.inputSchema.required).toEqual(["runtime", "attach"]);
+    expect(workerHeartbeat?.inputSchema.required).toEqual(["databasePath", "heartbeat"]);
+    expect(workerEnd?.inputSchema.required).toEqual(["databasePath", "end"]);
+    expect(workerStatus?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
     expect(prepare?.inputSchema.required).toEqual([
       "runtime",
       "workItem",
@@ -48,6 +56,29 @@ describe("published MCP Attempt lifecycle", () => {
     expect(start?.inputSchema.properties).toHaveProperty("runtime");
     expect(start?.inputSchema.properties).toHaveProperty("attempt");
     expect(status?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
+  });
+
+  it("keeps worker mutations behind the published mutation gate", async () => {
+    const operations = [
+      ["attach_attempt_worker", "attach an Attempt worker"],
+      ["heartbeat_attempt_worker", "heartbeat an Attempt worker"],
+      ["end_attempt_worker", "end an Attempt worker"],
+    ] as const;
+
+    for (const [name, action] of operations) {
+      const [response] = await invoke({
+        id: 10,
+        method: "tools/call",
+        params: { name, arguments: {} },
+      });
+      expect(JSON.parse(response.result.content[0].text)).toEqual({
+        error: {
+          code: "mutations_disabled",
+          message: `Mutations not allowed. Set ALLOW_MUTATIONS=true to ${action}.`,
+        },
+        ok: false,
+      });
+    }
   });
 
   it("keeps prepare_attempt behind the published mutation gate", async () => {

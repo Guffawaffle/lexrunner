@@ -10,12 +10,14 @@ import type {
   AttemptLifecycleHandlers,
   AttemptPreparationHandler,
 } from "../../src/runs/agent-work-adapters.js";
+import type { AttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
   let program: Command;
   let handlers: AttemptLifecycleHandlers;
   let preparationHandler: AttemptPreparationHandler;
+  let workerHandlers: AttemptWorkerHandlers;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -37,10 +39,17 @@ describe("attempt commands", () => {
         result: { ok: true, outcome: "launch_bundle_ready" } as never,
       })),
     };
+    workerHandlers = {
+      attach: vi.fn(async () => ({ ok: true, result: { updated: true } as never })),
+      heartbeat: vi.fn(async () => ({ ok: true, result: { updated: true } as never })),
+      end: vi.fn(async () => ({ ok: true, result: { updated: true } as never })),
+      status: vi.fn(async () => ({ ok: true, result: { workerSession: null } })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       handlers,
       preparationHandler,
+      workerHandlers,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
@@ -51,27 +60,99 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers prepare, start, and status beneath attempt", () => {
+  it("registers worker, prepare, start, and status beneath attempt", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
+      "worker",
       "prepare",
       "start",
       "status",
     ]);
-    expect(attempt?.commands[0].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
+    expect(attempt?.commands[0].commands.map((command) => command.name())).toEqual([
+      "attach",
+      "heartbeat",
+      "end",
+      "status",
     ]);
     expect(attempt?.commands[1].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[2].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[3].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
+  });
+
+  it("forwards native worker attachment input unchanged", async () => {
+    const request = { attach: { workerSessionId: "native-session-1" } };
+    const path = join(directory, "worker-attach.json");
+    await fs.writeFile(path, JSON.stringify(request));
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "worker",
+      "attach",
+      "--input",
+      path,
+      "--json",
+    ]);
+
+    expect(workerHandlers.attach).toHaveBeenCalledWith(request);
+    expect(outputs).toEqual([{ ok: true, result: { updated: true } }]);
+  });
+
+  it("forwards exact worker status identity", async () => {
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "worker",
+      "status",
+      "--database-path",
+      "/tmp/lifecycle.db",
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--json",
+    ]);
+
+    expect(workerHandlers.status).toHaveBeenCalledWith({
+      databasePath: "/tmp/lifecycle.db",
+      runId: "run-1",
+      attemptId: "attempt-1",
+    });
+  });
+
+  it("maps a rejected worker mutation to exit code one", async () => {
+    vi.mocked(workerHandlers.attach).mockResolvedValue({
+      ok: true,
+      result: { updated: false, reason: "worker_session_conflict" },
+    });
+    const path = join(directory, "worker-attach.json");
+    await fs.writeFile(path, "{}");
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "worker",
+      "attach",
+      "--input",
+      path,
+      "--json",
+    ]);
+
+    expect(process.exitCode).toBe(1);
   });
 
   it("forwards an assisted preparation request unchanged", async () => {
