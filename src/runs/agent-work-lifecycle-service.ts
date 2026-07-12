@@ -371,30 +371,10 @@ export class AgentWorkLifecycleService {
 
   async getStatus(input: { runId: string; attemptId?: string }): Promise<AgentWorkStatus> {
     try {
-      return await this.readStatus(input);
+      return await readAgentWorkStatus(this.coordinationStore, this.workspaceStore, input);
     } catch {
       return { run: null, attempt: null, workspace: null };
     }
-  }
-
-  private async readStatus(input: { runId: string; attemptId?: string }): Promise<AgentWorkStatus> {
-    const record = await this.coordinationStore.getRunCoordination(input.runId);
-    const candidate = input.attemptId
-      ? await this.workspaceStore.getAttempt(input.attemptId)
-      : null;
-    const attempt = candidate?.runId === input.runId ? candidate : null;
-    const candidateLease = attempt?.workspaceLeaseId
-      ? await this.workspaceStore.getWorkspaceLease(attempt.workspaceLeaseId)
-      : null;
-    const lease =
-      attempt && candidateLease && bound(attempt, candidateLease) ? candidateLease : null;
-    return {
-      run: record
-        ? boundedRun(record.runId, record.revision, record.state, record.updatedAt, record.lease)
-        : null,
-      attempt: attempt ? boundedAttempt(attempt) : null,
-      workspace: lease ? boundedWorkspace(lease) : null,
-    };
   }
 
   private async failure(
@@ -414,6 +394,28 @@ export class AgentWorkLifecycleService {
       ...(!storeResult || storeResult.updated ? {} : { storeReason: storeResult.reason }),
     };
   }
+}
+
+/** Shared read-only projection for adapters that do not construct a Git coordinator. */
+export async function readAgentWorkStatus(
+  coordinationStore: CoordinationStore,
+  workspaceStore: WorkspaceLifecycleStore,
+  input: { runId: string; attemptId?: string }
+): Promise<AgentWorkStatus> {
+  const record = await coordinationStore.getRunCoordination(input.runId);
+  const candidate = input.attemptId ? await workspaceStore.getAttempt(input.attemptId) : null;
+  const attempt = candidate?.runId === input.runId ? candidate : null;
+  const candidateLease = attempt?.workspaceLeaseId
+    ? await workspaceStore.getWorkspaceLease(attempt.workspaceLeaseId)
+    : null;
+  const lease = attempt && candidateLease && bound(attempt, candidateLease) ? candidateLease : null;
+  return {
+    run: record
+      ? boundedRun(record.runId, record.revision, record.state, record.updatedAt, record.lease)
+      : null,
+    attempt: attempt ? boundedAttempt(attempt) : null,
+    workspace: lease ? boundedWorkspace(lease) : null,
+  };
 }
 
 function canonicalRun(run: RunState): JsonValue {
