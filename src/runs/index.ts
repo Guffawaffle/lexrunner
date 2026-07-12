@@ -59,6 +59,20 @@ export {
   InvalidProcedureTransitionError,
   ProcedureUnavailableError,
 } from "./coordinated-manager.js";
+
+export { AgentWorkLifecycleService } from "./agent-work-lifecycle-service.js";
+export type {
+  AgentWorkLifecycleFailure,
+  AgentWorkLifecycleResult,
+  AgentWorkLifecycleSuccess,
+  AgentWorkStatus,
+  BoundedAttemptStatus,
+  BoundedRunStatus,
+  BoundedWorkspaceStatus,
+  LifecycleFailureReason,
+  LifecyclePhase,
+  StartAttemptInput,
+} from "./agent-work-lifecycle-service.js";
 export type {
   RunProjection,
   ProcedureResolver,
