@@ -14,6 +14,61 @@ describe("scripts/dogfood-merge-weave.sh", () => {
   const scriptPath = path.join(process.cwd(), "scripts/dogfood-merge-weave.sh");
   let tempDir: string;
 
+  const writePlan = (): string => {
+    const planPath = path.join(tempDir, "test-plan.json");
+    fs.writeFileSync(
+      planPath,
+      JSON.stringify({
+        schemaVersion: "1.0.0",
+        target: "main",
+        nodes: [],
+      })
+    );
+    return planPath;
+  };
+
+  const createFakeLexPr = (): string => {
+    const binDir = path.join(tempDir, "bin");
+    const lexPrPath = path.join(binDir, "lex-pr");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(lexPrPath, "#!/usr/bin/env bash\nprintf '{}\\n'\n", { mode: 0o755 });
+    return binDir;
+  };
+
+  const runForRepo = async (repoPath: string) => {
+    const artifactsDir = path.join(tempDir, `artifacts-${path.basename(repoPath)}`);
+    const fakeBin = createFakeLexPr();
+
+    return execa(
+      "bash",
+      [
+        scriptPath,
+        "--plan",
+        writePlan(),
+        "--repo",
+        repoPath,
+        "--artifacts",
+        artifactsDir,
+        "--dry-run",
+      ],
+      {
+        reject: false,
+        env: { PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+      }
+    );
+  };
+
+  const initRepository = async (repoPath: string): Promise<void> => {
+    fs.mkdirSync(repoPath, { recursive: true });
+    await execa("git", ["init", repoPath]);
+    await execa("git", ["-C", repoPath, "config", "user.name", "Dogfood Test"]);
+    await execa("git", ["-C", repoPath, "config", "user.email", "dogfood@example.invalid"]);
+    await execa("git", ["-C", repoPath, "config", "commit.gpgsign", "false"]);
+    fs.writeFileSync(path.join(repoPath, "README.md"), "test repository\n");
+    await execa("git", ["-C", repoPath, "add", "README.md"]);
+    await execa("git", ["-C", repoPath, "commit", "-m", "Initialize test repository"]);
+  };
+
   beforeEach(() => {
     // Create a temporary directory for test artifacts
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dogfood-test-"));
@@ -94,6 +149,44 @@ describe("scripts/dogfood-merge-weave.sh", () => {
       expect(error.exitCode).toBe(1);
       expect(error.stderr || error.stdout).toContain("Repository directory not found");
     }
+  });
+
+  it("accepts a primary checkout whose .git is a directory", async () => {
+    const repoPath = path.join(tempDir, "primary");
+    await initRepository(repoPath);
+
+    expect(fs.statSync(path.join(repoPath, ".git")).isDirectory()).toBe(true);
+
+    const { exitCode, stdout } = await runForRepo(repoPath);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("WORKFLOW COMPLETE");
+  });
+
+  it("accepts a linked worktree whose .git is a file", async () => {
+    const repoPath = path.join(tempDir, "primary");
+    const worktreePath = path.join(tempDir, "linked");
+    await initRepository(repoPath);
+    await execa("git", ["-C", repoPath, "worktree", "add", "-b", "linked-test", worktreePath]);
+
+    expect(fs.statSync(path.join(worktreePath, ".git")).isFile()).toBe(true);
+
+    const { exitCode, stdout } = await runForRepo(worktreePath);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("WORKFLOW COMPLETE");
+  });
+
+  it("rejects a non-repository nested inside a checkout", async () => {
+    const repoPath = path.join(tempDir, "primary");
+    const nestedPath = path.join(repoPath, "not-a-repository");
+    await initRepository(repoPath);
+    fs.mkdirSync(nestedPath);
+
+    const { exitCode, stdout } = await runForRepo(nestedPath);
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toContain(`Not a git repository: ${nestedPath}`);
   });
 
   it("should handle valid plan file with dry-run (default behavior)", async () => {

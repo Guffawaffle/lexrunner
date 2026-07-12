@@ -230,10 +230,20 @@ if [ ! -d "$REPO_DIR" ]; then
     exit 1
 fi
 
-cd "$REPO_DIR"
+# Ask Git to identify the worktree rather than assuming .git is a directory.
+# Requiring the discovered top-level to equal the explicit --repo path keeps
+# discovery bounded: a non-repository directory nested inside a checkout is
+# not silently treated as the checkout itself.
+REQUESTED_REPO_ROOT=$(cd "$REPO_DIR" && pwd -P)
+if ! DISCOVERED_REPO_ROOT=$(git -C "$REPO_DIR" rev-parse --show-toplevel 2>/dev/null); then
+    print_error "Not a git repository: $REPO_DIR"
+    exit 1
+fi
 
-# Check if git repository
-if [ ! -d ".git" ]; then
+cd "$REQUESTED_REPO_ROOT"
+
+if ! DISCOVERED_REPO_ROOT=$(cd "$DISCOVERED_REPO_ROOT" 2>/dev/null && pwd -P) || \
+   [ "$DISCOVERED_REPO_ROOT" != "$REQUESTED_REPO_ROOT" ]; then
     print_error "Not a git repository: $REPO_DIR"
     exit 1
 fi
