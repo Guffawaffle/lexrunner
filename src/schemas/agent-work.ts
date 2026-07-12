@@ -18,6 +18,25 @@ const Id = z.string().min(1);
 const Timestamp = z.string().datetime();
 const Revision = z.number().int().nonnegative();
 
+function timestampMillis(value: string): number {
+  return Date.parse(value);
+}
+
+function requireTimestampOrder(
+  earlier: string,
+  later: string,
+  laterPath: string,
+  ctx: z.RefinementCtx
+): void {
+  if (timestampMillis(later) < timestampMillis(earlier)) {
+    ctx.addIssue({
+      code: "custom",
+      path: [laterPath],
+      message: `${laterPath} must not precede the related earlier timestamp`,
+    });
+  }
+}
+
 /** A full Git object ID. Abbreviated SHAs are not safe concurrency preconditions. */
 export const GitObjectId = z
   .string()
@@ -132,6 +151,223 @@ export const WorkItem_v1 = z
   })
   .strict();
 export type WorkItem_v1 = z.infer<typeof WorkItem_v1>;
+
+// =============================================================================
+// COORDINATED RUNS AND ATTEMPTS
+// =============================================================================
+
+export const RunStatus = z.enum([
+  "created",
+  "planning",
+  "ready",
+  "executing",
+  "verifying",
+  "delivering",
+  "awaiting_human",
+  "paused",
+  "blocked",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export type RunStatus = z.infer<typeof RunStatus>;
+
+const RunResumeStatus = z.enum(["planning", "ready", "executing", "verifying", "delivering"]);
+const INTERRUPTED_RUN_STATUSES = new Set<RunStatus>(["awaiting_human", "paused", "blocked"]);
+const TERMINAL_RUN_STATUSES = new Set<RunStatus>(["completed", "failed", "cancelled"]);
+
+/** Canonical orchestration state for one immutable WorkItem revision. */
+export const Run_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    run_id: Id,
+    revision: Revision,
+    work_item_id: Id,
+    work_item_revision: Revision,
+    control_mode: z.enum(["assisted", "headless"]),
+    authority_ceiling: AuthorityEnvelope,
+    status: RunStatus,
+    active_controller_lease_id: Id.optional(),
+    attempt_ids: z.array(Id),
+    current_attempt_id: Id.optional(),
+    resume_status: RunResumeStatus.optional(),
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    completed_at: Timestamp.optional(),
+  })
+  .strict()
+  .superRefine((run, ctx) => {
+    requireTimestampOrder(run.created_at, run.updated_at, "updated_at", ctx);
+
+    if (run.completed_at !== undefined) {
+      requireTimestampOrder(run.created_at, run.completed_at, "completed_at", ctx);
+      requireTimestampOrder(run.completed_at, run.updated_at, "updated_at", ctx);
+    }
+    if (TERMINAL_RUN_STATUSES.has(run.status) !== (run.completed_at !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["completed_at"],
+        message: "completed_at is required exactly when a Run is terminal",
+      });
+    }
+    if (INTERRUPTED_RUN_STATUSES.has(run.status) !== (run.resume_status !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resume_status"],
+        message: "resume_status is required exactly when a Run is interrupted",
+      });
+    }
+    if (new Set(run.attempt_ids).size !== run.attempt_ids.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["attempt_ids"],
+        message: "attempt_ids must not contain duplicates",
+      });
+    }
+    if (run.current_attempt_id !== undefined && !run.attempt_ids.includes(run.current_attempt_id)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["current_attempt_id"],
+        message: "current_attempt_id must reference an entry in attempt_ids",
+      });
+    }
+  });
+export type Run_v1 = z.infer<typeof Run_v1>;
+
+export const AttemptStatus = z.enum([
+  "prepared",
+  "leased",
+  "launching",
+  "running",
+  "receipt_submitted",
+  "verifying",
+  "verified",
+  "accepted",
+  "rejected",
+  "inconclusive",
+  "blocked",
+  "launch_failed",
+  "failed",
+  "cancelled",
+  "quarantined",
+]);
+export type AttemptStatus = z.infer<typeof AttemptStatus>;
+
+const ATTEMPT_STATUSES_REQUIRING_LEASE = new Set<AttemptStatus>([
+  "leased",
+  "launching",
+  "running",
+  "receipt_submitted",
+  "verifying",
+  "verified",
+  "accepted",
+  "rejected",
+  "inconclusive",
+  "blocked",
+  "launch_failed",
+  "failed",
+  "quarantined",
+]);
+const ATTEMPT_STATUSES_REQUIRING_RECEIPT = new Set<AttemptStatus>([
+  "receipt_submitted",
+  "verifying",
+  "verified",
+  "accepted",
+  "rejected",
+  "inconclusive",
+]);
+const ATTEMPT_STATUSES_REQUIRING_VERIFICATION = new Set<AttemptStatus>([
+  "verified",
+  "accepted",
+  "rejected",
+  "inconclusive",
+]);
+const TERMINAL_ATTEMPT_STATUSES = new Set<AttemptStatus>([
+  "accepted",
+  "rejected",
+  "inconclusive",
+  "blocked",
+  "launch_failed",
+  "failed",
+  "cancelled",
+  "quarantined",
+]);
+
+/** One worker try, bound to one immutable packet and pinned repository base. */
+export const Attempt_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    attempt_id: Id,
+    revision: Revision,
+    run_id: Id,
+    run_revision: Revision,
+    work_item_id: Id,
+    work_item_revision: Revision,
+    packet_id: Id,
+    packet_hash: SHA256Hash,
+    base_sha: GitObjectId,
+    workspace_lease_id: Id.optional(),
+    receipt_id: Id.optional(),
+    verification_id: Id.optional(),
+    status: AttemptStatus,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    completed_at: Timestamp.optional(),
+  })
+  .strict()
+  .superRefine((attempt, ctx) => {
+    requireTimestampOrder(attempt.created_at, attempt.updated_at, "updated_at", ctx);
+
+    if (attempt.completed_at !== undefined) {
+      requireTimestampOrder(attempt.created_at, attempt.completed_at, "completed_at", ctx);
+      requireTimestampOrder(attempt.completed_at, attempt.updated_at, "updated_at", ctx);
+    }
+    if (TERMINAL_ATTEMPT_STATUSES.has(attempt.status) !== (attempt.completed_at !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["completed_at"],
+        message: "completed_at is required exactly when an Attempt is terminal",
+      });
+    }
+    if (
+      ATTEMPT_STATUSES_REQUIRING_LEASE.has(attempt.status) &&
+      attempt.workspace_lease_id === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["workspace_lease_id"],
+        message: `workspace_lease_id is required for Attempt status ${attempt.status}`,
+      });
+    }
+    if (attempt.status === "prepared" && attempt.workspace_lease_id !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["workspace_lease_id"],
+        message: "A prepared Attempt has not acquired a workspace lease",
+      });
+    }
+    if (
+      ATTEMPT_STATUSES_REQUIRING_RECEIPT.has(attempt.status) &&
+      attempt.receipt_id === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["receipt_id"],
+        message: `receipt_id is required for Attempt status ${attempt.status}`,
+      });
+    }
+    if (
+      ATTEMPT_STATUSES_REQUIRING_VERIFICATION.has(attempt.status) &&
+      attempt.verification_id === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["verification_id"],
+        message: `verification_id is required for Attempt status ${attempt.status}`,
+      });
+    }
+  });
+export type Attempt_v1 = z.infer<typeof Attempt_v1>;
 
 // =============================================================================
 // PORTABLE TASK PACKET AND LOCAL EXECUTION ENVELOPE
@@ -276,12 +512,14 @@ export const ControllerLease_v1 = z
 export type ControllerLease_v1 = z.infer<typeof ControllerLease_v1>;
 
 export const WorkspaceLeaseStatus = z.enum([
+  "reserved",
   "acquired",
   "active",
   "receipt_submitted",
   "verifying",
   "released",
   "preserved",
+  "quarantined",
   "expired",
   "abandoned",
 ]);
@@ -295,8 +533,10 @@ export const WorkspaceLease_v1 = z
     run_id: Id,
     run_revision: Revision,
     work_item_id: Id,
+    work_item_revision: Revision,
     attempt_id: Id,
     controller_lease_id: Id,
+    controller_fence: z.number().int().positive(),
     packet_id: Id,
     packet_hash: SHA256Hash,
     repository: PortableRepository,
@@ -311,8 +551,220 @@ export const WorkspaceLease_v1 = z
     released_at: Timestamp.optional(),
     cleanup_disposition: z.enum(["integrated", "preserved", "abandoned", "discarded"]).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((lease, ctx) => {
+    requireTimestampOrder(lease.acquired_at, lease.heartbeat_at, "heartbeat_at", ctx);
+    requireTimestampOrder(lease.acquired_at, lease.expires_at, "expires_at", ctx);
+    if (timestampMillis(lease.heartbeat_at) > timestampMillis(lease.expires_at)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["heartbeat_at"],
+        message: "heartbeat_at must not be later than expires_at",
+      });
+    }
+
+    const dispositionByTerminalStatus = {
+      preserved: "preserved",
+      quarantined: "preserved",
+      abandoned: "abandoned",
+    } as const;
+    const finalized = new Set<WorkspaceLeaseStatus>([
+      "released",
+      "preserved",
+      "quarantined",
+      "abandoned",
+    ]);
+
+    if (finalized.has(lease.status) !== (lease.released_at !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["released_at"],
+        message: "released_at is required exactly when a workspace lease is finalized",
+      });
+    }
+    if (lease.released_at !== undefined) {
+      requireTimestampOrder(lease.acquired_at, lease.released_at, "released_at", ctx);
+    }
+
+    if (lease.status === "released") {
+      if (lease.cleanup_disposition !== "integrated" && lease.cleanup_disposition !== "discarded") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cleanup_disposition"],
+          message: "A released lease must be integrated or safely discarded",
+        });
+      }
+    } else if (lease.status in dispositionByTerminalStatus) {
+      const expected =
+        dispositionByTerminalStatus[lease.status as keyof typeof dispositionByTerminalStatus];
+      if (lease.cleanup_disposition !== expected) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cleanup_disposition"],
+          message: `Workspace lease status ${lease.status} requires disposition ${expected}`,
+        });
+      }
+    } else if (lease.cleanup_disposition !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cleanup_disposition"],
+        message: "A non-finalized workspace lease must not have a cleanup disposition",
+      });
+    }
+  });
 export type WorkspaceLease_v1 = z.infer<typeof WorkspaceLease_v1>;
+
+// A local allocation is deliberately separate from AgentTaskPacket_v1. These
+// paths and Git registration details are meaningful only to the named host and
+// Git runtime; consumers must not infer Windows/WSL equivalence.
+export const WorkspaceAllocationStatus = z.enum(["allocated", "active", "released", "quarantined"]);
+export type WorkspaceAllocationStatus = z.infer<typeof WorkspaceAllocationStatus>;
+
+export const WorkspaceAllocation_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    allocation_id: Id,
+    revision: Revision,
+    run_id: Id,
+    attempt_id: Id,
+    workspace_lease_id: Id,
+    repository: PortableRepository,
+    base_sha: GitObjectId,
+    branch: z.string().min(1),
+    host_id: Id,
+    git_runtime: z.string().min(1),
+    paths: z
+      .object({
+        project_root: AbsolutePath,
+        worktree_root: AbsolutePath,
+        repository_git_common_dir: AbsolutePath,
+        worktree_git_dir: AbsolutePath,
+      })
+      .strict(),
+    status: WorkspaceAllocationStatus,
+    observation: z
+      .object({
+        registration: z.enum([
+          "registered",
+          "missing",
+          "unregistered",
+          "wrong_repository",
+          "wrong_branch",
+        ]),
+        cleanliness: z.enum(["clean", "dirty", "unknown"]),
+        observed_branch: z.string().min(1).optional(),
+        observed_head_sha: GitObjectId.optional(),
+        observed_at: Timestamp,
+      })
+      .strict()
+      .optional(),
+    quarantine_reason: z
+      .enum([
+        "dirty",
+        "missing",
+        "unregistered",
+        "wrong_repository",
+        "wrong_branch",
+        "identity_ambiguous",
+        "expired",
+        "other",
+      ])
+      .optional(),
+    quarantine_evidence: z.array(z.string().min(1)).min(1).optional(),
+    allocated_at: Timestamp,
+    updated_at: Timestamp,
+    released_at: Timestamp.optional(),
+    quarantined_at: Timestamp.optional(),
+  })
+  .strict()
+  .superRefine((allocation, ctx) => {
+    requireTimestampOrder(allocation.allocated_at, allocation.updated_at, "updated_at", ctx);
+
+    if (allocation.observation !== undefined) {
+      requireTimestampOrder(
+        allocation.allocated_at,
+        allocation.observation.observed_at,
+        "observation.observed_at",
+        ctx
+      );
+      requireTimestampOrder(
+        allocation.observation.observed_at,
+        allocation.updated_at,
+        "updated_at",
+        ctx
+      );
+    }
+    if (allocation.status === "released") {
+      if (allocation.released_at === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["released_at"],
+          message: "A released allocation must record released_at",
+        });
+      }
+    } else if (allocation.released_at !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["released_at"],
+        message: "released_at is only valid for a released allocation",
+      });
+    }
+    if (allocation.released_at !== undefined) {
+      requireTimestampOrder(allocation.allocated_at, allocation.released_at, "released_at", ctx);
+      requireTimestampOrder(allocation.released_at, allocation.updated_at, "updated_at", ctx);
+    }
+
+    const quarantineFieldsPresent =
+      allocation.quarantined_at !== undefined ||
+      allocation.quarantine_reason !== undefined ||
+      allocation.quarantine_evidence !== undefined;
+    if (allocation.status === "quarantined") {
+      if (allocation.quarantined_at === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["quarantined_at"],
+          message: "A quarantined allocation must record quarantined_at",
+        });
+      }
+      if (allocation.quarantine_reason === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["quarantine_reason"],
+          message: "A quarantined allocation must record a reason",
+        });
+      }
+      if (allocation.quarantine_evidence === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["quarantine_evidence"],
+          message: "A quarantined allocation must preserve inspection evidence",
+        });
+      }
+      if (allocation.observation === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["observation"],
+          message: "A quarantined allocation must include its reconciliation observation",
+        });
+      }
+    } else if (quarantineFieldsPresent) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "Quarantine metadata is only valid for a quarantined allocation",
+      });
+    }
+    if (allocation.quarantined_at !== undefined) {
+      requireTimestampOrder(
+        allocation.allocated_at,
+        allocation.quarantined_at,
+        "quarantined_at",
+        ctx
+      );
+      requireTimestampOrder(allocation.quarantined_at, allocation.updated_at, "updated_at", ctx);
+    }
+  });
+export type WorkspaceAllocation_v1 = z.infer<typeof WorkspaceAllocation_v1>;
 
 // =============================================================================
 // WORKER SESSION, RECEIPT, AND ENGINE VERIFICATION
@@ -595,6 +1047,14 @@ export function parseWorkItem(data: unknown): WorkItem_v1 {
   return WorkItem_v1.parse(data);
 }
 
+export function parseRun(data: unknown): Run_v1 {
+  return Run_v1.parse(data);
+}
+
+export function parseAttempt(data: unknown): Attempt_v1 {
+  return Attempt_v1.parse(data);
+}
+
 export function parseAgentTaskPacket(data: unknown): AgentTaskPacket_v1 {
   return AgentTaskPacket_v1.parse(data);
 }
@@ -609,6 +1069,10 @@ export function parseControllerLease(data: unknown): ControllerLease_v1 {
 
 export function parseWorkspaceLease(data: unknown): WorkspaceLease_v1 {
   return WorkspaceLease_v1.parse(data);
+}
+
+export function parseWorkspaceAllocation(data: unknown): WorkspaceAllocation_v1 {
+  return WorkspaceAllocation_v1.parse(data);
 }
 
 export function parseWorkerSession(data: unknown): WorkerSession_v1 {

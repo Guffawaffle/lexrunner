@@ -232,6 +232,49 @@ export class InMemoryCoordinationStore implements CoordinationStore {
     // No resources to release.
   }
 
+  /**
+   * Execute an in-memory mutation while the presented controller lease is
+   * authoritative. Subclasses use this synchronous critical section so a
+   * workspace mutation cannot be separated from controller authentication.
+   */
+  protected withActiveControllerCredential<T>(
+    credential: {
+      runId: string;
+      controllerId: string;
+      leaseId: string;
+      fencingToken: number;
+    },
+    now: string,
+    expectedRunRevision: number,
+    action: () => T
+  ):
+    | { authenticated: true; value: T }
+    | {
+        authenticated: false;
+        reason:
+          | "no_active_lease"
+          | "lease_mismatch"
+          | "stale_fence"
+          | "lease_expired"
+          | "stale_run_revision";
+        currentRunRevision?: number;
+      } {
+    const record = this.records.get(credential.runId);
+    const failure = credentialFailureReason(record?.lease ?? null, credential);
+    if (failure) return { authenticated: false, reason: failure };
+    if (record!.revision !== expectedRunRevision) {
+      return {
+        authenticated: false,
+        reason: "stale_run_revision",
+        currentRunRevision: record!.revision,
+      };
+    }
+    if (parseInstant(record!.lease!.expiresAt, "expiresAt") <= parseInstant(now, "now")) {
+      return { authenticated: false, reason: "lease_expired" };
+    }
+    return { authenticated: true, value: action() };
+  }
+
   private createLease(
     input: AcquireControllerLeaseInput,
     fencingToken: number,

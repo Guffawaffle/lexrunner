@@ -62,7 +62,32 @@ export type {
   CoordinationStore,
 } from "./coordination-store.js";
 export { InMemoryCoordinationStore } from "./inmemory/index.js";
-export { SqliteCoordinationStore } from "./sqlite/index.js";
+export { SqliteCoordinationStore, SqliteWorkspaceLifecycleStore } from "./sqlite/index.js";
+
+// Attempt/workspace persistence is additive and does not modify the frozen RunStore.
+export type {
+  AttemptStatus,
+  AttemptRecord,
+  WorkspaceLifecycleLeaseStatus,
+  WorkspaceCleanupDisposition,
+  WorkspaceIdentity,
+  WorkspaceObservation,
+  WorkspaceLifecycleLeaseRecord,
+  WorkspaceLifecycleEventType,
+  WorkspaceLifecycleEvent,
+  CreateAttemptInput,
+  TransitionAttemptInput,
+  AcquireWorkspaceInput,
+  HeartbeatWorkspaceInput,
+  ReleaseWorkspaceInput,
+  ReconcileWorkspaceInput,
+  QuarantineWorkspaceInput,
+  WorkspaceMutationFailureReason,
+  WorkspaceMutationResult,
+  WorkspaceLifecycleStore,
+} from "./workspace-lifecycle-store.js";
+export { InMemoryWorkspaceLifecycleStore } from "./inmemory/index.js";
+export { toAttemptContract } from "./workspace-lifecycle-store.js";
 
 /**
  * Default database path relative to baseDir.
