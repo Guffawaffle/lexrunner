@@ -6,12 +6,16 @@ import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registerAttemptCommand } from "../../src/commands/attempt.js";
-import type { AttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
+import type {
+  AttemptLifecycleHandlers,
+  AttemptPreparationHandler,
+} from "../../src/runs/agent-work-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
   let program: Command;
   let handlers: AttemptLifecycleHandlers;
+  let preparationHandler: AttemptPreparationHandler;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -27,9 +31,16 @@ describe("attempt commands", () => {
         result: { run: null, attempt: null, workspace: null },
       })),
     };
+    preparationHandler = {
+      prepare: vi.fn(async () => ({
+        ok: true,
+        result: { ok: true, outcome: "launch_bundle_ready" } as never,
+      })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       handlers,
+      preparationHandler,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
@@ -40,19 +51,38 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers start and status beneath attempt", () => {
+  it("registers prepare, start, and status beneath attempt", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
-    expect(attempt?.commands.map((command) => command.name())).toEqual(["start", "status"]);
+    expect(attempt?.commands.map((command) => command.name())).toEqual([
+      "prepare",
+      "start",
+      "status",
+    ]);
     expect(attempt?.commands[0].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[1].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[2].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
+  });
+
+  it("forwards an assisted preparation request unchanged", async () => {
+    const request = { workItem: { work_item_id: "work-1" }, identity: { runId: "run-1" } };
+    const path = join(directory, "prepare.json");
+    await fs.writeFile(path, JSON.stringify(request));
+
+    await program.parseAsync(["node", "lex-pr", "attempt", "prepare", "--input", path, "--json"]);
+
+    expect(preparationHandler.prepare).toHaveBeenCalledWith(request);
+    expect(outputs).toEqual([{ ok: true, result: { ok: true, outcome: "launch_bundle_ready" } }]);
   });
 
   it("parses a bounded JSON file and forwards it unchanged", async () => {
@@ -201,6 +231,24 @@ describe("attempt commands", () => {
     await fs.writeFile(path, "{}");
 
     await program.parseAsync(["node", "lex-pr", "attempt", "start", "--input", path, "--json"]);
+
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("maps a preparation lifecycle failure to exit code one", async () => {
+    vi.mocked(preparationHandler.prepare).mockResolvedValue({
+      ok: true,
+      result: {
+        ok: false,
+        phase: "workspace_allocate",
+        reason: "workspace_rejected",
+        reconciliationRequired: true,
+      },
+    });
+    const path = join(directory, "prepare.json");
+    await fs.writeFile(path, "{}");
+
+    await program.parseAsync(["node", "lex-pr", "attempt", "prepare", "--input", path, "--json"]);
 
     expect(process.exitCode).toBe(1);
   });

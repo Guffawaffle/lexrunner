@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,6 +17,164 @@ afterEach(async () => {
 });
 
 describe("attempt lifecycle adapter handlers", () => {
+  it("prepares a canonically bound assisted launch bundle and replays it stably", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    const handlers = createAttemptLifecycleHandlers();
+
+    const first = await handlers.prepare(request);
+    const replay = await handlers.prepare(request);
+
+    expect(first).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        outcome: "launch_bundle_ready",
+        lifecycle: {
+          outcome: "launch_authorized",
+          attempt: { status: "launching" },
+          workspace: { status: "active" },
+        },
+        packet: {
+          packet_id: "packet-assisted",
+          run_id: "run-adapter",
+          work_item: { work_item_id: "work-assisted", revision: 3 },
+          attempt_id: "attempt-assisted",
+          objective: "Prepare one assisted launch bundle",
+        },
+        envelope: {
+          envelope_id: "envelope-assisted",
+          run_id: "run-adapter",
+          attempt_id: "attempt-assisted",
+          branch: "lexrunner/attempt-assisted",
+          runtime: { host_id: "host-adapter", worker_runtime: "codex-native" },
+          path_mappings: [],
+        },
+      },
+    });
+    if (!first.ok || !first.result.ok || !replay.ok || !replay.result.ok) {
+      throw new Error("expected launch bundle success");
+    }
+    expect(first.result.packet.packet_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(first.result.envelope.packet_hash).toBe(first.result.packet.packet_hash);
+    expect(first.result.envelope.workspace_lease_revision).toBe(
+      first.result.lifecycle.workspace.revision
+    );
+    expect(first.result.envelope.paths).toEqual({
+      project_root: request.envelope.projectRoot,
+      execution_root: request.envelope.executionRoot,
+      worktree_root: request.attempt.workspace.worktreePath,
+    });
+    expect(replay.result.packet).toEqual(first.result.packet);
+    expect(replay.result.envelope).toEqual(first.result.envelope);
+  });
+
+  it("rejects launch bindings before opening SQLite or Git", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    request.workItem.repository.id = "another/repository";
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_input",
+        issues: [{ path: "workItem.repository.id", message: "must match runtime.repositoryId" }],
+      },
+    });
+    await expect(access(request.runtime.databasePath)).rejects.toThrow();
+    await expect(access(request.attempt.workspace.worktreePath)).rejects.toThrow();
+  });
+
+  it("rejects machine-local paths in the portable packet before mutation", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    request.packet.instructions = ["Read /home/operator/secret.txt"];
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "invalid_input", issues: [{ path: "packet.instructions.0" }] },
+    });
+    await expect(access(request.runtime.databasePath)).rejects.toThrow();
+  });
+
+  it("rejects traversal and duplicate check identities before mutation", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    request.packet.verification = [
+      {
+        id: "test",
+        argv: ["npm", "test"],
+        cwd_rel: "src/../../outside",
+        expected_exit_codes: [0],
+      },
+      { id: "test", argv: ["npm", "run", "lint"], expected_exit_codes: [0] },
+    ];
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid_input" } });
+    if (result.ok) throw new Error("expected invalid launch policy");
+    expect(result.error.issues.map((issue) => issue.path)).toEqual(
+      expect.arrayContaining(["packet.verification.0.cwd_rel"])
+    );
+    await expect(access(request.runtime.databasePath)).rejects.toThrow();
+  });
+
+  it("refuses to replay a bundle after the authorized worktree becomes dirty", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    const handlers = createAttemptLifecycleHandlers();
+    await expect(handlers.prepare(request)).resolves.toMatchObject({
+      ok: true,
+      result: { ok: true, outcome: "launch_bundle_ready" },
+    });
+    await writeFile(join(request.attempt.workspace.worktreePath, "dirty.txt"), "dirty\n", "utf8");
+
+    const replay = await handlers.prepare(request);
+
+    expect(replay).toMatchObject({
+      ok: false,
+      error: {
+        code: "operation_failed",
+        message: "Launch workspace observation is not safe for handoff",
+      },
+    });
+  });
+
+  it("rejects an envelope timestamp beyond lease authority before mutation", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    request.envelope.createdAt = "2026-07-12T12:02:00.000Z";
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid_input" } });
+    if (result.ok) throw new Error("expected expired envelope rejection");
+    expect(result.error.issues.map((issue) => issue.path)).toContain("envelope.createdAt");
+    await expect(access(request.runtime.databasePath)).rejects.toThrow();
+  });
+
+  it("does not emit a bundle through an in-worktree symlink escape", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    request.envelope.projectRoot = join(request.attempt.workspace.worktreePath, "escape");
+    request.envelope.executionRoot = request.envelope.projectRoot;
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "operation_failed",
+        message: "envelope.projectRoot must resolve within its authorized root",
+      },
+    });
+  });
+
   it("rejects runtime identity mismatch before opening SQLite", async () => {
     const root = await sandbox();
     const request = await fixture(root);
@@ -146,8 +304,12 @@ async function fixture(root: string) {
   await git(repositoryRoot, "config", "user.name", "LexRunner Test");
   await git(repositoryRoot, "config", "user.email", "test@example.invalid");
   await git(repositoryRoot, "config", "commit.gpgsign", "false");
+  await mkdir(join(repositoryRoot, "..project"));
+  await mkdir(join(root, "outside"));
   await writeFile(join(repositoryRoot, "tracked.txt"), "base\n", "utf8");
-  await git(repositoryRoot, "add", "tracked.txt");
+  await writeFile(join(repositoryRoot, "..project", "app.txt"), "app\n", "utf8");
+  await symlink(join(root, "outside"), join(repositoryRoot, "escape"), "dir");
+  await git(repositoryRoot, "add", "tracked.txt", "..project/app.txt", "escape");
   await git(repositoryRoot, "commit", "-m", "initial");
   const baseSha = (
     await execa("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot })
@@ -210,6 +372,82 @@ async function fixture(root: string) {
         quarantineWorkspace: { mutationId: "quarantine", now: at(5) },
         authorizeLaunch: { mutationId: "authorize", now: at(6) },
       },
+    },
+  };
+}
+
+async function prepareFixture(root: string) {
+  const started = await fixture(root);
+  started.runtime.repositoryId = "owner/repo";
+  return {
+    runtime: started.runtime,
+    workItem: {
+      schema_version: "1.0.0" as const,
+      work_item_id: "work-assisted",
+      revision: 3,
+      source: {
+        kind: "github" as const,
+        external_id: "753",
+        revision: "issue-753-v1",
+        url: "https://github.com/Guffawaffle/lexrunner/issues/753",
+        captured_at: "2026-07-12T12:00:00.000Z",
+      },
+      repository: { id: "owner/repo", default_branch: "main" },
+      title: "Prepare an assisted launch bundle",
+      objective: "Prepare one assisted launch bundle",
+      description: "Exercise the foreground-controller handoff seam.",
+      acceptance_criteria: [{ id: "ac-1", text: "Packet and envelope are bound" }],
+      constraints: ["Do not launch a worker"],
+      labels: ["agent-work"],
+      dependencies: [],
+    },
+    identity: {
+      runId: started.attempt.runId,
+      attemptId: "attempt-assisted",
+      baseSha: started.attempt.attempt.baseSha,
+    },
+    packet: {
+      packetId: "packet-assisted",
+      instructions: ["Implement the bounded issue contract"],
+      scope: {
+        read_globs: ["src/**", "tests/**"],
+        write_globs: ["src/**", "tests/**"],
+        deny_globs: [".env"],
+        cross_repo_allowed: false,
+      },
+      authority: {
+        edit: true,
+        git_write: true,
+        github_write: false,
+        external_runtime: false,
+        secrets: false,
+        signing: false,
+        release: false,
+      },
+      verification: [{ id: "test", argv: ["npm", "test"], expected_exit_codes: [0] }],
+      budget: { max_tokens: 20_000, max_tool_calls: 100, max_elapsed_ms: 3_600_000 },
+      createdAt: "2026-07-12T12:00:00.000Z",
+    },
+    envelope: {
+      envelopeId: "envelope-assisted",
+      os: "linux" as const,
+      architecture: "x64",
+      workerRuntime: "codex-native",
+      projectRoot: join(root, "worktrees", "attempt-assisted", "..project"),
+      executionRoot: join(root, "worktrees", "attempt-assisted", "..project"),
+      exposedEnvironmentKeys: ["PATH"],
+      createdAt: "2026-07-12T12:00:07.000Z",
+    },
+    attempt: {
+      initialRunState: started.attempt.initialRunState,
+      controller: started.attempt.controller,
+      workspace: {
+        workspaceLeaseId: "lease-assisted",
+        branch: "lexrunner/attempt-assisted",
+        worktreePath: join(root, "worktrees", "attempt-assisted"),
+        ttlMs: started.attempt.workspace.ttlMs,
+      },
+      mutations: started.attempt.mutations,
     },
   };
 }

@@ -74,6 +74,8 @@ export type {
   StartAttemptInput,
 } from "./agent-work-lifecycle-service.js";
 export {
+  AttemptPrepareRequestJsonSchema,
+  AttemptPrepareRequestSchema,
   AttemptStartInputSchema,
   AttemptStartRequestJsonSchema,
   AttemptStartRequestSchema,
@@ -88,10 +90,19 @@ export type {
   AgentWorkHandlerResult,
   AgentWorkRuntimeBinding,
   AttemptLifecycleHandlers,
+  AttemptPreparationHandler,
+  AttemptPrepareRequest,
   AttemptStartHandlerInput,
   AttemptStartRequest,
   AttemptStatusHandlerInput,
 } from "./agent-work-adapters.js";
+export type {
+  AttemptLaunchBundleResult,
+  AttemptLaunchBundleSuccess,
+  AttemptLaunchEnvelopePolicy,
+  AttemptLaunchPacketPolicy,
+  PrepareAttemptLaunchInput,
+} from "./agent-work-launch-bundle.js";
 export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
 export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {

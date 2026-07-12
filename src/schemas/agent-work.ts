@@ -51,11 +51,26 @@ const PortableRepository = z
   })
   .strict();
 
+const PortableGlob = z
+  .string()
+  .min(1)
+  .refine((value) => !isMachineLocalAbsolutePath(value), {
+    message: "Glob must be repository-relative",
+  })
+  .refine((value) => !value.split(/[\\/]/u).includes(".."), {
+    message: "Glob must not escape the repository root",
+  });
+
+const AgentRepoRelativePath = RepoRelativePath.min(1).refine(
+  (value) => !value.split(/[\\/]/u).includes(".."),
+  { message: "Path must not escape repo root" }
+);
+
 const PortableScope = z
   .object({
-    read_globs: z.array(z.string().min(1)),
-    write_globs: z.array(z.string().min(1)),
-    deny_globs: z.array(z.string().min(1)),
+    read_globs: z.array(PortableGlob),
+    write_globs: z.array(PortableGlob),
+    deny_globs: z.array(PortableGlob),
     cross_repo_allowed: z.boolean(),
   })
   .strict();
@@ -120,6 +135,24 @@ function rejectMachineLocalPaths(
       rejectMachineLocalPaths(item, ctx, [...path, key]);
     }
   }
+}
+
+function requireUniqueIds(
+  values: Array<{ id: string }>,
+  field: string,
+  ctx: z.RefinementCtx
+): void {
+  const seen = new Set<string>();
+  values.forEach((value, index) => {
+    if (seen.has(value.id)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [field, index, "id"],
+        message: `${field} IDs must be unique`,
+      });
+    }
+    seen.add(value.id);
+  });
 }
 
 // =============================================================================
@@ -398,7 +431,7 @@ const AgentTaskPacketBase = z
         .object({
           id: Id,
           argv: z.array(z.string()).min(1),
-          cwd_rel: RepoRelativePath.optional(),
+          cwd_rel: AgentRepoRelativePath.optional(),
           expected_exit_codes: z.array(z.number().int()).min(1),
         })
         .strict()
@@ -415,8 +448,13 @@ const AgentTaskPacketBase = z
   })
   .strict();
 
+/** Portable packet content before LexRunner derives and verifies packet_hash. */
+export const AgentTaskPacketHashInput_v1 = AgentTaskPacketBase.omit({ packet_hash: true });
+
 export const AgentTaskPacket_v1 = AgentTaskPacketBase.superRefine((packet, ctx) => {
   rejectMachineLocalPaths(packet, ctx);
+  requireUniqueIds(packet.acceptance_criteria, "acceptance_criteria", ctx);
+  requireUniqueIds(packet.verification, "verification", ctx);
   const { packet_hash: _packetHash, ...hashable } = packet;
   const expected = computeCanonicalHash(hashable);
   if (packet.packet_hash !== expected) {
@@ -429,7 +467,7 @@ export const AgentTaskPacket_v1 = AgentTaskPacketBase.superRefine((packet, ctx) 
 });
 export type AgentTaskPacket_v1 = z.infer<typeof AgentTaskPacket_v1>;
 
-export type AgentTaskPacketHashInput = Omit<AgentTaskPacket_v1, "packet_hash">;
+export type AgentTaskPacketHashInput = z.infer<typeof AgentTaskPacketHashInput_v1>;
 
 export function computeAgentTaskPacketHash(packet: AgentTaskPacketHashInput): string {
   return computeCanonicalHash(packet);
@@ -457,6 +495,8 @@ export const ExecutionEnvelope_v1 = z
     workspace_lease_id: Id,
     workspace_lease_revision: Revision,
     expected_head_sha: GitObjectId,
+    /** Emitted by Stage 3 launch bundles; optional for pre-Stage-3 v1 envelopes. */
+    branch: z.string().min(1).optional(),
     runtime: z
       .object({
         host_id: Id,

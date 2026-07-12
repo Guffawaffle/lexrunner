@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
 import { NodeGitWorktreeBroker } from "../workspaces/node-git-worktree-broker.js";
+import type { GitWorktreeBroker } from "../workspaces/git-worktree-broker.js";
 import { WorkspaceCoordinator } from "../workspaces/workspace-coordinator.js";
 import { AgentWorkLifecycleService } from "./agent-work-lifecycle-service.js";
 
@@ -40,6 +41,7 @@ export type AgentWorkRuntimeConfig = z.infer<typeof AgentWorkRuntimeConfigSchema
 
 export interface AgentWorkRuntime {
   config: Readonly<AgentWorkRuntimeConfig>;
+  observeWorkspace: GitWorktreeBroker["observe"];
   service: AgentWorkLifecycleService;
   close(): Promise<void>;
 }
@@ -67,6 +69,7 @@ export function createAgentWorkRuntime(input: unknown): AgentWorkRuntime {
     );
     return {
       config: Object.freeze({ ...config }),
+      observeWorkspace: broker.observe.bind(broker),
       service,
       close: () => store.close(),
     };

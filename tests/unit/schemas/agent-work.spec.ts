@@ -396,6 +396,7 @@ describe("agent work protocol contracts", () => {
       workspace_lease_id: lease.lease_id,
       workspace_lease_revision: lease.revision,
       expected_head_sha: BASE_SHA,
+      branch: lease.branch,
       runtime: {
         host_id: "devbox-1",
         os: "linux",
