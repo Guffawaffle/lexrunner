@@ -11,6 +11,7 @@ import type {
   AttemptPreparationHandler,
 } from "../../src/runs/agent-work-adapters.js";
 import type { AttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
+import type { AttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
@@ -18,6 +19,7 @@ describe("attempt commands", () => {
   let handlers: AttemptLifecycleHandlers;
   let preparationHandler: AttemptPreparationHandler;
   let workerHandlers: AttemptWorkerHandlers;
+  let receiptHandlers: AttemptReceiptHandlers;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -45,11 +47,16 @@ describe("attempt commands", () => {
       end: vi.fn(async () => ({ ok: true, result: { updated: true } as never })),
       status: vi.fn(async () => ({ ok: true, result: { workerSession: null } })),
     };
+    receiptHandlers = {
+      submit: vi.fn(async () => ({ ok: true, result: { submitted: true } as never })),
+      status: vi.fn(async () => ({ ok: true, result: { receipt: null } })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       handlers,
       preparationHandler,
       workerHandlers,
+      receiptHandlers,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
@@ -60,10 +67,11 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers worker, prepare, start, and status beneath attempt", () => {
+  it("registers worker, receipt, prepare, start, and status beneath attempt", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
       "worker",
+      "receipt",
       "prepare",
       "start",
       "status",
@@ -74,20 +82,105 @@ describe("attempt commands", () => {
       "end",
       "status",
     ]);
-    expect(attempt?.commands[1].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
+    expect(attempt?.commands[1].commands.map((command) => command.name())).toEqual([
+      "submit",
+      "status",
     ]);
     expect(attempt?.commands[2].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[3].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[4].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
+  });
+
+  it("forwards Attempt receipt submit and status input unchanged", async () => {
+    const request = { submission: { receipt: { receipt_id: "receipt-1" } } };
+    const path = join(directory, "receipt-submit.json");
+    await fs.writeFile(path, JSON.stringify(request));
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "receipt",
+      "submit",
+      "--input",
+      path,
+      "--json",
+    ]);
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "receipt",
+      "status",
+      "--database-path",
+      "/tmp/lifecycle.db",
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--json",
+    ]);
+
+    expect(receiptHandlers.submit).toHaveBeenCalledWith(request);
+    expect(receiptHandlers.status).toHaveBeenCalledWith({
+      databasePath: "/tmp/lifecycle.db",
+      runId: "run-1",
+      attemptId: "attempt-1",
+    });
+    expect(outputs).toEqual([
+      { ok: true, result: { submitted: true } },
+      { ok: true, result: { receipt: null } },
+    ]);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("maps rejected and invalid Attempt receipt submissions to exit codes one and two", async () => {
+    const path = join(directory, "receipt-submit.json");
+    await fs.writeFile(path, "{}");
+    vi.mocked(receiptHandlers.submit).mockResolvedValueOnce({
+      ok: true,
+      result: { submitted: false, reason: "receipt_conflict" },
+    });
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "receipt",
+      "submit",
+      "--input",
+      path,
+      "--json",
+    ]);
+    expect(process.exitCode).toBe(1);
+
+    process.exitCode = undefined;
+    vi.mocked(receiptHandlers.submit).mockResolvedValueOnce({
+      ok: false,
+      error: { code: "invalid_input", message: "Invalid receipt", issues: [] },
+    });
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "receipt",
+      "submit",
+      "--input",
+      path,
+      "--json",
+    ]);
+    expect(process.exitCode).toBe(2);
   });
 
   it("forwards native worker attachment input unchanged", async () => {

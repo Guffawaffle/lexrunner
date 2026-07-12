@@ -1,6 +1,7 @@
 import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.js";
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
 import type { Attempt_v1 as AttemptContract_v1 } from "../schemas/agent-work.js";
+import type { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
 
 /** Durable attempt state. Attempts exist before a workspace is allocated. */
 export type AttemptStatus =
@@ -259,6 +260,99 @@ export type LaunchEnvelopeBindingResult =
       currentRunRevision?: number;
     };
 
+export type AttemptReceiptDisposition = "verification_pending" | "retained_late";
+
+export interface AttemptReceiptRecord {
+  receiptId: string;
+  receiptHash: string;
+  receiptJson: string;
+  runId: string;
+  workItemId: string;
+  workItemRevision: number;
+  attemptId: string;
+  packetId: string;
+  packetHash: string;
+  workspaceLeaseId: string;
+  workspaceLeaseRevision: number;
+  workerSessionId: string;
+  workerSessionRevision: number;
+  workerRuntime: string;
+  observedBaseSha: string;
+  finalHeadSha?: string;
+  patchHash?: string;
+  outcome: AgentTaskReceipt_v2["outcome"];
+  disposition: AttemptReceiptDisposition;
+  submittedAt: string;
+  recordedAt: string;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  resultingAttemptRevision: number;
+  resultingAttemptStatus: AttemptStatus;
+}
+
+export type AttemptReceiptEventType =
+  | "attempt_receipt_submitted"
+  | "attempt_receipt_retained_late"
+  | "attempt_receipt_replayed";
+
+export interface AttemptReceiptEvent {
+  runId: string;
+  attemptId: string;
+  receiptId: string;
+  receiptHash: string;
+  mutationId: string;
+  sequence: number;
+  attemptRevision: number;
+  workspaceLeaseRevision: number;
+  workerSessionRevision: number;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  type: AttemptReceiptEventType;
+  disposition: AttemptReceiptDisposition;
+  outcome: AgentTaskReceipt_v2["outcome"];
+  createdAt: string;
+}
+
+export interface SubmitAttemptReceiptInput {
+  runId: string;
+  expectedRunRevision: number;
+  controller: ControllerLeaseCredential;
+  mutationId: string;
+  now: string;
+  attemptId: string;
+  expectedAttemptRevision: number;
+  workspaceLeaseId: string;
+  expectedWorkspaceLeaseRevision: number;
+  workerSessionId: string;
+  expectedWorkerSessionRevision: number;
+  receipt: AgentTaskReceipt_v2;
+}
+
+export type AttemptReceiptFailureReason =
+  | WorkspaceMutationFailureReason
+  | "stale_session_revision"
+  | "worker_session_not_active"
+  | "receipt_conflict";
+
+export type AttemptReceiptSubmissionResult =
+  | {
+      submitted: true;
+      receipt: AttemptReceiptRecord;
+      attempt: AttemptRecord;
+      event: AttemptReceiptEvent;
+      idempotentReplay: boolean;
+    }
+  | {
+      submitted: false;
+      reason: AttemptReceiptFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentSessionRevision?: number;
+      currentRunRevision?: number;
+    };
+
 export interface HeartbeatWorkerSessionInput extends AuthenticatedWorkerMutationInput {
   sessionId: string;
   expectedSessionRevision: number;
@@ -427,6 +521,15 @@ export interface WorkerSessionStore {
   getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null>;
   getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null>;
   listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]>;
+}
+
+/** Additive immutable AgentTaskReceipt v2 persistence port. */
+export interface AttemptReceiptStore {
+  submitAttemptReceipt(input: SubmitAttemptReceiptInput): Promise<AttemptReceiptSubmissionResult>;
+  getAttemptReceipt(receiptId: string): Promise<AttemptReceiptRecord | null>;
+  getAttemptReceiptForAttempt(attemptId: string): Promise<AttemptReceiptRecord | null>;
+  getAttemptReceiptByHash(receiptHash: string): Promise<AttemptReceiptRecord | null>;
+  listAttemptReceiptEvents(runId: string): Promise<AttemptReceiptEvent[]>;
 }
 
 /**

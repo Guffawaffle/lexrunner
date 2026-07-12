@@ -1,10 +1,16 @@
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
+import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type {
   AcquireWorkspaceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
+  AttemptReceiptEvent,
+  AttemptReceiptEventType,
+  AttemptReceiptFailureReason,
+  AttemptReceiptRecord,
+  AttemptReceiptSubmissionResult,
   BindLaunchEnvelopeInput,
   CreateAttemptInput,
   EndWorkerSessionInput,
@@ -16,6 +22,7 @@ import type {
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
   ReleaseWorkspaceInput,
+  SubmitAttemptReceiptInput,
   TransitionAttemptInput,
   WorkspaceIdentity,
   WorkspaceLifecycleLeaseRecord,
@@ -53,6 +60,11 @@ interface StoredWorkerMutation {
   result: Extract<WorkerSessionMutationResult, { updated: true }>;
 }
 
+interface StoredReceiptMutation {
+  fingerprint: string;
+  result: Extract<AttemptReceiptSubmissionResult, { submitted: true }>;
+}
+
 /**
  * In-memory authoritative controller + workspace lifecycle store.
  *
@@ -73,6 +85,11 @@ export class InMemoryWorkspaceLifecycleStore
   private readonly workerEvents = new Map<string, WorkerSessionEvent[]>();
   private readonly workerMutations = new Map<string, StoredWorkerMutation>();
   private readonly launchEnvelopeBindings = new Map<string, LaunchEnvelopeBindingRecord>();
+  private readonly attemptReceipts = new Map<string, AttemptReceiptRecord>();
+  private readonly receiptByAttempt = new Map<string, string>();
+  private readonly receiptByHash = new Map<string, string>();
+  private readonly receiptEvents = new Map<string, AttemptReceiptEvent[]>();
+  private readonly receiptMutations = new Map<string, StoredReceiptMutation>();
 
   async createAttempt(input: CreateAttemptInput): Promise<WorkspaceMutationResult> {
     return this.mutate(input, () => {
@@ -122,6 +139,35 @@ export class InMemoryWorkspaceLifecycleStore
       if (revisionFailure) return revisionFailure;
       if (!canTransition(attempt!.status, input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
+      }
+      if (input.status === "receipt_submitted") {
+        return this.failure("evidence_mismatch", attempt!);
+      }
+      if (input.receiptId !== undefined) {
+        const durableReceiptId = this.receiptByAttempt.get(attempt!.attemptId);
+        const receipt = this.attemptReceipts.get(input.receiptId);
+        if (
+          durableReceiptId !== input.receiptId ||
+          attempt!.receiptId !== input.receiptId ||
+          !receipt ||
+          receipt.attemptId !== attempt!.attemptId ||
+          receipt.disposition !== "verification_pending"
+        ) {
+          return this.failure("evidence_mismatch", attempt!);
+        }
+      }
+      if (requiresDurableReceipt(input.status)) {
+        const receiptId = this.receiptByAttempt.get(attempt!.attemptId);
+        const receipt = receiptId ? this.attemptReceipts.get(receiptId) : undefined;
+        if (
+          !receiptId ||
+          receiptId !== attempt!.receiptId ||
+          !receipt ||
+          receipt.attemptId !== attempt!.attemptId ||
+          receipt.disposition !== "verification_pending"
+        ) {
+          return this.failure("evidence_mismatch", attempt!);
+        }
       }
       if (parseInstant(input.now, "now") < parseInstant(attempt!.updatedAt, "updatedAt")) {
         return this.failure("invalid_time", attempt!);
@@ -618,6 +664,273 @@ export class InMemoryWorkspaceLifecycleStore
     return (this.workerEvents.get(runId) ?? []).map(cloneWorkerEvent);
   }
 
+  async submitAttemptReceipt(
+    input: SubmitAttemptReceiptInput
+  ): Promise<AttemptReceiptSubmissionResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return this.receiptFailure("invalid_time");
+    if (input.controller.runId !== input.runId) return this.receiptFailure("lease_mismatch");
+    const parsed = AgentTaskReceipt_v2.safeParse(input.receipt);
+    if (!parsed.success) return this.receiptFailure("evidence_mismatch");
+    const receiptJson = canonicalJSONStringify(parsed.data);
+    const receiptHash = computeCanonicalHash(parsed.data);
+    const authenticated = this.withActiveControllerCredential(
+      input.controller,
+      input.now,
+      input.expectedRunRevision,
+      () => {
+        const key = mutationKey(input.runId, input.mutationId);
+        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        if (this.mutations.has(key) || this.workerMutations.has(key)) {
+          return this.receiptFailure("mutation_conflict");
+        }
+        const prior = this.receiptMutations.get(key);
+        if (prior) {
+          if (prior.fingerprint !== fingerprint) return this.receiptFailure("mutation_conflict");
+          return { ...cloneReceiptSuccess(prior.result), idempotentReplay: true };
+        }
+        const hashReceiptId = this.receiptByHash.get(receiptHash);
+        if (hashReceiptId) {
+          const existing = this.attemptReceipts.get(hashReceiptId)!;
+          if (
+            existing.receiptJson !== receiptJson ||
+            existing.runId !== input.runId ||
+            existing.attemptId !== input.attemptId ||
+            existing.workspaceLeaseId !== input.workspaceLeaseId ||
+            existing.workerSessionId !== input.workerSessionId
+          ) {
+            return this.receiptFailure("receipt_conflict");
+          }
+          const attempt = this.attempts.get(existing.attemptId);
+          if (!attempt) return this.receiptFailure("not_found");
+          const session = this.workerSessions.get(existing.workerSessionId);
+          const lease = this.workspaceLeases.get(existing.workspaceLeaseId);
+          if (!session || !lease) return this.receiptFailure("not_found", attempt);
+          const committed = this.committedReceiptResult(existing.receiptId);
+          if (!committed) {
+            throw new Error(
+              `Attempt receipt '${existing.receiptId}' is missing its committed submission result`
+            );
+          }
+          const replay = this.recordReceiptEvent(
+            input,
+            attempt,
+            lease,
+            session,
+            existing,
+            "attempt_receipt_replayed"
+          );
+          const result = {
+            submitted: true as const,
+            receipt: { ...committed.receipt },
+            attempt: { ...committed.attempt },
+            event: replay.event,
+            idempotentReplay: true,
+          };
+          this.receiptMutations.set(key, { fingerprint, result: cloneReceiptSuccess(result) });
+          return result;
+        }
+        const result = this.submitNewReceipt(input, parsed.data, receiptJson, receiptHash);
+        if (result.submitted) {
+          this.receiptMutations.set(key, { fingerprint, result: cloneReceiptSuccess(result) });
+        }
+        return result;
+      }
+    );
+    return authenticated.authenticated
+      ? authenticated.value
+      : this.receiptFailure(
+          authenticated.reason,
+          undefined,
+          undefined,
+          undefined,
+          authenticated.currentRunRevision
+        );
+  }
+
+  async getAttemptReceipt(receiptId: string): Promise<AttemptReceiptRecord | null> {
+    const receipt = this.attemptReceipts.get(receiptId);
+    return receipt ? { ...receipt } : null;
+  }
+
+  async getAttemptReceiptForAttempt(attemptId: string): Promise<AttemptReceiptRecord | null> {
+    const receiptId = this.receiptByAttempt.get(attemptId);
+    return receiptId ? this.getAttemptReceipt(receiptId) : null;
+  }
+
+  async getAttemptReceiptByHash(receiptHash: string): Promise<AttemptReceiptRecord | null> {
+    const receiptId = this.receiptByHash.get(receiptHash);
+    return receiptId ? this.getAttemptReceipt(receiptId) : null;
+  }
+
+  async listAttemptReceiptEvents(runId: string): Promise<AttemptReceiptEvent[]> {
+    return (this.receiptEvents.get(runId) ?? []).map((event) => ({ ...event }));
+  }
+
+  private submitNewReceipt(
+    input: SubmitAttemptReceiptInput,
+    claim: import("../../schemas/agent-work.js").AgentTaskReceipt_v2,
+    receiptJson: string,
+    receiptHash: string
+  ): AttemptReceiptSubmissionResult {
+    const attempt = this.attempts.get(input.attemptId);
+    const lease = this.workspaceLeases.get(input.workspaceLeaseId);
+    const session = this.workerSessions.get(input.workerSessionId);
+    if (!attempt || attempt.runId !== input.runId || !lease || !session) {
+      return this.receiptFailure("not_found", attempt, lease, session);
+    }
+    if (attempt.revision !== input.expectedAttemptRevision) {
+      return this.receiptFailure("stale_attempt_revision", attempt, lease, session);
+    }
+    if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+      return this.receiptFailure("stale_workspace_revision", attempt, lease, session);
+    }
+    if (session.revision !== input.expectedWorkerSessionRevision) {
+      return this.receiptFailure("stale_session_revision", attempt, lease, session);
+    }
+    if (this.attemptReceipts.has(claim.receipt_id)) {
+      return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    if (this.receiptByAttempt.has(input.attemptId)) {
+      return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    if (!validReceiptBinding(claim, input, attempt, lease, session)) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
+    }
+    const terminalWorker = ["completed", "failed", "cancelled", "lost"].includes(session.status);
+    if (!terminalWorker || !session.endedAt) {
+      return this.receiptFailure("worker_session_not_active", attempt, lease, session);
+    }
+    const active =
+      attempt.status === "running" &&
+      session.status === "completed" &&
+      lease.status === "active" &&
+      lease.controllerId === input.controller.controllerId &&
+      lease.controllerLeaseId === input.controller.leaseId &&
+      lease.fencingToken === input.controller.fencingToken &&
+      parseInstant(lease.expiresAt, "expiresAt") > parseInstant(input.now, "now");
+    if (!active && attempt.status !== "running" && !isTerminalAttempt(attempt.status)) {
+      return this.receiptFailure("invalid_attempt_transition", attempt, lease, session);
+    }
+    const disposition = active ? "verification_pending" : "retained_late";
+    if (active) {
+      const nextStatus: AttemptRecord["status"] =
+        claim.outcome === "completed" ? "receipt_submitted" : claim.outcome;
+      attempt.revision += 1;
+      attempt.status = nextStatus;
+      attempt.receiptId = claim.receipt_id;
+      attempt.updatedAt = normalizeInstant(input.now);
+      attempt.completedAt = nextStatus === "receipt_submitted" ? null : normalizeInstant(input.now);
+    }
+    const record: AttemptReceiptRecord = {
+      receiptId: claim.receipt_id,
+      receiptHash,
+      receiptJson,
+      runId: input.runId,
+      workItemId: claim.work_item_id,
+      workItemRevision: claim.work_item_revision,
+      attemptId: input.attemptId,
+      packetId: claim.packet_id,
+      packetHash: claim.packet_hash,
+      workspaceLeaseId: input.workspaceLeaseId,
+      workspaceLeaseRevision: claim.workspace_lease_revision,
+      workerSessionId: input.workerSessionId,
+      workerSessionRevision: session.revision,
+      workerRuntime: claim.worker_runtime,
+      observedBaseSha: claim.observed_base_sha,
+      ...(claim.final_head_sha ? { finalHeadSha: claim.final_head_sha } : {}),
+      ...(claim.patch_hash ? { patchHash: claim.patch_hash } : {}),
+      outcome: claim.outcome,
+      disposition,
+      submittedAt: normalizeInstant(claim.submitted_at),
+      recordedAt: normalizeInstant(input.now),
+      controllerId: input.controller.controllerId,
+      controllerLeaseId: input.controller.leaseId,
+      fencingToken: input.controller.fencingToken,
+      resultingAttemptRevision: attempt.revision,
+      resultingAttemptStatus: attempt.status,
+    };
+    this.attemptReceipts.set(record.receiptId, record);
+    this.receiptByAttempt.set(record.attemptId, record.receiptId);
+    this.receiptByHash.set(record.receiptHash, record.receiptId);
+    return this.recordReceiptEvent(
+      input,
+      attempt,
+      lease,
+      session,
+      record,
+      active ? "attempt_receipt_submitted" : "attempt_receipt_retained_late"
+    );
+  }
+
+  private recordReceiptEvent(
+    input: SubmitAttemptReceiptInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord,
+    session: WorkerSessionRecord,
+    receipt: AttemptReceiptRecord,
+    type: AttemptReceiptEventType
+  ): Extract<AttemptReceiptSubmissionResult, { submitted: true }> {
+    const events = this.receiptEvents.get(input.runId) ?? [];
+    const event: AttemptReceiptEvent = {
+      runId: input.runId,
+      attemptId: attempt.attemptId,
+      receiptId: receipt.receiptId,
+      receiptHash: receipt.receiptHash,
+      mutationId: input.mutationId,
+      sequence: events.length + 1,
+      attemptRevision: attempt.revision,
+      workspaceLeaseRevision: lease.revision,
+      workerSessionRevision: session.revision,
+      controllerId: input.controller.controllerId,
+      controllerLeaseId: input.controller.leaseId,
+      fencingToken: input.controller.fencingToken,
+      type,
+      disposition: receipt.disposition,
+      outcome: receipt.outcome,
+      createdAt: normalizeInstant(input.now),
+    };
+    events.push(event);
+    this.receiptEvents.set(input.runId, events);
+    return {
+      submitted: true,
+      receipt: { ...receipt },
+      attempt: { ...attempt },
+      event: { ...event },
+      idempotentReplay: false,
+    };
+  }
+
+  private receiptFailure(
+    reason: AttemptReceiptFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): AttemptReceiptSubmissionResult {
+    return {
+      submitted: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
+  private committedReceiptResult(
+    receiptId: string
+  ): Extract<AttemptReceiptSubmissionResult, { submitted: true }> | null {
+    for (const { result } of this.receiptMutations.values()) {
+      if (
+        result.receipt.receiptId === receiptId &&
+        result.event.type !== "attempt_receipt_replayed"
+      ) {
+        return cloneReceiptSuccess(result);
+      }
+    }
+    return null;
+  }
+
   private async mutateWorker(
     input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput,
     action: () => WorkerSessionMutationResult
@@ -631,7 +944,8 @@ export class InMemoryWorkspaceLifecycleStore
       () => {
         const key = mutationKey(input.runId, input.mutationId);
         const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
-        if (this.mutations.has(key)) return this.workerFailure("mutation_conflict");
+        if (this.mutations.has(key) || this.receiptMutations.has(key))
+          return this.workerFailure("mutation_conflict");
         const prior = this.workerMutations.get(key);
         if (prior) {
           if (prior.fingerprint !== fingerprint) return this.workerFailure("mutation_conflict");
@@ -794,7 +1108,8 @@ export class InMemoryWorkspaceLifecycleStore
       () => {
         const key = mutationKey(input.runId, input.mutationId);
         const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
-        if (this.workerMutations.has(key)) return this.failure("mutation_conflict");
+        if (this.workerMutations.has(key) || this.receiptMutations.has(key))
+          return this.failure("mutation_conflict");
         const prior = this.mutations.get(key);
         if (prior) {
           if (prior.fingerprint !== fingerprint) return this.failure("mutation_conflict");
@@ -1274,4 +1589,66 @@ function boundWorkerRuntime(binding: LaunchEnvelopeBindingRecord): string | null
   } catch {
     return null;
   }
+}
+
+function validReceiptBinding(
+  receipt: import("../../schemas/agent-work.js").AgentTaskReceipt_v2,
+  input: SubmitAttemptReceiptInput,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord,
+  session: WorkerSessionRecord
+): boolean {
+  const started = parseInstant(receipt.worker_started_at, "worker_started_at");
+  const completed = parseInstant(receipt.worker_completed_at, "worker_completed_at");
+  return (
+    receipt.run_id === input.runId &&
+    receipt.attempt_id === input.attemptId &&
+    receipt.work_item_id === attempt.workItemId &&
+    receipt.work_item_revision === attempt.workItemRevision &&
+    receipt.packet_id === attempt.packetId &&
+    receipt.packet_hash === attempt.packetHash &&
+    receipt.workspace_lease_id === input.workspaceLeaseId &&
+    lease.attemptId === attempt.attemptId &&
+    receipt.workspace_lease_revision === session.workspaceLeaseRevision &&
+    receipt.worker_session_id === input.workerSessionId &&
+    session.runId === input.runId &&
+    session.attemptId === input.attemptId &&
+    session.packetId === attempt.packetId &&
+    session.packetHash === attempt.packetHash &&
+    session.workspaceLeaseId === input.workspaceLeaseId &&
+    receipt.worker_runtime === session.workerRuntime &&
+    receipt.observed_base_sha === attempt.baseSha.toLowerCase() &&
+    started >= parseInstant(session.startedAt, "session.startedAt") &&
+    Boolean(session.endedAt) &&
+    completed <= parseInstant(session.endedAt!, "session.endedAt") &&
+    parseInstant(receipt.submitted_at, "submitted_at") <= parseInstant(input.now, "now")
+  );
+}
+
+function isTerminalAttempt(status: AttemptRecord["status"]): boolean {
+  return [
+    "accepted",
+    "rejected",
+    "inconclusive",
+    "blocked",
+    "launch_failed",
+    "failed",
+    "cancelled",
+    "quarantined",
+  ].includes(status);
+}
+
+function requiresDurableReceipt(status: AttemptRecord["status"]): boolean {
+  return ["verifying", "verified", "accepted", "rejected", "inconclusive"].includes(status);
+}
+
+function cloneReceiptSuccess(
+  result: Extract<AttemptReceiptSubmissionResult, { submitted: true }>
+): Extract<AttemptReceiptSubmissionResult, { submitted: true }> {
+  return {
+    ...result,
+    receipt: { ...result.receipt },
+    attempt: { ...result.attempt },
+    event: { ...result.event },
+  };
 }

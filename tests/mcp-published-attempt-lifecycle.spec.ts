@@ -27,7 +27,11 @@ describe("published MCP Attempt lifecycle", () => {
     const workerHeartbeat = tools.find((tool) => tool.name === "heartbeat_attempt_worker");
     const workerEnd = tools.find((tool) => tool.name === "end_attempt_worker");
     const workerStatus = tools.find((tool) => tool.name === "get_attempt_worker");
+    const receiptSubmit = tools.find((tool) => tool.name === "submit_attempt_receipt");
+    const receiptStatus = tools.find((tool) => tool.name === "get_attempt_receipt");
 
+    expect(receiptSubmit?.inputSchema.required).toEqual(["databasePath", "submission"]);
+    expect(receiptStatus?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
     expect(workerAttach?.inputSchema.required).toEqual(["runtime", "attach"]);
     expect(workerHeartbeat?.inputSchema.required).toEqual(["databasePath", "heartbeat"]);
     expect(workerEnd?.inputSchema.required).toEqual(["databasePath", "end"]);
@@ -56,6 +60,22 @@ describe("published MCP Attempt lifecycle", () => {
     expect(start?.inputSchema.properties).toHaveProperty("runtime");
     expect(start?.inputSchema.properties).toHaveProperty("attempt");
     expect(status?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
+  });
+
+  it("keeps receipt submission behind the mutation gate", async () => {
+    const [response] = await invoke({
+      id: 11,
+      method: "tools/call",
+      params: { name: "submit_attempt_receipt", arguments: {} },
+    });
+
+    expect(JSON.parse(response.result.content[0].text)).toEqual({
+      error: {
+        code: "mutations_disabled",
+        message: "Mutations not allowed. Set ALLOW_MUTATIONS=true to submit an Attempt receipt.",
+      },
+      ok: false,
+    });
   });
 
   it("keeps worker mutations behind the published mutation gate", async () => {
@@ -122,6 +142,26 @@ describe("published MCP Attempt lifecycle", () => {
       method: "tools/call",
       params: {
         name: "get_attempt_status",
+        arguments: { databasePath, runId: "run-missing", attemptId: "attempt-missing" },
+      },
+    });
+
+    expect(JSON.parse(response.result.content[0].text)).toMatchObject({
+      error: { code: "invalid_input", issues: [{ path: "databasePath" }] },
+      ok: false,
+    });
+    await expect(access(databasePath)).rejects.toThrow();
+  });
+
+  it("does not create SQLite state while reading missing receipt status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "lexrunner-mcp-receipt-"));
+    roots.push(root);
+    const databasePath = join(root, "missing.db");
+    const [response] = await invoke({
+      id: 12,
+      method: "tools/call",
+      params: {
+        name: "get_attempt_receipt",
         arguments: { databasePath, runId: "run-missing", attemptId: "attempt-missing" },
       },
     });
