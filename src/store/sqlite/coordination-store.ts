@@ -99,7 +99,8 @@ interface CoordinationEventRow {
 
 /** SQLite implementation with transactionally serialized lease and CAS operations. */
 export class SqliteCoordinationStore implements CoordinationStore {
-  private readonly db: DatabaseType;
+  /** Shared connection for additive stores whose mutations must share this transaction boundary. */
+  protected readonly db: DatabaseType;
   private closed = false;
 
   constructor(dbPath: string) {
@@ -371,7 +372,7 @@ export class SqliteCoordinationStore implements CoordinationStore {
     }
   }
 
-  private immediateTransaction<T>(fn: () => T): T {
+  protected immediateTransaction<T>(fn: () => T): T {
     return this.db.transaction(fn).immediate();
   }
 
