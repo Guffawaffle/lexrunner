@@ -160,6 +160,73 @@ describe("SQLite workspace lifecycle concurrency", () => {
           workerRuntime: "native",
         }
       );
+      const winning = results.find((result) => result.updated);
+      if (!winning?.updated) throw new Error("expected a winning worker session");
+      await first.endWorkerSession({
+        runId: "worker-race-run",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "end-worker-race",
+        now: "2026-07-11T12:00:04.000Z",
+        attemptId: "worker-race-attempt",
+        workspaceLeaseId: "worker-race-lease",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: winning.workerSession.sessionId,
+        expectedSessionRevision: 0,
+        status: "completed",
+      });
+      const submit = (store: SqliteWorkspaceLifecycleStore, suffix: string) =>
+        store.submitAttemptReceipt({
+          runId: "worker-race-run",
+          expectedRunRevision: 0,
+          controller,
+          mutationId: `submit-race-${suffix}`,
+          now: "2026-07-11T12:00:05.000Z",
+          attemptId: "worker-race-attempt",
+          expectedAttemptRevision: 3,
+          workspaceLeaseId: "worker-race-lease",
+          expectedWorkspaceLeaseRevision: 0,
+          workerSessionId: winning.workerSession.sessionId,
+          expectedWorkerSessionRevision: 1,
+          receipt: {
+            schema_version: "2.0.0",
+            receipt_id: `race-receipt-${suffix}`,
+            run_id: "worker-race-run",
+            work_item_id: "worker-race-work",
+            work_item_revision: 1,
+            attempt_id: "worker-race-attempt",
+            packet_id: "worker-race-packet",
+            packet_hash: `sha256:${"b".repeat(64)}`,
+            workspace_lease_id: "worker-race-lease",
+            workspace_lease_revision: 0,
+            worker_runtime: "native",
+            worker_session_id: winning.workerSession.sessionId,
+            observed_base_sha: "a".repeat(40),
+            patch_hash: `sha256:${suffix === "a" ? "c".repeat(64) : "d".repeat(64)}`,
+            outcome: "completed",
+            exit_reason: "completed",
+            summary: `Competing receipt ${suffix}`,
+            files_touched: ["src/result.ts"],
+            commits: [],
+            acceptance_criteria_addressed: [],
+            claimed_checks: [],
+            assumptions: [],
+            blockers: [],
+            human_action_request_ids: [],
+            cost: {},
+            worker_started_at: "2026-07-11T12:00:02.500Z",
+            worker_completed_at: "2026-07-11T12:00:04.000Z",
+            submitted_at: "2026-07-11T12:00:04.500Z",
+          },
+        });
+      const receiptResults = await Promise.all([submit(first, "a"), submit(second, "b")]);
+      expect(receiptResults.filter((result) => result.submitted)).toHaveLength(1);
+      expect(receiptResults.find((result) => !result.submitted)).toMatchObject({
+        submitted: false,
+        reason: "stale_attempt_revision",
+      });
+      await expect(second.listAttemptReceiptEvents("worker-race-run")).resolves.toHaveLength(1);
     } finally {
       await first.close();
       await second.close();
@@ -188,6 +255,32 @@ describe("SQLite workspace lifecycle concurrency", () => {
       await expect(legacy.getWorkerSessionForAttempt("missing")).resolves.toBeNull();
       await expect(legacy.listWorkerSessionEvents("missing")).resolves.toEqual([]);
       await expect(legacy.getLaunchEnvelopeBinding("missing")).resolves.toBeNull();
+    } finally {
+      await legacy.close();
+    }
+  });
+
+  it("reads pre-receipt-schema databases as an empty receipt lifecycle", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lexrunner-receipt-legacy-read-"));
+    directories.push(directory);
+    const path = join(directory, "store.db");
+    const writable = new SqliteWorkspaceLifecycleStore(path);
+    await writable.close();
+    const database = new Database(path);
+    database.exec(`
+      DROP TABLE attempt_receipt_mutations;
+      DROP TABLE attempt_receipt_events;
+      DROP TABLE attempt_receipts;
+      DELETE FROM coordination_schema_migrations WHERE version = 4;
+    `);
+    database.close();
+
+    const legacy = new SqliteWorkspaceLifecycleStore(path, { readOnly: true });
+    try {
+      await expect(legacy.getAttemptReceipt("missing")).resolves.toBeNull();
+      await expect(legacy.getAttemptReceiptForAttempt("missing")).resolves.toBeNull();
+      await expect(legacy.getAttemptReceiptByHash(`sha256:${"0".repeat(64)}`)).resolves.toBeNull();
+      await expect(legacy.listAttemptReceiptEvents("missing")).resolves.toEqual([]);
     } finally {
       await legacy.close();
     }

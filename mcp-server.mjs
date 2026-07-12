@@ -46,9 +46,23 @@ try {
 
 const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
 const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
+const attemptReceiptHandlers = core.createAttemptReceiptHandlers();
 
 // MCP Tool implementations
 const tools = {
+  submit_attempt_receipt: {
+    description: "Persist one bounded AgentTaskReceipt v2 claim for an Attempt",
+    inputSchema: core.AttemptReceiptSubmitRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("submit an Attempt receipt", () => attemptReceiptHandlers.submit(args)),
+  },
+
+  get_attempt_receipt: {
+    description: "Get bounded, read-only status for one persisted Attempt receipt",
+    inputSchema: core.AttemptReceiptStatusRequestJsonSchema,
+    call: async (args) => canonicalToolResult(await attemptReceiptHandlers.status(args)),
+  },
+
   attach_attempt_worker: {
     description: "Attach a native worker session to an authorized Attempt",
     inputSchema: core.AttemptWorkerAttachRequestJsonSchema,

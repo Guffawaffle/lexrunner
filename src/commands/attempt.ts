@@ -13,6 +13,10 @@ import {
   createAttemptWorkerHandlers,
   type AttemptWorkerHandlers,
 } from "../runs/agent-work-worker-adapters.js";
+import {
+  createAttemptReceiptHandlers,
+  type AttemptReceiptHandlers,
+} from "../runs/agent-work-attempt-receipt-adapters.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
@@ -20,6 +24,7 @@ export interface AttemptCommandDependencies {
   handlers?: AttemptLifecycleHandlers;
   preparationHandler?: AttemptPreparationHandler;
   workerHandlers?: AttemptWorkerHandlers;
+  receiptHandlers?: AttemptReceiptHandlers;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -34,6 +39,7 @@ export function registerAttemptCommand(
   const handlers = dependencies.handlers ?? defaults;
   const preparationHandler = dependencies.preparationHandler ?? defaults;
   const workerHandlers = dependencies.workerHandlers ?? createAttemptWorkerHandlers();
+  const receiptHandlers = dependencies.receiptHandlers ?? createAttemptReceiptHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
 
   const worker = attempt.command("worker").description("Manage attached native worker sessions");
@@ -74,6 +80,39 @@ export function registerAttemptCommand(
       }) => {
         requireJsonMode(options.json, dependencies.jsonModeActive());
         const output = await workerHandlers.status({
+          databasePath: options.databasePath,
+          runId: options.runId,
+          attemptId: options.attemptId,
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+
+  const receipt = attempt.command("receipt").description("Manage immutable worker receipt claims");
+  registerReceiptInputCommand(
+    receipt,
+    "submit",
+    "Persist one AgentTaskReceipt v2 claim",
+    (input) => receiptHandlers.submit(input),
+    dependencies
+  );
+  receipt
+    .command("status")
+    .description("Read bounded status for one persisted receipt claim")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .requiredOption("--attempt-id <id>", "Attempt identifier")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        runId: string;
+        attemptId: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await receiptHandlers.status({
           databasePath: options.databasePath,
           runId: options.runId,
           attemptId: options.attemptId,
@@ -165,6 +204,30 @@ function registerWorkerInputCommand(
     });
 }
 
+function registerReceiptInputCommand(
+  receipt: Command,
+  name: string,
+  description: string,
+  dispatch: (input: unknown) => Promise<unknown>,
+  dependencies: AttemptCommandDependencies
+): void {
+  receipt
+    .command(name)
+    .description(description)
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES
+      );
+      const output = await dispatch(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
+}
+
 async function readJsonInput(inputPath: string, maxBytes: number): Promise<unknown> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
     throw new TypeError("maxInputBytes must be a positive safe integer");
@@ -227,6 +290,9 @@ function setFailureExitCode(output: unknown): void {
     return;
   }
   if (output.ok === true && isRecord(output.result) && output.result.updated === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.submitted === false) {
     process.exitCode = 1;
   }
 }

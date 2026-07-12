@@ -120,6 +120,19 @@ export type {
   AttachAttemptWorkerInput,
   WorkerSessionStatusResult,
 } from "./agent-work-worker-session-service.js";
+export {
+  AttemptReceiptStatusRequestJsonSchema,
+  AttemptReceiptStatusRequestSchema,
+  AttemptReceiptSubmitRequestJsonSchema,
+  AttemptReceiptSubmitRequestSchema,
+  createAttemptReceiptHandlers,
+} from "./agent-work-attempt-receipt-adapters.js";
+export type { AttemptReceiptHandlers } from "./agent-work-attempt-receipt-adapters.js";
+export { AgentWorkAttemptReceiptService } from "./agent-work-attempt-receipt-service.js";
+export type {
+  AttemptReceiptStatusProjection,
+  AttemptReceiptStatusResult,
+} from "./agent-work-attempt-receipt-service.js";
 export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
 export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {

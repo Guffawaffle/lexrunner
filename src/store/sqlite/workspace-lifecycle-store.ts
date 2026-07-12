@@ -2,12 +2,18 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
+import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type { JsonValue } from "../coordination-store.js";
 import type {
   AcquireWorkspaceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
+  AttemptReceiptEvent,
+  AttemptReceiptEventType,
+  AttemptReceiptFailureReason,
+  AttemptReceiptRecord,
+  AttemptReceiptSubmissionResult,
   BindLaunchEnvelopeInput,
   CreateAttemptInput,
   EndWorkerSessionInput,
@@ -19,6 +25,7 @@ import type {
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
   ReleaseWorkspaceInput,
+  SubmitAttemptReceiptInput,
   TransitionAttemptInput,
   WorkspaceIdentity,
   WorkspaceLifecycleLeaseRecord,
@@ -143,6 +150,34 @@ CREATE TABLE IF NOT EXISTS worker_session_mutations (
  REFERENCES worker_session_events(runId,mutationId) ON DELETE CASCADE);
 INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(3,'worker-session-lifecycle',datetime('now'));
+CREATE TABLE IF NOT EXISTS attempt_receipts (
+ receiptId TEXT PRIMARY KEY, receiptHash TEXT NOT NULL UNIQUE, receiptJson TEXT NOT NULL,
+ runId TEXT NOT NULL, workItemId TEXT NOT NULL, workItemRevision INTEGER NOT NULL,
+ attemptId TEXT NOT NULL UNIQUE, packetId TEXT NOT NULL, packetHash TEXT NOT NULL,
+ workspaceLeaseId TEXT NOT NULL, workspaceLeaseRevision INTEGER NOT NULL,
+ workerSessionId TEXT NOT NULL, workerSessionRevision INTEGER NOT NULL, workerRuntime TEXT NOT NULL,
+ observedBaseSha TEXT NOT NULL, finalHeadSha TEXT, patchHash TEXT, outcome TEXT NOT NULL,
+ disposition TEXT NOT NULL, submittedAt TEXT NOT NULL, recordedAt TEXT NOT NULL,
+ controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL,
+ resultingAttemptRevision INTEGER NOT NULL, resultingAttemptStatus TEXT NOT NULL,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
+ FOREIGN KEY(workerSessionId) REFERENCES worker_sessions(sessionId) ON DELETE RESTRICT);
+CREATE TABLE IF NOT EXISTS attempt_receipt_events (
+ runId TEXT NOT NULL, attemptId TEXT NOT NULL, receiptId TEXT NOT NULL, receiptHash TEXT NOT NULL,
+ mutationId TEXT NOT NULL, sequence INTEGER NOT NULL, attemptRevision INTEGER NOT NULL,
+ workspaceLeaseRevision INTEGER NOT NULL, workerSessionRevision INTEGER NOT NULL,
+ controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL,
+ type TEXT NOT NULL, disposition TEXT NOT NULL, outcome TEXT NOT NULL, createdAt TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
+ FOREIGN KEY(receiptId) REFERENCES attempt_receipts(receiptId) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS attempt_receipt_mutations (
+ runId TEXT NOT NULL, mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL, resultJson TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), FOREIGN KEY(runId,mutationId)
+ REFERENCES attempt_receipt_events(runId,mutationId) ON DELETE CASCADE);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+ VALUES(4,'attempt-receipt-persistence',datetime('now'));
 `;
 
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId"> {
@@ -207,6 +242,13 @@ interface WorkerSessionRow extends Omit<
 interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload"> {
   payloadJson: string;
 }
+
+interface AttemptReceiptRow extends Omit<AttemptReceiptRecord, "finalHeadSha" | "patchHash"> {
+  finalHeadSha: string | null;
+  patchHash: string | null;
+}
+
+interface AttemptReceiptEventRow extends AttemptReceiptEvent {}
 
 const LIVE_ATTEMPTS = new Set<AttemptRecord["status"]>([
   "prepared",
@@ -306,6 +348,32 @@ export class SqliteWorkspaceLifecycleStore
       if (failure) return failure;
       if (!TRANSITIONS[attempt!.status].includes(input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
+      }
+      if (input.status === "receipt_submitted") {
+        return this.failure("evidence_mismatch", attempt!);
+      }
+      if (input.receiptId !== undefined) {
+        const durableReceipt = this.getReceiptForAttempt(attempt!.attemptId);
+        if (
+          !durableReceipt ||
+          durableReceipt.receiptId !== input.receiptId ||
+          attempt!.receiptId !== input.receiptId ||
+          durableReceipt.attemptId !== attempt!.attemptId ||
+          durableReceipt.disposition !== "verification_pending"
+        ) {
+          return this.failure("evidence_mismatch", attempt!);
+        }
+      }
+      if (requiresDurableReceipt(input.status)) {
+        const receipt = this.getReceiptForAttempt(attempt!.attemptId);
+        if (
+          !receipt ||
+          receipt.receiptId !== attempt!.receiptId ||
+          receipt.attemptId !== attempt!.attemptId ||
+          receipt.disposition !== "verification_pending"
+        ) {
+          return this.failure("evidence_mismatch", attempt!);
+        }
       }
       if (parseInstant(input.now, "now") < parseInstant(attempt!.updatedAt, "updatedAt")) {
         return this.failure("invalid_time", attempt!);
@@ -870,6 +938,365 @@ export class SqliteWorkspaceLifecycleStore
     return rows.map(toWorkerEvent);
   }
 
+  async submitAttemptReceipt(
+    input: SubmitAttemptReceiptInput
+  ): Promise<AttemptReceiptSubmissionResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return this.receiptFailure("invalid_time");
+    if (input.controller.runId !== input.runId) return this.receiptFailure("lease_mismatch");
+    const parsed = AgentTaskReceipt_v2.safeParse(input.receipt);
+    if (!parsed.success) return this.receiptFailure("evidence_mismatch");
+    const receiptJson = canonicalJSONStringify(parsed.data);
+    const receiptHash = computeCanonicalHash(parsed.data);
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return this.receiptFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return this.receiptFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return this.receiptFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return this.receiptFailure(
+          "stale_run_revision",
+          undefined,
+          undefined,
+          undefined,
+          coordination.revision
+        );
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.receiptFailure("lease_expired");
+      }
+      const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
+      if (
+        this.db
+          .prepare(
+            `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?`
+          )
+          .get(input.runId, input.mutationId, input.runId, input.mutationId)
+      ) {
+        return this.receiptFailure("mutation_conflict");
+      }
+      const prior = this.db
+        .prepare(
+          `SELECT fingerprint, resultJson FROM attempt_receipt_mutations
+           WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId) as
+        | { fingerprint: string; resultJson: string }
+        | undefined;
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) return this.receiptFailure("mutation_conflict");
+        return {
+          ...(JSON.parse(prior.resultJson) as Extract<
+            AttemptReceiptSubmissionResult,
+            { submitted: true }
+          >),
+          idempotentReplay: true,
+        };
+      }
+      const hashReceipt = this.attemptReceiptByHash(receiptHash);
+      if (hashReceipt) {
+        if (
+          hashReceipt.receiptJson !== receiptJson ||
+          hashReceipt.runId !== input.runId ||
+          hashReceipt.attemptId !== input.attemptId ||
+          hashReceipt.workspaceLeaseId !== input.workspaceLeaseId ||
+          hashReceipt.workerSessionId !== input.workerSessionId
+        ) {
+          return this.receiptFailure("receipt_conflict");
+        }
+        const attempt = this.requireAttempt(hashReceipt.attemptId);
+        const lease = this.requireLease(hashReceipt.workspaceLeaseId);
+        const session = this.requireWorkerSession(hashReceipt.workerSessionId);
+        const committed = this.committedReceiptResult(hashReceipt);
+        if (!committed) {
+          throw new Error(
+            `Attempt receipt '${hashReceipt.receiptId}' is missing its committed submission result`
+          );
+        }
+        const replay = this.recordReceiptEvent(
+          input,
+          attempt,
+          lease,
+          session,
+          hashReceipt,
+          "attempt_receipt_replayed"
+        );
+        const result = {
+          submitted: true as const,
+          receipt: committed.receipt,
+          attempt: committed.attempt,
+          event: replay.event,
+          idempotentReplay: true,
+        };
+        this.storeReceiptMutation(input, fingerprint, result);
+        return result;
+      }
+      const result = this.submitNewReceipt(input, parsed.data, receiptJson, receiptHash);
+      if (result.submitted) this.storeReceiptMutation(input, fingerprint, result);
+      return result;
+    });
+  }
+
+  async getAttemptReceipt(receiptId: string): Promise<AttemptReceiptRecord | null> {
+    return this.hasTable("attempt_receipts") ? this.attemptReceipt(receiptId) : null;
+  }
+
+  async getAttemptReceiptForAttempt(attemptId: string): Promise<AttemptReceiptRecord | null> {
+    if (!this.hasTable("attempt_receipts")) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_receipts WHERE attemptId = ?`)
+      .get(attemptId) as AttemptReceiptRow | undefined;
+    return row ? toAttemptReceipt(row) : null;
+  }
+
+  async getAttemptReceiptByHash(receiptHash: string): Promise<AttemptReceiptRecord | null> {
+    return this.hasTable("attempt_receipts") ? this.attemptReceiptByHash(receiptHash) : null;
+  }
+
+  async listAttemptReceiptEvents(runId: string): Promise<AttemptReceiptEvent[]> {
+    if (!this.hasTable("attempt_receipt_events")) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM attempt_receipt_events WHERE runId = ? ORDER BY sequence`)
+      .all(runId) as AttemptReceiptEventRow[];
+    return rows.map(toAttemptReceiptEvent);
+  }
+
+  private submitNewReceipt(
+    input: SubmitAttemptReceiptInput,
+    claim: import("../../schemas/agent-work.js").AgentTaskReceipt_v2,
+    receiptJson: string,
+    receiptHash: string
+  ): AttemptReceiptSubmissionResult {
+    const attempt = this.attempt(input.attemptId);
+    const lease = this.lease(input.workspaceLeaseId);
+    const session = this.workerSession(input.workerSessionId);
+    if (!attempt || attempt.runId !== input.runId || !lease || !session) {
+      return this.receiptFailure(
+        "not_found",
+        attempt ?? undefined,
+        lease ?? undefined,
+        session ?? undefined
+      );
+    }
+    if (attempt.revision !== input.expectedAttemptRevision) {
+      return this.receiptFailure("stale_attempt_revision", attempt, lease, session);
+    }
+    if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+      return this.receiptFailure("stale_workspace_revision", attempt, lease, session);
+    }
+    if (session.revision !== input.expectedWorkerSessionRevision) {
+      return this.receiptFailure("stale_session_revision", attempt, lease, session);
+    }
+    if (this.attemptReceipt(claim.receipt_id) || this.getReceiptForAttempt(input.attemptId)) {
+      return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    if (!validReceiptBinding(claim, input, attempt, lease, session)) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
+    }
+    if (
+      !["completed", "failed", "cancelled", "lost"].includes(session.status) ||
+      !session.endedAt
+    ) {
+      return this.receiptFailure("worker_session_not_active", attempt, lease, session);
+    }
+    const active =
+      attempt.status === "running" &&
+      session.status === "completed" &&
+      lease.status === "active" &&
+      lease.controllerId === input.controller.controllerId &&
+      lease.controllerLeaseId === input.controller.leaseId &&
+      lease.fencingToken === input.controller.fencingToken &&
+      parseInstant(lease.expiresAt, "expiresAt") > parseInstant(input.now, "now");
+    if (!active && attempt.status !== "running" && !isTerminalAttempt(attempt.status)) {
+      return this.receiptFailure("invalid_attempt_transition", attempt, lease, session);
+    }
+    const disposition = active ? "verification_pending" : "retained_late";
+    if (active) {
+      const status: AttemptRecord["status"] =
+        claim.outcome === "completed" ? "receipt_submitted" : claim.outcome;
+      this.db
+        .prepare(
+          `UPDATE attempts SET revision = revision + 1, status = ?, receiptId = ?, updatedAt = ?,
+           completedAt = ? WHERE attemptId = ?`
+        )
+        .run(
+          status,
+          claim.receipt_id,
+          instant(input.now),
+          status === "receipt_submitted" ? null : instant(input.now),
+          input.attemptId
+        );
+    }
+    const updatedAttempt = this.requireAttempt(input.attemptId);
+    this.db
+      .prepare(
+        `INSERT INTO attempt_receipts (receiptId, receiptHash, receiptJson, runId, workItemId,
+         workItemRevision, attemptId, packetId, packetHash, workspaceLeaseId,
+         workspaceLeaseRevision, workerSessionId, workerSessionRevision, workerRuntime,
+         observedBaseSha, finalHeadSha, patchHash, outcome, disposition, submittedAt, recordedAt,
+         controllerId, controllerLeaseId, fencingToken, resultingAttemptRevision,
+         resultingAttemptStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        claim.receipt_id,
+        receiptHash,
+        receiptJson,
+        input.runId,
+        claim.work_item_id,
+        claim.work_item_revision,
+        input.attemptId,
+        claim.packet_id,
+        claim.packet_hash,
+        input.workspaceLeaseId,
+        claim.workspace_lease_revision,
+        input.workerSessionId,
+        session.revision,
+        claim.worker_runtime,
+        claim.observed_base_sha,
+        claim.final_head_sha ?? null,
+        claim.patch_hash ?? null,
+        claim.outcome,
+        disposition,
+        instant(claim.submitted_at),
+        instant(input.now),
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        updatedAttempt.revision,
+        updatedAttempt.status
+      );
+    const record = this.requireAttemptReceipt(claim.receipt_id);
+    return this.recordReceiptEvent(
+      input,
+      updatedAttempt,
+      lease,
+      session,
+      record,
+      active ? "attempt_receipt_submitted" : "attempt_receipt_retained_late"
+    );
+  }
+
+  private recordReceiptEvent(
+    input: SubmitAttemptReceiptInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord,
+    session: WorkerSessionRecord,
+    receipt: AttemptReceiptRecord,
+    type: AttemptReceiptEventType
+  ): Extract<AttemptReceiptSubmissionResult, { submitted: true }> {
+    const sequence = (
+      this.db
+        .prepare(
+          `SELECT COALESCE(MAX(sequence), 0) + 1 AS value FROM attempt_receipt_events WHERE runId = ?`
+        )
+        .get(input.runId) as { value: number }
+    ).value;
+    this.db
+      .prepare(
+        `INSERT INTO attempt_receipt_events (runId, attemptId, receiptId, receiptHash, mutationId,
+         sequence, attemptRevision, workspaceLeaseRevision, workerSessionRevision, controllerId,
+         controllerLeaseId, fencingToken, type, disposition, outcome, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.runId,
+        attempt.attemptId,
+        receipt.receiptId,
+        receipt.receiptHash,
+        input.mutationId,
+        sequence,
+        attempt.revision,
+        lease.revision,
+        session.revision,
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        type,
+        receipt.disposition,
+        receipt.outcome,
+        instant(input.now)
+      );
+    const event = this.db
+      .prepare(`SELECT * FROM attempt_receipt_events WHERE runId = ? AND mutationId = ?`)
+      .get(input.runId, input.mutationId) as AttemptReceiptEventRow;
+    return {
+      submitted: true,
+      receipt,
+      attempt,
+      event,
+      idempotentReplay: false,
+    };
+  }
+
+  private storeReceiptMutation(
+    input: SubmitAttemptReceiptInput,
+    fingerprint: string,
+    result: Extract<AttemptReceiptSubmissionResult, { submitted: true }>
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO attempt_receipt_mutations (runId, mutationId, fingerprint, resultJson)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(input.runId, input.mutationId, fingerprint, json(result));
+  }
+
+  private receiptFailure(
+    reason: AttemptReceiptFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): AttemptReceiptSubmissionResult {
+    return {
+      submitted: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
+  private committedReceiptResult(
+    receipt: AttemptReceiptRecord
+  ): Extract<AttemptReceiptSubmissionResult, { submitted: true }> | null {
+    const row = this.db
+      .prepare(
+        `SELECT mutation.resultJson FROM attempt_receipt_mutations AS mutation
+         JOIN attempt_receipt_events AS event
+           ON event.runId = mutation.runId AND event.mutationId = mutation.mutationId
+         WHERE event.runId = ? AND event.receiptId = ?
+           AND event.type IN ('attempt_receipt_submitted', 'attempt_receipt_retained_late')
+         LIMIT 1`
+      )
+      .get(receipt.runId, receipt.receiptId) as { resultJson: string } | undefined;
+    return row
+      ? (JSON.parse(row.resultJson) as Extract<AttemptReceiptSubmissionResult, { submitted: true }>)
+      : null;
+  }
+
   private mutateWorker(
     input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput,
     action: () => WorkerSessionMutationResult
@@ -916,8 +1343,11 @@ export class SqliteWorkspaceLifecycleStore
 
       const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
       const workspaceClaim = this.db
-        .prepare(`SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?`)
-        .get(input.runId, input.mutationId);
+        .prepare(
+          `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId, input.runId, input.mutationId);
       if (workspaceClaim) return this.workerFailure("mutation_conflict");
       const prior = this.db
         .prepare(
@@ -1122,8 +1552,11 @@ export class SqliteWorkspaceLifecycleStore
 
       const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
       const workerClaim = this.db
-        .prepare(`SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?`)
-        .get(input.runId, input.mutationId);
+        .prepare(
+          `SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId, input.runId, input.mutationId);
       if (workerClaim) return this.failure("mutation_conflict");
       const prior = this.db
         .prepare(
@@ -1381,6 +1814,33 @@ export class SqliteWorkspaceLifecycleStore
     );
   }
 
+  private attemptReceipt(receiptId: string): AttemptReceiptRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_receipts WHERE receiptId = ?`)
+      .get(receiptId) as AttemptReceiptRow | undefined;
+    return row ? toAttemptReceipt(row) : null;
+  }
+
+  private requireAttemptReceipt(receiptId: string): AttemptReceiptRecord {
+    const receipt = this.attemptReceipt(receiptId);
+    if (!receipt) throw new Error(`Attempt receipt '${receiptId}' disappeared`);
+    return receipt;
+  }
+
+  private attemptReceiptByHash(receiptHash: string): AttemptReceiptRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_receipts WHERE receiptHash = ?`)
+      .get(receiptHash) as AttemptReceiptRow | undefined;
+    return row ? toAttemptReceipt(row) : null;
+  }
+
+  private getReceiptForAttempt(attemptId: string): AttemptReceiptRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_receipts WHERE attemptId = ?`)
+      .get(attemptId) as AttemptReceiptRow | undefined;
+    return row ? toAttemptReceipt(row) : null;
+  }
+
   private requireLaunchEnvelopeBinding(attemptId: string): LaunchEnvelopeBindingRecord {
     const binding = this.launchEnvelopeBinding(attemptId);
     if (!binding) throw new Error(`Launch envelope binding for Attempt '${attemptId}' disappeared`);
@@ -1442,7 +1902,10 @@ export class SqliteWorkspaceLifecycleStore
       const workerPath = fileURLToPath(
         new URL("./migrations/003-worker-session-lifecycle.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}`;
+      const receiptPath = fileURLToPath(
+        new URL("./migrations/004-attempt-receipt-persistence.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -1585,6 +2048,58 @@ function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
     fencingToken: row.fencingToken,
     type: row.type,
     payload: JSON.parse(row.payloadJson) as JsonValue,
+    createdAt: row.createdAt,
+  };
+}
+
+function toAttemptReceipt(row: AttemptReceiptRow): AttemptReceiptRecord {
+  return {
+    receiptId: row.receiptId,
+    receiptHash: row.receiptHash,
+    receiptJson: row.receiptJson,
+    runId: row.runId,
+    workItemId: row.workItemId,
+    workItemRevision: row.workItemRevision,
+    attemptId: row.attemptId,
+    packetId: row.packetId,
+    packetHash: row.packetHash,
+    workspaceLeaseId: row.workspaceLeaseId,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    workerSessionId: row.workerSessionId,
+    workerSessionRevision: row.workerSessionRevision,
+    workerRuntime: row.workerRuntime,
+    observedBaseSha: row.observedBaseSha,
+    ...(row.finalHeadSha ? { finalHeadSha: row.finalHeadSha } : {}),
+    ...(row.patchHash ? { patchHash: row.patchHash } : {}),
+    outcome: row.outcome,
+    disposition: row.disposition,
+    submittedAt: row.submittedAt,
+    recordedAt: row.recordedAt,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    resultingAttemptRevision: row.resultingAttemptRevision,
+    resultingAttemptStatus: row.resultingAttemptStatus,
+  };
+}
+
+function toAttemptReceiptEvent(row: AttemptReceiptEventRow): AttemptReceiptEvent {
+  return {
+    runId: row.runId,
+    attemptId: row.attemptId,
+    receiptId: row.receiptId,
+    receiptHash: row.receiptHash,
+    mutationId: row.mutationId,
+    sequence: row.sequence,
+    attemptRevision: row.attemptRevision,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    workerSessionRevision: row.workerSessionRevision,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    type: row.type,
+    disposition: row.disposition,
+    outcome: row.outcome,
     createdAt: row.createdAt,
   };
 }
@@ -1741,4 +2256,55 @@ function boundWorkerRuntime(binding: LaunchEnvelopeBindingRecord): string | null
   } catch {
     return null;
   }
+}
+
+function validReceiptBinding(
+  receipt: import("../../schemas/agent-work.js").AgentTaskReceipt_v2,
+  input: SubmitAttemptReceiptInput,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord,
+  session: WorkerSessionRecord
+): boolean {
+  const started = parseInstant(receipt.worker_started_at, "worker_started_at");
+  const completed = parseInstant(receipt.worker_completed_at, "worker_completed_at");
+  return (
+    receipt.run_id === input.runId &&
+    receipt.attempt_id === input.attemptId &&
+    receipt.work_item_id === attempt.workItemId &&
+    receipt.work_item_revision === attempt.workItemRevision &&
+    receipt.packet_id === attempt.packetId &&
+    receipt.packet_hash === attempt.packetHash &&
+    receipt.workspace_lease_id === input.workspaceLeaseId &&
+    lease.attemptId === attempt.attemptId &&
+    receipt.workspace_lease_revision === session.workspaceLeaseRevision &&
+    receipt.worker_session_id === input.workerSessionId &&
+    session.runId === input.runId &&
+    session.attemptId === input.attemptId &&
+    session.packetId === attempt.packetId &&
+    session.packetHash === attempt.packetHash &&
+    session.workspaceLeaseId === input.workspaceLeaseId &&
+    receipt.worker_runtime === session.workerRuntime &&
+    receipt.observed_base_sha === attempt.baseSha.toLowerCase() &&
+    started >= parseInstant(session.startedAt, "session.startedAt") &&
+    Boolean(session.endedAt) &&
+    completed <= parseInstant(session.endedAt!, "session.endedAt") &&
+    parseInstant(receipt.submitted_at, "submitted_at") <= parseInstant(input.now, "now")
+  );
+}
+
+function isTerminalAttempt(status: AttemptRecord["status"]): boolean {
+  return [
+    "accepted",
+    "rejected",
+    "inconclusive",
+    "blocked",
+    "launch_failed",
+    "failed",
+    "cancelled",
+    "quarantined",
+  ].includes(status);
+}
+
+function requiresDurableReceipt(status: AttemptRecord["status"]): boolean {
+  return ["verifying", "verified", "accepted", "rejected", "inconclusive"].includes(status);
 }

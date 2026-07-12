@@ -8,13 +8,18 @@ import type {
 import type {
   WorkspaceLifecycleStore,
   LaunchEnvelopeBindingStore,
+  AttemptReceiptStore,
   WorkspaceObservation,
   WorkerSessionStore,
 } from "../../src/store/workspace-lifecycle-store.js";
 import { toAttemptContract } from "../../src/store/workspace-lifecycle-store.js";
 
 export interface WorkspaceLifecycleHarness
-  extends WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore {
+  extends
+    WorkspaceLifecycleStore,
+    LaunchEnvelopeBindingStore,
+    WorkerSessionStore,
+    AttemptReceiptStore {
   acquireControllerLease(input: {
     runId: string;
     controllerId: string;
@@ -213,6 +218,86 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         workerId: "native-session-123",
         model: "gpt-5",
         startedAt: "2026-07-11T12:00:02.500Z",
+        ...overrides,
+      };
+    }
+
+    async function endedWorker(
+      status: "completed" | "failed" | "cancelled" | "lost" = "completed"
+    ) {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      return store.endWorkerSession({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: `end-for-receipt-${status}`,
+        now: "2026-07-11T12:00:04.000Z",
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+        expectedSessionRevision: 0,
+        status,
+        exitReason: status,
+      });
+    }
+
+    function receiptClaim(
+      outcome: "completed" | "blocked" | "failed" | "cancelled" = "completed",
+      overrides: Record<string, unknown> = {}
+    ) {
+      return {
+        schema_version: "2.0.0" as const,
+        receipt_id: "receipt-1",
+        run_id: "run-1",
+        work_item_id: "work-1",
+        work_item_revision: 7,
+        attempt_id: "attempt-1",
+        packet_id: "packet-1",
+        packet_hash: `sha256:${"b".repeat(64)}`,
+        workspace_lease_id: "workspace-lease-1",
+        workspace_lease_revision: 0,
+        worker_runtime: "codex-native",
+        worker_session_id: "worker-session-1",
+        observed_base_sha: "a".repeat(40),
+        patch_hash: `sha256:${"c".repeat(64)}`,
+        outcome,
+        exit_reason: outcome,
+        summary: `Worker reported ${outcome}`,
+        files_touched: ["src/result.ts"],
+        commits: [],
+        acceptance_criteria_addressed: [],
+        claimed_checks: [{ id: "claimed", outcome: "pass" as const }],
+        assumptions: [],
+        blockers: outcome === "blocked" ? ["Needs a decision"] : [],
+        human_action_request_ids: [],
+        cost: { tool_calls: 1 },
+        worker_started_at: "2026-07-11T12:00:02.500Z",
+        worker_completed_at: "2026-07-11T12:00:04.000Z",
+        submitted_at: "2026-07-11T12:00:04.500Z",
+        ...overrides,
+      };
+    }
+
+    function receiptInput(
+      outcome: "completed" | "blocked" | "failed" | "cancelled" = "completed",
+      overrides: Record<string, unknown> = {}
+    ) {
+      return {
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "submit-receipt-1",
+        now: "2026-07-11T12:00:05.000Z",
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 3,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        workerSessionId: "worker-session-1",
+        expectedWorkerSessionRevision: 1,
+        receipt: receiptClaim(outcome),
         ...overrides,
       };
     }
@@ -591,6 +676,253 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         revision: 0,
         status: "running",
       });
+    });
+
+    it.each([
+      ["completed", "receipt_submitted"],
+      ["blocked", "blocked"],
+      ["failed", "failed"],
+      ["cancelled", "cancelled"],
+    ] as const)("atomically applies active %s receipt claims", async (outcome, status) => {
+      await endedWorker();
+      const input = receiptInput(outcome);
+      const submitted = await store.submitAttemptReceipt(input);
+      expect(submitted).toMatchObject({
+        submitted: true,
+        idempotentReplay: false,
+        receipt: {
+          receiptId: "receipt-1",
+          disposition: "verification_pending",
+          outcome,
+          workerSessionRevision: 1,
+        },
+        attempt: { status, revision: 4, receiptId: "receipt-1" },
+        event: { type: "attempt_receipt_submitted", sequence: 1 },
+      });
+      if (!submitted.submitted) throw new Error("receipt submission failed");
+      expect(submitted.receipt.receiptHash).toBe(computeCanonicalHash(input.receipt));
+      expect(submitted.receipt.receiptJson).toBe(canonicalJSONStringify(input.receipt));
+      await expect(store.getAttemptReceipt("receipt-1")).resolves.toEqual(submitted.receipt);
+      await expect(store.getAttemptReceiptForAttempt("attempt-1")).resolves.toEqual(
+        submitted.receipt
+      );
+      await expect(store.getAttemptReceiptByHash(submitted.receipt.receiptHash)).resolves.toEqual(
+        submitted.receipt
+      );
+    });
+
+    it("replays receipts by mutation ID and canonical hash while reserving the mutation namespace", async () => {
+      await endedWorker();
+      const input = receiptInput();
+      const first = await store.submitAttemptReceipt(input);
+      expect(first).toMatchObject({ submitted: true, idempotentReplay: false });
+      await expect(store.submitAttemptReceipt(input)).resolves.toMatchObject({
+        submitted: true,
+        idempotentReplay: true,
+      });
+      await expect(
+        store.submitAttemptReceipt({
+          ...input,
+          mutationId: "submit-receipt-hash-wrong-lease",
+          workspaceLeaseId: "other-lease",
+        })
+      ).resolves.toMatchObject({ submitted: false, reason: "receipt_conflict" });
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "begin-verification-after-receipt",
+          now: "2026-07-11T12:00:05.250Z",
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 4,
+          status: "verifying",
+        })
+      ).resolves.toMatchObject({ updated: true, attempt: { status: "verifying", revision: 5 } });
+      await expect(
+        store.submitAttemptReceipt({
+          ...input,
+          mutationId: "submit-receipt-hash-replay",
+          now: "2026-07-11T12:00:05.500Z",
+        })
+      ).resolves.toMatchObject({
+        submitted: true,
+        idempotentReplay: true,
+        receipt: { receiptId: "receipt-1" },
+        attempt: { status: "receipt_submitted", revision: 4 },
+        event: { type: "attempt_receipt_replayed", sequence: 2 },
+      });
+      await expect(
+        store.submitAttemptReceipt({
+          ...input,
+          mutationId: "launch-1",
+        })
+      ).resolves.toMatchObject({ submitted: false, reason: "mutation_conflict" });
+      await expect(
+        store.heartbeatWorkspace({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "submit-receipt-hash-replay",
+          now: "2026-07-11T12:00:05.500Z",
+          attemptId: "attempt-1",
+          workspaceLeaseId: "workspace-lease-1",
+          expectedAttemptRevision: 4,
+          expectedWorkspaceLeaseRevision: 0,
+          ttlMs: 5_000,
+          observation: observation(),
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
+      await expect(store.listAttemptReceiptEvents("run-1")).resolves.toHaveLength(2);
+    });
+
+    it("rejects wrong receipt identity and a second immutable receipt", async () => {
+      await endedWorker();
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            receipt: receiptClaim("completed", { packet_hash: `sha256:${"d".repeat(64)}` }),
+          })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "evidence_mismatch" });
+      await store.submitAttemptReceipt(receiptInput());
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            mutationId: "submit-receipt-2",
+            expectedAttemptRevision: 4,
+            receipt: receiptClaim("completed", {
+              receipt_id: "receipt-2",
+              summary: "A distinct second claim",
+            }),
+          })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "receipt_conflict" });
+    });
+
+    it("fences receipt submission by controller and every current entity revision", async () => {
+      await endedWorker();
+      await expect(
+        store.submitAttemptReceipt(receiptInput("completed", { expectedAttemptRevision: 99 }))
+      ).resolves.toMatchObject({ submitted: false, reason: "stale_attempt_revision" });
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", { expectedWorkspaceLeaseRevision: 99 })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "stale_workspace_revision" });
+      await expect(
+        store.submitAttemptReceipt(receiptInput("completed", { expectedWorkerSessionRevision: 99 }))
+      ).resolves.toMatchObject({ submitted: false, reason: "stale_session_revision" });
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            controller: { ...controller, fencingToken: controller.fencingToken + 1 },
+          })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "stale_fence" });
+    });
+
+    it.each([
+      ["work item", { work_item_id: "other-work" }],
+      ["work revision", { work_item_revision: 8 }],
+      ["Attempt", { attempt_id: "other-attempt" }],
+      ["packet", { packet_id: "other-packet" }],
+      ["lease", { workspace_lease_id: "other-lease" }],
+      ["launch revision", { workspace_lease_revision: 9 }],
+      ["runtime", { worker_runtime: "other-runtime" }],
+      ["session", { worker_session_id: "other-session" }],
+      ["base", { observed_base_sha: "d".repeat(40) }],
+    ] as const)("rejects mismatched receipt %s binding", async (_field, claimOverride) => {
+      await endedWorker();
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", { receipt: receiptClaim("completed", claimOverride) })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "evidence_mismatch" });
+    });
+
+    it.each(["failed", "cancelled", "lost"] as const)(
+      "retains correctly bound evidence after worker %s without advancing Attempt",
+      async (workerStatus) => {
+        await endedWorker(workerStatus);
+        const attempt = await store.getAttempt("attempt-1");
+        const input = receiptInput(workerStatus === "cancelled" ? "cancelled" : "failed", {
+          expectedAttemptRevision: attempt!.revision,
+        });
+        await expect(store.submitAttemptReceipt(input)).resolves.toMatchObject({
+          submitted: true,
+          receipt: { disposition: "retained_late" },
+          attempt: { status: attempt!.status, revision: attempt!.revision, receiptId: null },
+          event: { type: "attempt_receipt_retained_late" },
+        });
+      }
+    );
+
+    it("retains correctly bound evidence after workspace expiry", async () => {
+      await endedWorker();
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            now: "2026-07-11T12:00:07.000Z",
+            receipt: receiptClaim("completed", {
+              submitted_at: "2026-07-11T12:00:06.500Z",
+            }),
+          })
+        )
+      ).resolves.toMatchObject({
+        submitted: true,
+        receipt: { disposition: "retained_late" },
+        attempt: { status: "running", revision: 3, receiptId: null },
+      });
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "cannot-attach-retained-late-receipt",
+          now: "2026-07-11T12:00:07.000Z",
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 3,
+          status: "failed",
+          receiptId: "receipt-1",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      await expect(store.getAttempt("attempt-1")).resolves.toMatchObject({
+        status: "running",
+        revision: 3,
+        receiptId: null,
+      });
+    });
+
+    it("closes direct receipt-submitted transitions without durable evidence", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "bypass-receipt",
+          now: "2026-07-11T12:00:04.000Z",
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 3,
+          status: "receipt_submitted",
+          receiptId: "not-durable",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "bypass-terminal-receipt",
+          now: "2026-07-11T12:00:04.000Z",
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 3,
+          status: "blocked",
+          receiptId: "not-durable",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
     });
 
     it("durably creates an attempt before reserving a workspace", async () => {
@@ -1158,7 +1490,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           expectedAttemptRevision: 3,
           status: "receipt_submitted",
         })
-      ).resolves.toMatchObject({ updated: false, reason: "invalid_time" });
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
       expect(await store.listWorkspaceLifecycleEvents("run-1")).toHaveLength(4);
     });
 
@@ -1191,17 +1523,10 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       });
       expect(
         await transition("receipt", 3, "receipt_submitted", { receiptId: "receipt-1" })
-      ).toMatchObject({ updated: true, attempt: { receiptId: "receipt-1" } });
-      expect(await transition("verify", 4, "verifying")).toMatchObject({ updated: true });
-      expect(await transition("verified-missing", 5, "verified")).toMatchObject({
+      ).toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      expect(await transition("verify", 3, "verifying")).toMatchObject({
         updated: false,
-        reason: "evidence_mismatch",
-      });
-      expect(
-        await transition("verified", 5, "verified", { verificationId: "verification-1" })
-      ).toMatchObject({
-        updated: true,
-        attempt: { receiptId: "receipt-1", verificationId: "verification-1" },
+        reason: "invalid_attempt_transition",
       });
     });
 
