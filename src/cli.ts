@@ -1229,3 +1229,6 @@ export { createFileAnalyzer } from "./planner/fileAnalysis.js";
 
 // LPR-037: Workflow guidance exports for MCP
 export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";
+
+// Portable agent-work protocol contracts for orchestrators and worker runtimes.
+export * from "./schemas/agent-work.js";
