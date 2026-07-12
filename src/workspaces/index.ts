@@ -34,3 +34,20 @@ export {
 
 export type { NodeGitWorktreeBrokerOptions } from "./node-git-worktree-broker.js";
 export { NodeGitWorktreeBroker } from "./node-git-worktree-broker.js";
+
+export type {
+  AllocateWorkspaceInput,
+  HeartbeatCoordinatedWorkspaceInput,
+  ReleaseCoordinatedWorkspaceInput,
+  ResumeCoordinatedWorkspaceInput,
+  ResumeWorkspaceInput,
+  WorkspaceCoordinatorAuth,
+  WorkspaceCoordinatorBrokerOptions,
+  WorkspaceCoordinatorFailure,
+  WorkspaceCoordinatorPhase,
+  WorkspaceCoordinatorResult,
+  WorkspaceCoordinatorSuccess,
+  WorkspaceCoordinatorSuccessOutcome,
+  WorkspaceMutationStep,
+} from "./workspace-coordinator.js";
+export { WorkspaceCoordinator } from "./workspace-coordinator.js";
