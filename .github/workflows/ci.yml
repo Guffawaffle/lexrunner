@@ -1,5 +1,5 @@
-# Minimal CI: lint + typecheck only
-# To run full CI: use workflow_dispatch with 'level' input
+# PR CI: lint, typecheck, build, sharded tests, Git integration, and package artifacts.
+# workflow_dispatch retains lower-cost manual levels for diagnosis.
 # Local equivalents:
 #   minimal: npm run ci:minimal
 #   standard: npm run ci
@@ -94,13 +94,24 @@ jobs:
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
       - run: npm run typecheck
 
-  # Standard gates: build + tests (only on workflow_dispatch with level >= standard)
+  # Standard gates: build + sharded test suite. Required on every non-draft PR.
   build-and-test:
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     if: >-
-      github.event_name == 'workflow_dispatch' && 
-      (inputs.level == 'standard' || inputs.level == 'full')
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.level == 'standard' || inputs.level == 'full'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1/3
+            artifact: 1-of-3
+          - shard: 2/3
+            artifact: 2-of-3
+          - shard: 3/3
+            artifact: 3-of-3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -112,59 +123,67 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
       - run: npm run build
-      - name: Run tests with JSON output
-        run: npm test
+      - name: Run test shard with JSON output
+        run: npm test -- --shard=${{ matrix.shard }}
         continue-on-error: true
         id: test-run
-      - name: Generate AX-compliant test summary
-        if: always() && steps.test-run.outcome != 'skipped'
-        run: |
-          node dist/cli.js gate test \
-            --adapter=vitest-json \
-            --input=test-results.json \
-            --output=ax-summary.json \
-            --include-raw
-        continue-on-error: true
-      - name: Upload AX test summary
+      - name: Upload test shard result
         if: always() && steps.test-run.outcome != 'skipped'
         uses: actions/upload-artifact@v4
         with:
-          name: ax-test-summary
-          path: ax-summary.json
-          if-no-files-found: warn
-      - name: Generate markdown summary for failures
-        if: always() && steps.test-run.outcome == 'failure'
-        run: |
-          node dist/cli.js gate test \
-            --adapter=vitest-json \
-            --input=test-results.json \
-            --format=markdown \
-            --output=test-summary.md
-        continue-on-error: true
-      - name: Comment PR with test failures
-        if: always() && steps.test-run.outcome == 'failure' && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            if (!fs.existsSync('test-summary.md')) {
-              console.log('No test summary found, skipping comment');
-              return;
-            }
-            const summary = fs.readFileSync('test-summary.md', 'utf8');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: summary
-            });
-        continue-on-error: true
+          name: test-results-${{ matrix.artifact }}
+          path: test-results.json
+          if-no-files-found: error
       - name: Fail if tests failed
         if: steps.test-run.outcome == 'failure'
         run: exit 1
-      - run: npm run validate:manifests
 
-  # Full gates: determinism + license (only on workflow_dispatch with level == full)
+  # Git-backed lifecycle and recovery coverage. Required on every non-draft PR.
+  git-backed-tests:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.level == 'full')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - run: npm run build
+      - run: npm run test:git
+
+  # Build-artifact/package boundary validation. Required on every non-draft PR.
+  package-artifacts:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.level == 'full')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - run: npm run build
+      - run: npm run validate:build-artifacts
+      - run: npm pack --dry-run --json > npm-pack-dry-run.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-pack-dry-run
+          path: npm-pack-dry-run.json
+
+  # Full manual-only determinism and license gate.
   determinism-and-license:
     runs-on: ubuntu-latest
     needs: build-and-test
@@ -203,7 +222,7 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
+    needs: [lint, typecheck, build-and-test, git-backed-tests, package-artifacts]
     if: always()
     steps:
       - name: Check results
@@ -214,4 +233,13 @@ jobs:
           if [[ "${{ needs.typecheck.result }}" != "success" ]]; then
             echo "❌ TypeCheck failed"; exit 1
           fi
-          echo "✅ CI Complete (level: ${{ inputs.level || 'minimal' }})"
+          if [[ "${{ needs.build-and-test.result }}" != "success" && "${{ needs.build-and-test.result }}" != "skipped" ]]; then
+            echo "❌ build-and-test did not pass"; exit 1
+          fi
+          if [[ "${{ needs.git-backed-tests.result }}" != "success" && "${{ needs.git-backed-tests.result }}" != "skipped" ]]; then
+            echo "❌ git-backed-tests did not pass"; exit 1
+          fi
+          if [[ "${{ needs.package-artifacts.result }}" != "success" && "${{ needs.package-artifacts.result }}" != "skipped" ]]; then
+            echo "❌ package-artifacts did not pass"; exit 1
+          fi
+          echo "✅ CI Complete (level: ${{ inputs.level || 'pull-request' }})"

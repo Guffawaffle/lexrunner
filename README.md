@@ -202,7 +202,7 @@ See [`docs/TERMS.md`](docs/TERMS.md) for complete canonical terms and separation
 
 ## Requirements
 
-- **Node.js**: Version specified in `.nvmrc` (currently 20.18.0)
+- **Node.js**: Version specified in `.nvmrc` (currently 22)
 - **npm**: Version specified in `packageManager` field of `package.json` (currently 10.0.0)
 - **Git**: Configured with `user.name` and `user.email`
 
