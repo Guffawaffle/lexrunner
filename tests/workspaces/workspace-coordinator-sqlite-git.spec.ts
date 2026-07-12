@@ -253,6 +253,57 @@ describe("WorkspaceCoordinator SQLite and real Git integration", () => {
     );
     expect(prepareEvents).toHaveLength(1);
   });
+
+  it("quarantines a prepared release when recovery finds the worktree already removed", async () => {
+    const allocated = await allocate(
+      coordinator,
+      controller,
+      baseSha,
+      repositoryRoot,
+      worktreePath
+    );
+    if (!allocated.ok) throw new Error("allocation failed");
+    const mutations = {
+      prepare: { mutationId: "crash-release-prepare", now: T3 },
+      finalize: { mutationId: "crash-release-finalize", now: T4 },
+      quarantine: { mutationId: "crash-release-quarantine", now: T4 },
+    };
+    const prepared = await store.heartbeatWorkspace({
+      runId: RUN_ID,
+      expectedRunRevision: 0,
+      controller,
+      attemptId: ATTEMPT_ID,
+      workspaceLeaseId: LEASE_ID,
+      expectedAttemptRevision: 2,
+      expectedWorkspaceLeaseRevision: 1,
+      ttlMs: 10_000,
+      observation: allocated.observation,
+      ...mutations.prepare,
+    });
+    expect(prepared).toMatchObject({ updated: true });
+    await git(repositoryRoot, "worktree", "remove", worktreePath);
+
+    const recovered = await coordinator.release({
+      runId: RUN_ID,
+      expectedRunRevision: 0,
+      controller,
+      attemptId: ATTEMPT_ID,
+      workspaceLeaseId: LEASE_ID,
+      expectedAttemptRevision: 2,
+      expectedWorkspaceLeaseRevision: 1,
+      disposition: "discarded",
+      prepareTtlMs: 10_000,
+      mutations,
+    });
+
+    expect(recovered).toMatchObject({
+      ok: false,
+      phase: "quarantine",
+      attempt: { status: "quarantined" },
+      workspaceLease: { status: "quarantined", cleanupDisposition: "preserved" },
+    });
+    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
 
 async function allocate(

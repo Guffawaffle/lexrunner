@@ -561,6 +561,61 @@ describe("WorkspaceCoordinator", () => {
     expect(ports.broker.remove).not.toHaveBeenCalled();
   });
 
+  it("quarantines a missing worktree after authenticating a prepared release retry", async () => {
+    const ports = activePorts();
+    ports.durable.attempt = attempt(3);
+    ports.durable.lease = lease(2, "active", observation());
+    ports.store.heartbeatWorkspace.mockResolvedValue({
+      ...success(
+        ports.durable.attempt,
+        ports.durable.lease,
+        "workspace_heartbeat",
+        "release-prepare"
+      ),
+      idempotentReplay: true,
+    });
+    const missing = observation({
+      exists: false,
+      registered: false,
+      repositoryId: null,
+      projectRoot: null,
+      branch: null,
+      attemptId: null,
+      headSha: null,
+      reason: "worktree missing after prior removal",
+    });
+    ports.broker.observe.mockResolvedValue({
+      ok: false,
+      operation: "observe",
+      reason: "identity_mismatch",
+      message: "worktree missing",
+      observation: missing,
+    });
+    ports.store.quarantineWorkspace.mockImplementation(async (input) => {
+      ports.durable.attempt = attempt(4, "quarantined");
+      ports.durable.lease = lease(3, "quarantined", input.observation);
+      return success(
+        ports.durable.attempt,
+        ports.durable.lease,
+        "workspace_quarantined",
+        input.mutationId
+      );
+    });
+
+    const result = await new WorkspaceCoordinator(ports.store, ports.broker).release(
+      releaseInput()
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      phase: "quarantine",
+      workspaceLease: { status: "quarantined" },
+    });
+    expect(ports.store.heartbeatWorkspace).toHaveBeenCalledOnce();
+    expect(ports.store.quarantineWorkspace).toHaveBeenCalledOnce();
+    expect(ports.broker.remove).not.toHaveBeenCalled();
+  });
+
   it("does not let a stale one-revision release quarantine concurrent work", async () => {
     const ports = activePorts();
     ports.durable.attempt = attempt(3);
@@ -570,13 +625,14 @@ describe("WorkspaceCoordinator", () => {
       outcome: "observed",
       observation: observation({ cleanliness: "dirty", dirtyPaths: ["concurrent.ts"] }),
     });
+    ports.store.heartbeatWorkspace.mockResolvedValue(failure("mutation_conflict", 3, 2));
 
     const result = await new WorkspaceCoordinator(ports.store, ports.broker).release(
       releaseInput()
     );
 
     expect(result).toMatchObject({ ok: false, reason: "reconciliation_required" });
-    expect(ports.store.heartbeatWorkspace).not.toHaveBeenCalled();
+    expect(ports.store.heartbeatWorkspace).toHaveBeenCalledOnce();
     expect(ports.store.quarantineWorkspace).not.toHaveBeenCalled();
     expect(ports.broker.remove).not.toHaveBeenCalled();
   });

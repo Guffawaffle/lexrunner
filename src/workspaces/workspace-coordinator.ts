@@ -408,15 +408,40 @@ export class WorkspaceCoordinator {
       return reconciliation("release_prepare", current);
     }
 
+    let prepared: WorkspaceMutationResult | undefined;
+    if (preparedRevisions) {
+      if (
+        !current.lease.lastObservation ||
+        !releaseObservation(current.lease, current.lease.lastObservation)
+      ) {
+        return reconciliation("release_prepare", current);
+      }
+      try {
+        prepared = await this.store.heartbeatWorkspace({
+          ...authority(input),
+          attemptId: input.attemptId,
+          workspaceLeaseId: input.workspaceLeaseId,
+          expectedAttemptRevision: input.expectedAttemptRevision,
+          expectedWorkspaceLeaseRevision: input.expectedWorkspaceLeaseRevision,
+          ttlMs: input.prepareTtlMs,
+          observation: current.lease.lastObservation,
+          ...input.mutations.prepare,
+        });
+      } catch {
+        return reconciliation("release_prepare", current);
+      }
+      if (
+        !prepared ||
+        !prepared.updated ||
+        !prepared.workspaceLease ||
+        !prepared.idempotentReplay
+      ) {
+        return reconciliation("release_prepare", current);
+      }
+    }
+
     const observed = await this.observe(target, input.broker);
     if (!observed.ok) {
-      if (preparedRevisions) {
-        return {
-          ...reconciliation("release_prepare", current),
-          brokerFailure: observed,
-          observation: observed.observation ?? syntheticObservation(target, observed),
-        };
-      }
       return this.quarantineAfterFailure(
         input,
         "observe",
@@ -427,12 +452,6 @@ export class WorkspaceCoordinator {
       );
     }
     if (!releaseObservation(current.lease, observed.observation)) {
-      if (preparedRevisions) {
-        return {
-          ...reconciliation("release_prepare", current),
-          observation: observed.observation,
-        };
-      }
       return this.quarantineUnsafe(
         input,
         "release_prepare",
@@ -442,25 +461,27 @@ export class WorkspaceCoordinator {
         "unsafe release observation"
       );
     }
-    let prepared: WorkspaceMutationResult;
-    try {
-      prepared = await this.store.heartbeatWorkspace({
-        ...authority(input),
-        attemptId: input.attemptId,
-        workspaceLeaseId: input.workspaceLeaseId,
-        expectedAttemptRevision: input.expectedAttemptRevision,
-        expectedWorkspaceLeaseRevision: input.expectedWorkspaceLeaseRevision,
-        ttlMs: input.prepareTtlMs,
-        observation: observed.observation,
-        ...input.mutations.prepare,
-      });
-    } catch {
-      return { ...reconciliation("release_prepare", current), observation: observed.observation };
+    if (initialRevisions) {
+      try {
+        prepared = await this.store.heartbeatWorkspace({
+          ...authority(input),
+          attemptId: input.attemptId,
+          workspaceLeaseId: input.workspaceLeaseId,
+          expectedAttemptRevision: input.expectedAttemptRevision,
+          expectedWorkspaceLeaseRevision: input.expectedWorkspaceLeaseRevision,
+          ttlMs: input.prepareTtlMs,
+          observation: observed.observation,
+          ...input.mutations.prepare,
+        });
+      } catch {
+        return { ...reconciliation("release_prepare", current), observation: observed.observation };
+      }
+      if (!prepared.updated || !prepared.workspaceLease) {
+        return storeFailure("release_prepare", prepared);
+      }
     }
-    if (!prepared.updated || !prepared.workspaceLease) {
-      return preparedRevisions
-        ? reconciliation("release_prepare", current)
-        : storeFailure("release_prepare", prepared);
+    if (!prepared?.updated || !prepared.workspaceLease) {
+      return reconciliation("release_prepare", current);
     }
     const preparedAttempt = preparedRevisions ? current.attempt : prepared.attempt;
     const preparedLease = preparedRevisions ? current.lease : prepared.workspaceLease;
