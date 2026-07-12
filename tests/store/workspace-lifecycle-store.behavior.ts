@@ -1,15 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
 } from "../../src/store/coordination-store.js";
 import type {
   WorkspaceLifecycleStore,
+  LaunchEnvelopeBindingStore,
   WorkspaceObservation,
+  WorkerSessionStore,
 } from "../../src/store/workspace-lifecycle-store.js";
 import { toAttemptContract } from "../../src/store/workspace-lifecycle-store.js";
 
-export interface WorkspaceLifecycleHarness extends WorkspaceLifecycleStore {
+export interface WorkspaceLifecycleHarness
+  extends WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore {
   acquireControllerLease(input: {
     runId: string;
     controllerId: string;
@@ -128,6 +133,465 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         ...overrides,
       });
     }
+
+    async function launchReadyAttempt() {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      await bindEnvelope();
+    }
+
+    function envelopeBindingInput(overrides: Record<string, unknown> = {}) {
+      const createdAt = "2026-07-11T12:00:02.250Z";
+      const envelopeId = "envelope-1";
+      const envelope = {
+        schema_version: "1.0.0",
+        envelope_id: envelopeId,
+        run_id: "run-1",
+        attempt_id: "attempt-1",
+        packet_id: "packet-1",
+        packet_hash: `sha256:${"b".repeat(64)}`,
+        workspace_lease_id: "workspace-lease-1",
+        workspace_lease_revision: 0,
+        expected_head_sha: "a".repeat(40),
+        branch: "agent/work-1",
+        runtime: { host_id: "host-1", git_runtime: "wsl-git", worker_runtime: "codex-native" },
+        paths: { worktree_root: "/srv/worktrees/work-1" },
+        created_at: createdAt,
+      };
+      const envelopeJson = canonicalJSONStringify(envelope);
+      return {
+        runId: "run-1",
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedRunRevision: 0,
+        expectedAttemptRevision: 2,
+        expectedWorkspaceLeaseRevision: 0,
+        controller,
+        authorizationMutationId: "launch-1",
+        envelopeId,
+        envelopeHash: computeCanonicalHash(envelope),
+        envelopeJson,
+        createdAt,
+        ...overrides,
+      };
+    }
+
+    async function bindEnvelope(overrides: Record<string, unknown> = {}) {
+      return store.bindLaunchEnvelope(envelopeBindingInput(overrides));
+    }
+
+    function attachInput(overrides: Record<string, unknown> = {}) {
+      return {
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "attach-worker-1",
+        now: T3,
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 2,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+        packetId: "packet-1",
+        packetHash: `sha256:${"b".repeat(64)}`,
+        executionEnvelopeId: "envelope-1",
+        executionEnvelopeHash: envelopeBindingInput().envelopeHash,
+        hostId: "host-1",
+        workerRuntime: "codex-native",
+        gitRuntime: "wsl-git",
+        backend: "host-subagent" as const,
+        workerId: "native-session-123",
+        model: "gpt-5",
+        startedAt: "2026-07-11T12:00:02.500Z",
+        ...overrides,
+      };
+    }
+
+    it("binds one canonical envelope to the audited launch authorization", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      const input = envelopeBindingInput();
+      await expect(store.bindLaunchEnvelope(input)).resolves.toMatchObject({
+        bound: true,
+        idempotentReplay: false,
+        binding: { envelopeId: "envelope-1", authorizationMutationId: "launch-1" },
+      });
+      await expect(store.bindLaunchEnvelope(input)).resolves.toMatchObject({
+        bound: true,
+        idempotentReplay: true,
+      });
+      await expect(
+        store.bindLaunchEnvelope({ ...input, envelopeHash: `sha256:${"f".repeat(64)}` })
+      ).resolves.toMatchObject({ bound: false, reason: "mutation_conflict" });
+      await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toMatchObject({
+        envelopeHash: input.envelopeHash,
+      });
+    });
+
+    it("attaches an exact worker identity and atomically starts the attempt", async () => {
+      await launchReadyAttempt();
+      const input = attachInput();
+      const attached = await store.attachWorkerSession(input);
+      expect(attached).toMatchObject({
+        updated: true,
+        idempotentReplay: false,
+        attempt: { status: "running", revision: 3 },
+        workerSession: {
+          sessionId: "worker-session-1",
+          revision: 0,
+          backend: "host-subagent",
+          workerId: "native-session-123",
+          hostId: "host-1",
+          workerRuntime: "codex-native",
+          gitRuntime: "wsl-git",
+          status: "running",
+          startedAt: "2026-07-11T12:00:02.500Z",
+          heartbeatAt: T3,
+        },
+        event: {
+          type: "worker_session_attached",
+          sequence: 1,
+          attemptRevision: 3,
+          sessionRevision: 0,
+        },
+      });
+
+      await expect(store.attachWorkerSession(input)).resolves.toMatchObject({
+        updated: true,
+        idempotentReplay: true,
+      });
+      await expect(bindEnvelope()).resolves.toMatchObject({
+        bound: true,
+        idempotentReplay: true,
+      });
+      await expect(store.getWorkerSession("worker-session-1")).resolves.toMatchObject({
+        workerId: "native-session-123",
+      });
+      await expect(store.getWorkerSessionForAttempt("attempt-1")).resolves.toMatchObject({
+        sessionId: "worker-session-1",
+      });
+      await expect(store.listWorkerSessionEvents("run-1")).resolves.toHaveLength(1);
+      await expect(
+        store.attachWorkerSession({ ...input, workerId: "different-native-session" })
+      ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
+    });
+
+    it("rejects stale, mismatched, or duplicate worker attachment", async () => {
+      await launchReadyAttempt();
+      await expect(
+        store.attachWorkerSession(attachInput({ expectedWorkspaceLeaseRevision: 9 }))
+      ).resolves.toMatchObject({ updated: false, reason: "stale_workspace_revision" });
+      await expect(
+        store.attachWorkerSession(attachInput({ mutationId: "bad-host", hostId: "other-host" }))
+      ).resolves.toMatchObject({ updated: false, reason: "identity_mismatch" });
+      await expect(
+        store.attachWorkerSession(
+          attachInput({ mutationId: "bad-runtime", workerRuntime: "other-runtime" })
+        )
+      ).resolves.toMatchObject({ updated: false, reason: "identity_mismatch" });
+      await expect(
+        store.attachWorkerSession(
+          attachInput({
+            mutationId: "early-start",
+            startedAt: "2026-07-11T12:00:02.000Z",
+          })
+        )
+      ).resolves.toMatchObject({ updated: false, reason: "invalid_time" });
+      await expect(store.attachWorkerSession(attachInput())).resolves.toMatchObject({
+        updated: true,
+      });
+      await expect(
+        store.attachWorkerSession(
+          attachInput({
+            mutationId: "attach-worker-2",
+            sessionId: "worker-session-2",
+            expectedAttemptRevision: 3,
+          })
+        )
+      ).resolves.toMatchObject({ updated: false, reason: "worker_session_conflict" });
+    });
+
+    it("reserves mutation IDs across workspace and worker lifecycle domains", async () => {
+      await launchReadyAttempt();
+      await expect(
+        store.attachWorkerSession(attachInput({ mutationId: "launch-1" }))
+      ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
+      await store.attachWorkerSession(attachInput());
+      await expect(
+        store.heartbeatWorkspace({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "attach-worker-1",
+          now: "2026-07-11T12:00:04.000Z",
+          attemptId: "attempt-1",
+          workspaceLeaseId: "workspace-lease-1",
+          expectedAttemptRevision: 3,
+          expectedWorkspaceLeaseRevision: 0,
+          ttlMs: 5_000,
+          observation: observation(),
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
+    });
+
+    it("prevents one live native worker identity from serving two attempts", async () => {
+      await createAttempt("attempt-1", "work-1");
+      await createAttempt("attempt-2", "work-2");
+      await acquire({ observation: observation() });
+      const secondIdentity = {
+        ...identity,
+        attemptId: "attempt-2",
+        branch: "agent/work-2",
+        worktreePath: "/srv/worktrees/work-2",
+      };
+      await acquire({
+        ...secondIdentity,
+        mutationId: "acquire-2",
+        workspaceLeaseId: "workspace-lease-2",
+        workItemId: "work-2",
+        observation: observation(secondIdentity),
+      });
+      for (const [attemptId, mutationId] of [
+        ["attempt-1", "launch-1"],
+        ["attempt-2", "launch-2"],
+      ] as const) {
+        await store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId,
+          now: T2,
+          attemptId,
+          expectedAttemptRevision: 1,
+          status: "launching",
+        });
+      }
+      await bindEnvelope();
+      const secondEnvelope = JSON.parse(envelopeBindingInput().envelopeJson) as Record<
+        string,
+        unknown
+      >;
+      secondEnvelope.envelope_id = "envelope-2";
+      secondEnvelope.attempt_id = "attempt-2";
+      secondEnvelope.workspace_lease_id = "workspace-lease-2";
+      secondEnvelope.branch = "agent/work-2";
+      (secondEnvelope.paths as Record<string, unknown>).worktree_root = "/srv/worktrees/work-2";
+      const secondEnvelopeJson = canonicalJSONStringify(secondEnvelope);
+      const secondEnvelopeHash = computeCanonicalHash(secondEnvelope);
+      const duplicateIdEnvelope = { ...secondEnvelope, envelope_id: "envelope-1" };
+      const duplicateIdEnvelopeJson = canonicalJSONStringify(duplicateIdEnvelope);
+      await expect(
+        store.bindLaunchEnvelope({
+          ...envelopeBindingInput(),
+          attemptId: "attempt-2",
+          workspaceLeaseId: "workspace-lease-2",
+          authorizationMutationId: "launch-2",
+          envelopeId: "envelope-1",
+          envelopeHash: computeCanonicalHash(duplicateIdEnvelope),
+          envelopeJson: duplicateIdEnvelopeJson,
+        })
+      ).resolves.toMatchObject({ bound: false, reason: "mutation_conflict" });
+      await store.bindLaunchEnvelope({
+        ...envelopeBindingInput(),
+        attemptId: "attempt-2",
+        workspaceLeaseId: "workspace-lease-2",
+        authorizationMutationId: "launch-2",
+        envelopeId: "envelope-2",
+        envelopeHash: secondEnvelopeHash,
+        envelopeJson: secondEnvelopeJson,
+      });
+      await store.attachWorkerSession(attachInput());
+      await expect(
+        store.attachWorkerSession(
+          attachInput({
+            mutationId: "attach-worker-2",
+            attemptId: "attempt-2",
+            workspaceLeaseId: "workspace-lease-2",
+            sessionId: "worker-session-2",
+            executionEnvelopeId: "envelope-2",
+            executionEnvelopeHash: secondEnvelopeHash,
+          })
+        )
+      ).resolves.toMatchObject({ updated: false, reason: "worker_session_conflict" });
+    });
+
+    it("heartbeats and ends worker sessions with revision fencing and audit events", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      const heartbeat = await store.heartbeatWorkerSession({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "heartbeat-worker-1",
+        now: "2026-07-11T12:00:04.000Z",
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+        expectedSessionRevision: 0,
+        status: "awaiting_human",
+      });
+      expect(heartbeat).toMatchObject({
+        updated: true,
+        workerSession: { revision: 1, status: "awaiting_human" },
+        event: { type: "worker_session_heartbeat", sequence: 2 },
+      });
+      await expect(
+        store.heartbeatWorkerSession({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "heartbeat-worker-stale",
+          now: "2026-07-11T12:00:04.500Z",
+          attemptId: "attempt-1",
+          workspaceLeaseId: "workspace-lease-1",
+          expectedAttemptRevision: 3,
+          expectedWorkspaceLeaseRevision: 0,
+          sessionId: "worker-session-1",
+          expectedSessionRevision: 0,
+        })
+      ).resolves.toMatchObject({
+        updated: false,
+        reason: "stale_session_revision",
+        currentSessionRevision: 1,
+      });
+      const ended = await store.endWorkerSession({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "end-worker-1",
+        now: "2026-07-11T12:00:05.000Z",
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+        expectedSessionRevision: 1,
+        status: "completed",
+        exitReason: "work_complete",
+        exitCode: 0,
+        exitSummary: "Implementation and focused checks completed.",
+      });
+      expect(ended).toMatchObject({
+        updated: true,
+        attempt: { status: "running", revision: 3 },
+        workerSession: {
+          revision: 2,
+          status: "completed",
+          endedAt: "2026-07-11T12:00:05.000Z",
+          exitCode: 0,
+        },
+        event: { type: "worker_session_ended", sequence: 3 },
+      });
+      await expect(store.listWorkerSessionEvents("run-1")).resolves.toHaveLength(3);
+    });
+
+    it("preserves awaiting-human status when a heartbeat omits status", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      const common = {
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+      };
+      await store.heartbeatWorkerSession({
+        ...common,
+        mutationId: "heartbeat-awaiting",
+        now: "2026-07-11T12:00:04.000Z",
+        expectedSessionRevision: 0,
+        status: "awaiting_human",
+      });
+      await expect(
+        store.heartbeatWorkerSession({
+          ...common,
+          mutationId: "heartbeat-omitted",
+          now: "2026-07-11T12:00:04.500Z",
+          expectedSessionRevision: 1,
+        })
+      ).resolves.toMatchObject({
+        updated: true,
+        workerSession: { revision: 2, status: "awaiting_human" },
+        event: { payload: { status: "awaiting_human" } },
+      });
+    });
+
+    it("atomically fails the attempt when its worker fails or is lost", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      const ended = await store.endWorkerSession({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "lose-worker-1",
+        now: "2026-07-11T12:00:04.000Z",
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 3,
+        expectedWorkspaceLeaseRevision: 0,
+        sessionId: "worker-session-1",
+        expectedSessionRevision: 0,
+        status: "lost",
+        exitReason: "native_session_missing",
+      });
+      expect(ended).toMatchObject({
+        updated: true,
+        attempt: { status: "failed", revision: 4, completedAt: "2026-07-11T12:00:04.000Z" },
+        workerSession: { status: "lost", revision: 1 },
+        event: { attemptRevision: 4 },
+      });
+    });
+
+    it("rejects unbounded worker exit metadata without mutating the session", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+      await expect(
+        store.endWorkerSession({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "end-worker-unbounded",
+          now: "2026-07-11T12:00:04.000Z",
+          attemptId: "attempt-1",
+          workspaceLeaseId: "workspace-lease-1",
+          expectedAttemptRevision: 3,
+          expectedWorkspaceLeaseRevision: 0,
+          sessionId: "worker-session-1",
+          expectedSessionRevision: 0,
+          status: "failed",
+          exitSummary: "x".repeat(4_097),
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      await expect(store.getWorkerSession("worker-session-1")).resolves.toMatchObject({
+        revision: 0,
+        status: "running",
+      });
+    });
 
     it("durably creates an attempt before reserving a workspace", async () => {
       const created = await createAttempt();

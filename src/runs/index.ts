@@ -103,6 +103,23 @@ export type {
   AttemptLaunchPacketPolicy,
   PrepareAttemptLaunchInput,
 } from "./agent-work-launch-bundle.js";
+export {
+  AttemptWorkerAttachRequestJsonSchema,
+  AttemptWorkerAttachRequestSchema,
+  AttemptWorkerEndRequestJsonSchema,
+  AttemptWorkerEndRequestSchema,
+  AttemptWorkerHeartbeatRequestJsonSchema,
+  AttemptWorkerHeartbeatRequestSchema,
+  AttemptWorkerStatusRequestJsonSchema,
+  AttemptWorkerStatusRequestSchema,
+  createAttemptWorkerHandlers,
+} from "./agent-work-worker-adapters.js";
+export type { AttemptWorkerHandlers } from "./agent-work-worker-adapters.js";
+export { AgentWorkWorkerSessionService } from "./agent-work-worker-session-service.js";
+export type {
+  AttachAttemptWorkerInput,
+  WorkerSessionStatusResult,
+} from "./agent-work-worker-session-service.js";
 export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
 export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {

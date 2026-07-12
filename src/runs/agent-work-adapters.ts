@@ -10,6 +10,8 @@ import {
   createAgentTaskPacket,
 } from "../schemas/agent-work.js";
 import { RunStateSchema } from "./types.js";
+import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type {
   AgentWorkLifecycleResult,
   AgentWorkStatus,
@@ -330,9 +332,32 @@ export function createAttemptLifecycleHandlers(): AttemptLifecycleHandlers &
         return operationFailed(error);
       }
       try {
+        const result = await prepareAttemptLaunchBundle(runtime.service, parsed.data, runtime);
+        if (result.ok) {
+          const envelopeJson = canonicalJSONStringify(result.envelope);
+          const binding = await runtime.workerSessions.bindLaunchEnvelope({
+            runId: result.lifecycle.run.runId,
+            attemptId: result.lifecycle.attempt.attemptId,
+            workspaceLeaseId: result.lifecycle.workspace.leaseId,
+            expectedRunRevision: result.lifecycle.run.revision,
+            expectedAttemptRevision: result.lifecycle.attempt.revision,
+            expectedWorkspaceLeaseRevision: result.lifecycle.workspace.revision,
+            controller: result.lifecycle.controllerLease,
+            authorizationMutationId: parsed.data.attempt.mutations.authorizeLaunch.mutationId,
+            envelopeId: result.envelope.envelope_id,
+            envelopeHash: computeCanonicalHash(result.envelope),
+            envelopeJson,
+            createdAt: result.envelope.created_at,
+          });
+          if (!binding.bound) {
+            return operationFailed(
+              new Error(`Launch envelope binding rejected: ${binding.reason}`)
+            );
+          }
+        }
         return {
           ok: true,
-          result: await prepareAttemptLaunchBundle(runtime.service, parsed.data, runtime),
+          result,
         };
       } catch (error) {
         return operationFailed(error);

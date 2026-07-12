@@ -128,6 +128,82 @@ export interface WorkspaceLifecycleEvent {
   createdAt: string;
 }
 
+export type WorkerSessionBackend = "host-subagent" | "codex-cli" | "external";
+export type WorkerSessionStatus =
+  | "starting"
+  | "running"
+  | "awaiting_human"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "lost";
+
+/** Durable identity and observed lifecycle for one native worker attached to an Attempt. */
+export interface WorkerSessionRecord {
+  sessionId: string;
+  revision: number;
+  runId: string;
+  attemptId: string;
+  packetId: string;
+  packetHash: string;
+  workspaceLeaseId: string;
+  workspaceLeaseRevision: number;
+  executionEnvelopeId: string;
+  executionEnvelopeHash: string;
+  hostId: string;
+  workerRuntime: string;
+  gitRuntime: string;
+  backend: WorkerSessionBackend;
+  workerId: string;
+  model?: string;
+  status: WorkerSessionStatus;
+  startedAt: string;
+  heartbeatAt: string;
+  endedAt?: string;
+  exitReason?: string;
+  exitCode?: number;
+  exitSummary?: string;
+}
+
+/** Immutable canonical envelope authorized for one launching Attempt. */
+export interface LaunchEnvelopeBindingRecord {
+  runId: string;
+  attemptId: string;
+  workspaceLeaseId: string;
+  attemptRevision: number;
+  workspaceLeaseRevision: number;
+  authorizationMutationId: string;
+  envelopeId: string;
+  envelopeHash: string;
+  envelopeJson: string;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  createdAt: string;
+}
+
+export type WorkerSessionEventType =
+  | "worker_session_attached"
+  | "worker_session_heartbeat"
+  | "worker_session_ended";
+
+export interface WorkerSessionEvent {
+  runId: string;
+  attemptId: string;
+  sessionId: string;
+  mutationId: string;
+  sequence: number;
+  attemptRevision: number;
+  workspaceLeaseRevision: number;
+  sessionRevision: number;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  type: WorkerSessionEventType;
+  payload: JsonValue;
+  createdAt: string;
+}
+
 interface AuthenticatedMutationInput {
   runId: string;
   expectedRunRevision: number;
@@ -135,6 +211,91 @@ interface AuthenticatedMutationInput {
   mutationId: string;
   now: string;
 }
+
+interface AuthenticatedWorkerMutationInput extends AuthenticatedMutationInput {
+  attemptId: string;
+  workspaceLeaseId: string;
+  expectedAttemptRevision: number;
+  expectedWorkspaceLeaseRevision: number;
+}
+
+export interface AttachWorkerSessionInput extends AuthenticatedWorkerMutationInput {
+  sessionId: string;
+  packetId: string;
+  packetHash: string;
+  executionEnvelopeId: string;
+  executionEnvelopeHash: string;
+  hostId: string;
+  workerRuntime: string;
+  gitRuntime: string;
+  backend: WorkerSessionBackend;
+  workerId: string;
+  model?: string;
+  startedAt: string;
+}
+
+export interface BindLaunchEnvelopeInput {
+  runId: string;
+  attemptId: string;
+  workspaceLeaseId: string;
+  expectedRunRevision: number;
+  expectedAttemptRevision: number;
+  expectedWorkspaceLeaseRevision: number;
+  controller: ControllerLeaseCredential;
+  authorizationMutationId: string;
+  envelopeId: string;
+  envelopeHash: string;
+  envelopeJson: string;
+  createdAt: string;
+}
+
+export type LaunchEnvelopeBindingResult =
+  | { bound: true; binding: LaunchEnvelopeBindingRecord; idempotentReplay: boolean }
+  | {
+      bound: false;
+      reason: WorkspaceMutationFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentRunRevision?: number;
+    };
+
+export interface HeartbeatWorkerSessionInput extends AuthenticatedWorkerMutationInput {
+  sessionId: string;
+  expectedSessionRevision: number;
+  status?: "running" | "awaiting_human";
+}
+
+export interface EndWorkerSessionInput extends AuthenticatedWorkerMutationInput {
+  sessionId: string;
+  expectedSessionRevision: number;
+  status: "completed" | "failed" | "cancelled" | "lost";
+  exitReason?: string;
+  exitCode?: number;
+  exitSummary?: string;
+}
+
+export type WorkerSessionMutationFailureReason =
+  | WorkspaceMutationFailureReason
+  | "stale_session_revision"
+  | "worker_session_not_active"
+  | "worker_session_conflict";
+
+export type WorkerSessionMutationResult =
+  | {
+      updated: true;
+      attempt: AttemptRecord;
+      workerSession: WorkerSessionRecord;
+      event: WorkerSessionEvent;
+      idempotentReplay: boolean;
+    }
+  | {
+      updated: false;
+      reason: WorkerSessionMutationFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentSessionRevision?: number;
+      currentRunRevision?: number;
+    };
 
 export interface CreateAttemptInput extends AuthenticatedMutationInput {
   attemptId: string;
@@ -250,6 +411,22 @@ export interface WorkspaceLifecycleStore {
   getAttempt(attemptId: string): Promise<AttemptRecord | null>;
   getWorkspaceLease(leaseId: string): Promise<WorkspaceLifecycleLeaseRecord | null>;
   listWorkspaceLifecycleEvents(runId: string): Promise<WorkspaceLifecycleEvent[]>;
+}
+
+/** Additive binding port for Stage 3 launch envelopes. */
+export interface LaunchEnvelopeBindingStore {
+  bindLaunchEnvelope(input: BindLaunchEnvelopeInput): Promise<LaunchEnvelopeBindingResult>;
+  getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null>;
+}
+
+/** Additive Stage 3 persistence port; kept separate from the Stage 1 workspace contract. */
+export interface WorkerSessionStore {
+  attachWorkerSession(input: AttachWorkerSessionInput): Promise<WorkerSessionMutationResult>;
+  heartbeatWorkerSession(input: HeartbeatWorkerSessionInput): Promise<WorkerSessionMutationResult>;
+  endWorkerSession(input: EndWorkerSessionInput): Promise<WorkerSessionMutationResult>;
+  getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null>;
+  getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null>;
+  listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]>;
 }
 
 /**

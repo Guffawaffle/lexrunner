@@ -511,6 +511,14 @@ credential loss, and reboot reconciliation.
   coordinator-owned delivery.
 - Test controller interruption and assisted/headless handoff semantics.
 
+Native assisted launch uses a quiescent attachment handshake. The foreground
+controller first spawns the background agent with a wait-only bootstrap that
+forbids repository mutation, records the opaque native session ID through the
+WorkerSession attachment operation, and only then dispatches the task packet.
+This ordering prevents work from beginning before its durable Attempt and lease
+binding exists; a task-bearing spawn followed by best-effort attachment is not
+an accepted assisted launch.
+
 ### Stage 4: Headless supervisor
 
 - Add the first non-interactive CLI worker adapter.

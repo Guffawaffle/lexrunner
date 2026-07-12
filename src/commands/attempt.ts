@@ -9,12 +9,17 @@ import {
   type AttemptPreparationHandler,
   type AttemptLifecycleHandlers,
 } from "../runs/agent-work-adapters.js";
+import {
+  createAttemptWorkerHandlers,
+  type AttemptWorkerHandlers,
+} from "../runs/agent-work-worker-adapters.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
 export interface AttemptCommandDependencies {
   handlers?: AttemptLifecycleHandlers;
   preparationHandler?: AttemptPreparationHandler;
+  workerHandlers?: AttemptWorkerHandlers;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -28,7 +33,55 @@ export function registerAttemptCommand(
   const defaults = createAttemptLifecycleHandlers();
   const handlers = dependencies.handlers ?? defaults;
   const preparationHandler = dependencies.preparationHandler ?? defaults;
+  const workerHandlers = dependencies.workerHandlers ?? createAttemptWorkerHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
+
+  const worker = attempt.command("worker").description("Manage attached native worker sessions");
+  registerWorkerInputCommand(
+    worker,
+    "attach",
+    "Attach a native worker session",
+    (input) => workerHandlers.attach(input),
+    dependencies
+  );
+  registerWorkerInputCommand(
+    worker,
+    "heartbeat",
+    "Record a worker heartbeat",
+    (input) => workerHandlers.heartbeat(input),
+    dependencies
+  );
+  registerWorkerInputCommand(
+    worker,
+    "end",
+    "End an attached worker session",
+    (input) => workerHandlers.end(input),
+    dependencies
+  );
+  worker
+    .command("status")
+    .description("Read bounded status for an attached worker session")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .requiredOption("--attempt-id <id>", "Attempt identifier")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        runId: string;
+        attemptId: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await workerHandlers.status({
+          databasePath: options.databasePath,
+          runId: options.runId,
+          attemptId: options.attemptId,
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
 
   attempt
     .command("prepare")
@@ -86,6 +139,30 @@ export function registerAttemptCommand(
         setFailureExitCode(output);
       }
     );
+}
+
+function registerWorkerInputCommand(
+  worker: Command,
+  name: string,
+  description: string,
+  dispatch: (input: unknown) => Promise<unknown>,
+  dependencies: AttemptCommandDependencies
+): void {
+  worker
+    .command(name)
+    .description(description)
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES
+      );
+      const output = await dispatch(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
 }
 
 async function readJsonInput(inputPath: string, maxBytes: number): Promise<unknown> {
@@ -146,6 +223,10 @@ function setFailureExitCode(output: unknown): void {
     return;
   }
   if (output.ok === true && isRecord(output.result) && output.result.ok === false) {
+    process.exitCode = 1;
+    return;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.updated === false) {
     process.exitCode = 1;
   }
 }
