@@ -52,6 +52,25 @@ export {
 export { RunManager, createRunManager } from "./manager.js";
 export type { RunManagerOptions } from "./manager.js";
 
+// Lease-fenced coordinated run application service
+export {
+  CoordinatedRunManager,
+  FileRunProjection,
+  InvalidProcedureTransitionError,
+  ProcedureUnavailableError,
+} from "./coordinated-manager.js";
+export type {
+  RunProjection,
+  ProcedureResolver,
+  CoordinatedRunManagerOptions,
+  AcquireCoordinatedRunInput,
+  RenewCoordinatedRunInput,
+  AdvanceCoordinatedRunInput,
+  ProjectionResult,
+  AdvanceCoordinatedRunResult,
+  RebuildProjectionResult,
+} from "./coordinated-manager.js";
+
 // Enforcement
 export {
   ViolationType,
