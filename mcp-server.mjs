@@ -48,6 +48,34 @@ const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
 
 // MCP Tool implementations
 const tools = {
+  prepare_attempt: {
+    description:
+      "Prepare an ADR-010 assisted launch packet and envelope (requires ALLOW_MUTATIONS=true)",
+    inputSchema: core.AttemptPrepareRequestJsonSchema,
+    call: async (args) => {
+      if (!config.allowMutations) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: core.canonicalJSONStringify({
+                ok: false,
+                error: {
+                  code: "mutations_disabled",
+                  message: "Mutations not allowed. Set ALLOW_MUTATIONS=true to prepare an Attempt.",
+                },
+              }),
+            },
+          ],
+        };
+      }
+      const result = await attemptLifecycleHandlers.prepare(args);
+      return {
+        content: [{ type: "text", text: core.canonicalJSONStringify(result) }],
+      };
+    },
+  },
+
   start_attempt: {
     description:
       "Start or safely resume an ADR-010 agent-work Attempt (requires ALLOW_MUTATIONS=true)",

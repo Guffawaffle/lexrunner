@@ -21,12 +21,49 @@ describe("published MCP Attempt lifecycle", () => {
     }>;
 
     const start = tools.find((tool) => tool.name === "start_attempt");
+    const prepare = tools.find((tool) => tool.name === "prepare_attempt");
     const status = tools.find((tool) => tool.name === "get_attempt_status");
 
+    expect(prepare?.inputSchema.required).toEqual([
+      "runtime",
+      "workItem",
+      "identity",
+      "packet",
+      "envelope",
+      "attempt",
+    ]);
+    expect(prepare?.inputSchema.properties).toHaveProperty("workItem");
+    expect(prepare?.inputSchema.properties).toHaveProperty("packet");
+    expect(prepare?.inputSchema.properties).toHaveProperty("envelope");
+    const envelopeSchema = prepare?.inputSchema.properties?.envelope as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    expect(envelopeSchema.properties).toHaveProperty("projectRoot");
+    expect(envelopeSchema.properties).toHaveProperty("executionRoot");
+    expect(envelopeSchema.required).toEqual(
+      expect.arrayContaining(["projectRoot", "executionRoot"])
+    );
     expect(start?.inputSchema.required).toEqual(["runtime", "attempt"]);
     expect(start?.inputSchema.properties).toHaveProperty("runtime");
     expect(start?.inputSchema.properties).toHaveProperty("attempt");
     expect(status?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
+  });
+
+  it("keeps prepare_attempt behind the published mutation gate", async () => {
+    const [response] = await invoke({
+      id: 4,
+      method: "tools/call",
+      params: { name: "prepare_attempt", arguments: {} },
+    });
+
+    expect(JSON.parse(response.result.content[0].text)).toEqual({
+      error: {
+        code: "mutations_disabled",
+        message: "Mutations not allowed. Set ALLOW_MUTATIONS=true to prepare an Attempt.",
+      },
+      ok: false,
+    });
   });
 
   it("keeps start_attempt behind the published mutation gate", async () => {

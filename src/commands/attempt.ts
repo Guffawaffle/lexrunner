@@ -6,6 +6,7 @@ import { throwExit } from "../cli/exitHandler.js";
 import { writeJsonOutput } from "../cli/output.js";
 import {
   createAttemptLifecycleHandlers,
+  type AttemptPreparationHandler,
   type AttemptLifecycleHandlers,
 } from "../runs/agent-work-adapters.js";
 
@@ -13,6 +14,7 @@ const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
 export interface AttemptCommandDependencies {
   handlers?: AttemptLifecycleHandlers;
+  preparationHandler?: AttemptPreparationHandler;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -23,8 +25,26 @@ export function registerAttemptCommand(
   program: Command,
   dependencies: AttemptCommandDependencies
 ): void {
-  const handlers = dependencies.handlers ?? createAttemptLifecycleHandlers();
+  const defaults = createAttemptLifecycleHandlers();
+  const handlers = dependencies.handlers ?? defaults;
+  const preparationHandler = dependencies.preparationHandler ?? defaults;
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
+
+  attempt
+    .command("prepare")
+    .description("Prepare a packet and authorized execution envelope for assisted launch")
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES
+      );
+      const output = await preparationHandler.prepare(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
 
   attempt
     .command("start")
