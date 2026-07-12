@@ -174,9 +174,11 @@ describe("Cluster Gate Execution and Rollback", () => {
     expect(bundle.failedGates[0].gate).toBe("test");
     expect(bundle.rollbackSha).toBeDefined();
 
-    // Verify git state rolled back
-    const currentHead = (await git.log(["-1"])).latest?.hash || "";
-    expect(currentHead).toBe(result.rollbackSha);
+    // Failure-delivery work must stay inside the GitOperations checkout rather
+    // than mutating whichever repository launched the test process. The
+    // artifact commit is based directly on the recorded rollback SHA.
+    expect((await git.branchLocal()).current).toMatch(/^weave\/cluster-0-failure-/);
+    expect((await git.revparse(["HEAD^"])).trim()).toBe(result.rollbackSha);
   });
 
   it("should skip gates when skipGates option is true", async () => {

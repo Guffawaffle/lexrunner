@@ -80,6 +80,7 @@ export async function executeClusterWithGates(
   const { clusterIndex, items, baseBranch, integrationBranch, weaveDir } = cluster;
   const policy = plan.policy || getDefaultPolicy();
   const timeoutMs = options?.timeoutMs || 30000;
+  const workingDir = options?.baseDir || gitOps.getWorkingDirectory();
 
   // Ensure .weave directory exists
   if (!fs.existsSync(weaveDir)) {
@@ -116,7 +117,7 @@ export async function executeClusterWithGates(
           clusterArtifactDir,
           timeoutMs,
           false,
-          process.cwd(),
+          workingDir,
           {
             runId: options?.runId,
             baseDir: options?.baseDir,
@@ -161,7 +162,7 @@ export async function executeClusterWithGates(
         emitClusterFailureReceipt(cluster, result, failureBundle);
 
         // Attempt to create draft PR with failure artifacts
-        await createDraftPRForClusterFailure(cluster, result, failureBundle, options?.baseDir);
+        await createDraftPRForClusterFailure(cluster, result, failureBundle, workingDir);
 
         result.error = `Gates failed for cluster ${clusterIndex}`;
         return result;

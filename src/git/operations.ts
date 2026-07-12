@@ -44,6 +44,11 @@ export class GitOperations {
     this.git = simpleGit(workingDir);
   }
 
+  /** Repository-local execution root owned by this Git operations instance. */
+  getWorkingDirectory(): string {
+    return this.workingDir;
+  }
+
   /**
    * Check if git repository is in a clean state
    */
