@@ -1,7 +1,10 @@
 import { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
 import type {
+  AttemptReceiptDisposition,
+  AttemptReceiptEventType,
   AttemptReceiptStore,
   AttemptReceiptSubmissionResult,
+  AttemptStatus,
   WorkerSessionStore,
   WorkspaceLifecycleStore,
 } from "../store/workspace-lifecycle-store.js";
@@ -11,6 +14,25 @@ const MAX_OUTPUT_BYTES = 4_096;
 export interface AttemptReceiptStatusResult {
   receipt: AttemptReceiptStatusProjection | null;
 }
+
+export type AttemptReceiptSubmissionAcknowledgement =
+  | {
+      submitted: true;
+      receiptId: string;
+      receiptHash: string;
+      attemptId: string;
+      outcome: "completed" | "blocked" | "failed" | "cancelled";
+      disposition: AttemptReceiptDisposition;
+      attemptRevision: number;
+      attemptStatus: AttemptStatus;
+      event: {
+        type: AttemptReceiptEventType;
+        sequence: number;
+        createdAt: string;
+      };
+      idempotentReplay: boolean;
+    }
+  | Extract<AttemptReceiptSubmissionResult, { submitted: false }>;
 
 /** Prompt-safe metadata for a durable worker claim; receipt JSON stays in the store. */
 export interface AttemptReceiptStatusProjection {
@@ -52,10 +74,27 @@ export class AgentWorkAttemptReceiptService {
     private readonly store: WorkspaceLifecycleStore & AttemptReceiptStore & WorkerSessionStore
   ) {}
 
-  submit(
+  async submit(
     input: Parameters<AttemptReceiptStore["submitAttemptReceipt"]>[0]
-  ): Promise<AttemptReceiptSubmissionResult> {
-    return this.store.submitAttemptReceipt(input);
+  ): Promise<AttemptReceiptSubmissionAcknowledgement> {
+    const result = await this.store.submitAttemptReceipt(input);
+    if (!result.submitted) return result;
+    return {
+      submitted: true,
+      receiptId: bounded(result.receipt.receiptId),
+      receiptHash: bounded(result.receipt.receiptHash),
+      attemptId: bounded(result.receipt.attemptId),
+      outcome: result.receipt.outcome,
+      disposition: result.receipt.disposition,
+      attemptRevision: result.receipt.resultingAttemptRevision,
+      attemptStatus: result.receipt.resultingAttemptStatus,
+      event: {
+        type: result.event.type,
+        sequence: result.event.sequence,
+        createdAt: result.event.createdAt,
+      },
+      idempotentReplay: result.idempotentReplay,
+    };
   }
 
   async status(input: { runId: string; attemptId: string }): Promise<AttemptReceiptStatusResult> {
