@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
-import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
+import { AgentTaskPacket_v1, AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type { JsonValue } from "../coordination-store.js";
 import type {
@@ -21,6 +21,8 @@ import type {
   LaunchEnvelopeBindingRecord,
   LaunchEnvelopeBindingResult,
   LaunchEnvelopeBindingStore,
+  TaskPacketBindingRecord,
+  TaskPacketBindingStore,
   HeartbeatWorkspaceInput,
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
@@ -178,6 +180,14 @@ CREATE TABLE IF NOT EXISTS attempt_receipt_mutations (
  REFERENCES attempt_receipt_events(runId,mutationId) ON DELETE CASCADE);
 INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(4,'attempt-receipt-persistence',datetime('now'));
+CREATE TABLE IF NOT EXISTS task_packet_bindings (
+ attemptId TEXT PRIMARY KEY, runId TEXT NOT NULL, workItemId TEXT NOT NULL,
+ workItemRevision INTEGER NOT NULL CHECK(workItemRevision>=0), packetId TEXT NOT NULL,
+ packetHash TEXT NOT NULL, packetJson TEXT NOT NULL, createdAt TEXT NOT NULL,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+ VALUES(5,'task-packet-snapshot-persistence',datetime('now'));
 `;
 
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId"> {
@@ -292,7 +302,11 @@ const TRANSITIONS: Record<AttemptRecord["status"], AttemptRecord["status"][]> = 
 /** SQLite attempt/workspace store sharing the authoritative controller transaction. */
 export class SqliteWorkspaceLifecycleStore
   extends SqliteCoordinationStore
-  implements WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore
+  implements
+    WorkspaceLifecycleStore,
+    LaunchEnvelopeBindingStore,
+    TaskPacketBindingStore,
+    WorkerSessionStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -678,7 +692,8 @@ export class SqliteWorkspaceLifecycleStore
       const lease = this.lease(input.workspaceLeaseId);
       const existing = this.launchEnvelopeBinding(input.attemptId);
       if (existing) {
-        return sameLaunchBinding(existing, input)
+        return sameLaunchBinding(existing, input) &&
+          sameTaskPacketBinding(this.taskPacketBinding(input.attemptId), input.packetJson, attempt)
           ? { bound: true, binding: existing, idempotentReplay: true }
           : sqliteLaunchFailure("mutation_conflict", attempt ?? undefined, lease ?? undefined);
       }
@@ -698,6 +713,15 @@ export class SqliteWorkspaceLifecycleStore
         return sqliteLaunchFailure("evidence_mismatch", attempt!, lease!);
       }
       if (!validateCanonicalEnvelope(input, attempt!, lease!)) {
+        return sqliteLaunchFailure("evidence_mismatch", attempt!, lease!);
+      }
+      // A packet snapshot is mandatory for every new binding.  The optional
+      // input remains only so an already-persisted pre-snapshot envelope can
+      // be replayed exactly during compatibility migration.
+      if (
+        input.packetJson === undefined ||
+        !validateCanonicalTaskPacket(input.packetJson, attempt!)
+      ) {
         return sqliteLaunchFailure("evidence_mismatch", attempt!, lease!);
       }
       const createdAt = instant(input.createdAt);
@@ -723,6 +747,22 @@ export class SqliteWorkspaceLifecycleStore
           input.controller.fencingToken,
           createdAt
         );
+      this.db
+        .prepare(
+          `INSERT INTO task_packet_bindings (attemptId, runId, workItemId, workItemRevision,
+           packetId, packetHash, packetJson, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          input.attemptId,
+          input.runId,
+          attempt!.workItemId,
+          attempt!.workItemRevision,
+          attempt!.packetId,
+          attempt!.packetHash,
+          input.packetJson,
+          createdAt
+        );
       return {
         bound: true,
         binding: this.requireLaunchEnvelopeBinding(input.attemptId),
@@ -733,6 +773,13 @@ export class SqliteWorkspaceLifecycleStore
 
   async getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null> {
     return this.hasTable("launch_envelope_bindings") ? this.launchEnvelopeBinding(attemptId) : null;
+  }
+
+  async getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null> {
+    if (!this.hasTable("task_packet_bindings")) return null;
+    const binding = this.taskPacketBinding(attemptId);
+    const attempt = this.attempt(attemptId);
+    return binding && attempt && validateTaskPacketBinding(binding, attempt) ? binding : null;
   }
 
   async attachWorkerSession(input: AttachWorkerSessionInput): Promise<WorkerSessionMutationResult> {
@@ -994,6 +1041,16 @@ export class SqliteWorkspaceLifecycleStore
           .get(input.runId, input.mutationId, input.runId, input.mutationId)
       ) {
         return this.receiptFailure("mutation_conflict");
+      }
+      const packetAttempt = this.attempt(input.attemptId);
+      const packetBinding = this.hasTable("task_packet_bindings")
+        ? this.taskPacketBinding(input.attemptId)
+        : null;
+      if (
+        packetAttempt &&
+        (!packetBinding || !validateTaskPacketBinding(packetBinding, packetAttempt))
+      ) {
+        return this.receiptFailure("evidence_mismatch", packetAttempt);
       }
       const prior = this.db
         .prepare(
@@ -1814,6 +1871,14 @@ export class SqliteWorkspaceLifecycleStore
     );
   }
 
+  private taskPacketBinding(attemptId: string): TaskPacketBindingRecord | null {
+    return (
+      (this.db.prepare(`SELECT * FROM task_packet_bindings WHERE attemptId = ?`).get(attemptId) as
+        | TaskPacketBindingRecord
+        | undefined) ?? null
+    );
+  }
+
   private attemptReceipt(receiptId: string): AttemptReceiptRecord | null {
     const row = this.db
       .prepare(`SELECT * FROM attempt_receipts WHERE receiptId = ?`)
@@ -1905,7 +1970,10 @@ export class SqliteWorkspaceLifecycleStore
       const receiptPath = fileURLToPath(
         new URL("./migrations/004-attempt-receipt-persistence.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}`;
+      const packetPath = fileURLToPath(
+        new URL("./migrations/005-task-packet-snapshot-persistence.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -2220,6 +2288,61 @@ function validateCanonicalEnvelope(
     paths.worktree_root === lease.worktreePath
     ? envelope
     : null;
+}
+
+function validateCanonicalTaskPacket(
+  packetJson: string,
+  attempt: AttemptRecord
+): AgentTaskPacket_v1 | null {
+  if (Buffer.byteLength(packetJson, "utf8") > 256 * 1024) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(packetJson);
+  } catch {
+    return null;
+  }
+  if (!isJsonRecord(value) || canonicalJSONStringify(value) !== packetJson) return null;
+  const parsed = AgentTaskPacket_v1.safeParse(value);
+  if (!parsed.success) return null;
+  const packet = parsed.data;
+  return packet.run_id === attempt.runId &&
+    packet.attempt_id === attempt.attemptId &&
+    packet.work_item.work_item_id === attempt.workItemId &&
+    packet.work_item.revision === attempt.workItemRevision &&
+    packet.packet_id === attempt.packetId &&
+    packet.packet_hash === attempt.packetHash &&
+    packet.repository.base_sha === attempt.baseSha
+    ? packet
+    : null;
+}
+
+function sameTaskPacketBinding(
+  existing: TaskPacketBindingRecord | null,
+  packetJson: string | undefined,
+  attempt: AttemptRecord | null
+): boolean {
+  if (!attempt) return false;
+  return existing
+    ? packetJson !== undefined &&
+        existing.packetJson === packetJson &&
+        validateTaskPacketBinding(existing, attempt)
+    : packetJson === undefined;
+}
+
+function validateTaskPacketBinding(
+  binding: TaskPacketBindingRecord,
+  attempt: AttemptRecord
+): boolean {
+  return (
+    binding.runId === attempt.runId &&
+    binding.attemptId === attempt.attemptId &&
+    binding.workItemId === attempt.workItemId &&
+    binding.workItemRevision === attempt.workItemRevision &&
+    binding.packetId === attempt.packetId &&
+    binding.packetHash === attempt.packetHash &&
+    Number.isFinite(Date.parse(binding.createdAt)) &&
+    validateCanonicalTaskPacket(binding.packetJson, attempt) !== null
+  );
 }
 
 function sameLaunchBinding(

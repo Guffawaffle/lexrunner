@@ -1,7 +1,9 @@
 import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.js";
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
-import type { Attempt_v1 as AttemptContract_v1 } from "../schemas/agent-work.js";
-import type { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
+import type {
+  AgentTaskReceipt_v2,
+  Attempt_v1 as AttemptContract_v1,
+} from "../schemas/agent-work.js";
 
 /** Durable attempt state. Attempts exist before a workspace is allocated. */
 export type AttemptStatus =
@@ -183,6 +185,25 @@ export interface LaunchEnvelopeBindingRecord {
   createdAt: string;
 }
 
+/**
+ * Immutable canonical AgentTaskPacket snapshot bound to the durable Attempt.
+ *
+ * The snapshot is written only as part of launch-envelope binding, so callers
+ * cannot make a packet body appear after a worker has started.  It deliberately
+ * retains the canonical JSON for later criterion/check reference validation;
+ * consumers must parse it under AgentTaskPacket_v1 before acting on it.
+ */
+export interface TaskPacketBindingRecord {
+  runId: string;
+  attemptId: string;
+  workItemId: string;
+  workItemRevision: number;
+  packetId: string;
+  packetHash: string;
+  packetJson: string;
+  createdAt: string;
+}
+
 export type WorkerSessionEventType =
   | "worker_session_attached"
   | "worker_session_heartbeat"
@@ -247,6 +268,13 @@ export interface BindLaunchEnvelopeInput {
   envelopeId: string;
   envelopeHash: string;
   envelopeJson: string;
+  /**
+   * Required for every new launch-envelope binding. It remains optional in
+   * the input type solely so callers can exactly replay an already-persisted
+   * legacy envelope-only binding during compatibility migration; it must not
+   * be omitted when creating a binding.
+   */
+  packetJson?: string;
   createdAt: string;
 }
 
@@ -511,6 +539,11 @@ export interface WorkspaceLifecycleStore {
 export interface LaunchEnvelopeBindingStore {
   bindLaunchEnvelope(input: BindLaunchEnvelopeInput): Promise<LaunchEnvelopeBindingResult>;
   getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null>;
+}
+
+/** Read-only access to immutable task packet snapshots written during launch binding. */
+export interface TaskPacketBindingStore {
+  getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null>;
 }
 
 /** Additive Stage 3 persistence port; kept separate from the Stage 1 workspace contract. */

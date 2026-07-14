@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import Database from "better-sqlite3-multiple-ciphers";
+import { createAgentTaskPacket } from "../../../src/schemas/agent-work.js";
 import { computeCanonicalHash } from "../../../src/schemas/task-contract.js";
 import { SqliteWorkspaceLifecycleStore } from "../../../src/store/sqlite/workspace-lifecycle-store.js";
 import { canonicalJSONStringify } from "../../../src/util/canonicalJson.js";
@@ -42,6 +43,36 @@ describe("SQLite workspace lifecycle concurrency", () => {
         leaseId: acquired.lease.leaseId,
         fencingToken: acquired.lease.fencingToken,
       };
+      const packet = createAgentTaskPacket({
+        schema_version: "1.0.0",
+        packet_id: "worker-race-packet",
+        run_id: "worker-race-run",
+        work_item: { work_item_id: "worker-race-work", revision: 1 },
+        attempt_id: "worker-race-attempt",
+        repository: { id: "repo", base_sha: "a".repeat(40) },
+        objective: "Race worker attachment",
+        acceptance_criteria: [],
+        instructions: [],
+        scope: {
+          read_globs: [],
+          write_globs: [],
+          deny_globs: [],
+          cross_repo_allowed: false,
+        },
+        authority: {
+          edit: false,
+          git_write: false,
+          github_write: false,
+          external_runtime: false,
+          secrets: false,
+          signing: false,
+          release: false,
+        },
+        verification: [],
+        budget: {},
+        created_at: "2026-07-11T12:00:00.000Z",
+      });
+      const packetJson = canonicalJSONStringify(packet);
       await first.createAttempt({
         runId: "worker-race-run",
         controller,
@@ -52,7 +83,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         workItemId: "worker-race-work",
         workItemRevision: 1,
         packetId: "worker-race-packet",
-        packetHash: `sha256:${"b".repeat(64)}`,
+        packetHash: packet.packet_hash,
         baseSha: "a".repeat(40),
       });
       const identity = {
@@ -99,7 +130,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         run_id: "worker-race-run",
         attempt_id: "worker-race-attempt",
         packet_id: "worker-race-packet",
-        packet_hash: `sha256:${"b".repeat(64)}`,
+        packet_hash: packet.packet_hash,
         workspace_lease_id: "worker-race-lease",
         workspace_lease_revision: 0,
         expected_head_sha: "a".repeat(40),
@@ -122,6 +153,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         envelopeId: "worker-race-envelope",
         envelopeHash,
         envelopeJson,
+        packetJson,
         createdAt: "2026-07-11T12:00:02.250Z",
       });
       const attach = (store: SqliteWorkspaceLifecycleStore, suffix: string) =>
@@ -137,7 +169,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
           expectedWorkspaceLeaseRevision: 0,
           sessionId: `session-${suffix}`,
           packetId: "worker-race-packet",
-          packetHash: `sha256:${"b".repeat(64)}`,
+          packetHash: packet.packet_hash,
           executionEnvelopeId: "worker-race-envelope",
           executionEnvelopeHash: envelopeHash,
           hostId: "host",
@@ -197,7 +229,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
             work_item_revision: 1,
             attempt_id: "worker-race-attempt",
             packet_id: "worker-race-packet",
-            packet_hash: `sha256:${"b".repeat(64)}`,
+            packet_hash: packet.packet_hash,
             workspace_lease_id: "worker-race-lease",
             workspace_lease_revision: 0,
             worker_runtime: "native",
@@ -281,6 +313,27 @@ describe("SQLite workspace lifecycle concurrency", () => {
       await expect(legacy.getAttemptReceiptForAttempt("missing")).resolves.toBeNull();
       await expect(legacy.getAttemptReceiptByHash(`sha256:${"0".repeat(64)}`)).resolves.toBeNull();
       await expect(legacy.listAttemptReceiptEvents("missing")).resolves.toEqual([]);
+    } finally {
+      await legacy.close();
+    }
+  });
+
+  it("reads pre-packet-snapshot databases without creating a snapshot table", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lexrunner-packet-legacy-read-"));
+    directories.push(directory);
+    const path = join(directory, "store.db");
+    const writable = new SqliteWorkspaceLifecycleStore(path);
+    await writable.close();
+    const database = new Database(path);
+    database.exec(`
+      DROP TABLE task_packet_bindings;
+      DELETE FROM coordination_schema_migrations WHERE version = 5;
+    `);
+    database.close();
+
+    const legacy = new SqliteWorkspaceLifecycleStore(path, { readOnly: true });
+    try {
+      await expect(legacy.getTaskPacketBinding("missing")).resolves.toBeNull();
     } finally {
       await legacy.close();
     }

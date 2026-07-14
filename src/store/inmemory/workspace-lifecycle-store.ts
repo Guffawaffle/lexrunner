@@ -1,6 +1,6 @@
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
-import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
+import { AgentTaskPacket_v1, AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type {
   AcquireWorkspaceInput,
@@ -18,6 +18,8 @@ import type {
   LaunchEnvelopeBindingRecord,
   LaunchEnvelopeBindingResult,
   LaunchEnvelopeBindingStore,
+  TaskPacketBindingRecord,
+  TaskPacketBindingStore,
   HeartbeatWorkspaceInput,
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
@@ -74,7 +76,11 @@ interface StoredReceiptMutation {
  */
 export class InMemoryWorkspaceLifecycleStore
   extends InMemoryCoordinationStore
-  implements WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore
+  implements
+    WorkspaceLifecycleStore,
+    LaunchEnvelopeBindingStore,
+    TaskPacketBindingStore,
+    WorkerSessionStore
 {
   private readonly attempts = new Map<string, AttemptRecord>();
   private readonly workspaceLeases = new Map<string, WorkspaceLifecycleLeaseRecord>();
@@ -85,6 +91,7 @@ export class InMemoryWorkspaceLifecycleStore
   private readonly workerEvents = new Map<string, WorkerSessionEvent[]>();
   private readonly workerMutations = new Map<string, StoredWorkerMutation>();
   private readonly launchEnvelopeBindings = new Map<string, LaunchEnvelopeBindingRecord>();
+  private readonly taskPacketBindings = new Map<string, TaskPacketBindingRecord>();
   private readonly attemptReceipts = new Map<string, AttemptReceiptRecord>();
   private readonly receiptByAttempt = new Map<string, string>();
   private readonly receiptByHash = new Map<string, string>();
@@ -440,7 +447,12 @@ export class InMemoryWorkspaceLifecycleStore
         const lease = this.workspaceLeases.get(input.workspaceLeaseId);
         const existing = this.launchEnvelopeBindings.get(input.attemptId);
         if (existing) {
-          return sameLaunchBinding(existing, input)
+          return sameLaunchBinding(existing, input) &&
+            sameTaskPacketBinding(
+              this.taskPacketBindings.get(input.attemptId),
+              input.packetJson,
+              attempt
+            )
             ? { bound: true as const, binding: { ...existing }, idempotentReplay: true }
             : launchFailure("mutation_conflict", attempt, lease);
         }
@@ -461,6 +473,13 @@ export class InMemoryWorkspaceLifecycleStore
         }
         const envelope = validateCanonicalEnvelope(input, attempt!, lease!);
         if (!envelope) return launchFailure("evidence_mismatch", attempt, lease);
+        // A packet snapshot is mandatory for every new binding.  The optional
+        // input remains only so an already-persisted pre-snapshot envelope can
+        // be replayed exactly during compatibility migration.
+        if (input.packetJson === undefined)
+          return launchFailure("evidence_mismatch", attempt, lease);
+        const packet = validateCanonicalTaskPacket(input.packetJson, attempt!);
+        if (!packet) return launchFailure("evidence_mismatch", attempt, lease);
         const binding: LaunchEnvelopeBindingRecord = {
           runId: input.runId,
           attemptId: input.attemptId,
@@ -477,6 +496,16 @@ export class InMemoryWorkspaceLifecycleStore
           createdAt: normalizeInstant(input.createdAt),
         };
         this.launchEnvelopeBindings.set(input.attemptId, binding);
+        this.taskPacketBindings.set(input.attemptId, {
+          runId: input.runId,
+          attemptId: input.attemptId,
+          workItemId: attempt!.workItemId,
+          workItemRevision: attempt!.workItemRevision,
+          packetId: attempt!.packetId,
+          packetHash: attempt!.packetHash,
+          packetJson: input.packetJson,
+          createdAt: normalizeInstant(input.createdAt),
+        });
         return { bound: true as const, binding: { ...binding }, idempotentReplay: false };
       }
     );
@@ -494,6 +523,14 @@ export class InMemoryWorkspaceLifecycleStore
   async getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null> {
     const binding = this.launchEnvelopeBindings.get(attemptId);
     return binding ? { ...binding } : null;
+  }
+
+  async getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null> {
+    const binding = this.taskPacketBindings.get(attemptId);
+    const attempt = this.attempts.get(attemptId);
+    return binding && attempt && validateTaskPacketBinding(binding, attempt)
+      ? { ...binding }
+      : null;
   }
 
   async attachWorkerSession(input: AttachWorkerSessionInput): Promise<WorkerSessionMutationResult> {
@@ -682,6 +719,14 @@ export class InMemoryWorkspaceLifecycleStore
         const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
         if (this.mutations.has(key) || this.workerMutations.has(key)) {
           return this.receiptFailure("mutation_conflict");
+        }
+        const packetAttempt = this.attempts.get(input.attemptId);
+        const packetBinding = this.taskPacketBindings.get(input.attemptId);
+        if (
+          packetAttempt &&
+          (!packetBinding || !validateTaskPacketBinding(packetBinding, packetAttempt))
+        ) {
+          return this.receiptFailure("evidence_mismatch", packetAttempt);
         }
         const prior = this.receiptMutations.get(key);
         if (prior) {
@@ -1553,6 +1598,61 @@ function validateCanonicalEnvelope(
     paths.worktree_root === lease.worktreePath
     ? envelope
     : null;
+}
+
+function validateCanonicalTaskPacket(
+  packetJson: string,
+  attempt: AttemptRecord
+): AgentTaskPacket_v1 | null {
+  if (Buffer.byteLength(packetJson, "utf8") > 256 * 1024) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(packetJson);
+  } catch {
+    return null;
+  }
+  if (!isJsonRecord(value) || canonicalJSONStringify(value) !== packetJson) return null;
+  const parsed = AgentTaskPacket_v1.safeParse(value);
+  if (!parsed.success) return null;
+  const packet = parsed.data;
+  return packet.run_id === attempt.runId &&
+    packet.attempt_id === attempt.attemptId &&
+    packet.work_item.work_item_id === attempt.workItemId &&
+    packet.work_item.revision === attempt.workItemRevision &&
+    packet.packet_id === attempt.packetId &&
+    packet.packet_hash === attempt.packetHash &&
+    packet.repository.base_sha === attempt.baseSha
+    ? packet
+    : null;
+}
+
+function sameTaskPacketBinding(
+  existing: TaskPacketBindingRecord | undefined,
+  packetJson: string | undefined,
+  attempt: AttemptRecord | undefined
+): boolean {
+  if (!attempt) return false;
+  return existing
+    ? packetJson !== undefined &&
+        existing.packetJson === packetJson &&
+        validateTaskPacketBinding(existing, attempt)
+    : packetJson === undefined;
+}
+
+function validateTaskPacketBinding(
+  binding: TaskPacketBindingRecord,
+  attempt: AttemptRecord
+): boolean {
+  return (
+    binding.runId === attempt.runId &&
+    binding.attemptId === attempt.attemptId &&
+    binding.workItemId === attempt.workItemId &&
+    binding.workItemRevision === attempt.workItemRevision &&
+    binding.packetId === attempt.packetId &&
+    binding.packetHash === attempt.packetHash &&
+    Number.isFinite(Date.parse(binding.createdAt)) &&
+    validateCanonicalTaskPacket(binding.packetJson, attempt) !== null
+  );
 }
 
 function sameLaunchBinding(

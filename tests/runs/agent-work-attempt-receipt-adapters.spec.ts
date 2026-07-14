@@ -2,12 +2,14 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import Database from "better-sqlite3-multiple-ciphers";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
+import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
 
 const roots: string[] = [];
 
@@ -100,6 +102,69 @@ describe("Attempt receipt adapter handlers", () => {
     });
     await expect(access(databasePath)).rejects.toThrow();
   });
+
+  it.each(["missing", "noncanonical", "hash-mismatched"] as const)(
+    "rejects receipt ingestion when the packet snapshot is %s",
+    async (tamper) => {
+      const root = await sandbox();
+      const prepared = await prepare(root);
+      const workerHandlers = createAttemptWorkerHandlers();
+      const attached = await workerHandlers.attach(attachRequest(prepared));
+      if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+      const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+      if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+
+      const databasePath = prepared.request.runtime.databasePath;
+      const database = new Database(databasePath);
+      try {
+        if (tamper === "missing") {
+          database
+            .prepare(`DELETE FROM task_packet_bindings WHERE attemptId = ?`)
+            .run("attempt-receipt");
+        } else if (tamper === "noncanonical") {
+          database
+            .prepare(
+              `UPDATE task_packet_bindings SET packetJson = packetJson || ' ' WHERE attemptId = ?`
+            )
+            .run("attempt-receipt");
+        } else {
+          database
+            .prepare(`UPDATE task_packet_bindings SET packetHash = ? WHERE attemptId = ?`)
+            .run(`sha256:${"f".repeat(64)}`, "attempt-receipt");
+        }
+      } finally {
+        database.close();
+      }
+
+      const readOnly = new SqliteWorkspaceLifecycleStore(databasePath, { readOnly: true });
+      try {
+        await expect(readOnly.getTaskPacketBinding("attempt-receipt")).resolves.toBeNull();
+      } finally {
+        await readOnly.close();
+      }
+
+      await expect(
+        createAttemptReceiptHandlers().submit(submitRequest(prepared, ended.result))
+      ).resolves.toMatchObject({
+        ok: true,
+        result: { submitted: false, reason: "evidence_mismatch" },
+      });
+
+      const verification = new Database(databasePath);
+      try {
+        expect(
+          verification.prepare(`SELECT COUNT(*) AS count FROM attempt_receipts`).get()
+        ).toEqual({ count: 0 });
+        expect(
+          verification
+            .prepare(`SELECT status FROM attempts WHERE attemptId = ?`)
+            .get("attempt-receipt")
+        ).toEqual({ status: "running" });
+      } finally {
+        verification.close();
+      }
+    }
+  );
 });
 
 async function sandbox(): Promise<string> {
