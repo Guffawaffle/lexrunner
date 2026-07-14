@@ -3,8 +3,16 @@ import { stat } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { ExecutionEnvelope_v1 } from "../schemas/agent-work.js";
+import {
+  ExecutionEnvelope_v1,
+  ExecutionEnvironmentOS,
+  WorkerSessionBackend,
+} from "../schemas/agent-work.js";
 import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
+import {
+  EndWorkerSessionStatus,
+  HeartbeatWorkerSessionStatus,
+} from "../store/workspace-lifecycle-domains.js";
 import type {
   EndWorkerSessionInput,
   HeartbeatWorkerSessionInput,
@@ -75,7 +83,7 @@ const BoundedExecutionEnvelopeSchema = z
     runtime: z
       .object({
         host_id: text,
-        os: z.enum(["linux", "windows", "darwin", "other"]),
+        os: ExecutionEnvironmentOS,
         architecture: text,
         worker_runtime: text,
         git_runtime: text,
@@ -111,7 +119,7 @@ export const AttemptWorkerAttachRequestSchema = z
         envelope: BoundedExecutionEnvelopeSchema,
         worker: z
           .object({
-            backend: z.enum(["host-subagent", "codex-cli", "external"]),
+            backend: WorkerSessionBackend,
             workerId: text,
             model: text.optional(),
             startedAt: instant,
@@ -145,7 +153,7 @@ const WorkerHeartbeatInputSchema = z
   .object({
     ...common,
     expectedWorkerSessionRevision: revision,
-    status: z.enum(["running", "awaiting_human"]).optional(),
+    status: HeartbeatWorkerSessionStatus.optional(),
   })
   .strict();
 export const AttemptWorkerHeartbeatRequestSchema = z
@@ -159,7 +167,7 @@ const WorkerEndInputSchema = z
   .object({
     ...common,
     expectedWorkerSessionRevision: revision,
-    status: z.enum(["completed", "failed", "cancelled", "lost"]),
+    status: EndWorkerSessionStatus,
     exit: z
       .object({
         code: z.number().int().optional(),

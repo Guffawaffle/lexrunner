@@ -1,3 +1,6 @@
+-- CHECK constraints below protect newly created databases. Existing version-2+
+-- tables are not destructively rebuilt; runtime row validation provides their
+-- fail-closed compatibility boundary.
 CREATE TABLE IF NOT EXISTS attempts (
   attemptId TEXT PRIMARY KEY,
   runId TEXT NOT NULL,
@@ -8,7 +11,11 @@ CREATE TABLE IF NOT EXISTS attempts (
   packetHash TEXT NOT NULL,
   baseSha TEXT NOT NULL,
   revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
-  status TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN (
+    'prepared', 'leased', 'launching', 'running', 'receipt_submitted', 'verifying', 'verified',
+    'accepted', 'rejected', 'inconclusive', 'blocked', 'launch_failed', 'failed', 'cancelled',
+    'quarantined'
+  )),
   receiptId TEXT,
   verificationId TEXT,
   workspaceLeaseId TEXT,
@@ -45,12 +52,18 @@ CREATE TABLE IF NOT EXISTS workspace_leases (
   branch TEXT NOT NULL,
   worktreePath TEXT NOT NULL,
   baseSha TEXT NOT NULL,
-  status TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN (
+    'reserved', 'active', 'released', 'preserved', 'abandoned', 'quarantined'
+  )),
   acquiredAt TEXT NOT NULL,
   heartbeatAt TEXT NOT NULL,
   expiresAt TEXT NOT NULL,
   releasedAt TEXT,
-  cleanupDisposition TEXT,
+  cleanupDisposition TEXT CHECK (
+    cleanupDisposition IS NULL OR cleanupDisposition IN (
+      'integrated', 'preserved', 'abandoned', 'discarded'
+    )
+  ),
   lastObservationJson TEXT,
   FOREIGN KEY (runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
   FOREIGN KEY (attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE
@@ -75,7 +88,10 @@ CREATE TABLE IF NOT EXISTS workspace_lifecycle_events (
   controllerId TEXT NOT NULL,
   controllerLeaseId TEXT NOT NULL,
   fencingToken INTEGER NOT NULL CHECK (fencingToken > 0),
-  type TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN (
+    'attempt_created', 'attempt_transitioned', 'workspace_acquired', 'workspace_heartbeat',
+    'workspace_released', 'workspace_reconciled', 'workspace_quarantined'
+  )),
   payloadJson TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   PRIMARY KEY (runId, mutationId),

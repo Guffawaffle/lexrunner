@@ -2,6 +2,20 @@ import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
+import {
+  canTransitionAttempt,
+  attemptStatusRequiresReceipt,
+  attemptStatusRequiresVerification,
+  isLiveAttemptStatus,
+  isTerminalAttemptStatus,
+  isTerminalWorkerSession,
+  requiresDurableReceipt,
+  requiresLiveWorkspace,
+} from "../workspace-lifecycle-domains.js";
+import type {
+  FinishedWorkspaceLeaseStatus,
+  WorkspaceCleanupDisposition,
+} from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
   AttachWorkerSessionInput,
@@ -137,7 +151,7 @@ export class InMemoryWorkspaceLifecycleStore
         input.expectedAttemptRevision
       );
       if (revisionFailure) return revisionFailure;
-      if (!canTransition(attempt!.status, input.status)) {
+      if (!canTransitionAttempt(attempt!.status, input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
       }
       if (input.status === "receipt_submitted") {
@@ -201,7 +215,7 @@ export class InMemoryWorkspaceLifecycleStore
       attempt!.receiptId = evidence.receiptId;
       attempt!.verificationId = evidence.verificationId;
       attempt!.updatedAt = now;
-      attempt!.completedAt = TERMINAL_ATTEMPTS.has(input.status) ? now : null;
+      attempt!.completedAt = isTerminalAttemptStatus(input.status) ? now : null;
       const lease = attempt!.workspaceLeaseId
         ? (this.workspaceLeases.get(attempt!.workspaceLeaseId) ?? null)
         : null;
@@ -796,7 +810,7 @@ export class InMemoryWorkspaceLifecycleStore
     if (!validReceiptBinding(claim, input, attempt, lease, session)) {
       return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
-    const terminalWorker = ["completed", "failed", "cancelled", "lost"].includes(session.status);
+    const terminalWorker = isTerminalWorkerSession(session.status);
     if (!terminalWorker || !session.endedAt) {
       return this.receiptFailure("worker_session_not_active", attempt, lease, session);
     }
@@ -808,7 +822,7 @@ export class InMemoryWorkspaceLifecycleStore
       lease.controllerLeaseId === input.controller.leaseId &&
       lease.fencingToken === input.controller.fencingToken &&
       parseInstant(lease.expiresAt, "expiresAt") > parseInstant(input.now, "now");
-    if (!active && attempt.status !== "running" && !isTerminalAttempt(attempt.status)) {
+    if (!active && attempt.status !== "running" && !isTerminalAttemptStatus(attempt.status)) {
       return this.receiptFailure("invalid_attempt_transition", attempt, lease, session);
     }
     const disposition = active ? "verification_pending" : "retained_late";
@@ -1188,8 +1202,8 @@ export class InMemoryWorkspaceLifecycleStore
     input: MutationInput,
     attempt: AttemptRecord,
     lease: WorkspaceLifecycleLeaseRecord,
-    status: "released" | "preserved" | "abandoned",
-    disposition: "integrated" | "preserved" | "abandoned" | "discarded",
+    status: FinishedWorkspaceLeaseStatus,
+    disposition: WorkspaceCleanupDisposition,
     eventType: WorkspaceLifecycleEventType
   ): WorkspaceMutationResult {
     const now = normalizeInstant(input.now);
@@ -1285,44 +1299,7 @@ function mutationKey(runId: string, mutationId: string): string {
 }
 
 function isLiveAttempt(attempt: AttemptRecord): boolean {
-  return !TERMINAL_ATTEMPTS.has(attempt.status);
-}
-
-const TERMINAL_ATTEMPTS = new Set<AttemptRecord["status"]>([
-  "accepted",
-  "rejected",
-  "inconclusive",
-  "blocked",
-  "launch_failed",
-  "failed",
-  "cancelled",
-  "quarantined",
-]);
-
-const legalAttemptTransitions: Record<AttemptRecord["status"], AttemptRecord["status"][]> = {
-  prepared: ["cancelled"],
-  leased: ["launching", "cancelled", "quarantined"],
-  launching: ["running", "launch_failed", "failed", "cancelled", "quarantined"],
-  running: ["receipt_submitted", "blocked", "failed", "cancelled", "quarantined"],
-  receipt_submitted: ["verifying", "quarantined"],
-  verifying: ["verified", "rejected", "inconclusive", "failed", "quarantined"],
-  verified: ["accepted", "rejected", "inconclusive", "quarantined"],
-  accepted: [],
-  rejected: [],
-  inconclusive: [],
-  blocked: [],
-  launch_failed: [],
-  failed: [],
-  cancelled: [],
-  quarantined: [],
-};
-
-function canTransition(from: AttemptRecord["status"], to: AttemptRecord["status"]): boolean {
-  return legalAttemptTransitions[from].includes(to);
-}
-
-function requiresLiveWorkspace(status: AttemptRecord["status"]): boolean {
-  return !["prepared", "leased", "cancelled", "quarantined"].includes(status);
+  return isLiveAttemptStatus(attempt.status);
 }
 
 function validTtl(ttlMs: number): boolean {
@@ -1352,18 +1329,10 @@ function bindAttemptEvidence(
     verificationId = input.verificationId;
   }
 
-  if (
-    ["receipt_submitted", "verifying", "verified", "accepted", "rejected", "inconclusive"].includes(
-      input.status
-    ) &&
-    receiptId === null
-  ) {
+  if (attemptStatusRequiresReceipt(input.status) && receiptId === null) {
     return { bound: false };
   }
-  if (
-    ["verified", "accepted", "rejected", "inconclusive"].includes(input.status) &&
-    verificationId === null
-  ) {
+  if (attemptStatusRequiresVerification(input.status) && verificationId === null) {
     return { bound: false };
   }
 
@@ -1422,10 +1391,6 @@ function cloneSuccess(
     workspaceLease: result.workspaceLease ? cloneLease(result.workspaceLease) : null,
     event: cloneEvent(result.event),
   };
-}
-
-function isTerminalWorkerSession(status: WorkerSessionRecord["status"]): boolean {
-  return ["completed", "failed", "cancelled", "lost"].includes(status);
 }
 
 function cloneWorkerEvent(event: WorkerSessionEvent): WorkerSessionEvent {
@@ -1623,23 +1588,6 @@ function validReceiptBinding(
     completed <= parseInstant(session.endedAt!, "session.endedAt") &&
     parseInstant(receipt.submitted_at, "submitted_at") <= parseInstant(input.now, "now")
   );
-}
-
-function isTerminalAttempt(status: AttemptRecord["status"]): boolean {
-  return [
-    "accepted",
-    "rejected",
-    "inconclusive",
-    "blocked",
-    "launch_failed",
-    "failed",
-    "cancelled",
-    "quarantined",
-  ].includes(status);
-}
-
-function requiresDurableReceipt(status: AttemptRecord["status"]): boolean {
-  return ["verifying", "verified", "accepted", "rejected", "inconclusive"].includes(status);
 }
 
 function cloneReceiptSuccess(

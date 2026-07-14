@@ -12,10 +12,12 @@ CREATE TABLE IF NOT EXISTS worker_sessions (
   hostId TEXT NOT NULL,
   workerRuntime TEXT NOT NULL,
   gitRuntime TEXT NOT NULL,
-  backend TEXT NOT NULL,
+  backend TEXT NOT NULL CHECK (backend IN ('host-subagent', 'codex-cli', 'external')),
   workerId TEXT NOT NULL,
   model TEXT,
-  status TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN (
+    'starting', 'running', 'awaiting_human', 'completed', 'failed', 'cancelled', 'lost'
+  )),
   startedAt TEXT NOT NULL,
   heartbeatAt TEXT NOT NULL,
   endedAt TEXT,
@@ -66,7 +68,9 @@ CREATE TABLE IF NOT EXISTS worker_session_events (
   controllerId TEXT NOT NULL,
   controllerLeaseId TEXT NOT NULL,
   fencingToken INTEGER NOT NULL CHECK (fencingToken > 0),
-  type TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN (
+    'worker_session_attached', 'worker_session_heartbeat', 'worker_session_ended'
+  )),
   payloadJson TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   PRIMARY KEY (runId, mutationId),

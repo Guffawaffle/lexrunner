@@ -347,6 +347,18 @@ const TERMINAL_ATTEMPT_STATUSES = new Set<AttemptStatus>([
   "quarantined",
 ]);
 
+export function attemptStatusRequiresReceipt(status: AttemptStatus): boolean {
+  return ATTEMPT_STATUSES_REQUIRING_RECEIPT.has(status);
+}
+
+export function attemptStatusRequiresVerification(status: AttemptStatus): boolean {
+  return ATTEMPT_STATUSES_REQUIRING_VERIFICATION.has(status);
+}
+
+export function isTerminalAttemptStatus(status: AttemptStatus): boolean {
+  return TERMINAL_ATTEMPT_STATUSES.has(status);
+}
+
 /** One worker try, bound to one immutable packet and pinned repository base. */
 export const Attempt_v1 = z
   .object({
@@ -505,6 +517,9 @@ const AbsolutePath = z.string().min(1).refine(isMachineLocalAbsolutePath, {
   message: "Must be an absolute machine-local path",
 });
 
+export const ExecutionEnvironmentOS = z.enum(["linux", "windows", "darwin", "other"]);
+export type ExecutionEnvironmentOS = z.infer<typeof ExecutionEnvironmentOS>;
+
 export const ExecutionEnvelope_v1 = z
   .object({
     schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
@@ -521,7 +536,7 @@ export const ExecutionEnvelope_v1 = z
     runtime: z
       .object({
         host_id: Id,
-        os: z.enum(["linux", "windows", "darwin", "other"]),
+        os: ExecutionEnvironmentOS,
         architecture: z.string().min(1),
         worker_runtime: z.string().min(1),
         git_runtime: z.string().min(1),
@@ -586,6 +601,14 @@ export const WorkspaceLeaseStatus = z.enum([
 ]);
 export type WorkspaceLeaseStatus = z.infer<typeof WorkspaceLeaseStatus>;
 
+export const WorkspaceCleanupDisposition = z.enum([
+  "integrated",
+  "preserved",
+  "abandoned",
+  "discarded",
+]);
+export type WorkspaceCleanupDisposition = z.infer<typeof WorkspaceCleanupDisposition>;
+
 export const WorkspaceLease_v1 = z
   .object({
     schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
@@ -610,7 +633,7 @@ export const WorkspaceLease_v1 = z
     heartbeat_at: Timestamp,
     expires_at: Timestamp,
     released_at: Timestamp.optional(),
-    cleanup_disposition: z.enum(["integrated", "preserved", "abandoned", "discarded"]).optional(),
+    cleanup_disposition: WorkspaceCleanupDisposition.optional(),
   })
   .strict()
   .superRefine((lease, ctx) => {
@@ -831,6 +854,20 @@ export type WorkspaceAllocation_v1 = z.infer<typeof WorkspaceAllocation_v1>;
 // WORKER SESSION, RECEIPT, AND ENGINE VERIFICATION
 // =============================================================================
 
+export const WorkerSessionBackend = z.enum(["host-subagent", "codex-cli", "external"]);
+export type WorkerSessionBackend = z.infer<typeof WorkerSessionBackend>;
+
+export const WorkerSessionStatus = z.enum([
+  "starting",
+  "running",
+  "awaiting_human",
+  "completed",
+  "failed",
+  "cancelled",
+  "lost",
+]);
+export type WorkerSessionStatus = z.infer<typeof WorkerSessionStatus>;
+
 export const WorkerSession_v1 = z
   .object({
     schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
@@ -844,20 +881,12 @@ export const WorkerSession_v1 = z
     execution_envelope_id: Id,
     worker: z
       .object({
-        backend: z.enum(["host-subagent", "codex-cli", "external"]),
+        backend: WorkerSessionBackend,
         worker_id: Id,
         model: z.string().min(1).optional(),
       })
       .strict(),
-    status: z.enum([
-      "starting",
-      "running",
-      "awaiting_human",
-      "completed",
-      "failed",
-      "cancelled",
-      "lost",
-    ]),
+    status: WorkerSessionStatus,
     started_at: Timestamp,
     heartbeat_at: Timestamp,
     ended_at: Timestamp.optional(),
@@ -865,14 +894,20 @@ export const WorkerSession_v1 = z
   .strict();
 export type WorkerSession_v1 = z.infer<typeof WorkerSession_v1>;
 
+export const ClaimedCheckOutcome = z.enum(["pass", "fail", "not_run"]);
+export type ClaimedCheckOutcome = z.infer<typeof ClaimedCheckOutcome>;
+
 const ClaimedCheck = z
   .object({
     id: Id,
-    outcome: z.enum(["pass", "fail", "not_run"]),
+    outcome: ClaimedCheckOutcome,
     exit_code: z.number().int().optional(),
     output_snippet: z.string().optional(),
   })
   .strict();
+
+export const AgentTaskReceiptOutcome = z.enum(["completed", "blocked", "failed", "cancelled"]);
+export type AgentTaskReceiptOutcome = z.infer<typeof AgentTaskReceiptOutcome>;
 
 export const AgentTaskReceipt_v1 = z
   .object({
@@ -888,7 +923,7 @@ export const AgentTaskReceipt_v1 = z
     worker_session_id: Id,
     base_sha: GitObjectId,
     final_head_sha: GitObjectId.optional(),
-    outcome: z.enum(["completed", "blocked", "failed", "cancelled"]),
+    outcome: AgentTaskReceiptOutcome,
     summary: z.string().min(1),
     files_touched: z.array(RepoRelativePath),
     commits: z.array(GitObjectId),
@@ -957,7 +992,7 @@ export const AgentTaskReceipt_v2 = z
      * stdout bytes unchanged. This differs from receipt_hash and remains a claim.
      */
     patch_hash: SHA256Hash.optional(),
-    outcome: z.enum(["completed", "blocked", "failed", "cancelled"]),
+    outcome: AgentTaskReceiptOutcome,
     exit_reason: Id,
     summary: z.string().min(1),
     files_touched: z.array(CanonicalAgentRepoPathV2),

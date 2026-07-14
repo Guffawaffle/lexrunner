@@ -1,5 +1,7 @@
 import { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
 import type {
+  AgentTaskReceiptOutcome,
+  AttemptReceiptDisposition,
   AttemptReceiptStore,
   AttemptReceiptSubmissionResult,
   WorkerSessionStore,
@@ -31,8 +33,8 @@ export interface AttemptReceiptStatusProjection {
   observedBaseSha: string;
   finalHeadSha?: string;
   patchHash?: string;
-  outcome: "completed" | "blocked" | "failed" | "cancelled";
-  disposition: "verification_pending" | "retained_late";
+  outcome: AgentTaskReceiptOutcome;
+  disposition: AttemptReceiptDisposition;
   summary: string;
   workerStartedAt: string;
   workerCompletedAt: string;

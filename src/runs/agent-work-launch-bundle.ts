@@ -6,6 +6,7 @@ import {
   ExecutionEnvelope_v1,
   createAgentTaskPacket,
   type AgentTaskPacket_v1,
+  type ExecutionEnvironmentOS,
   type ExecutionEnvelope_v1 as ExecutionEnvelope,
   type WorkItem_v1,
 } from "../schemas/agent-work.js";
@@ -51,7 +52,7 @@ export interface AttemptLaunchPacketPolicy {
 
 export interface AttemptLaunchEnvelopePolicy {
   envelopeId: string;
-  os: "linux" | "windows" | "darwin" | "other";
+  os: ExecutionEnvironmentOS;
   architecture: string;
   workerRuntime: string;
   projectRoot: string;
