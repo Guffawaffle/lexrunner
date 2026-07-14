@@ -1,23 +1,50 @@
-import { defineConfig } from "tsup";
+import { defineConfig, type Options } from "tsup";
 
-export default defineConfig({
-  entry: [
-    "src/cli.ts",
-    "src/sdk/index.ts",
-    "src/frames/index.ts",
-    "src/hooks/events.ts",
-    "src/errors/index.ts",
-  ],
-  format: ["esm", "cjs"],
-  dts: true,
+const entry = [
+  "src/cli.ts",
+  "src/sdk/index.ts",
+  "src/frames/index.ts",
+  "src/hooks/events.ts",
+  "src/errors/index.ts",
+  "src/package-schemas/behavior-rule.ts",
+  "src/package-schemas/execution-plan-v1.ts",
+  "src/package-schemas/gates.ts",
+  "src/package-schemas/runner-scope.ts",
+  "src/package-schemas/runner-stack.ts",
+];
+
+const shared: Options = {
+  entry,
   outDir: "dist",
-  clean: true,
-  // Suppress expected warnings about import.meta in CJS builds
-  // See src/cli.ts entry point detection comments for rationale
+  target: "es2020",
+  // Suppress expected warnings about import.meta in CJS builds.
+  // See src/cli.ts entry point detection comments for rationale.
   esbuildOptions(options) {
     options.logOverride = {
       ...options.logOverride,
       "empty-import-meta": "silent",
     };
   },
-});
+};
+
+export default defineConfig([
+  {
+    ...shared,
+    format: ["esm"],
+    dts: {
+      // Public package-schema entries compile canonical portable definitions from
+      // .smartergpt into package-owned dist/ artifacts without shipping the workspace.
+      compilerOptions: { rootDir: "." },
+    },
+    clean: false,
+  },
+  {
+    ...shared,
+    format: ["cjs"],
+    dts: false,
+    clean: false,
+    // Lex 2.1 publishes ESM-only conditions. Bundle the Lex APIs used by
+    // LexRunner only in CJS so the advertised require targets remain executable.
+    noExternal: [/^@smartergpt\/lex(?:\/.*)?$/],
+  },
+]);

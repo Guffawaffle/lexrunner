@@ -17,6 +17,16 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "SEE LICENSE IN LICENSE.md",
+  "files": [
+    "dist/",
+    "schemas/",
+    "mcp-server.mjs",
+    "README.md",
+    "README.mcp.md",
+    "CHANGELOG.md",
+    "NOTICE.md",
+    "LICENSE.md"
+  ],
   "bin": {
     "lex-pr": "dist/cli.js",
     "lexrunner-mcp": "./mcp-server.mjs"
@@ -41,24 +51,29 @@
       "import": "./dist/errors/index.js"
     },
     "./schemas/runner-stack": {
-      "types": "./.smartergpt/schemas/runner.stack.schema.d.ts",
-      "import": "./.smartergpt/schemas/runner.stack.schema.js"
+      "types": "./dist/package-schemas/runner-stack.d.ts",
+      "import": "./dist/package-schemas/runner-stack.js",
+      "require": "./dist/package-schemas/runner-stack.cjs"
     },
     "./schemas/runner-scope": {
-      "types": "./.smartergpt/schemas/runner.scope.schema.d.ts",
-      "import": "./.smartergpt/schemas/runner.scope.schema.js"
+      "types": "./dist/package-schemas/runner-scope.d.ts",
+      "import": "./dist/package-schemas/runner-scope.js",
+      "require": "./dist/package-schemas/runner-scope.cjs"
     },
     "./schemas/execution-plan-v1": {
-      "types": "./.smartergpt/schemas/execution-plan-v1.d.ts",
-      "import": "./.smartergpt/schemas/execution-plan-v1.js"
+      "types": "./dist/package-schemas/execution-plan-v1.d.ts",
+      "import": "./dist/package-schemas/execution-plan-v1.js",
+      "require": "./dist/package-schemas/execution-plan-v1.cjs"
     },
     "./schemas/gates": {
-      "types": "./.smartergpt/schemas/gates.schema.d.ts",
-      "import": "./.smartergpt/schemas/gates.schema.js"
+      "types": "./dist/package-schemas/gates.d.ts",
+      "import": "./dist/package-schemas/gates.js",
+      "require": "./dist/package-schemas/gates.cjs"
     },
     "./schemas/behavior-rule": {
-      "types": "./.smartergpt/schemas/behavior-rule.schema.d.ts",
-      "import": "./.smartergpt/schemas/behavior-rule.schema.js"
+      "types": "./dist/package-schemas/behavior-rule.d.ts",
+      "import": "./dist/package-schemas/behavior-rule.js",
+      "require": "./dist/package-schemas/behavior-rule.cjs"
     }
   },
   "scripts": {
@@ -67,7 +82,8 @@
     "cli": "tsx src/cli.ts",
     "cli:built": "node dist/cli.js",
     "mcp": "node mcp-server.mjs",
-    "build": "tsup && npm run validate:build-artifacts",
+    "clean:dist": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean:dist && tsup && npm run validate:build-artifacts",
     "pretest": "npm run build",
     "generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts && tsx scripts/generate-executor-manifest-schema.ts && tsx scripts/generate-run-schemas.ts",
     "lint": "npm run typecheck && npm run format:check",
@@ -76,6 +92,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "validate:manifests": "tsx scripts/validate-manifests.ts",
     "validate:build-artifacts": "tsx scripts/validate-build-artifacts.ts",
+    "validate:package": "tsx scripts/validate-package-boundary.ts",
+    "test:package": "node scripts/smoke-packed-package.mjs",
     "test": "vitest run",
     "test:git": "vitest run -c vitest.git.config.ts tests/release-prepare.spec.ts tests/promptsResolver.spec.ts tests/e2e-comprehensive.test.ts tests/autopilot-e2e-level3-4.spec.ts tests/deterministic-build.test.ts",
     "test:cli:slow": "vitest run -c vitest.slow-cli.config.ts",
