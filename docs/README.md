@@ -42,6 +42,10 @@ New to lexrunner? Start here:
 - **[Autopilot](./autopilot.md)** - Automation overview
 - **[Autopilot Levels](./autopilot-levels.md)** - Levels 0-4 explained
 
+### Agent safety
+
+- **[Agent worktree physical containment](./security/agent-worktree-containment.md)** - Directory-identity guarantees and platform restrictions
+
 ## 🔧 Configuration
 
 ### Workspace Setup

@@ -127,6 +127,9 @@ An expired clean lease may be released by reconciliation policy. An expired
 dirty lease MUST be quarantined for inspection and MUST NOT be automatically
 deleted. Cleanup MUST verify that the recorded path is still a registered
 worktree for the expected repository and is still on the recorded branch.
+The local broker's pathname-swap guarantees and fail-closed platform matrix are
+specified in
+[Agent worktree physical containment](../security/agent-worktree-containment.md).
 
 #### AgentTaskPacket
 
