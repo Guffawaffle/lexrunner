@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   AGENT_WORK_CONTRACT_VERSION,
   AgentTaskPacketHashInput_v1,
+  ExecutionEnvironmentOS,
   WorkItem_v1,
   createAgentTaskPacket,
 } from "../schemas/agent-work.js";
@@ -132,7 +133,7 @@ const AttemptLaunchPacketPolicySchema = AgentTaskPacketHashInput_v1.pick({
 const AttemptLaunchEnvelopePolicySchema = z
   .object({
     envelopeId: text,
-    os: z.enum(["linux", "windows", "darwin", "other"]),
+    os: ExecutionEnvironmentOS,
     architecture: text,
     workerRuntime: text,
     projectRoot: absoluteNativePath,

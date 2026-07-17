@@ -1,10 +1,40 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { ZodType } from "zod";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type { JsonValue } from "../coordination-store.js";
+import {
+  AgentTaskReceiptOutcome as AgentTaskReceiptOutcomeSchema,
+  AttemptReceiptDisposition as AttemptReceiptDispositionSchema,
+  AttemptReceiptEventType as AttemptReceiptEventTypeSchema,
+  AttemptStatus as AttemptStatusSchema,
+  WorkerSessionBackend as WorkerSessionBackendSchema,
+  WorkerSessionEventType as WorkerSessionEventTypeSchema,
+  WorkerSessionStatus as WorkerSessionStatusSchema,
+  WorkspaceCleanupDisposition as WorkspaceCleanupDispositionSchema,
+  WorkspaceLifecycleEventType as WorkspaceLifecycleEventTypeSchema,
+  WorkspaceLifecycleLeaseStatus as WorkspaceLifecycleLeaseStatusSchema,
+  WorkspaceObservation as WorkspaceObservationSchema,
+  INITIAL_ATTEMPT_RECEIPT_EVENT_TYPES,
+  LIVE_ATTEMPT_STATUSES,
+  LIVE_WORKSPACE_LEASE_STATUSES,
+  NONTERMINAL_WORKER_SESSION_STATUSES,
+  attemptStatusRequiresReceipt,
+  attemptStatusRequiresVerification,
+  canTransitionAttempt,
+  isLiveAttemptStatus,
+  isTerminalAttemptStatus,
+  isTerminalWorkerSession,
+  requiresDurableReceipt,
+  requiresLiveWorkspace,
+} from "../workspace-lifecycle-domains.js";
+import type {
+  FinishedWorkspaceLeaseStatus,
+  WorkspaceCleanupDisposition,
+} from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
   AttachWorkerSessionInput,
@@ -58,19 +88,26 @@ type MutationInput =
 type Success = Extract<WorkspaceMutationResult, { updated: true }>;
 type JsonRecord = { [key: string]: JsonValue };
 
+function sqlEnumValues(values: readonly string[]): string {
+  return values.map((value) => `'${value.replace(/'/g, "''")}'`).join(",");
+}
+
 // Kept inline because published bundles do not necessarily contain standalone SQL assets.
 // The source migration remains the reviewable/canonical deployment artifact.
+// CHECK constraints protect new tables. Existing versioned tables are not rebuilt;
+// runtime row validation is their fail-closed compatibility boundary.
 const INLINE_WORKSPACE_MIGRATION = `
 CREATE TABLE IF NOT EXISTS attempts (
  attemptId TEXT PRIMARY KEY, runId TEXT NOT NULL, runRevision INTEGER NOT NULL CHECK(runRevision>=0),
  workItemId TEXT NOT NULL,
  workItemRevision INTEGER NOT NULL CHECK(workItemRevision>=0), packetId TEXT NOT NULL,
  packetHash TEXT NOT NULL, baseSha TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
- status TEXT NOT NULL, receiptId TEXT, verificationId TEXT, workspaceLeaseId TEXT,
+ status TEXT NOT NULL CHECK(status IN (${sqlEnumValues(AttemptStatusSchema.options)})),
+ receiptId TEXT, verificationId TEXT, workspaceLeaseId TEXT,
  createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, completedAt TEXT,
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_one_live_work_item ON attempts(runId,workItemId)
- WHERE status IN ('prepared','leased','launching','running','receipt_submitted','verifying','verified');
+ WHERE status IN (${sqlEnumValues(LIVE_ATTEMPT_STATUSES)});
 CREATE TABLE IF NOT EXISTS workspace_leases (
  leaseId TEXT PRIMARY KEY, runId TEXT NOT NULL, runRevision INTEGER NOT NULL CHECK(runRevision>=0),
  workItemId TEXT NOT NULL,
@@ -79,22 +116,26 @@ CREATE TABLE IF NOT EXISTS workspace_leases (
  revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0), controllerId TEXT NOT NULL,
  controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
  repositoryId TEXT NOT NULL, hostId TEXT NOT NULL, gitRuntime TEXT NOT NULL, projectRoot TEXT NOT NULL,
- branch TEXT NOT NULL, worktreePath TEXT NOT NULL, baseSha TEXT NOT NULL, status TEXT NOT NULL,
+ branch TEXT NOT NULL, worktreePath TEXT NOT NULL, baseSha TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN (${sqlEnumValues(WorkspaceLifecycleLeaseStatusSchema.options)})),
  acquiredAt TEXT NOT NULL, heartbeatAt TEXT NOT NULL, expiresAt TEXT NOT NULL, releasedAt TEXT,
- cleanupDisposition TEXT, lastObservationJson TEXT,
+ cleanupDisposition TEXT CHECK(cleanupDisposition IS NULL OR cleanupDisposition IN
+ (${sqlEnumValues(WorkspaceCleanupDispositionSchema.options)})), lastObservationJson TEXT,
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_leases_live_branch ON workspace_leases(repositoryId,branch)
- WHERE status IN ('reserved','active');
+ WHERE status IN (${sqlEnumValues(LIVE_WORKSPACE_LEASE_STATUSES)});
 CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_leases_live_worktree ON workspace_leases(hostId,gitRuntime,worktreePath)
- WHERE status IN ('reserved','active');
+ WHERE status IN (${sqlEnumValues(LIVE_WORKSPACE_LEASE_STATUSES)});
 CREATE INDEX IF NOT EXISTS idx_workspace_leases_expiry ON workspace_leases(expiresAt)
- WHERE status IN ('reserved','active');
+ WHERE status IN (${sqlEnumValues(LIVE_WORKSPACE_LEASE_STATUSES)});
 CREATE TABLE IF NOT EXISTS workspace_lifecycle_events (
  runId TEXT NOT NULL, attemptId TEXT NOT NULL, mutationId TEXT NOT NULL,
  sequence INTEGER NOT NULL CHECK(sequence>0), attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0),
  workspaceLeaseRevision INTEGER, controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL,
- fencingToken INTEGER NOT NULL CHECK(fencingToken>0), type TEXT NOT NULL, payloadJson TEXT NOT NULL,
+ fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ type TEXT NOT NULL CHECK(type IN (${sqlEnumValues(WorkspaceLifecycleEventTypeSchema.options)})),
+ payloadJson TEXT NOT NULL,
  createdAt TEXT NOT NULL, PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE);
@@ -110,8 +151,11 @@ CREATE TABLE IF NOT EXISTS worker_sessions (
  workspaceLeaseId TEXT NOT NULL, workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
  executionEnvelopeId TEXT NOT NULL, executionEnvelopeHash TEXT NOT NULL,
  hostId TEXT NOT NULL, workerRuntime TEXT NOT NULL,
- gitRuntime TEXT NOT NULL, backend TEXT NOT NULL, workerId TEXT NOT NULL, model TEXT,
- status TEXT NOT NULL, startedAt TEXT NOT NULL, heartbeatAt TEXT NOT NULL, endedAt TEXT,
+ gitRuntime TEXT NOT NULL,
+ backend TEXT NOT NULL CHECK(backend IN (${sqlEnumValues(WorkerSessionBackendSchema.options)})),
+ workerId TEXT NOT NULL, model TEXT,
+ status TEXT NOT NULL CHECK(status IN (${sqlEnumValues(WorkerSessionStatusSchema.options)})),
+ startedAt TEXT NOT NULL, heartbeatAt TEXT NOT NULL, endedAt TEXT,
  exitReason TEXT, exitCode INTEGER, exitSummary TEXT,
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
@@ -129,17 +173,18 @@ CREATE TABLE IF NOT EXISTS launch_envelope_bindings (
  FOREIGN KEY(runId,authorizationMutationId)
  REFERENCES workspace_lifecycle_events(runId,mutationId) ON DELETE RESTRICT);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_sessions_one_nonterminal_attempt ON worker_sessions(attemptId)
- WHERE status IN ('starting','running','awaiting_human');
+ WHERE status IN (${sqlEnumValues(NONTERMINAL_WORKER_SESSION_STATUSES)});
 CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_sessions_one_live_native_identity
  ON worker_sessions(hostId,backend,workerId)
- WHERE status IN ('starting','running','awaiting_human');
+ WHERE status IN (${sqlEnumValues(NONTERMINAL_WORKER_SESSION_STATUSES)});
 CREATE TABLE IF NOT EXISTS worker_session_events (
  runId TEXT NOT NULL, attemptId TEXT NOT NULL, sessionId TEXT NOT NULL, mutationId TEXT NOT NULL,
  sequence INTEGER NOT NULL CHECK(sequence>0), attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0),
  workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
  sessionRevision INTEGER NOT NULL CHECK(sessionRevision>=0), controllerId TEXT NOT NULL,
  controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
- type TEXT NOT NULL, payloadJson TEXT NOT NULL, createdAt TEXT NOT NULL,
+ type TEXT NOT NULL CHECK(type IN (${sqlEnumValues(WorkerSessionEventTypeSchema.options)})),
+ payloadJson TEXT NOT NULL, createdAt TEXT NOT NULL,
  PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
@@ -156,10 +201,14 @@ CREATE TABLE IF NOT EXISTS attempt_receipts (
  attemptId TEXT NOT NULL UNIQUE, packetId TEXT NOT NULL, packetHash TEXT NOT NULL,
  workspaceLeaseId TEXT NOT NULL, workspaceLeaseRevision INTEGER NOT NULL,
  workerSessionId TEXT NOT NULL, workerSessionRevision INTEGER NOT NULL, workerRuntime TEXT NOT NULL,
- observedBaseSha TEXT NOT NULL, finalHeadSha TEXT, patchHash TEXT, outcome TEXT NOT NULL,
- disposition TEXT NOT NULL, submittedAt TEXT NOT NULL, recordedAt TEXT NOT NULL,
+ observedBaseSha TEXT NOT NULL, finalHeadSha TEXT, patchHash TEXT,
+ outcome TEXT NOT NULL CHECK(outcome IN (${sqlEnumValues(AgentTaskReceiptOutcomeSchema.options)})),
+ disposition TEXT NOT NULL CHECK(disposition IN (${sqlEnumValues(AttemptReceiptDispositionSchema.options)})),
+ submittedAt TEXT NOT NULL, recordedAt TEXT NOT NULL,
  controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL,
- resultingAttemptRevision INTEGER NOT NULL, resultingAttemptStatus TEXT NOT NULL,
+ resultingAttemptRevision INTEGER NOT NULL,
+ resultingAttemptStatus TEXT NOT NULL CHECK(resultingAttemptStatus IN
+ (${sqlEnumValues(AttemptStatusSchema.options)})),
  FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
  FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
@@ -169,7 +218,10 @@ CREATE TABLE IF NOT EXISTS attempt_receipt_events (
  mutationId TEXT NOT NULL, sequence INTEGER NOT NULL, attemptRevision INTEGER NOT NULL,
  workspaceLeaseRevision INTEGER NOT NULL, workerSessionRevision INTEGER NOT NULL,
  controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL,
- type TEXT NOT NULL, disposition TEXT NOT NULL, outcome TEXT NOT NULL, createdAt TEXT NOT NULL,
+ type TEXT NOT NULL CHECK(type IN (${sqlEnumValues(AttemptReceiptEventTypeSchema.options)})),
+ disposition TEXT NOT NULL CHECK(disposition IN (${sqlEnumValues(AttemptReceiptDispositionSchema.options)})),
+ outcome TEXT NOT NULL CHECK(outcome IN (${sqlEnumValues(AgentTaskReceiptOutcomeSchema.options)})),
+ createdAt TEXT NOT NULL,
  PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
  FOREIGN KEY(receiptId) REFERENCES attempt_receipts(receiptId) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS attempt_receipt_mutations (
@@ -180,8 +232,9 @@ INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(4,'attempt-receipt-persistence',datetime('now'));
 `;
 
-interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId"> {
+interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
   workspaceLeaseId: string | null;
+  status: string;
 }
 
 interface LeaseRow {
@@ -204,12 +257,12 @@ interface LeaseRow {
   branch: string;
   worktreePath: string;
   baseSha: string;
-  status: WorkspaceLifecycleLeaseRecord["status"];
+  status: string;
   acquiredAt: string;
   heartbeatAt: string;
   expiresAt: string;
   releasedAt: string | null;
-  cleanupDisposition: WorkspaceLifecycleLeaseRecord["cleanupDisposition"] | null;
+  cleanupDisposition: string | null;
   lastObservationJson: string | null;
 }
 
@@ -223,15 +276,17 @@ interface EventRow {
   controllerId: string;
   controllerLeaseId: string;
   fencingToken: number;
-  type: WorkspaceLifecycleEventType;
+  type: string;
   payloadJson: string;
   createdAt: string;
 }
 
 interface WorkerSessionRow extends Omit<
   WorkerSessionRecord,
-  "model" | "endedAt" | "exitReason" | "exitCode" | "exitSummary"
+  "backend" | "status" | "model" | "endedAt" | "exitReason" | "exitCode" | "exitSummary"
 > {
+  backend: string;
+  status: string;
   model: string | null;
   endedAt: string | null;
   exitReason: string | null;
@@ -239,55 +294,30 @@ interface WorkerSessionRow extends Omit<
   exitSummary: string | null;
 }
 
-interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload"> {
+interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload" | "type"> {
+  type: string;
   payloadJson: string;
 }
 
-interface AttemptReceiptRow extends Omit<AttemptReceiptRecord, "finalHeadSha" | "patchHash"> {
+interface AttemptReceiptRow extends Omit<
+  AttemptReceiptRecord,
+  "outcome" | "disposition" | "resultingAttemptStatus" | "finalHeadSha" | "patchHash"
+> {
+  outcome: string;
+  disposition: string;
+  resultingAttemptStatus: string;
   finalHeadSha: string | null;
   patchHash: string | null;
 }
 
-interface AttemptReceiptEventRow extends AttemptReceiptEvent {}
-
-const LIVE_ATTEMPTS = new Set<AttemptRecord["status"]>([
-  "prepared",
-  "leased",
-  "launching",
-  "running",
-  "receipt_submitted",
-  "verifying",
-  "verified",
-]);
-
-const TERMINAL_ATTEMPTS = new Set<AttemptRecord["status"]>([
-  "accepted",
-  "rejected",
-  "inconclusive",
-  "blocked",
-  "launch_failed",
-  "failed",
-  "cancelled",
-  "quarantined",
-]);
-
-const TRANSITIONS: Record<AttemptRecord["status"], AttemptRecord["status"][]> = {
-  prepared: ["cancelled"],
-  leased: ["launching", "cancelled", "quarantined"],
-  launching: ["running", "launch_failed", "failed", "cancelled", "quarantined"],
-  running: ["receipt_submitted", "blocked", "failed", "cancelled", "quarantined"],
-  receipt_submitted: ["verifying", "quarantined"],
-  verifying: ["verified", "rejected", "inconclusive", "failed", "quarantined"],
-  verified: ["accepted", "rejected", "inconclusive", "quarantined"],
-  accepted: [],
-  rejected: [],
-  inconclusive: [],
-  blocked: [],
-  launch_failed: [],
-  failed: [],
-  cancelled: [],
-  quarantined: [],
-};
+interface AttemptReceiptEventRow extends Omit<
+  AttemptReceiptEvent,
+  "type" | "disposition" | "outcome"
+> {
+  type: string;
+  disposition: string;
+  outcome: string;
+}
 
 /** SQLite attempt/workspace store sharing the authoritative controller transaction. */
 export class SqliteWorkspaceLifecycleStore
@@ -312,7 +342,7 @@ export class SqliteWorkspaceLifecycleStore
       const conflict = this.db
         .prepare(
           `SELECT 1 FROM attempts WHERE runId = ? AND workItemId = ?
-           AND status IN ('prepared','leased','launching','running','receipt_submitted','verifying','verified')`
+           AND status IN (${sqlEnumValues(LIVE_ATTEMPT_STATUSES)})`
         )
         .get(input.runId, input.workItemId);
       if (conflict) return this.failure("live_attempt_conflict");
@@ -346,7 +376,7 @@ export class SqliteWorkspaceLifecycleStore
       const attempt = this.attempt(input.attemptId);
       const failure = this.validateAttempt(attempt, input.runId, input.expectedAttemptRevision);
       if (failure) return failure;
-      if (!TRANSITIONS[attempt!.status].includes(input.status)) {
+      if (!canTransitionAttempt(attempt!.status, input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
       }
       if (input.status === "receipt_submitted") {
@@ -408,7 +438,7 @@ export class SqliteWorkspaceLifecycleStore
         .run(
           input.status,
           instant(input.now),
-          TERMINAL_ATTEMPTS.has(input.status) ? instant(input.now) : null,
+          isTerminalAttemptStatus(input.status) ? instant(input.now) : null,
           evidence.receiptId,
           evidence.verificationId,
           input.attemptId
@@ -432,7 +462,7 @@ export class SqliteWorkspaceLifecycleStore
       if (parseInstant(input.now, "now") < parseInstant(attempt!.updatedAt, "updatedAt"))
         return this.failure("invalid_time", attempt!);
       if (!validTtl(input.ttlMs)) return this.failure("invalid_time", attempt!);
-      if (!LIVE_ATTEMPTS.has(attempt!.status)) return this.failure("attempt_not_live", attempt!);
+      if (!isLiveAttemptStatus(attempt!.status)) return this.failure("attempt_not_live", attempt!);
       if (attempt!.workspaceLeaseId || this.lease(input.workspaceLeaseId))
         return this.failure("live_attempt_conflict", attempt!);
       if (attempt!.workItemId !== input.workItemId || attempt!.baseSha !== input.baseSha)
@@ -446,13 +476,15 @@ export class SqliteWorkspaceLifecycleStore
         return this.failure("dirty_workspace", attempt!);
       const branch = this.db
         .prepare(
-          `SELECT 1 FROM workspace_leases WHERE repositoryId = ? AND branch = ? AND status IN ('active','reserved')`
+          `SELECT 1 FROM workspace_leases WHERE repositoryId = ? AND branch = ?
+           AND status IN (${sqlEnumValues(LIVE_WORKSPACE_LEASE_STATUSES)})`
         )
         .get(input.repositoryId, input.branch);
       if (branch) return this.failure("branch_conflict", attempt!);
       const tree = this.db
         .prepare(
-          `SELECT 1 FROM workspace_leases WHERE hostId = ? AND gitRuntime = ? AND worktreePath = ? AND status IN ('active','reserved')`
+          `SELECT 1 FROM workspace_leases WHERE hostId = ? AND gitRuntime = ? AND worktreePath = ?
+           AND status IN (${sqlEnumValues(LIVE_WORKSPACE_LEASE_STATUSES)})`
         )
         .get(input.hostId, input.gitRuntime, input.worktreePath);
       if (tree) return this.failure("worktree_conflict", attempt!);
@@ -1005,13 +1037,10 @@ export class SqliteWorkspaceLifecycleStore
         | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.receiptFailure("mutation_conflict");
-        return {
-          ...(JSON.parse(prior.resultJson) as Extract<
-            AttemptReceiptSubmissionResult,
-            { submitted: true }
-          >),
-          idempotentReplay: true,
-        };
+        const replay = parseReceiptMutationSuccess(prior.resultJson);
+        return replay
+          ? { ...replay, idempotentReplay: true }
+          : this.receiptFailure("evidence_mismatch");
       }
       const hashReceipt = this.attemptReceiptByHash(receiptHash);
       if (hashReceipt) {
@@ -1113,10 +1142,7 @@ export class SqliteWorkspaceLifecycleStore
     if (!validReceiptBinding(claim, input, attempt, lease, session)) {
       return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
-    if (
-      !["completed", "failed", "cancelled", "lost"].includes(session.status) ||
-      !session.endedAt
-    ) {
+    if (!isTerminalWorkerSession(session.status) || !session.endedAt) {
       return this.receiptFailure("worker_session_not_active", attempt, lease, session);
     }
     const active =
@@ -1127,7 +1153,7 @@ export class SqliteWorkspaceLifecycleStore
       lease.controllerLeaseId === input.controller.leaseId &&
       lease.fencingToken === input.controller.fencingToken &&
       parseInstant(lease.expiresAt, "expiresAt") > parseInstant(input.now, "now");
-    if (!active && attempt.status !== "running" && !isTerminalAttempt(attempt.status)) {
+    if (!active && attempt.status !== "running" && !isTerminalAttemptStatus(attempt.status)) {
       return this.receiptFailure("invalid_attempt_transition", attempt, lease, session);
     }
     const disposition = active ? "verification_pending" : "retained_late";
@@ -1237,9 +1263,11 @@ export class SqliteWorkspaceLifecycleStore
         receipt.outcome,
         instant(input.now)
       );
-    const event = this.db
-      .prepare(`SELECT * FROM attempt_receipt_events WHERE runId = ? AND mutationId = ?`)
-      .get(input.runId, input.mutationId) as AttemptReceiptEventRow;
+    const event = toAttemptReceiptEvent(
+      this.db
+        .prepare(`SELECT * FROM attempt_receipt_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId) as AttemptReceiptEventRow
+    );
     return {
       submitted: true,
       receipt,
@@ -1288,13 +1316,11 @@ export class SqliteWorkspaceLifecycleStore
          JOIN attempt_receipt_events AS event
            ON event.runId = mutation.runId AND event.mutationId = mutation.mutationId
          WHERE event.runId = ? AND event.receiptId = ?
-           AND event.type IN ('attempt_receipt_submitted', 'attempt_receipt_retained_late')
+           AND event.type IN (${sqlEnumValues(INITIAL_ATTEMPT_RECEIPT_EVENT_TYPES)})
          LIMIT 1`
       )
       .get(receipt.runId, receipt.receiptId) as { resultJson: string } | undefined;
-    return row
-      ? (JSON.parse(row.resultJson) as Extract<AttemptReceiptSubmissionResult, { submitted: true }>)
-      : null;
+    return row ? parseReceiptMutationSuccess(row.resultJson) : null;
   }
 
   private mutateWorker(
@@ -1359,13 +1385,10 @@ export class SqliteWorkspaceLifecycleStore
         | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.workerFailure("mutation_conflict");
-        return {
-          ...(JSON.parse(prior.resultJson) as Extract<
-            WorkerSessionMutationResult,
-            { updated: true }
-          >),
-          idempotentReplay: true,
-        };
+        const replay = parseWorkerMutationSuccess(prior.resultJson);
+        return replay
+          ? { ...replay, idempotentReplay: true }
+          : this.workerFailure("evidence_mismatch");
       }
       const result = action();
       if (result.updated) {
@@ -1567,7 +1590,8 @@ export class SqliteWorkspaceLifecycleStore
         | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.failure("mutation_conflict");
-        return { ...(JSON.parse(prior.resultJson) as Success), idempotentReplay: true };
+        const replay = parseWorkspaceMutationSuccess(prior.resultJson);
+        return replay ? { ...replay, idempotentReplay: true } : this.failure("evidence_mismatch");
       }
       const result = action();
       if (result.updated) {
@@ -1634,8 +1658,8 @@ export class SqliteWorkspaceLifecycleStore
     input: MutationInput,
     attempt: AttemptRecord,
     lease: WorkspaceLifecycleLeaseRecord,
-    status: "released" | "preserved" | "abandoned",
-    disposition: "integrated" | "preserved" | "abandoned" | "discarded",
+    status: FinishedWorkspaceLeaseStatus,
+    disposition: WorkspaceCleanupDisposition,
     type: WorkspaceLifecycleEventType
   ): WorkspaceMutationResult {
     const now = instant(input.now);
@@ -1743,11 +1767,12 @@ export class SqliteWorkspaceLifecycleStore
   }
 
   private attempt(id: string): AttemptRecord | null {
-    return (
-      (this.db.prepare(`SELECT * FROM attempts WHERE attemptId = ?`).get(id) as
-        | AttemptRow
-        | undefined) ?? null
-    );
+    const row = this.db.prepare(`SELECT * FROM attempts WHERE attemptId = ?`).get(id) as
+      | AttemptRow
+      | undefined;
+    if (!row) return null;
+    const status = AttemptStatusSchema.safeParse(row.status);
+    return status.success ? { ...row, status: status.data } : null;
   }
 
   private requireAttempt(id: string): AttemptRecord {
@@ -1761,6 +1786,22 @@ export class SqliteWorkspaceLifecycleStore
       | LeaseRow
       | undefined;
     if (!row) return null;
+    const status = WorkspaceLifecycleLeaseStatusSchema.safeParse(row.status);
+    const cleanupDisposition =
+      row.cleanupDisposition === null
+        ? null
+        : WorkspaceCleanupDispositionSchema.safeParse(row.cleanupDisposition);
+    if (!status.success || (cleanupDisposition && !cleanupDisposition.success)) return null;
+    let lastObservation: WorkspaceObservation | undefined;
+    if (row.lastObservationJson !== null) {
+      try {
+        const parsed = WorkspaceObservationSchema.safeParse(JSON.parse(row.lastObservationJson));
+        if (!parsed.success) return null;
+        lastObservation = parsed.data;
+      } catch {
+        return null;
+      }
+    }
     return {
       leaseId: row.leaseId,
       runId: row.runId,
@@ -1781,15 +1822,13 @@ export class SqliteWorkspaceLifecycleStore
       branch: row.branch,
       worktreePath: row.worktreePath,
       baseSha: row.baseSha,
-      status: row.status,
+      status: status.data,
       acquiredAt: row.acquiredAt,
       heartbeatAt: row.heartbeatAt,
       expiresAt: row.expiresAt,
       ...(row.releasedAt ? { releasedAt: row.releasedAt } : {}),
-      ...(row.cleanupDisposition ? { cleanupDisposition: row.cleanupDisposition } : {}),
-      ...(row.lastObservationJson
-        ? { lastObservation: JSON.parse(row.lastObservationJson) as WorkspaceObservation }
-        : {}),
+      ...(cleanupDisposition?.success ? { cleanupDisposition: cleanupDisposition.data } : {}),
+      ...(lastObservation ? { lastObservation } : {}),
     };
   }
 
@@ -1866,7 +1905,7 @@ export class SqliteWorkspaceLifecycleStore
     const row = this.db
       .prepare(
         `SELECT * FROM worker_sessions WHERE attemptId = ?
-         ${nonterminalOnly ? "AND status IN ('starting','running','awaiting_human')" : ""}
+         ${nonterminalOnly ? `AND status IN (${sqlEnumValues(NONTERMINAL_WORKER_SESSION_STATUSES)})` : ""}
          ORDER BY startedAt DESC, sessionId DESC LIMIT 1`
       )
       .get(attemptId) as WorkerSessionRow | undefined;
@@ -1881,7 +1920,7 @@ export class SqliteWorkspaceLifecycleStore
     const row = this.db
       .prepare(
         `SELECT * FROM worker_sessions WHERE hostId = ? AND backend = ? AND workerId = ?
-         AND status IN ('starting','running','awaiting_human') LIMIT 1`
+         AND status IN (${sqlEnumValues(NONTERMINAL_WORKER_SESSION_STATUSES)}) LIMIT 1`
       )
       .get(hostId, backend, workerId) as WorkerSessionRow | undefined;
     return row ? toWorkerSession(row) : null;
@@ -1919,10 +1958,6 @@ function instant(value: string): string {
 
 function validTtl(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
-}
-
-function requiresLiveWorkspace(status: AttemptRecord["status"]): boolean {
-  return !["prepared", "leased", "cancelled", "quarantined"].includes(status);
 }
 
 function sameIdentity(expected: WorkspaceIdentity, observed: WorkspaceObservation): boolean {
@@ -1969,18 +2004,8 @@ function bindEvidence(
       return null;
     verificationId = input.verificationId;
   }
-  if (
-    ["receipt_submitted", "verifying", "verified", "accepted", "rejected", "inconclusive"].includes(
-      input.status
-    ) &&
-    receiptId === null
-  )
-    return null;
-  if (
-    ["verified", "accepted", "rejected", "inconclusive"].includes(input.status) &&
-    verificationId === null
-  )
-    return null;
+  if (attemptStatusRequiresReceipt(input.status) && receiptId === null) return null;
+  if (attemptStatusRequiresVerification(input.status) && verificationId === null) return null;
   return { receiptId, verificationId };
 }
 
@@ -1989,6 +2014,11 @@ function json(value: unknown): string {
 }
 
 function toEvent(row: EventRow): WorkspaceLifecycleEvent {
+  const type = requireDurableDomain(
+    WorkspaceLifecycleEventTypeSchema,
+    row.type,
+    "workspace_lifecycle_events.type"
+  );
   return {
     runId: row.runId,
     attemptId: row.attemptId,
@@ -1999,13 +2029,16 @@ function toEvent(row: EventRow): WorkspaceLifecycleEvent {
     controllerId: row.controllerId,
     controllerLeaseId: row.controllerLeaseId,
     fencingToken: row.fencingToken,
-    type: row.type,
+    type,
     payload: JSON.parse(row.payloadJson) as JsonValue,
     createdAt: row.createdAt,
   };
 }
 
-function toWorkerSession(row: WorkerSessionRow): WorkerSessionRecord {
+function toWorkerSession(row: WorkerSessionRow): WorkerSessionRecord | null {
+  const backend = WorkerSessionBackendSchema.safeParse(row.backend);
+  const status = WorkerSessionStatusSchema.safeParse(row.status);
+  if (!backend.success || !status.success) return null;
   return {
     sessionId: row.sessionId,
     revision: row.revision,
@@ -2020,10 +2053,10 @@ function toWorkerSession(row: WorkerSessionRow): WorkerSessionRecord {
     hostId: row.hostId,
     workerRuntime: row.workerRuntime,
     gitRuntime: row.gitRuntime,
-    backend: row.backend,
+    backend: backend.data,
     workerId: row.workerId,
     ...(row.model ? { model: row.model } : {}),
-    status: row.status,
+    status: status.data,
     startedAt: row.startedAt,
     heartbeatAt: row.heartbeatAt,
     ...(row.endedAt ? { endedAt: row.endedAt } : {}),
@@ -2034,6 +2067,11 @@ function toWorkerSession(row: WorkerSessionRow): WorkerSessionRecord {
 }
 
 function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
+  const type = requireDurableDomain(
+    WorkerSessionEventTypeSchema,
+    row.type,
+    "worker_session_events.type"
+  );
   return {
     runId: row.runId,
     attemptId: row.attemptId,
@@ -2046,13 +2084,17 @@ function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
     controllerId: row.controllerId,
     controllerLeaseId: row.controllerLeaseId,
     fencingToken: row.fencingToken,
-    type: row.type,
+    type,
     payload: JSON.parse(row.payloadJson) as JsonValue,
     createdAt: row.createdAt,
   };
 }
 
-function toAttemptReceipt(row: AttemptReceiptRow): AttemptReceiptRecord {
+function toAttemptReceipt(row: AttemptReceiptRow): AttemptReceiptRecord | null {
+  const outcome = AgentTaskReceiptOutcomeSchema.safeParse(row.outcome);
+  const disposition = AttemptReceiptDispositionSchema.safeParse(row.disposition);
+  const resultingAttemptStatus = AttemptStatusSchema.safeParse(row.resultingAttemptStatus);
+  if (!outcome.success || !disposition.success || !resultingAttemptStatus.success) return null;
   return {
     receiptId: row.receiptId,
     receiptHash: row.receiptHash,
@@ -2071,19 +2113,34 @@ function toAttemptReceipt(row: AttemptReceiptRow): AttemptReceiptRecord {
     observedBaseSha: row.observedBaseSha,
     ...(row.finalHeadSha ? { finalHeadSha: row.finalHeadSha } : {}),
     ...(row.patchHash ? { patchHash: row.patchHash } : {}),
-    outcome: row.outcome,
-    disposition: row.disposition,
+    outcome: outcome.data,
+    disposition: disposition.data,
     submittedAt: row.submittedAt,
     recordedAt: row.recordedAt,
     controllerId: row.controllerId,
     controllerLeaseId: row.controllerLeaseId,
     fencingToken: row.fencingToken,
     resultingAttemptRevision: row.resultingAttemptRevision,
-    resultingAttemptStatus: row.resultingAttemptStatus,
+    resultingAttemptStatus: resultingAttemptStatus.data,
   };
 }
 
 function toAttemptReceiptEvent(row: AttemptReceiptEventRow): AttemptReceiptEvent {
+  const type = requireDurableDomain(
+    AttemptReceiptEventTypeSchema,
+    row.type,
+    "attempt_receipt_events.type"
+  );
+  const disposition = requireDurableDomain(
+    AttemptReceiptDispositionSchema,
+    row.disposition,
+    "attempt_receipt_events.disposition"
+  );
+  const outcome = requireDurableDomain(
+    AgentTaskReceiptOutcomeSchema,
+    row.outcome,
+    "attempt_receipt_events.outcome"
+  );
   return {
     runId: row.runId,
     attemptId: row.attemptId,
@@ -2097,15 +2154,124 @@ function toAttemptReceiptEvent(row: AttemptReceiptEventRow): AttemptReceiptEvent
     controllerId: row.controllerId,
     controllerLeaseId: row.controllerLeaseId,
     fencingToken: row.fencingToken,
-    type: row.type,
-    disposition: row.disposition,
-    outcome: row.outcome,
+    type,
+    disposition,
+    outcome,
     createdAt: row.createdAt,
   };
 }
 
-function isTerminalWorkerSession(status: WorkerSessionRecord["status"]): boolean {
-  return ["completed", "failed", "cancelled", "lost"].includes(status);
+function requireDurableDomain<T>(schema: ZodType<T>, value: unknown, field: string): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new Error(`Invalid durable categorical value in ${field}`);
+  return parsed.data;
+}
+
+function parseWorkspaceMutationSuccess(resultJson: string): Success | null {
+  const value = parseDurableJsonRecord(resultJson);
+  if (
+    !value ||
+    value.updated !== true ||
+    typeof value.idempotentReplay !== "boolean" ||
+    !validAttemptCategories(value.attempt) ||
+    !validWorkspaceEventCategories(value.event) ||
+    (value.workspaceLease !== null && !validLeaseCategories(value.workspaceLease))
+  ) {
+    return null;
+  }
+  return value as unknown as Success;
+}
+
+function parseWorkerMutationSuccess(
+  resultJson: string
+): Extract<WorkerSessionMutationResult, { updated: true }> | null {
+  const value = parseDurableJsonRecord(resultJson);
+  if (
+    !value ||
+    value.updated !== true ||
+    typeof value.idempotentReplay !== "boolean" ||
+    !validAttemptCategories(value.attempt) ||
+    !validWorkerSessionCategories(value.workerSession) ||
+    !validWorkerEventCategories(value.event)
+  ) {
+    return null;
+  }
+  return value as unknown as Extract<WorkerSessionMutationResult, { updated: true }>;
+}
+
+function parseReceiptMutationSuccess(
+  resultJson: string
+): Extract<AttemptReceiptSubmissionResult, { submitted: true }> | null {
+  const value = parseDurableJsonRecord(resultJson);
+  if (
+    !value ||
+    value.submitted !== true ||
+    typeof value.idempotentReplay !== "boolean" ||
+    !validAttemptCategories(value.attempt) ||
+    !validReceiptCategories(value.receipt) ||
+    !validReceiptEventCategories(value.event)
+  ) {
+    return null;
+  }
+  return value as unknown as Extract<AttemptReceiptSubmissionResult, { submitted: true }>;
+}
+
+function parseDurableJsonRecord(value: string): JsonRecord | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isJsonRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function validAttemptCategories(value: unknown): boolean {
+  return isJsonRecord(value) && AttemptStatusSchema.safeParse(value.status).success;
+}
+
+function validLeaseCategories(value: unknown): boolean {
+  return (
+    isJsonRecord(value) &&
+    WorkspaceLifecycleLeaseStatusSchema.safeParse(value.status).success &&
+    (value.cleanupDisposition === undefined ||
+      WorkspaceCleanupDispositionSchema.safeParse(value.cleanupDisposition).success) &&
+    (value.lastObservation === undefined ||
+      WorkspaceObservationSchema.safeParse(value.lastObservation).success)
+  );
+}
+
+function validWorkspaceEventCategories(value: unknown): boolean {
+  return isJsonRecord(value) && WorkspaceLifecycleEventTypeSchema.safeParse(value.type).success;
+}
+
+function validWorkerSessionCategories(value: unknown): boolean {
+  return (
+    isJsonRecord(value) &&
+    WorkerSessionBackendSchema.safeParse(value.backend).success &&
+    WorkerSessionStatusSchema.safeParse(value.status).success
+  );
+}
+
+function validWorkerEventCategories(value: unknown): boolean {
+  return isJsonRecord(value) && WorkerSessionEventTypeSchema.safeParse(value.type).success;
+}
+
+function validReceiptCategories(value: unknown): boolean {
+  return (
+    isJsonRecord(value) &&
+    AgentTaskReceiptOutcomeSchema.safeParse(value.outcome).success &&
+    AttemptReceiptDispositionSchema.safeParse(value.disposition).success &&
+    AttemptStatusSchema.safeParse(value.resultingAttemptStatus).success
+  );
+}
+
+function validReceiptEventCategories(value: unknown): boolean {
+  return (
+    isJsonRecord(value) &&
+    AttemptReceiptEventTypeSchema.safeParse(value.type).success &&
+    AttemptReceiptDispositionSchema.safeParse(value.disposition).success &&
+    AgentTaskReceiptOutcomeSchema.safeParse(value.outcome).success
+  );
 }
 
 function validExitMetadata(input: EndWorkerSessionInput): boolean {
@@ -2290,21 +2456,4 @@ function validReceiptBinding(
     completed <= parseInstant(session.endedAt!, "session.endedAt") &&
     parseInstant(receipt.submitted_at, "submitted_at") <= parseInstant(input.now, "now")
   );
-}
-
-function isTerminalAttempt(status: AttemptRecord["status"]): boolean {
-  return [
-    "accepted",
-    "rejected",
-    "inconclusive",
-    "blocked",
-    "launch_failed",
-    "failed",
-    "cancelled",
-    "quarantined",
-  ].includes(status);
-}
-
-function requiresDurableReceipt(status: AttemptRecord["status"]): boolean {
-  return ["verifying", "verified", "accepted", "rejected", "inconclusive"].includes(status);
 }
