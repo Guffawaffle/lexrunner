@@ -42,6 +42,14 @@ New to lexrunner? Start here:
 - **[Autopilot](./autopilot.md)** - Automation overview
 - **[Autopilot Levels](./autopilot-levels.md)** - Levels 0-4 explained
 
+### Architecture
+
+- **[Canonical CLI and MCP surface](./architecture/canonical-cli-mcp-surface.md)** - Registration-verified dispositions, parity, and ownership
+
+### Agent safety
+
+- **[Agent worktree physical containment](./security/agent-worktree-containment.md)** - Directory-identity guarantees and platform restrictions
+
 ## 🔧 Configuration
 
 ### Workspace Setup

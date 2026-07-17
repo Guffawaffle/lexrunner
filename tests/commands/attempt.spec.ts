@@ -48,7 +48,25 @@ describe("attempt commands", () => {
       status: vi.fn(async () => ({ ok: true, result: { workerSession: null } })),
     };
     receiptHandlers = {
-      submit: vi.fn(async () => ({ ok: true, result: { submitted: true } as never })),
+      submit: vi.fn(async () => ({
+        ok: true,
+        result: {
+          submitted: true,
+          receiptId: "receipt-1",
+          receiptHash: `sha256:${"b".repeat(64)}`,
+          attemptId: "attempt-1",
+          outcome: "completed",
+          disposition: "verification_pending",
+          attemptRevision: 5,
+          attemptStatus: "receipt_submitted",
+          event: {
+            type: "attempt_receipt_submitted",
+            sequence: 1,
+            createdAt: "2026-07-14T12:00:00.000Z",
+          },
+          idempotentReplay: false,
+        },
+      })),
       status: vi.fn(async () => ({ ok: true, result: { receipt: null } })),
     };
     process.exitCode = undefined;
@@ -139,7 +157,25 @@ describe("attempt commands", () => {
       attemptId: "attempt-1",
     });
     expect(outputs).toEqual([
-      { ok: true, result: { submitted: true } },
+      {
+        ok: true,
+        result: {
+          submitted: true,
+          receiptId: "receipt-1",
+          receiptHash: `sha256:${"b".repeat(64)}`,
+          attemptId: "attempt-1",
+          outcome: "completed",
+          disposition: "verification_pending",
+          attemptRevision: 5,
+          attemptStatus: "receipt_submitted",
+          event: {
+            type: "attempt_receipt_submitted",
+            sequence: 1,
+            createdAt: "2026-07-14T12:00:00.000Z",
+          },
+          idempotentReplay: false,
+        },
+      },
       { ok: true, result: { receipt: null } },
     ]);
     expect(process.exitCode).toBeUndefined();

@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
   CommandRequest,
@@ -8,18 +12,34 @@ import type {
 import type { WorktreeTarget } from "../../src/workspaces/git-worktree-broker.js";
 import { NodeGitWorktreeBroker } from "../../src/workspaces/node-git-worktree-broker.js";
 
-const target: WorktreeTarget = {
-  repositoryId: "repo-1",
-  hostId: "host-1",
-  gitRuntime: "git-test",
-  projectRoot: "/repo",
-  branch: "agent/test",
-  worktreePath: "/trees/test",
-  attemptId: "attempt-1",
-  baseSha: "a".repeat(40),
-};
+let sandbox: string;
+let repositoryRoot: string;
+let worktreeRoot: string;
+let target: WorktreeTarget;
 
 describe("NodeGitWorktreeBroker command failures", () => {
+  beforeEach(async () => {
+    sandbox = await mkdtemp(join(tmpdir(), "lexrunner-worktree-errors-"));
+    repositoryRoot = join(sandbox, "repo");
+    worktreeRoot = join(sandbox, "trees");
+    await mkdir(join(repositoryRoot, ".git"), { recursive: true });
+    await mkdir(worktreeRoot);
+    target = {
+      repositoryId: "repo-1",
+      hostId: "host-1",
+      gitRuntime: "git-test",
+      projectRoot: repositoryRoot,
+      branch: "agent/test",
+      worktreePath: join(worktreeRoot, "test"),
+      attemptId: "attempt-1",
+      baseSha: "a".repeat(40),
+    };
+  });
+
+  afterEach(async () => {
+    await rm(sandbox, { recursive: true, force: true });
+  });
+
   it.each([
     ["timeout", "timeout"],
     ["aborted", "aborted"],
@@ -27,17 +47,20 @@ describe("NodeGitWorktreeBroker command failures", () => {
     const runner = new StaticRunner(failure(kind));
     const broker = makeBroker(runner);
 
-    await expect(broker.create(target)).resolves.toMatchObject({
+    const result = await broker.create(target);
+
+    expect(result).toMatchObject({
       ok: false,
       operation: "create",
       reason,
       command: {
         executable: "git",
-        args: ["check-ref-format", "--branch", "agent/test"],
-        cwd: "/repo",
+        args: expect.arrayContaining(["check-ref-format", "--branch", "agent/test"]),
+        cwd: repositoryRoot,
         exitCode: null,
       },
     });
+    expect(JSON.stringify(result)).not.toMatch(/\/proc\/\d+\/fd/);
     expect(runner.requests).toHaveLength(1);
   });
 
@@ -73,7 +96,12 @@ describe("NodeGitWorktreeBroker command failures", () => {
         reason: kind,
         command: {
           exitCode: 1,
-          args: ["show-ref", "--verify", "--quiet", `refs/heads/${target.branch}`],
+          args: expect.arrayContaining([
+            "show-ref",
+            "--verify",
+            "--quiet",
+            `refs/heads/${target.branch}`,
+          ]),
         },
       });
       expect(runner.requests).toHaveLength(4);
@@ -95,7 +123,7 @@ describe("NodeGitWorktreeBroker command failures", () => {
       ok: false,
       operation: "observe",
       reason: "identity_mismatch",
-      command: { args: ["worktree", "list", "--porcelain", "-z"] },
+      command: { args: expect.arrayContaining(["worktree", "list", "--porcelain", "-z"]) },
     });
   });
 });
@@ -127,8 +155,8 @@ class QueueRunner implements CommandRunner {
 function makeBroker(runner: CommandRunner): NodeGitWorktreeBroker {
   return new NodeGitWorktreeBroker({
     repositoryId: "repo-1",
-    repositoryRoot: "/repo",
-    worktreeRoot: "/trees",
+    repositoryRoot,
+    worktreeRoot,
     hostId: "host-1",
     gitRuntime: "git-test",
     pathComparison: "case-sensitive",

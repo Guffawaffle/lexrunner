@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorktreeTarget } from "../../src/workspaces/git-worktree-broker.js";
 import { NodeGitWorktreeBroker } from "../../src/workspaces/node-git-worktree-broker.js";
+import {
+  ExecaCommandRunner,
+  type CommandRequest,
+  type CommandResult,
+  type CommandRunner,
+} from "../../src/workspaces/command-runner.js";
 
 const REPOSITORY_ID = "repo-integration";
 const HOST_ID = "host-integration";
@@ -374,6 +380,295 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
     ).toBe(baseSha);
   });
 
+  it("rejects existing symlink traversal before Git can create a branch or worktree", async () => {
+    const outside = join(sandbox, "outside");
+    const linkedParent = join(worktreeRoot, "linked-parent");
+    await mkdir(outside);
+    await symlink(outside, linkedParent, "dir");
+    const target = makeTarget("symlink-parent", {
+      worktreePath: join(linkedParent, "attempt"),
+    });
+
+    await expect(broker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
+    expect(await pathExists(join(outside, "attempt"))).toBe(false);
+  });
+
+  it("rejects a symlinked allocation root and case-insensitive runtime at construction", async () => {
+    const physicalRoot = join(sandbox, "physical allocation");
+    const linkedRoot = join(sandbox, "linked allocation");
+    await mkdir(physicalRoot);
+    await symlink(physicalRoot, linkedRoot, "dir");
+
+    expect(
+      () =>
+        new NodeGitWorktreeBroker({
+          repositoryId: REPOSITORY_ID,
+          repositoryRoot,
+          worktreeRoot: linkedRoot,
+          hostId: HOST_ID,
+          gitRuntime: GIT_RUNTIME,
+          pathComparison: "case-sensitive",
+        })
+    ).toThrow(/symlink-free/);
+    expect(
+      () =>
+        new NodeGitWorktreeBroker({
+          repositoryId: REPOSITORY_ID,
+          repositoryRoot,
+          worktreeRoot: physicalRoot,
+          hostId: HOST_ID,
+          gitRuntime: GIT_RUNTIME,
+          pathComparison: "case-insensitive",
+        })
+    ).toThrow(/case-sensitive Linux Git runtime/);
+  });
+
+  it("rejects a case-variant allocation-root spelling", async () => {
+    const exactRoot = join(sandbox, "Case-Sensitive-Root");
+    await mkdir(exactRoot);
+
+    expect(
+      () =>
+        new NodeGitWorktreeBroker({
+          repositoryId: REPOSITORY_ID,
+          repositoryRoot,
+          worktreeRoot: join(sandbox, "case-sensitive-root"),
+          hostId: HOST_ID,
+          gitRuntime: GIT_RUNTIME,
+          pathComparison: "case-sensitive",
+        })
+    ).toThrow(/symlink-free directory/);
+  });
+
+  it("fails closed when the allocation root identity is replaced between operations", async () => {
+    const originalRoot = join(sandbox, "original allocation identity");
+    const outside = join(sandbox, "replacement destination");
+    await rename(worktreeRoot, originalRoot);
+    await mkdir(outside);
+    await symlink(outside, worktreeRoot, "dir");
+    const target = makeTarget("replaced-root");
+
+    await expect(broker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
+    expect(await pathExists(join(outside, "replaced-root"))).toBe(false);
+    expect(await pathExists(join(originalRoot, "replaced-root"))).toBe(false);
+  });
+
+  it("detects allocation-root replacement in the immediate process preflight", async () => {
+    const anchoredRoot = join(sandbox, "anchored allocation root");
+    const outside = join(sandbox, "root-preflight-outside");
+    await mkdir(outside);
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (
+          !swapped &&
+          phase === "before" &&
+          hasArgSequence(request, ["check-ref-format", "--branch"])
+        ) {
+          swapped = true;
+          await rename(worktreeRoot, anchoredRoot);
+          await symlink(outside, worktreeRoot, "dir");
+        }
+      })
+    );
+    const target = makeTarget("root-preflight-swap");
+
+    await expect(guardedBroker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(swapped).toBe(true);
+    expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
+    expect(await pathExists(join(outside, "root-preflight-swap"))).toBe(false);
+    expect(await pathExists(join(anchoredRoot, "root-preflight-swap"))).toBe(false);
+  });
+
+  it("binds Git commands to the captured repository identity", async () => {
+    const anchoredRepository = join(sandbox, "anchored repository");
+    const outside = join(sandbox, "repository-substitute");
+    await mkdir(outside);
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (
+          !swapped &&
+          phase === "before" &&
+          hasArgSequence(request, ["check-ref-format", "--branch"])
+        ) {
+          swapped = true;
+          await rename(repositoryRoot, anchoredRepository);
+          await symlink(outside, repositoryRoot, "dir");
+        }
+      })
+    );
+    const target = makeTarget("repository-swap");
+
+    await expect(guardedBroker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(swapped).toBe(true);
+    expect(await localBranchExists(anchoredRepository, target.branch)).toBe(false);
+    expect(await pathExists(join(outside, ".git"))).toBe(false);
+    expect(await pathExists(target.worktreePath)).toBe(false);
+  });
+
+  it("detects a target-ancestor swap in the process preflight and never invokes Git on its substitute", async () => {
+    const parent = join(worktreeRoot, "target-parent");
+    const anchoredParent = join(worktreeRoot, "anchored-parent");
+    const outside = join(sandbox, "outside-redirection");
+    await mkdir(parent);
+    await mkdir(outside);
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (!swapped && phase === "before" && hasArgSequence(request, ["worktree", "add"])) {
+          swapped = true;
+          await rename(parent, anchoredParent);
+          await symlink(outside, parent, "dir");
+        }
+      })
+    );
+    const target = makeTarget("ancestor-swap", {
+      worktreePath: join(parent, "attempt"),
+    });
+
+    await expect(guardedBroker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(swapped).toBe(true);
+    expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
+    expect(await pathExists(join(outside, "attempt"))).toBe(false);
+    expect(await pathExists(join(anchoredParent, "attempt", ".git"))).toBe(false);
+  });
+
+  it("does not redirect the Attempt marker when an ancestor moves after Git returns", async () => {
+    const parent = join(worktreeRoot, "marker-parent");
+    const anchoredParent = join(worktreeRoot, "marker-parent-anchored");
+    const outside = join(sandbox, "marker-outside");
+    await mkdir(parent);
+    await mkdir(outside);
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (!swapped && phase === "after" && hasArgSequence(request, ["worktree", "add"])) {
+          swapped = true;
+          await rename(parent, anchoredParent);
+          await symlink(outside, parent, "dir");
+        }
+      })
+    );
+    const target = makeTarget("marker-swap", { worktreePath: join(parent, "attempt") });
+
+    await expect(guardedBroker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(swapped).toBe(true);
+    expect(await pathExists(join(outside, "attempt"))).toBe(false);
+    const anchoredTarget = join(anchoredParent, "attempt");
+    const gitAdmin = await gitStdout(anchoredTarget, "rev-parse", "--absolute-git-dir");
+    expect(await pathExists(join(gitAdmin, "lexrunner-attempt.json"))).toBe(false);
+  });
+
+  it("does not follow an Attempt-marker symlink installed after Git returns", async () => {
+    const outside = join(sandbox, "marker-symlink-outside");
+    const sentinel = join(outside, "sentinel");
+    await mkdir(outside);
+    await writeFile(sentinel, "outside\n", "utf8");
+    const target = makeTarget("marker-symlink");
+    let injected = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (!injected && phase === "after" && hasArgSequence(request, ["worktree", "add"])) {
+          const gitFile = await readFile(join(target.worktreePath, ".git"), "utf8");
+          const gitAdmin = gitFile.trim().slice("gitdir: ".length);
+          await symlink(sentinel, join(gitAdmin, "lexrunner-attempt.json"));
+          injected = true;
+        }
+      })
+    );
+
+    await expect(guardedBroker.create(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(injected).toBe(true);
+    expect(await readFile(sentinel, "utf8")).toBe("outside\n");
+  });
+
+  it("blocks observation and removal redirection after an owned worktree is swapped", async () => {
+    const parent = join(worktreeRoot, "owned-parent");
+    const anchoredParent = join(worktreeRoot, "owned-parent-anchored");
+    const outside = join(sandbox, "owned-outside");
+    await mkdir(parent);
+    await mkdir(outside);
+    const target = makeTarget("owned-swap", { worktreePath: join(parent, "attempt") });
+    expect((await broker.create(target)).ok).toBe(true);
+    await writeFile(join(outside, "sentinel"), "outside\n", "utf8");
+
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (!swapped && phase === "before" && hasArgSequence(request, ["status"])) {
+          swapped = true;
+          await rename(parent, anchoredParent);
+          await symlink(outside, parent, "dir");
+        }
+      })
+    );
+    await expect(guardedBroker.observe(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    await expect(guardedBroker.remove(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(await readFile(join(outside, "sentinel"), "utf8")).toBe("outside\n");
+    expect(await pathExists(join(outside, "attempt"))).toBe(false);
+    expect(await pathExists(join(anchoredParent, "attempt", ".git"))).toBe(true);
+  });
+
+  it("does not redirect worktree removal when the ancestor is swapped at process preflight", async () => {
+    const parent = join(worktreeRoot, "remove-parent");
+    const anchoredParent = join(worktreeRoot, "remove-parent-anchored");
+    const outside = join(sandbox, "remove-outside");
+    await mkdir(parent);
+    await mkdir(outside);
+    await writeFile(join(outside, "sentinel"), "outside\n", "utf8");
+    const target = makeTarget("remove-swap", { worktreePath: join(parent, "attempt") });
+    expect((await broker.create(target)).ok).toBe(true);
+
+    let swapped = false;
+    const guardedBroker = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (!swapped && phase === "before" && hasArgSequence(request, ["worktree", "remove"])) {
+          swapped = true;
+          await rename(parent, anchoredParent);
+          await symlink(outside, parent, "dir");
+        }
+      })
+    );
+    await expect(guardedBroker.remove(target)).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+    });
+    expect(swapped).toBe(true);
+    expect(await readFile(join(outside, "sentinel"), "utf8")).toBe("outside\n");
+    expect(await pathExists(join(outside, "attempt"))).toBe(false);
+    expect(await pathExists(join(anchoredParent, "attempt", ".git"))).toBe(true);
+  });
+
   it("keeps paths opaque and rejects a target owned by another Git runtime", async () => {
     const target = makeTarget("runtime", {
       worktreePath: join(worktreeRoot, "C:\\opaque windows-looking path"),
@@ -402,7 +697,40 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       ...overrides,
     };
   }
+
+  function brokerWithRunner(runner: CommandRunner): NodeGitWorktreeBroker {
+    return new NodeGitWorktreeBroker({
+      repositoryId: REPOSITORY_ID,
+      repositoryRoot,
+      worktreeRoot,
+      hostId: HOST_ID,
+      gitRuntime: GIT_RUNTIME,
+      pathComparison: "case-sensitive",
+      runner,
+    });
+  }
 });
+
+class HookedRunner implements CommandRunner {
+  private readonly delegate = new ExecaCommandRunner();
+
+  constructor(
+    private readonly hook: (request: CommandRequest, phase: "before" | "after") => Promise<void>
+  ) {}
+
+  async run(request: CommandRequest): Promise<CommandResult> {
+    await this.hook(request, "before");
+    const result = await this.delegate.run(request);
+    await this.hook(request, "after");
+    return result;
+  }
+}
+
+function hasArgSequence(request: CommandRequest, expected: readonly string[]): boolean {
+  return request.args.some((_, index) =>
+    expected.every((value, offset) => request.args[index + offset] === value)
+  );
+}
 
 async function git(cwd: string, ...args: string[]): Promise<void> {
   await execa("git", args, { cwd });

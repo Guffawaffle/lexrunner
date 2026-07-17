@@ -31,6 +31,7 @@ export type BrokerFailureReason =
   | "runtime_mismatch"
   | "path_conflict"
   | "branch_conflict"
+  | "containment_violation"
   | "identity_mismatch"
   | "dirty_workspace"
   | "command_failed"

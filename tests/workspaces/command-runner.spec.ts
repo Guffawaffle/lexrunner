@@ -83,6 +83,26 @@ describe("ExecaCommandRunner", () => {
     });
   });
 
+  it("fails a synchronous identity preflight without spawning", async () => {
+    const result = await runner.run({
+      executable: process.execPath,
+      args: ["-e", 'process.stdout.write("should-not-run")'],
+      cwd,
+      timeoutMs: 2_000,
+      preflight: () => {
+        throw new Error("anchored directory moved");
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      kind: "preflight_error",
+      exitCode: null,
+      stdout: "",
+      message: "anchored directory moved",
+    });
+  });
+
   it("reports timeouts distinctly", async () => {
     const result = await runNode("setInterval(() => {}, 1_000)", { timeoutMs: 100 });
 

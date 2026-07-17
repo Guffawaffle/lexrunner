@@ -1,7 +1,21 @@
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
-import { AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
+import { AgentTaskPacket_v1, AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
+import {
+  canTransitionAttempt,
+  attemptStatusRequiresReceipt,
+  attemptStatusRequiresVerification,
+  isLiveAttemptStatus,
+  isTerminalAttemptStatus,
+  isTerminalWorkerSession,
+  requiresDurableReceipt,
+  requiresLiveWorkspace,
+} from "../workspace-lifecycle-domains.js";
+import type {
+  FinishedWorkspaceLeaseStatus,
+  WorkspaceCleanupDisposition,
+} from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
   AttachWorkerSessionInput,
@@ -18,6 +32,8 @@ import type {
   LaunchEnvelopeBindingRecord,
   LaunchEnvelopeBindingResult,
   LaunchEnvelopeBindingStore,
+  TaskPacketBindingRecord,
+  TaskPacketBindingStore,
   HeartbeatWorkspaceInput,
   QuarantineWorkspaceInput,
   ReconcileWorkspaceInput,
@@ -74,7 +90,11 @@ interface StoredReceiptMutation {
  */
 export class InMemoryWorkspaceLifecycleStore
   extends InMemoryCoordinationStore
-  implements WorkspaceLifecycleStore, LaunchEnvelopeBindingStore, WorkerSessionStore
+  implements
+    WorkspaceLifecycleStore,
+    LaunchEnvelopeBindingStore,
+    TaskPacketBindingStore,
+    WorkerSessionStore
 {
   private readonly attempts = new Map<string, AttemptRecord>();
   private readonly workspaceLeases = new Map<string, WorkspaceLifecycleLeaseRecord>();
@@ -85,6 +105,7 @@ export class InMemoryWorkspaceLifecycleStore
   private readonly workerEvents = new Map<string, WorkerSessionEvent[]>();
   private readonly workerMutations = new Map<string, StoredWorkerMutation>();
   private readonly launchEnvelopeBindings = new Map<string, LaunchEnvelopeBindingRecord>();
+  private readonly taskPacketBindings = new Map<string, TaskPacketBindingRecord>();
   private readonly attemptReceipts = new Map<string, AttemptReceiptRecord>();
   private readonly receiptByAttempt = new Map<string, string>();
   private readonly receiptByHash = new Map<string, string>();
@@ -137,7 +158,7 @@ export class InMemoryWorkspaceLifecycleStore
         input.expectedAttemptRevision
       );
       if (revisionFailure) return revisionFailure;
-      if (!canTransition(attempt!.status, input.status)) {
+      if (!canTransitionAttempt(attempt!.status, input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
       }
       if (input.status === "receipt_submitted") {
@@ -201,7 +222,7 @@ export class InMemoryWorkspaceLifecycleStore
       attempt!.receiptId = evidence.receiptId;
       attempt!.verificationId = evidence.verificationId;
       attempt!.updatedAt = now;
-      attempt!.completedAt = TERMINAL_ATTEMPTS.has(input.status) ? now : null;
+      attempt!.completedAt = isTerminalAttemptStatus(input.status) ? now : null;
       const lease = attempt!.workspaceLeaseId
         ? (this.workspaceLeases.get(attempt!.workspaceLeaseId) ?? null)
         : null;
@@ -440,7 +461,12 @@ export class InMemoryWorkspaceLifecycleStore
         const lease = this.workspaceLeases.get(input.workspaceLeaseId);
         const existing = this.launchEnvelopeBindings.get(input.attemptId);
         if (existing) {
-          return sameLaunchBinding(existing, input)
+          return sameLaunchBinding(existing, input) &&
+            sameTaskPacketBinding(
+              this.taskPacketBindings.get(input.attemptId),
+              input.packetJson,
+              attempt
+            )
             ? { bound: true as const, binding: { ...existing }, idempotentReplay: true }
             : launchFailure("mutation_conflict", attempt, lease);
         }
@@ -461,6 +487,13 @@ export class InMemoryWorkspaceLifecycleStore
         }
         const envelope = validateCanonicalEnvelope(input, attempt!, lease!);
         if (!envelope) return launchFailure("evidence_mismatch", attempt, lease);
+        // A packet snapshot is mandatory for every new binding.  The optional
+        // input remains only so an already-persisted pre-snapshot envelope can
+        // be replayed exactly during compatibility migration.
+        if (input.packetJson === undefined)
+          return launchFailure("evidence_mismatch", attempt, lease);
+        const packet = validateCanonicalTaskPacket(input.packetJson, attempt!);
+        if (!packet) return launchFailure("evidence_mismatch", attempt, lease);
         const binding: LaunchEnvelopeBindingRecord = {
           runId: input.runId,
           attemptId: input.attemptId,
@@ -477,6 +510,16 @@ export class InMemoryWorkspaceLifecycleStore
           createdAt: normalizeInstant(input.createdAt),
         };
         this.launchEnvelopeBindings.set(input.attemptId, binding);
+        this.taskPacketBindings.set(input.attemptId, {
+          runId: input.runId,
+          attemptId: input.attemptId,
+          workItemId: attempt!.workItemId,
+          workItemRevision: attempt!.workItemRevision,
+          packetId: attempt!.packetId,
+          packetHash: attempt!.packetHash,
+          packetJson: input.packetJson,
+          createdAt: normalizeInstant(input.createdAt),
+        });
         return { bound: true as const, binding: { ...binding }, idempotentReplay: false };
       }
     );
@@ -494,6 +537,14 @@ export class InMemoryWorkspaceLifecycleStore
   async getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null> {
     const binding = this.launchEnvelopeBindings.get(attemptId);
     return binding ? { ...binding } : null;
+  }
+
+  async getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null> {
+    const binding = this.taskPacketBindings.get(attemptId);
+    const attempt = this.attempts.get(attemptId);
+    return binding && attempt && validateTaskPacketBinding(binding, attempt)
+      ? { ...binding }
+      : null;
   }
 
   async attachWorkerSession(input: AttachWorkerSessionInput): Promise<WorkerSessionMutationResult> {
@@ -683,6 +734,14 @@ export class InMemoryWorkspaceLifecycleStore
         if (this.mutations.has(key) || this.workerMutations.has(key)) {
           return this.receiptFailure("mutation_conflict");
         }
+        const packetAttempt = this.attempts.get(input.attemptId);
+        const packetBinding = this.taskPacketBindings.get(input.attemptId);
+        if (
+          packetAttempt &&
+          (!packetBinding || !validateTaskPacketBinding(packetBinding, packetAttempt))
+        ) {
+          return this.receiptFailure("evidence_mismatch", packetAttempt);
+        }
         const prior = this.receiptMutations.get(key);
         if (prior) {
           if (prior.fingerprint !== fingerprint) return this.receiptFailure("mutation_conflict");
@@ -796,7 +855,7 @@ export class InMemoryWorkspaceLifecycleStore
     if (!validReceiptBinding(claim, input, attempt, lease, session)) {
       return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
-    const terminalWorker = ["completed", "failed", "cancelled", "lost"].includes(session.status);
+    const terminalWorker = isTerminalWorkerSession(session.status);
     if (!terminalWorker || !session.endedAt) {
       return this.receiptFailure("worker_session_not_active", attempt, lease, session);
     }
@@ -808,7 +867,7 @@ export class InMemoryWorkspaceLifecycleStore
       lease.controllerLeaseId === input.controller.leaseId &&
       lease.fencingToken === input.controller.fencingToken &&
       parseInstant(lease.expiresAt, "expiresAt") > parseInstant(input.now, "now");
-    if (!active && attempt.status !== "running" && !isTerminalAttempt(attempt.status)) {
+    if (!active && attempt.status !== "running" && !isTerminalAttemptStatus(attempt.status)) {
       return this.receiptFailure("invalid_attempt_transition", attempt, lease, session);
     }
     const disposition = active ? "verification_pending" : "retained_late";
@@ -1188,8 +1247,8 @@ export class InMemoryWorkspaceLifecycleStore
     input: MutationInput,
     attempt: AttemptRecord,
     lease: WorkspaceLifecycleLeaseRecord,
-    status: "released" | "preserved" | "abandoned",
-    disposition: "integrated" | "preserved" | "abandoned" | "discarded",
+    status: FinishedWorkspaceLeaseStatus,
+    disposition: WorkspaceCleanupDisposition,
     eventType: WorkspaceLifecycleEventType
   ): WorkspaceMutationResult {
     const now = normalizeInstant(input.now);
@@ -1285,44 +1344,7 @@ function mutationKey(runId: string, mutationId: string): string {
 }
 
 function isLiveAttempt(attempt: AttemptRecord): boolean {
-  return !TERMINAL_ATTEMPTS.has(attempt.status);
-}
-
-const TERMINAL_ATTEMPTS = new Set<AttemptRecord["status"]>([
-  "accepted",
-  "rejected",
-  "inconclusive",
-  "blocked",
-  "launch_failed",
-  "failed",
-  "cancelled",
-  "quarantined",
-]);
-
-const legalAttemptTransitions: Record<AttemptRecord["status"], AttemptRecord["status"][]> = {
-  prepared: ["cancelled"],
-  leased: ["launching", "cancelled", "quarantined"],
-  launching: ["running", "launch_failed", "failed", "cancelled", "quarantined"],
-  running: ["receipt_submitted", "blocked", "failed", "cancelled", "quarantined"],
-  receipt_submitted: ["verifying", "quarantined"],
-  verifying: ["verified", "rejected", "inconclusive", "failed", "quarantined"],
-  verified: ["accepted", "rejected", "inconclusive", "quarantined"],
-  accepted: [],
-  rejected: [],
-  inconclusive: [],
-  blocked: [],
-  launch_failed: [],
-  failed: [],
-  cancelled: [],
-  quarantined: [],
-};
-
-function canTransition(from: AttemptRecord["status"], to: AttemptRecord["status"]): boolean {
-  return legalAttemptTransitions[from].includes(to);
-}
-
-function requiresLiveWorkspace(status: AttemptRecord["status"]): boolean {
-  return !["prepared", "leased", "cancelled", "quarantined"].includes(status);
+  return isLiveAttemptStatus(attempt.status);
 }
 
 function validTtl(ttlMs: number): boolean {
@@ -1352,18 +1374,10 @@ function bindAttemptEvidence(
     verificationId = input.verificationId;
   }
 
-  if (
-    ["receipt_submitted", "verifying", "verified", "accepted", "rejected", "inconclusive"].includes(
-      input.status
-    ) &&
-    receiptId === null
-  ) {
+  if (attemptStatusRequiresReceipt(input.status) && receiptId === null) {
     return { bound: false };
   }
-  if (
-    ["verified", "accepted", "rejected", "inconclusive"].includes(input.status) &&
-    verificationId === null
-  ) {
+  if (attemptStatusRequiresVerification(input.status) && verificationId === null) {
     return { bound: false };
   }
 
@@ -1422,10 +1436,6 @@ function cloneSuccess(
     workspaceLease: result.workspaceLease ? cloneLease(result.workspaceLease) : null,
     event: cloneEvent(result.event),
   };
-}
-
-function isTerminalWorkerSession(status: WorkerSessionRecord["status"]): boolean {
-  return ["completed", "failed", "cancelled", "lost"].includes(status);
 }
 
 function cloneWorkerEvent(event: WorkerSessionEvent): WorkerSessionEvent {
@@ -1555,6 +1565,61 @@ function validateCanonicalEnvelope(
     : null;
 }
 
+function validateCanonicalTaskPacket(
+  packetJson: string,
+  attempt: AttemptRecord
+): AgentTaskPacket_v1 | null {
+  if (Buffer.byteLength(packetJson, "utf8") > 256 * 1024) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(packetJson);
+  } catch {
+    return null;
+  }
+  if (!isJsonRecord(value) || canonicalJSONStringify(value) !== packetJson) return null;
+  const parsed = AgentTaskPacket_v1.safeParse(value);
+  if (!parsed.success) return null;
+  const packet = parsed.data;
+  return packet.run_id === attempt.runId &&
+    packet.attempt_id === attempt.attemptId &&
+    packet.work_item.work_item_id === attempt.workItemId &&
+    packet.work_item.revision === attempt.workItemRevision &&
+    packet.packet_id === attempt.packetId &&
+    packet.packet_hash === attempt.packetHash &&
+    packet.repository.base_sha === attempt.baseSha
+    ? packet
+    : null;
+}
+
+function sameTaskPacketBinding(
+  existing: TaskPacketBindingRecord | undefined,
+  packetJson: string | undefined,
+  attempt: AttemptRecord | undefined
+): boolean {
+  if (!attempt) return false;
+  return existing
+    ? packetJson !== undefined &&
+        existing.packetJson === packetJson &&
+        validateTaskPacketBinding(existing, attempt)
+    : packetJson === undefined;
+}
+
+function validateTaskPacketBinding(
+  binding: TaskPacketBindingRecord,
+  attempt: AttemptRecord
+): boolean {
+  return (
+    binding.runId === attempt.runId &&
+    binding.attemptId === attempt.attemptId &&
+    binding.workItemId === attempt.workItemId &&
+    binding.workItemRevision === attempt.workItemRevision &&
+    binding.packetId === attempt.packetId &&
+    binding.packetHash === attempt.packetHash &&
+    Number.isFinite(Date.parse(binding.createdAt)) &&
+    validateCanonicalTaskPacket(binding.packetJson, attempt) !== null
+  );
+}
+
 function sameLaunchBinding(
   existing: LaunchEnvelopeBindingRecord,
   input: BindLaunchEnvelopeInput
@@ -1623,23 +1688,6 @@ function validReceiptBinding(
     completed <= parseInstant(session.endedAt!, "session.endedAt") &&
     parseInstant(receipt.submitted_at, "submitted_at") <= parseInstant(input.now, "now")
   );
-}
-
-function isTerminalAttempt(status: AttemptRecord["status"]): boolean {
-  return [
-    "accepted",
-    "rejected",
-    "inconclusive",
-    "blocked",
-    "launch_failed",
-    "failed",
-    "cancelled",
-    "quarantined",
-  ].includes(status);
-}
-
-function requiresDurableReceipt(status: AttemptRecord["status"]): boolean {
-  return ["verifying", "verified", "accepted", "rejected", "inconclusive"].includes(status);
 }
 
 function cloneReceiptSuccess(

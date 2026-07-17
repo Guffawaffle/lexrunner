@@ -130,6 +130,7 @@ export {
 export type { AttemptReceiptHandlers } from "./agent-work-attempt-receipt-adapters.js";
 export { AgentWorkAttemptReceiptService } from "./agent-work-attempt-receipt-service.js";
 export type {
+  AttemptReceiptSubmissionAcknowledgement,
   AttemptReceiptStatusProjection,
   AttemptReceiptStatusResult,
 } from "./agent-work-attempt-receipt-service.js";

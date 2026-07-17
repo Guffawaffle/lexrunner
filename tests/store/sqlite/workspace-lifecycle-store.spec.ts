@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import Database from "better-sqlite3-multiple-ciphers";
+import { createAgentTaskPacket } from "../../../src/schemas/agent-work.js";
 import { computeCanonicalHash } from "../../../src/schemas/task-contract.js";
 import { SqliteWorkspaceLifecycleStore } from "../../../src/store/sqlite/workspace-lifecycle-store.js";
 import { canonicalJSONStringify } from "../../../src/util/canonicalJson.js";
@@ -42,6 +43,36 @@ describe("SQLite workspace lifecycle concurrency", () => {
         leaseId: acquired.lease.leaseId,
         fencingToken: acquired.lease.fencingToken,
       };
+      const packet = createAgentTaskPacket({
+        schema_version: "1.0.0",
+        packet_id: "worker-race-packet",
+        run_id: "worker-race-run",
+        work_item: { work_item_id: "worker-race-work", revision: 1 },
+        attempt_id: "worker-race-attempt",
+        repository: { id: "repo", base_sha: "a".repeat(40) },
+        objective: "Race worker attachment",
+        acceptance_criteria: [],
+        instructions: [],
+        scope: {
+          read_globs: [],
+          write_globs: [],
+          deny_globs: [],
+          cross_repo_allowed: false,
+        },
+        authority: {
+          edit: false,
+          git_write: false,
+          github_write: false,
+          external_runtime: false,
+          secrets: false,
+          signing: false,
+          release: false,
+        },
+        verification: [],
+        budget: {},
+        created_at: "2026-07-11T12:00:00.000Z",
+      });
+      const packetJson = canonicalJSONStringify(packet);
       await first.createAttempt({
         runId: "worker-race-run",
         controller,
@@ -52,7 +83,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         workItemId: "worker-race-work",
         workItemRevision: 1,
         packetId: "worker-race-packet",
-        packetHash: `sha256:${"b".repeat(64)}`,
+        packetHash: packet.packet_hash,
         baseSha: "a".repeat(40),
       });
       const identity = {
@@ -99,7 +130,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         run_id: "worker-race-run",
         attempt_id: "worker-race-attempt",
         packet_id: "worker-race-packet",
-        packet_hash: `sha256:${"b".repeat(64)}`,
+        packet_hash: packet.packet_hash,
         workspace_lease_id: "worker-race-lease",
         workspace_lease_revision: 0,
         expected_head_sha: "a".repeat(40),
@@ -122,6 +153,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         envelopeId: "worker-race-envelope",
         envelopeHash,
         envelopeJson,
+        packetJson,
         createdAt: "2026-07-11T12:00:02.250Z",
       });
       const attach = (store: SqliteWorkspaceLifecycleStore, suffix: string) =>
@@ -137,7 +169,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
           expectedWorkspaceLeaseRevision: 0,
           sessionId: `session-${suffix}`,
           packetId: "worker-race-packet",
-          packetHash: `sha256:${"b".repeat(64)}`,
+          packetHash: packet.packet_hash,
           executionEnvelopeId: "worker-race-envelope",
           executionEnvelopeHash: envelopeHash,
           hostId: "host",
@@ -197,7 +229,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
             work_item_revision: 1,
             attempt_id: "worker-race-attempt",
             packet_id: "worker-race-packet",
-            packet_hash: `sha256:${"b".repeat(64)}`,
+            packet_hash: packet.packet_hash,
             workspace_lease_id: "worker-race-lease",
             workspace_lease_revision: 0,
             worker_runtime: "native",
@@ -281,6 +313,220 @@ describe("SQLite workspace lifecycle concurrency", () => {
       await expect(legacy.getAttemptReceiptForAttempt("missing")).resolves.toBeNull();
       await expect(legacy.getAttemptReceiptByHash(`sha256:${"0".repeat(64)}`)).resolves.toBeNull();
       await expect(legacy.listAttemptReceiptEvents("missing")).resolves.toEqual([]);
+    } finally {
+      await legacy.close();
+    }
+  });
+
+  it("constrains new categorical rows and fails closed on corrupt legacy values", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lexrunner-lifecycle-domain-read-"));
+    directories.push(directory);
+    const path = join(directory, "store.db");
+    const writable = new SqliteWorkspaceLifecycleStore(path);
+    const acquired = await writable.acquireControllerLease({
+      runId: "domain-run",
+      controllerId: "domain-controller",
+      leaseId: "domain-controller-lease",
+      now: "2026-07-11T12:00:00.000Z",
+      ttlMs: 60_000,
+      initialState: {},
+    });
+    if (!acquired.acquired) throw new Error("controller setup failed");
+    const controller = {
+      runId: acquired.lease.runId,
+      controllerId: acquired.lease.controllerId,
+      leaseId: acquired.lease.leaseId,
+      fencingToken: acquired.lease.fencingToken,
+    };
+    const createInput = {
+      runId: "domain-run",
+      controller,
+      expectedRunRevision: 0,
+      mutationId: "domain-create",
+      now: "2026-07-11T12:00:01.000Z",
+      attemptId: "domain-attempt",
+      workItemId: "domain-work",
+      workItemRevision: 1,
+      packetId: "domain-packet",
+      packetHash: `sha256:${"b".repeat(64)}`,
+      baseSha: "a".repeat(40),
+    };
+    await writable.createAttempt(createInput);
+    await writable.close();
+
+    const database = new Database(path);
+    database.pragma("foreign_keys = OFF");
+    database.exec(`
+      INSERT INTO workspace_leases (
+        leaseId, runId, runRevision, workItemId, workItemRevision, packetId, packetHash,
+        attemptId, revision, controllerId, controllerLeaseId, fencingToken, repositoryId,
+        hostId, gitRuntime, projectRoot, branch, worktreePath, baseSha, status, acquiredAt,
+        heartbeatAt, expiresAt
+      ) VALUES (
+        'domain-lease', 'domain-run', 0, 'domain-work', 1, 'domain-packet',
+        'sha256:${"b".repeat(64)}', 'domain-attempt', 0, 'domain-controller',
+        'domain-controller-lease', 1, 'owner/repo', 'host', 'git', '/repo', 'agent/domain',
+        '/trees/domain', '${"a".repeat(40)}', 'reserved', '2026-07-11T12:00:01.000Z',
+        '2026-07-11T12:00:01.000Z', '2026-07-11T12:01:00.000Z'
+      );
+      INSERT INTO worker_sessions (
+        sessionId, revision, runId, attemptId, packetId, packetHash, workspaceLeaseId,
+        workspaceLeaseRevision, executionEnvelopeId, executionEnvelopeHash, hostId,
+        workerRuntime, gitRuntime, backend, workerId, status, startedAt, heartbeatAt
+      ) VALUES (
+        'domain-session', 0, 'domain-run', 'domain-attempt', 'domain-packet',
+        'sha256:${"b".repeat(64)}', 'domain-lease', 0, 'domain-envelope',
+        'sha256:${"c".repeat(64)}', 'host', 'future-runtime', 'git', 'external',
+        'domain-worker', 'starting', '2026-07-11T12:00:02.000Z',
+        '2026-07-11T12:00:02.000Z'
+      );
+      INSERT INTO worker_session_events (
+        runId, attemptId, sessionId, mutationId, sequence, attemptRevision,
+        workspaceLeaseRevision, sessionRevision, controllerId, controllerLeaseId,
+        fencingToken, type, payloadJson, createdAt
+      ) VALUES (
+        'domain-run', 'domain-attempt', 'domain-session', 'domain-worker-event', 1, 0, 0, 0,
+        'domain-controller', 'domain-controller-lease', 1, 'worker_session_attached', '{}',
+        '2026-07-11T12:00:02.000Z'
+      );
+      INSERT INTO attempt_receipts (
+        receiptId, receiptHash, receiptJson, runId, workItemId, workItemRevision, attemptId,
+        packetId, packetHash, workspaceLeaseId, workspaceLeaseRevision, workerSessionId,
+        workerSessionRevision, workerRuntime, observedBaseSha, outcome, disposition, submittedAt,
+        recordedAt, controllerId, controllerLeaseId, fencingToken, resultingAttemptRevision,
+        resultingAttemptStatus
+      ) VALUES (
+        'domain-receipt', 'sha256:${"d".repeat(64)}', '{}', 'domain-run', 'domain-work', 1,
+        'domain-attempt', 'domain-packet', 'sha256:${"b".repeat(64)}', 'domain-lease', 0,
+        'domain-session', 0, 'future-runtime', '${"a".repeat(40)}', 'completed',
+        'retained_late', '2026-07-11T12:00:03.000Z', '2026-07-11T12:00:03.000Z',
+        'domain-controller', 'domain-controller-lease', 1, 0, 'prepared'
+      );
+      INSERT INTO attempt_receipt_events (
+        runId, attemptId, receiptId, receiptHash, mutationId, sequence, attemptRevision,
+        workspaceLeaseRevision, workerSessionRevision, controllerId, controllerLeaseId,
+        fencingToken, type, disposition, outcome, createdAt
+      ) VALUES (
+        'domain-run', 'domain-attempt', 'domain-receipt', 'sha256:${"d".repeat(64)}',
+        'domain-receipt-event', 1, 0, 0, 0, 'domain-controller', 'domain-controller-lease', 1,
+        'attempt_receipt_retained_late', 'retained_late', 'completed',
+        '2026-07-11T12:00:03.000Z'
+      );
+    `);
+
+    for (const statement of [
+      `UPDATE attempts SET status = 'invented' WHERE attemptId = 'domain-attempt'`,
+      `UPDATE workspace_leases SET status = 'invented' WHERE leaseId = 'domain-lease'`,
+      `UPDATE workspace_leases SET cleanupDisposition = 'invented' WHERE leaseId = 'domain-lease'`,
+      `UPDATE worker_sessions SET backend = 'invented' WHERE sessionId = 'domain-session'`,
+      `UPDATE worker_sessions SET status = 'invented' WHERE sessionId = 'domain-session'`,
+      `UPDATE workspace_lifecycle_events SET type = 'invented' WHERE mutationId = 'domain-create'`,
+      `UPDATE worker_session_events SET type = 'invented' WHERE mutationId = 'domain-worker-event'`,
+      `UPDATE attempt_receipts SET outcome = 'invented' WHERE receiptId = 'domain-receipt'`,
+      `UPDATE attempt_receipts SET disposition = 'invented' WHERE receiptId = 'domain-receipt'`,
+      `UPDATE attempt_receipts SET resultingAttemptStatus = 'invented' WHERE receiptId = 'domain-receipt'`,
+      `UPDATE attempt_receipt_events SET type = 'invented' WHERE mutationId = 'domain-receipt-event'`,
+      `UPDATE attempt_receipt_events SET disposition = 'invented' WHERE mutationId = 'domain-receipt-event'`,
+      `UPDATE attempt_receipt_events SET outcome = 'invented' WHERE mutationId = 'domain-receipt-event'`,
+    ]) {
+      expect(() => database.exec(statement)).toThrow(/CHECK constraint failed/);
+    }
+
+    const mutationRow = database
+      .prepare(
+        `SELECT resultJson FROM workspace_lifecycle_mutations
+         WHERE runId = 'domain-run' AND mutationId = 'domain-create'`
+      )
+      .get() as { resultJson: string };
+    const mutationResult = JSON.parse(mutationRow.resultJson) as {
+      attempt: { status: string };
+    };
+    mutationResult.attempt.status = "invented";
+    database
+      .prepare(
+        `UPDATE workspace_lifecycle_mutations SET resultJson = ?
+         WHERE runId = 'domain-run' AND mutationId = 'domain-create'`
+      )
+      .run(JSON.stringify(mutationResult));
+    database.close();
+
+    const replayStore = new SqliteWorkspaceLifecycleStore(path);
+    try {
+      await expect(replayStore.createAttempt(createInput)).resolves.toMatchObject({
+        updated: false,
+        reason: "evidence_mismatch",
+      });
+    } finally {
+      await replayStore.close();
+    }
+
+    const corrupter = new Database(path);
+    corrupter.pragma("ignore_check_constraints = ON");
+    corrupter.exec(`
+      UPDATE attempts SET status = 'invented' WHERE attemptId = 'domain-attempt';
+      UPDATE workspace_leases SET status = 'invented' WHERE leaseId = 'domain-lease';
+      UPDATE worker_sessions SET backend = 'invented' WHERE sessionId = 'domain-session';
+      UPDATE workspace_lifecycle_events SET type = 'invented' WHERE mutationId = 'domain-create';
+      UPDATE worker_session_events SET type = 'invented' WHERE mutationId = 'domain-worker-event';
+      UPDATE attempt_receipts SET outcome = 'invented' WHERE receiptId = 'domain-receipt';
+      UPDATE attempt_receipt_events SET type = 'invented' WHERE mutationId = 'domain-receipt-event';
+    `);
+    corrupter.close();
+
+    const corrupted = new SqliteWorkspaceLifecycleStore(path, { readOnly: true });
+    try {
+      await expect(corrupted.getAttempt("domain-attempt")).resolves.toBeNull();
+      await expect(corrupted.getWorkspaceLease("domain-lease")).resolves.toBeNull();
+      await expect(corrupted.getWorkerSession("domain-session")).resolves.toBeNull();
+      await expect(corrupted.getAttemptReceipt("domain-receipt")).resolves.toBeNull();
+      await expect(corrupted.listWorkspaceLifecycleEvents("domain-run")).rejects.toThrow(
+        "Invalid durable categorical value"
+      );
+      await expect(corrupted.listWorkerSessionEvents("domain-run")).rejects.toThrow(
+        "Invalid durable categorical value"
+      );
+      await expect(corrupted.listAttemptReceiptEvents("domain-run")).rejects.toThrow(
+        "Invalid durable categorical value"
+      );
+    } finally {
+      await corrupted.close();
+    }
+
+    const mutationStore = new SqliteWorkspaceLifecycleStore(path);
+    try {
+      await expect(
+        mutationStore.transitionAttempt({
+          runId: "domain-run",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "domain-transition",
+          now: "2026-07-11T12:00:04.000Z",
+          attemptId: "domain-attempt",
+          expectedAttemptRevision: 0,
+          status: "cancelled",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "not_found" });
+    } finally {
+      await mutationStore.close();
+    }
+  });
+
+  it("reads pre-packet-snapshot databases without creating a snapshot table", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lexrunner-packet-legacy-read-"));
+    directories.push(directory);
+    const path = join(directory, "store.db");
+    const writable = new SqliteWorkspaceLifecycleStore(path);
+    await writable.close();
+    const database = new Database(path);
+    database.exec(`
+      DROP TABLE task_packet_bindings;
+      DELETE FROM coordination_schema_migrations WHERE version = 5;
+    `);
+    database.close();
+
+    const legacy = new SqliteWorkspaceLifecycleStore(path, { readOnly: true });
+    try {
+      await expect(legacy.getTaskPacketBinding("missing")).resolves.toBeNull();
     } finally {
       await legacy.close();
     }

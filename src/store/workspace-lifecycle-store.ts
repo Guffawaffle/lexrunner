@@ -2,25 +2,51 @@ import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
 import type { Attempt_v1 as AttemptContract_v1 } from "../schemas/agent-work.js";
 import type { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
+import type {
+  AgentTaskReceiptOutcome,
+  AttemptReceiptFailureReason,
+  AttemptReceiptDisposition,
+  AttemptReceiptEventType,
+  AttemptStatus,
+  EndWorkerSessionStatus,
+  FinishedWorkspaceLeaseStatus,
+  HeartbeatWorkerSessionStatus,
+  ReleaseWorkspaceDisposition,
+  WorkerSessionBackend,
+  WorkerSessionEventType,
+  WorkerSessionMutationFailureReason,
+  WorkerSessionStatus,
+  WorkspaceCleanupDisposition,
+  WorkspaceLifecycleEventType,
+  WorkspaceLifecycleLeaseStatus,
+  WorkspaceMutationFailureReason,
+  WorkspaceObservation,
+  WorkspaceReconciliationAction,
+} from "./workspace-lifecycle-domains.js";
+
+export type {
+  AgentTaskReceiptOutcome,
+  AttemptReceiptFailureReason,
+  AttemptReceiptDisposition,
+  AttemptReceiptEventType,
+  AttemptStatus,
+  EndWorkerSessionStatus,
+  FinishedWorkspaceLeaseStatus,
+  HeartbeatWorkerSessionStatus,
+  ReleaseWorkspaceDisposition,
+  WorkerSessionBackend,
+  WorkerSessionEventType,
+  WorkerSessionMutationFailureReason,
+  WorkerSessionStatus,
+  WorkspaceCleanupDisposition,
+  WorkspaceLifecycleEventType,
+  WorkspaceLifecycleLeaseStatus,
+  WorkspaceMutationFailureReason,
+  WorkspaceObservation,
+  WorkspaceReconciliationAction,
+} from "./workspace-lifecycle-domains.js";
 
 /** Durable attempt state. Attempts exist before a workspace is allocated. */
-export type AttemptStatus =
-  | "prepared"
-  | "leased"
-  | "launching"
-  | "running"
-  | "receipt_submitted"
-  | "verifying"
-  | "verified"
-  | "accepted"
-  | "rejected"
-  | "inconclusive"
-  | "blocked"
-  | "launch_failed"
-  | "failed"
-  | "cancelled"
-  | "quarantined";
-
 export interface AttemptRecord {
   attemptId: string;
   runId: string;
@@ -40,16 +66,6 @@ export interface AttemptRecord {
   completedAt: string | null;
 }
 
-export type WorkspaceLifecycleLeaseStatus =
-  | "reserved"
-  | "active"
-  | "released"
-  | "preserved"
-  | "abandoned"
-  | "quarantined";
-
-export type WorkspaceCleanupDisposition = "integrated" | "preserved" | "abandoned" | "discarded";
-
 export interface WorkspaceIdentity {
   repositoryId: string;
   hostId: string;
@@ -58,23 +74,6 @@ export interface WorkspaceIdentity {
   branch: string;
   worktreePath: string;
   attemptId: string;
-}
-
-/** Facts observed by a Git adapter. The store never probes Git itself. */
-export interface WorkspaceObservation {
-  exists: boolean;
-  registered: boolean;
-  repositoryId: string | null;
-  hostId: string;
-  gitRuntime: string;
-  projectRoot: string | null;
-  branch: string | null;
-  worktreePath: string;
-  attemptId: string | null;
-  headSha: string | null;
-  cleanliness: "clean" | "dirty";
-  dirtyPaths?: string[];
-  reason?: string;
 }
 
 /**
@@ -105,15 +104,6 @@ export interface WorkspaceLifecycleLeaseRecord extends WorkspaceIdentity {
   lastObservation?: WorkspaceObservation;
 }
 
-export type WorkspaceLifecycleEventType =
-  | "attempt_created"
-  | "attempt_transitioned"
-  | "workspace_acquired"
-  | "workspace_heartbeat"
-  | "workspace_released"
-  | "workspace_reconciled"
-  | "workspace_quarantined";
-
 export interface WorkspaceLifecycleEvent {
   runId: string;
   attemptId: string;
@@ -128,16 +118,6 @@ export interface WorkspaceLifecycleEvent {
   payload: JsonValue;
   createdAt: string;
 }
-
-export type WorkerSessionBackend = "host-subagent" | "codex-cli" | "external";
-export type WorkerSessionStatus =
-  | "starting"
-  | "running"
-  | "awaiting_human"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "lost";
 
 /** Durable identity and observed lifecycle for one native worker attached to an Attempt. */
 export interface WorkerSessionRecord {
@@ -183,10 +163,24 @@ export interface LaunchEnvelopeBindingRecord {
   createdAt: string;
 }
 
-export type WorkerSessionEventType =
-  | "worker_session_attached"
-  | "worker_session_heartbeat"
-  | "worker_session_ended";
+/**
+ * Immutable canonical AgentTaskPacket snapshot bound to the durable Attempt.
+ *
+ * The snapshot is written only as part of launch-envelope binding, so callers
+ * cannot make a packet body appear after a worker has started.  It deliberately
+ * retains the canonical JSON for later criterion/check reference validation;
+ * consumers must parse it under AgentTaskPacket_v1 before acting on it.
+ */
+export interface TaskPacketBindingRecord {
+  runId: string;
+  attemptId: string;
+  workItemId: string;
+  workItemRevision: number;
+  packetId: string;
+  packetHash: string;
+  packetJson: string;
+  createdAt: string;
+}
 
 export interface WorkerSessionEvent {
   runId: string;
@@ -247,6 +241,13 @@ export interface BindLaunchEnvelopeInput {
   envelopeId: string;
   envelopeHash: string;
   envelopeJson: string;
+  /**
+   * Required for every new launch-envelope binding. It remains optional in
+   * the input type solely so callers can exactly replay an already-persisted
+   * legacy envelope-only binding during compatibility migration; it must not
+   * be omitted when creating a binding.
+   */
+  packetJson?: string;
   createdAt: string;
 }
 
@@ -259,8 +260,6 @@ export type LaunchEnvelopeBindingResult =
       currentWorkspaceLeaseRevision?: number;
       currentRunRevision?: number;
     };
-
-export type AttemptReceiptDisposition = "verification_pending" | "retained_late";
 
 export interface AttemptReceiptRecord {
   receiptId: string;
@@ -280,7 +279,7 @@ export interface AttemptReceiptRecord {
   observedBaseSha: string;
   finalHeadSha?: string;
   patchHash?: string;
-  outcome: AgentTaskReceipt_v2["outcome"];
+  outcome: AgentTaskReceiptOutcome;
   disposition: AttemptReceiptDisposition;
   submittedAt: string;
   recordedAt: string;
@@ -290,11 +289,6 @@ export interface AttemptReceiptRecord {
   resultingAttemptRevision: number;
   resultingAttemptStatus: AttemptStatus;
 }
-
-export type AttemptReceiptEventType =
-  | "attempt_receipt_submitted"
-  | "attempt_receipt_retained_late"
-  | "attempt_receipt_replayed";
 
 export interface AttemptReceiptEvent {
   runId: string;
@@ -311,7 +305,7 @@ export interface AttemptReceiptEvent {
   fencingToken: number;
   type: AttemptReceiptEventType;
   disposition: AttemptReceiptDisposition;
-  outcome: AgentTaskReceipt_v2["outcome"];
+  outcome: AgentTaskReceiptOutcome;
   createdAt: string;
 }
 
@@ -329,12 +323,6 @@ export interface SubmitAttemptReceiptInput {
   expectedWorkerSessionRevision: number;
   receipt: AgentTaskReceipt_v2;
 }
-
-export type AttemptReceiptFailureReason =
-  | WorkspaceMutationFailureReason
-  | "stale_session_revision"
-  | "worker_session_not_active"
-  | "receipt_conflict";
 
 export type AttemptReceiptSubmissionResult =
   | {
@@ -356,23 +344,17 @@ export type AttemptReceiptSubmissionResult =
 export interface HeartbeatWorkerSessionInput extends AuthenticatedWorkerMutationInput {
   sessionId: string;
   expectedSessionRevision: number;
-  status?: "running" | "awaiting_human";
+  status?: HeartbeatWorkerSessionStatus;
 }
 
 export interface EndWorkerSessionInput extends AuthenticatedWorkerMutationInput {
   sessionId: string;
   expectedSessionRevision: number;
-  status: "completed" | "failed" | "cancelled" | "lost";
+  status: EndWorkerSessionStatus;
   exitReason?: string;
   exitCode?: number;
   exitSummary?: string;
 }
-
-export type WorkerSessionMutationFailureReason =
-  | WorkspaceMutationFailureReason
-  | "stale_session_revision"
-  | "worker_session_not_active"
-  | "worker_session_conflict";
 
 export type WorkerSessionMutationResult =
   | {
@@ -432,7 +414,7 @@ export interface ReleaseWorkspaceInput extends AuthenticatedMutationInput {
   workspaceLeaseId: string;
   expectedAttemptRevision: number;
   expectedWorkspaceLeaseRevision: number;
-  disposition: "integrated" | "discarded";
+  disposition: ReleaseWorkspaceDisposition;
   observation: WorkspaceObservation;
 }
 
@@ -441,7 +423,7 @@ export interface ReconcileWorkspaceInput extends AuthenticatedMutationInput {
   workspaceLeaseId: string;
   expectedAttemptRevision: number;
   expectedWorkspaceLeaseRevision: number;
-  action: "resume" | "release" | "preserve" | "abandon";
+  action: WorkspaceReconciliationAction;
   ttlMs?: number;
   observation: WorkspaceObservation;
 }
@@ -454,29 +436,6 @@ export interface QuarantineWorkspaceInput extends AuthenticatedMutationInput {
   reason: string;
   observation: WorkspaceObservation;
 }
-
-export type WorkspaceMutationFailureReason =
-  | "not_found"
-  | "no_active_lease"
-  | "lease_mismatch"
-  | "stale_fence"
-  | "lease_expired"
-  | "stale_run_revision"
-  | "workspace_expired"
-  | "invalid_time"
-  | "stale_attempt_revision"
-  | "stale_workspace_revision"
-  | "attempt_not_live"
-  | "workspace_not_active"
-  | "live_attempt_conflict"
-  | "branch_conflict"
-  | "worktree_conflict"
-  | "identity_mismatch"
-  | "dirty_workspace"
-  | "mutation_conflict"
-  | "invalid_reconciliation"
-  | "invalid_attempt_transition"
-  | "evidence_mismatch";
 
 export type WorkspaceMutationResult =
   | {
@@ -511,6 +470,11 @@ export interface WorkspaceLifecycleStore {
 export interface LaunchEnvelopeBindingStore {
   bindLaunchEnvelope(input: BindLaunchEnvelopeInput): Promise<LaunchEnvelopeBindingResult>;
   getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null>;
+}
+
+/** Read-only access to immutable task packet snapshots written during launch binding. */
+export interface TaskPacketBindingStore {
+  getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null>;
 }
 
 /** Additive Stage 3 persistence port; kept separate from the Stage 1 workspace contract. */

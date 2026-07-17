@@ -2,12 +2,14 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import Database from "better-sqlite3-multiple-ciphers";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
+import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
 
 const roots: string[] = [];
 
@@ -33,32 +35,68 @@ describe("Attempt receipt adapter handlers", () => {
 
     const handlers = createAttemptReceiptHandlers();
     const request = submitRequest(prepared, ended.result);
+    const rejectedRequest = structuredClone(request);
+    rejectedRequest.submission.expectedAttemptRevision += 1;
+    rejectedRequest.submission.mutation.mutationId = "submit-receipt-stale";
+    const rejected = await handlers.submit(rejectedRequest);
     const submitted = await handlers.submit(request);
-    const replay = await handlers.submit(request);
+    const exactReplay = await handlers.submit(request);
+    const hashReplayRequest = structuredClone(request);
+    hashReplayRequest.submission.mutation.mutationId = "submit-receipt-hash-replay";
+    const hashReplay = await handlers.submit(hashReplayRequest);
 
+    expect(rejected).toMatchObject({
+      ok: true,
+      result: {
+        submitted: false,
+        reason: "stale_attempt_revision",
+        currentAttemptRevision: 4,
+      },
+    });
+    expect(JSON.stringify(rejected)).not.toContain("receiptJson");
     expect(submitted).toMatchObject({
       ok: true,
       result: {
         submitted: true,
         idempotentReplay: false,
-        receipt: {
-          receiptId: "receipt-patch-only",
-          receiptHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
-          patchHash: `sha256:${"c".repeat(64)}`,
-          disposition: "verification_pending",
-          workerSessionId: "native-receipt-session",
-        },
-        attempt: { attemptId: "attempt-receipt", status: "receipt_submitted" },
-        event: { type: "attempt_receipt_submitted", disposition: "verification_pending" },
+        receiptId: "receipt-patch-only",
+        receiptHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        attemptId: "attempt-receipt",
+        outcome: "completed",
+        disposition: "verification_pending",
+        attemptRevision: 5,
+        attemptStatus: "receipt_submitted",
+        event: { type: "attempt_receipt_submitted", sequence: 1 },
       },
     });
     if (!submitted.ok || !submitted.result.submitted)
       throw new Error("expected receipt submission");
-    expect(submitted.result.receipt).not.toHaveProperty("finalHeadSha");
-    expect(replay).toMatchObject({
+    expect(submitted.result).not.toHaveProperty("receipt");
+    expect(submitted.result).not.toHaveProperty("attempt");
+    expect(JSON.stringify(submitted.result)).not.toContain("receiptJson");
+    expect(JSON.stringify(submitted.result)).not.toContain("Worker claims an uncommitted result");
+    expect(exactReplay).toMatchObject({
       ok: true,
-      result: { submitted: true, idempotentReplay: true },
+      result: {
+        submitted: true,
+        receiptId: "receipt-patch-only",
+        attemptRevision: 5,
+        attemptStatus: "receipt_submitted",
+        event: { type: "attempt_receipt_submitted", sequence: 1 },
+        idempotentReplay: true,
+      },
     });
+    expect(hashReplay).toMatchObject({
+      ok: true,
+      result: {
+        submitted: true,
+        receiptId: "receipt-patch-only",
+        event: { type: "attempt_receipt_replayed", sequence: 2 },
+        idempotentReplay: true,
+      },
+    });
+    expect(JSON.stringify(exactReplay)).not.toContain("receiptJson");
+    expect(JSON.stringify(hashReplay)).not.toContain("receiptJson");
 
     const before = await readFile(prepared.request.runtime.databasePath);
     const status = await handlers.status({
@@ -84,6 +122,38 @@ describe("Attempt receipt adapter handlers", () => {
     expect(after).toEqual(before);
   });
 
+  it("returns the same compact acknowledgement for retained late evidence", async () => {
+    const root = await sandbox();
+    const prepared = await prepare(root);
+    const workerHandlers = createAttemptWorkerHandlers();
+    const attached = await workerHandlers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+    const ended = await workerHandlers.end(endRequest(prepared, attached.result, "failed"));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+
+    const submitted = await createAttemptReceiptHandlers().submit(
+      submitRequest(prepared, ended.result, "failed")
+    );
+
+    expect(submitted).toMatchObject({
+      ok: true,
+      result: {
+        submitted: true,
+        receiptId: "receipt-patch-only",
+        receiptHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        attemptId: "attempt-receipt",
+        outcome: "failed",
+        disposition: "retained_late",
+        attemptRevision: 5,
+        attemptStatus: "failed",
+        event: { type: "attempt_receipt_retained_late", sequence: 1 },
+        idempotentReplay: false,
+      },
+    });
+    expect(JSON.stringify(submitted)).not.toContain("receiptJson");
+    expect(JSON.stringify(submitted)).not.toContain("Worker claims failed evidence");
+  });
+
   it("does not create SQLite while reading missing receipt status", async () => {
     const root = await sandbox();
     const databasePath = join(root, "missing.db");
@@ -100,6 +170,69 @@ describe("Attempt receipt adapter handlers", () => {
     });
     await expect(access(databasePath)).rejects.toThrow();
   });
+
+  it.each(["missing", "noncanonical", "hash-mismatched"] as const)(
+    "rejects receipt ingestion when the packet snapshot is %s",
+    async (tamper) => {
+      const root = await sandbox();
+      const prepared = await prepare(root);
+      const workerHandlers = createAttemptWorkerHandlers();
+      const attached = await workerHandlers.attach(attachRequest(prepared));
+      if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+      const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+      if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+
+      const databasePath = prepared.request.runtime.databasePath;
+      const database = new Database(databasePath);
+      try {
+        if (tamper === "missing") {
+          database
+            .prepare(`DELETE FROM task_packet_bindings WHERE attemptId = ?`)
+            .run("attempt-receipt");
+        } else if (tamper === "noncanonical") {
+          database
+            .prepare(
+              `UPDATE task_packet_bindings SET packetJson = packetJson || ' ' WHERE attemptId = ?`
+            )
+            .run("attempt-receipt");
+        } else {
+          database
+            .prepare(`UPDATE task_packet_bindings SET packetHash = ? WHERE attemptId = ?`)
+            .run(`sha256:${"f".repeat(64)}`, "attempt-receipt");
+        }
+      } finally {
+        database.close();
+      }
+
+      const readOnly = new SqliteWorkspaceLifecycleStore(databasePath, { readOnly: true });
+      try {
+        await expect(readOnly.getTaskPacketBinding("attempt-receipt")).resolves.toBeNull();
+      } finally {
+        await readOnly.close();
+      }
+
+      await expect(
+        createAttemptReceiptHandlers().submit(submitRequest(prepared, ended.result))
+      ).resolves.toMatchObject({
+        ok: true,
+        result: { submitted: false, reason: "evidence_mismatch" },
+      });
+
+      const verification = new Database(databasePath);
+      try {
+        expect(
+          verification.prepare(`SELECT COUNT(*) AS count FROM attempt_receipts`).get()
+        ).toEqual({ count: 0 });
+        expect(
+          verification
+            .prepare(`SELECT status FROM attempts WHERE attemptId = ?`)
+            .get("attempt-receipt")
+        ).toEqual({ status: "running" });
+      } finally {
+        verification.close();
+      }
+    }
+  );
 });
 
 async function sandbox(): Promise<string> {
@@ -155,7 +288,8 @@ function endRequest(
   attached: Extract<
     Awaited<ReturnType<ReturnType<typeof createAttemptWorkerHandlers>["attach"]>>,
     { ok: true }
-  >["result"] & { updated: true }
+  >["result"] & { updated: true },
+  status: "completed" | "failed" = "completed"
 ) {
   return {
     databasePath: prepared.request.runtime.databasePath,
@@ -169,8 +303,11 @@ function endRequest(
       expectedWorkspaceLeaseRevision: prepared.bundle.lifecycle.workspace.revision,
       workerSessionId: attached.workerSession.sessionId,
       expectedWorkerSessionRevision: attached.workerSession.revision,
-      status: "completed" as const,
-      exit: { code: 0, summary: "Worker emitted a receipt claim" },
+      status,
+      exit: {
+        code: status === "completed" ? 0 : 1,
+        summary: "Worker emitted a receipt claim",
+      },
       mutation: { mutationId: "end-receipt-worker", now: "2026-07-12T12:00:10.000Z" },
     },
   };
@@ -181,7 +318,8 @@ function submitRequest(
   ended: Extract<
     Awaited<ReturnType<ReturnType<typeof createAttemptWorkerHandlers>["end"]>>,
     { ok: true }
-  >["result"] & { updated: true }
+  >["result"] & { updated: true },
+  outcome: "completed" | "failed" = "completed"
 ) {
   const packet = prepared.bundle.packet;
   const session = ended.workerSession;
@@ -212,9 +350,12 @@ function submitRequest(
         worker_session_id: session.sessionId,
         observed_base_sha: packet.repository.base_sha,
         patch_hash: `sha256:${"c".repeat(64)}`,
-        outcome: "completed" as const,
-        exit_reason: "work_complete",
-        summary: "Worker claims an uncommitted result without engine verification.",
+        outcome,
+        exit_reason: outcome === "completed" ? "work_complete" : "worker_failed",
+        summary:
+          outcome === "completed"
+            ? "Worker claims an uncommitted result without engine verification."
+            : "Worker claims failed evidence without engine verification.",
         files_touched: ["project/result.txt"],
         commits: [],
         acceptance_criteria_addressed: ["ac-1"],

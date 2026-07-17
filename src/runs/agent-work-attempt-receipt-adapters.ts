@@ -3,9 +3,12 @@ import { stat } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
+import {
+  AgentTaskReceipt_v2,
+  AgentTaskReceiptOutcome,
+  ClaimedCheckOutcome,
+} from "../schemas/agent-work.js";
 import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
-import type { AttemptReceiptSubmissionResult } from "../store/workspace-lifecycle-store.js";
 import type {
   AdapterInputError,
   AdapterOperationError,
@@ -13,6 +16,7 @@ import type {
 } from "./agent-work-adapters.js";
 import {
   AgentWorkAttemptReceiptService,
+  type AttemptReceiptSubmissionAcknowledgement,
   type AttemptReceiptStatusResult,
 } from "./agent-work-attempt-receipt-service.js";
 
@@ -70,7 +74,7 @@ const BoundedAgentTaskReceiptV2Schema = z
     observed_base_sha: gitObjectId,
     final_head_sha: gitObjectId.optional(),
     patch_hash: sha256.optional(),
-    outcome: z.enum(["completed", "blocked", "failed", "cancelled"]),
+    outcome: AgentTaskReceiptOutcome,
     exit_reason: text,
     summary: z.string().min(1).max(4_096),
     files_touched: z.array(receiptPath).max(2_048),
@@ -81,7 +85,7 @@ const BoundedAgentTaskReceiptV2Schema = z
         z
           .object({
             id: text,
-            outcome: z.enum(["pass", "fail", "not_run"]),
+            outcome: ClaimedCheckOutcome,
             exit_code: z.number().int().optional(),
             output_snippet: shortText.optional(),
           })
@@ -165,7 +169,9 @@ export const AttemptReceiptStatusRequestJsonSchema = z.toJSONSchema(
 );
 
 export interface AttemptReceiptHandlers {
-  submit(request: unknown): Promise<AgentWorkHandlerResult<AttemptReceiptSubmissionResult>>;
+  submit(
+    request: unknown
+  ): Promise<AgentWorkHandlerResult<AttemptReceiptSubmissionAcknowledgement>>;
   status(request: unknown): Promise<AgentWorkHandlerResult<AttemptReceiptStatusResult>>;
 }
 

@@ -1,0 +1,451 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedFrom": {
+    "cli": "inspectRegisteredCliSurface()",
+    "mcp": "published tools/list from mcp-server.mjs"
+  },
+  "dispositions": ["canonical", "compatibility", "deprecated", "internal-only", "remove"],
+  "nouns": [
+    {
+      "noun": "WorkItem",
+      "owner": "CoordinationStore",
+      "surface": "accepted by the Attempt preparation service; no independent public adapter yet",
+      "decision": "durable orchestration authority"
+    },
+    {
+      "noun": "Run",
+      "owner": "CoordinationStore",
+      "surface": "created and advanced by the Attempt lifecycle service; no independent public adapter yet",
+      "decision": "durable orchestration authority; never confuse with frozen RunStore integration records"
+    },
+    {
+      "noun": "Attempt",
+      "owner": "CoordinationStore and WorkspaceLifecycleStore application services",
+      "surface": "canonical CLI attempt group and canonical MCP Attempt tools",
+      "decision": "one bounded worker try and the current public orchestration root"
+    },
+    {
+      "noun": "Task",
+      "owner": "ADR-007 compatibility contracts",
+      "surface": "no currently published CLI command or MCP tool",
+      "decision": "bounded repair compatibility only; do not duplicate ADR-010 general-work lifecycle"
+    },
+    {
+      "noun": "IntegrationRun",
+      "owner": "frozen RunStore",
+      "surface": "compatibility-only lexrunner.* MCP tools",
+      "decision": "gate/artifact integration record; never orchestration authority"
+    },
+    {
+      "noun": "Plan/Gate/Weave",
+      "owner": "stateless integration core",
+      "surface": "canonical weave/gate CLI and selected MCP tools",
+      "decision": "consumes frozen plan inputs and must not read CoordinationStore authority"
+    }
+  ],
+  "contractProfiles": {
+    "agent-work-handler-v1": {
+      "success": "bounded JSON-safe AgentWorkHandlerResult projection; durable canonical bodies remain in storage",
+      "error": "bounded invalid_input or operation_failed adapter error with stable code and capped issues/message",
+      "transport": "CLI and MCP call the same application handler"
+    },
+    "bounded-ax-v1": {
+      "success": "canonical JSON envelope with operation identity, schema/version, bounded inline fields, and artifact references for large data",
+      "error": "AXError envelope with stable code, bounded message/context, and at least one nextAction",
+      "transport": "CLI and MCP equivalents call one application service; human formatting is a projection"
+    },
+    "human-local-v1": {
+      "success": "human-oriented local or interactive output; JSON may exist for diagnostics but is not an MCP parity promise",
+      "error": "actionable local diagnostic with non-zero exit status",
+      "transport": "intentionally CLI-only"
+    }
+  },
+  "cli": {
+    "canonical": [
+      "attempt",
+      "attempt prepare",
+      "attempt receipt",
+      "attempt receipt status",
+      "attempt receipt submit",
+      "attempt start",
+      "attempt status",
+      "attempt worker",
+      "attempt worker attach",
+      "attempt worker end",
+      "attempt worker heartbeat",
+      "attempt worker status",
+      "audit",
+      "audit verify",
+      "completion",
+      "config",
+      "config show",
+      "config validate",
+      "create-project",
+      "explain",
+      "fanout",
+      "fanout analyze",
+      "fanout harvest",
+      "gate",
+      "gate attest",
+      "gate import",
+      "gate import-checks",
+      "gate test",
+      "gate-report",
+      "gate-report validate",
+      "governance:cleanup",
+      "governance:report",
+      "idea",
+      "issues",
+      "issues status",
+      "metrics",
+      "metrics definitions",
+      "metrics show",
+      "plan-diff",
+      "plan-review",
+      "preview-constraints",
+      "query",
+      "retry",
+      "schema",
+      "schema validate",
+      "security",
+      "security check-rotation",
+      "security scan-plan",
+      "security validate-secrets",
+      "token-report",
+      "view",
+      "weave",
+      "weave apply",
+      "weave checkpoints",
+      "weave checkpoints clean",
+      "weave checkpoints list",
+      "weave checkpoints show",
+      "weave discover",
+      "weave fanout",
+      "weave fanout analyze",
+      "weave fanout harvest",
+      "weave fanout preview",
+      "weave fanout scan",
+      "weave fanout show",
+      "weave fanout validate",
+      "weave merge-order",
+      "weave plan",
+      "weave policy",
+      "weave policy plan",
+      "weave policy run",
+      "weave policy show",
+      "weave policy validate",
+      "weave report",
+      "weave resume",
+      "weave status",
+      "workspace",
+      "workspace doctor",
+      "workspace init"
+    ],
+    "compatibility": [
+      { "path": "autopilot", "replacement": "weave policy run" },
+      { "path": "bootstrap", "replacement": "workspace init --non-interactive" },
+      { "path": "config:inspect", "replacement": "config show" },
+      { "path": "deliverables:cleanup", "replacement": "governance:cleanup" },
+      { "path": "deliverables:list", "replacement": "weave report" },
+      { "path": "gate execute", "replacement": "planned canonical gate run" },
+      { "path": "init-local", "replacement": "workspace init --non-interactive" },
+      { "path": "merge", "replacement": "weave apply" },
+      { "path": "migrate-profile", "replacement": "planned workspace migrate" }
+    ],
+    "deprecated": [
+      { "path": "discover", "replacement": "weave discover" },
+      { "path": "doctor", "replacement": "workspace doctor" },
+      { "path": "execute", "replacement": "planned canonical gate run" },
+      { "path": "init", "replacement": "workspace init" },
+      { "path": "merge-order", "replacement": "weave merge-order" },
+      { "path": "orchestrate", "replacement": "weave and fanout command groups" },
+      { "path": "orchestrate pin-toolchain", "replacement": "workspace doctor" },
+      { "path": "orchestrate:analyze-issues", "replacement": "fanout analyze" },
+      { "path": "orchestrate:assign-batch", "replacement": "planned fanout assign" },
+      { "path": "orchestrate:generate-deliverables", "replacement": "weave report" },
+      { "path": "orchestrate:plan-batch", "replacement": "weave plan" },
+      { "path": "orchestrate:predict-conflicts", "replacement": "weave fanout analyze" },
+      { "path": "plan", "replacement": "weave plan" },
+      { "path": "report", "replacement": "weave report" },
+      { "path": "status", "replacement": "weave status" }
+    ],
+    "internal-only": [
+      "budget",
+      "budget allocations",
+      "budget reset",
+      "budget set",
+      "budget show",
+      "counter-examples",
+      "counter-examples export",
+      "counter-examples list",
+      "counter-examples show",
+      "fanout monitor",
+      "senior-dev",
+      "senior-dev capture-frame",
+      "senior-dev modes",
+      "senior-dev prepare-context",
+      "senior-dev recall-context"
+    ],
+    "remove": [],
+    "humanOnly": [
+      "audit verify",
+      "completion",
+      "create-project",
+      "gate attest",
+      "governance:cleanup",
+      "governance:report",
+      "idea",
+      "issues status",
+      "plan-review",
+      "security check-rotation",
+      "security scan-plan",
+      "security validate-secrets",
+      "view",
+      "workspace init"
+    ],
+    "contractOverrides": [
+      {
+        "profile": "agent-work-handler-v1",
+        "operations": [
+          "attempt prepare",
+          "attempt receipt status",
+          "attempt receipt submit",
+          "attempt start",
+          "attempt status",
+          "attempt worker attach",
+          "attempt worker end",
+          "attempt worker heartbeat",
+          "attempt worker status"
+        ]
+      }
+    ],
+    "defaultCanonicalOperationContract": "bounded-ax-v1",
+    "humanOnlyContract": "human-local-v1"
+  },
+  "mcp": {
+    "canonical": [
+      "attach_attempt_worker",
+      "config.show",
+      "discover",
+      "doctor",
+      "end_attempt_worker",
+      "gates.run",
+      "get_attempt_receipt",
+      "get_attempt_status",
+      "get_attempt_worker",
+      "heartbeat_attempt_worker",
+      "local.init",
+      "merge-order",
+      "merge.apply",
+      "plan.create",
+      "prepare_attempt",
+      "profile.resolve",
+      "start_attempt",
+      "status",
+      "submit_attempt_receipt",
+      "workflow.guide"
+    ],
+    "compatibility": [
+      {
+        "tool": "lexrunner.getStatus",
+        "replacement": "ADR-010 Attempt status or stateless integration status, selected explicitly",
+        "owner": "frozen RunStore integration records"
+      },
+      {
+        "tool": "lexrunner.listArtifacts",
+        "replacement": "bounded artifact references from the owning integration operation",
+        "owner": "frozen RunStore integration records"
+      },
+      {
+        "tool": "lexrunner.startRun",
+        "replacement": "ADR-010 lifecycle services for orchestration; plan/gate services for integration",
+        "owner": "frozen RunStore integration records"
+      }
+    ],
+    "deprecated": [{ "tool": "health", "replacement": "doctor" }],
+    "internal-only": [],
+    "remove": [],
+    "contractOverrides": [
+      {
+        "profile": "agent-work-handler-v1",
+        "operations": [
+          "attach_attempt_worker",
+          "end_attempt_worker",
+          "get_attempt_receipt",
+          "get_attempt_status",
+          "get_attempt_worker",
+          "heartbeat_attempt_worker",
+          "prepare_attempt",
+          "start_attempt",
+          "submit_attempt_receipt"
+        ]
+      }
+    ],
+    "defaultCanonicalOperationContract": "bounded-ax-v1",
+    "parity": [
+      {
+        "tool": "attach_attempt_worker",
+        "cli": "attempt worker attach",
+        "owner": "AgentWorkWorkerSessionService"
+      },
+      {
+        "tool": "config.show",
+        "cli": "config show",
+        "owner": "planned shared configuration query service"
+      },
+      {
+        "tool": "discover",
+        "cli": "weave discover",
+        "owner": "planned shared discovery service"
+      },
+      {
+        "tool": "doctor",
+        "cli": "workspace doctor",
+        "owner": "planned shared workspace diagnostics service"
+      },
+      {
+        "tool": "end_attempt_worker",
+        "cli": "attempt worker end",
+        "owner": "AgentWorkWorkerSessionService"
+      },
+      {
+        "tool": "gates.run",
+        "cli": "planned canonical gate run",
+        "owner": "planned shared gate execution service"
+      },
+      {
+        "tool": "get_attempt_receipt",
+        "cli": "attempt receipt status",
+        "owner": "AgentWorkAttemptReceiptService"
+      },
+      {
+        "tool": "get_attempt_status",
+        "cli": "attempt status",
+        "owner": "AgentWorkLifecycleService"
+      },
+      {
+        "tool": "get_attempt_worker",
+        "cli": "attempt worker status",
+        "owner": "AgentWorkWorkerSessionService"
+      },
+      {
+        "tool": "heartbeat_attempt_worker",
+        "cli": "attempt worker heartbeat",
+        "owner": "AgentWorkWorkerSessionService"
+      },
+      {
+        "tool": "local.init",
+        "cli": "workspace init",
+        "owner": "planned shared workspace initialization service"
+      },
+      {
+        "tool": "merge-order",
+        "cli": "weave merge-order",
+        "owner": "planned shared plan query service"
+      },
+      {
+        "tool": "merge.apply",
+        "cli": "weave apply",
+        "owner": "planned shared merge application service"
+      },
+      {
+        "tool": "plan.create",
+        "cli": "weave plan",
+        "owner": "planned shared plan creation service"
+      },
+      {
+        "tool": "prepare_attempt",
+        "cli": "attempt prepare",
+        "owner": "AgentWorkLifecycleService"
+      },
+      {
+        "tool": "profile.resolve",
+        "cli": "config show",
+        "owner": "planned shared configuration query service"
+      },
+      {
+        "tool": "start_attempt",
+        "cli": "attempt start",
+        "owner": "AgentWorkLifecycleService"
+      },
+      {
+        "tool": "status",
+        "cli": "weave status",
+        "owner": "planned shared integration status service"
+      },
+      {
+        "tool": "submit_attempt_receipt",
+        "cli": "attempt receipt submit",
+        "owner": "AgentWorkAttemptReceiptService"
+      }
+    ],
+    "intentionalParityExceptions": [
+      {
+        "tool": "workflow.guide",
+        "reason": "agent-only workflow guidance; humans use CLI help and checked-in documentation"
+      },
+      {
+        "cli": "plan-review",
+        "reason": "interactive human approval is intentionally not exposed as an MCP mutation"
+      },
+      {
+        "cli": "idea",
+        "reason": "human ideation and GitHub issue creation remain an explicit local workflow"
+      },
+      {
+        "cli": "view",
+        "reason": "terminal-interactive plan navigation has no machine-facing semantics"
+      }
+    ]
+  },
+  "implementationGaps": [
+    {
+      "issue": 779,
+      "title": "Add canonical gate run backed by a shared gate execution service",
+      "surface": ["gate run", "gate execute", "execute", "gates.run"]
+    },
+    {
+      "issue": 780,
+      "title": "Share bounded discovery, planning, status, and merge-order query services",
+      "surface": [
+        "weave discover",
+        "discover",
+        "weave plan",
+        "plan.create",
+        "weave status",
+        "status",
+        "weave merge-order",
+        "merge-order"
+      ]
+    },
+    {
+      "issue": 781,
+      "title": "Share bounded merge application service across CLI and MCP",
+      "surface": ["weave apply", "merge", "merge.apply"]
+    },
+    {
+      "issue": 782,
+      "title": "Share workspace/config services and retire the MCP health duplicate",
+      "surface": [
+        "workspace init",
+        "local.init",
+        "workspace doctor",
+        "doctor",
+        "health",
+        "config show",
+        "config.show",
+        "profile.resolve"
+      ]
+    },
+    {
+      "issue": 783,
+      "title": "Rename or retire compatibility lexrunner.* RunStore MCP tools",
+      "surface": ["lexrunner.startRun", "lexrunner.getStatus", "lexrunner.listArtifacts"]
+    },
+    {
+      "issue": 784,
+      "title": "Enforce deprecated CLI alias warnings and removal windows",
+      "surface": ["all CLI compatibility and deprecated registrations"]
+    }
+  ]
+}
