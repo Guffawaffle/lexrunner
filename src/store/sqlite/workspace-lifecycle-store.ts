@@ -74,6 +74,7 @@ import type {
   WorkerSessionRecord,
   WorkerSessionStore,
 } from "../workspace-lifecycle-store.js";
+import { validateCanonicalEnvelope } from "../workspace-lifecycle-evidence.js";
 import {
   SqliteCoordinationStore,
   type SqliteCoordinationStoreOptions,
@@ -2419,41 +2420,6 @@ function isMatchingLaunchAuthorization(
     parseInstant(event.createdAt, "authorization.createdAt") <=
       parseInstant(input.createdAt, "createdAt")
   );
-}
-
-function validateCanonicalEnvelope(
-  input: BindLaunchEnvelopeInput,
-  attempt: AttemptRecord,
-  lease: WorkspaceLifecycleLeaseRecord
-): JsonRecord | null {
-  if (Buffer.byteLength(input.envelopeJson, "utf8") > 256 * 1024) return null;
-  let envelope: unknown;
-  try {
-    envelope = JSON.parse(input.envelopeJson);
-  } catch {
-    return null;
-  }
-  if (!isJsonRecord(envelope) || canonicalJSONStringify(envelope) !== input.envelopeJson)
-    return null;
-  if (input.envelopeHash !== computeCanonicalHash(envelope)) return null;
-  const runtime = envelope.runtime;
-  const paths = envelope.paths;
-  if (!isJsonRecord(runtime) || !isJsonRecord(paths)) return null;
-  return envelope.envelope_id === input.envelopeId &&
-    envelope.run_id === input.runId &&
-    envelope.attempt_id === input.attemptId &&
-    envelope.packet_id === attempt.packetId &&
-    envelope.packet_hash === attempt.packetHash &&
-    envelope.workspace_lease_id === input.workspaceLeaseId &&
-    envelope.workspace_lease_revision === input.expectedWorkspaceLeaseRevision &&
-    envelope.expected_head_sha === attempt.baseSha &&
-    envelope.branch === lease.branch &&
-    envelope.created_at === input.createdAt &&
-    runtime.host_id === lease.hostId &&
-    runtime.git_runtime === lease.gitRuntime &&
-    paths.worktree_root === lease.worktreePath
-    ? envelope
-    : null;
 }
 
 function validateCanonicalTaskPacket(
