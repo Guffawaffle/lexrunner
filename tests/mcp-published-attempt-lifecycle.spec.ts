@@ -78,6 +78,32 @@ describe("published MCP Attempt lifecycle", () => {
     });
   });
 
+  it("returns the shared bounded receipt failure contract when mutations are enabled", async () => {
+    const [response] = await invoke(
+      {
+        id: 13,
+        method: "tools/call",
+        params: { name: "submit_attempt_receipt", arguments: {} },
+      },
+      true
+    );
+
+    const output = response.result.content[0].text as string;
+    expect(JSON.parse(output)).toEqual({
+      error: {
+        code: "invalid_input",
+        issues: [
+          { message: "Invalid input: expected string, received undefined", path: "databasePath" },
+          { message: "Invalid input: expected object, received undefined", path: "submission" },
+        ],
+        message: "Invalid Attempt receipt input",
+      },
+      ok: false,
+    });
+    expect(Buffer.byteLength(output, "utf8")).toBeLessThan(4_096);
+    expect(output).not.toContain("receiptJson");
+  });
+
   it("keeps worker mutations behind the published mutation gate", async () => {
     const operations = [
       ["attach_attempt_worker", "attach an Attempt worker"],
@@ -178,14 +204,17 @@ interface JsonRpcResponse {
   result: any;
 }
 
-async function invoke(request: {
-  id: number;
-  method: string;
-  params: Record<string, unknown>;
-}): Promise<JsonRpcResponse[]> {
+async function invoke(
+  request: {
+    id: number;
+    method: string;
+    params: Record<string, unknown>;
+  },
+  allowMutations = false
+): Promise<JsonRpcResponse[]> {
   const subprocess = execa("node", ["mcp-server.mjs"], {
     cwd: repositoryRoot,
-    env: { ...process.env, ALLOW_MUTATIONS: "false" },
+    env: { ...process.env, ALLOW_MUTATIONS: String(allowMutations) },
   });
   let stdout = "";
   const response = new Promise<JsonRpcResponse>((resolveResponse, rejectResponse) => {

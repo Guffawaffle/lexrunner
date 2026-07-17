@@ -9,7 +9,6 @@ import {
   ClaimedCheckOutcome,
 } from "../schemas/agent-work.js";
 import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
-import type { AttemptReceiptSubmissionResult } from "../store/workspace-lifecycle-store.js";
 import type {
   AdapterInputError,
   AdapterOperationError,
@@ -17,6 +16,7 @@ import type {
 } from "./agent-work-adapters.js";
 import {
   AgentWorkAttemptReceiptService,
+  type AttemptReceiptSubmissionAcknowledgement,
   type AttemptReceiptStatusResult,
 } from "./agent-work-attempt-receipt-service.js";
 
@@ -169,7 +169,9 @@ export const AttemptReceiptStatusRequestJsonSchema = z.toJSONSchema(
 );
 
 export interface AttemptReceiptHandlers {
-  submit(request: unknown): Promise<AgentWorkHandlerResult<AttemptReceiptSubmissionResult>>;
+  submit(
+    request: unknown
+  ): Promise<AgentWorkHandlerResult<AttemptReceiptSubmissionAcknowledgement>>;
   status(request: unknown): Promise<AgentWorkHandlerResult<AttemptReceiptStatusResult>>;
 }
 
