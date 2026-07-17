@@ -2,6 +2,7 @@ import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import Database from "better-sqlite3-multiple-ciphers";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,6 +10,7 @@ import {
   AttemptStartRequestSchema,
   createAttemptLifecycleHandlers,
 } from "../../src/runs/agent-work-adapters.js";
+import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
 
 const roots: string[] = [];
 
@@ -67,6 +69,42 @@ describe("attempt lifecycle adapter handlers", () => {
     });
     expect(replay.result.packet).toEqual(first.result.packet);
     expect(replay.result.envelope).toEqual(first.result.envelope);
+  });
+
+  it("rolls back the launch envelope when packet snapshot persistence fails", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    const seeded = new SqliteWorkspaceLifecycleStore(request.runtime.databasePath);
+    await seeded.close();
+    const database = new Database(request.runtime.databasePath);
+    try {
+      database.exec(`
+        CREATE TRIGGER reject_task_packet_snapshot
+        BEFORE INSERT ON task_packet_bindings
+        BEGIN
+          SELECT RAISE(ABORT, 'forced packet snapshot failure');
+        END;
+      `);
+    } finally {
+      database.close();
+    }
+
+    await expect(createAttemptLifecycleHandlers().prepare(request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: "operation_failed" },
+    });
+
+    const verification = new Database(request.runtime.databasePath);
+    try {
+      expect(
+        verification.prepare(`SELECT COUNT(*) AS count FROM launch_envelope_bindings`).get()
+      ).toEqual({ count: 0 });
+      expect(
+        verification.prepare(`SELECT COUNT(*) AS count FROM task_packet_bindings`).get()
+      ).toEqual({ count: 0 });
+    } finally {
+      verification.close();
+    }
   });
 
   it("rejects launch bindings before opening SQLite or Git", async () => {

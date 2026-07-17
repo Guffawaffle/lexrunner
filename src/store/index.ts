@@ -95,6 +95,7 @@ export type {
   WorkerSessionRecord,
   WorkerSessionEvent,
   LaunchEnvelopeBindingRecord,
+  TaskPacketBindingRecord,
   AttemptReceiptRecord,
   AttemptReceiptEvent,
   CreateAttemptInput,
@@ -115,6 +116,7 @@ export type {
   AttemptReceiptSubmissionResult,
   WorkspaceLifecycleStore,
   LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
   WorkerSessionStore,
   AttemptReceiptStore,
 } from "./workspace-lifecycle-store.js";

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
+import { createAgentTaskPacket } from "../../src/schemas/agent-work.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
@@ -8,6 +9,7 @@ import type {
 import type {
   WorkspaceLifecycleStore,
   LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
   AttemptReceiptStore,
   WorkspaceObservation,
   WorkerSessionStore,
@@ -18,6 +20,7 @@ export interface WorkspaceLifecycleHarness
   extends
     WorkspaceLifecycleStore,
     LaunchEnvelopeBindingStore,
+    TaskPacketBindingStore,
     WorkerSessionStore,
     AttemptReceiptStore {
   acquireControllerLease(input: {
@@ -52,6 +55,41 @@ const T1 = "2026-07-11T12:00:01.000Z";
 const T2 = "2026-07-11T12:00:02.000Z";
 const T3 = "2026-07-11T12:00:03.000Z";
 const T_LATE = "2026-07-11T12:00:11.000Z";
+
+function taskPacketSnapshot(attemptId = "attempt-1", workItemId = "work-1", packetId = "packet-1") {
+  return createAgentTaskPacket({
+    schema_version: "1.0.0",
+    packet_id: packetId,
+    run_id: "run-1",
+    work_item: { work_item_id: workItemId, revision: 7 },
+    attempt_id: attemptId,
+    repository: { id: "repo-1", base_sha: "a".repeat(40) },
+    objective: "Persist the packet snapshot",
+    acceptance_criteria: [{ id: "criterion-1", text: "Packet is immutable" }],
+    instructions: ["Make no host-local assumptions."],
+    scope: {
+      read_globs: ["src/**"],
+      write_globs: ["src/**"],
+      deny_globs: [],
+      cross_repo_allowed: false,
+    },
+    authority: {
+      edit: true,
+      git_write: false,
+      github_write: false,
+      external_runtime: false,
+      secrets: false,
+      signing: false,
+      release: false,
+    },
+    verification: [{ id: "check-1", argv: ["npm", "test"], expected_exit_codes: [0] }],
+    budget: {},
+    created_at: T2,
+  });
+}
+
+const DEFAULT_PACKET = taskPacketSnapshot();
+const DEFAULT_PACKET_JSON = canonicalJSONStringify(DEFAULT_PACKET);
 
 const identity = {
   repositoryId: "repo-1",
@@ -106,7 +144,11 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
 
     afterEach(async () => store.close());
 
-    async function createAttempt(attemptId = "attempt-1", workItemId = "work-1") {
+    async function createAttempt(
+      attemptId = "attempt-1",
+      workItemId = "work-1",
+      packet = { packetId: DEFAULT_PACKET.packet_id, packetHash: DEFAULT_PACKET.packet_hash }
+    ) {
       return store.createAttempt({
         runId: "run-1",
         controller,
@@ -116,8 +158,8 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         attemptId,
         workItemId,
         workItemRevision: 7,
-        packetId: "packet-1",
-        packetHash: `sha256:${"b".repeat(64)}`,
+        packetId: packet.packetId,
+        packetHash: packet.packetHash,
         baseSha: "a".repeat(40),
       });
     }
@@ -164,7 +206,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         run_id: "run-1",
         attempt_id: "attempt-1",
         packet_id: "packet-1",
-        packet_hash: `sha256:${"b".repeat(64)}`,
+        packet_hash: DEFAULT_PACKET.packet_hash,
         workspace_lease_id: "workspace-lease-1",
         workspace_lease_revision: 0,
         expected_head_sha: "a".repeat(40),
@@ -186,6 +228,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         envelopeId,
         envelopeHash: computeCanonicalHash(envelope),
         envelopeJson,
+        packetJson: DEFAULT_PACKET_JSON,
         createdAt,
         ...overrides,
       };
@@ -208,7 +251,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         expectedWorkspaceLeaseRevision: 0,
         sessionId: "worker-session-1",
         packetId: "packet-1",
-        packetHash: `sha256:${"b".repeat(64)}`,
+        packetHash: DEFAULT_PACKET.packet_hash,
         executionEnvelopeId: "envelope-1",
         executionEnvelopeHash: envelopeBindingInput().envelopeHash,
         hostId: "host-1",
@@ -256,7 +299,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         work_item_revision: 7,
         attempt_id: "attempt-1",
         packet_id: "packet-1",
-        packet_hash: `sha256:${"b".repeat(64)}`,
+        packet_hash: DEFAULT_PACKET.packet_hash,
         workspace_lease_id: "workspace-lease-1",
         workspace_lease_revision: 0,
         worker_runtime: "codex-native",
@@ -331,6 +374,127 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toMatchObject({
         envelopeHash: input.envelopeHash,
       });
+    });
+
+    it("rejects a new launch-envelope binding that omits its packet snapshot", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+
+      await expect(
+        store.bindLaunchEnvelope({ ...envelopeBindingInput(), packetJson: undefined })
+      ).resolves.toMatchObject({ bound: false, reason: "evidence_mismatch" });
+      await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toBeNull();
+      await expect(store.getTaskPacketBinding("attempt-1")).resolves.toBeNull();
+    });
+
+    it("persists a canonical task packet atomically with its launch envelope", async () => {
+      const packet = createAgentTaskPacket({
+        schema_version: "1.0.0",
+        packet_id: "packet-1",
+        run_id: "run-1",
+        work_item: { work_item_id: "work-1", revision: 7 },
+        attempt_id: "attempt-1",
+        repository: { id: "repo-1", base_sha: "a".repeat(40) },
+        objective: "Persist the packet snapshot",
+        acceptance_criteria: [{ id: "criterion-1", text: "Packet is immutable" }],
+        instructions: ["Make no host-local assumptions."],
+        scope: {
+          read_globs: ["src/**"],
+          write_globs: ["src/**"],
+          deny_globs: [],
+          cross_repo_allowed: false,
+        },
+        authority: {
+          edit: true,
+          git_write: false,
+          github_write: false,
+          external_runtime: false,
+          secrets: false,
+          signing: false,
+          release: false,
+        },
+        verification: [{ id: "check-1", argv: ["npm", "test"], expected_exit_codes: [0] }],
+        budget: {},
+        created_at: T2,
+      });
+      await createAttempt("attempt-1", "work-1", {
+        packetId: packet.packet_id,
+        packetHash: packet.packet_hash,
+      });
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      const input = envelopeBindingInput();
+      const envelope = JSON.parse(input.envelopeJson) as Record<string, unknown>;
+      envelope.packet_hash = packet.packet_hash;
+      input.envelopeJson = canonicalJSONStringify(envelope);
+      input.envelopeHash = computeCanonicalHash(envelope);
+      const packetJson = canonicalJSONStringify(packet);
+      await expect(store.bindLaunchEnvelope({ ...input, packetJson })).resolves.toMatchObject({
+        bound: true,
+        idempotentReplay: false,
+      });
+      const binding = await store.getTaskPacketBinding("attempt-1");
+      expect(binding).toEqual({
+        runId: "run-1",
+        attemptId: "attempt-1",
+        workItemId: "work-1",
+        workItemRevision: 7,
+        packetId: "packet-1",
+        packetHash: packet.packet_hash,
+        packetJson,
+        createdAt: "2026-07-11T12:00:02.250Z",
+      });
+      if (!binding) throw new Error("expected task packet binding");
+      binding.packetJson = "{}";
+      await expect(store.getTaskPacketBinding("attempt-1")).resolves.toMatchObject({ packetJson });
+      await expect(store.bindLaunchEnvelope({ ...input, packetJson: "{}" })).resolves.toMatchObject(
+        {
+          bound: false,
+          reason: "mutation_conflict",
+        }
+      );
+    });
+
+    it("rejects a malformed packet snapshot without writing either binding", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      await expect(
+        store.bindLaunchEnvelope({ ...envelopeBindingInput(), packetJson: "{}" })
+      ).resolves.toMatchObject({
+        bound: false,
+        reason: "evidence_mismatch",
+      });
+      await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toBeNull();
+      await expect(store.getTaskPacketBinding("attempt-1")).resolves.toBeNull();
     });
 
     it("attaches an exact worker identity and atomically starts the attempt", async () => {
@@ -440,8 +604,13 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
     });
 
     it("prevents one live native worker identity from serving two attempts", async () => {
+      const secondPacket = taskPacketSnapshot("attempt-2", "work-2");
+      const secondPacketJson = canonicalJSONStringify(secondPacket);
       await createAttempt("attempt-1", "work-1");
-      await createAttempt("attempt-2", "work-2");
+      await createAttempt("attempt-2", "work-2", {
+        packetId: secondPacket.packet_id,
+        packetHash: secondPacket.packet_hash,
+      });
       await acquire({ observation: observation() });
       const secondIdentity = {
         ...identity,
@@ -478,6 +647,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       >;
       secondEnvelope.envelope_id = "envelope-2";
       secondEnvelope.attempt_id = "attempt-2";
+      secondEnvelope.packet_hash = secondPacket.packet_hash;
       secondEnvelope.workspace_lease_id = "workspace-lease-2";
       secondEnvelope.branch = "agent/work-2";
       (secondEnvelope.paths as Record<string, unknown>).worktree_root = "/srv/worktrees/work-2";
@@ -494,6 +664,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           envelopeId: "envelope-1",
           envelopeHash: computeCanonicalHash(duplicateIdEnvelope),
           envelopeJson: duplicateIdEnvelopeJson,
+          packetJson: secondPacketJson,
         })
       ).resolves.toMatchObject({ bound: false, reason: "mutation_conflict" });
       await store.bindLaunchEnvelope({
@@ -504,6 +675,12 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         envelopeId: "envelope-2",
         envelopeHash: secondEnvelopeHash,
         envelopeJson: secondEnvelopeJson,
+        packetJson: secondPacketJson,
+      });
+      await expect(store.getTaskPacketBinding("attempt-2")).resolves.toMatchObject({
+        packetId: "packet-1",
+        packetHash: secondPacket.packet_hash,
+        packetJson: secondPacketJson,
       });
       await store.attachWorkerSession(attachInput());
       await expect(
@@ -513,6 +690,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
             attemptId: "attempt-2",
             workspaceLeaseId: "workspace-lease-2",
             sessionId: "worker-session-2",
+            packetHash: secondPacket.packet_hash,
             executionEnvelopeId: "envelope-2",
             executionEnvelopeHash: secondEnvelopeHash,
           })
@@ -956,7 +1134,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           hostId: "host-1",
           workItemRevision: 7,
           packetId: "packet-1",
-          packetHash: `sha256:${"b".repeat(64)}`,
+          packetHash: DEFAULT_PACKET.packet_hash,
         },
         event: { type: "workspace_acquired", sequence: 2 },
       });

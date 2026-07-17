@@ -336,6 +336,7 @@ export function createAttemptLifecycleHandlers(): AttemptLifecycleHandlers &
         const result = await prepareAttemptLaunchBundle(runtime.service, parsed.data, runtime);
         if (result.ok) {
           const envelopeJson = canonicalJSONStringify(result.envelope);
+          const packetJson = canonicalJSONStringify(result.packet);
           const binding = await runtime.workerSessions.bindLaunchEnvelope({
             runId: result.lifecycle.run.runId,
             attemptId: result.lifecycle.attempt.attemptId,
@@ -348,6 +349,7 @@ export function createAttemptLifecycleHandlers(): AttemptLifecycleHandlers &
             envelopeId: result.envelope.envelope_id,
             envelopeHash: computeCanonicalHash(result.envelope),
             envelopeJson,
+            packetJson,
             createdAt: result.envelope.created_at,
           });
           if (!binding.bound) {
