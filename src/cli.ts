@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import { Command, CommanderError } from "commander";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import chalk from "chalk";
 import { Plan, loadPlan, SchemaValidationError } from "./schema.js";
@@ -1159,10 +1159,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 // - ESM build: import.meta is available and we check import.meta.url
 // - CJS build: import.meta.url will be undefined/empty (tsup warning is expected)
 //
-// Using Node's pathToFileURL and resolve ensures:
-// 1. Windows paths are normalized correctly (C:\... → file:///C:/...)
+// Comparing real paths ensures:
+// 1. Windows paths are normalized through resolve + realpath
 // 2. Symlinks are resolved consistently
-// 3. URL encoding is handled (spaces, special chars)
+// 3. Module URL encoding is decoded (spaces, special chars)
 //
 // tsup will emit a warning about import.meta in CJS, but that's acceptable since:
 // 1. The check prevents execution in CJS context
@@ -1174,8 +1174,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 const isDirectExec = (() => {
   try {
     if (typeof import.meta === "undefined") return false;
-    const argHref = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "";
-    return import.meta.url === argHref;
+    if (!process.argv[1] || !import.meta.url) return false;
+    const invokedPath = fs.realpathSync(resolve(process.argv[1]));
+    const modulePath = fs.realpathSync(fileURLToPath(import.meta.url));
+    return invokedPath === modulePath;
   } catch {
     return false;
   }
