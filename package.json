@@ -104,7 +104,7 @@
     "@modelcontextprotocol/sdk": "^1.18.2",
     "@octokit/auth-token": "^6.0.0",
     "@octokit/rest": "^22.0.0",
-    "@smartergpt/lex": "^2.1.1",
+    "@smartergpt/lex": "^2.10.0",
     "@types/babel__traverse": "^7.28.0",
     "better-sqlite3-multiple-ciphers": "^12.6.2",
     "chalk": "^5.3.0",
