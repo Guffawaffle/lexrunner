@@ -34,6 +34,17 @@ export const TASK_CONTRACT_VERSION = "1.0.0" as const;
  */
 export function computeCanonicalHash(obj: unknown): string {
   const canonical = JSON.stringify(obj, sortedReplacer);
+  return computeCanonicalHashFromCompactJSON(canonical);
+}
+
+/**
+ * Hash an already-canonical compact JSON representation.
+ *
+ * Callers must establish canonical key ordering before using this lower-level
+ * helper. It exists for validation paths that already paid that cost and can
+ * avoid recursively sorting the parsed value a second time.
+ */
+export function computeCanonicalHashFromCompactJSON(canonical: string): string {
   const hash = createHash("sha256").update(canonical, "utf8").digest("hex");
   return `sha256:${hash}`;
 }
