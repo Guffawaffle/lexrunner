@@ -11,9 +11,7 @@ All commands that support `--json` output use a consistent envelope structure wi
 ```json
 {
   "success": true,
-  "data": {
-    /* command-specific payload */
-  },
+  "data": {/* command-specific payload */},
   "meta": {
     "command": "lex-pr <command-name>",
     "timestamp": "<ISO 8601 timestamp>",
@@ -30,9 +28,7 @@ All commands that support `--json` output use a consistent envelope structure wi
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable error message",
-    "details": {
-      /* optional additional context */
-    }
+    "details": {/* optional additional context */}
   },
   "meta": {
     "command": "lex-pr <command-name>",

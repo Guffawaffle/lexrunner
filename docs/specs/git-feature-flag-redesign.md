@@ -20,10 +20,11 @@ Controls whether git operations are enabled.
 - **Case Sensitivity:** Case-insensitive (e.g., `LIVE`, `Live`, `live` are all valid)
 
 **Behavior:**
-| Value | Git Operations | Use Case |
-|-------|---------------|----------|
-| `off` (default) | Disabled, returns safe fallbacks | CI/CD, ephemeral environments, testing |
-| `live` | Enabled, executes actual git commands | Local development, git-dependent workflows |
+
+| Value           | Git Operations                        | Use Case                                   |
+| --------------- | ------------------------------------- | ------------------------------------------ |
+| `off` (default) | Disabled, returns safe fallbacks      | CI/CD, ephemeral environments, testing     |
+| `live`          | Enabled, executes actual git commands | Local development, git-dependent workflows |
 
 ### `LEX_DEFAULT_BRANCH`
 

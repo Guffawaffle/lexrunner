@@ -46,9 +46,7 @@ Generate an Execution Plan v1 JSON object conforming to schema.
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": {
-    /* Feature Spec v0 */
-  },
+  "sourceSpec": {/* Feature Spec v0 */},
   "epic": {
     "title": "Add dark mode support",
     "description": "Implement theme switcher with light/dark modes",

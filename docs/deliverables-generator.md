@@ -141,9 +141,7 @@ The plan hash is deterministic and can be used to verify reproducibility:
 import { computePlanHash } from "./src/orchestration/deliverablesGenerator";
 import { Plan } from "./src/schema";
 
-const plan: Plan = {
-  /* your plan */
-};
+const plan: Plan = {/* your plan */};
 const hash = computePlanHash(plan);
 // Returns: SHA256 hex string (64 characters)
 ```

@@ -405,8 +405,7 @@ export class SqliteCoordinationStore implements CoordinationStore {
   private selectRow(runId: string): CoordinationRow | null {
     return (
       (this.db.prepare("SELECT * FROM run_coordination WHERE runId = ?").get(runId) as
-        | CoordinationRow
-        | undefined) ?? null
+        CoordinationRow | undefined) ?? null
     );
   }
 

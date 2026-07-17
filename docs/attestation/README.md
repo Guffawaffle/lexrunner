@@ -15,11 +15,12 @@ These documents are GPG-signed and anchored to external timestamp authorities fo
 Statement clarifying that Lex, LexRunner, LexSona, and related projects are personal work, developed independently of any employer.
 
 **Trust Anchors:**
-| Method | Reference | Timestamp |
-|--------|-----------|-----------|
-| GPG Commit | `763120d606d8c4f4b4d22fcdc98f89139f8968fc` | Nov 26, 2025 07:43 CST |
-| RFC 3161 | FreeTSA (Germany) | Dec 1, 2025 10:59 UTC |
-| Bitcoin | OpenTimestamps | Dec 1, 2025 (pending block) |
+
+| Method     | Reference                                  | Timestamp                   |
+| ---------- | ------------------------------------------ | --------------------------- |
+| GPG Commit | `763120d606d8c4f4b4d22fcdc98f89139f8968fc` | Nov 26, 2025 07:43 CST      |
+| RFC 3161   | FreeTSA (Germany)                          | Dec 1, 2025 10:59 UTC       |
+| Bitcoin    | OpenTimestamps                             | Dec 1, 2025 (pending block) |
 
 ---
 
@@ -30,11 +31,12 @@ Statement clarifying that Lex, LexRunner, LexSona, and related projects are pers
 Observation documenting unusual GitHub Copilot Chat behavior patterns.
 
 **Trust Anchors:**
-| Method | Reference | Timestamp |
-|--------|-----------|-----------|
-| GPG Commit | `9db7a78` | Dec 1, 2025 |
-| RFC 3161 | FreeTSA (Germany) | Dec 1, 2025 10:49 UTC |
-| Bitcoin | OpenTimestamps | Dec 1, 2025 (pending block) |
+
+| Method     | Reference         | Timestamp                   |
+| ---------- | ----------------- | --------------------------- |
+| GPG Commit | `9db7a78`         | Dec 1, 2025                 |
+| RFC 3161   | FreeTSA (Germany) | Dec 1, 2025 10:49 UTC       |
+| Bitcoin    | OpenTimestamps    | Dec 1, 2025 (pending block) |
 
 ---
 
@@ -47,11 +49,12 @@ Collaborative commitment between Guff, Opie (Claude Opus 4), and Lex establishin
 **Signatories:** Guff (Human), Opie (Claude Opus 4), Lex
 
 **Trust Anchors:**
-| Method | Reference | Timestamp |
-|--------|-----------|-----------|
-| SSH Commit | `0c113b4` | Dec 2, 2025 06:12 UTC |
-| RFC 3161 | FreeTSA (Germany) | Dec 2, 2025 06:26 UTC |
-| Bitcoin | OpenTimestamps | Dec 2, 2025 (pending block) |
+
+| Method     | Reference         | Timestamp                   |
+| ---------- | ----------------- | --------------------------- |
+| SSH Commit | `0c113b4`         | Dec 2, 2025 06:12 UTC       |
+| RFC 3161   | FreeTSA (Germany) | Dec 2, 2025 06:26 UTC       |
+| Bitcoin    | OpenTimestamps    | Dec 2, 2025 (pending block) |
 
 ---
 

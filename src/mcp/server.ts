@@ -3218,12 +3218,8 @@ async function handleFanoutHarvest(
 
         // Determine review status
         let reviewStatus:
-          | "approved"
-          | "changes_requested"
-          | "pending"
-          | "none"
-          | "unknown"
-          | "unavailable" = "unknown";
+          "approved" | "changes_requested" | "pending" | "none" | "unknown" | "unavailable" =
+          "unknown";
         try {
           const reviews = await githubAPI.getReviews(pr.number);
           const latestByUser = new Map<string, string>();

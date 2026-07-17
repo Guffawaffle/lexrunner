@@ -524,9 +524,7 @@ describe("My Executor", () => {
 
   describe("executeStochasticPhase", () => {
     it("should parse valid model response", async () => {
-      const prepResult = {
-        /* mock */
-      };
+      const prepResult = {/* mock */};
       const modelResponse = '{"decision": "approve"}';
 
       const result = await executeStochasticPhase(prepResult, modelResponse);
@@ -536,9 +534,7 @@ describe("My Executor", () => {
 
   describe("captureFrame", () => {
     it("should emit frame", async () => {
-      const stochasticResult = {
-        /* mock */
-      };
+      const stochasticResult = {/* mock */};
       const result = await captureFrame(stochasticResult);
       expect(result.data.frameId).toBeDefined();
     });

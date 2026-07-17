@@ -81,10 +81,11 @@ Controls whether git operations are enabled. Default is "off" for safe CI/epheme
 - **Case Sensitivity:** Case-insensitive
 
 **Behavior:**
-| Value | Git Operations | Use Case |
-|-------|---------------|----------|
-| `off` (default) | Disabled, returns safe fallbacks | CI/CD, ephemeral environments, testing |
-| `live` | Enabled, executes actual git commands | Local development, git-dependent workflows |
+
+| Value           | Git Operations                        | Use Case                                   |
+| --------------- | ------------------------------------- | ------------------------------------------ |
+| `off` (default) | Disabled, returns safe fallbacks      | CI/CD, ephemeral environments, testing     |
+| `live`          | Enabled, executes actual git commands | Local development, git-dependent workflows |
 
 **Example:**
 

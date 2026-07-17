@@ -64,12 +64,7 @@ export interface ObserveWorktreeSuccess {
 export type ObserveWorktreeResult = ObserveWorktreeSuccess | BrokerFailure;
 
 export type WorktreePreservationReason =
-  | "dirty"
-  | "missing"
-  | "unregistered"
-  | "wrong_repository"
-  | "wrong_branch"
-  | "identity_ambiguous";
+  "dirty" | "missing" | "unregistered" | "wrong_repository" | "wrong_branch" | "identity_ambiguous";
 
 export interface RemoveWorktreeSuccess {
   ok: true;

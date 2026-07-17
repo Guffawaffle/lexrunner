@@ -213,12 +213,12 @@ lex-pr discover --owner <owner> --repo <repo>
 # ❌ Wrong
 items:
   - name: feature-a
-    deps: ["feature-B"]  # Case mismatch!
+    deps: ["feature-B"] # Case mismatch!
 
 # ✅ Correct
 items:
   - name: feature-a
-    deps: ["feature-b"]  # Exact match
+    deps: ["feature-b"] # Exact match
 ```
 
 #### Issue: `Cycle detected in dependency graph`

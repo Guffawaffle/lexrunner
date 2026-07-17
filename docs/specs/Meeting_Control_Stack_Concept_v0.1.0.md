@@ -125,14 +125,7 @@ We can support the above ideas with a small number of new Lex frame types.
 
 ```ts
 type MeetingKind =
-  | "status"
-  | "planning"
-  | "decision"
-  | "1:1"
-  | "retro"
-  | "brainstorm"
-  | "incident"
-  | "other";
+  "status" | "planning" | "decision" | "1:1" | "retro" | "brainstorm" | "incident" | "other";
 
 interface MeetingFrame {
   frame_type: "meeting";
