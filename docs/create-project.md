@@ -68,9 +68,7 @@ The generated Execution Plan v1 contains:
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": {
-    /* Feature Spec v0 */
-  },
+  "sourceSpec": {/* Feature Spec v0 */},
   "epic": {
     "title": "Epic Title",
     "description": "Epic description",

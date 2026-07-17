@@ -17,13 +17,7 @@ type StatusBuilderInput = RunState | RunStateFile;
  * RunState state field values
  */
 type StateValue =
-  | "planning"
-  | "gated"
-  | "executing"
-  | "completed"
-  | "failed"
-  | "paused"
-  | "aborted";
+  "planning" | "gated" | "executing" | "completed" | "failed" | "paused" | "aborted";
 
 /**
  * Default next options by state

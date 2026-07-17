@@ -494,15 +494,11 @@ lex-pr create-project \
 ```json
 {
   "schemaVersion": "1.0.0",
-  "sourceSpec": {
-    /* Feature Spec v0 */
-  },
+  "sourceSpec": {/* Feature Spec v0 */},
   "epic": {
     "title": "Add dark mode support",
     "description": "Implement theme switcher with light/dark modes",
-    "acceptanceCriteria": [
-      /* from Feature Spec */
-    ]
+    "acceptanceCriteria": [/* from Feature Spec */]
   },
   "subIssues": [
     {
@@ -510,9 +506,7 @@ lex-pr create-project \
       "title": "Implement Add dark mode support",
       "description": "Core implementation of feature",
       "type": "feature",
-      "acceptanceCriteria": [
-        /* from Feature Spec */
-      ],
+      "acceptanceCriteria": [/* from Feature Spec */],
       "dependsOn": []
     },
     {

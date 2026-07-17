@@ -347,9 +347,7 @@ const fileChanges = await analyzer.getPRFileChanges(123);
 // Validate each change
 for (const file of fileChanges) {
   if (file.status === "modified") {
-    const plan = {
-      /* declared edit plan */
-    };
+    const plan = {/* declared edit plan */};
     await validateEditScope(file.filename, plan);
   }
 }

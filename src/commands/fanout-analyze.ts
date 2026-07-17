@@ -108,12 +108,7 @@ interface Fact {
 
 interface Relation {
   type:
-    | "depends_on"
-    | "blocks"
-    | "implements"
-    | "references"
-    | "modifies_same_file"
-    | "branches_from";
+    "depends_on" | "blocks" | "implements" | "references" | "modifies_same_file" | "branches_from";
   from: string;
   to: string;
   source: "label" | "body_parse" | "file_overlap" | "git" | "explicit";

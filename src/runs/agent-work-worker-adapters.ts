@@ -341,8 +341,7 @@ async function mutate<T extends z.ZodTypeAny>(
 }
 
 type ParseResult<T> =
-  | { success: true; data: T }
-  | { success: false; failure: { ok: false; error: AdapterInputError } };
+  { success: true; data: T } | { success: false; failure: { ok: false; error: AdapterInputError } };
 
 function parseBounded<T>(schema: z.ZodType<T>, input: unknown): ParseResult<T> {
   if (!isJsonSafe(input)) {

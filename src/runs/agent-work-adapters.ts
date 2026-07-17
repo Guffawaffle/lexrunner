@@ -304,8 +304,7 @@ export interface AdapterOperationError {
 export type AdapterError = AdapterInputError | AdapterOperationError;
 
 export type AgentWorkHandlerResult<T> =
-  | { ok: true; result: T }
-  | { ok: false; error: AdapterError };
+  { ok: true; result: T } | { ok: false; error: AdapterError };
 
 export interface AttemptLifecycleHandlers {
   start(request: unknown): Promise<AgentWorkHandlerResult<AgentWorkLifecycleResult>>;
@@ -445,8 +444,7 @@ function toStartInput(input: AttemptPrepareRequest): AttemptStartHandlerInput {
 }
 
 type ParseResult<T> =
-  | { success: true; data: T }
-  | { success: false; failure: { ok: false; error: AdapterInputError } };
+  { success: true; data: T } | { success: false; failure: { ok: false; error: AdapterInputError } };
 
 function parseBounded<T>(schema: z.ZodType<T>, input: unknown): ParseResult<T> {
   if (!isJsonSafe(input)) {

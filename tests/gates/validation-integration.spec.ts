@@ -45,7 +45,7 @@ describe("Gate Input Validation Integration", () => {
 
     expect(result.status).toBe("fail");
     expect(getStd(result.stderr)).toContain('Invalid input for gate "lint"');
-    expect(getStd(result.stderr)).toContain("should NOT have fewer than 1 items");
+    expect(getStd(result.stderr)).toMatch(/(?:should|must) NOT have fewer than 1 items/i);
     expect(result.attempts).toBe(0); // Validation failure, no execution attempts
   });
 

@@ -13,15 +13,16 @@ mcp_lexrunner_{category}_{action}
 ```
 
 **Categories:**
-| Category | Purpose |
-|----------|---------|
-| `plan` | Plan creation and validation |
-| `gate` | CI/gate execution |
-| `weave` | Merge-weave orchestration |
-| `workspace` | Local workspace management |
-| `run` | Run lifecycle management |
-| `executor` | Executor tools (Senior Dev, etc.) |
-| `core` | Cross-cutting utilities |
+
+| Category    | Purpose                           |
+| ----------- | --------------------------------- |
+| `plan`      | Plan creation and validation      |
+| `gate`      | CI/gate execution                 |
+| `weave`     | Merge-weave orchestration         |
+| `workspace` | Local workspace management        |
+| `run`       | Run lifecycle management          |
+| `executor`  | Executor tools (Senior Dev, etc.) |
+| `core`      | Cross-cutting utilities           |
 
 **Deprecated Aliases:** Old tool names (e.g., `plan.create`, `discover`) still work but are deprecated. Use canonical names for new integrations.
 

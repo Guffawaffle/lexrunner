@@ -124,6 +124,7 @@
     "@octokit/rest": "^22.0.0",
     "@smartergpt/lex": "^2.10.0",
     "@types/babel__traverse": "^7.28.0",
+    "ajv": "^8.20.0",
     "better-sqlite3-multiple-ciphers": "^12.6.2",
     "chalk": "^5.3.0",
     "commander": "^14.0.2",
@@ -147,6 +148,9 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vitest": "^4.0.15"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [

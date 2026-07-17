@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import "dotenv/config";
+import packageMetadata from "../package.json" with { type: "json" };
 import { Command, CommanderError } from "commander";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -213,7 +214,7 @@ program
   .description(
     "Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly"
   )
-  .version(`LexRunner 0.5.0 (lex-pr)`)
+  .version(`LexRunner ${packageMetadata.version} (lex-pr)`)
   .option("--no-color", "Disable ANSI color codes in output")
   .option("--audit-profile <profile>", "Audit logging profile: off|basic|soc2|hipaa-strict", "off")
   .option("--audit-key <hex>", "Audit encryption key (64 hex chars) - overrides LEX_AUDIT_KEY_HEX")

@@ -16,9 +16,7 @@ const PROC_FD_ROOT = `/proc/${process.pid}/fd`;
 const UNSUPPORTED_WSL_FILESYSTEM_TYPES = new Set([0x01021997n, 0x53464846n]);
 
 export type DirectoryBoundaryErrorCode =
-  | "unsupported_platform"
-  | "invalid_path"
-  | "identity_changed";
+  "unsupported_platform" | "invalid_path" | "identity_changed";
 
 export class DirectoryBoundaryError extends Error {
   constructor(

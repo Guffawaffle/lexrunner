@@ -1090,8 +1090,7 @@ export class SqliteWorkspaceLifecycleStore
            WHERE runId = ? AND mutationId = ?`
         )
         .get(input.runId, input.mutationId) as
-        | { fingerprint: string; resultJson: string }
-        | undefined;
+        { fingerprint: string; resultJson: string } | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.receiptFailure("mutation_conflict");
         const replay = parseReceiptMutationSuccess(prior.resultJson);
@@ -1438,8 +1437,7 @@ export class SqliteWorkspaceLifecycleStore
            WHERE runId = ? AND mutationId = ?`
         )
         .get(input.runId, input.mutationId) as
-        | { fingerprint: string; resultJson: string }
-        | undefined;
+        { fingerprint: string; resultJson: string } | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.workerFailure("mutation_conflict");
         const replay = parseWorkerMutationSuccess(prior.resultJson);
@@ -1643,8 +1641,7 @@ export class SqliteWorkspaceLifecycleStore
           `SELECT fingerprint, resultJson FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?`
         )
         .get(input.runId, input.mutationId) as
-        | { fingerprint: string; resultJson: string }
-        | undefined;
+        { fingerprint: string; resultJson: string } | undefined;
       if (prior) {
         if (prior.fingerprint !== fingerprint) return this.failure("mutation_conflict");
         const replay = parseWorkspaceMutationSuccess(prior.resultJson);
@@ -1825,8 +1822,7 @@ export class SqliteWorkspaceLifecycleStore
 
   private attempt(id: string): AttemptRecord | null {
     const row = this.db.prepare(`SELECT * FROM attempts WHERE attemptId = ?`).get(id) as
-      | AttemptRow
-      | undefined;
+      AttemptRow | undefined;
     if (!row) return null;
     const status = AttemptStatusSchema.safeParse(row.status);
     return status.success ? { ...row, status: status.data } : null;
@@ -1840,8 +1836,7 @@ export class SqliteWorkspaceLifecycleStore
 
   private lease(id: string): WorkspaceLifecycleLeaseRecord | null {
     const row = this.db.prepare(`SELECT * FROM workspace_leases WHERE leaseId = ?`).get(id) as
-      | LeaseRow
-      | undefined;
+      LeaseRow | undefined;
     if (!row) return null;
     const status = WorkspaceLifecycleLeaseStatusSchema.safeParse(row.status);
     const cleanupDisposition =
@@ -1897,8 +1892,7 @@ export class SqliteWorkspaceLifecycleStore
 
   private workerSession(id: string): WorkerSessionRecord | null {
     const row = this.db.prepare(`SELECT * FROM worker_sessions WHERE sessionId = ?`).get(id) as
-      | WorkerSessionRow
-      | undefined;
+      WorkerSessionRow | undefined;
     return row ? toWorkerSession(row) : null;
   }
 
@@ -1913,8 +1907,7 @@ export class SqliteWorkspaceLifecycleStore
   private taskPacketBinding(attemptId: string): TaskPacketBindingRecord | null {
     return (
       (this.db.prepare(`SELECT * FROM task_packet_bindings WHERE attemptId = ?`).get(attemptId) as
-        | TaskPacketBindingRecord
-        | undefined) ?? null
+        TaskPacketBindingRecord | undefined) ?? null
     );
   }
 

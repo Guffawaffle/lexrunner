@@ -236,9 +236,7 @@ const pr = {
   number: 100,
   title: "Test",
   body: "Depends on: #99",
-  files: [
-    /* ... */
-  ],
+  files: [/* ... */],
   // ... many more fields
 };
 ```

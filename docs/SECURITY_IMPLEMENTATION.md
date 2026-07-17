@@ -435,9 +435,7 @@ npm test          # Full test suite (664 tests)
 2. Configure policies:
 
    ```typescript
-   const policy = new CompliancePolicyService({
-     /* config */
-   });
+   const policy = new CompliancePolicyService({/* config */});
    ```
 
 3. Initialize security:

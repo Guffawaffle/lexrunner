@@ -62,11 +62,7 @@ export interface StartAttemptInput {
 }
 
 export type LifecyclePhase =
-  | "controller"
-  | "attempt_create"
-  | "workspace_allocate"
-  | "workspace_resume"
-  | "launch_authorize";
+  "controller" | "attempt_create" | "workspace_allocate" | "workspace_resume" | "launch_authorize";
 
 export type LifecycleFailureReason =
   | "controller_held"

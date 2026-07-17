@@ -1,7 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import Ajv from "ajv";
-import type { ErrorObject } from "ajv";
+import { Ajv, type ErrorObject } from "ajv";
 
 // Create a single shared AJV instance
 const ajv = new Ajv({
