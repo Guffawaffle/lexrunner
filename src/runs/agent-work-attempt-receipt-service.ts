@@ -22,7 +22,7 @@ export type AttemptReceiptSubmissionAcknowledgement =
       receiptId: string;
       receiptHash: string;
       attemptId: string;
-      outcome: "completed" | "blocked" | "failed" | "cancelled";
+      outcome: AgentTaskReceiptOutcome;
       disposition: AttemptReceiptDisposition;
       attemptRevision: number;
       attemptStatus: AttemptStatus;

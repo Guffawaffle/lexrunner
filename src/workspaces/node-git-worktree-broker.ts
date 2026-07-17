@@ -985,11 +985,6 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       ...(preflight ? { preflight } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     };
-    try {
-      preflight?.();
-    } catch (error) {
-      return this.containmentFailure(operation, error);
-    }
     const result = await this.runner.run(request);
     if (
       result.ok ||
