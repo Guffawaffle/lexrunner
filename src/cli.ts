@@ -85,6 +85,10 @@ import { ProgressReporter } from "./util/progress.js";
 import { initColorControl, isColorDisabled } from "./util/colorControl.js";
 import { parseGlobalFlags, validateFlagCombinations } from "./cli/flags.js";
 import { writeJsonOutput } from "./cli/output.js";
+import {
+  collectRegisteredCliSurface,
+  type RegisteredCliCommand,
+} from "./cli/registered-surface.js";
 import { registerWeaveCommand } from "./commands/weave.js";
 import { registerExplainCommand } from "./commands/explain.js";
 import { setFrameEmissionEnabled } from "./frames/controller.js";
@@ -1105,6 +1109,11 @@ registerMetricsCommand(program, { jsonModeActive: () => jsonModeActive });
 
 // Token usage tracking and reporting
 registerTokenReportCommand(program, { jsonModeActive: () => jsonModeActive });
+
+/** Architecture-test hook; returns metadata only and never executes a command. */
+export function inspectRegisteredCliSurface(): RegisteredCliCommand[] {
+  return collectRegisteredCliSurface(program);
+}
 
 export async function main(argv: string[] = process.argv): Promise<void> {
   try {

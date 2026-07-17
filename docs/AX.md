@@ -1,5 +1,11 @@
 # AX (Agent Experience) Compliance
 
+> **Surface inventory notice:** the January v1.0.1 command/tool tables below are
+> historical and are not the current parity contract. The live,
+> registration-verified dispositions are defined by
+> [Canonical CLI and MCP surface](./architecture/canonical-cli-mcp-surface.md).
+> A full editorial refresh is tracked by #772.
+
 **AX** is the set of principles and guarantees that make Lex tools work reliably for AI agents.
 
 This document describes the AX philosophy, compliance requirements, and current status for LexRunner.

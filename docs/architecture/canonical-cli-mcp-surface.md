@@ -1,0 +1,117 @@
+# Canonical CLI and MCP surface
+
+Status: **Normative surface decision for LexRunner v1.1**
+
+The machine-readable source of truth is
+[`cli-mcp-surface.json`](./cli-mcp-surface.json). It is checked against the live
+Commander tree and the published MCP `tools/list` response. This document
+explains the decisions behind that inventory.
+
+## Dispositions
+
+The audited registration set contains 117 CLI entries (96 operations and 21
+groups) and 24 published MCP tools.
+
+| Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
+| ------- | --------: | ------------: | ---------: | ------------: | -----: |
+| CLI     |        78 |             9 |         15 |            15 |      0 |
+| MCP     |        20 |             3 |          1 |             0 |      0 |
+
+- **canonical** is supported vocabulary. Machine-facing canonical operations
+  must resolve to a contract profile in the JSON matrix.
+- **compatibility** is retained because it has distinct existing callers, but
+  it has an explicit canonical replacement.
+- **deprecated** is a legacy alias that should warn and be removed after its
+  migration window.
+- **internal-only** is developer/governance machinery, not a public parity
+  promise.
+- **remove** is reserved for a registration that should disappear without a
+  replacement. No current entry received that disposition.
+
+Full CLI/MCP symmetry is not the goal. Semantic parity is required for approved
+machine operations. Interactive review, ideation, local administration, and
+terminal navigation remain deliberately CLI-only. `workflow.guide` remains
+deliberately MCP-only because humans have CLI help and checked-in documentation.
+
+## Canonical nouns and ownership
+
+`WorkItem`, `Run`, and `Attempt` are ADR-010 durable orchestration nouns.
+`CoordinationStore` and the workspace lifecycle stores are their operational
+authority. Current public orchestration is rooted at `attempt`: preparation may
+create/bind the WorkItem and Run, but no separate Work or Run adapter is
+approved yet.
+
+The frozen `RunStore` is different. It records stateless integration runs,
+steps, receipts, and artifacts; it cannot authorize or advance ADR-010 state.
+The three published `lexrunner.*` MCP tools are compatibility-only RunStore
+adapters and must be renamed or retired rather than presented as ADR-010 Run
+operations.
+
+ADR-007 `TaskSnapshot_v1` and `TaskReceipt_v1` remain supported contracts for
+bounded repair procedures. There is no currently registered `task` CLI command
+or MCP tool. The parity project will not resurrect a generic Task lifecycle or
+silently alias Task to Work/Run/Attempt.
+
+`Plan`, `Gate`, and `Weave` belong to the stateless integration core. Their
+services consume frozen inputs and must not read CoordinationStore authority.
+
+## Adapter rule
+
+CLI and MCP adapters do transport work only:
+
+1. validate and bound input;
+2. call one owning application service;
+3. project that service result into the selected transport; and
+4. map failure to the operation's declared bounded error contract.
+
+No adapter implements a lifecycle transition. The existing Attempt adapters
+already follow this rule. Several inline merge-weave/workspace MCP handlers do
+not yet share a service with their CLI counterpart; the matrix records the
+intended owner so follow-up work can be independently tested.
+
+## Output contracts
+
+The JSON matrix defines three profiles:
+
+- `agent-work-handler-v1` is the current bounded JSON-safe result used by the
+  Attempt CLI and MCP handlers. Canonical bodies stay in durable storage.
+- `bounded-ax-v1` is the target for all other canonical machine operations.
+  Large collections and logs use bounded summaries plus artifact references;
+  failures use stable AXError codes, bounded context, and recovery actions.
+- `human-local-v1` covers explicitly interactive or local-only CLI operations.
+  These are not MCP parity gaps.
+
+A canonical designation does not pretend that every legacy implementation is
+already conformant. It states the target contract. The focused child issues
+listed in the matrix own implementation gaps.
+
+## Audit findings
+
+- The live command is `gate execute`, while help and AX documentation claim the
+  canonical spelling is `gate run`. `gate execute` is therefore compatibility
+  surface until `gate run` exists and shares a gate service with `gates.run`.
+- The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
+  ADR-007 task tools that are not published by `mcp-server.mjs`.
+- `health` duplicates `doctor` and is deprecated.
+- Top-level `discover`, `plan`, `status`, `report`, `merge-order`, `execute`,
+  `doctor`, and `init` remain deprecated aliases for category/action commands.
+- `orchestrate:*` commands are legacy aliases; `senior-dev`, budget,
+  counter-example, and fanout-monitor commands are internal-only.
+
+The full per-registration disposition, parity mapping, contract profile, and
+implementation issue is deliberately kept in the JSON matrix so CI can detect
+drift.
+
+## Focused implementation issues
+
+| Issue | Boundary                                                                  |
+| ----- | ------------------------------------------------------------------------- |
+| #779  | Canonical `gate run` and shared CLI/MCP gate execution service            |
+| #780  | Shared bounded discovery, plan, status, and merge-order query services    |
+| #781  | Shared bounded merge application service                                  |
+| #782  | Shared workspace/config services and retirement of MCP `health`           |
+| #783  | Rename or retirement of frozen RunStore `lexrunner.*` compatibility tools |
+| #784  | CLI alias warnings and removal windows                                    |
+
+Each issue is independently testable and requires a fresh branch. Documentation
+reconciliation remains tracked by #772.
