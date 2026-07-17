@@ -10,6 +10,8 @@ export interface CommandRequest {
   signal?: AbortSignal;
   /** Maximum buffered bytes for each output stream. */
   maxOutputBytes?: number;
+  /** Synchronous identity assertion run immediately before process creation. */
+  preflight?: () => void;
 }
 
 interface CommandResultBase {
@@ -27,6 +29,7 @@ export type CommandFailureKind =
   | "invalid_request"
   | "nonzero_exit"
   | "spawn_error"
+  | "preflight_error"
   | "timeout"
   | "aborted"
   | "output_limit";
@@ -42,6 +45,7 @@ export type CommandResult = CommandSuccess | CommandFailure;
 
 /** Injectable process boundary used by the Git workspace broker. */
 export interface CommandRunner {
+  /** Implementations that spawn must execute request.preflight immediately before spawning. */
   run(request: CommandRequest): Promise<CommandResult>;
 }
 
@@ -61,6 +65,19 @@ export class ExecaCommandRunner implements CommandRunner {
     }
 
     try {
+      try {
+        request.preflight?.();
+      } catch (error) {
+        return {
+          ok: false,
+          kind: "preflight_error",
+          exitCode: null,
+          stdout: "",
+          stderr: "",
+          durationMs: 0,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
       const result = await execa(request.executable, [...request.args], {
         cwd: request.cwd,
         timeout: request.timeoutMs,
