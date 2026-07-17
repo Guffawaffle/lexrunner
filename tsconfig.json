@@ -9,7 +9,6 @@
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "downlevelIteration": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["node"]
