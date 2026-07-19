@@ -26,7 +26,8 @@ import { registerPolicyCommands } from "./weave-policy.js";
 import { registerFanoutCommands } from "./weave-fanout.js";
 import { registerCheckpointCommands } from "./weave-checkpoints.js";
 import { loadCheckpoint, getLatestCheckpoint } from "../weave/checkpoint/storage.js";
-import { validateCheckpointForResume } from "../weave/checkpoint/utils.js";
+import { LocalWeaveResumeDriver } from "../weave/local-resume-driver.js";
+import { resumePersistedWeave } from "../weave/resume-service.js";
 import fs from "fs";
 import path from "path";
 
@@ -466,45 +467,27 @@ Subcommands:
           throwExit(1);
         }
 
-        // Validate checkpoint is resumable
-        const validation = validateCheckpointForResume(checkpoint);
-        if (!validation.valid) {
-          console.error(`\n❌ Cannot resume: ${validation.reason}\n`);
-          throwExit(1);
-        }
-
-        if (opts.json || deps.jsonModeActive()) {
-          console.log(
-            canonicalJSONStringify({
-              action: "resume",
-              runId,
-              phase: checkpoint.phase,
-              state: checkpoint.state,
-              progress: {
-                completed: checkpoint.completedItems.length,
-                pending: checkpoint.pendingItems.length,
-                failed: checkpoint.failedItems.length,
-              },
-            })
-          );
-        } else {
+        if (!(opts.json || deps.jsonModeActive())) {
           console.log("\n🔄 Resuming merge-weave execution\n");
           console.log(`Run ID: ${runId}`);
           console.log(`Phase: ${checkpoint.phase}`);
-          console.log(`State: ${checkpoint.state}`);
+        }
+        const result = await resumePersistedWeave({
+          runId,
+          driver: new LocalWeaveResumeDriver(process.cwd()),
+        });
+        if (opts.json || deps.jsonModeActive()) {
+          console.log(canonicalJSONStringify({ action: "resume", ...result }));
+        } else if (result.ok) {
           console.log(
-            `Progress: ${checkpoint.currentBatchIndex + 1}/${checkpoint.totalBatches} batches\n`
+            `✅ ${result.outcome === "completed" ? "Execution completed" : "Execution paused"}`
           );
-          console.log(`Completed: ${checkpoint.completedItems.length} items`);
-          console.log(`Pending: ${checkpoint.pendingItems.length} items`);
-          console.log(`Failed: ${checkpoint.failedItems.length} items\n`);
-
-          // Note: Actual resume implementation would restore execution state
-          // For now, show the plan file that should be used
-          console.log("⚠️  Resume functionality is not yet fully implemented.\n");
-          console.log("To continue manually:");
-          console.log(`  1. Review checkpoint: lex-pr weave checkpoints show ${runId}`);
-          console.log(`  2. Continue execution with remaining items\n`);
+          console.log(
+            `Completed: ${result.completed} | Pending: ${result.pending} | Failed: ${result.failed}\n`
+          );
+        } else {
+          console.error(`\n❌ Cannot resume: ${result.reason}\n`);
+          throwExit(1);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

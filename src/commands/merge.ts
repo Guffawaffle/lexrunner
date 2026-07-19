@@ -12,20 +12,11 @@ import {
   getAutopilotLevelDescription,
   AutopilotLevel,
 } from "../autopilot/index.js";
-import { ProgressReporter } from "../util/progress.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
-import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
 import { initAuditEmitter, emitEvent, AuditEmitter, EVENT_TYPES } from "../audit/index.js";
-import {
-  generateDryRunOutput,
-  formatDryRunOutput,
-  validateResume,
-  initializeWeaveExecution,
-} from "../weave/mergeHelpers.js";
-import { initializeLockFile, updateLockFile, deleteLockFile } from "../weave/lockFile.js";
-import { WeaveEvent } from "../weave/types.js";
-import { computeLockHash, formatLockHash, generateLockBranchName } from "../util/lockHash.js";
+import { generateDryRunOutput, formatDryRunOutput } from "../weave/mergeHelpers.js";
+import { computeLockHash, formatLockHash } from "../util/lockHash.js";
 import { parseWeaveLock, serializeWeaveLock, WeaveLock } from "../schema/weaveLock.js";
 import { MergeWeaveTurnCost } from "../metrics/turncost.js";
 import {
@@ -35,12 +26,22 @@ import {
   formatShadowGovernanceSummary,
   createGovernanceComparisonLog,
   writeGovernanceLog,
-  formatGovernanceLog,
   type LexSonaWorkflowContext,
   type RunnerGovernanceSignals,
 } from "../lexsona/index.js";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  createLocalResumeCheckpoint,
+  LocalWeaveResumeDriver,
+} from "../weave/local-resume-driver.js";
+import {
+  getLatestCheckpoint,
+  loadCheckpoint,
+  saveCheckpoint,
+} from "../weave/checkpoint/storage.js";
+import { resumePersistedWeave } from "../weave/resume-service.js";
+import { sha256 } from "../util/hash.js";
 
 // Guarded finalize: ensure HIPAA-prefixed errors rethrow (to map to exit 2),
 // while non-HIPAA finalize errors are logged and ignored.
@@ -70,7 +71,7 @@ export function registerMergeCommand(
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .option("--dry-run", "Show what would be merged without executing", true)
     .option("--execute", "Actually perform merge operations")
-    .option("--resume [runId]", "Resume execution from weave-lock.json (optional: specific run ID)")
+    .option("--resume [runId]", "Resume from the persisted operation checkpoint")
     .option("--cleanup", "Clean up integration branches after execution")
     .option("--force", "Force execution even if same lock hash exists")
     .option("--json", "Output JSON format")
@@ -120,9 +121,9 @@ Examples:
 
 State Management:
   • Dry-run shows planned batches and execution order
-  • Execute creates weave-lock.json for resume capability
-  • Lock file contains hash(plan.json + PR heads) for validation
-  • Resume validates lock file and continues from last successful state
+  • Execute creates a versioned operation checkpoint for resume capability
+  • The checkpoint binds the plan, target, source heads, and integration branch
+  • Resume reconciles current external state before continuing
 
 Idempotency:
   • Lock hash computed from plan.json + PR head commits
@@ -349,25 +350,44 @@ Common Issues:
             console.log("🔄 RESUME MODE - Validating execution state...");
           }
 
-          const resumeValidation = await validateResume(runId, plan);
-
-          if (!resumeValidation.valid) {
-            console.error(`Resume Error: ${resumeValidation.reason}`);
+          const checkpoint = runId
+            ? await loadCheckpoint(runId, { validatePlanHash: false })
+            : await getLatestCheckpoint();
+          if (!checkpoint) {
+            console.error("Resume Error: No persisted checkpoint found.");
+            throwExit(1);
+          }
+          const requestedPlanHash = sha256(Buffer.from(canonicalJSONStringify(plan)));
+          if (checkpoint.planHash !== requestedPlanHash) {
+            console.error("Resume Error: The supplied plan does not match the persisted run.");
             throwExit(1);
           }
 
           if (!(opts.json || jsonModeActive())) {
-            console.log(`✓ Lock file validated (Run ID: ${resumeValidation.context.runId})`);
-            console.log(`✓ Resuming from state: ${resumeValidation.context.state}`);
-            console.log(
-              `✓ Completed batches: ${resumeValidation.context.currentBatchIndex}/${resumeValidation.context.batches.length}`
-            );
+            console.log(`✓ Checkpoint validated (Run ID: ${checkpoint.runId})`);
+            console.log(`✓ Resuming from state: ${checkpoint.state}`);
             console.log("");
           }
-
-          // Resume execution would continue here
-          // For now, this is a placeholder for the actual resume logic
-          console.log("Resume functionality will continue execution from saved state");
+          const result = await resumePersistedWeave({
+            runId: checkpoint.runId,
+            driver: new LocalWeaveResumeDriver(process.cwd()),
+          });
+          if (opts.json || jsonModeActive()) {
+            console.log(canonicalJSONStringify({ mode: "resume", ...result }));
+          } else if (result.ok) {
+            console.log(
+              `✅ ${result.outcome === "completed" ? "Execution completed" : "Execution paused"}`
+            );
+            console.log(
+              `Completed: ${result.completed} | Pending: ${result.pending} | Failed: ${result.failed}`
+            );
+          } else {
+            console.error(`Resume Error: ${result.reason}`);
+            throwExit(1);
+          }
+          if (result.ok && result.outcome === "completed" && fs.existsSync(lockFilePath)) {
+            fs.unlinkSync(lockFilePath);
+          }
           return;
         }
 
@@ -418,11 +438,8 @@ Common Issues:
             console.log(formatDryRunOutput(dryRunOutput));
           }
         } else if (opts.execute) {
-          // Execute mode with state machine
-          // Initialize weave execution context
-          const { context, stateMachine } = await initializeWeaveExecution(plan);
-
-          // Initialize lock file with lock hash from PR #378
+          const checkpoint = await createLocalResumeCheckpoint({ plan, workingDir: process.cwd() });
+          await saveCheckpoint(checkpoint, { skipCleanup: true });
           const lockData: WeaveLock = {
             lockHash,
             planHash: lockHashResult.inputs.planHash,
@@ -431,35 +448,15 @@ Common Issues:
             status: "in-progress",
           };
           fs.writeFileSync(lockFilePath, serializeWeaveLock(lockData));
-          initializeLockFile(context);
 
-          if (opts.json || jsonModeActive()) {
-            writeJsonOutput({
-              mode: "execute",
-              status: "starting",
-              runId: context.runId,
-              lockHash: lockHashShort,
-            });
-          } else {
+          if (!(opts.json || jsonModeActive())) {
             console.log(`🚀 EXECUTE MODE - Starting merge pyramid execution`);
-            console.log(`Run ID: ${context.runId}`);
+            console.log(`Run ID: ${checkpoint.runId}`);
             console.log(`Target: ${plan.target}`);
             console.log(`Items: ${plan.items.length}`);
-            console.log(`Batches: ${context.batches.length}`);
+            console.log(`Batches: ${checkpoint.totalBatches}`);
             console.log("");
           }
-
-          // Transition to planning state
-          stateMachine.transition(WeaveEvent.START);
-          updateLockFile(stateMachine.getContext());
-
-          // Create progress reporter (disabled in JSON mode)
-          const progressReporter = new ProgressReporter({
-            enabled: !jsonModeActive(),
-          });
-
-          // Compute merge order
-          const levels = computeMergeOrder(plan);
 
           // Initialize Turn Cost tracker if enabled
           const turnCostTracker = opts.trackTurncost ? new MergeWeaveTurnCost() : null;
@@ -478,7 +475,7 @@ Common Issues:
               hints: {
                 task: "merge-pyramid-execution",
                 itemCount: plan.items.length,
-                batchCount: context.batches.length,
+                batchCount: checkpoint.totalBatches,
               },
             };
 
@@ -512,58 +509,51 @@ Common Issues:
               console.log(`   Logged to: ${logPath.replace(process.cwd(), ".")}`);
               console.log("");
             }
-          } // Execute weave
-          const result = await gitOps.executeWeave(plan, levels, progressReporter);
+          }
+          const result = await resumePersistedWeave({
+            runId: checkpoint.runId,
+            driver: new LocalWeaveResumeDriver(process.cwd()),
+          });
+          const persisted = await loadCheckpoint(checkpoint.runId, { validatePlanHash: false });
+          const operations = persisted.metadata?.resume?.operations ?? [];
+          const merges = operations.filter((operation) => operation.phase === "merge");
+          const successful = merges.filter((operation) => operation.status === "completed").length;
+          const failed = merges.filter((operation) => operation.status === "failed").length;
 
           // Record Turn Cost metrics
           if (turnCostTracker) {
-            // Record total execution latency
             turnCostTracker.recordLatency(performance.now() - executeStartTime, "total_execution");
-
-            // Record renegotiations (conflicts that need resolution)
-            for (const op of result.operations) {
-              if (op.conflicts && op.conflicts.length > 0) {
-                turnCostTracker.recordRenegotiation(
-                  `conflict in ${op.item.name}: ${op.conflicts.length} file(s)`,
-                  op.item.name
-                );
-              }
-            }
-
-            // Attach Turn Cost to context for frame emission
-            context.turnCost = turnCostTracker.toJSON();
           }
 
-          // Update lock file status based on result
           const finalLockData: WeaveLock = {
             lockHash,
             planHash: lockHashResult.inputs.planHash,
             prHeads: lockHashResult.inputs.prHeads,
             timestamp: lockHashResult.timestamp,
-            status: result.failed > 0 ? "failed" : "completed",
+            status: result.ok && result.outcome === "completed" ? "completed" : "failed",
           };
           fs.writeFileSync(lockFilePath, serializeWeaveLock(finalLockData));
 
           if (opts.json || jsonModeActive()) {
             const output: Record<string, any> = {
               mode: "execute",
-              status: "completed",
+              status: result.ok ? result.outcome : "failed",
+              runId: checkpoint.runId,
               lockHash: lockHashShort,
               result: {
-                successful: result.successful,
-                failed: result.failed,
-                conflicts: result.conflicts,
-                totalOperations: result.totalOperations,
+                successful,
+                failed,
+                totalOperations: merges.length,
               },
-              operations: result.operations.map((op) => ({
-                item: op.item.name,
-                success: op.success,
-                conflicts: op.conflicts,
-                message: op.message,
-                sha: op.sha,
+              operations: operations.map((operation) => ({
+                id: operation.id,
+                phase: operation.phase,
+                item: operation.item,
+                status: operation.status,
+                externalId: operation.result?.externalId,
+                error: operation.error,
               })),
             };
-            // Include Turn Cost in JSON output if tracked
             if (turnCostTracker) {
               output.turnCost = turnCostTracker.toJSON();
             }
@@ -572,35 +562,21 @@ Common Issues:
             console.log("");
             console.log("## Execution Results");
             console.log("");
-            console.log("| Item | Status | Message | SHA |");
-            console.log("|------|--------|---------|-----|");
+            console.log("| Operation | Phase | Status | Evidence |");
+            console.log("|-----------|-------|--------|----------|");
 
-            for (const operation of result.operations) {
-              const status = operation.success ? "✓" : "✗";
-              const sha = operation.sha ? operation.sha.substring(0, 8) : "—";
-              const message = operation.message || "—";
-              console.log(`| ${operation.item.name} | ${status} | ${message} | ${sha} |`);
+            for (const operation of operations) {
+              const evidence = operation.result?.externalId?.slice(0, 12) ?? operation.error ?? "—";
+              console.log(
+                `| ${operation.id} | ${operation.phase} | ${operation.status} | ${evidence} |`
+              );
             }
 
             console.log("");
             console.log("### Summary");
-            console.log(`- **Successful**: ${result.successful}/${result.totalOperations}`);
-            console.log(`- **Failed**: ${result.failed}/${result.totalOperations}`);
-            console.log(`- **Conflicts**: ${result.conflicts}/${result.totalOperations}`);
-
-            // Display detailed conflict information if any
-            if (result.conflicts > 0) {
-              console.log("");
-              console.log("### Conflicted Files");
-              for (const operation of result.operations) {
-                if (operation.conflicts && operation.conflicts.length > 0) {
-                  console.log(`\n**${operation.item.name}**:`);
-                  for (const file of operation.conflicts) {
-                    console.log(`  - ${file}`);
-                  }
-                }
-              }
-            }
+            console.log(`- **Successful merges**: ${successful}/${merges.length}`);
+            console.log(`- **Failed merges**: ${failed}/${merges.length}`);
+            console.log(`- **Checkpoint**: ${checkpoint.runId}`);
 
             // Display Turn Cost summary if tracked
             if (turnCostTracker) {
@@ -620,9 +596,11 @@ Common Issues:
               }
             }
 
-            if (result.failed > 0) {
+            if (!result.ok || result.outcome !== "completed") {
               console.log("");
-              console.log("❌ Merge pyramid execution completed with failures");
+              console.log(
+                `❌ Merge pyramid execution stopped: ${result.ok ? result.outcome : result.reason}`
+              );
               throwExit(1);
             } else {
               console.log("");
@@ -638,11 +616,10 @@ Common Issues:
             }
           }
 
-          // Delete lock file on successful completion
-          if (result.failed === 0) {
-            deleteLockFile();
+          if (result.ok && result.outcome === "completed") {
+            if (fs.existsSync(lockFilePath)) fs.unlinkSync(lockFilePath);
             if (!opts.json && !jsonModeActive()) {
-              console.log("🗑️  Removed weave-lock.json (execution complete)");
+              console.log("🗑️  Removed weave-lock.json; retained the completed checkpoint");
             }
           }
         }

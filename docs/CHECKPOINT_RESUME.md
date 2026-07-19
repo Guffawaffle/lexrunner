@@ -2,7 +2,11 @@
 
 ## Overview
 
-Merge-weave now supports checkpointing and resume functionality to handle interruptions during execution (network issues, rate limits, system crashes). The system automatically saves execution state at key milestones, allowing you to resume from the last successful state.
+Merge-weave persists an operation journal before and after every gate, merge, and post-check. A
+restart continues from the last proven boundary without repeating completed side effects.
+
+`weave resume` and `merge --resume` are two CLI entry points to the same application service and
+the same checkpoint. They cannot apply different recovery semantics.
 
 ## Quick Start
 
@@ -44,7 +48,7 @@ Each checkpoint contains:
 interface WeaveCheckpoint {
   runId: string; // Unique run identifier
   timestamp: string; // ISO 8601 timestamp
-  phase: CheckpointPhase; // discovery | gates | merge | complete
+  phase: CheckpointPhase; // discovery | gates | merge | post_checks | complete
   state: WeaveState; // Current state machine state
   planHash: string; // Plan hash for validation
   plan: Plan; // Original plan
@@ -62,6 +66,22 @@ interface WeaveCheckpoint {
     version?: string; // Lexrunner version
     target?: string; // Target branch
     warnings?: string[]; // Any warnings
+    resume?: {
+      schemaVersion: "1.0.0";
+      revision: number;
+      operations: Array<{
+        id: string;
+        phase: "gate" | "merge" | "post_check";
+        status: "pending" | "in_progress" | "completed" | "failed";
+        attempts: number;
+      }>;
+      repository: {
+        target: string;
+        targetHeadSha: string;
+        integrationBranch: string;
+        sourceHeads: Record<string, string>;
+      };
+    };
   };
 }
 ```
@@ -70,6 +90,7 @@ interface WeaveCheckpoint {
 
 - **Location**: `.lexrunner/checkpoints/`
 - **Format**: JSON files named `<run-id>.json`
+- **Writes**: atomic replace, with a local execution lease preventing concurrent resume
 - **Retention**: 7 days (automatic cleanup)
 
 ## Commands
@@ -150,56 +171,46 @@ Checkpoints are categorized by execution phase:
 - **discovery**: Initial planning and order computation
 - **gates**: Gate execution and validation
 - **merge**: Actual merge operations
+- **post_checks**: Integrated-result validation
 - **complete**: Successfully completed execution
 
 ## Resumable States
 
-A checkpoint can be resumed if:
+A checkpoint can be resumed when its versioned operation journal, canonical plan hash, captured
+target head, source heads, and integration-branch boundary still agree. If a process exits after a
+merge but before recording success, LexRunner observes the exact source commit on the integration
+branch and records the operation as completed. It does not repeat the merge.
 
-- State is not `COMPLETED` or `FAILED`
-- Plan is valid and contains items
-- Batch index is within valid range
+Gate and post-check processes do not expose equivalent external proof. If one exits while marked
+`in_progress`, resume fails closed as ambiguous instead of claiming or repeating success.
 
 ## Implementation Status
 
-### ✅ Completed
+### Implemented
 
-- Checkpoint data structure and types
-- File-based storage layer with auto-cleanup
-- CLI commands (resume, list, show, clean)
-- Comprehensive test suite (49 tests)
-- Plan hash validation
-- Checkpoint filtering and formatting
-
-### ⚠️ Pending (Future Work)
-
-- Automatic checkpoint saving during weave execution
-- State machine integration for checkpoint creation
-- Actual resume execution logic
-- Checkpoint versioning for schema evolution
-- Distributed checkpoint storage options
+- automatic checkpoint creation and atomic progress writes;
+- one versioned operation journal for gates, merges, and post-checks;
+- plan, target, source-head, and integration-head validation;
+- idempotent observation of a merge completed immediately before a crash;
+- bounded JSON results and actionable fail-closed errors;
+- compatible checkpoint list, show, cleanup, and retention commands.
 
 ## Notes
 
-- **Current Limitation**: While checkpoint infrastructure is complete, automatic checkpoint saving during weave execution is not yet fully integrated. Manual checkpoint creation is supported via the storage API.
-
-- **Manual Testing**: You can create checkpoints programmatically using the storage API:
-
-```typescript
-import { saveCheckpoint, createCheckpointFromContext } from "./src/weave/checkpoint";
-
-// During weave execution
-const checkpoint = createCheckpointFromContext(context, completedItems, pendingItems, failedItems);
-await saveCheckpoint(checkpoint);
-```
+- Checkpoints created before the `metadata.resume` journal existed are inspectable but are not
+  executable. Their item-level state cannot prove which individual side effects completed, so
+  LexRunner asks for a fresh execution rather than guessing.
+- The repository-local execution lease is not a distributed lock. Cross-host scheduling belongs
+  to the durable agent-work coordination layer, not this local merge-weave checkpoint.
 
 ## Design Decisions
 
 1. **File-based storage**: Simple, deterministic, no external dependencies
 2. **JSON format**: Human-readable, easy to debug, compatible with existing tooling
 3. **7-day retention**: Balances disk space with recovery window
-4. **Plan hash validation**: Ensures checkpoint matches current plan
-5. **Phase categorization**: Enables filtering and monitoring by execution stage
+4. **Plan and repository validation**: Ensures the plan and captured Git refs still match
+5. **Write-ahead operation state**: Persists `in_progress` before issuing a side effect
+6. **Observation before retry**: Retries only after proving the side effect remains pending
 
 ## Related Documentation
 

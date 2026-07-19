@@ -75,6 +75,8 @@ export { WeaveStateMachine } from "./stateMachine.js";
 
 // Checkpoint and resume support
 export * from "./checkpoint/index.js";
+export * from "./resume-service.js";
+export * from "./local-resume-driver.js";
 
 // ADR-007: Task snapshot contract integration
 export {

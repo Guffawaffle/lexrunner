@@ -8,7 +8,38 @@ import type { Plan } from "../../schema.js";
 /**
  * Execution phase for checkpoint categorization
  */
-export type CheckpointPhase = "discovery" | "gates" | "merge" | "complete";
+export type CheckpointPhase = "discovery" | "gates" | "merge" | "post_checks" | "complete";
+
+export type ResumeOperationStatus = "pending" | "in_progress" | "completed" | "failed";
+
+/** One durable, independently reconcilable operation in a resumable weave. */
+export interface ResumeOperation {
+  id: string;
+  phase: "gate" | "merge" | "post_check";
+  item: string;
+  status: ResumeOperationStatus;
+  attempts: number;
+  startedAt?: string;
+  completedAt?: string;
+  result?: {
+    outcome: "executed" | "observed";
+    externalId?: string;
+  };
+  error?: string;
+}
+
+/** Versioned execution journal shared by every resume entry point. */
+export interface WeaveResumeJournal_v1 {
+  schemaVersion: "1.0.0";
+  revision: number;
+  operations: ResumeOperation[];
+  repository: {
+    target: string;
+    targetHeadSha: string;
+    integrationBranch: string;
+    sourceHeads: Record<string, string>;
+  };
+}
 
 /**
  * Checkpoint for merge-weave execution state
@@ -55,6 +86,8 @@ export interface WeaveCheckpoint {
     target?: string;
     /** Any warnings or notices */
     warnings?: string[];
+    /** Canonical operation journal used by both resume CLI entry points. */
+    resume?: WeaveResumeJournal_v1;
   };
 }
 
