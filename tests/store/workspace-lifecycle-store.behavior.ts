@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
-import { createAgentTaskPacket } from "../../src/schemas/agent-work.js";
+import { createAgentTaskPacket, parseAgentTaskReceiptV2 } from "../../src/schemas/agent-work.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
@@ -65,7 +65,10 @@ function taskPacketSnapshot(attemptId = "attempt-1", workItemId = "work-1", pack
     attempt_id: attemptId,
     repository: { id: "repo-1", base_sha: "a".repeat(40) },
     objective: "Persist the packet snapshot",
-    acceptance_criteria: [{ id: "criterion-1", text: "Packet is immutable" }],
+    acceptance_criteria: [
+      { id: "criterion-1", text: "Packet is immutable" },
+      { id: "criterion-2", text: "Receipt references are bound" },
+    ],
     instructions: ["Make no host-local assumptions."],
     scope: {
       read_globs: ["src/**"],
@@ -82,7 +85,10 @@ function taskPacketSnapshot(attemptId = "attempt-1", workItemId = "work-1", pack
       signing: false,
       release: false,
     },
-    verification: [{ id: "check-1", argv: ["npm", "test"], expected_exit_codes: [0] }],
+    verification: [
+      { id: "check-1", argv: ["npm", "test"], expected_exit_codes: [0] },
+      { id: "check-2", argv: ["npm", "run", "typecheck"], expected_exit_codes: [0] },
+    ],
     budget: {},
     created_at: T2,
   });
@@ -312,7 +318,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         files_touched: ["src/result.ts"],
         commits: [],
         acceptance_criteria_addressed: [],
-        claimed_checks: [{ id: "claimed", outcome: "pass" as const }],
+        claimed_checks: [{ id: "check-1", outcome: "pass" as const }],
         assumptions: [],
         blockers: outcome === "blocked" ? ["Needs a decision"] : [],
         human_action_request_ids: [],
@@ -952,6 +958,66 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         })
       ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
       await expect(store.listAttemptReceiptEvents("run-1")).resolves.toHaveLength(2);
+    });
+
+    it("canonicalizes set-like receipt fields before hashing and replay fingerprinting", async () => {
+      await endedWorker();
+      const unordered = receiptInput("completed", {
+        receipt: receiptClaim("completed", {
+          files_touched: ["src/z.ts", "src/a.ts"],
+          acceptance_criteria_addressed: ["criterion-2", "criterion-1"],
+          claimed_checks: [
+            { id: "check-2", outcome: "pass" as const },
+            { id: "check-1", outcome: "pass" as const },
+          ],
+          assumptions: ["z assumption", "a assumption"],
+          human_action_request_ids: ["request-z", "request-a"],
+        }),
+      });
+      const first = await store.submitAttemptReceipt(unordered);
+      expect(first).toMatchObject({ submitted: true, idempotentReplay: false });
+      if (!first.submitted) throw new Error("receipt submission failed");
+
+      const canonicalReceipt = receiptClaim("completed", {
+        files_touched: ["src/a.ts", "src/z.ts"],
+        acceptance_criteria_addressed: ["criterion-1", "criterion-2"],
+        claimed_checks: [
+          { id: "check-1", outcome: "pass" as const },
+          { id: "check-2", outcome: "pass" as const },
+        ],
+        assumptions: ["a assumption", "z assumption"],
+        human_action_request_ids: ["request-a", "request-z"],
+      });
+      expect(first.receipt.receiptHash).toBe(
+        computeCanonicalHash(parseAgentTaskReceiptV2(canonicalReceipt))
+      );
+      await expect(
+        store.submitAttemptReceipt({ ...unordered, receipt: canonicalReceipt })
+      ).resolves.toMatchObject({ submitted: true, idempotentReplay: true });
+    });
+
+    it("rejects duplicate set members and dangling packet references", async () => {
+      await endedWorker();
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            receipt: receiptClaim("completed", {
+              files_touched: ["src/result.ts", "src/result.ts"],
+            }),
+          })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "evidence_mismatch" });
+      await expect(
+        store.submitAttemptReceipt(
+          receiptInput("completed", {
+            mutationId: "submit-dangling-references",
+            receipt: receiptClaim("completed", {
+              acceptance_criteria_addressed: ["criterion-unknown"],
+              claimed_checks: [{ id: "check-unknown", outcome: "pass" as const }],
+            }),
+          })
+        )
+      ).resolves.toMatchObject({ submitted: false, reason: "evidence_mismatch" });
     });
 
     it("rejects wrong receipt identity and a second immutable receipt", async () => {

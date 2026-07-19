@@ -1,6 +1,10 @@
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
-import { AgentTaskPacket_v1, AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
+import {
+  AgentTaskPacket_v1,
+  AgentTaskReceipt_v2,
+  validateAgentTaskReceiptV2PacketReferences,
+} from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import {
   canTransitionAttempt,
@@ -731,7 +735,10 @@ export class InMemoryWorkspaceLifecycleStore
       input.expectedRunRevision,
       () => {
         const key = mutationKey(input.runId, input.mutationId);
-        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        const fingerprint = canonicalJSONStringify({
+          ...input,
+          receipt: parsed.data,
+        } as unknown as JsonRecord);
         if (this.mutations.has(key) || this.workerMutations.has(key)) {
           return this.receiptFailure("mutation_conflict");
         }
@@ -852,6 +859,13 @@ export class InMemoryWorkspaceLifecycleStore
     }
     if (this.receiptByAttempt.has(input.attemptId)) {
       return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    const packetBinding = this.taskPacketBindings.get(input.attemptId);
+    const packet = packetBinding
+      ? validateCanonicalTaskPacket(packetBinding.packetJson, attempt)
+      : null;
+    if (!packet || !validateAgentTaskReceiptV2PacketReferences(packet, claim).valid) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
     if (!validReceiptBinding(claim, input, attempt, lease, session)) {
       return this.receiptFailure("evidence_mismatch", attempt, lease, session);

@@ -22,6 +22,7 @@ import {
   parseAgentTaskReceiptV2,
   validateAgentTaskReceiptBinding,
   validateAgentTaskReceiptV2Binding,
+  validateAgentTaskReceiptV2PacketReferences,
   validateHumanActionReceiptBinding,
   type AgentTaskPacketHashInput,
 } from "../../../src/schemas/agent-work.js";
@@ -620,6 +621,79 @@ describe("agent work protocol contracts", () => {
         patch_hash: undefined,
       }).success
     ).toBe(false);
+  });
+
+  it("canonicalizes receipt v2 set fields while preserving commit order", () => {
+    const unordered = parseAgentTaskReceiptV2({
+      ...agentReceiptV2(),
+      files_touched: ["z.ts", "a.ts"],
+      acceptance_criteria_addressed: ["criterion-z", "criterion-a"],
+      claimed_checks: [
+        { id: "z-check", outcome: "not_run" },
+        { id: "a-check", outcome: "pass" },
+      ],
+      assumptions: ["z assumption", "a assumption"],
+      blockers: ["z blocker", "a blocker"],
+      human_action_request_ids: ["request-z", "request-a"],
+      commits: [HEAD_SHA, BASE_SHA],
+    });
+    const canonical = parseAgentTaskReceiptV2({
+      ...unordered,
+      files_touched: ["a.ts", "z.ts"],
+      acceptance_criteria_addressed: ["criterion-a", "criterion-z"],
+      claimed_checks: [
+        { id: "a-check", outcome: "pass" },
+        { id: "z-check", outcome: "not_run" },
+      ],
+      assumptions: ["a assumption", "z assumption"],
+      blockers: ["a blocker", "z blocker"],
+      human_action_request_ids: ["request-a", "request-z"],
+    });
+
+    expect(unordered).toEqual(canonical);
+    expect(computeCanonicalHash(unordered)).toBe(computeCanonicalHash(canonical));
+    expect(unordered.commits).toEqual([HEAD_SHA, BASE_SHA]);
+  });
+
+  it.each([
+    ["files_touched", ["same.ts", "same.ts"]],
+    ["acceptance_criteria_addressed", ["same", "same"]],
+    [
+      "claimed_checks",
+      [
+        { id: "same", outcome: "pass" },
+        { id: "same", outcome: "fail" },
+      ],
+    ],
+    ["assumptions", ["same", "same"]],
+    ["blockers", ["same", "same"]],
+    ["human_action_request_ids", ["same", "same"]],
+  ])("rejects duplicate receipt v2 %s set members", (field, value) => {
+    expect(AgentTaskReceipt_v2.safeParse({ ...agentReceiptV2(), [field]: value }).success).toBe(
+      false
+    );
+  });
+
+  it("validates receipt v2 criterion and check references against the packet", () => {
+    expect(validateAgentTaskReceiptV2PacketReferences(packet(), agentReceiptV2())).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(
+      validateAgentTaskReceiptV2PacketReferences(
+        packet(),
+        agentReceiptV2({
+          acceptance_criteria_addressed: ["criterion-unknown"],
+          claimed_checks: [{ id: "check-unknown", outcome: "pass" }],
+        })
+      )
+    ).toEqual({
+      valid: false,
+      errors: [
+        "acceptance_criteria_addressed contains undeclared criterion: criterion-unknown",
+        "claimed_checks contains undeclared verification: check-unknown",
+      ],
+    });
   });
 
   it("enforces v2 decisive evidence and worker timestamp ordering", () => {

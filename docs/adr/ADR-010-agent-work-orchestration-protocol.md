@@ -201,6 +201,14 @@ worker session. Receipt submission MUST be idempotent by receipt hash. A late
 receipt after lease revocation is retained as audit evidence but cannot advance
 the run without an explicit recovery decision.
 
+Receipt v2 treats `files_touched`, `acceptance_criteria_addressed`,
+`claimed_checks` (keyed by ID), `assumptions`, `blockers`, and
+`human_action_request_ids` as duplicate-free canonical sets. Ingestion sorts
+those fields before hashing. `commits` is ordered evidence and remains
+order-sensitive. Addressed criteria and claimed checks MUST name entries in the
+durable authoritative packet snapshot; receipt v2 has no implicit extra-check
+lane. A future extra-check lane requires a versioned contract.
+
 `AgentTaskReceipt_v2.patch_hash` uses the named `git-diff-binary-v1` profile. It
 is produced with this exact recipe:
 
