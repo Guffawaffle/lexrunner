@@ -546,6 +546,7 @@ Quick links:
 - **Diffgraph Planner**: docs/diffgraph-planner.md — automatic dependency discovery & merge ordering
 - **Prompts Configuration**: docs/prompts.md — prompts precedence, cross-repo usage, token expansion
 - **Architecture Overview**: docs/architecture.md — system design & philosophy
+- **Design Principles**: docs/PRINCIPLES.md — cumulative intelligence, fail-forward evidence, and retry discipline
 - **CLI Reference**: docs/cli.md — complete command documentation
 - **Troubleshooting**: docs/troubleshooting.md — common issues & solutions
 - **Migration Guide**: docs/migration-guide.md — migrating to lexrunner

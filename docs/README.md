@@ -16,7 +16,12 @@ New to lexrunner? Start here:
    - Core components
    - Data flow
 
-3. **[CLI Reference](./cli.md)**
+3. **[LexRunner Principles](./PRINCIPLES.md)**
+   - Leave the work better than you found it
+   - Durable-delta and retry-delta invariants
+   - Ecosystem responsibilities and executable follow-ups
+
+4. **[CLI Reference](./cli.md)**
    - Complete command documentation
    - Options and flags
    - JSON output schemas
@@ -44,6 +49,7 @@ New to lexrunner? Start here:
 
 ### Architecture
 
+- **[LexRunner Principles](./PRINCIPLES.md)** - Normative cumulative-intelligence and fail-forward design guidance
 - **[Canonical CLI and MCP surface](./architecture/canonical-cli-mcp-surface.md)** - Registration-verified dispositions, parity, and ownership
 
 ### Agent safety

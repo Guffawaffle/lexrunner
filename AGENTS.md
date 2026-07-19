@@ -21,6 +21,9 @@ should remain stable even as implementation details evolve.
    - **`.smartergpt/` is a portable user workspace** and canonical profile. It is **not read at runtime** by the runner. It can contain example profiles, prompts, policies, and developer tooling.
 5. **Reproducibility Over Magic.** No hidden state, no “auto inference.” Integration inputs are explicit; outputs are traceable.
 6. **Auditability.** Every decision is inspectable (plan, gates, logs, outcomes).
+7. **Cumulative Intelligence.** Every execution advances the work or improves the next attempt.
+   Terminal executions leave an inspectable durable delta; retries record a meaningful changed
+   premise. See [LexRunner Principles](docs/PRINCIPLES.md).
 
 > ### Clarification: Scope of “Only Runtime Truth”
 >
@@ -290,6 +293,7 @@ Yes. Keep your CI; point it at the runner CLI. The runner remains deterministic 
 - Local and CI gate semantics are identical.
 - No hidden side‑effects; everything is declared.
 - Same inputs → same outputs.
+- Terminal executions leave an inspectable durable delta; retries identify their changed premise.
 
 #### CI-Bound Resources & Environments
 

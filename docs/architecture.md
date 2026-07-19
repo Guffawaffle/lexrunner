@@ -2,7 +2,7 @@
 
 ## Design Philosophy
 
-lexrunner is built on three core principles:
+lexrunner is built on four core principles:
 
 ### 1. **Determinism First**
 
@@ -22,6 +22,13 @@ lexrunner is built on three core principles:
 - All operations run locally with no server dependencies
 - Privacy-first: no secrets in artifacts
 - GitHub API calls only for discovery, not execution
+
+### 4. **Cumulative Intelligence**
+
+- Successful executions advance the work; failed executions improve the next attempt
+- Terminal executions leave inspectable durable evidence rather than only activity or logs
+- Retries record a meaningful changed premise instead of blindly replaying work
+- See [LexRunner Principles](./PRINCIPLES.md) for the normative definitions and provenance
 
 ## System Architecture
 

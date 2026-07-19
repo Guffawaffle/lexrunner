@@ -100,6 +100,19 @@ SHA. A retry creates a new attempt, packet binding, and workspace lease. Reusing
 an existing worktree is an explicit resume of the same attempt, never an
 implicit retry.
 
+Every terminal Attempt is evaluated against the
+[LexRunner durable-delta principle](../PRINCIPLES.md). A new Attempt that retries
+earlier work MUST identify the inherited evidence and a meaningful changed
+premise—evidence, strategy, inputs, environment, authority, worker/runtime, or
+an explicit reason the same operation should now behave differently. A new
+identifier alone is not a retry delta. Blind replay is repetition, not recovery.
+
+The current orchestration schemas do not yet claim executable conformance with
+durable-delta or retry-delta enforcement. Canonical attempt evidence is tracked
+in #766 and #762; supervisor enforcement and reconciliation are tracked in
+#801, #767, and #699. This ADR states the protocol invariant without silently
+broadening a released schema.
+
 #### ControllerLease
 
 A `ControllerLease` is the first airlock. Exactly one live controller may
@@ -398,6 +411,8 @@ verifying -> verified -> accepted
 - At most one nonterminal WorkerSession belongs to an Attempt.
 - `accepted` requires engine verification and policy acceptance.
 - Retrying any terminal or rejected Attempt creates a new Attempt.
+- A retry records inherited evidence and a meaningful changed premise; otherwise
+  it is rejected, explicitly excepted by policy, or identified as blind replay.
 - An expired dirty workspace enters `quarantined`; it is not silently reused or
   removed.
 
@@ -431,6 +446,10 @@ requested -> presented -> satisfied -> consumed
 11. Run mutations are lease-bound, revision-checked, and append-only audited.
 12. Assisted and headless control use the same WorkItem, Attempt, receipt,
     verification, authority, and delivery contracts.
+13. Every terminal execution identifies an inspectable durable delta or records
+    that the orchestration failed to leave the work better positioned.
+14. Every retry identifies inherited evidence and a meaningful retry delta;
+    a new Attempt identifier alone is insufficient.
 
 ---
 
@@ -638,6 +657,8 @@ and authority-gated.
 - ADR-003: Gate Uniform Execution
 - ADR-004: Runner State Model
 - ADR-007: Task Snapshot Contract
+- [LexRunner Principles](../PRINCIPLES.md): cumulative intelligence, durable delta,
+  retry delta, and principle provenance
 - STFC `docs/AGENT_WORKTREE_BROKER.md`: executable workspace-lease prior art
 - STFC `docs/AGENT_ORCHESTRATION.md`: bridge/background-agent authority model
-- LexRunner issues #367, #390, #699, #706, and #709
+- LexRunner issues #367, #390, #699, #706, #709, #766, #762, #767, and #801
