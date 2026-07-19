@@ -17,6 +17,10 @@ import {
   createAttemptReceiptHandlers,
   type AttemptReceiptHandlers,
 } from "../runs/agent-work-attempt-receipt-adapters.js";
+import {
+  createAttemptVerificationHandlers,
+  type AttemptVerificationHandlers,
+} from "../runs/agent-work-attempt-verification-adapters.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
@@ -25,6 +29,7 @@ export interface AttemptCommandDependencies {
   preparationHandler?: AttemptPreparationHandler;
   workerHandlers?: AttemptWorkerHandlers;
   receiptHandlers?: AttemptReceiptHandlers;
+  verificationHandlers?: AttemptVerificationHandlers;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -40,6 +45,8 @@ export function registerAttemptCommand(
   const preparationHandler = dependencies.preparationHandler ?? defaults;
   const workerHandlers = dependencies.workerHandlers ?? createAttemptWorkerHandlers();
   const receiptHandlers = dependencies.receiptHandlers ?? createAttemptReceiptHandlers();
+  const verificationHandlers =
+    dependencies.verificationHandlers ?? createAttemptVerificationHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
 
   const worker = attempt.command("worker").description("Manage attached native worker sessions");
@@ -113,6 +120,79 @@ export function registerAttemptCommand(
       }) => {
         requireJsonMode(options.json, dependencies.jsonModeActive());
         const output = await receiptHandlers.status({
+          databasePath: options.databasePath,
+          runId: options.runId,
+          attemptId: options.attemptId,
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+
+  const verification = attempt
+    .command("verification")
+    .description("Run engine-owned packet verification and inspect its evidence");
+  registerReceiptInputCommand(
+    verification,
+    "run",
+    "Run and persist immutable packet-declared verification",
+    (input) => verificationHandlers.run(input),
+    dependencies
+  );
+  verification
+    .command("status")
+    .description("Read compact verification status; diagnostics are opt-in")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .requiredOption("--attempt-id <id>", "Attempt identifier")
+    .option("--diagnostics", "Include bounded check evidence and trust-gap diagnostics")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        runId: string;
+        attemptId: string;
+        diagnostics?: boolean;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await verificationHandlers.status({
+          databasePath: options.databasePath,
+          runId: options.runId,
+          attemptId: options.attemptId,
+          ...(options.diagnostics ? { diagnostics: true } : {}),
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+
+  const acceptance = attempt
+    .command("acceptance")
+    .description("Apply and inspect policy acceptance for verified evidence");
+  registerReceiptInputCommand(
+    acceptance,
+    "apply",
+    "Apply the built-in strict acceptance policy",
+    (input) => verificationHandlers.applyAcceptance(input),
+    dependencies
+  );
+  acceptance
+    .command("status")
+    .description("Read bounded policy-acceptance status")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .requiredOption("--attempt-id <id>", "Attempt identifier")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        runId: string;
+        attemptId: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await verificationHandlers.acceptanceStatus({
           databasePath: options.databasePath,
           runId: options.runId,
           attemptId: options.attemptId,
@@ -293,6 +373,12 @@ function setFailureExitCode(output: unknown): void {
     process.exitCode = 1;
   }
   if (output.ok === true && isRecord(output.result) && output.result.submitted === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.recorded === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.applied === false) {
     process.exitCode = 1;
   }
 }

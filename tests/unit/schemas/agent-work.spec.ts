@@ -1035,7 +1035,7 @@ describe("agent work protocol contracts", () => {
     expect(AgentEngineVerification_v2.safeParse(verification).success).toBe(true);
   });
 
-  it("requires result identity, coherent pass evidence, unique sets, and ordered time", () => {
+  it("requires conclusive result identity, coherent pass evidence, unique sets, and ordered time", () => {
     expect(
       AgentEngineVerification_v2.safeParse({
         ...agentVerificationV2(),
@@ -1043,6 +1043,18 @@ describe("agent work protocol contracts", () => {
         verified_patch_hash: undefined,
       }).success
     ).toBe(false);
+    expect(
+      AgentEngineVerification_v2.safeParse({
+        ...agentVerificationV2({
+          outcome: "infrastructure_error",
+          checks: [],
+          failures: ["workspace observation unavailable"],
+          trust_gap_reasons: ["patch_identity_disagrees"],
+        }),
+        verified_head_sha: undefined,
+        verified_patch_hash: undefined,
+      }).success
+    ).toBe(true);
     expect(
       AgentEngineVerification_v2.safeParse({
         ...agentVerificationV2(),

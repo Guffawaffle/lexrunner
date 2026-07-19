@@ -1230,13 +1230,15 @@ export const AgentEngineVerification_v2 = z
   .strict()
   .superRefine((verification, ctx) => {
     if (
+      (verification.outcome === "pass" || verification.outcome === "fail") &&
       verification.verified_head_sha === undefined &&
       verification.verified_patch_hash === undefined
     ) {
       ctx.addIssue({
         code: "custom",
         path: ["verified_head_sha"],
-        message: "Engine verification must identify an observed HEAD and/or canonical patch",
+        message:
+          "Conclusive engine verification must identify an observed HEAD and/or canonical patch",
       });
     }
     requireTimestampOrder(verification.started_at, verification.completed_at, "completed_at", ctx);

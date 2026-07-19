@@ -271,6 +271,23 @@ The immutable verification hash covers the canonical complete record. A passing
 verification must include every packet-declared check; extra checks never
 masquerade as packet declarations.
 
+Public verification is one shared CLI/MCP application service. It authenticates
+and durably authorizes the fenced Attempt before observing the workspace or
+running a packet command. Commands come only from the immutable packet snapshot,
+run as argv without a shell, and use the immutable envelope's environment-key
+allowlist. Caller input cannot replace the command or working directory. A
+pre-command observation failure is persisted as `infrastructure_error` without
+executing packet commands; inconclusive, infrastructure-error, and cancelled
+evidence may therefore omit a result identity when no result could be observed.
+
+The first policy-acceptance implementation is the named
+`lexrunner.strict-pass@1.0.0` policy. It advances `verified` to `accepted` only
+when engine outcome is `pass` and no trust-gap reason remains. Otherwise it
+records a policy-owned rejection. Acceptance is a separate audited mutation;
+verification alone never implies delivery authority. Compact verification and
+acceptance status are the default, while check excerpts and trust-gap details
+require an explicit diagnostics request.
+
 #### Delivery
 
 `Delivery` is the coordinator-owned process that turns a verified result into a

@@ -118,6 +118,7 @@ export type {
   SubmitAttemptReceiptInput,
   BeginAttemptVerificationInput,
   SubmitAttemptVerificationInput,
+  ApplyAttemptAcceptanceInput,
   WorkspaceMutationResult,
   WorkerSessionMutationResult,
   LaunchEnvelopeBindingResult,
@@ -130,6 +131,11 @@ export type {
   WorkerSessionStore,
   AttemptReceiptStore,
   AttemptVerificationStore,
+  AttemptAcceptanceStore,
+} from "./workspace-lifecycle-store.js";
+export {
+  STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
+  STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION,
 } from "./workspace-lifecycle-store.js";
 export { InMemoryWorkspaceLifecycleStore } from "./inmemory/index.js";
 export { toAttemptContract } from "./workspace-lifecycle-store.js";

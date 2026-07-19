@@ -46,6 +46,7 @@ import type {
 } from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
+  ApplyAttemptAcceptanceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
   AttemptReceiptEvent,
@@ -61,6 +62,7 @@ import type {
   AttemptVerificationRecord,
   AttemptVerificationStore,
   AttemptVerificationSubmissionResult,
+  AttemptAcceptanceStore,
   BindLaunchEnvelopeInput,
   BeginAttemptVerificationInput,
   CreateAttemptInput,
@@ -93,6 +95,10 @@ import type {
   WorkerSessionRecord,
   WorkerSessionStore,
 } from "../workspace-lifecycle-store.js";
+import {
+  STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
+  STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION,
+} from "../workspace-lifecycle-store.js";
 import { validateCanonicalEnvelope } from "../workspace-lifecycle-evidence.js";
 import {
   SqliteCoordinationStore,
@@ -102,6 +108,7 @@ import {
 type MutationInput =
   | CreateAttemptInput
   | TransitionAttemptInput
+  | ApplyAttemptAcceptanceInput
   | AcquireWorkspaceInput
   | HeartbeatWorkspaceInput
   | ReleaseWorkspaceInput
@@ -439,7 +446,8 @@ export class SqliteWorkspaceLifecycleStore
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
     WorkerSessionStore,
-    AttemptVerificationStore
+    AttemptVerificationStore,
+    AttemptAcceptanceStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -1649,6 +1657,107 @@ export class SqliteWorkspaceLifecycleStore
       .prepare(`SELECT * FROM attempt_verification_events WHERE runId = ? ORDER BY sequence`)
       .all(runId) as AttemptVerificationEventRow[];
     return rows.map(toAttemptVerificationEvent);
+  }
+
+  async getAttemptVerificationAuthorization(
+    verificationId: string
+  ): Promise<AttemptVerificationAuthorizationRecord | null> {
+    if (!this.hasTable("attempt_verification_authorizations")) return null;
+    return this.verificationAuthorization(verificationId);
+  }
+
+  async getAttemptVerificationAuthorizationForAttempt(
+    attemptId: string
+  ): Promise<AttemptVerificationAuthorizationRecord | null> {
+    if (!this.hasTable("attempt_verification_authorizations")) return null;
+    return this.verificationAuthorizationForAttempt(attemptId);
+  }
+
+  async applyAttemptAcceptance(
+    input: ApplyAttemptAcceptanceInput
+  ): Promise<WorkspaceMutationResult> {
+    return this.mutate(input, () => {
+      const attempt = this.attempt(input.attemptId);
+      const revisionFailure = this.validateAttempt(
+        attempt,
+        input.runId,
+        input.expectedAttemptRevision
+      );
+      if (revisionFailure) return revisionFailure;
+      const lease = this.lease(input.workspaceLeaseId);
+      const session = this.workerSession(input.workerSessionId);
+      const receipt = this.attemptReceipt(input.receiptId);
+      const verification = this.attemptVerification(input.verificationId);
+      if (!lease || !session || !receipt || !verification) {
+        return this.failure("not_found", attempt!);
+      }
+      if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+        return this.failure("stale_workspace_revision", attempt!, lease);
+      }
+      if (
+        session.revision !== input.expectedWorkerSessionRevision ||
+        session.runId !== input.runId ||
+        session.attemptId !== input.attemptId ||
+        session.workspaceLeaseId !== input.workspaceLeaseId ||
+        receipt.attemptId !== input.attemptId ||
+        receipt.receiptHash !== input.receiptHash ||
+        verification.attemptId !== input.attemptId ||
+        verification.verificationHash !== input.verificationHash ||
+        verification.receiptId !== input.receiptId ||
+        verification.receiptHash !== input.receiptHash
+      ) {
+        return this.failure("evidence_mismatch", attempt!, lease);
+      }
+      if (
+        attempt!.status !== "verified" ||
+        attempt!.receiptId !== input.receiptId ||
+        attempt!.verificationId !== input.verificationId ||
+        verification.outcome !== "pass"
+      ) {
+        return this.failure("invalid_attempt_transition", attempt!, lease);
+      }
+      if (
+        lease.status !== "active" ||
+        lease.attemptId !== attempt!.attemptId ||
+        lease.controllerId !== input.controller.controllerId ||
+        lease.controllerLeaseId !== input.controller.leaseId ||
+        lease.fencingToken !== input.controller.fencingToken
+      ) {
+        return this.failure("stale_fence", attempt!, lease);
+      }
+      if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.failure("workspace_expired", attempt!, lease);
+      }
+      if (parseInstant(input.now, "now") < parseInstant(attempt!.updatedAt, "updatedAt")) {
+        return this.failure("invalid_time", attempt!, lease);
+      }
+      const reasonCodes = verification.trustGapReasons.map((reason) => `trust_gap:${reason}`);
+      const status = reasonCodes.length === 0 ? "accepted" : "rejected";
+      const now = instant(input.now);
+      this.db
+        .prepare(
+          `UPDATE attempts SET revision = revision + 1, status = ?, updatedAt = ?, completedAt = ?
+           WHERE attemptId = ?`
+        )
+        .run(status, now, now, input.attemptId);
+      return this.record(
+        input,
+        this.requireAttempt(input.attemptId),
+        lease,
+        "attempt_transitioned",
+        {
+          status,
+          receiptId: input.receiptId,
+          verificationId: input.verificationId,
+          details: {
+            policyId: STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
+            policyVersion: STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION,
+            decision: status,
+            reasonCodes,
+          },
+        }
+      );
+    });
   }
 
   private submitNewVerification(

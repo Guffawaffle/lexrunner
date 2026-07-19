@@ -63,12 +63,18 @@
   "cli": {
     "canonical": [
       "attempt",
+      "attempt acceptance",
+      "attempt acceptance apply",
+      "attempt acceptance status",
       "attempt prepare",
       "attempt receipt",
       "attempt receipt status",
       "attempt receipt submit",
       "attempt start",
       "attempt status",
+      "attempt verification",
+      "attempt verification run",
+      "attempt verification status",
       "attempt worker",
       "attempt worker attach",
       "attempt worker end",
@@ -207,11 +213,15 @@
       {
         "profile": "agent-work-handler-v1",
         "operations": [
+          "attempt acceptance apply",
+          "attempt acceptance status",
           "attempt prepare",
           "attempt receipt status",
           "attempt receipt submit",
           "attempt start",
           "attempt status",
+          "attempt verification run",
+          "attempt verification status",
           "attempt worker attach",
           "attempt worker end",
           "attempt worker heartbeat",
@@ -224,14 +234,17 @@
   },
   "mcp": {
     "canonical": [
+      "accept_attempt",
       "attach_attempt_worker",
       "config.show",
       "discover",
       "doctor",
       "end_attempt_worker",
       "gates.run",
+      "get_attempt_acceptance",
       "get_attempt_receipt",
       "get_attempt_status",
+      "get_attempt_verification",
       "get_attempt_worker",
       "heartbeat_attempt_worker",
       "local.init",
@@ -243,6 +256,7 @@
       "start_attempt",
       "status",
       "submit_attempt_receipt",
+      "verify_attempt",
       "workflow.guide"
     ],
     "compatibility": [
@@ -269,20 +283,29 @@
       {
         "profile": "agent-work-handler-v1",
         "operations": [
+          "accept_attempt",
           "attach_attempt_worker",
           "end_attempt_worker",
+          "get_attempt_acceptance",
           "get_attempt_receipt",
           "get_attempt_status",
+          "get_attempt_verification",
           "get_attempt_worker",
           "heartbeat_attempt_worker",
           "prepare_attempt",
           "start_attempt",
-          "submit_attempt_receipt"
+          "submit_attempt_receipt",
+          "verify_attempt"
         ]
       }
     ],
     "defaultCanonicalOperationContract": "bounded-ax-v1",
     "parity": [
+      {
+        "tool": "accept_attempt",
+        "cli": "attempt acceptance apply",
+        "owner": "AgentWorkAttemptAcceptanceService"
+      },
       {
         "tool": "attach_attempt_worker",
         "cli": "attempt worker attach",
@@ -314,6 +337,11 @@
         "owner": "planned shared gate execution service"
       },
       {
+        "tool": "get_attempt_acceptance",
+        "cli": "attempt acceptance status",
+        "owner": "AgentWorkAttemptAcceptanceService"
+      },
+      {
         "tool": "get_attempt_receipt",
         "cli": "attempt receipt status",
         "owner": "AgentWorkAttemptReceiptService"
@@ -322,6 +350,11 @@
         "tool": "get_attempt_status",
         "cli": "attempt status",
         "owner": "AgentWorkLifecycleService"
+      },
+      {
+        "tool": "get_attempt_verification",
+        "cli": "attempt verification status",
+        "owner": "AgentWorkAttemptVerificationService"
       },
       {
         "tool": "get_attempt_worker",
@@ -377,6 +410,11 @@
         "tool": "submit_attempt_receipt",
         "cli": "attempt receipt submit",
         "owner": "AgentWorkAttemptReceiptService"
+      },
+      {
+        "tool": "verify_attempt",
+        "cli": "attempt verification run",
+        "owner": "AgentWorkAttemptVerificationService"
       }
     ],
     "intentionalParityExceptions": [
