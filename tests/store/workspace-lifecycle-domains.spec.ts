@@ -28,6 +28,10 @@ import {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  WorkerAuthorityDecision,
+  WorkerAuthorityDimension,
+  WorkerAuthorityEnforcement,
+  WorkerAuthorityReason,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
   WorkspaceLifecycleLeaseStatus,
@@ -114,6 +118,10 @@ describe("workspace lifecycle categorical domains", () => {
       "src/store/sqlite/migrations/006-attempt-engine-verification-persistence.sql",
       "utf8"
     );
+    const authority = readFileSync(
+      "src/store/sqlite/migrations/007-worker-authority-events.sql",
+      "utf8"
+    );
 
     expectTableContains(workspace, "attempts", AttemptStatus.options);
     expectTableContains(workspace, "workspace_leases", WorkspaceLifecycleLeaseStatus.options);
@@ -141,6 +149,10 @@ describe("workspace lifecycle categorical domains", () => {
     );
     expectTableContains(verification, "attempt_verification_events", VerificationOutcome.options);
     expectTableContains(verification, "attempt_verification_events", AttemptStatus.options);
+    expectTableContains(authority, "worker_authority_events", WorkerAuthorityDimension.options);
+    expectTableContains(authority, "worker_authority_events", WorkerAuthorityDecision.options);
+    expectTableContains(authority, "worker_authority_events", WorkerAuthorityEnforcement.options);
+    expectTableContains(authority, "worker_authority_events", WorkerAuthorityReason.options);
   });
 
   it("keeps verification failure reasons within the workspace mutation namespace", () => {

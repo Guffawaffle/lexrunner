@@ -72,6 +72,10 @@ import type {
   WorkerSessionMutationResult,
   WorkerSessionRecord,
   WorkerSessionStore,
+  RecordWorkerAuthorityDecisionInput,
+  WorkerAuthorityDecisionResult,
+  WorkerAuthorityDecisionStore,
+  WorkerAuthorityEventRecord,
 } from "../workspace-lifecycle-store.js";
 import {
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
@@ -98,6 +102,11 @@ interface StoredMutation {
 interface StoredWorkerMutation {
   fingerprint: string;
   result: Extract<WorkerSessionMutationResult, { updated: true }>;
+}
+
+interface StoredWorkerAuthorityMutation {
+  fingerprint: string;
+  event: WorkerAuthorityEventRecord;
 }
 
 interface StoredReceiptMutation {
@@ -129,6 +138,7 @@ export class InMemoryWorkspaceLifecycleStore
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
     WorkerSessionStore,
+    WorkerAuthorityDecisionStore,
     AttemptVerificationStore,
     AttemptAcceptanceStore
 {
@@ -140,6 +150,8 @@ export class InMemoryWorkspaceLifecycleStore
   private readonly workerSessionByAttempt = new Map<string, string>();
   private readonly workerEvents = new Map<string, WorkerSessionEvent[]>();
   private readonly workerMutations = new Map<string, StoredWorkerMutation>();
+  private readonly workerAuthorityEvents = new Map<string, WorkerAuthorityEventRecord[]>();
+  private readonly workerAuthorityMutations = new Map<string, StoredWorkerAuthorityMutation>();
   private readonly launchEnvelopeBindings = new Map<string, LaunchEnvelopeBindingRecord>();
   private readonly taskPacketBindings = new Map<string, TaskPacketBindingRecord>();
   private readonly attemptReceipts = new Map<string, AttemptReceiptRecord>();
@@ -770,6 +782,126 @@ export class InMemoryWorkspaceLifecycleStore
     return (this.workerEvents.get(runId) ?? []).map(cloneWorkerEvent);
   }
 
+  async recordWorkerAuthorityDecision(
+    input: RecordWorkerAuthorityDecisionInput
+  ): Promise<WorkerAuthorityDecisionResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return this.authorityFailure("invalid_time");
+    if (input.controller.runId !== input.runId) return this.authorityFailure("lease_mismatch");
+    const authenticated = this.withActiveControllerCredential(
+      input.controller,
+      input.now,
+      input.expectedRunRevision,
+      () => {
+        const key = mutationKey(input.runId, input.mutationId);
+        const fingerprint = authorityDecisionFingerprint(input);
+        if (
+          this.mutations.has(key) ||
+          this.workerMutations.has(key) ||
+          this.receiptMutations.has(key) ||
+          this.verificationMutations.has(key) ||
+          this.verificationBeginMutations.has(key)
+        ) {
+          return this.authorityFailure("mutation_conflict");
+        }
+        const prior = this.workerAuthorityMutations.get(key);
+        if (prior) {
+          return prior.fingerprint === fingerprint
+            ? { recorded: true as const, event: { ...prior.event }, idempotentReplay: true }
+            : this.authorityFailure("mutation_conflict");
+        }
+        const attempt = this.attempts.get(input.attemptId);
+        const lease = this.workspaceLeases.get(input.workspaceLeaseId);
+        const session = this.workerSessions.get(input.workerSessionId);
+        const packetBinding = this.taskPacketBindings.get(input.attemptId);
+        if (!attempt || !lease || !session || !packetBinding) {
+          return this.authorityFailure("not_found", attempt, lease, session);
+        }
+        if (attempt.revision !== input.expectedAttemptRevision) {
+          return this.authorityFailure("stale_attempt_revision", attempt, lease, session);
+        }
+        if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+          return this.authorityFailure("stale_workspace_revision", attempt, lease, session);
+        }
+        if (session.revision !== input.expectedWorkerSessionRevision) {
+          return this.authorityFailure("stale_session_revision", attempt, lease, session);
+        }
+        if (
+          lease.status !== "active" ||
+          lease.attemptId !== input.attemptId ||
+          lease.controllerId !== input.controller.controllerId ||
+          lease.controllerLeaseId !== input.controller.leaseId ||
+          lease.fencingToken !== input.controller.fencingToken
+        ) {
+          return this.authorityFailure("stale_fence", attempt, lease, session);
+        }
+        if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+          return this.authorityFailure("workspace_expired", attempt, lease, session);
+        }
+        if (
+          session.runId !== input.runId ||
+          session.attemptId !== input.attemptId ||
+          session.workspaceLeaseId !== input.workspaceLeaseId ||
+          session.packetId !== attempt.packetId ||
+          session.packetHash !== attempt.packetHash
+        ) {
+          return this.authorityFailure("identity_mismatch", attempt, lease, session);
+        }
+        let packet: AgentTaskPacket_v1;
+        try {
+          packet = AgentTaskPacket_v1.parse(JSON.parse(packetBinding.packetJson) as unknown);
+        } catch {
+          return this.authorityFailure("evidence_mismatch", attempt, lease, session);
+        }
+        if (!validAuthorityDecision(input, packet.authority)) {
+          return this.authorityFailure("evidence_mismatch", attempt, lease, session);
+        }
+        const events = this.workerAuthorityEvents.get(input.runId) ?? [];
+        const event: WorkerAuthorityEventRecord = {
+          runId: input.runId,
+          attemptId: input.attemptId,
+          workerSessionId: input.workerSessionId,
+          mutationId: input.mutationId,
+          sequence: events.length + 1,
+          attemptRevision: attempt.revision,
+          workspaceLeaseId: input.workspaceLeaseId,
+          workspaceLeaseRevision: lease.revision,
+          workerSessionRevision: session.revision,
+          packetId: attempt.packetId,
+          packetHash: attempt.packetHash,
+          dimension: input.dimension,
+          decision: input.decision,
+          enforcement: input.enforcement,
+          actionClass: input.actionClass,
+          actionHash: input.actionHash,
+          backendId: input.backendId,
+          backendVersion: input.backendVersion,
+          reason: input.reason,
+          controllerId: input.controller.controllerId,
+          controllerLeaseId: input.controller.leaseId,
+          fencingToken: input.controller.fencingToken,
+          createdAt: normalizeInstant(input.now),
+        };
+        events.push(event);
+        this.workerAuthorityEvents.set(input.runId, events);
+        this.workerAuthorityMutations.set(key, { fingerprint, event: { ...event } });
+        return { recorded: true as const, event: { ...event }, idempotentReplay: false };
+      }
+    );
+    return authenticated.authenticated
+      ? authenticated.value
+      : this.authorityFailure(
+          authenticated.reason,
+          undefined,
+          undefined,
+          undefined,
+          authenticated.currentRunRevision
+        );
+  }
+
+  async listWorkerAuthorityEvents(runId: string): Promise<WorkerAuthorityEventRecord[]> {
+    return (this.workerAuthorityEvents.get(runId) ?? []).map((event) => ({ ...event }));
+  }
+
   async submitAttemptReceipt(
     input: SubmitAttemptReceiptInput
   ): Promise<AttemptReceiptSubmissionResult> {
@@ -793,7 +925,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.mutations.has(key) ||
           this.workerMutations.has(key) ||
           this.verificationMutations.has(key) ||
-          this.verificationBeginMutations.has(key)
+          this.verificationBeginMutations.has(key) ||
+          this.workerAuthorityMutations.has(key)
         ) {
           return this.receiptFailure("mutation_conflict");
         }
@@ -907,7 +1040,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.mutations.has(key) ||
           this.workerMutations.has(key) ||
           this.receiptMutations.has(key) ||
-          this.verificationMutations.has(key)
+          this.verificationMutations.has(key) ||
+          this.workerAuthorityMutations.has(key)
         ) {
           return this.verificationBeginFailure("mutation_conflict");
         }
@@ -1053,7 +1187,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.mutations.has(key) ||
           this.workerMutations.has(key) ||
           this.receiptMutations.has(key) ||
-          this.verificationBeginMutations.has(key)
+          this.verificationBeginMutations.has(key) ||
+          this.workerAuthorityMutations.has(key)
         ) {
           return this.verificationFailure("mutation_conflict");
         }
@@ -1294,7 +1429,16 @@ export class InMemoryWorkspaceLifecycleStore
       !validVerificationAuthorization(authorization, input, attempt, lease, session, receipt) ||
       !validateAgentEngineVerificationV2PacketReferences(packet, evidence).valid ||
       !validVerificationBinding(evidence, input, attempt, lease, session, receipt) ||
-      !hasRequiredTrustGaps(evidence, parsedReceipt)
+      !hasRequiredTrustGaps(
+        evidence,
+        parsedReceipt,
+        (this.workerAuthorityEvents.get(input.runId) ?? []).some(
+          (event) =>
+            event.attemptId === input.attemptId &&
+            event.workerSessionId === input.workerSessionId &&
+            event.decision === "deviation"
+        )
+      )
     ) {
       return this.verificationFailure("evidence_mismatch", attempt, lease, session);
     }
@@ -1695,7 +1839,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.mutations.has(key) ||
           this.receiptMutations.has(key) ||
           this.verificationMutations.has(key) ||
-          this.verificationBeginMutations.has(key)
+          this.verificationBeginMutations.has(key) ||
+          this.workerAuthorityMutations.has(key)
         )
           return this.workerFailure("mutation_conflict");
         const prior = this.workerMutations.get(key);
@@ -1847,6 +1992,23 @@ export class InMemoryWorkspaceLifecycleStore
     };
   }
 
+  private authorityFailure(
+    reason: WorkerSessionMutationFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): WorkerAuthorityDecisionResult {
+    return {
+      recorded: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
   private async mutate(
     input: MutationInput,
     action: () => WorkspaceMutationResult
@@ -1864,7 +2026,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.workerMutations.has(key) ||
           this.receiptMutations.has(key) ||
           this.verificationMutations.has(key) ||
-          this.verificationBeginMutations.has(key)
+          this.verificationBeginMutations.has(key) ||
+          this.workerAuthorityMutations.has(key)
         )
           return this.failure("mutation_conflict");
         const prior = this.mutations.get(key);
@@ -2423,9 +2586,43 @@ function validVerificationAuthorization(
   );
 }
 
+function validAuthorityDecision(
+  input: RecordWorkerAuthorityDecisionInput,
+  authority: AgentTaskPacket_v1["authority"]
+): boolean {
+  if (
+    input.actionClass.length === 0 ||
+    input.actionClass.length > 128 ||
+    input.backendId.length === 0 ||
+    input.backendId.length > 128 ||
+    input.backendVersion.length === 0 ||
+    input.backendVersion.length > 128 ||
+    !/^sha256:[a-f0-9]{64}$/.test(input.actionHash)
+  ) {
+    return false;
+  }
+  const granted = authority[input.dimension];
+  if (input.decision === "allowed") {
+    return granted && input.reason === "packet_granted" && input.enforcement !== "unenforced";
+  }
+  if (input.decision === "deviation") {
+    return !granted && input.reason === "observed_after_execution";
+  }
+  return (
+    (!granted && input.reason === "packet_denied" && input.enforcement !== "unenforced") ||
+    (input.reason === "backend_unenforceable" && input.enforcement === "unenforced")
+  );
+}
+
+function authorityDecisionFingerprint(input: RecordWorkerAuthorityDecisionInput): string {
+  const { now: _observedAt, ...semanticInput } = input;
+  return canonicalJSONStringify(semanticInput as unknown as JsonRecord);
+}
+
 function hasRequiredTrustGaps(
   verification: import("../../schemas/agent-work.js").AgentEngineVerification_v2,
-  receipt: AgentTaskReceipt_v2
+  receipt: AgentTaskReceipt_v2,
+  authorityDeviation = false
 ): boolean {
   const required = new Set<
     import("../../schemas/agent-work.js").EngineVerificationTrustGapReason_v2
@@ -2457,6 +2654,7 @@ function hasRequiredTrustGaps(
     );
   });
   if (!claimAgrees) required.add("claimed_check_disagrees");
+  if (authorityDeviation) required.add("authority_deviation");
   const declared = new Set(verification.trust_gap_reasons);
   return [...required].every((reason) => declared.has(reason));
 }

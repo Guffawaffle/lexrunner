@@ -19,6 +19,7 @@ import type {
   LaunchEnvelopeBindingStore,
   TaskPacketBindingStore,
   WorkerSessionStore,
+  WorkerAuthorityDecisionStore,
   WorkspaceLifecycleStore,
   WorkspaceMutationFailureReason,
 } from "../store/workspace-lifecycle-store.js";
@@ -44,6 +45,7 @@ type VerificationStore = WorkspaceLifecycleStore &
   LaunchEnvelopeBindingStore &
   TaskPacketBindingStore &
   WorkerSessionStore &
+  WorkerAuthorityDecisionStore &
   AttemptReceiptStore &
   AttemptVerificationStore;
 
@@ -293,7 +295,19 @@ export class AgentWorkAttemptVerificationService {
     let outcome = aggregateOutcome(checks.map((check) => check.outcome));
     if (observationFailed) outcome = "infrastructure_error";
     else if (observationDrifted) outcome = "inconclusive";
-    const trustGapReasons = trustGaps(receipt, checks, finalObservation, outcome);
+    const authorityDeviation = (await this.store.listWorkerAuthorityEvents(input.runId)).some(
+      (event) =>
+        event.attemptId === input.attemptId &&
+        event.workerSessionId === input.workerSessionId &&
+        event.decision === "deviation"
+    );
+    const trustGapReasons = trustGaps(
+      receipt,
+      checks,
+      finalObservation,
+      outcome,
+      authorityDeviation
+    );
     const completedAt = notBefore(this.now(), authorization.startedAt);
     const verification = AgentEngineVerification_v2.parse({
       schema_version: "2.0.0",
@@ -686,7 +700,8 @@ function trustGaps(
   receipt: AgentTaskReceipt_v2,
   checks: AgentEngineVerification_v2["checks"],
   observation: VerificationWorkspaceObservation | null,
-  outcome: VerificationOutcome
+  outcome: VerificationOutcome,
+  authorityDeviation: boolean
 ): EngineVerificationTrustGapReason_v2[] {
   const reasons = new Set<EngineVerificationTrustGapReason_v2>();
   if ((receipt.outcome === "completed") !== (outcome === "pass")) {
@@ -706,6 +721,7 @@ function trustGaps(
   ) {
     reasons.add("claimed_check_disagrees");
   }
+  if (authorityDeviation) reasons.add("authority_deviation");
   return [...reasons].sort();
 }
 

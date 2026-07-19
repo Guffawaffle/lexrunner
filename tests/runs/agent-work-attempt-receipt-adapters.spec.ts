@@ -6,6 +6,7 @@ import Database from "better-sqlite3-multiple-ciphers";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
 import { createAttemptVerificationHandlers } from "../../src/runs/agent-work-attempt-verification-adapters.js";
@@ -393,6 +394,110 @@ describe("Attempt receipt adapter handlers", () => {
         outcome: "inconclusive",
         attemptStatus: "inconclusive",
         trustGapCount: 2,
+      },
+    });
+  });
+
+  it("carries an observed authority deviation into verification and strict rejection", async () => {
+    const fixture = await submitPatchFixture(await sandbox());
+    const store = new SqliteWorkspaceLifecycleStore(fixture.prepared.request.runtime.databasePath);
+    try {
+      const deviation = await store.recordWorkerAuthorityDecision({
+        runId: fixture.receiptRequest.submission.runId,
+        expectedRunRevision: fixture.receiptRequest.submission.expectedRunRevision,
+        controller: fixture.receiptRequest.submission.controller,
+        mutationId: "observed-external-runtime-deviation",
+        now: "2026-07-12T12:00:12.500Z",
+        attemptId: fixture.receiptRequest.submission.attemptId,
+        expectedAttemptRevision: fixture.receipt.attemptRevision,
+        workspaceLeaseId: fixture.receiptRequest.submission.workspaceLeaseId,
+        expectedWorkspaceLeaseRevision:
+          fixture.receiptRequest.submission.expectedWorkspaceLeaseRevision,
+        workerSessionId: fixture.receiptRequest.submission.workerSessionId,
+        expectedWorkerSessionRevision:
+          fixture.receiptRequest.submission.expectedWorkerSessionRevision,
+        dimension: "external_runtime",
+        decision: "deviation",
+        enforcement: "unenforced",
+        actionClass: "external_runtime",
+        actionHash: computeCanonicalHash({
+          action_class: "external_runtime",
+          executable: "docker",
+        }),
+        backendId: "lexrunner.argv-authority-broker",
+        backendVersion: "1.0.0",
+        reason: "observed_after_execution",
+      });
+      expect(deviation).toMatchObject({ recorded: true, event: { decision: "deviation" } });
+    } finally {
+      await store.close();
+    }
+
+    const observation = observed(fixture.prepared.bundle.packet.repository.base_sha);
+    const handlers = createAttemptVerificationHandlers({
+      runtime: new ScriptedVerificationRuntime([observation, observation], [passedCheck()]),
+      now: times(
+        "2026-07-12T12:00:13.000Z",
+        "2026-07-12T12:00:14.000Z",
+        "2026-07-12T12:00:15.000Z"
+      ),
+    });
+    const verification = await handlers.run(
+      verificationRequest(
+        fixture.prepared,
+        fixture.receiptRequest,
+        fixture.receipt,
+        "verification-authority-deviation"
+      )
+    );
+    expect(verification).toMatchObject({
+      ok: true,
+      result: { recorded: true, outcome: "pass", trustGapCount: 1, attemptStatus: "verified" },
+    });
+    if (!verification.ok || !verification.result.recorded) {
+      throw new Error("expected authority-aware verification");
+    }
+    await expect(
+      handlers.status({
+        databasePath: fixture.prepared.request.runtime.databasePath,
+        runId: fixture.receiptRequest.submission.runId,
+        attemptId: fixture.receiptRequest.submission.attemptId,
+        diagnostics: true,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        verification: { diagnostics: { trustGapReasons: ["authority_deviation"] } },
+      },
+    });
+    await expect(
+      handlers.applyAcceptance({
+        databasePath: fixture.prepared.request.runtime.databasePath,
+        acceptance: {
+          runId: fixture.receiptRequest.submission.runId,
+          expectedRunRevision: fixture.receiptRequest.submission.expectedRunRevision,
+          controller: fixture.receiptRequest.submission.controller,
+          verificationId: verification.result.verificationId,
+          verificationHash: verification.result.verificationHash,
+          attemptId: fixture.receiptRequest.submission.attemptId,
+          expectedAttemptRevision: verification.result.attemptRevision,
+          workspaceLeaseId: fixture.receiptRequest.submission.workspaceLeaseId,
+          expectedWorkspaceLeaseRevision:
+            fixture.receiptRequest.submission.expectedWorkspaceLeaseRevision,
+          workerSessionId: fixture.receiptRequest.submission.workerSessionId,
+          expectedWorkerSessionRevision:
+            fixture.receiptRequest.submission.expectedWorkerSessionRevision,
+          receiptId: fixture.receipt.receiptId,
+          receiptHash: fixture.receipt.receiptHash,
+          mutationId: "reject-authority-deviation",
+        },
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        applied: true,
+        decision: "rejected",
+        reasonCodes: ["trust_gap:authority_deviation"],
       },
     });
   });

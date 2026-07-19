@@ -22,6 +22,10 @@ import type {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  WorkerAuthorityDecision,
+  WorkerAuthorityDimension,
+  WorkerAuthorityEnforcement,
+  WorkerAuthorityReason,
   VerificationOutcome,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
@@ -47,6 +51,10 @@ export type {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  WorkerAuthorityDecision,
+  WorkerAuthorityDimension,
+  WorkerAuthorityEnforcement,
+  WorkerAuthorityReason,
   VerificationOutcome,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
@@ -209,6 +217,33 @@ export interface WorkerSessionEvent {
   createdAt: string;
 }
 
+/** Redacted packet-authority decision made immediately before, or observed after, worker action. */
+export interface WorkerAuthorityEventRecord {
+  runId: string;
+  attemptId: string;
+  workerSessionId: string;
+  mutationId: string;
+  sequence: number;
+  attemptRevision: number;
+  workspaceLeaseId: string;
+  workspaceLeaseRevision: number;
+  workerSessionRevision: number;
+  packetId: string;
+  packetHash: string;
+  dimension: WorkerAuthorityDimension;
+  decision: WorkerAuthorityDecision;
+  enforcement: WorkerAuthorityEnforcement;
+  actionClass: string;
+  actionHash: string;
+  backendId: string;
+  backendVersion: string;
+  reason: WorkerAuthorityReason;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  createdAt: string;
+}
+
 interface AuthenticatedMutationInput {
   runId: string;
   expectedRunRevision: number;
@@ -223,6 +258,38 @@ interface AuthenticatedWorkerMutationInput extends AuthenticatedMutationInput {
   expectedAttemptRevision: number;
   expectedWorkspaceLeaseRevision: number;
 }
+
+export interface RecordWorkerAuthorityDecisionInput extends AuthenticatedMutationInput {
+  attemptId: string;
+  expectedAttemptRevision: number;
+  workspaceLeaseId: string;
+  expectedWorkspaceLeaseRevision: number;
+  workerSessionId: string;
+  expectedWorkerSessionRevision: number;
+  dimension: WorkerAuthorityDimension;
+  decision: WorkerAuthorityDecision;
+  enforcement: WorkerAuthorityEnforcement;
+  actionClass: string;
+  actionHash: string;
+  backendId: string;
+  backendVersion: string;
+  reason: WorkerAuthorityReason;
+}
+
+export type WorkerAuthorityDecisionResult =
+  | {
+      recorded: true;
+      event: WorkerAuthorityEventRecord;
+      idempotentReplay: boolean;
+    }
+  | {
+      recorded: false;
+      reason: WorkerSessionMutationFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentSessionRevision?: number;
+      currentRunRevision?: number;
+    };
 
 export interface AttachWorkerSessionInput extends AuthenticatedWorkerMutationInput {
   sessionId: string;
@@ -652,6 +719,14 @@ export interface WorkerSessionStore {
   getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null>;
   getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null>;
   listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]>;
+}
+
+/** Additive audit port for packet-bound worker authority decisions. */
+export interface WorkerAuthorityDecisionStore {
+  recordWorkerAuthorityDecision(
+    input: RecordWorkerAuthorityDecisionInput
+  ): Promise<WorkerAuthorityDecisionResult>;
+  listWorkerAuthorityEvents(runId: string): Promise<WorkerAuthorityEventRecord[]>;
 }
 
 /** Additive immutable AgentTaskReceipt v2 persistence port. */

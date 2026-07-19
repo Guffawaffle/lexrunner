@@ -170,6 +170,20 @@ export type {
   VerificationCommandResult,
   VerificationWorkspaceObservation,
 } from "./agent-work-attempt-verification-runtime.js";
+export {
+  AgentWorkAuthorityService,
+  classifyWorkerAuthorityAction,
+  LocalWorkerAuthorityCommandExecutor,
+  WorkerAuthorityCommandBroker,
+  WORKER_AUTHORITY_BROKER_ID,
+  WORKER_AUTHORITY_BROKER_VERSION,
+} from "./agent-work-authority-service.js";
+export type {
+  ClassifiedWorkerAuthorityAction,
+  WorkerAuthorityAuthorizationResult,
+  WorkerAuthorityBinding,
+  WorkerAuthorityCommandExecutor,
+} from "./agent-work-authority-service.js";
 export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
 export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {
