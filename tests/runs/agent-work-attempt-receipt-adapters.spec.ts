@@ -8,6 +8,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
+import { createAttemptVerificationHandlers } from "../../src/runs/agent-work-attempt-verification-adapters.js";
+import { LocalAttemptVerificationRuntime } from "../../src/runs/agent-work-attempt-verification-runtime.js";
+import type {
+  AttemptVerificationRuntime,
+  VerificationCommandResult,
+  VerificationWorkspaceObservation,
+} from "../../src/runs/agent-work-attempt-verification-runtime.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
 
@@ -154,6 +161,335 @@ describe("Attempt receipt adapter handlers", () => {
     expect(JSON.stringify(submitted)).not.toContain("Worker claims failed evidence");
   });
 
+  it("verifies and accepts a real patch-only Attempt through the public application surface", async () => {
+    const root = await sandbox();
+    const prepared = await prepare(root);
+    const workerHandlers = createAttemptWorkerHandlers();
+    const attached = await workerHandlers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+    await writeFile(
+      join(prepared.request.attempt.workspace.worktreePath, "project", "result.txt"),
+      "engine-observed result\n",
+      "utf8"
+    );
+    const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+
+    const receiptRequest = submitRequest(prepared, ended.result);
+    const store = new SqliteWorkspaceLifecycleStore(prepared.request.runtime.databasePath, {
+      readOnly: true,
+    });
+    try {
+      const lease = await store.getWorkspaceLease(ended.result.workerSession.workspaceLeaseId);
+      if (!lease) throw new Error("expected durable workspace lease");
+      const observation = await new LocalAttemptVerificationRuntime().observe({
+        lease,
+        receipt: receiptRequest.submission.receipt,
+      });
+      receiptRequest.submission.receipt.patch_hash = observation.patchHash;
+    } finally {
+      await store.close();
+    }
+    const receipt = await createAttemptReceiptHandlers().submit(receiptRequest);
+    if (!receipt.ok || !receipt.result.submitted) throw new Error("expected submitted receipt");
+
+    const clock = times(
+      "2026-07-12T12:00:13.000Z",
+      "2026-07-12T12:00:14.000Z",
+      "2026-07-12T12:00:15.000Z"
+    );
+    const handlers = createAttemptVerificationHandlers({ now: clock });
+    const verification = await handlers.run({
+      databasePath: prepared.request.runtime.databasePath,
+      verification: {
+        runId: receiptRequest.submission.runId,
+        expectedRunRevision: receiptRequest.submission.expectedRunRevision,
+        controller: receiptRequest.submission.controller,
+        verificationId: "verification-patch-only",
+        attemptId: receiptRequest.submission.attemptId,
+        expectedAttemptRevision: receipt.result.attemptRevision,
+        workspaceLeaseId: receiptRequest.submission.workspaceLeaseId,
+        expectedWorkspaceLeaseRevision: receiptRequest.submission.expectedWorkspaceLeaseRevision,
+        workerSessionId: receiptRequest.submission.workerSessionId,
+        expectedWorkerSessionRevision: receiptRequest.submission.expectedWorkerSessionRevision,
+        receiptId: receipt.result.receiptId,
+        receiptHash: receipt.result.receiptHash,
+        beginMutationId: "begin-public-verification",
+        completeMutationId: "complete-public-verification",
+      },
+    });
+    expect(verification).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "pass",
+        attemptRevision: 7,
+        attemptStatus: "verified",
+        trustGapCount: 0,
+        checkCounts: { pass: 1 },
+      },
+    });
+    if (!verification.ok || !verification.result.recorded) {
+      throw new Error("expected recorded verification");
+    }
+
+    await expect(
+      handlers.status({
+        databasePath: prepared.request.runtime.databasePath,
+        runId: receiptRequest.submission.runId,
+        attemptId: receiptRequest.submission.attemptId,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        verification: {
+          outcome: "pass",
+          trustGapCount: 0,
+          checkCounts: { pass: 1 },
+        },
+      },
+    });
+    const diagnostic = await handlers.status({
+      databasePath: prepared.request.runtime.databasePath,
+      runId: receiptRequest.submission.runId,
+      attemptId: receiptRequest.submission.attemptId,
+      diagnostics: true,
+    });
+    expect(diagnostic).toMatchObject({
+      ok: true,
+      result: { verification: { diagnostics: { checks: [{ id: "test", outcome: "pass" }] } } },
+    });
+
+    const accepted = await handlers.applyAcceptance({
+      databasePath: prepared.request.runtime.databasePath,
+      acceptance: {
+        runId: receiptRequest.submission.runId,
+        expectedRunRevision: receiptRequest.submission.expectedRunRevision,
+        controller: receiptRequest.submission.controller,
+        verificationId: verification.result.verificationId,
+        verificationHash: verification.result.verificationHash,
+        attemptId: receiptRequest.submission.attemptId,
+        expectedAttemptRevision: verification.result.attemptRevision,
+        workspaceLeaseId: receiptRequest.submission.workspaceLeaseId,
+        expectedWorkspaceLeaseRevision: receiptRequest.submission.expectedWorkspaceLeaseRevision,
+        workerSessionId: receiptRequest.submission.workerSessionId,
+        expectedWorkerSessionRevision: receiptRequest.submission.expectedWorkerSessionRevision,
+        receiptId: receipt.result.receiptId,
+        receiptHash: receipt.result.receiptHash,
+        mutationId: "accept-public-verification",
+      },
+    });
+    expect(accepted).toMatchObject({
+      ok: true,
+      result: {
+        applied: true,
+        decision: "accepted",
+        attemptRevision: 8,
+        policyId: "lexrunner.strict-pass",
+        reasonCodes: [],
+      },
+    });
+    await expect(
+      handlers.acceptanceStatus({
+        databasePath: prepared.request.runtime.databasePath,
+        runId: receiptRequest.submission.runId,
+        attemptId: receiptRequest.submission.attemptId,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { acceptance: { decision: "accepted", attemptRevision: 8 } },
+    });
+  });
+
+  it("independently includes unclaimed untracked files in workspace identity", async () => {
+    const root = await sandbox();
+    const prepared = await prepare(root);
+    const workerHandlers = createAttemptWorkerHandlers();
+    const attached = await workerHandlers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+    const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+    const receipt = submitRequest(prepared, ended.result).submission.receipt;
+    const store = new SqliteWorkspaceLifecycleStore(prepared.request.runtime.databasePath, {
+      readOnly: true,
+    });
+    try {
+      const lease = await store.getWorkspaceLease(ended.result.workerSession.workspaceLeaseId);
+      if (!lease) throw new Error("expected durable workspace lease");
+      const runtime = new LocalAttemptVerificationRuntime();
+      const before = await runtime.observe({ lease, receipt });
+      await writeFile(
+        join(prepared.request.attempt.workspace.worktreePath, "project", "unclaimed.txt"),
+        "must not be hidden by files_touched\n",
+        "utf8"
+      );
+      const after = await runtime.observe({ lease, receipt });
+
+      expect(receipt.files_touched).not.toContain("project/unclaimed.txt");
+      expect(after.patchHash).not.toBe(before.patchHash);
+      expect(after.observationHash).not.toBe(before.observationHash);
+    } finally {
+      await store.close();
+    }
+  });
+
+  it("retries timeout evidence once and leaves the Attempt inconclusive", async () => {
+    const fixture = await submitPatchFixture(await sandbox());
+    const observation = observed(fixture.prepared.bundle.packet.repository.base_sha);
+    const runtime = new ScriptedVerificationRuntime(
+      [observation, observation],
+      [timedOut(), timedOut()]
+    );
+    const handlers = createAttemptVerificationHandlers({
+      runtime,
+      now: times("2026-07-12T12:00:13.000Z", "2026-07-12T12:00:14.000Z"),
+    });
+    const result = await handlers.run(
+      verificationRequest(fixture.prepared, fixture.receiptRequest, fixture.receipt)
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "infrastructure_error",
+        attemptStatus: "inconclusive",
+        trustGapCount: 2,
+        checkCounts: { infrastructure_error: 1 },
+      },
+    });
+    expect(runtime.runCount).toBe(2);
+    await expect(
+      handlers.status({
+        databasePath: fixture.prepared.request.runtime.databasePath,
+        runId: fixture.receiptRequest.submission.runId,
+        attemptId: fixture.receiptRequest.submission.attemptId,
+        diagnostics: true,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        verification: {
+          diagnostics: {
+            checks: [{ id: "test", outcome: "infrastructure_error", retry_count: 1 }],
+          },
+        },
+      },
+    });
+  });
+
+  it("records workspace drift as inconclusive instead of accepting stale evidence", async () => {
+    const fixture = await submitPatchFixture(await sandbox());
+    const initial = observed(fixture.prepared.bundle.packet.repository.base_sha);
+    const drifted = { ...initial, patchHash: `sha256:${"d".repeat(64)}` };
+    const runtime = new ScriptedVerificationRuntime([initial, drifted], [passedCheck()]);
+    const result = await createAttemptVerificationHandlers({
+      runtime,
+      now: times("2026-07-12T12:00:13.000Z", "2026-07-12T12:00:14.000Z"),
+    }).run(verificationRequest(fixture.prepared, fixture.receiptRequest, fixture.receipt));
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "inconclusive",
+        attemptStatus: "inconclusive",
+        trustGapCount: 2,
+      },
+    });
+  });
+
+  it("authenticates first and persists observation failure without running packet commands", async () => {
+    const fixture = await submitPatchFixture(await sandbox());
+    const runtime = new ScriptedVerificationRuntime([], []);
+    const result = await createAttemptVerificationHandlers({
+      runtime,
+      now: times("2026-07-12T12:00:13.000Z", "2026-07-12T12:00:14.000Z"),
+    }).run(
+      verificationRequest(
+        fixture.prepared,
+        fixture.receiptRequest,
+        fixture.receipt,
+        "verification-observation-failure"
+      )
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "infrastructure_error",
+        attemptStatus: "inconclusive",
+      },
+    });
+    expect(runtime.runCount).toBe(0);
+  });
+
+  it("rejects stale fencing before observing or executing the workspace", async () => {
+    const fixture = await submitPatchFixture(await sandbox());
+    const runtime = new ScriptedVerificationRuntime([], []);
+    const request = verificationRequest(
+      fixture.prepared,
+      fixture.receiptRequest,
+      fixture.receipt,
+      "verification-stale"
+    );
+    request.verification.expectedWorkerSessionRevision += 1;
+    const result = await createAttemptVerificationHandlers({ runtime }).run(request);
+    expect(result).toMatchObject({
+      ok: true,
+      result: { recorded: false, reason: "stale_session_revision" },
+    });
+    expect(runtime.observeCount).toBe(0);
+    expect(runtime.runCount).toBe(0);
+  });
+
+  it("verifies a committed result identity selected by the immutable packet", async () => {
+    const root = await sandbox();
+    const prepared = await prepare(root, true);
+    const workerHandlers = createAttemptWorkerHandlers();
+    const attached = await workerHandlers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+    const worktreePath = prepared.request.attempt.workspace.worktreePath;
+    await writeFile(join(worktreePath, "project", "result.txt"), "committed result\n", "utf8");
+    await git(worktreePath, "add", "project/result.txt");
+    await git(worktreePath, "commit", "-m", "test committed result");
+    const finalHeadSha = (
+      await execa("git", ["rev-parse", "HEAD"], { cwd: worktreePath })
+    ).stdout.trim();
+    const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+    const receiptRequest = submitRequest(prepared, ended.result, "completed", {
+      finalHeadSha,
+      patchHash: null,
+      commits: [finalHeadSha],
+    });
+    const receipt = await createAttemptReceiptHandlers().submit(receiptRequest);
+    if (!receipt.ok || !receipt.result.submitted) throw new Error("expected submitted receipt");
+    const result = await createAttemptVerificationHandlers({
+      now: times("2026-07-12T12:00:13.000Z", "2026-07-12T12:00:14.000Z"),
+    }).run(verificationRequest(prepared, receiptRequest, receipt.result, "verification-commit"));
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "pass",
+        attemptStatus: "verified",
+        trustGapCount: 0,
+      },
+    });
+  });
+
+  it("redacts bound environment values from diagnostic snippets", async () => {
+    const secret = "verification-secret-value";
+    const result = await new LocalAttemptVerificationRuntime().runCheck({
+      argv: [process.execPath, "-e", "process.stdout.write(process.env.API_TOKEN)"],
+      cwd: process.cwd(),
+      environment: { API_TOKEN: secret },
+      timeoutMs: 5_000,
+    });
+    expect(result).toMatchObject({ ok: true, exitCode: 0 });
+    expect(result.stdoutSnippet).toContain("***REDACTED***");
+    expect(result.stdoutSnippet).not.toContain(secret);
+  });
+
   it("does not create SQLite while reading missing receipt status", async () => {
     const root = await sandbox();
     const databasePath = join(root, "missing.db");
@@ -241,8 +577,113 @@ async function sandbox(): Promise<string> {
   return root;
 }
 
-async function prepare(root: string) {
-  const request = await prepareRequest(root);
+async function submitPatchFixture(root: string) {
+  const prepared = await prepare(root);
+  const workerHandlers = createAttemptWorkerHandlers();
+  const attached = await workerHandlers.attach(attachRequest(prepared));
+  if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+  await writeFile(
+    join(prepared.request.attempt.workspace.worktreePath, "project", "result.txt"),
+    "fixture result\n",
+    "utf8"
+  );
+  const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+  if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+  const receiptRequest = submitRequest(prepared, ended.result);
+  const submitted = await createAttemptReceiptHandlers().submit(receiptRequest);
+  if (!submitted.ok || !submitted.result.submitted) throw new Error("expected submitted receipt");
+  return { prepared, receiptRequest, receipt: submitted.result };
+}
+
+function verificationRequest(
+  prepared: Awaited<ReturnType<typeof prepare>>,
+  receiptRequest: ReturnType<typeof submitRequest>,
+  receipt: { receiptId: string; receiptHash: string; attemptRevision: number },
+  verificationId = "verification-public"
+) {
+  return {
+    databasePath: prepared.request.runtime.databasePath,
+    verification: {
+      runId: receiptRequest.submission.runId,
+      expectedRunRevision: receiptRequest.submission.expectedRunRevision,
+      controller: receiptRequest.submission.controller,
+      verificationId,
+      attemptId: receiptRequest.submission.attemptId,
+      expectedAttemptRevision: receipt.attemptRevision,
+      workspaceLeaseId: receiptRequest.submission.workspaceLeaseId,
+      expectedWorkspaceLeaseRevision: receiptRequest.submission.expectedWorkspaceLeaseRevision,
+      workerSessionId: receiptRequest.submission.workerSessionId,
+      expectedWorkerSessionRevision: receiptRequest.submission.expectedWorkerSessionRevision,
+      receiptId: receipt.receiptId,
+      receiptHash: receipt.receiptHash,
+      beginMutationId: `begin-${verificationId}`,
+      completeMutationId: `complete-${verificationId}`,
+    },
+  };
+}
+
+class ScriptedVerificationRuntime implements AttemptVerificationRuntime {
+  runCount = 0;
+  observeCount = 0;
+
+  constructor(
+    private readonly observations: VerificationWorkspaceObservation[],
+    private readonly results: VerificationCommandResult[]
+  ) {}
+
+  resolveEnvironment(): Readonly<Record<string, string>> {
+    return {};
+  }
+
+  async resolveCheckCwd(worktreePath: string): Promise<string> {
+    return worktreePath;
+  }
+
+  async observe(): Promise<VerificationWorkspaceObservation> {
+    this.observeCount += 1;
+    const observation = this.observations.shift();
+    if (!observation) throw new Error("missing scripted observation");
+    return observation;
+  }
+
+  async runCheck(): Promise<VerificationCommandResult> {
+    this.runCount += 1;
+    const result = this.results.shift();
+    if (!result) throw new Error("missing scripted command result");
+    return result;
+  }
+}
+
+function observed(headSha: string): VerificationWorkspaceObservation {
+  return {
+    headSha,
+    patchHash: `sha256:${"c".repeat(64)}`,
+    observationHash: `sha256:${"e".repeat(64)}`,
+  };
+}
+
+function timedOut(): VerificationCommandResult {
+  return {
+    ok: false,
+    failureKind: "timeout",
+    durationMs: 60_000,
+    stdoutHash: `sha256:${"1".repeat(64)}`,
+    stderrHash: `sha256:${"2".repeat(64)}`,
+  };
+}
+
+function passedCheck(): VerificationCommandResult {
+  return {
+    ok: true,
+    exitCode: 0,
+    durationMs: 10,
+    stdoutHash: `sha256:${"1".repeat(64)}`,
+    stderrHash: `sha256:${"2".repeat(64)}`,
+  };
+}
+
+async function prepare(root: string, gitWrite = false) {
+  const request = await prepareRequest(root, gitWrite);
   const response = await createAttemptLifecycleHandlers().prepare(request);
   if (!response.ok || !response.result.ok) throw new Error("expected prepared Attempt");
   return { request, bundle: response.result };
@@ -319,7 +760,12 @@ function submitRequest(
     Awaited<ReturnType<ReturnType<typeof createAttemptWorkerHandlers>["end"]>>,
     { ok: true }
   >["result"] & { updated: true },
-  outcome: "completed" | "failed" = "completed"
+  outcome: "completed" | "failed" = "completed",
+  resultIdentity: {
+    finalHeadSha?: string;
+    patchHash?: string | null;
+    commits?: string[];
+  } = {}
 ) {
   const packet = prepared.bundle.packet;
   const session = ended.workerSession;
@@ -349,7 +795,10 @@ function submitRequest(
         worker_runtime: session.workerRuntime,
         worker_session_id: session.sessionId,
         observed_base_sha: packet.repository.base_sha,
-        patch_hash: `sha256:${"c".repeat(64)}`,
+        ...(resultIdentity.finalHeadSha ? { final_head_sha: resultIdentity.finalHeadSha } : {}),
+        ...(resultIdentity.patchHash === null
+          ? {}
+          : { patch_hash: resultIdentity.patchHash ?? `sha256:${"c".repeat(64)}` }),
         outcome,
         exit_reason: outcome === "completed" ? "work_complete" : "worker_failed",
         summary:
@@ -357,7 +806,7 @@ function submitRequest(
             ? "Worker claims an uncommitted result without engine verification."
             : "Worker claims failed evidence without engine verification.",
         files_touched: ["project/result.txt"],
-        commits: [],
+        commits: resultIdentity.commits ?? [],
         acceptance_criteria_addressed: ["ac-1"],
         claimed_checks: [
           { id: "test", outcome: "pass" as const, output_snippet: "not independently run" },
@@ -375,7 +824,7 @@ function submitRequest(
   };
 }
 
-async function prepareRequest(root: string) {
+async function prepareRequest(root: string, gitWrite = false) {
   const repositoryRoot = join(root, "repository");
   const worktreeRoot = join(root, "worktrees");
   await mkdir(repositoryRoot);
@@ -436,14 +885,16 @@ async function prepareRequest(root: string) {
       },
       authority: {
         edit: true,
-        git_write: false,
+        git_write: gitWrite,
         github_write: false,
         external_runtime: false,
         secrets: false,
         signing: false,
         release: false,
       },
-      verification: [{ id: "test", argv: ["npm", "test"], expected_exit_codes: [0] }],
+      verification: [
+        { id: "test", argv: ["node", "-e", "process.exit(0)"], expected_exit_codes: [0] },
+      ],
       budget: { max_tokens: 20_000, max_tool_calls: 100, max_elapsed_ms: 3_600_000 },
       createdAt: at(0),
     },
@@ -497,4 +948,9 @@ async function prepareRequest(root: string) {
 
 async function git(cwd: string, ...args: string[]): Promise<void> {
   await execa("git", args, { cwd });
+}
+
+function times(...values: string[]): () => string {
+  let index = 0;
+  return () => values[Math.min(index++, values.length - 1)]!;
 }

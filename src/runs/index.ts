@@ -134,6 +134,42 @@ export type {
   AttemptReceiptStatusProjection,
   AttemptReceiptStatusResult,
 } from "./agent-work-attempt-receipt-service.js";
+export {
+  AttemptAcceptanceApplyRequestJsonSchema,
+  AttemptAcceptanceApplyRequestSchema,
+  AttemptAcceptanceStatusRequestJsonSchema,
+  AttemptAcceptanceStatusRequestSchema,
+  AttemptVerificationRunRequestJsonSchema,
+  AttemptVerificationRunRequestSchema,
+  AttemptVerificationStatusRequestJsonSchema,
+  AttemptVerificationStatusRequestSchema,
+  createAttemptVerificationHandlers,
+} from "./agent-work-attempt-verification-adapters.js";
+export type {
+  AttemptVerificationHandlerOptions,
+  AttemptVerificationHandlers,
+} from "./agent-work-attempt-verification-adapters.js";
+export {
+  AgentWorkAttemptAcceptanceService,
+  AgentWorkAttemptVerificationService,
+  ATTEMPT_VERIFIER_ID,
+  ATTEMPT_VERIFIER_VERSION,
+} from "./agent-work-attempt-verification-service.js";
+export type {
+  ApplyAttemptAcceptanceRequest,
+  AttemptAcceptanceResult,
+  AttemptAcceptanceStatusResult,
+  AttemptVerificationRunResult,
+  AttemptVerificationStatusResult,
+  RunAttemptVerificationInput,
+} from "./agent-work-attempt-verification-service.js";
+export { LocalAttemptVerificationRuntime } from "./agent-work-attempt-verification-runtime.js";
+export type {
+  AttemptVerificationRuntime,
+  VerificationCommandFailureKind,
+  VerificationCommandResult,
+  VerificationWorkspaceObservation,
+} from "./agent-work-attempt-verification-runtime.js";
 export { AgentWorkRuntimeConfigSchema, createAgentWorkRuntime } from "./agent-work-runtime.js";
 export type { AgentWorkRuntime, AgentWorkRuntimeConfig } from "./agent-work-runtime.js";
 export type {

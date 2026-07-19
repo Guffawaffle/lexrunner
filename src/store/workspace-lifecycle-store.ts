@@ -440,6 +440,23 @@ export interface SubmitAttemptVerificationInput {
   verification: AgentEngineVerification_v2;
 }
 
+/** Built-in fail-closed policy used by the first public acceptance surface. */
+export const STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID = "lexrunner.strict-pass" as const;
+export const STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION = "1.0.0" as const;
+
+export interface ApplyAttemptAcceptanceInput extends AuthenticatedMutationInput {
+  attemptId: string;
+  expectedAttemptRevision: number;
+  workspaceLeaseId: string;
+  expectedWorkspaceLeaseRevision: number;
+  workerSessionId: string;
+  expectedWorkerSessionRevision: number;
+  receiptId: string;
+  receiptHash: string;
+  verificationId: string;
+  verificationHash: string;
+}
+
 export interface BeginAttemptVerificationInput {
   runId: string;
   expectedRunRevision: number;
@@ -657,7 +674,18 @@ export interface AttemptVerificationStore {
   getAttemptVerification(verificationId: string): Promise<AttemptVerificationRecord | null>;
   getAttemptVerificationForAttempt(attemptId: string): Promise<AttemptVerificationRecord | null>;
   getAttemptVerificationByHash(verificationHash: string): Promise<AttemptVerificationRecord | null>;
+  getAttemptVerificationAuthorization(
+    verificationId: string
+  ): Promise<AttemptVerificationAuthorizationRecord | null>;
+  getAttemptVerificationAuthorizationForAttempt(
+    attemptId: string
+  ): Promise<AttemptVerificationAuthorizationRecord | null>;
   listAttemptVerificationEvents(runId: string): Promise<AttemptVerificationEvent[]>;
+}
+
+/** Policy-owned transition from verified evidence to an accepted or rejected Attempt. */
+export interface AttemptAcceptanceStore {
+  applyAttemptAcceptance(input: ApplyAttemptAcceptanceInput): Promise<WorkspaceMutationResult>;
 }
 
 /**

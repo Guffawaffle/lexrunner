@@ -1238,6 +1238,13 @@ export {
   createAttemptReceiptHandlers,
 } from "./runs/index.js";
 export {
+  AttemptAcceptanceApplyRequestJsonSchema,
+  AttemptAcceptanceStatusRequestJsonSchema,
+  AttemptVerificationRunRequestJsonSchema,
+  AttemptVerificationStatusRequestJsonSchema,
+  createAttemptVerificationHandlers,
+} from "./runs/index.js";
+export {
   AttemptWorkerAttachRequestJsonSchema,
   AttemptWorkerEndRequestJsonSchema,
   AttemptWorkerHeartbeatRequestJsonSchema,

@@ -442,6 +442,28 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       };
     }
 
+    function acceptanceInput(overrides: Record<string, unknown> = {}) {
+      const verification = verificationEvidence();
+      return {
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "accept-verification-1",
+        now: "2026-07-11T12:00:05.900Z",
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 6,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        workerSessionId: "worker-session-1",
+        expectedWorkerSessionRevision: 1,
+        receiptId: "receipt-1",
+        receiptHash: verification.receipt_hash,
+        verificationId: verification.verification_id,
+        verificationHash: computeCanonicalHash(verification),
+        ...overrides,
+      };
+    }
+
     async function receiptSubmittedAttempt() {
       await endedWorker();
       const submitted = await store.submitAttemptReceipt(receiptInput());
@@ -1356,6 +1378,77 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       await expect(
         store.beginAttemptVerification({ ...input, receiptHash: `sha256:${"9".repeat(64)}` })
       ).resolves.toMatchObject({ started: false, reason: "mutation_conflict" });
+      await expect(
+        store.getAttemptVerificationAuthorization("verification-1")
+      ).resolves.toMatchObject({
+        verificationId: "verification-1",
+        attemptId: "attempt-1",
+        attemptRevision: 5,
+      });
+      await expect(
+        store.getAttemptVerificationAuthorizationForAttempt("attempt-1")
+      ).resolves.toMatchObject({ verificationId: "verification-1" });
+    });
+
+    it("applies strict policy acceptance only to exact passing evidence", async () => {
+      await verificationStartedAttempt();
+      await store.submitAttemptVerification(verificationInput());
+      const input = acceptanceInput();
+      await expect(
+        store.applyAttemptAcceptance({
+          ...input,
+          mutationId: "accept-verification-wrong-hash",
+          verificationHash: `sha256:${"9".repeat(64)}`,
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      await expect(store.applyAttemptAcceptance(input)).resolves.toMatchObject({
+        updated: true,
+        idempotentReplay: false,
+        attempt: { status: "accepted", revision: 7 },
+        event: {
+          type: "attempt_transitioned",
+          payload: {
+            details: {
+              policyId: "lexrunner.strict-pass",
+              policyVersion: "1.0.0",
+              decision: "accepted",
+              reasonCodes: [],
+            },
+          },
+        },
+      });
+      await expect(store.applyAttemptAcceptance(input)).resolves.toMatchObject({
+        updated: true,
+        idempotentReplay: true,
+        attempt: { status: "accepted", revision: 7 },
+      });
+    });
+
+    it("rejects passing verification with an unresolved trust gap", async () => {
+      await verificationStartedAttempt();
+      const verification = verificationEvidence("pass", {
+        verified_patch_hash: `sha256:${"9".repeat(64)}`,
+        trust_gap_reasons: ["patch_identity_disagrees"],
+      });
+      await store.submitAttemptVerification(
+        verificationInput("pass", { verification, receiptHash: verification.receipt_hash })
+      );
+      await expect(
+        store.applyAttemptAcceptance(
+          acceptanceInput({ verificationHash: computeCanonicalHash(verification) })
+        )
+      ).resolves.toMatchObject({
+        updated: true,
+        attempt: { status: "rejected", revision: 7 },
+        event: {
+          payload: {
+            details: {
+              decision: "rejected",
+              reasonCodes: ["trust_gap:patch_identity_disagrees"],
+            },
+          },
+        },
+      });
     });
 
     it("rejects completed evidence without a durable verification authorization", async () => {

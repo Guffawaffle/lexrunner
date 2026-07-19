@@ -47,9 +47,39 @@ try {
 const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
 const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
 const attemptReceiptHandlers = core.createAttemptReceiptHandlers();
+const attemptVerificationHandlers = core.createAttemptVerificationHandlers();
 
 // MCP Tool implementations
 const tools = {
+  verify_attempt: {
+    description: "Run packet-declared engine verification for one fenced Attempt",
+    inputSchema: core.AttemptVerificationRunRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("verify an Attempt", () => attemptVerificationHandlers.run(args)),
+  },
+
+  get_attempt_verification: {
+    description: "Get compact verification status, with explicit optional diagnostics",
+    inputSchema: core.AttemptVerificationStatusRequestJsonSchema,
+    call: async (args) => canonicalToolResult(await attemptVerificationHandlers.status(args)),
+  },
+
+  accept_attempt: {
+    description: "Apply LexRunner's strict acceptance policy to verified evidence",
+    inputSchema: core.AttemptAcceptanceApplyRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("accept an Attempt", () =>
+        attemptVerificationHandlers.applyAcceptance(args)
+      ),
+  },
+
+  get_attempt_acceptance: {
+    description: "Get bounded policy-acceptance status for one Attempt",
+    inputSchema: core.AttemptAcceptanceStatusRequestJsonSchema,
+    call: async (args) =>
+      canonicalToolResult(await attemptVerificationHandlers.acceptanceStatus(args)),
+  },
+
   submit_attempt_receipt: {
     description: "Persist one bounded AgentTaskReceipt v2 claim for an Attempt",
     inputSchema: core.AttemptReceiptSubmitRequestJsonSchema,

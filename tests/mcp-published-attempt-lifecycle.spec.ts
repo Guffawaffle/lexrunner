@@ -29,7 +29,20 @@ describe("published MCP Attempt lifecycle", () => {
     const workerStatus = tools.find((tool) => tool.name === "get_attempt_worker");
     const receiptSubmit = tools.find((tool) => tool.name === "submit_attempt_receipt");
     const receiptStatus = tools.find((tool) => tool.name === "get_attempt_receipt");
+    const verificationRun = tools.find((tool) => tool.name === "verify_attempt");
+    const verificationStatus = tools.find((tool) => tool.name === "get_attempt_verification");
+    const acceptanceApply = tools.find((tool) => tool.name === "accept_attempt");
+    const acceptanceStatus = tools.find((tool) => tool.name === "get_attempt_acceptance");
 
+    expect(verificationRun?.inputSchema.required).toEqual(["databasePath", "verification"]);
+    expect(verificationStatus?.inputSchema.required).toEqual([
+      "databasePath",
+      "runId",
+      "attemptId",
+    ]);
+    expect(verificationStatus?.inputSchema.properties).toHaveProperty("diagnostics");
+    expect(acceptanceApply?.inputSchema.required).toEqual(["databasePath", "acceptance"]);
+    expect(acceptanceStatus?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
     expect(receiptSubmit?.inputSchema.required).toEqual(["databasePath", "submission"]);
     expect(receiptStatus?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
     expect(workerAttach?.inputSchema.required).toEqual(["runtime", "attach"]);
@@ -114,6 +127,27 @@ describe("published MCP Attempt lifecycle", () => {
     for (const [name, action] of operations) {
       const [response] = await invoke({
         id: 10,
+        method: "tools/call",
+        params: { name, arguments: {} },
+      });
+      expect(JSON.parse(response.result.content[0].text)).toEqual({
+        error: {
+          code: "mutations_disabled",
+          message: `Mutations not allowed. Set ALLOW_MUTATIONS=true to ${action}.`,
+        },
+        ok: false,
+      });
+    }
+  });
+
+  it("keeps verification and acceptance behind the published mutation gate", async () => {
+    const operations = [
+      ["verify_attempt", "verify an Attempt"],
+      ["accept_attempt", "accept an Attempt"],
+    ] as const;
+    for (const [name, action] of operations) {
+      const [response] = await invoke({
+        id: 14,
         method: "tools/call",
         params: { name, arguments: {} },
       });

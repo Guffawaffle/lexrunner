@@ -12,6 +12,7 @@ import type {
 } from "../../src/runs/agent-work-adapters.js";
 import type { AttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 import type { AttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
+import type { AttemptVerificationHandlers } from "../../src/runs/agent-work-attempt-verification-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
@@ -20,6 +21,7 @@ describe("attempt commands", () => {
   let preparationHandler: AttemptPreparationHandler;
   let workerHandlers: AttemptWorkerHandlers;
   let receiptHandlers: AttemptReceiptHandlers;
+  let verificationHandlers: AttemptVerificationHandlers;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -69,15 +71,101 @@ describe("attempt commands", () => {
       })),
       status: vi.fn(async () => ({ ok: true, result: { receipt: null } })),
     };
+    verificationHandlers = {
+      run: vi.fn(async () => ({ ok: true, result: { recorded: true } as never })),
+      status: vi.fn(async () => ({ ok: true, result: { verification: null } })),
+      applyAcceptance: vi.fn(async () => ({ ok: true, result: { applied: true } as never })),
+      acceptanceStatus: vi.fn(async () => ({ ok: true, result: { acceptance: null } })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       handlers,
       preparationHandler,
       workerHandlers,
       receiptHandlers,
+      verificationHandlers,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
+  });
+
+  it("forwards verification and acceptance inputs through their shared public handlers", async () => {
+    const verificationRequest = { verification: { verificationId: "verification-1" } };
+    const acceptanceRequest = { acceptance: { verificationId: "verification-1" } };
+    const verificationPath = join(directory, "verification-run.json");
+    const acceptancePath = join(directory, "acceptance-apply.json");
+    await fs.writeFile(verificationPath, JSON.stringify(verificationRequest));
+    await fs.writeFile(acceptancePath, JSON.stringify(acceptanceRequest));
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "verification",
+      "run",
+      "--input",
+      verificationPath,
+      "--json",
+    ]);
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "verification",
+      "status",
+      "--database-path",
+      "/tmp/lifecycle.db",
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--diagnostics",
+      "--json",
+    ]);
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "acceptance",
+      "apply",
+      "--input",
+      acceptancePath,
+      "--json",
+    ]);
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "acceptance",
+      "status",
+      "--database-path",
+      "/tmp/lifecycle.db",
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--json",
+    ]);
+
+    expect(verificationHandlers.run).toHaveBeenCalledWith(verificationRequest);
+    expect(verificationHandlers.status).toHaveBeenCalledWith({
+      databasePath: "/tmp/lifecycle.db",
+      runId: "run-1",
+      attemptId: "attempt-1",
+      diagnostics: true,
+    });
+    expect(verificationHandlers.applyAcceptance).toHaveBeenCalledWith(acceptanceRequest);
+    expect(verificationHandlers.acceptanceStatus).toHaveBeenCalledWith({
+      databasePath: "/tmp/lifecycle.db",
+      runId: "run-1",
+      attemptId: "attempt-1",
+    });
+    expect(outputs).toEqual([
+      { ok: true, result: { recorded: true } },
+      { ok: true, result: { verification: null } },
+      { ok: true, result: { applied: true } },
+      { ok: true, result: { acceptance: null } },
+    ]);
   });
 
   afterEach(async () => {
@@ -85,11 +173,13 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers worker, receipt, prepare, start, and status beneath attempt", () => {
+  it("registers worker, receipt, verification, acceptance, prepare, start, and status beneath attempt", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
       "worker",
       "receipt",
+      "verification",
+      "acceptance",
       "prepare",
       "start",
       "status",
@@ -104,15 +194,26 @@ describe("attempt commands", () => {
       "submit",
       "status",
     ]);
-    expect(attempt?.commands[2].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
+    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
+      "run",
+      "status",
     ]);
-    expect(attempt?.commands[3].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
+    expect(attempt?.commands[2].commands[1].options.map((option) => option.long)).toContain(
+      "--diagnostics"
+    );
+    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
+      "apply",
+      "status",
     ]);
     expect(attempt?.commands[4].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[5].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[6].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",

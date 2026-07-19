@@ -9,13 +9,13 @@ explains the decisions behind that inventory.
 
 ## Dispositions
 
-The audited registration set contains 117 CLI entries (96 operations and 21
-groups) and 24 published MCP tools.
+The audited registration set contains 123 CLI entries (100 operations and 23
+groups) and 28 published MCP tools.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        78 |             9 |         15 |            15 |      0 |
-| MCP     |        20 |             3 |          1 |             0 |      0 |
+| CLI     |        84 |             9 |         15 |            15 |      0 |
+| MCP     |        24 |             3 |          1 |             0 |      0 |
 
 - **canonical** is supported vocabulary. Machine-facing canonical operations
   must resolve to a contract profile in the JSON matrix.
