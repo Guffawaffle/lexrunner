@@ -79,6 +79,7 @@ import type {
   TaskPacketBindingStore,
   HeartbeatWorkspaceInput,
   QuarantineWorkspaceInput,
+  ReconcileIncompleteLaunchInput,
   ReconcileWorkspaceInput,
   ReleaseWorkspaceInput,
   SubmitAttemptReceiptInput,
@@ -121,6 +122,7 @@ type MutationInput =
   | HeartbeatWorkspaceInput
   | ReleaseWorkspaceInput
   | ReconcileWorkspaceInput
+  | ReconcileIncompleteLaunchInput
   | QuarantineWorkspaceInput;
 type Success = Extract<WorkspaceMutationResult, { updated: true }>;
 type JsonRecord = { [key: string]: JsonValue };
@@ -978,6 +980,86 @@ export class SqliteWorkspaceLifecycleStore
 
   async getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null> {
     return this.hasTable("launch_envelope_bindings") ? this.launchEnvelopeBinding(attemptId) : null;
+  }
+
+  async reconcileIncompleteLaunch(
+    input: ReconcileIncompleteLaunchInput
+  ): Promise<WorkspaceMutationResult> {
+    return this.mutate(input, () => {
+      const attempt = this.attempt(input.attemptId);
+      const attemptFailure = this.validateAttempt(
+        attempt,
+        input.runId,
+        input.expectedAttemptRevision
+      );
+      if (attemptFailure) return attemptFailure;
+      const lease = this.lease(input.workspaceLeaseId);
+      if (!lease || lease.attemptId !== attempt!.attemptId) {
+        return this.failure("not_found", attempt!);
+      }
+      if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+        return this.failure("stale_workspace_revision", attempt!, lease);
+      }
+      if (attempt!.status !== "launching") {
+        return this.failure("invalid_reconciliation", attempt!, lease);
+      }
+      if (lease.status !== "active") {
+        return this.failure("workspace_not_active", attempt!, lease);
+      }
+      if (
+        lease.controllerId !== input.controller.controllerId ||
+        lease.controllerLeaseId !== input.controller.leaseId ||
+        lease.fencingToken !== input.controller.fencingToken
+      ) {
+        return this.failure("stale_fence", attempt!, lease);
+      }
+      if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.failure("workspace_expired", attempt!, lease);
+      }
+      const durableLaunchEvidence = this.db
+        .prepare(
+          `SELECT 1 FROM launch_envelope_bindings WHERE attemptId = ?
+           UNION ALL SELECT 1 FROM task_packet_bindings WHERE attemptId = ?
+           UNION ALL SELECT 1 FROM worker_sessions WHERE attemptId = ? LIMIT 1`
+        )
+        .get(input.attemptId, input.attemptId, input.attemptId);
+      if (durableLaunchEvidence) return this.failure("evidence_mismatch", attempt!, lease);
+      const authorizationRow = this.db
+        .prepare(
+          `SELECT * FROM workspace_lifecycle_events
+           WHERE runId = ? AND attemptId = ? AND type = 'attempt_transitioned'
+           ORDER BY sequence DESC`
+        )
+        .all(input.runId, input.attemptId)
+        .map((row) => toEvent(row as EventRow))
+        .find((event) => isLaunchAuthorizationForAttempt(event, attempt!, lease));
+      if (!authorizationRow) return this.failure("evidence_mismatch", attempt!, lease);
+      if (parseInstant(input.now, "now") < parseInstant(attempt!.updatedAt, "updatedAt")) {
+        return this.failure("invalid_time", attempt!, lease);
+      }
+      const now = instant(input.now);
+      this.db
+        .prepare(
+          `UPDATE attempts SET revision = revision + 1, status = 'launch_failed',
+           updatedAt = ?, completedAt = ? WHERE attemptId = ?`
+        )
+        .run(now, now, input.attemptId);
+      return this.record(
+        input,
+        this.requireAttempt(input.attemptId),
+        lease,
+        "attempt_transitioned",
+        {
+          status: "launch_failed",
+          receiptId: null,
+          verificationId: null,
+          details: {
+            reconciliation: "missing_launch_envelope",
+            authorizationMutationId: authorizationRow.mutationId,
+          },
+        }
+      );
+    });
   }
 
   async getTaskPacketBinding(attemptId: string): Promise<TaskPacketBindingRecord | null> {
@@ -4073,6 +4155,26 @@ function isMatchingLaunchAuthorization(
     event.payload.status === "launching" &&
     parseInstant(event.createdAt, "authorization.createdAt") <=
       parseInstant(input.createdAt, "createdAt")
+  );
+}
+
+function isLaunchAuthorizationForAttempt(
+  event: WorkspaceLifecycleEvent,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord
+): boolean {
+  return (
+    event.runId === attempt.runId &&
+    event.attemptId === attempt.attemptId &&
+    event.type === "attempt_transitioned" &&
+    event.attemptRevision > 0 &&
+    event.attemptRevision <= attempt.revision &&
+    event.workspaceLeaseRevision !== null &&
+    event.workspaceLeaseRevision <= lease.revision &&
+    parseInstant(event.createdAt, "authorization.createdAt") <=
+      parseInstant(attempt.updatedAt, "attempt.updatedAt") &&
+    isJsonRecord(event.payload) &&
+    event.payload.status === "launching"
   );
 }
 

@@ -69,6 +69,54 @@ describe("attempt lifecycle adapter handlers", () => {
     });
     expect(replay.result.packet).toEqual(first.result.packet);
     expect(replay.result.envelope).toEqual(first.result.envelope);
+    await expect(
+      handlers.status({
+        databasePath: request.runtime.databasePath,
+        runId: request.identity.runId,
+        attemptId: request.identity.attemptId,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { launch: { state: "bound", reconciliationRequired: false } },
+    });
+  });
+
+  it("reports a durable launch binding as stale after controller authority changes", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    const handlers = createAttemptLifecycleHandlers();
+
+    await expect(handlers.prepare(request)).resolves.toMatchObject({
+      ok: true,
+      result: { ok: true, outcome: "launch_bundle_ready" },
+    });
+
+    const store = new SqliteWorkspaceLifecycleStore(request.runtime.databasePath);
+    try {
+      await expect(
+        store.acquireControllerLease({
+          runId: request.identity.runId,
+          controllerId: "replacement-controller",
+          leaseId: "replacement-controller-lease",
+          now: "2026-07-12T12:01:01.000Z",
+          ttlMs: 60_000,
+          initialState: {},
+        })
+      ).resolves.toMatchObject({ acquired: true });
+    } finally {
+      await store.close();
+    }
+
+    await expect(
+      handlers.status({
+        databasePath: request.runtime.databasePath,
+        runId: request.identity.runId,
+        attemptId: request.identity.attemptId,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { launch: { state: "binding_stale", reconciliationRequired: true } },
+    });
   });
 
   it("rolls back the launch envelope when packet snapshot persistence fails", async () => {
@@ -277,6 +325,7 @@ describe("attempt lifecycle adapter handlers", () => {
         run: { runId: "run-adapter" },
         attempt: { attemptId: "attempt-adapter", status: "launching" },
         workspace: { leaseId: "lease-adapter", status: "active" },
+        launch: { state: "binding_missing", reconciliationRequired: true },
       },
     });
   });

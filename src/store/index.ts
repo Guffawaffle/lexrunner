@@ -119,6 +119,7 @@ export type {
   HeartbeatWorkerSessionInput,
   EndWorkerSessionInput,
   BindLaunchEnvelopeInput,
+  ReconcileIncompleteLaunchInput,
   SubmitAttemptReceiptInput,
   BeginAttemptVerificationInput,
   SubmitAttemptVerificationInput,

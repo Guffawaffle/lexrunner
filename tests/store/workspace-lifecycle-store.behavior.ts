@@ -252,6 +252,21 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       return store.bindLaunchEnvelope(envelopeBindingInput(overrides));
     }
 
+    function launchReconciliationInput(overrides: Record<string, unknown> = {}) {
+      return {
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "reconcile-incomplete-launch-1",
+        now: T3,
+        attemptId: "attempt-1",
+        workspaceLeaseId: "workspace-lease-1",
+        expectedAttemptRevision: 2,
+        expectedWorkspaceLeaseRevision: 0,
+        ...overrides,
+      };
+    }
+
     function attachInput(overrides: Record<string, unknown> = {}) {
       return {
         runId: "run-1",
@@ -679,6 +694,140 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       });
       await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toBeNull();
       await expect(store.getTaskPacketBinding("attempt-1")).resolves.toBeNull();
+    });
+
+    it("fails an incomplete launch closed once and replays concurrent reconciliation", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      const input = launchReconciliationInput();
+
+      const results = await Promise.all([
+        store.reconcileIncompleteLaunch(input),
+        store.reconcileIncompleteLaunch(input),
+      ]);
+
+      expect(results.map((result) => result.updated && result.idempotentReplay).sort()).toEqual([
+        false,
+        true,
+      ]);
+      for (const result of results) {
+        expect(result).toMatchObject({
+          updated: true,
+          attempt: { status: "launch_failed", revision: 3 },
+          workspaceLease: { status: "active", revision: 0 },
+          event: {
+            type: "attempt_transitioned",
+            payload: {
+              status: "launch_failed",
+              receiptId: null,
+              verificationId: null,
+              details: {
+                reconciliation: "missing_launch_envelope",
+                authorizationMutationId: "launch-1",
+              },
+            },
+          },
+        });
+      }
+      await expect(store.getLaunchEnvelopeBinding("attempt-1")).resolves.toBeNull();
+      await expect(store.getTaskPacketBinding("attempt-1")).resolves.toBeNull();
+      await expect(
+        store.bindLaunchEnvelope(envelopeBindingInput({ expectedAttemptRevision: 3 }))
+      ).resolves.toMatchObject({ bound: false, reason: "invalid_attempt_transition" });
+    });
+
+    it("lets a complete durable launch binding win reconciliation", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      await expect(bindEnvelope()).resolves.toMatchObject({ bound: true });
+
+      await expect(
+        store.reconcileIncompleteLaunch(launchReconciliationInput())
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+      await expect(store.getAttempt("attempt-1")).resolves.toMatchObject({
+        status: "launching",
+        revision: 2,
+      });
+    });
+
+    it("fails a missing launch binding closed after controller restart and workspace takeover", async () => {
+      await createAttempt();
+      await acquire({ observation: observation() });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "launch-1",
+        now: T2,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 1,
+        status: "launching",
+      });
+      const takeover = await store.acquireControllerLease({
+        runId: "run-1",
+        controllerId: "controller-2",
+        leaseId: "controller-lease-2",
+        now: T_LATE,
+        ttlMs: 10_000,
+        initialState: {},
+      });
+      if (!takeover.acquired) throw new Error("expected controller takeover");
+      controller = credential(takeover.lease);
+      await expect(
+        store.reconcileWorkspace({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "resume-incomplete-launch",
+          now: "2026-07-11T12:00:11.100Z",
+          attemptId: "attempt-1",
+          workspaceLeaseId: "workspace-lease-1",
+          expectedAttemptRevision: 2,
+          expectedWorkspaceLeaseRevision: 0,
+          action: "resume",
+          ttlMs: 5_000,
+          observation: observation(),
+        })
+      ).resolves.toMatchObject({
+        updated: true,
+        attempt: { revision: 3, status: "launching" },
+        workspaceLease: { revision: 1, controllerId: "controller-2" },
+      });
+
+      await expect(
+        store.reconcileIncompleteLaunch(
+          launchReconciliationInput({
+            mutationId: "fail-incomplete-launch-after-restart",
+            now: "2026-07-11T12:00:11.200Z",
+            expectedAttemptRevision: 3,
+            expectedWorkspaceLeaseRevision: 1,
+          })
+        )
+      ).resolves.toMatchObject({
+        updated: true,
+        attempt: { revision: 4, status: "launch_failed" },
+        workspaceLease: { status: "active", revision: 1 },
+      });
     });
 
     it("attaches an exact worker identity and atomically starts the attempt", async () => {
