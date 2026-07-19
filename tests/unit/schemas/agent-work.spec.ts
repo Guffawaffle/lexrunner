@@ -3,6 +3,8 @@ import {
   AGENT_WORK_CONTRACT_VERSION,
   AGENT_TASK_RECEIPT_PATCH_PROFILE,
   AGENT_TASK_RECEIPT_V2_VERSION,
+  AGENT_ENGINE_VERIFICATION_V2_VERSION,
+  AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v1,
   AgentTaskReceipt_v2,
@@ -18,11 +20,14 @@ import {
   WorkspaceLease_v1,
   WorkspaceAllocation_v1,
   computeAgentTaskPacketHash,
+  computeAgentEngineVerificationV2Hash,
   createAgentTaskPacket,
   parseAgentTaskReceiptV2,
+  parseAgentEngineVerificationV2,
   validateAgentTaskReceiptBinding,
   validateAgentTaskReceiptV2Binding,
   validateAgentTaskReceiptV2PacketReferences,
+  validateAgentEngineVerificationV2PacketReferences,
   validateHumanActionReceiptBinding,
   type AgentTaskPacketHashInput,
 } from "../../../src/schemas/agent-work.js";
@@ -223,6 +228,55 @@ function agentReceiptV2(overrides: Record<string, unknown> = {}) {
     worker_started_at: NOW,
     worker_completed_at: LATER,
     submitted_at: SUBMITTED,
+    ...overrides,
+  });
+}
+
+function agentVerificationV2(overrides: Record<string, unknown> = {}) {
+  const taskPacket = packet();
+  const lease = workspaceLease();
+  const receipt = agentReceiptV2();
+  return parseAgentEngineVerificationV2({
+    schema_version: AGENT_ENGINE_VERIFICATION_V2_VERSION,
+    verification_id: "agent-verification-v2-1",
+    run_id: taskPacket.run_id,
+    work_item_id: taskPacket.work_item.work_item_id,
+    work_item_revision: taskPacket.work_item.revision,
+    attempt_id: taskPacket.attempt_id,
+    packet_id: taskPacket.packet_id,
+    packet_hash: taskPacket.packet_hash,
+    workspace_lease_id: lease.lease_id,
+    workspace_lease_revision: lease.revision,
+    worker_session_id: "worker-session-1",
+    worker_session_revision: 1,
+    receipt_id: receipt.receipt_id,
+    receipt_hash: computeCanonicalHash(receipt),
+    observed_base_sha: BASE_SHA,
+    verified_head_sha: HEAD_SHA,
+    workspace_observation_hash: `sha256:${"c".repeat(64)}`,
+    outcome: "pass",
+    summary: "Engine independently verified the result.",
+    checks: [
+      {
+        id: "unit",
+        source: "packet",
+        outcome: "pass",
+        command_hash: `sha256:${"d".repeat(64)}`,
+        environment_fingerprint: `sha256:${"e".repeat(64)}`,
+        exit_code: 0,
+        stdout_hash: `sha256:${"f".repeat(64)}`,
+        duration_ms: 125,
+        retry_count: 0,
+        artifact_refs: [],
+        determinism: "deterministic",
+      },
+    ],
+    failures: [],
+    trust_gap_reasons: [],
+    verifier_id: "lexrunner-engine",
+    verifier_version: "1.1.0",
+    started_at: NOW,
+    completed_at: LATER,
     ...overrides,
   });
 }
@@ -952,6 +1006,88 @@ describe("agent work protocol contracts", () => {
       expect(verification.outcome).toBe(outcome);
     }
   );
+
+  it("represents canonical immutable engine verification v2 evidence", () => {
+    const verification = agentVerificationV2({
+      checks: [
+        {
+          id: "z-extra",
+          source: "engine_extra",
+          outcome: "pass",
+          command_hash: `sha256:${"1".repeat(64)}`,
+          environment_fingerprint: `sha256:${"2".repeat(64)}`,
+          duration_ms: 1,
+          retry_count: 0,
+          artifact_refs: ["z-artifact", "a-artifact"],
+          determinism: "unknown",
+        },
+        ...agentVerificationV2().checks,
+      ],
+      failures: [],
+      trust_gap_reasons: ["authority_deviation"],
+    });
+
+    expect(verification.checks.map(({ id }) => id)).toEqual(["unit", "z-extra"]);
+    expect(verification.checks[1]?.artifact_refs).toEqual(["a-artifact", "z-artifact"]);
+    expect(computeAgentEngineVerificationV2Hash(verification)).toBe(
+      computeCanonicalHash(verification)
+    );
+    expect(AgentEngineVerification_v2.safeParse(verification).success).toBe(true);
+  });
+
+  it("requires result identity, coherent pass evidence, unique sets, and ordered time", () => {
+    expect(
+      AgentEngineVerification_v2.safeParse({
+        ...agentVerificationV2(),
+        verified_head_sha: undefined,
+        verified_patch_hash: undefined,
+      }).success
+    ).toBe(false);
+    expect(
+      AgentEngineVerification_v2.safeParse({
+        ...agentVerificationV2(),
+        failures: ["gate failed"],
+      }).success
+    ).toBe(false);
+    expect(
+      AgentEngineVerification_v2.safeParse({
+        ...agentVerificationV2(),
+        trust_gap_reasons: ["authority_deviation", "authority_deviation"],
+      }).success
+    ).toBe(false);
+    expect(
+      AgentEngineVerification_v2.safeParse({
+        ...agentVerificationV2(),
+        completed_at: "2026-07-11T12:00:00.000Z",
+      }).success
+    ).toBe(false);
+  });
+
+  it("binds the declared verification lane to the packet", () => {
+    expect(
+      validateAgentEngineVerificationV2PacketReferences(packet(), agentVerificationV2())
+    ).toEqual({ valid: true, errors: [] });
+    const dangling = agentVerificationV2({
+      outcome: "fail",
+      checks: [
+        {
+          ...agentVerificationV2().checks[0],
+          id: "undeclared",
+          outcome: "fail",
+        },
+      ],
+      failures: ["undeclared check failed"],
+    });
+    expect(validateAgentEngineVerificationV2PacketReferences(packet(), dangling)).toEqual({
+      valid: false,
+      errors: ["checks contains undeclared packet verification: undeclared"],
+    });
+    const omitted = agentVerificationV2({ checks: [] });
+    expect(validateAgentEngineVerificationV2PacketReferences(packet(), omitted)).toEqual({
+      valid: false,
+      errors: ["passing verification omits packet verification: unit"],
+    });
+  });
 
   it("requires completed and blocked receipts to carry their decisive evidence", () => {
     expect(

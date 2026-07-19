@@ -1,12 +1,18 @@
 import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.js";
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
 import type { Attempt_v1 as AttemptContract_v1 } from "../schemas/agent-work.js";
-import type { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
+import type {
+  AgentEngineVerification_v2,
+  AgentTaskReceipt_v2,
+  EngineVerificationTrustGapReason_v2,
+} from "../schemas/agent-work.js";
 import type {
   AgentTaskReceiptOutcome,
   AttemptReceiptFailureReason,
   AttemptReceiptDisposition,
   AttemptReceiptEventType,
+  AttemptVerificationEventType,
+  AttemptVerificationFailureReason,
   AttemptStatus,
   EndWorkerSessionStatus,
   FinishedWorkspaceLeaseStatus,
@@ -16,6 +22,7 @@ import type {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  VerificationOutcome,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
   WorkspaceLifecycleLeaseStatus,
@@ -29,6 +36,8 @@ export type {
   AttemptReceiptFailureReason,
   AttemptReceiptDisposition,
   AttemptReceiptEventType,
+  AttemptVerificationEventType,
+  AttemptVerificationFailureReason,
   AttemptStatus,
   EndWorkerSessionStatus,
   FinishedWorkspaceLeaseStatus,
@@ -38,6 +47,7 @@ export type {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  VerificationOutcome,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
   WorkspaceLifecycleLeaseStatus,
@@ -341,6 +351,146 @@ export type AttemptReceiptSubmissionResult =
       currentRunRevision?: number;
     };
 
+export interface AttemptVerificationRecord {
+  verificationId: string;
+  verificationHash: string;
+  verificationJson: string;
+  runId: string;
+  workItemId: string;
+  workItemRevision: number;
+  attemptId: string;
+  packetId: string;
+  packetHash: string;
+  workspaceLeaseId: string;
+  workspaceLeaseRevision: number;
+  workerSessionId: string;
+  workerSessionRevision: number;
+  receiptId: string;
+  receiptHash: string;
+  observedBaseSha: string;
+  verifiedHeadSha?: string;
+  verifiedPatchHash?: string;
+  workspaceObservationHash: string;
+  outcome: VerificationOutcome;
+  trustGapReasons: EngineVerificationTrustGapReason_v2[];
+  verifierId: string;
+  verifierVersion: string;
+  startedAt: string;
+  completedAt: string;
+  recordedAt: string;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  resultingAttemptRevision: number;
+  resultingAttemptStatus: AttemptStatus;
+}
+
+export interface AttemptVerificationAuthorizationRecord {
+  verificationId: string;
+  runId: string;
+  attemptId: string;
+  attemptRevision: number;
+  workspaceLeaseId: string;
+  workspaceLeaseRevision: number;
+  workerSessionId: string;
+  workerSessionRevision: number;
+  receiptId: string;
+  receiptHash: string;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  startedAt: string;
+}
+
+export interface AttemptVerificationEvent {
+  runId: string;
+  attemptId: string;
+  verificationId: string;
+  verificationHash: string | null;
+  receiptId: string;
+  receiptHash: string;
+  mutationId: string;
+  sequence: number;
+  attemptRevision: number;
+  workspaceLeaseRevision: number;
+  workerSessionRevision: number;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  type: AttemptVerificationEventType;
+  outcome: VerificationOutcome | null;
+  resultingAttemptStatus: AttemptStatus;
+  createdAt: string;
+}
+
+export interface SubmitAttemptVerificationInput {
+  runId: string;
+  expectedRunRevision: number;
+  controller: ControllerLeaseCredential;
+  mutationId: string;
+  now: string;
+  attemptId: string;
+  expectedAttemptRevision: number;
+  workspaceLeaseId: string;
+  expectedWorkspaceLeaseRevision: number;
+  workerSessionId: string;
+  expectedWorkerSessionRevision: number;
+  receiptId: string;
+  receiptHash: string;
+  verification: AgentEngineVerification_v2;
+}
+
+export interface BeginAttemptVerificationInput {
+  runId: string;
+  expectedRunRevision: number;
+  controller: ControllerLeaseCredential;
+  mutationId: string;
+  now: string;
+  verificationId: string;
+  attemptId: string;
+  expectedAttemptRevision: number;
+  workspaceLeaseId: string;
+  expectedWorkspaceLeaseRevision: number;
+  workerSessionId: string;
+  expectedWorkerSessionRevision: number;
+  receiptId: string;
+  receiptHash: string;
+}
+
+export type AttemptVerificationBeginResult =
+  | {
+      started: true;
+      authorization: AttemptVerificationAuthorizationRecord;
+      attempt: AttemptRecord;
+      event: AttemptVerificationEvent;
+      idempotentReplay: boolean;
+    }
+  | {
+      started: false;
+      reason: AttemptVerificationFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentSessionRevision?: number;
+      currentRunRevision?: number;
+    };
+
+export type AttemptVerificationSubmissionResult =
+  | {
+      recorded: true;
+      verification: AttemptVerificationRecord;
+      attempt: AttemptRecord;
+      event: AttemptVerificationEvent;
+      idempotentReplay: boolean;
+    }
+  | {
+      recorded: false;
+      reason: AttemptVerificationFailureReason;
+      currentAttemptRevision?: number;
+      currentWorkspaceLeaseRevision?: number;
+      currentSessionRevision?: number;
+      currentRunRevision?: number;
+    };
+
 export interface HeartbeatWorkerSessionInput extends AuthenticatedWorkerMutationInput {
   sessionId: string;
   expectedSessionRevision: number;
@@ -494,6 +644,20 @@ export interface AttemptReceiptStore {
   getAttemptReceiptForAttempt(attemptId: string): Promise<AttemptReceiptRecord | null>;
   getAttemptReceiptByHash(receiptHash: string): Promise<AttemptReceiptRecord | null>;
   listAttemptReceiptEvents(runId: string): Promise<AttemptReceiptEvent[]>;
+}
+
+/** Additive immutable AgentEngineVerification v2 persistence port. */
+export interface AttemptVerificationStore {
+  beginAttemptVerification(
+    input: BeginAttemptVerificationInput
+  ): Promise<AttemptVerificationBeginResult>;
+  submitAttemptVerification(
+    input: SubmitAttemptVerificationInput
+  ): Promise<AttemptVerificationSubmissionResult>;
+  getAttemptVerification(verificationId: string): Promise<AttemptVerificationRecord | null>;
+  getAttemptVerificationForAttempt(attemptId: string): Promise<AttemptVerificationRecord | null>;
+  getAttemptVerificationByHash(verificationHash: string): Promise<AttemptVerificationRecord | null>;
+  listAttemptVerificationEvents(runId: string): Promise<AttemptVerificationEvent[]>;
 }
 
 /**

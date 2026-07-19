@@ -17,6 +17,8 @@ export const AGENT_WORK_CONTRACT_VERSION = "1.0.0" as const;
 export const AGENT_TASK_RECEIPT_V2_VERSION = "2.0.0" as const;
 /** Reproducible patch-byte profile used by AgentTaskReceipt_v2.patch_hash claims. */
 export const AGENT_TASK_RECEIPT_PATCH_PROFILE = "git-diff-binary-v1" as const;
+/** Breaking verification-only evolution for durable AgentTaskReceipt v2 evidence. */
+export const AGENT_ENGINE_VERIFICATION_V2_VERSION = "2.0.0" as const;
 
 const Id = z.string().min(1);
 const Timestamp = z.string().datetime();
@@ -1153,6 +1155,150 @@ export const AgentEngineVerification_v1 = z
   .strict();
 export type AgentEngineVerification_v1 = z.infer<typeof AgentEngineVerification_v1>;
 
+export const EngineVerificationCheckSource_v2 = z.enum(["packet", "engine_extra"]);
+export type EngineVerificationCheckSource_v2 = z.infer<typeof EngineVerificationCheckSource_v2>;
+
+export const EngineVerificationDeterminism_v2 = z.enum([
+  "deterministic",
+  "externally_nondeterministic",
+  "unknown",
+]);
+export type EngineVerificationDeterminism_v2 = z.infer<typeof EngineVerificationDeterminism_v2>;
+
+export const EngineVerificationTrustGapReason_v2 = z.enum([
+  "worker_outcome_disagrees",
+  "head_identity_disagrees",
+  "patch_identity_disagrees",
+  "claimed_check_disagrees",
+  "authority_deviation",
+]);
+export type EngineVerificationTrustGapReason_v2 = z.infer<
+  typeof EngineVerificationTrustGapReason_v2
+>;
+
+const AgentEngineVerificationCheck_v2 = z
+  .object({
+    id: Id,
+    source: EngineVerificationCheckSource_v2,
+    outcome: VerificationOutcome,
+    command_hash: SHA256Hash,
+    cwd_rel: CanonicalAgentRepoPathV2.optional(),
+    environment_fingerprint: SHA256Hash,
+    exit_code: z.number().int().optional(),
+    stdout_hash: SHA256Hash.optional(),
+    stderr_hash: SHA256Hash.optional(),
+    stdout_snippet: z.string().max(4_096).optional(),
+    stderr_snippet: z.string().max(4_096).optional(),
+    duration_ms: z.number().int().nonnegative(),
+    retry_count: z.number().int().nonnegative(),
+    artifact_refs: z.array(z.string().min(1).max(1_024)).max(512),
+    determinism: EngineVerificationDeterminism_v2,
+  })
+  .strict();
+
+/** Immutable engine-observed evidence for one durable AgentTaskReceipt v2. */
+export const AgentEngineVerification_v2 = z
+  .object({
+    schema_version: z.literal(AGENT_ENGINE_VERIFICATION_V2_VERSION),
+    verification_id: Id,
+    run_id: Id,
+    work_item_id: Id,
+    work_item_revision: Revision,
+    attempt_id: Id,
+    packet_id: Id,
+    packet_hash: SHA256Hash,
+    workspace_lease_id: Id,
+    workspace_lease_revision: Revision,
+    worker_session_id: Id,
+    worker_session_revision: Revision,
+    receipt_id: Id,
+    receipt_hash: SHA256Hash,
+    observed_base_sha: CanonicalGitObjectId,
+    verified_head_sha: CanonicalGitObjectId.optional(),
+    verified_patch_hash: SHA256Hash.optional(),
+    workspace_observation_hash: SHA256Hash,
+    outcome: VerificationOutcome,
+    summary: z.string().min(1).max(4_096),
+    checks: z.array(AgentEngineVerificationCheck_v2).max(1_024),
+    failures: z.array(z.string().min(1).max(2_048)).max(1_024),
+    trust_gap_reasons: z.array(EngineVerificationTrustGapReason_v2).max(16),
+    verifier_id: Id,
+    verifier_version: Id,
+    started_at: ReceiptTimestampV2,
+    completed_at: ReceiptTimestampV2,
+  })
+  .strict()
+  .superRefine((verification, ctx) => {
+    if (
+      verification.verified_head_sha === undefined &&
+      verification.verified_patch_hash === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["verified_head_sha"],
+        message: "Engine verification must identify an observed HEAD and/or canonical patch",
+      });
+    }
+    requireTimestampOrder(verification.started_at, verification.completed_at, "completed_at", ctx);
+    requireUniqueIds(verification.checks, "checks", ctx);
+    requireUniqueStrings(verification.failures, "failures", ctx);
+    requireUniqueStrings(verification.trust_gap_reasons, "trust_gap_reasons", ctx);
+    verification.checks.forEach((check, index) => {
+      requireUniqueStrings(check.artifact_refs, `checks.${index}.artifact_refs`, ctx);
+    });
+    if (
+      verification.outcome === "pass" &&
+      (verification.failures.length > 0 ||
+        verification.checks.some((check) => check.outcome !== "pass"))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcome"],
+        message: "A passing verification cannot contain failed checks or failures",
+      });
+    }
+  })
+  .transform((verification) => ({
+    ...verification,
+    checks: verification.checks
+      .map((check) => ({
+        ...check,
+        artifact_refs: [...check.artifact_refs].sort(compareCanonicalStrings),
+      }))
+      .sort((left, right) => compareCanonicalStrings(left.id, right.id)),
+    failures: [...verification.failures].sort(compareCanonicalStrings),
+    trust_gap_reasons: [...verification.trust_gap_reasons].sort(compareCanonicalStrings),
+  }));
+export type AgentEngineVerification_v2 = z.infer<typeof AgentEngineVerification_v2>;
+
+export function computeAgentEngineVerificationV2Hash(
+  verification: AgentEngineVerification_v2
+): string {
+  return computeCanonicalHash(verification);
+}
+
+/** Validate the packet-declared check lane without conflating explicit engine extras. */
+export function validateAgentEngineVerificationV2PacketReferences(
+  packet: AgentTaskPacket_v1,
+  verification: AgentEngineVerification_v2
+): { valid: boolean; errors: string[] } {
+  const declaredIds = new Set(packet.verification.map(({ id }) => id));
+  const observedDeclaredIds = new Set(
+    verification.checks.filter(({ source }) => source === "packet").map(({ id }) => id)
+  );
+  const errors = verification.checks
+    .filter(({ id, source }) => source === "packet" && !declaredIds.has(id))
+    .map(({ id }) => `checks contains undeclared packet verification: ${id}`);
+  if (verification.outcome === "pass") {
+    errors.push(
+      ...packet.verification
+        .filter(({ id }) => !observedDeclaredIds.has(id))
+        .map(({ id }) => `passing verification omits packet verification: ${id}`)
+    );
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 export interface AgentTaskReceiptBindingContext {
   packet: AgentTaskPacket_v1;
   lease: WorkspaceLease_v1;
@@ -1425,6 +1571,10 @@ export function parseAgentTaskReceiptV2(data: unknown): AgentTaskReceipt_v2 {
 
 export function parseAgentEngineVerification(data: unknown): AgentEngineVerification_v1 {
   return AgentEngineVerification_v1.parse(data);
+}
+
+export function parseAgentEngineVerificationV2(data: unknown): AgentEngineVerification_v2 {
+  return AgentEngineVerification_v2.parse(data);
 }
 
 export function parseHumanActionRequest(data: unknown): HumanActionRequest_v1 {

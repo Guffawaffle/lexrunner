@@ -256,6 +256,21 @@ between a receipt and engine evidence creates a trust-gap record.
 Verification is **engine-owned**, not universally deterministic. External
 services, tests, and CI systems may still be nondeterministic.
 
+Durable verification uses two fenced steps. `beginAttemptVerification` binds a
+verification ID to the current Run, Attempt revision, packet snapshot,
+WorkspaceLease revision, WorkerSession revision, and receipt hash, then advances
+the Attempt to `verifying`. Only completion under that exact authorization may
+persist `AgentEngineVerification_v2` and advance to `verified`, `rejected`, or
+`inconclusive`. Generic Attempt transitions cannot manufacture these states.
+
+`AgentEngineVerification_v2` identifies an independently observed HEAD and/or
+canonical patch, the workspace-observation hash, packet-declared and explicit
+engine-extra check lanes, command/environment/output identities, bounded
+excerpts, duration, retry count, determinism class, and named trust-gap reasons.
+The immutable verification hash covers the canonical complete record. A passing
+verification must include every packet-declared check; extra checks never
+masquerade as packet declarations.
+
 #### Delivery
 
 `Delivery` is the coordinator-owned process that turns a verified result into a
@@ -496,6 +511,7 @@ ExecutionEnvelope_v1
 AgentTaskReceipt_v1 (legacy general-work claim)
 AgentTaskReceipt_v2 (durable general-work ingestion claim)
 AgentEngineVerification_v1
+AgentEngineVerification_v2 (durable receipt-v2 engine evidence)
 ```
 
 `AgentTaskReceipt_v1` remains readable for compatibility but is not accepted by
@@ -506,11 +522,11 @@ and a committed and/or uncommitted result identity. Existing `task` commands may
 remain compatibility aliases for ADR-007 repair flows; `work`, `run`, and
 `attempt` are the durable orchestration nouns.
 
-`AgentEngineVerification_v1` can identify only an optional verified HEAD; it
-cannot represent a verified patch hash. Independent verification of a patch-only
-`AgentTaskReceipt_v2` therefore requires a later, explicitly versioned
-verification-contract evolution; receipt v2 does not silently broaden
-verification v1.
+`AgentEngineVerification_v1` remains the legacy general-work verification
+contract and can identify only an optional verified HEAD. Durable
+`AgentTaskReceipt_v2` verification uses the explicitly versioned
+`AgentEngineVerification_v2`, including patch-only result identity; v1 is not
+silently broadened.
 
 ---
 

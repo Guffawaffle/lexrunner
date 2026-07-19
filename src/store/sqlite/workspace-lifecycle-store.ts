@@ -4,8 +4,11 @@ import type { ZodType } from "zod";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import {
+  AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v2,
+  EngineVerificationTrustGapReason_v2 as EngineVerificationTrustGapReasonV2Schema,
+  validateAgentEngineVerificationV2PacketReferences,
   validateAgentTaskReceiptV2PacketReferences,
 } from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
@@ -14,7 +17,9 @@ import {
   AgentTaskReceiptOutcome as AgentTaskReceiptOutcomeSchema,
   AttemptReceiptDisposition as AttemptReceiptDispositionSchema,
   AttemptReceiptEventType as AttemptReceiptEventTypeSchema,
+  AttemptVerificationEventType as AttemptVerificationEventTypeSchema,
   AttemptStatus as AttemptStatusSchema,
+  VerificationOutcome as VerificationOutcomeSchema,
   WorkerSessionBackend as WorkerSessionBackendSchema,
   WorkerSessionEventType as WorkerSessionEventTypeSchema,
   WorkerSessionStatus as WorkerSessionStatusSchema,
@@ -48,7 +53,16 @@ import type {
   AttemptReceiptFailureReason,
   AttemptReceiptRecord,
   AttemptReceiptSubmissionResult,
+  AttemptVerificationEvent,
+  AttemptVerificationEventType,
+  AttemptVerificationFailureReason,
+  AttemptVerificationAuthorizationRecord,
+  AttemptVerificationBeginResult,
+  AttemptVerificationRecord,
+  AttemptVerificationStore,
+  AttemptVerificationSubmissionResult,
   BindLaunchEnvelopeInput,
+  BeginAttemptVerificationInput,
   CreateAttemptInput,
   EndWorkerSessionInput,
   HeartbeatWorkerSessionInput,
@@ -62,6 +76,7 @@ import type {
   ReconcileWorkspaceInput,
   ReleaseWorkspaceInput,
   SubmitAttemptReceiptInput,
+  SubmitAttemptVerificationInput,
   TransitionAttemptInput,
   WorkspaceIdentity,
   WorkspaceLifecycleLeaseRecord,
@@ -245,6 +260,68 @@ CREATE TABLE IF NOT EXISTS task_packet_bindings (
  FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE);
 INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(5,'task-packet-snapshot-persistence',datetime('now'));
+CREATE TABLE IF NOT EXISTS attempt_verification_authorizations (
+ verificationId TEXT PRIMARY KEY, runId TEXT NOT NULL, attemptId TEXT NOT NULL UNIQUE,
+ attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0), workspaceLeaseId TEXT NOT NULL,
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ workerSessionId TEXT NOT NULL, workerSessionRevision INTEGER NOT NULL CHECK(workerSessionRevision>=0),
+ receiptId TEXT NOT NULL UNIQUE, receiptHash TEXT NOT NULL, controllerId TEXT NOT NULL,
+ controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ startedAt TEXT NOT NULL,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
+ FOREIGN KEY(workerSessionId) REFERENCES worker_sessions(sessionId) ON DELETE RESTRICT,
+ FOREIGN KEY(receiptId) REFERENCES attempt_receipts(receiptId) ON DELETE RESTRICT);
+CREATE TABLE IF NOT EXISTS attempt_verifications (
+ verificationId TEXT PRIMARY KEY, verificationHash TEXT NOT NULL UNIQUE,
+ verificationJson TEXT NOT NULL, runId TEXT NOT NULL, workItemId TEXT NOT NULL,
+ workItemRevision INTEGER NOT NULL CHECK(workItemRevision>=0), attemptId TEXT NOT NULL UNIQUE,
+ packetId TEXT NOT NULL, packetHash TEXT NOT NULL, workspaceLeaseId TEXT NOT NULL,
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ workerSessionId TEXT NOT NULL, workerSessionRevision INTEGER NOT NULL CHECK(workerSessionRevision>=0),
+ receiptId TEXT NOT NULL UNIQUE, receiptHash TEXT NOT NULL, observedBaseSha TEXT NOT NULL,
+ verifiedHeadSha TEXT, verifiedPatchHash TEXT, workspaceObservationHash TEXT NOT NULL,
+ outcome TEXT NOT NULL CHECK(outcome IN (${sqlEnumValues(VerificationOutcomeSchema.options)})),
+ trustGapReasonsJson TEXT NOT NULL, verifierId TEXT NOT NULL, verifierVersion TEXT NOT NULL,
+ startedAt TEXT NOT NULL, completedAt TEXT NOT NULL, recordedAt TEXT NOT NULL,
+ controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL,
+ fencingToken INTEGER NOT NULL CHECK(fencingToken>0), resultingAttemptRevision INTEGER NOT NULL,
+ resultingAttemptStatus TEXT NOT NULL CHECK(resultingAttemptStatus IN
+ (${sqlEnumValues(AttemptStatusSchema.options)})),
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
+ FOREIGN KEY(workerSessionId) REFERENCES worker_sessions(sessionId) ON DELETE RESTRICT,
+ FOREIGN KEY(receiptId) REFERENCES attempt_receipts(receiptId) ON DELETE RESTRICT,
+ FOREIGN KEY(verificationId) REFERENCES attempt_verification_authorizations(verificationId)
+ ON DELETE RESTRICT);
+CREATE TABLE IF NOT EXISTS attempt_verification_events (
+ runId TEXT NOT NULL, attemptId TEXT NOT NULL, verificationId TEXT NOT NULL,
+ verificationHash TEXT, receiptId TEXT NOT NULL, receiptHash TEXT NOT NULL,
+ mutationId TEXT NOT NULL, sequence INTEGER NOT NULL CHECK(sequence>0),
+ attemptRevision INTEGER NOT NULL CHECK(attemptRevision>=0),
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision>=0),
+ workerSessionRevision INTEGER NOT NULL CHECK(workerSessionRevision>=0),
+ controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL,
+ fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ type TEXT NOT NULL CHECK(type IN (${sqlEnumValues(AttemptVerificationEventTypeSchema.options)})),
+ outcome TEXT CHECK(outcome IN (${sqlEnumValues(VerificationOutcomeSchema.options)})),
+ resultingAttemptStatus TEXT NOT NULL CHECK(resultingAttemptStatus IN
+ (${sqlEnumValues(AttemptStatusSchema.options)})), createdAt TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
+ FOREIGN KEY(verificationId) REFERENCES attempt_verification_authorizations(verificationId)
+ ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS attempt_verification_begin_mutations (
+ runId TEXT NOT NULL, mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL, resultJson TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), FOREIGN KEY(runId,mutationId)
+ REFERENCES attempt_verification_events(runId,mutationId) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS attempt_verification_mutations (
+ runId TEXT NOT NULL, mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL, resultJson TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), FOREIGN KEY(runId,mutationId)
+ REFERENCES attempt_verification_events(runId,mutationId) ON DELETE CASCADE);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+ VALUES(6,'attempt-engine-verification-persistence',datetime('now'));
 `;
 
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
@@ -334,6 +411,26 @@ interface AttemptReceiptEventRow extends Omit<
   outcome: string;
 }
 
+interface AttemptVerificationRow extends Omit<
+  AttemptVerificationRecord,
+  "outcome" | "resultingAttemptStatus" | "verifiedHeadSha" | "verifiedPatchHash" | "trustGapReasons"
+> {
+  outcome: string;
+  resultingAttemptStatus: string;
+  verifiedHeadSha: string | null;
+  verifiedPatchHash: string | null;
+  trustGapReasonsJson: string;
+}
+
+interface AttemptVerificationEventRow extends Omit<
+  AttemptVerificationEvent,
+  "type" | "outcome" | "resultingAttemptStatus"
+> {
+  type: string;
+  outcome: string | null;
+  resultingAttemptStatus: string;
+}
+
 /** SQLite attempt/workspace store sharing the authoritative controller transaction. */
 export class SqliteWorkspaceLifecycleStore
   extends SqliteCoordinationStore
@@ -341,7 +438,8 @@ export class SqliteWorkspaceLifecycleStore
     WorkspaceLifecycleStore,
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
-    WorkerSessionStore
+    WorkerSessionStore,
+    AttemptVerificationStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -397,6 +495,14 @@ export class SqliteWorkspaceLifecycleStore
       if (failure) return failure;
       if (!canTransitionAttempt(attempt!.status, input.status)) {
         return this.failure("invalid_attempt_transition", attempt!);
+      }
+      if (
+        (attempt!.status === "receipt_submitted" ||
+          attempt!.status === "verifying" ||
+          attempt!.status === "verified") &&
+        input.status !== "quarantined"
+      ) {
+        return this.failure("evidence_mismatch", attempt!);
       }
       if (input.status === "receipt_submitted") {
         return this.failure("evidence_mismatch", attempt!);
@@ -1076,9 +1182,22 @@ export class SqliteWorkspaceLifecycleStore
         this.db
           .prepare(
             `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
-             UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?`
+             UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_verification_mutations
+             WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+             WHERE runId = ? AND mutationId = ?`
           )
-          .get(input.runId, input.mutationId, input.runId, input.mutationId)
+          .get(
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId
+          )
       ) {
         return this.receiptFailure("mutation_conflict");
       }
@@ -1172,6 +1291,682 @@ export class SqliteWorkspaceLifecycleStore
       .prepare(`SELECT * FROM attempt_receipt_events WHERE runId = ? ORDER BY sequence`)
       .all(runId) as AttemptReceiptEventRow[];
     return rows.map(toAttemptReceiptEvent);
+  }
+
+  async beginAttemptVerification(
+    input: BeginAttemptVerificationInput
+  ): Promise<AttemptVerificationBeginResult> {
+    if (!Number.isFinite(Date.parse(input.now)))
+      return this.verificationBeginFailure("invalid_time");
+    if (input.controller.runId !== input.runId) {
+      return this.verificationBeginFailure("lease_mismatch");
+    }
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return this.verificationBeginFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return this.verificationBeginFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return this.verificationBeginFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return this.verificationBeginFailure(
+          "stale_run_revision",
+          undefined,
+          undefined,
+          undefined,
+          coordination.revision
+        );
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.verificationBeginFailure("lease_expired");
+      }
+      const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
+      if (
+        this.db
+          .prepare(
+            `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_verification_mutations
+             WHERE runId = ? AND mutationId = ?`
+          )
+          .get(
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId
+          )
+      ) {
+        return this.verificationBeginFailure("mutation_conflict");
+      }
+      const prior = this.db
+        .prepare(
+          `SELECT fingerprint, resultJson FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId) as
+        { fingerprint: string; resultJson: string } | undefined;
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) {
+          return this.verificationBeginFailure("mutation_conflict");
+        }
+        const replay = parseVerificationBeginSuccess(prior.resultJson);
+        return replay
+          ? { ...replay, idempotentReplay: true }
+          : this.verificationBeginFailure("evidence_mismatch");
+      }
+      const attempt = this.attempt(input.attemptId);
+      const lease = this.lease(input.workspaceLeaseId);
+      const session = this.workerSession(input.workerSessionId);
+      const receipt = this.attemptReceipt(input.receiptId);
+      if (!attempt || attempt.runId !== input.runId || !lease || !session || !receipt) {
+        return this.verificationBeginFailure(
+          "not_found",
+          attempt ?? undefined,
+          lease ?? undefined,
+          session ?? undefined
+        );
+      }
+      if (attempt.revision !== input.expectedAttemptRevision) {
+        return this.verificationBeginFailure("stale_attempt_revision", attempt, lease, session);
+      }
+      if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+        return this.verificationBeginFailure("stale_workspace_revision", attempt, lease, session);
+      }
+      if (session.revision !== input.expectedWorkerSessionRevision) {
+        return this.verificationBeginFailure("stale_session_revision", attempt, lease, session);
+      }
+      if (
+        input.verificationId.length === 0 ||
+        this.verificationAuthorization(input.verificationId) ||
+        this.verificationAuthorizationForAttempt(input.attemptId)
+      ) {
+        return this.verificationBeginFailure("verification_conflict", attempt, lease, session);
+      }
+      if (
+        attempt.status !== "receipt_submitted" ||
+        attempt.receiptId !== input.receiptId ||
+        receipt.attemptId !== input.attemptId ||
+        receipt.receiptHash !== input.receiptHash ||
+        receipt.disposition !== "verification_pending"
+      ) {
+        return this.verificationBeginFailure("invalid_attempt_transition", attempt, lease, session);
+      }
+      if (
+        lease.status !== "active" ||
+        lease.attemptId !== attempt.attemptId ||
+        lease.controllerId !== input.controller.controllerId ||
+        lease.controllerLeaseId !== input.controller.leaseId ||
+        lease.fencingToken !== input.controller.fencingToken
+      ) {
+        return this.verificationBeginFailure("stale_fence", attempt, lease, session);
+      }
+      if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.verificationBeginFailure("workspace_expired", attempt, lease, session);
+      }
+      if (
+        session.runId !== input.runId ||
+        session.attemptId !== input.attemptId ||
+        session.workspaceLeaseId !== input.workspaceLeaseId
+      ) {
+        return this.verificationBeginFailure("evidence_mismatch", attempt, lease, session);
+      }
+      const now = instant(input.now);
+      this.db
+        .prepare(
+          `UPDATE attempts SET revision = revision + 1, status = 'verifying', updatedAt = ?,
+           completedAt = NULL WHERE attemptId = ?`
+        )
+        .run(now, input.attemptId);
+      const updatedAttempt = this.requireAttempt(input.attemptId);
+      this.db
+        .prepare(
+          `INSERT INTO attempt_verification_authorizations (verificationId, runId, attemptId,
+           attemptRevision, workspaceLeaseId, workspaceLeaseRevision, workerSessionId,
+           workerSessionRevision, receiptId, receiptHash, controllerId, controllerLeaseId,
+           fencingToken, startedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          input.verificationId,
+          input.runId,
+          input.attemptId,
+          updatedAttempt.revision,
+          input.workspaceLeaseId,
+          lease.revision,
+          input.workerSessionId,
+          session.revision,
+          input.receiptId,
+          input.receiptHash,
+          input.controller.controllerId,
+          input.controller.leaseId,
+          input.controller.fencingToken,
+          now
+        );
+      const authorization = this.requireVerificationAuthorization(input.verificationId);
+      const result = this.recordVerificationStartedEvent(
+        input,
+        updatedAttempt,
+        lease,
+        session,
+        authorization
+      );
+      this.db
+        .prepare(
+          `INSERT INTO attempt_verification_begin_mutations
+           (runId, mutationId, fingerprint, resultJson) VALUES (?, ?, ?, ?)`
+        )
+        .run(input.runId, input.mutationId, fingerprint, json(result));
+      return result;
+    });
+  }
+
+  async submitAttemptVerification(
+    input: SubmitAttemptVerificationInput
+  ): Promise<AttemptVerificationSubmissionResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return this.verificationFailure("invalid_time");
+    if (input.controller.runId !== input.runId) {
+      return this.verificationFailure("lease_mismatch");
+    }
+    const parsed = AgentEngineVerification_v2.safeParse(input.verification);
+    if (!parsed.success) return this.verificationFailure("evidence_mismatch");
+    const verificationJson = canonicalJSONStringify(parsed.data);
+    if (Buffer.byteLength(verificationJson, "utf8") > 256 * 1_024) {
+      return this.verificationFailure("evidence_mismatch");
+    }
+    const verificationHash = computeCanonicalHash(parsed.data);
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return this.verificationFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return this.verificationFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return this.verificationFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return this.verificationFailure(
+          "stale_run_revision",
+          undefined,
+          undefined,
+          undefined,
+          coordination.revision
+        );
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.verificationFailure("lease_expired");
+      }
+      const fingerprint = canonicalJSONStringify({
+        ...input,
+        verification: parsed.data,
+      } as unknown as JsonValue);
+      if (
+        this.db
+          .prepare(
+            `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+             WHERE runId = ? AND mutationId = ?`
+          )
+          .get(
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId,
+            input.runId,
+            input.mutationId
+          )
+      ) {
+        return this.verificationFailure("mutation_conflict");
+      }
+      const prior = this.db
+        .prepare(
+          `SELECT fingerprint, resultJson FROM attempt_verification_mutations
+           WHERE runId = ? AND mutationId = ?`
+        )
+        .get(input.runId, input.mutationId) as
+        { fingerprint: string; resultJson: string } | undefined;
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) {
+          return this.verificationFailure("mutation_conflict");
+        }
+        const replay = parseVerificationMutationSuccess(prior.resultJson);
+        return replay
+          ? { ...replay, idempotentReplay: true }
+          : this.verificationFailure("evidence_mismatch");
+      }
+      const hashVerification = this.attemptVerificationByHash(verificationHash);
+      if (hashVerification) {
+        if (
+          hashVerification.verificationJson !== verificationJson ||
+          hashVerification.runId !== input.runId ||
+          hashVerification.attemptId !== input.attemptId ||
+          hashVerification.workspaceLeaseId !== input.workspaceLeaseId ||
+          hashVerification.workerSessionId !== input.workerSessionId ||
+          hashVerification.receiptId !== input.receiptId
+        ) {
+          return this.verificationFailure("verification_conflict");
+        }
+        const attempt = this.requireAttempt(hashVerification.attemptId);
+        const lease = this.requireLease(hashVerification.workspaceLeaseId);
+        const session = this.requireWorkerSession(hashVerification.workerSessionId);
+        const committed = this.committedVerificationResult(hashVerification);
+        if (!committed) return this.verificationFailure("evidence_mismatch");
+        const replay = this.recordVerificationEvent(
+          input,
+          attempt,
+          lease,
+          session,
+          hashVerification,
+          "attempt_verification_replayed"
+        );
+        const result = {
+          recorded: true as const,
+          verification: committed.verification,
+          attempt: committed.attempt,
+          event: replay.event,
+          idempotentReplay: true,
+        };
+        this.storeVerificationMutation(input, fingerprint, result);
+        return result;
+      }
+      const result = this.submitNewVerification(
+        input,
+        parsed.data,
+        verificationJson,
+        verificationHash
+      );
+      if (result.recorded) this.storeVerificationMutation(input, fingerprint, result);
+      return result;
+    });
+  }
+
+  async getAttemptVerification(verificationId: string): Promise<AttemptVerificationRecord | null> {
+    return this.hasTable("attempt_verifications") ? this.attemptVerification(verificationId) : null;
+  }
+
+  async getAttemptVerificationForAttempt(
+    attemptId: string
+  ): Promise<AttemptVerificationRecord | null> {
+    if (!this.hasTable("attempt_verifications")) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_verifications WHERE attemptId = ?`)
+      .get(attemptId) as AttemptVerificationRow | undefined;
+    return row ? toAttemptVerification(row) : null;
+  }
+
+  async getAttemptVerificationByHash(
+    verificationHash: string
+  ): Promise<AttemptVerificationRecord | null> {
+    return this.hasTable("attempt_verifications")
+      ? this.attemptVerificationByHash(verificationHash)
+      : null;
+  }
+
+  async listAttemptVerificationEvents(runId: string): Promise<AttemptVerificationEvent[]> {
+    if (!this.hasTable("attempt_verification_events")) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM attempt_verification_events WHERE runId = ? ORDER BY sequence`)
+      .all(runId) as AttemptVerificationEventRow[];
+    return rows.map(toAttemptVerificationEvent);
+  }
+
+  private submitNewVerification(
+    input: SubmitAttemptVerificationInput,
+    evidence: import("../../schemas/agent-work.js").AgentEngineVerification_v2,
+    verificationJson: string,
+    verificationHash: string
+  ): AttemptVerificationSubmissionResult {
+    const attempt = this.attempt(input.attemptId);
+    const lease = this.lease(input.workspaceLeaseId);
+    const session = this.workerSession(input.workerSessionId);
+    const receipt = this.attemptReceipt(input.receiptId);
+    const authorization = this.verificationAuthorization(evidence.verification_id);
+    if (
+      !attempt ||
+      attempt.runId !== input.runId ||
+      !lease ||
+      !session ||
+      !receipt ||
+      !authorization
+    ) {
+      return this.verificationFailure(
+        "not_found",
+        attempt ?? undefined,
+        lease ?? undefined,
+        session ?? undefined
+      );
+    }
+    if (attempt.revision !== input.expectedAttemptRevision) {
+      return this.verificationFailure("stale_attempt_revision", attempt, lease, session);
+    }
+    if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+      return this.verificationFailure("stale_workspace_revision", attempt, lease, session);
+    }
+    if (session.revision !== input.expectedWorkerSessionRevision) {
+      return this.verificationFailure("stale_session_revision", attempt, lease, session);
+    }
+    if (
+      this.attemptVerification(evidence.verification_id) ||
+      this.getVerificationForAttempt(input.attemptId)
+    ) {
+      return this.verificationFailure("verification_conflict", attempt, lease, session);
+    }
+    const packetBinding = this.taskPacketBinding(input.attemptId);
+    const packet = packetBinding
+      ? validateCanonicalTaskPacket(packetBinding.packetJson, attempt)
+      : null;
+    const parsedReceipt = parseStoredReceipt(receipt);
+    if (
+      !packet ||
+      !parsedReceipt ||
+      !validVerificationAuthorization(authorization, input, attempt, lease, session, receipt) ||
+      !validateAgentEngineVerificationV2PacketReferences(packet, evidence).valid ||
+      !validVerificationBinding(evidence, input, attempt, lease, session, receipt) ||
+      !hasRequiredTrustGaps(evidence, parsedReceipt)
+    ) {
+      return this.verificationFailure("evidence_mismatch", attempt, lease, session);
+    }
+    if (
+      attempt.status !== "verifying" ||
+      attempt.receiptId !== receipt.receiptId ||
+      receipt.attemptId !== attempt.attemptId ||
+      receipt.receiptHash !== input.receiptHash ||
+      receipt.disposition !== "verification_pending"
+    ) {
+      return this.verificationFailure("invalid_attempt_transition", attempt, lease, session);
+    }
+    if (
+      lease.status !== "active" ||
+      lease.controllerId !== input.controller.controllerId ||
+      lease.controllerLeaseId !== input.controller.leaseId ||
+      lease.fencingToken !== input.controller.fencingToken
+    ) {
+      return this.verificationFailure("stale_fence", attempt, lease, session);
+    }
+    if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+      return this.verificationFailure("workspace_expired", attempt, lease, session);
+    }
+    if (
+      parseInstant(evidence.started_at, "verification.started_at") <
+        parseInstant(authorization.startedAt, "authorization.startedAt") ||
+      parseInstant(evidence.completed_at, "verification.completed_at") >
+        parseInstant(input.now, "now")
+    ) {
+      return this.verificationFailure("invalid_time", attempt, lease, session);
+    }
+
+    const status = verificationAttemptStatus(evidence.outcome);
+    this.db
+      .prepare(
+        `UPDATE attempts SET revision = revision + 1, status = ?, verificationId = ?, updatedAt = ?,
+         completedAt = ? WHERE attemptId = ?`
+      )
+      .run(
+        status,
+        evidence.verification_id,
+        instant(input.now),
+        isTerminalAttemptStatus(status) ? instant(input.now) : null,
+        input.attemptId
+      );
+    const updatedAttempt = this.requireAttempt(input.attemptId);
+    this.db
+      .prepare(
+        `INSERT INTO attempt_verifications (verificationId, verificationHash, verificationJson,
+         runId, workItemId, workItemRevision, attemptId, packetId, packetHash, workspaceLeaseId,
+         workspaceLeaseRevision, workerSessionId, workerSessionRevision, receiptId, receiptHash,
+         observedBaseSha, verifiedHeadSha, verifiedPatchHash, workspaceObservationHash, outcome,
+         trustGapReasonsJson, verifierId, verifierVersion, startedAt, completedAt, recordedAt,
+         controllerId, controllerLeaseId, fencingToken, resultingAttemptRevision,
+         resultingAttemptStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        evidence.verification_id,
+        verificationHash,
+        verificationJson,
+        input.runId,
+        evidence.work_item_id,
+        evidence.work_item_revision,
+        input.attemptId,
+        evidence.packet_id,
+        evidence.packet_hash,
+        input.workspaceLeaseId,
+        evidence.workspace_lease_revision,
+        input.workerSessionId,
+        evidence.worker_session_revision,
+        input.receiptId,
+        input.receiptHash,
+        evidence.observed_base_sha,
+        evidence.verified_head_sha ?? null,
+        evidence.verified_patch_hash ?? null,
+        evidence.workspace_observation_hash,
+        evidence.outcome,
+        canonicalJSONStringify(evidence.trust_gap_reasons),
+        evidence.verifier_id,
+        evidence.verifier_version,
+        instant(evidence.started_at),
+        instant(evidence.completed_at),
+        instant(input.now),
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        updatedAttempt.revision,
+        status
+      );
+    const record = this.requireAttemptVerification(evidence.verification_id);
+    return this.recordVerificationEvent(
+      input,
+      updatedAttempt,
+      lease,
+      session,
+      record,
+      "attempt_verification_recorded"
+    );
+  }
+
+  private recordVerificationEvent(
+    input: SubmitAttemptVerificationInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord,
+    session: WorkerSessionRecord,
+    verification: AttemptVerificationRecord,
+    type: AttemptVerificationEventType
+  ): Extract<AttemptVerificationSubmissionResult, { recorded: true }> {
+    const sequence = (
+      this.db
+        .prepare(
+          `SELECT COALESCE(MAX(sequence), 0) + 1 AS value
+           FROM attempt_verification_events WHERE runId = ?`
+        )
+        .get(input.runId) as { value: number }
+    ).value;
+    this.db
+      .prepare(
+        `INSERT INTO attempt_verification_events (runId, attemptId, verificationId,
+         verificationHash, receiptId, receiptHash, mutationId, sequence, attemptRevision,
+         workspaceLeaseRevision, workerSessionRevision, controllerId, controllerLeaseId,
+         fencingToken, type, outcome, resultingAttemptStatus, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.runId,
+        attempt.attemptId,
+        verification.verificationId,
+        verification.verificationHash,
+        verification.receiptId,
+        verification.receiptHash,
+        input.mutationId,
+        sequence,
+        attempt.revision,
+        lease.revision,
+        session.revision,
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        type,
+        verification.outcome,
+        verification.resultingAttemptStatus,
+        instant(input.now)
+      );
+    const event = toAttemptVerificationEvent(
+      this.db
+        .prepare(`SELECT * FROM attempt_verification_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId) as AttemptVerificationEventRow
+    );
+    return {
+      recorded: true,
+      verification,
+      attempt,
+      event,
+      idempotentReplay: false,
+    };
+  }
+
+  private recordVerificationStartedEvent(
+    input: BeginAttemptVerificationInput,
+    attempt: AttemptRecord,
+    lease: WorkspaceLifecycleLeaseRecord,
+    session: WorkerSessionRecord,
+    authorization: AttemptVerificationAuthorizationRecord
+  ): Extract<AttemptVerificationBeginResult, { started: true }> {
+    const sequence = (
+      this.db
+        .prepare(
+          `SELECT COALESCE(MAX(sequence), 0) + 1 AS value
+           FROM attempt_verification_events WHERE runId = ?`
+        )
+        .get(input.runId) as { value: number }
+    ).value;
+    this.db
+      .prepare(
+        `INSERT INTO attempt_verification_events (runId, attemptId, verificationId,
+         verificationHash, receiptId, receiptHash, mutationId, sequence, attemptRevision,
+         workspaceLeaseRevision, workerSessionRevision, controllerId, controllerLeaseId,
+         fencingToken, type, outcome, resultingAttemptStatus, createdAt)
+         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'attempt_verification_started',
+         NULL, 'verifying', ?)`
+      )
+      .run(
+        input.runId,
+        attempt.attemptId,
+        authorization.verificationId,
+        authorization.receiptId,
+        authorization.receiptHash,
+        input.mutationId,
+        sequence,
+        attempt.revision,
+        lease.revision,
+        session.revision,
+        input.controller.controllerId,
+        input.controller.leaseId,
+        input.controller.fencingToken,
+        instant(input.now)
+      );
+    const event = toAttemptVerificationEvent(
+      this.db
+        .prepare(`SELECT * FROM attempt_verification_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId) as AttemptVerificationEventRow
+    );
+    return {
+      started: true,
+      authorization,
+      attempt,
+      event,
+      idempotentReplay: false,
+    };
+  }
+
+  private storeVerificationMutation(
+    input: SubmitAttemptVerificationInput,
+    fingerprint: string,
+    result: Extract<AttemptVerificationSubmissionResult, { recorded: true }>
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO attempt_verification_mutations (runId, mutationId, fingerprint, resultJson)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(
+        input.runId,
+        input.mutationId,
+        fingerprint,
+        canonicalJSONStringify(result as unknown as JsonValue)
+      );
+  }
+
+  private verificationFailure(
+    reason: AttemptVerificationFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): AttemptVerificationSubmissionResult {
+    return {
+      recorded: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
+  private verificationBeginFailure(
+    reason: AttemptVerificationFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): AttemptVerificationBeginResult {
+    return {
+      started: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
   }
 
   private submitNewReceipt(
@@ -1394,6 +2189,21 @@ export class SqliteWorkspaceLifecycleStore
     return row ? parseReceiptMutationSuccess(row.resultJson) : null;
   }
 
+  private committedVerificationResult(
+    verification: AttemptVerificationRecord
+  ): Extract<AttemptVerificationSubmissionResult, { recorded: true }> | null {
+    const row = this.db
+      .prepare(
+        `SELECT mutation.resultJson FROM attempt_verification_mutations AS mutation
+         JOIN attempt_verification_events AS event
+           ON event.runId = mutation.runId AND event.mutationId = mutation.mutationId
+         WHERE event.runId = ? AND event.verificationId = ?
+           AND event.type = 'attempt_verification_recorded' LIMIT 1`
+      )
+      .get(verification.runId, verification.verificationId) as { resultJson: string } | undefined;
+    return row ? parseVerificationMutationSuccess(row.resultJson) : null;
+  }
+
   private mutateWorker(
     input: AttachWorkerSessionInput | HeartbeatWorkerSessionInput | EndWorkerSessionInput,
     action: () => WorkerSessionMutationResult
@@ -1442,9 +2252,22 @@ export class SqliteWorkspaceLifecycleStore
       const workspaceClaim = this.db
         .prepare(
           `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
-           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?`
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_mutations
+           WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?`
         )
-        .get(input.runId, input.mutationId, input.runId, input.mutationId);
+        .get(
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId
+        );
       if (workspaceClaim) return this.workerFailure("mutation_conflict");
       const prior = this.db
         .prepare(
@@ -1647,9 +2470,22 @@ export class SqliteWorkspaceLifecycleStore
       const workerClaim = this.db
         .prepare(
           `SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
-           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?`
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_mutations
+           WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?`
         )
-        .get(input.runId, input.mutationId, input.runId, input.mutationId);
+        .get(
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId
+        );
       if (workerClaim) return this.failure("mutation_conflict");
       const prior = this.db
         .prepare(
@@ -1953,6 +2789,63 @@ export class SqliteWorkspaceLifecycleStore
     return row ? toAttemptReceipt(row) : null;
   }
 
+  private attemptVerification(verificationId: string): AttemptVerificationRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_verifications WHERE verificationId = ?`)
+      .get(verificationId) as AttemptVerificationRow | undefined;
+    return row ? toAttemptVerification(row) : null;
+  }
+
+  private verificationAuthorization(
+    verificationId: string
+  ): AttemptVerificationAuthorizationRecord | null {
+    return (
+      (this.db
+        .prepare(`SELECT * FROM attempt_verification_authorizations WHERE verificationId = ?`)
+        .get(verificationId) as AttemptVerificationAuthorizationRecord | undefined) ?? null
+    );
+  }
+
+  private requireVerificationAuthorization(
+    verificationId: string
+  ): AttemptVerificationAuthorizationRecord {
+    const authorization = this.verificationAuthorization(verificationId);
+    if (!authorization) {
+      throw new Error(`Attempt verification authorization '${verificationId}' disappeared`);
+    }
+    return authorization;
+  }
+
+  private verificationAuthorizationForAttempt(
+    attemptId: string
+  ): AttemptVerificationAuthorizationRecord | null {
+    return (
+      (this.db
+        .prepare(`SELECT * FROM attempt_verification_authorizations WHERE attemptId = ?`)
+        .get(attemptId) as AttemptVerificationAuthorizationRecord | undefined) ?? null
+    );
+  }
+
+  private requireAttemptVerification(verificationId: string): AttemptVerificationRecord {
+    const verification = this.attemptVerification(verificationId);
+    if (!verification) throw new Error(`Attempt verification '${verificationId}' disappeared`);
+    return verification;
+  }
+
+  private attemptVerificationByHash(verificationHash: string): AttemptVerificationRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_verifications WHERE verificationHash = ?`)
+      .get(verificationHash) as AttemptVerificationRow | undefined;
+    return row ? toAttemptVerification(row) : null;
+  }
+
+  private getVerificationForAttempt(attemptId: string): AttemptVerificationRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_verifications WHERE attemptId = ?`)
+      .get(attemptId) as AttemptVerificationRow | undefined;
+    return row ? toAttemptVerification(row) : null;
+  }
+
   private requireLaunchEnvelopeBinding(attemptId: string): LaunchEnvelopeBindingRecord {
     const binding = this.launchEnvelopeBinding(attemptId);
     if (!binding) throw new Error(`Launch envelope binding for Attempt '${attemptId}' disappeared`);
@@ -2020,7 +2913,10 @@ export class SqliteWorkspaceLifecycleStore
       const packetPath = fileURLToPath(
         new URL("./migrations/005-task-packet-snapshot-persistence.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}`;
+      const verificationPath = fileURLToPath(
+        new URL("./migrations/006-attempt-engine-verification-persistence.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -2166,6 +3062,122 @@ function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
   };
 }
 
+function parseStoredReceipt(record: AttemptReceiptRecord): AgentTaskReceipt_v2 | null {
+  try {
+    const value = JSON.parse(record.receiptJson) as unknown;
+    const parsed = AgentTaskReceipt_v2.safeParse(value);
+    return parsed.success &&
+      canonicalJSONStringify(parsed.data) === record.receiptJson &&
+      computeCanonicalHash(parsed.data) === record.receiptHash
+      ? parsed.data
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function validVerificationBinding(
+  verification: import("../../schemas/agent-work.js").AgentEngineVerification_v2,
+  input: SubmitAttemptVerificationInput,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord,
+  session: WorkerSessionRecord,
+  receipt: AttemptReceiptRecord
+): boolean {
+  return (
+    verification.run_id === input.runId &&
+    verification.attempt_id === input.attemptId &&
+    verification.work_item_id === attempt.workItemId &&
+    verification.work_item_revision === attempt.workItemRevision &&
+    verification.packet_id === attempt.packetId &&
+    verification.packet_hash === attempt.packetHash &&
+    verification.workspace_lease_id === input.workspaceLeaseId &&
+    verification.workspace_lease_revision === lease.revision &&
+    lease.attemptId === attempt.attemptId &&
+    verification.worker_session_id === input.workerSessionId &&
+    verification.worker_session_revision === session.revision &&
+    session.runId === input.runId &&
+    session.attemptId === input.attemptId &&
+    session.workspaceLeaseId === input.workspaceLeaseId &&
+    verification.receipt_id === input.receiptId &&
+    verification.receipt_hash === input.receiptHash &&
+    receipt.receiptId === input.receiptId &&
+    receipt.receiptHash === input.receiptHash &&
+    verification.observed_base_sha === attempt.baseSha.toLowerCase()
+  );
+}
+
+function validVerificationAuthorization(
+  authorization: AttemptVerificationAuthorizationRecord,
+  input: SubmitAttemptVerificationInput,
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord,
+  session: WorkerSessionRecord,
+  receipt: AttemptReceiptRecord
+): boolean {
+  return (
+    authorization.runId === input.runId &&
+    authorization.attemptId === input.attemptId &&
+    authorization.attemptRevision === attempt.revision &&
+    authorization.workspaceLeaseId === input.workspaceLeaseId &&
+    authorization.workspaceLeaseRevision === lease.revision &&
+    authorization.workerSessionId === input.workerSessionId &&
+    authorization.workerSessionRevision === session.revision &&
+    authorization.receiptId === input.receiptId &&
+    authorization.receiptHash === input.receiptHash &&
+    authorization.controllerId === input.controller.controllerId &&
+    authorization.controllerLeaseId === input.controller.leaseId &&
+    authorization.fencingToken === input.controller.fencingToken &&
+    receipt.receiptId === authorization.receiptId
+  );
+}
+
+function hasRequiredTrustGaps(
+  verification: import("../../schemas/agent-work.js").AgentEngineVerification_v2,
+  receipt: AgentTaskReceipt_v2
+): boolean {
+  const required = new Set<
+    import("../../schemas/agent-work.js").EngineVerificationTrustGapReason_v2
+  >();
+  if ((receipt.outcome === "completed") !== (verification.outcome === "pass")) {
+    required.add("worker_outcome_disagrees");
+  }
+  if (
+    receipt.final_head_sha !== undefined &&
+    receipt.final_head_sha !== verification.verified_head_sha
+  ) {
+    required.add("head_identity_disagrees");
+  }
+  if (receipt.patch_hash !== undefined && receipt.patch_hash !== verification.verified_patch_hash) {
+    required.add("patch_identity_disagrees");
+  }
+  const observedChecks = new Map(
+    verification.checks
+      .filter(({ source }) => source === "packet")
+      .map((check) => [check.id, check.outcome] as const)
+  );
+  const claimAgrees = receipt.claimed_checks.every((claim) => {
+    const observed = observedChecks.get(claim.id);
+    return (
+      observed === undefined ||
+      (claim.outcome === "pass" && observed === "pass") ||
+      (claim.outcome === "fail" && observed === "fail") ||
+      (claim.outcome === "not_run" && observed !== "pass" && observed !== "fail")
+    );
+  });
+  if (!claimAgrees) required.add("claimed_check_disagrees");
+  const declared = new Set(verification.trust_gap_reasons);
+  return [...required].every((reason) => declared.has(reason));
+}
+
+function verificationAttemptStatus(
+  outcome: import("../../schemas/agent-work.js").VerificationOutcome
+): AttemptRecord["status"] {
+  if (outcome === "pass") return "verified";
+  if (outcome === "fail") return "rejected";
+  return "inconclusive";
+}
+
 function toAttemptReceipt(row: AttemptReceiptRow): AttemptReceiptRecord | null {
   const outcome = AgentTaskReceiptOutcomeSchema.safeParse(row.outcome);
   const disposition = AttemptReceiptDispositionSchema.safeParse(row.disposition);
@@ -2237,6 +3249,90 @@ function toAttemptReceiptEvent(row: AttemptReceiptEventRow): AttemptReceiptEvent
   };
 }
 
+function toAttemptVerification(row: AttemptVerificationRow): AttemptVerificationRecord | null {
+  const outcome = VerificationOutcomeSchema.safeParse(row.outcome);
+  const resultingAttemptStatus = AttemptStatusSchema.safeParse(row.resultingAttemptStatus);
+  let trustGapReasons: unknown;
+  try {
+    trustGapReasons = JSON.parse(row.trustGapReasonsJson) as unknown;
+  } catch {
+    return null;
+  }
+  const parsedReasons = EngineVerificationTrustGapReasonV2Schema.array().safeParse(trustGapReasons);
+  if (!outcome.success || !resultingAttemptStatus.success || !parsedReasons.success) return null;
+  return {
+    verificationId: row.verificationId,
+    verificationHash: row.verificationHash,
+    verificationJson: row.verificationJson,
+    runId: row.runId,
+    workItemId: row.workItemId,
+    workItemRevision: row.workItemRevision,
+    attemptId: row.attemptId,
+    packetId: row.packetId,
+    packetHash: row.packetHash,
+    workspaceLeaseId: row.workspaceLeaseId,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    workerSessionId: row.workerSessionId,
+    workerSessionRevision: row.workerSessionRevision,
+    receiptId: row.receiptId,
+    receiptHash: row.receiptHash,
+    observedBaseSha: row.observedBaseSha,
+    ...(row.verifiedHeadSha ? { verifiedHeadSha: row.verifiedHeadSha } : {}),
+    ...(row.verifiedPatchHash ? { verifiedPatchHash: row.verifiedPatchHash } : {}),
+    workspaceObservationHash: row.workspaceObservationHash,
+    outcome: outcome.data,
+    trustGapReasons: parsedReasons.data,
+    verifierId: row.verifierId,
+    verifierVersion: row.verifierVersion,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    recordedAt: row.recordedAt,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    resultingAttemptRevision: row.resultingAttemptRevision,
+    resultingAttemptStatus: resultingAttemptStatus.data,
+  };
+}
+
+function toAttemptVerificationEvent(row: AttemptVerificationEventRow): AttemptVerificationEvent {
+  return {
+    runId: row.runId,
+    attemptId: row.attemptId,
+    verificationId: row.verificationId,
+    verificationHash: row.verificationHash,
+    receiptId: row.receiptId,
+    receiptHash: row.receiptHash,
+    mutationId: row.mutationId,
+    sequence: row.sequence,
+    attemptRevision: row.attemptRevision,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    workerSessionRevision: row.workerSessionRevision,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    type: requireDurableDomain(
+      AttemptVerificationEventTypeSchema,
+      row.type,
+      "attempt_verification_events.type"
+    ),
+    outcome:
+      row.outcome === null
+        ? null
+        : requireDurableDomain(
+            VerificationOutcomeSchema,
+            row.outcome,
+            "attempt_verification_events.outcome"
+          ),
+    resultingAttemptStatus: requireDurableDomain(
+      AttemptStatusSchema,
+      row.resultingAttemptStatus,
+      "attempt_verification_events.resultingAttemptStatus"
+    ),
+    createdAt: row.createdAt,
+  };
+}
+
 function requireDurableDomain<T>(schema: ZodType<T>, value: unknown, field: string): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new Error(`Invalid durable categorical value in ${field}`);
@@ -2292,6 +3388,40 @@ function parseReceiptMutationSuccess(
   return value as unknown as Extract<AttemptReceiptSubmissionResult, { submitted: true }>;
 }
 
+function parseVerificationMutationSuccess(
+  resultJson: string
+): Extract<AttemptVerificationSubmissionResult, { recorded: true }> | null {
+  const value = parseDurableJsonRecord(resultJson);
+  if (
+    !value ||
+    value.recorded !== true ||
+    typeof value.idempotentReplay !== "boolean" ||
+    !validAttemptCategories(value.attempt) ||
+    !validVerificationCategories(value.verification) ||
+    !validVerificationEventCategories(value.event)
+  ) {
+    return null;
+  }
+  return value as unknown as Extract<AttemptVerificationSubmissionResult, { recorded: true }>;
+}
+
+function parseVerificationBeginSuccess(
+  resultJson: string
+): Extract<AttemptVerificationBeginResult, { started: true }> | null {
+  const value = parseDurableJsonRecord(resultJson);
+  if (
+    !value ||
+    value.started !== true ||
+    typeof value.idempotentReplay !== "boolean" ||
+    !isJsonRecord(value.authorization) ||
+    !validAttemptCategories(value.attempt) ||
+    !validVerificationEventCategories(value.event)
+  ) {
+    return null;
+  }
+  return value as unknown as Extract<AttemptVerificationBeginResult, { started: true }>;
+}
+
 function parseDurableJsonRecord(value: string): JsonRecord | null {
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -2303,6 +3433,27 @@ function parseDurableJsonRecord(value: string): JsonRecord | null {
 
 function validAttemptCategories(value: unknown): boolean {
   return isJsonRecord(value) && AttemptStatusSchema.safeParse(value.status).success;
+}
+
+function validVerificationCategories(value: unknown): boolean {
+  return (
+    isJsonRecord(value) &&
+    VerificationOutcomeSchema.safeParse(value.outcome).success &&
+    AttemptStatusSchema.safeParse(value.resultingAttemptStatus).success &&
+    EngineVerificationTrustGapReasonV2Schema.array().safeParse(value.trustGapReasons).success
+  );
+}
+
+function validVerificationEventCategories(value: unknown): boolean {
+  if (!isJsonRecord(value)) return false;
+  const type = AttemptVerificationEventTypeSchema.safeParse(value.type);
+  if (!type.success || !AttemptStatusSchema.safeParse(value.resultingAttemptStatus).success) {
+    return false;
+  }
+  return type.data === "attempt_verification_started"
+    ? value.outcome === null && value.verificationHash === null
+    : VerificationOutcomeSchema.safeParse(value.outcome).success &&
+        typeof value.verificationHash === "string";
 }
 
 function validLeaseCategories(value: unknown): boolean {

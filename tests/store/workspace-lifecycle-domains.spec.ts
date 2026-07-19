@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   AgentTaskReceiptOutcome as ContractReceiptOutcome,
   AttemptStatus as ContractAttemptStatus,
+  VerificationOutcome as ContractVerificationOutcome,
   WorkerSessionBackend as ContractWorkerSessionBackend,
   WorkerSessionStatus as ContractWorkerSessionStatus,
   WorkspaceCleanupDisposition as ContractWorkspaceCleanupDisposition,
@@ -15,7 +16,10 @@ import {
   AttemptReceiptFailureReason,
   AttemptReceiptDisposition,
   AttemptReceiptEventType,
+  AttemptVerificationEventType,
+  AttemptVerificationFailureReason,
   AttemptStatus,
+  VerificationOutcome,
   EndWorkerSessionStatus,
   FinishedWorkspaceLeaseStatus,
   HeartbeatWorkerSessionStatus,
@@ -41,6 +45,7 @@ describe("workspace lifecycle categorical domains", () => {
     expect(WorkerSessionStatus).toBe(ContractWorkerSessionStatus);
     expect(WorkspaceCleanupDisposition).toBe(ContractWorkspaceCleanupDisposition);
     expect(AgentTaskReceiptOutcome).toBe(ContractReceiptOutcome);
+    expect(VerificationOutcome).toBe(ContractVerificationOutcome);
   });
 
   it("defines an exhaustive transition entry for every Attempt status", () => {
@@ -105,6 +110,10 @@ describe("workspace lifecycle categorical domains", () => {
       "src/store/sqlite/migrations/004-attempt-receipt-persistence.sql",
       "utf8"
     );
+    const verification = readFileSync(
+      "src/store/sqlite/migrations/006-attempt-engine-verification-persistence.sql",
+      "utf8"
+    );
 
     expectTableContains(workspace, "attempts", AttemptStatus.options);
     expectTableContains(workspace, "workspace_leases", WorkspaceLifecycleLeaseStatus.options);
@@ -123,6 +132,21 @@ describe("workspace lifecycle categorical domains", () => {
     expectTableContains(receipt, "attempt_receipt_events", AttemptReceiptEventType.options);
     expectTableContains(receipt, "attempt_receipt_events", AttemptReceiptDisposition.options);
     expectTableContains(receipt, "attempt_receipt_events", AgentTaskReceiptOutcome.options);
+    expectTableContains(verification, "attempt_verifications", VerificationOutcome.options);
+    expectTableContains(verification, "attempt_verifications", AttemptStatus.options);
+    expectTableContains(
+      verification,
+      "attempt_verification_events",
+      AttemptVerificationEventType.options
+    );
+    expectTableContains(verification, "attempt_verification_events", VerificationOutcome.options);
+    expectTableContains(verification, "attempt_verification_events", AttemptStatus.options);
+  });
+
+  it("keeps verification failure reasons within the workspace mutation namespace", () => {
+    expect(AttemptVerificationFailureReason.options).toEqual(
+      expect.arrayContaining(WorkspaceMutationFailureReason.options)
+    );
   });
 });
 
