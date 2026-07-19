@@ -4,6 +4,10 @@ This directory contains Architecture Decision Records for LexRunner. Each ADR do
 
 > **IP Boundary Note:** ADRs in this directory contain LexRunner-specific implementation details. Public, engine-agnostic decisions live in [Lex's ADR directory](https://github.com/smartergpt/lex/docs/adr/).
 
+Normative design review also follows [LexRunner Principles](../PRINCIPLES.md), including the
+durable-delta and retry-delta invariants. ADRs describe how a decision satisfies or deliberately
+defers those principles.
+
 ## Index
 
 | ID  | Title                                                                               | Status   | Date       |
