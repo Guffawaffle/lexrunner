@@ -30,6 +30,10 @@ lexrunner is built on four core principles:
 - Retries record a meaningful changed premise instead of blindly replaying work
 - See [LexRunner Principles](./PRINCIPLES.md) for the normative definitions and provenance
 
+The [orchestration primitives decision record](./architecture/orchestration-primitives.md) applies
+these principles to current Cursor, OpenClaw, Claude Code, Codex/Symphony, and GitHub Copilot
+patterns without importing their product assumptions wholesale.
+
 ## System Architecture
 
 ```
