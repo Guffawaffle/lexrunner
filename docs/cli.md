@@ -1273,7 +1273,7 @@ Options:
   --plan <file>                      Path to plan.json file (default: "plan.json")
   --dry-run                          Show what would be merged without executing (default: true)
   --execute                          Actually perform merge operations
-  --resume [runId]                   Resume execution from weave-lock.json (optional: specific run ID)
+  --resume [runId]                   Resume from the persisted operation checkpoint
   --cleanup                          Clean up integration branches after execution
   --force                            Force execution even if same lock hash exists
   --json                             Output JSON format
@@ -1346,11 +1346,13 @@ lex-pr merge --execute  # Will pause on conflicts for manual resolution
 
 #### State Management
 
-The merge command uses a lock file (`weave-lock.json`) for idempotency and resumability:
+The merge command uses two deliberately separate artifacts:
 
 - **Lock Hash**: Computed from `plan.json` + PR head commits
 - **Idempotency**: Duplicate runs with same lock hash are skipped (use `--force` to override)
-- **Resume**: Failed executions can be resumed with `--resume`
+- **Duplicate-run marker**: `weave-lock.json` records the frozen plan/head lock hash
+- **Resume journal**: `.lexrunner/checkpoints/<run-id>.json` records every operation boundary
+- **Resume**: `merge --resume` and `weave resume` invoke the same recovery service
 
 **Lock File Example:**
 

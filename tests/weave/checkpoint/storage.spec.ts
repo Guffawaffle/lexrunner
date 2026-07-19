@@ -16,6 +16,7 @@ import {
   ensureCheckpointDir,
   getCheckpointPath,
   CHECKPOINT_RETENTION_DAYS,
+  MAX_CHECKPOINT_BYTES,
 } from "../../../src/weave/checkpoint/storage.js";
 import type { WeaveCheckpoint } from "../../../src/weave/checkpoint/types.js";
 import { WeaveState } from "../../../src/weave/types.js";
@@ -70,6 +71,13 @@ describe("Checkpoint Storage", () => {
     });
   });
 
+  describe("getCheckpointPath", () => {
+    it("rejects path-like run identities", () => {
+      expect(() => getCheckpointPath("../outside", testDir)).toThrow("Invalid checkpoint run ID");
+      expect(() => getCheckpointPath("nested/run", testDir)).toThrow("Invalid checkpoint run ID");
+    });
+  });
+
   describe("saveCheckpoint", () => {
     it("should save checkpoint to disk", async () => {
       const checkpoint = createTestCheckpoint();
@@ -100,6 +108,15 @@ describe("Checkpoint Storage", () => {
 
       const loaded = await loadCheckpoint(checkpoint1.runId, { checkpointDir: testDir });
       expect(loaded.completedItems).toEqual(["item1", "item2"]);
+    });
+
+    it("rejects unbounded checkpoint payloads", async () => {
+      const checkpoint = createTestCheckpoint({
+        metadata: { warnings: ["x".repeat(MAX_CHECKPOINT_BYTES)] },
+      });
+      await expect(
+        saveCheckpoint(checkpoint, { checkpointDir: testDir, skipCleanup: true })
+      ).rejects.toThrow(`Checkpoint exceeds ${MAX_CHECKPOINT_BYTES} bytes`);
     });
   });
 

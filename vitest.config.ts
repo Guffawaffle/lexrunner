@@ -20,6 +20,7 @@ export default defineConfig({
       "**/tests/e2e-synthetic-6pr-weave.spec.ts",
       "**/tests/guardrails.spec.ts",
       "**/tests/promptsResolver.spec.ts",
+      "**/tests/e2e-merge-resume.spec.ts",
       // Exclude slow CLI tests (run via test:cli:slow with LEX_ENABLE_SLOW_CLI_TESTS=true)
       "**/tests/cli-progress.spec.ts",
     ],

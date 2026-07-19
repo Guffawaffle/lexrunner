@@ -23,6 +23,7 @@ export const DEFAULT_CHECKPOINT_DIR = ".lexrunner/checkpoints";
  * Checkpoint retention period in days
  */
 export const CHECKPOINT_RETENTION_DAYS = 7;
+export const MAX_CHECKPOINT_BYTES = 1024 * 1024;
 
 /**
  * Get the default checkpoint directory path
@@ -46,6 +47,9 @@ export function ensureCheckpointDir(checkpointDir?: string): string {
  * Get checkpoint file path for a run ID
  */
 export function getCheckpointPath(runId: string, checkpointDir?: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(runId)) {
+    throw new Error("Invalid checkpoint run ID");
+  }
   const dir = ensureCheckpointDir(checkpointDir);
   return path.join(dir, `${runId}.json`);
 }
@@ -59,12 +63,83 @@ export async function saveCheckpoint(
 ): Promise<void> {
   const checkpointPath = getCheckpointPath(checkpoint.runId, options.checkpointDir);
   const json = canonicalJSONStringify(checkpoint);
-
-  fs.writeFileSync(checkpointPath, json + "\n", "utf-8");
+  if (Buffer.byteLength(json, "utf-8") > MAX_CHECKPOINT_BYTES) {
+    throw new Error(`Checkpoint exceeds ${MAX_CHECKPOINT_BYTES} bytes`);
+  }
+  const temporaryPath = `${checkpointPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, json + "\n", { encoding: "utf-8", mode: 0o600 });
+  fs.renameSync(temporaryPath, checkpointPath);
 
   // Run cleanup unless explicitly skipped
   if (!options.skipCleanup) {
     await cleanupOldCheckpoints(options.checkpointDir);
+  }
+}
+
+export interface CheckpointExecutionLease {
+  release(): void;
+}
+
+/**
+ * Acquire a process-scoped execution lease for a checkpoint. The journal itself is still the
+ * durable truth; this lock only prevents two local resume processes from issuing the same next
+ * side effect concurrently.
+ */
+export function acquireCheckpointExecutionLease(
+  runId: string,
+  checkpointDir?: string
+): CheckpointExecutionLease | null {
+  const checkpointPath = getCheckpointPath(runId, checkpointDir);
+  const lockPath = `${checkpointPath}.resume.lock`;
+  let descriptor: number;
+  try {
+    descriptor = fs.openSync(lockPath, "wx", 0o600);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EEXIST" && removeStaleExecutionLease(lockPath)) {
+      try {
+        descriptor = fs.openSync(lockPath, "wx", 0o600);
+      } catch (retryError) {
+        if ((retryError as NodeJS.ErrnoException).code === "EEXIST") return null;
+        throw retryError;
+      }
+    } else if (code === "EEXIST") {
+      return null;
+    } else {
+      throw error;
+    }
+  }
+  fs.writeFileSync(descriptor, `${process.pid}\n`, "utf-8");
+  let released = false;
+  return {
+    release(): void {
+      if (released) return;
+      released = true;
+      fs.closeSync(descriptor);
+      try {
+        fs.unlinkSync(lockPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    },
+  };
+}
+
+function removeStaleExecutionLease(lockPath: string): boolean {
+  try {
+    const pid = Number.parseInt(fs.readFileSync(lockPath, "utf-8").trim(), 10);
+    if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ESRCH") return false;
+    }
+    fs.unlinkSync(lockPath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -79,6 +154,10 @@ export async function loadCheckpoint(
 
   if (!fs.existsSync(checkpointPath)) {
     throw new Error(`Checkpoint not found for run ID: ${runId}`);
+  }
+
+  if (fs.statSync(checkpointPath).size > MAX_CHECKPOINT_BYTES) {
+    throw new Error(`Checkpoint exceeds ${MAX_CHECKPOINT_BYTES} bytes`);
   }
 
   const json = fs.readFileSync(checkpointPath, "utf-8");
@@ -115,6 +194,7 @@ export async function listCheckpoints(
   for (const file of files) {
     try {
       const filePath = path.join(dir, file);
+      if (fs.statSync(filePath).size > MAX_CHECKPOINT_BYTES) continue;
       const json = fs.readFileSync(filePath, "utf-8");
       const checkpoint: WeaveCheckpoint = JSON.parse(json);
 

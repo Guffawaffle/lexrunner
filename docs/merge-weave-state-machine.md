@@ -276,10 +276,10 @@ lex-pr merge --plan plan.json --execute
 
 This will:
 
-1. Create `weave-lock.json` with execution state
-2. Execute merges batch by batch
-3. Update lock file after each batch
-4. Delete lock file on completion
+1. Create a duplicate-run marker and versioned operation checkpoint
+2. Execute gates, merges, and configured post-checks in dependency order
+3. Persist before and after every operation
+4. Retain the completed checkpoint as an inspectable execution receipt
 
 ### Resume
 
@@ -291,23 +291,24 @@ lex-pr merge --plan plan.json --resume <runId>
 
 The system will:
 
-1. Read `weave-lock.json`
-2. Validate the plan hash
-3. Resume from the last successful state
-4. Continue execution
+1. Load the run's `.lexrunner/checkpoints/<run-id>.json` operation journal
+2. Validate the canonical plan plus captured target and source heads
+3. Reconcile any `in_progress` operation against current Git state
+4. Continue from the next proven gate, merge, or post-check boundary
 
-**Note:** Resume requires the lock file's `planHash` to match the current plan + PR heads. If they've changed, you must start a fresh execution.
+**Note:** `weave-lock.json` remains a short-lived duplicate-run marker. It is not the resume truth.
+Legacy checkpoints without a versioned operation journal remain inspectable but fail closed on
+resume.
 
 ## Implementation Details
 
 ### State Persistence
 
-The lock file is updated after each state transition to ensure the execution can be resumed at any point. Critical updates occur:
+The checkpoint is atomically updated before and after every externally meaningful operation:
 
-- After computing merge order
-- After each batch merge
-- After each validation
-- When entering paused state
+- before a gate, merge, or post-check is issued (`in_progress`);
+- after its result or exact external completion is observed;
+- when execution pauses or completes.
 
 ### Error Handling
 
@@ -317,7 +318,9 @@ The lock file is updated after each state transition to ensure the execution can
 
 ### Idempotency
 
-Each state transition is idempotent. If a state update fails partway through, re-entering the same state should produce the same result.
+Completed operations are never issued again. An interrupted merge is marked complete only when its
+captured source commit is already an ancestor of the integration head. Ambiguous interrupted gates,
+post-checks, or Git state fail closed.
 
 ## Examples
 
