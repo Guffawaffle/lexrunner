@@ -878,6 +878,36 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
     });
 
+    it("atomically persists the negotiated adapter and compact enforcement identity", async () => {
+      await launchReadyAttempt();
+      const adapter = {
+        adapterId: "lexrunner.host-assisted",
+        adapterVersion: "1.0.0",
+        enforcementSummaryHash: `sha256:${"b".repeat(64)}`,
+        trustGapDimensions: ["filesystem_read", "filesystem_write"],
+      };
+      const attached = await store.attachWorkerSession(attachInput({ adapter }));
+
+      expect(attached).toMatchObject({
+        updated: true,
+        event: {
+          payload: {
+            adapter: {
+              id: adapter.adapterId,
+              version: adapter.adapterVersion,
+              enforcementSummaryHash: adapter.enforcementSummaryHash,
+              trustGapDimensions: adapter.trustGapDimensions,
+            },
+          },
+        },
+      });
+      await expect(store.getWorkerAdapterBinding("worker-session-1")).resolves.toEqual({
+        sessionId: "worker-session-1",
+        ...adapter,
+        createdAt: T3,
+      });
+    });
+
     it("persists redacted packet-bound worker authority decisions and deviations", async () => {
       await launchReadyAttempt();
       await store.attachWorkerSession(attachInput());

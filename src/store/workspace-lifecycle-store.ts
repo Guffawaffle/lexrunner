@@ -164,6 +164,16 @@ export interface WorkerSessionRecord {
   exitSummary?: string;
 }
 
+/** Immutable adapter/enforcement identity negotiated before a worker session is attached. */
+export interface WorkerAdapterBindingRecord {
+  sessionId: string;
+  adapterId: string;
+  adapterVersion: string;
+  enforcementSummaryHash: string;
+  trustGapDimensions: string[];
+  createdAt: string;
+}
+
 /** Immutable canonical envelope authorized for one launching Attempt. */
 export interface LaunchEnvelopeBindingRecord {
   runId: string;
@@ -304,6 +314,12 @@ export interface AttachWorkerSessionInput extends AuthenticatedWorkerMutationInp
   workerId: string;
   model?: string;
   startedAt: string;
+  adapter?: {
+    adapterId: string;
+    adapterVersion: string;
+    enforcementSummaryHash: string;
+    trustGapDimensions: string[];
+  };
 }
 
 export interface BindLaunchEnvelopeInput {
@@ -732,6 +748,7 @@ export interface WorkerSessionStore {
   endWorkerSession(input: EndWorkerSessionInput): Promise<WorkerSessionMutationResult>;
   getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null>;
   getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null>;
+  getWorkerAdapterBinding(sessionId: string): Promise<WorkerAdapterBindingRecord | null>;
   listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]>;
 }
 

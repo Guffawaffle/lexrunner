@@ -824,6 +824,17 @@ function attachRequest(prepared: Awaited<ReturnType<typeof prepare>>) {
         model: "gpt-5-codex",
         startedAt: "2026-07-12T12:00:08.000Z",
       },
+      adapter: {
+        schema_version: "1.0.0" as const,
+        adapter_id: "lexrunner.host-assisted",
+        adapter_version: "1.0.0",
+        mode: "assisted_attach" as const,
+        accepted_trust_gaps: [
+          "filesystem_read",
+          "filesystem_write",
+          ...(request.packet.authority.git_write ? (["git_write"] as const) : []),
+        ],
+      },
       mutation: { mutationId: "attach-receipt-worker", now: "2026-07-12T12:00:09.000Z" },
     },
   };

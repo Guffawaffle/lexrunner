@@ -73,6 +73,7 @@ import type {
   WorkerSessionMutationResult,
   WorkerSessionRecord,
   WorkerSessionStore,
+  WorkerAdapterBindingRecord,
   RecordWorkerAuthorityDecisionInput,
   WorkerAuthorityDecisionResult,
   WorkerAuthorityDecisionStore,
@@ -149,6 +150,7 @@ export class InMemoryWorkspaceLifecycleStore
   private readonly lifecycleEvents = new Map<string, WorkspaceLifecycleEvent[]>();
   private readonly mutations = new Map<string, StoredMutation>();
   private readonly workerSessions = new Map<string, WorkerSessionRecord>();
+  private readonly workerAdapterBindings = new Map<string, WorkerAdapterBindingRecord>();
   private readonly workerSessionByAttempt = new Map<string, string>();
   private readonly workerEvents = new Map<string, WorkerSessionEvent[]>();
   private readonly workerMutations = new Map<string, StoredWorkerMutation>();
@@ -732,6 +734,9 @@ export class InMemoryWorkspaceLifecycleStore
       if (!Number.isFinite(Date.parse(input.startedAt))) {
         return this.workerFailure("invalid_time", attempt, lease);
       }
+      if (input.adapter && !validWorkerAdapterBinding(input.adapter)) {
+        return this.workerFailure("evidence_mismatch", attempt, lease);
+      }
       const now = normalizeInstant(input.now);
       const startedAt = normalizeInstant(input.startedAt);
       if (
@@ -766,11 +771,31 @@ export class InMemoryWorkspaceLifecycleStore
       attempt.status = "running";
       attempt.updatedAt = now;
       this.workerSessions.set(session.sessionId, session);
+      if (input.adapter) {
+        this.workerAdapterBindings.set(session.sessionId, {
+          sessionId: session.sessionId,
+          adapterId: input.adapter.adapterId,
+          adapterVersion: input.adapter.adapterVersion,
+          enforcementSummaryHash: input.adapter.enforcementSummaryHash,
+          trustGapDimensions: [...input.adapter.trustGapDimensions],
+          createdAt: now,
+        });
+      }
       this.workerSessionByAttempt.set(session.attemptId, session.sessionId);
       return this.recordWorker(input, attempt, lease, session, "worker_session_attached", {
         backend: session.backend,
         workerId: session.workerId,
         executionEnvelopeId: session.executionEnvelopeId,
+        ...(input.adapter
+          ? {
+              adapter: {
+                id: input.adapter.adapterId,
+                version: input.adapter.adapterVersion,
+                enforcementSummaryHash: input.adapter.enforcementSummaryHash,
+                trustGapDimensions: input.adapter.trustGapDimensions,
+              },
+            }
+          : {}),
       });
     });
   }
@@ -843,6 +868,11 @@ export class InMemoryWorkspaceLifecycleStore
   async getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null> {
     const sessionId = this.workerSessionByAttempt.get(attemptId);
     return sessionId ? this.getWorkerSession(sessionId) : null;
+  }
+
+  async getWorkerAdapterBinding(sessionId: string): Promise<WorkerAdapterBindingRecord | null> {
+    const binding = this.workerAdapterBindings.get(sessionId);
+    return binding ? { ...binding, trustGapDimensions: [...binding.trustGapDimensions] } : null;
   }
 
   async listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]> {
@@ -2704,6 +2734,21 @@ function validAuthorityDecision(
 function authorityDecisionFingerprint(input: RecordWorkerAuthorityDecisionInput): string {
   const { now: _observedAt, ...semanticInput } = input;
   return canonicalJSONStringify(semanticInput as unknown as JsonRecord);
+}
+
+function validWorkerAdapterBinding(
+  input: NonNullable<AttachWorkerSessionInput["adapter"]>
+): boolean {
+  return (
+    input.adapterId.length > 0 &&
+    input.adapterId.length <= 128 &&
+    input.adapterVersion.length > 0 &&
+    input.adapterVersion.length <= 128 &&
+    /^sha256:[0-9a-f]{64}$/u.test(input.enforcementSummaryHash) &&
+    input.trustGapDimensions.length <= 16 &&
+    new Set(input.trustGapDimensions).size === input.trustGapDimensions.length &&
+    input.trustGapDimensions.every((value) => value.length > 0 && value.length <= 128)
+  );
 }
 
 function hasRequiredTrustGaps(
