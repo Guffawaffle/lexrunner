@@ -360,7 +360,7 @@ function submitRequest(
         commits: [],
         acceptance_criteria_addressed: ["ac-1"],
         claimed_checks: [
-          { id: "claimed-test", outcome: "pass" as const, output_snippet: "not independently run" },
+          { id: "test", outcome: "pass" as const, output_snippet: "not independently run" },
         ],
         assumptions: [],
         blockers: [],
