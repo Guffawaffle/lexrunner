@@ -238,7 +238,8 @@ disposition, owner, smallest proof, and implementation/licensing boundary.
    runtime evidence in the lease/envelope.
 6. **Owner:** LexRunner #794, #767, and #799.
 7. **Proof:** two attempts with colliding branch/file names cannot cross-observe or clean one
-   another; Windows/WSL identity mismatch fails closed.
+   another; Windows/WSL identity mismatch fails closed; an authorized launch with no durable
+   envelope fails closed without reconstructing the missing evidence.
 8. **Boundary:** conceptual behavior only. Do not copy product worktree managers; use LexRunner's
    broker and Git contracts.
 

@@ -166,6 +166,17 @@ bootstrap data.
 The envelope is not part of the packet hash. It is separately integrity-bound
 to the attempt and lease.
 
+Launch authorization and immutable envelope/packet binding are distinct
+durable boundaries. Status MUST distinguish an authorized `launching` Attempt
+with a complete binding from one stranded without it. A complete, current canonical
+binding that wins a concurrent recovery race is exact recoverable evidence. If
+the binding is absent, reconciliation MUST NOT reconstruct or infer it from
+the workspace, request, or authorization event. A fenced atomic reconciliation
+instead transitions the Attempt to `launch_failed`; its active workspace is
+left for explicit observe/release/preserve policy, and retry requires a new
+Attempt. Replaying that reconciliation is idempotent, and a later envelope
+cannot be attached to the failed Attempt.
+
 `projectRoot` identifies the logical project presented to workspace tooling.
 `executionRoot` identifies the process working directory from which commands
 run. They MAY differ and MUST both be explicit when they do.

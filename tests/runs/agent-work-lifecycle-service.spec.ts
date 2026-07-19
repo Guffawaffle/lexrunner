@@ -63,6 +63,76 @@ describe("AgentWorkLifecycleService", () => {
     expect(await store.listWorkspaceLifecycleEvents("run-1")).toEqual(before);
   });
 
+  it("detects and fails a stranded launch closed after controller restart", async () => {
+    const { store, service } = ports();
+    const input = startInput();
+    await expect(service.startAttempt(input)).resolves.toMatchObject({
+      ok: true,
+      attempt: { status: "launching", revision: 3 },
+    });
+    await expect(
+      service.getStatus({ runId: "run-1", attemptId: "attempt-1" })
+    ).resolves.toMatchObject({
+      launch: { state: "binding_missing", reconciliationRequired: true },
+    });
+
+    const takeover = await store.acquireControllerLease({
+      runId: "run-1",
+      controllerId: "controller-2",
+      leaseId: "controller-lease-2",
+      now: "2026-07-11T20:01:01.000Z",
+      ttlMs: 60_000,
+      initialState: {},
+    });
+    if (!takeover.acquired) throw new Error("expected controller takeover");
+    const nextController = credential(takeover.lease);
+    const resumed = await store.reconcileWorkspace({
+      runId: "run-1",
+      expectedRunRevision: 0,
+      controller: nextController,
+      mutationId: "resume-stranded-launch",
+      now: "2026-07-11T20:01:02.000Z",
+      attemptId: "attempt-1",
+      workspaceLeaseId: "workspace-1",
+      expectedAttemptRevision: 3,
+      expectedWorkspaceLeaseRevision: 1,
+      action: "resume",
+      ttlMs: 60_000,
+      observation: observation(),
+    });
+    expect(resumed).toMatchObject({
+      updated: true,
+      attempt: { revision: 4, status: "launching" },
+      workspaceLease: { revision: 2, controllerId: "controller-2" },
+    });
+    const reconciliation = {
+      runId: "run-1",
+      expectedRunRevision: 0,
+      controller: nextController,
+      mutationId: "fail-stranded-launch",
+      now: "2026-07-11T20:01:03.000Z",
+      attemptId: "attempt-1",
+      workspaceLeaseId: "workspace-1",
+      expectedAttemptRevision: 4,
+      expectedWorkspaceLeaseRevision: 2,
+    };
+
+    await expect(service.reconcileIncompleteLaunch(reconciliation)).resolves.toMatchObject({
+      ok: true,
+      outcome: "launch_failed",
+      idempotentReplay: false,
+      status: {
+        attempt: { status: "launch_failed", revision: 5 },
+        launch: { state: "failed_closed", reconciliationRequired: false },
+      },
+    });
+    await expect(service.reconcileIncompleteLaunch(reconciliation)).resolves.toMatchObject({
+      ok: true,
+      outcome: "launch_failed",
+      idempotentReplay: true,
+    });
+  });
+
   it("rejects a launch replay event that is not bound to the exact Attempt", async () => {
     const { store, service } = ports();
     const input = startInput();
@@ -324,7 +394,7 @@ describe("AgentWorkLifecycleService", () => {
       phase: "controller",
       reason: "reconciliation_required",
       reconciliationRequired: true,
-      status: { run: null, attempt: null, workspace: null },
+      status: { run: null, attempt: null, workspace: null, launch: null },
     });
     expect(() => JSON.stringify(result)).not.toThrow();
   });
@@ -352,7 +422,7 @@ describe("AgentWorkLifecycleService", () => {
 
     const status = await service.getStatus({ runId: "run-1", attemptId: "attempt-2" });
 
-    expect(status).toEqual({ run: null, attempt: null, workspace: null });
+    expect(status).toEqual({ run: null, attempt: null, workspace: null, launch: null });
   });
 });
 

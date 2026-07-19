@@ -34,7 +34,7 @@ describe("attempt commands", () => {
       start: vi.fn(async () => ({ ok: true, result: { outcome: "launch_authorized" } as never })),
       status: vi.fn(async () => ({
         ok: true,
-        result: { run: null, attempt: null, workspace: null },
+        result: { run: null, attempt: null, workspace: null, launch: null },
       })),
     };
     preparationHandler = {
@@ -452,7 +452,9 @@ describe("attempt commands", () => {
       runId: "run-1",
       attemptId: "attempt-1",
     });
-    expect(outputs).toEqual([{ ok: true, result: { run: null, attempt: null, workspace: null } }]);
+    expect(outputs).toEqual([
+      { ok: true, result: { run: null, attempt: null, workspace: null, launch: null } },
+    ]);
   });
 
   it("rejects malformed JSON without calling the handler", async () => {

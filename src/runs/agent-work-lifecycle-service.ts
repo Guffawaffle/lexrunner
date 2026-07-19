@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import { ExecutionEnvelope_v1 } from "../schemas/agent-work.js";
+import { computeCanonicalHash } from "../schemas/task-contract.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
@@ -8,12 +10,18 @@ import type {
 } from "../store/coordination-store.js";
 import type {
   AttemptRecord,
+  LaunchEnvelopeBindingRecord,
+  LaunchEnvelopeBindingStore,
+  ReconcileIncompleteLaunchInput,
+  TaskPacketBindingStore,
+  TaskPacketBindingRecord,
   WorkspaceLifecycleLeaseRecord,
   WorkspaceLifecycleStore,
   WorkspaceMutationFailureReason,
   WorkspaceMutationResult,
   WorkspaceObservation,
 } from "../store/workspace-lifecycle-store.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type {
   AllocateWorkspaceInput,
   WorkspaceMutationStep,
@@ -149,13 +157,42 @@ export interface AgentWorkStatus {
   run: BoundedRunStatus | null;
   attempt: BoundedAttemptStatus | null;
   workspace: BoundedWorkspaceStatus | null;
+  launch: BoundedLaunchStatus | null;
 }
+
+export interface BoundedLaunchStatus {
+  state:
+    | "not_authorized"
+    | "binding_missing"
+    | "binding_stale"
+    | "bound"
+    | "failed_closed"
+    | "inconsistent";
+  reconciliationRequired: boolean;
+}
+
+export type AgentWorkLaunchReconciliationResult =
+  | {
+      ok: true;
+      outcome: "binding_present" | "launch_failed";
+      status: AgentWorkStatus;
+      idempotentReplay: boolean;
+    }
+  | {
+      ok: false;
+      reason: "store_rejected";
+      reconciliationRequired: true;
+      status: AgentWorkStatus;
+      storeReason: WorkspaceMutationFailureReason;
+    };
 
 /** Shared, adapter-neutral Stage 2 application service. */
 export class AgentWorkLifecycleService {
   constructor(
     private readonly coordinationStore: CoordinationStore,
-    private readonly workspaceStore: WorkspaceLifecycleStore,
+    private readonly workspaceStore: WorkspaceLifecycleStore &
+      LaunchEnvelopeBindingStore &
+      TaskPacketBindingStore,
     private readonly workspaceCoordinator: WorkspaceCoordinator
   ) {}
 
@@ -369,8 +406,43 @@ export class AgentWorkLifecycleService {
     try {
       return await readAgentWorkStatus(this.coordinationStore, this.workspaceStore, input);
     } catch {
-      return { run: null, attempt: null, workspace: null };
+      return { run: null, attempt: null, workspace: null, launch: null };
     }
+  }
+
+  /**
+   * Resolve a stranded launch without inventing the missing envelope. A complete binding that won
+   * the race is recoverable; otherwise the store atomically terminates the Attempt as launch_failed.
+   */
+  async reconcileIncompleteLaunch(
+    input: ReconcileIncompleteLaunchInput
+  ): Promise<AgentWorkLaunchReconciliationResult> {
+    const result = await this.workspaceStore.reconcileIncompleteLaunch(input);
+    const status = await this.getStatus({ runId: input.runId, attemptId: input.attemptId });
+    if (result.updated) {
+      return {
+        ok: true,
+        outcome: "launch_failed",
+        status,
+        idempotentReplay: result.idempotentReplay,
+      };
+    }
+    if (
+      status.launch?.state === "bound" &&
+      status.run?.controller &&
+      status.workspace &&
+      Date.parse(status.run.controller.expiresAt) > Date.parse(input.now) &&
+      Date.parse(status.workspace.expiresAt) > Date.parse(input.now)
+    ) {
+      return { ok: true, outcome: "binding_present", status, idempotentReplay: false };
+    }
+    return {
+      ok: false,
+      reason: "store_rejected",
+      reconciliationRequired: true,
+      status,
+      storeReason: result.reason,
+    };
   }
 
   private async failure(
@@ -395,7 +467,7 @@ export class AgentWorkLifecycleService {
 /** Shared read-only projection for adapters that do not construct a Git coordinator. */
 export async function readAgentWorkStatus(
   coordinationStore: CoordinationStore,
-  workspaceStore: WorkspaceLifecycleStore,
+  workspaceStore: WorkspaceLifecycleStore & LaunchEnvelopeBindingStore & TaskPacketBindingStore,
   input: { runId: string; attemptId?: string }
 ): Promise<AgentWorkStatus> {
   const record = await coordinationStore.getRunCoordination(input.runId);
@@ -405,13 +477,93 @@ export async function readAgentWorkStatus(
     ? await workspaceStore.getWorkspaceLease(attempt.workspaceLeaseId)
     : null;
   const lease = attempt && candidateLease && bound(attempt, candidateLease) ? candidateLease : null;
+  const envelope = attempt
+    ? await workspaceStore.getLaunchEnvelopeBinding(attempt.attemptId)
+    : null;
+  const packet = attempt ? await workspaceStore.getTaskPacketBinding(attempt.attemptId) : null;
   return {
     run: record
       ? boundedRun(record.runId, record.revision, record.state, record.updatedAt, record.lease)
       : null,
     attempt: attempt ? boundedAttempt(attempt) : null,
     workspace: lease ? boundedWorkspace(lease) : null,
+    launch: attempt ? boundedLaunch(attempt, lease, record?.lease ?? null, envelope, packet) : null,
   };
+}
+
+function boundedLaunch(
+  attempt: AttemptRecord,
+  lease: WorkspaceLifecycleLeaseRecord | null,
+  controller: ControllerLease | null,
+  envelope: LaunchEnvelopeBindingRecord | null,
+  packet: TaskPacketBindingRecord | null
+): BoundedLaunchStatus {
+  if (envelope && packet && completeLaunchBinding(attempt, envelope, packet)) {
+    if (
+      attempt.status === "launching" &&
+      (!lease ||
+        !controller ||
+        envelope.attemptRevision !== attempt.revision ||
+        envelope.workspaceLeaseRevision !== lease.revision ||
+        envelope.controllerId !== controller.controllerId ||
+        envelope.controllerLeaseId !== controller.leaseId ||
+        envelope.fencingToken !== controller.fencingToken ||
+        lease.controllerId !== controller.controllerId ||
+        lease.controllerLeaseId !== controller.leaseId ||
+        lease.fencingToken !== controller.fencingToken)
+    ) {
+      return { state: "binding_stale", reconciliationRequired: true };
+    }
+    return { state: "bound", reconciliationRequired: false };
+  }
+  if (envelope || packet) return { state: "inconsistent", reconciliationRequired: true };
+  if (attempt.status === "launching") {
+    return { state: "binding_missing", reconciliationRequired: true };
+  }
+  if (attempt.status === "launch_failed") {
+    return { state: "failed_closed", reconciliationRequired: false };
+  }
+  if (
+    attempt.status === "prepared" ||
+    attempt.status === "leased" ||
+    attempt.status === "cancelled"
+  ) {
+    return { state: "not_authorized", reconciliationRequired: false };
+  }
+  return { state: "inconsistent", reconciliationRequired: true };
+}
+
+function completeLaunchBinding(
+  attempt: AttemptRecord,
+  binding: LaunchEnvelopeBindingRecord,
+  packet: TaskPacketBindingRecord
+): boolean {
+  try {
+    const value = JSON.parse(binding.envelopeJson) as unknown;
+    const envelope = ExecutionEnvelope_v1.safeParse(value);
+    return (
+      envelope.success &&
+      canonicalJSONStringify(value) === binding.envelopeJson &&
+      computeCanonicalHash(value) === binding.envelopeHash &&
+      binding.runId === attempt.runId &&
+      binding.attemptId === attempt.attemptId &&
+      binding.workspaceLeaseId === attempt.workspaceLeaseId &&
+      binding.attemptRevision <= attempt.revision &&
+      packet.runId === attempt.runId &&
+      packet.attemptId === attempt.attemptId &&
+      packet.packetId === attempt.packetId &&
+      packet.packetHash === attempt.packetHash &&
+      envelope.data.envelope_id === binding.envelopeId &&
+      envelope.data.run_id === attempt.runId &&
+      envelope.data.attempt_id === attempt.attemptId &&
+      envelope.data.packet_id === attempt.packetId &&
+      envelope.data.packet_hash === attempt.packetHash &&
+      envelope.data.workspace_lease_id === attempt.workspaceLeaseId &&
+      envelope.data.workspace_lease_revision === binding.workspaceLeaseRevision
+    );
+  } catch {
+    return false;
+  }
 }
 
 function canonicalRun(run: RunState): JsonValue {

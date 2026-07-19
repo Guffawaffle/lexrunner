@@ -328,6 +328,17 @@ export interface BindLaunchEnvelopeInput {
   createdAt: string;
 }
 
+/**
+ * Fenced fail-closed recovery for an Attempt stranded after launch authorization but before its
+ * immutable envelope and packet were durably bound. No envelope evidence is accepted here.
+ */
+export interface ReconcileIncompleteLaunchInput extends AuthenticatedMutationInput {
+  attemptId: string;
+  workspaceLeaseId: string;
+  expectedAttemptRevision: number;
+  expectedWorkspaceLeaseRevision: number;
+}
+
 export type LaunchEnvelopeBindingResult =
   | { bound: true; binding: LaunchEnvelopeBindingRecord; idempotentReplay: boolean }
   | {
@@ -703,6 +714,9 @@ export interface WorkspaceLifecycleStore {
 /** Additive binding port for Stage 3 launch envelopes. */
 export interface LaunchEnvelopeBindingStore {
   bindLaunchEnvelope(input: BindLaunchEnvelopeInput): Promise<LaunchEnvelopeBindingResult>;
+  reconcileIncompleteLaunch(
+    input: ReconcileIncompleteLaunchInput
+  ): Promise<WorkspaceMutationResult>;
   getLaunchEnvelopeBinding(attemptId: string): Promise<LaunchEnvelopeBindingRecord | null>;
 }
 
