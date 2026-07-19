@@ -99,15 +99,16 @@ they are not separate ecosystem products.
 
 ## Executable obligations
 
-This document defines design invariants. It does not silently change persisted schemas or claim
-unimplemented behavior. The corresponding executable work is tracked explicitly:
+This document defines design invariants. It does not silently change persisted schemas. The
+corresponding executable work and proof surfaces are tracked explicitly:
 
 - [#766](https://github.com/Guffawaffle/lexrunner/issues/766): canonical receipt sets and durable packet references;
 - [#762](https://github.com/Guffawaffle/lexrunner/issues/762): immutable engine verification persistence;
 - [#767](https://github.com/Guffawaffle/lexrunner/issues/767): incomplete launch-envelope reconciliation;
 - [#699](https://github.com/Guffawaffle/lexrunner/issues/699): merge-weave resume from persisted state;
 - [#794](https://github.com/Guffawaffle/lexrunner/issues/794): runtime-enforced authority ceilings;
-- [#801](https://github.com/Guffawaffle/lexrunner/issues/801): fail-forward supervision and retry-delta enforcement;
+- [#801](https://github.com/Guffawaffle/lexrunner/issues/801): implemented headless reconciliation,
+  fail-forward supervision, and memory/SQLite retry-delta enforcement;
 - [#802](https://github.com/Guffawaffle/lexrunner/issues/802): evidence-preserving fan-out/fan-in; and
 - [#799](https://github.com/Guffawaffle/lexrunner/issues/799): fault-injected ecosystem dogfood and durable-delta acceptance.
 

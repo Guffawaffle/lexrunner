@@ -96,6 +96,7 @@ export {
 } from "./workspace-lifecycle-domains.js";
 export type {
   AttemptRecord,
+  AttemptRetryDeltaRecord,
   WorkspaceIdentity,
   WorkspaceLifecycleLeaseRecord,
   WorkspaceLifecycleEvent,

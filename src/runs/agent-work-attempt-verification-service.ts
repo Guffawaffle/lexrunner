@@ -488,7 +488,11 @@ export class AgentWorkAttemptVerificationService {
       receipt.run_id !== input.runId ||
       receipt.attempt_id !== input.attemptId ||
       receipt.workspace_lease_id !== input.workspaceLeaseId ||
-      receipt.workspace_lease_revision !== input.expectedWorkspaceLeaseRevision ||
+      // A receipt binds the workspace revision at worker attachment. The active
+      // lease may advance through ordinary supervisor heartbeats before
+      // verification begins, so comparing it with the current fencing revision
+      // would reject valid long-running sessions.
+      receipt.workspace_lease_revision !== session.workspaceLeaseRevision ||
       receipt.worker_session_id !== input.workerSessionId ||
       receipt.packet_hash !== packet.packet_hash ||
       envelope.packet_hash !== packet.packet_hash ||

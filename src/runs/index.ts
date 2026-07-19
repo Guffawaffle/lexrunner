@@ -136,6 +136,25 @@ export {
   WorkerRuntimeSignalSchema,
   WORKER_ADAPTER_CONTRACT_VERSION,
 } from "./agent-work-worker-runtime.js";
+export {
+  AgentWorkHeadlessSupervisor,
+  DEFAULT_HEADLESS_SUPERVISOR_CONFIG,
+  HeadlessSupervisorConfig,
+  planSupervisorAttempt,
+} from "./agent-work-supervisor.js";
+export type {
+  HeadlessSupervisorConfig as HeadlessSupervisorConfiguration,
+  HeadlessSupervisorWorkerControl,
+  HeadlessSupervisorWorkspaceObserver,
+  ReconcileHeadlessRunInput,
+  ReconcileHeadlessRunResult,
+  SupervisorAttemptAction,
+  SupervisorAttemptPlan,
+  SupervisorAttemptResult,
+  SupervisorAttemptSnapshot,
+  SupervisorWorkerLaunchResult,
+  SupervisorWorkerObservation,
+} from "./agent-work-supervisor.js";
 export type {
   WorkerAdapterManifest_v1 as WorkerAdapterManifest,
   WorkerAdapterNegotiationDimension,

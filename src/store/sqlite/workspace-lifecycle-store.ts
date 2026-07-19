@@ -7,6 +7,7 @@ import {
   AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v2,
+  AttemptRetryDelta_v1,
   EngineVerificationTrustGapReason_v2 as EngineVerificationTrustGapReasonV2Schema,
   validateAgentEngineVerificationV2PacketReferences,
   validateAgentTaskReceiptV2PacketReferences,
@@ -53,6 +54,7 @@ import type {
   ApplyAttemptAcceptanceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
+  AttemptRetryDeltaRecord,
   AttemptReceiptEvent,
   AttemptReceiptEventType,
   AttemptReceiptFailureReason,
@@ -390,6 +392,20 @@ INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
 VALUES(8,'worker-adapter-bindings',datetime('now'));
 `;
 
+const INLINE_ATTEMPT_RETRY_DELTA_MIGRATION = `
+CREATE TABLE IF NOT EXISTS attempt_retry_deltas (
+ attemptId TEXT PRIMARY KEY, previousAttemptId TEXT NOT NULL,
+ deltaHash TEXT NOT NULL, deltaJson TEXT NOT NULL CHECK(length(deltaJson) <= 262144),
+ createdAt TEXT NOT NULL,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(previousAttemptId) REFERENCES attempts(attemptId) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attempt_retry_deltas_previous
+ON attempt_retry_deltas(previousAttemptId,attemptId);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+VALUES(9,'attempt-retry-deltas',datetime('now'));
+`;
+
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
   workspaceLeaseId: string | null;
   status: string;
@@ -546,6 +562,8 @@ export class SqliteWorkspaceLifecycleStore
         )
         .get(input.runId, input.workItemId);
       if (conflict) return this.failure("live_attempt_conflict");
+      const retry = this.validateRetryDelta(input);
+      if (!retry.valid) return this.failure(retry.reason);
       const now = instant(input.now);
       this.db
         .prepare(
@@ -565,8 +583,24 @@ export class SqliteWorkspaceLifecycleStore
           now,
           now
         );
+      if (retry.record) {
+        this.db
+          .prepare(
+            `INSERT INTO attempt_retry_deltas
+             (attemptId, previousAttemptId, deltaHash, deltaJson, createdAt)
+             VALUES (?, ?, ?, ?, ?)`
+          )
+          .run(
+            retry.record.attemptId,
+            retry.record.previousAttemptId,
+            retry.record.deltaHash,
+            retry.record.deltaJson,
+            retry.record.createdAt
+          );
+      }
       return this.record(input, this.requireAttempt(input.attemptId), null, "attempt_created", {
         workItemId: input.workItemId,
+        retryDeltaHash: retry.record?.deltaHash ?? null,
       });
     });
   }
@@ -862,8 +896,49 @@ export class SqliteWorkspaceLifecycleStore
     return this.attempt(attemptId);
   }
 
+  async listAttempts(runId: string): Promise<AttemptRecord[]> {
+    const rows = this.db
+      .prepare(`SELECT * FROM attempts WHERE runId = ? ORDER BY rowid`)
+      .all(runId) as AttemptRow[];
+    return rows.flatMap((row) => {
+      const status = AttemptStatusSchema.safeParse(row.status);
+      return status.success ? [{ ...row, status: status.data }] : [];
+    });
+  }
+
+  async getAttemptRetryDelta(attemptId: string): Promise<AttemptRetryDeltaRecord | null> {
+    if (!this.hasTable("attempt_retry_deltas")) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM attempt_retry_deltas WHERE attemptId = ?`)
+      .get(attemptId) as AttemptRetryDeltaRecord | undefined;
+    if (!row) return null;
+    try {
+      const parsed = AttemptRetryDelta_v1.safeParse(JSON.parse(row.deltaJson));
+      return parsed.success &&
+        canonicalJSONStringify(parsed.data) === row.deltaJson &&
+        computeCanonicalHash(parsed.data) === row.deltaHash &&
+        parsed.data.next_attempt_id === row.attemptId &&
+        parsed.data.previous_attempt_id === row.previousAttemptId &&
+        parsed.data.created_at === row.createdAt
+        ? { ...row }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getWorkspaceLease(leaseId: string): Promise<WorkspaceLifecycleLeaseRecord | null> {
     return this.lease(leaseId);
+  }
+
+  async listWorkspaceLeases(runId: string): Promise<WorkspaceLifecycleLeaseRecord[]> {
+    const rows = this.db
+      .prepare(`SELECT leaseId FROM workspace_leases WHERE runId = ? ORDER BY rowid`)
+      .all(runId) as Array<{ leaseId: string }>;
+    return rows.flatMap(({ leaseId }) => {
+      const lease = this.lease(leaseId);
+      return lease ? [lease] : [];
+    });
   }
 
   async listWorkspaceLifecycleEvents(runId: string): Promise<WorkspaceLifecycleEvent[]> {
@@ -3462,8 +3537,75 @@ export class SqliteWorkspaceLifecycleStore
       .run(now, id);
   }
 
+  private validateRetryDelta(
+    input: CreateAttemptInput
+  ):
+    | { valid: true; record?: AttemptRetryDeltaRecord }
+    | { valid: false; reason: "retry_delta_required" | "retry_delta_invalid" } {
+    const row = this.db
+      .prepare(
+        `SELECT attemptId FROM attempts
+         WHERE runId = ? AND workItemId = ? AND workItemRevision = ?
+         ORDER BY rowid DESC LIMIT 1`
+      )
+      .get(input.runId, input.workItemId, input.workItemRevision) as
+      { attemptId: string } | undefined;
+    if (!row) {
+      return input.retry ? { valid: false, reason: "retry_delta_invalid" } : { valid: true };
+    }
+    if (!input.retry) return { valid: false, reason: "retry_delta_required" };
+    const prior = this.attempt(row.attemptId);
+    const parsed = AttemptRetryDelta_v1.safeParse(input.retry);
+    if (
+      !prior ||
+      !parsed.success ||
+      !isTerminalAttemptStatus(prior.status) ||
+      parsed.data.previous_attempt_id !== prior.attemptId ||
+      parsed.data.next_attempt_id !== input.attemptId ||
+      parsed.data.work_item_id !== input.workItemId ||
+      parsed.data.work_item_revision !== input.workItemRevision ||
+      instant(parsed.data.created_at) !== instant(input.now) ||
+      !this.validInheritedRetryEvidence(prior, parsed.data.inherited_evidence)
+    ) {
+      return { valid: false, reason: "retry_delta_invalid" };
+    }
+    const deltaJson = canonicalJSONStringify(parsed.data);
+    return {
+      valid: true,
+      record: {
+        attemptId: input.attemptId,
+        previousAttemptId: prior.attemptId,
+        deltaHash: computeCanonicalHash(parsed.data),
+        deltaJson,
+        createdAt: instant(input.now),
+      },
+    };
+  }
+
+  private validInheritedRetryEvidence(
+    prior: AttemptRecord,
+    references: import("../../schemas/agent-work.js").AttemptRetryDelta_v1["inherited_evidence"]
+  ): boolean {
+    return references.every((reference) => {
+      if (reference.kind === "receipt") {
+        const receipt = this.attemptReceipt(reference.id);
+        return receipt?.attemptId === prior.attemptId && receipt.receiptHash === reference.hash;
+      }
+      if (reference.kind === "verification") {
+        const verification = this.attemptVerification(reference.id);
+        return (
+          verification?.attemptId === prior.attemptId &&
+          verification.verificationHash === reference.hash
+        );
+      }
+      // Reserved evidence kinds fail closed until backed by a canonical store
+      // whose identity and content hash can be verified here.
+      return false;
+    });
+  }
+
   private applyWorkspaceMigration(): void {
-    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}\n${INLINE_WORKER_ADAPTER_MIGRATION}`;
+    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}\n${INLINE_WORKER_ADAPTER_MIGRATION}\n${INLINE_ATTEMPT_RETRY_DELTA_MIGRATION}`;
     try {
       const workspacePath = fileURLToPath(
         new URL("./migrations/002-attempt-workspace-lifecycle.sql", import.meta.url)
@@ -3486,7 +3628,10 @@ export class SqliteWorkspaceLifecycleStore
       const adapterPath = fileURLToPath(
         new URL("./migrations/008-worker-adapter-bindings.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}\n${readFileSync(adapterPath, "utf8")}`;
+      const retryDeltaPath = fileURLToPath(
+        new URL("./migrations/009-attempt-retry-deltas.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}\n${readFileSync(adapterPath, "utf8")}\n${readFileSync(retryDeltaPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }

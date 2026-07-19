@@ -288,8 +288,10 @@ disposition, owner, smallest proof, and implementation/licensing boundary.
 5. **Decision:** **Adapt** the recurring reconciliation pattern, but compare persisted Run/Attempt/
    lease/session state with process, worktree, tracker, and delivery observations before mutation.
 6. **Owner:** LexRunner #801, #767, and #699.
-7. **Proof:** fault injection at every lifecycle boundary yields resume, quarantine, escalation, or a
-   new Attempt without repeating a completed side effect.
+7. **Proof:** the deterministic planner covers every lifecycle boundary and the restart integration
+   injects controller termination after provider launch but before attachment. Stable operation
+   redelivery creates one external launch, then resumes heartbeat, receipt, verification, and
+   acceptance. Store suites retain stale-lease and workspace-quarantine fault coverage.
 8. **Boundary:** do not copy automatic redispatch or path-based cleanup assumptions.
 
 ### D5. Retry/backoff requires a retry delta — Adapt and Reject blind replay
@@ -304,8 +306,9 @@ disposition, owner, smallest proof, and implementation/licensing boundary.
 5. **Decision:** **Adapt** capped backoff for transport/infrastructure delivery. **Reject** new work
    Attempts that cannot name a retry delta or explicit policy exception.
 6. **Owner:** LexRunner #801; evidence foundations #766 and #762.
-7. **Proof:** transport redelivery is idempotent; work retry with changed environment succeeds and
-   records the delta; unchanged replay is refused and escalated.
+7. **Proof:** transport redelivery is idempotent; memory and SQLite atomically bind a validated
+   changed-premise delta to the later Attempt; unchanged replay and unresolvable inherited evidence
+   are refused; capped backoff and exhaustion are deterministic.
 8. **Boundary:** formulas are conventional concepts, not imported code. Policy selects timing.
 
 ### D6. Evidence-preserving best-of-N and competing hypotheses — Adapt

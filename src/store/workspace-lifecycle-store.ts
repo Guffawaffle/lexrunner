@@ -1,6 +1,9 @@
 import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.js";
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
-import type { Attempt_v1 as AttemptContract_v1 } from "../schemas/agent-work.js";
+import type {
+  AttemptRetryDelta_v1,
+  Attempt_v1 as AttemptContract_v1,
+} from "../schemas/agent-work.js";
 import type {
   AgentEngineVerification_v2,
   AgentTaskReceipt_v2,
@@ -82,6 +85,15 @@ export interface AttemptRecord {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+}
+
+/** Canonical immutable retry delta persisted atomically with its new Attempt. */
+export interface AttemptRetryDeltaRecord {
+  attemptId: string;
+  previousAttemptId: string;
+  deltaHash: string;
+  deltaJson: string;
+  createdAt: string;
 }
 
 export interface WorkspaceIdentity {
@@ -641,6 +653,7 @@ export interface CreateAttemptInput extends AuthenticatedMutationInput {
   packetId: string;
   packetHash: string;
   baseSha: string;
+  retry?: AttemptRetryDelta_v1;
 }
 
 export interface AcquireWorkspaceInput extends AuthenticatedMutationInput, WorkspaceIdentity {
@@ -723,7 +736,10 @@ export interface WorkspaceLifecycleStore {
   reconcileWorkspace(input: ReconcileWorkspaceInput): Promise<WorkspaceMutationResult>;
   quarantineWorkspace(input: QuarantineWorkspaceInput): Promise<WorkspaceMutationResult>;
   getAttempt(attemptId: string): Promise<AttemptRecord | null>;
+  listAttempts(runId: string): Promise<AttemptRecord[]>;
+  getAttemptRetryDelta(attemptId: string): Promise<AttemptRetryDeltaRecord | null>;
   getWorkspaceLease(leaseId: string): Promise<WorkspaceLifecycleLeaseRecord | null>;
+  listWorkspaceLeases(runId: string): Promise<WorkspaceLifecycleLeaseRecord[]>;
   listWorkspaceLifecycleEvents(runId: string): Promise<WorkspaceLifecycleEvent[]>;
 }
 
