@@ -351,6 +351,22 @@ MUST recompute it immediately before each side effect and MUST persist the
 inputs and decision. Workspace leases distinguish at least edit, Git, GitHub,
 external-runtime, secret, signing, and release permissions.
 
+Authority support is a runtime property, not a declaration inferred from a
+worker's command prose. An `enforced` dimension has a containment mechanism
+that prevents the action outside the controller boundary. A `brokered`
+dimension proves that a specific direct operation was denied or allowed before
+execution, but does not claim process isolation. An `unenforced` dimension is
+an explicit capability absence and MUST fail adapter negotiation when the task
+requires it. In particular, argv classification and shell-free spawning are
+useful broker controls, not a sandbox for an otherwise unrestricted worker.
+
+Authority audit events contain the dimension, decision, enforcement level,
+bounded action class, and a non-secret action hash. They MUST NOT persist raw
+argv, environment values, credential-bearing output, or command prose. A
+detected post-execution action outside the packet ceiling is a durable
+deviation and MUST surface as an engine-verification trust gap even when all
+declared checks pass.
+
 ### Concurrency and Revisioning
 
 LexRunner adopts **one logical writer per run, enforced by a renewable

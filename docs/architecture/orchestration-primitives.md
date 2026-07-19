@@ -252,7 +252,8 @@ disposition, owner, smallest proof, and implementation/licensing boundary.
 3. **Assumptions:** each source controls both configuration and runtime or targets one provider.
 4. **Fit:** ADR-010 requires replaceable workers and effective-authority intersection.
 5. **Decision:** **Adapt** into an explicit adapter descriptor and attempt-time negotiation. Unknown
-   or unenforceable dimensions reject attachment.
+   or unenforceable dimensions reject attachment. LexRunner's packet-bound argv broker records
+   direct-operation decisions, but `brokered` is not synonymous with sandboxed or `enforced`.
 6. **Owner:** LexRunner #804 on top of #794.
 7. **Proof:** one capable fake adapter attaches; adapters missing cancellation, identity, or an
    authority control fail before worker launch.

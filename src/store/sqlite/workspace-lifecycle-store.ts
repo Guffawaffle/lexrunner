@@ -21,6 +21,10 @@ import {
   AttemptStatus as AttemptStatusSchema,
   VerificationOutcome as VerificationOutcomeSchema,
   WorkerSessionBackend as WorkerSessionBackendSchema,
+  WorkerAuthorityDecision as WorkerAuthorityDecisionSchema,
+  WorkerAuthorityDimension as WorkerAuthorityDimensionSchema,
+  WorkerAuthorityEnforcement as WorkerAuthorityEnforcementSchema,
+  WorkerAuthorityReason as WorkerAuthorityReasonSchema,
   WorkerSessionEventType as WorkerSessionEventTypeSchema,
   WorkerSessionStatus as WorkerSessionStatusSchema,
   WorkspaceCleanupDisposition as WorkspaceCleanupDispositionSchema,
@@ -94,6 +98,10 @@ import type {
   WorkerSessionMutationResult,
   WorkerSessionRecord,
   WorkerSessionStore,
+  RecordWorkerAuthorityDecisionInput,
+  WorkerAuthorityDecisionResult,
+  WorkerAuthorityDecisionStore,
+  WorkerAuthorityEventRecord,
 } from "../workspace-lifecycle-store.js";
 import {
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
@@ -331,6 +339,40 @@ INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
  VALUES(6,'attempt-engine-verification-persistence',datetime('now'));
 `;
 
+const INLINE_WORKER_AUTHORITY_MIGRATION = `
+CREATE TABLE IF NOT EXISTS worker_authority_events (
+ runId TEXT NOT NULL, attemptId TEXT NOT NULL, workerSessionId TEXT NOT NULL,
+ mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL,
+ sequence INTEGER NOT NULL CHECK(sequence > 0),
+ attemptRevision INTEGER NOT NULL CHECK(attemptRevision >= 0),
+ workspaceLeaseId TEXT NOT NULL,
+ workspaceLeaseRevision INTEGER NOT NULL CHECK(workspaceLeaseRevision >= 0),
+ workerSessionRevision INTEGER NOT NULL CHECK(workerSessionRevision >= 0),
+ packetId TEXT NOT NULL, packetHash TEXT NOT NULL,
+ dimension TEXT NOT NULL CHECK(dimension IN
+  ('edit','git_write','github_write','external_runtime','secrets','signing','release')),
+ decision TEXT NOT NULL CHECK(decision IN ('allowed','denied','deviation')),
+ enforcement TEXT NOT NULL CHECK(enforcement IN ('enforced','brokered','unenforced')),
+ actionClass TEXT NOT NULL CHECK(length(actionClass) BETWEEN 1 AND 128),
+ actionHash TEXT NOT NULL,
+ backendId TEXT NOT NULL CHECK(length(backendId) BETWEEN 1 AND 128),
+ backendVersion TEXT NOT NULL CHECK(length(backendVersion) BETWEEN 1 AND 128),
+ reason TEXT NOT NULL CHECK(reason IN
+  ('packet_granted','packet_denied','backend_unenforceable','observed_after_execution')),
+ controllerId TEXT NOT NULL, controllerLeaseId TEXT NOT NULL,
+ fencingToken INTEGER NOT NULL CHECK(fencingToken > 0), createdAt TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId), UNIQUE(runId,sequence),
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE,
+ FOREIGN KEY(workspaceLeaseId) REFERENCES workspace_leases(leaseId) ON DELETE RESTRICT,
+ FOREIGN KEY(workerSessionId) REFERENCES worker_sessions(sessionId) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_worker_authority_events_attempt
+ON worker_authority_events(runId,attemptId,sequence);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+VALUES(7,'worker-authority-events',datetime('now'));
+`;
+
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
   workspaceLeaseId: string | null;
   status: string;
@@ -398,6 +440,17 @@ interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload" | "type"> {
   payloadJson: string;
 }
 
+interface WorkerAuthorityEventRow extends Omit<
+  WorkerAuthorityEventRecord,
+  "dimension" | "decision" | "enforcement" | "reason"
+> {
+  dimension: string;
+  decision: string;
+  enforcement: string;
+  reason: string;
+  fingerprint: string;
+}
+
 interface AttemptReceiptRow extends Omit<
   AttemptReceiptRecord,
   "outcome" | "disposition" | "resultingAttemptStatus" | "finalHeadSha" | "patchHash"
@@ -446,6 +499,7 @@ export class SqliteWorkspaceLifecycleStore
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
     WorkerSessionStore,
+    WorkerAuthorityDecisionStore,
     AttemptVerificationStore,
     AttemptAcceptanceStore
 {
@@ -1136,6 +1190,198 @@ export class SqliteWorkspaceLifecycleStore
     return rows.map(toWorkerEvent);
   }
 
+  async recordWorkerAuthorityDecision(
+    input: RecordWorkerAuthorityDecisionInput
+  ): Promise<WorkerAuthorityDecisionResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return this.authorityFailure("invalid_time");
+    if (input.controller.runId !== input.runId) return this.authorityFailure("lease_mismatch");
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision, controllerId, leaseId, fencingToken, expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return this.authorityFailure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken) {
+        return this.authorityFailure("stale_fence");
+      }
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return this.authorityFailure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return this.authorityFailure(
+          "stale_run_revision",
+          undefined,
+          undefined,
+          undefined,
+          coordination.revision
+        );
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.authorityFailure("lease_expired");
+      }
+      const fingerprint = authorityDecisionFingerprint(input);
+      const namespaceClaim = this.db
+        .prepare(
+          `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?`
+        )
+        .get(
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId,
+          input.runId,
+          input.mutationId
+        );
+      if (namespaceClaim) return this.authorityFailure("mutation_conflict");
+      const prior = this.db
+        .prepare(`SELECT * FROM worker_authority_events WHERE runId = ? AND mutationId = ?`)
+        .get(input.runId, input.mutationId) as WorkerAuthorityEventRow | undefined;
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) return this.authorityFailure("mutation_conflict");
+        const event = toWorkerAuthorityEvent(prior);
+        return event
+          ? { recorded: true, event, idempotentReplay: true }
+          : this.authorityFailure("evidence_mismatch");
+      }
+      const attempt = this.attempt(input.attemptId);
+      const lease = this.lease(input.workspaceLeaseId);
+      const session = this.workerSession(input.workerSessionId);
+      const packetBinding = this.taskPacketBinding(input.attemptId);
+      if (!attempt || !lease || !session || !packetBinding) {
+        return this.authorityFailure(
+          "not_found",
+          attempt ?? undefined,
+          lease ?? undefined,
+          session ?? undefined
+        );
+      }
+      if (attempt.revision !== input.expectedAttemptRevision) {
+        return this.authorityFailure("stale_attempt_revision", attempt, lease, session);
+      }
+      if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
+        return this.authorityFailure("stale_workspace_revision", attempt, lease, session);
+      }
+      if (session.revision !== input.expectedWorkerSessionRevision) {
+        return this.authorityFailure("stale_session_revision", attempt, lease, session);
+      }
+      if (
+        lease.status !== "active" ||
+        lease.attemptId !== input.attemptId ||
+        lease.controllerId !== input.controller.controllerId ||
+        lease.controllerLeaseId !== input.controller.leaseId ||
+        lease.fencingToken !== input.controller.fencingToken
+      ) {
+        return this.authorityFailure("stale_fence", attempt, lease, session);
+      }
+      if (parseInstant(lease.expiresAt, "expiresAt") <= parseInstant(input.now, "now")) {
+        return this.authorityFailure("workspace_expired", attempt, lease, session);
+      }
+      if (
+        session.runId !== input.runId ||
+        session.attemptId !== input.attemptId ||
+        session.workspaceLeaseId !== input.workspaceLeaseId ||
+        session.packetId !== attempt.packetId ||
+        session.packetHash !== attempt.packetHash
+      ) {
+        return this.authorityFailure("identity_mismatch", attempt, lease, session);
+      }
+      let packet: AgentTaskPacket_v1;
+      try {
+        packet = AgentTaskPacket_v1.parse(JSON.parse(packetBinding.packetJson) as unknown);
+      } catch {
+        return this.authorityFailure("evidence_mismatch", attempt, lease, session);
+      }
+      if (!validAuthorityDecision(input, packet.authority)) {
+        return this.authorityFailure("evidence_mismatch", attempt, lease, session);
+      }
+      const sequence = (
+        this.db
+          .prepare(
+            `SELECT COALESCE(MAX(sequence), 0) + 1 AS value FROM worker_authority_events
+             WHERE runId = ?`
+          )
+          .get(input.runId) as { value: number }
+      ).value;
+      this.db
+        .prepare(
+          `INSERT INTO worker_authority_events (
+           runId, attemptId, workerSessionId, mutationId, fingerprint, sequence, attemptRevision,
+           workspaceLeaseId, workspaceLeaseRevision, workerSessionRevision, packetId, packetHash,
+           dimension, decision, enforcement, actionClass, actionHash, backendId, backendVersion,
+           reason, controllerId, controllerLeaseId, fencingToken, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          input.runId,
+          input.attemptId,
+          input.workerSessionId,
+          input.mutationId,
+          fingerprint,
+          sequence,
+          attempt.revision,
+          input.workspaceLeaseId,
+          lease.revision,
+          session.revision,
+          attempt.packetId,
+          attempt.packetHash,
+          input.dimension,
+          input.decision,
+          input.enforcement,
+          input.actionClass,
+          input.actionHash,
+          input.backendId,
+          input.backendVersion,
+          input.reason,
+          input.controller.controllerId,
+          input.controller.leaseId,
+          input.controller.fencingToken,
+          instant(input.now)
+        );
+      const event = toWorkerAuthorityEvent(
+        this.db
+          .prepare(`SELECT * FROM worker_authority_events WHERE runId = ? AND mutationId = ?`)
+          .get(input.runId, input.mutationId) as WorkerAuthorityEventRow
+      );
+      return event
+        ? { recorded: true, event, idempotentReplay: false }
+        : this.authorityFailure("evidence_mismatch", attempt, lease, session);
+    });
+  }
+
+  async listWorkerAuthorityEvents(runId: string): Promise<WorkerAuthorityEventRecord[]> {
+    if (!this.hasTable("worker_authority_events")) return [];
+    const rows = this.db
+      .prepare(`SELECT * FROM worker_authority_events WHERE runId = ? ORDER BY sequence`)
+      .all(runId) as WorkerAuthorityEventRow[];
+    const events = rows.map(toWorkerAuthorityEvent);
+    if (events.some((event) => event === null)) {
+      throw new Error("Corrupt worker authority event");
+    }
+    return events as WorkerAuthorityEventRecord[];
+  }
+
   async submitAttemptReceipt(
     input: SubmitAttemptReceiptInput
   ): Promise<AttemptReceiptSubmissionResult> {
@@ -1194,9 +1440,13 @@ export class SqliteWorkspaceLifecycleStore
              UNION ALL SELECT 1 FROM attempt_verification_mutations
              WHERE runId = ? AND mutationId = ?
              UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+             WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_authority_events
              WHERE runId = ? AND mutationId = ?`
           )
           .get(
+            input.runId,
+            input.mutationId,
             input.runId,
             input.mutationId,
             input.runId,
@@ -1354,9 +1604,13 @@ export class SqliteWorkspaceLifecycleStore
              UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
              UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
              UNION ALL SELECT 1 FROM attempt_verification_mutations
+             WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_authority_events
              WHERE runId = ? AND mutationId = ?`
           )
           .get(
+            input.runId,
+            input.mutationId,
             input.runId,
             input.mutationId,
             input.runId,
@@ -1552,9 +1806,13 @@ export class SqliteWorkspaceLifecycleStore
              UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
              UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
              UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+             WHERE runId = ? AND mutationId = ?
+             UNION ALL SELECT 1 FROM worker_authority_events
              WHERE runId = ? AND mutationId = ?`
           )
           .get(
+            input.runId,
+            input.mutationId,
             input.runId,
             input.mutationId,
             input.runId,
@@ -1812,7 +2070,20 @@ export class SqliteWorkspaceLifecycleStore
       !validVerificationAuthorization(authorization, input, attempt, lease, session, receipt) ||
       !validateAgentEngineVerificationV2PacketReferences(packet, evidence).valid ||
       !validVerificationBinding(evidence, input, attempt, lease, session, receipt) ||
-      !hasRequiredTrustGaps(evidence, parsedReceipt)
+      !hasRequiredTrustGaps(
+        evidence,
+        parsedReceipt,
+        this.hasTable("worker_authority_events") &&
+          Boolean(
+            this.db
+              .prepare(
+                `SELECT 1 FROM worker_authority_events
+                 WHERE runId = ? AND attemptId = ? AND workerSessionId = ?
+                   AND decision = 'deviation' LIMIT 1`
+              )
+              .get(input.runId, input.attemptId, input.workerSessionId)
+          )
+      )
     ) {
       return this.verificationFailure("evidence_mismatch", attempt, lease, session);
     }
@@ -2365,9 +2636,13 @@ export class SqliteWorkspaceLifecycleStore
            UNION ALL SELECT 1 FROM attempt_verification_mutations
            WHERE runId = ? AND mutationId = ?
            UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM worker_authority_events
            WHERE runId = ? AND mutationId = ?`
         )
         .get(
+          input.runId,
+          input.mutationId,
           input.runId,
           input.mutationId,
           input.runId,
@@ -2542,6 +2817,23 @@ export class SqliteWorkspaceLifecycleStore
     };
   }
 
+  private authorityFailure(
+    reason: WorkerSessionMutationFailureReason,
+    attempt?: AttemptRecord,
+    lease?: WorkspaceLifecycleLeaseRecord,
+    session?: WorkerSessionRecord,
+    currentRunRevision?: number
+  ): WorkerAuthorityDecisionResult {
+    return {
+      recorded: false,
+      reason,
+      ...(attempt ? { currentAttemptRevision: attempt.revision } : {}),
+      ...(lease ? { currentWorkspaceLeaseRevision: lease.revision } : {}),
+      ...(session ? { currentSessionRevision: session.revision } : {}),
+      ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+    };
+  }
+
   private mutate(
     input: MutationInput,
     action: () => WorkspaceMutationResult
@@ -2583,9 +2875,13 @@ export class SqliteWorkspaceLifecycleStore
            UNION ALL SELECT 1 FROM attempt_verification_mutations
            WHERE runId = ? AND mutationId = ?
            UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+           WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM worker_authority_events
            WHERE runId = ? AND mutationId = ?`
         )
         .get(
+          input.runId,
+          input.mutationId,
           input.runId,
           input.mutationId,
           input.runId,
@@ -3008,7 +3304,7 @@ export class SqliteWorkspaceLifecycleStore
   }
 
   private applyWorkspaceMigration(): void {
-    let sql = INLINE_WORKSPACE_MIGRATION;
+    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}`;
     try {
       const workspacePath = fileURLToPath(
         new URL("./migrations/002-attempt-workspace-lifecycle.sql", import.meta.url)
@@ -3025,7 +3321,10 @@ export class SqliteWorkspaceLifecycleStore
       const verificationPath = fileURLToPath(
         new URL("./migrations/006-attempt-engine-verification-persistence.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}`;
+      const authorityPath = fileURLToPath(
+        new URL("./migrations/007-worker-authority-events.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -3171,6 +3470,59 @@ function toWorkerEvent(row: WorkerEventRow): WorkerSessionEvent {
   };
 }
 
+function toWorkerAuthorityEvent(row: WorkerAuthorityEventRow): WorkerAuthorityEventRecord | null {
+  const dimension = WorkerAuthorityDimensionSchema.safeParse(row.dimension);
+  const decision = WorkerAuthorityDecisionSchema.safeParse(row.decision);
+  const enforcement = WorkerAuthorityEnforcementSchema.safeParse(row.enforcement);
+  const reason = WorkerAuthorityReasonSchema.safeParse(row.reason);
+  if (
+    !dimension.success ||
+    !decision.success ||
+    !enforcement.success ||
+    !reason.success ||
+    row.sequence <= 0 ||
+    row.attemptRevision < 0 ||
+    row.workspaceLeaseRevision < 0 ||
+    row.workerSessionRevision < 0 ||
+    row.fencingToken <= 0 ||
+    !Number.isFinite(Date.parse(row.createdAt)) ||
+    row.actionClass.length === 0 ||
+    row.actionClass.length > 128 ||
+    row.backendId.length === 0 ||
+    row.backendId.length > 128 ||
+    row.backendVersion.length === 0 ||
+    row.backendVersion.length > 128 ||
+    !/^sha256:[a-f0-9]{64}$/.test(row.actionHash)
+  ) {
+    return null;
+  }
+  return {
+    runId: row.runId,
+    attemptId: row.attemptId,
+    workerSessionId: row.workerSessionId,
+    mutationId: row.mutationId,
+    sequence: row.sequence,
+    attemptRevision: row.attemptRevision,
+    workspaceLeaseId: row.workspaceLeaseId,
+    workspaceLeaseRevision: row.workspaceLeaseRevision,
+    workerSessionRevision: row.workerSessionRevision,
+    packetId: row.packetId,
+    packetHash: row.packetHash,
+    dimension: dimension.data,
+    decision: decision.data,
+    enforcement: enforcement.data,
+    actionClass: row.actionClass,
+    actionHash: row.actionHash,
+    backendId: row.backendId,
+    backendVersion: row.backendVersion,
+    reason: reason.data,
+    controllerId: row.controllerId,
+    controllerLeaseId: row.controllerLeaseId,
+    fencingToken: row.fencingToken,
+    createdAt: row.createdAt,
+  };
+}
+
 function parseStoredReceipt(record: AttemptReceiptRecord): AgentTaskReceipt_v2 | null {
   try {
     const value = JSON.parse(record.receiptJson) as unknown;
@@ -3241,9 +3593,43 @@ function validVerificationAuthorization(
   );
 }
 
+function validAuthorityDecision(
+  input: RecordWorkerAuthorityDecisionInput,
+  authority: AgentTaskPacket_v1["authority"]
+): boolean {
+  if (
+    input.actionClass.length === 0 ||
+    input.actionClass.length > 128 ||
+    input.backendId.length === 0 ||
+    input.backendId.length > 128 ||
+    input.backendVersion.length === 0 ||
+    input.backendVersion.length > 128 ||
+    !/^sha256:[a-f0-9]{64}$/.test(input.actionHash)
+  ) {
+    return false;
+  }
+  const granted = authority[input.dimension];
+  if (input.decision === "allowed") {
+    return granted && input.reason === "packet_granted" && input.enforcement !== "unenforced";
+  }
+  if (input.decision === "deviation") {
+    return !granted && input.reason === "observed_after_execution";
+  }
+  return (
+    (!granted && input.reason === "packet_denied" && input.enforcement !== "unenforced") ||
+    (input.reason === "backend_unenforceable" && input.enforcement === "unenforced")
+  );
+}
+
+function authorityDecisionFingerprint(input: RecordWorkerAuthorityDecisionInput): string {
+  const { now: _observedAt, ...semanticInput } = input;
+  return canonicalJSONStringify(semanticInput as unknown as JsonValue);
+}
+
 function hasRequiredTrustGaps(
   verification: import("../../schemas/agent-work.js").AgentEngineVerification_v2,
-  receipt: AgentTaskReceipt_v2
+  receipt: AgentTaskReceipt_v2,
+  authorityDeviation = false
 ): boolean {
   const required = new Set<
     import("../../schemas/agent-work.js").EngineVerificationTrustGapReason_v2
@@ -3275,6 +3661,7 @@ function hasRequiredTrustGaps(
     );
   });
   if (!claimAgrees) required.add("claimed_check_disagrees");
+  if (authorityDeviation) required.add("authority_deviation");
   const declared = new Set(verification.trust_gap_reasons);
   return [...required].every((reason) => declared.has(reason));
 }

@@ -85,6 +85,31 @@ export const AttemptVerificationEventType = z.enum([
 ]);
 export type AttemptVerificationEventType = z.infer<typeof AttemptVerificationEventType>;
 
+export const WorkerAuthorityDimension = z.enum([
+  "edit",
+  "git_write",
+  "github_write",
+  "external_runtime",
+  "secrets",
+  "signing",
+  "release",
+]);
+export type WorkerAuthorityDimension = z.infer<typeof WorkerAuthorityDimension>;
+
+export const WorkerAuthorityDecision = z.enum(["allowed", "denied", "deviation"]);
+export type WorkerAuthorityDecision = z.infer<typeof WorkerAuthorityDecision>;
+
+export const WorkerAuthorityEnforcement = z.enum(["enforced", "brokered", "unenforced"]);
+export type WorkerAuthorityEnforcement = z.infer<typeof WorkerAuthorityEnforcement>;
+
+export const WorkerAuthorityReason = z.enum([
+  "packet_granted",
+  "packet_denied",
+  "backend_unenforceable",
+  "observed_after_execution",
+]);
+export type WorkerAuthorityReason = z.infer<typeof WorkerAuthorityReason>;
+
 export const WorkspaceMutationFailureReason = z.enum([
   "not_found",
   "no_active_lease",

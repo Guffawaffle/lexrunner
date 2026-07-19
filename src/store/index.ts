@@ -82,6 +82,10 @@ export {
   WorkerSessionEventType,
   WorkerSessionMutationFailureReason,
   WorkerSessionStatus,
+  WorkerAuthorityDecision,
+  WorkerAuthorityDimension,
+  WorkerAuthorityEnforcement,
+  WorkerAuthorityReason,
   WorkspaceCleanupDisposition,
   WorkspaceLifecycleEventType,
   WorkspaceLifecycleLeaseStatus,
@@ -132,6 +136,10 @@ export type {
   AttemptReceiptStore,
   AttemptVerificationStore,
   AttemptAcceptanceStore,
+  RecordWorkerAuthorityDecisionInput,
+  WorkerAuthorityDecisionResult,
+  WorkerAuthorityDecisionStore,
+  WorkerAuthorityEventRecord,
 } from "./workspace-lifecycle-store.js";
 export {
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,

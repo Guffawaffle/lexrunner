@@ -18,6 +18,7 @@ import type {
   AttemptVerificationStore,
   WorkspaceObservation,
   WorkerSessionStore,
+  WorkerAuthorityDecisionStore,
 } from "../../src/store/workspace-lifecycle-store.js";
 import { toAttemptContract } from "../../src/store/workspace-lifecycle-store.js";
 
@@ -27,6 +28,7 @@ export interface WorkspaceLifecycleHarness
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
     WorkerSessionStore,
+    WorkerAuthorityDecisionStore,
     AttemptReceiptStore,
     AttemptVerificationStore {
   acquireControllerLease(input: {
@@ -273,6 +275,34 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         workerId: "native-session-123",
         model: "gpt-5",
         startedAt: "2026-07-11T12:00:02.500Z",
+        ...overrides,
+      };
+    }
+
+    function authorityInput(overrides: Record<string, unknown> = {}) {
+      return {
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "authority-external-runtime-1",
+        now: "2026-07-11T12:00:03.500Z",
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 3,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        workerSessionId: "worker-session-1",
+        expectedWorkerSessionRevision: 0,
+        dimension: "external_runtime" as const,
+        decision: "denied" as const,
+        enforcement: "brokered" as const,
+        actionClass: "external_runtime",
+        actionHash: computeCanonicalHash({
+          action_class: "external_runtime",
+          executable: "docker",
+        }),
+        backendId: "lexrunner.argv-authority-broker",
+        backendVersion: "1.0.0",
+        reason: "packet_denied" as const,
         ...overrides,
       };
     }
@@ -697,6 +727,85 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       await expect(
         store.attachWorkerSession({ ...input, workerId: "different-native-session" })
       ).resolves.toMatchObject({ updated: false, reason: "mutation_conflict" });
+    });
+
+    it("persists redacted packet-bound worker authority decisions and deviations", async () => {
+      await launchReadyAttempt();
+      await store.attachWorkerSession(attachInput());
+
+      const denied = authorityInput();
+      await expect(store.recordWorkerAuthorityDecision(denied)).resolves.toMatchObject({
+        recorded: true,
+        idempotentReplay: false,
+        event: {
+          sequence: 1,
+          dimension: "external_runtime",
+          decision: "denied",
+          enforcement: "brokered",
+          reason: "packet_denied",
+          packetId: "packet-1",
+        },
+      });
+      await expect(store.recordWorkerAuthorityDecision(denied)).resolves.toMatchObject({
+        recorded: true,
+        idempotentReplay: true,
+      });
+      await expect(
+        store.recordWorkerAuthorityDecision({
+          ...denied,
+          now: "2026-07-11T12:00:03.500Z",
+        })
+      ).resolves.toMatchObject({ recorded: true, idempotentReplay: true });
+      await expect(
+        store.recordWorkerAuthorityDecision({ ...denied, actionClass: "changed" })
+      ).resolves.toMatchObject({ recorded: false, reason: "mutation_conflict" });
+
+      await expect(
+        store.recordWorkerAuthorityDecision(
+          authorityInput({
+            mutationId: "authority-edit-allowed",
+            dimension: "edit",
+            decision: "allowed",
+            enforcement: "enforced",
+            actionClass: "workspace_mutation",
+            actionHash: computeCanonicalHash({
+              action_class: "workspace_mutation",
+              executable: "apply_patch",
+            }),
+            reason: "packet_granted",
+          })
+        )
+      ).resolves.toMatchObject({
+        recorded: true,
+        event: { sequence: 2, dimension: "edit", decision: "allowed" },
+      });
+      await expect(
+        store.recordWorkerAuthorityDecision(
+          authorityInput({
+            mutationId: "authority-external-deviation",
+            decision: "deviation",
+            enforcement: "unenforced",
+            reason: "observed_after_execution",
+          })
+        )
+      ).resolves.toMatchObject({
+        recorded: true,
+        event: { sequence: 3, decision: "deviation" },
+      });
+      const events = await store.listWorkerAuthorityEvents("run-1");
+      expect(events).toHaveLength(3);
+      expect(events.every((event) => !Object.hasOwn(event, "argv"))).toBe(true);
+      expect(JSON.stringify(events)).not.toContain("docker");
+
+      await expect(
+        store.recordWorkerAuthorityDecision(
+          authorityInput({
+            mutationId: "authority-invalid-allow",
+            decision: "allowed",
+            reason: "packet_granted",
+          })
+        )
+      ).resolves.toMatchObject({ recorded: false, reason: "evidence_mismatch" });
     });
 
     it("rejects stale, mismatched, or duplicate worker attachment", async () => {
