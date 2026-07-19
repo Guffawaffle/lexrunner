@@ -176,6 +176,24 @@ function requireUniqueIds(
   });
 }
 
+function requireUniqueStrings(values: string[], field: string, ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  values.forEach((value, index) => {
+    if (seen.has(value)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [field, index],
+        message: `${field} values must be unique`,
+      });
+    }
+    seen.add(value);
+  });
+}
+
+function compareCanonicalStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 // =============================================================================
 // WORK INTAKE
 // =============================================================================
@@ -1037,8 +1055,55 @@ export const AgentTaskReceipt_v2 = z
       ctx
     );
     requireTimestampOrder(receipt.worker_completed_at, receipt.submitted_at, "submitted_at", ctx);
-  });
+    requireUniqueStrings(receipt.files_touched, "files_touched", ctx);
+    requireUniqueStrings(
+      receipt.acceptance_criteria_addressed,
+      "acceptance_criteria_addressed",
+      ctx
+    );
+    requireUniqueIds(receipt.claimed_checks, "claimed_checks", ctx);
+    requireUniqueStrings(receipt.assumptions, "assumptions", ctx);
+    requireUniqueStrings(receipt.blockers, "blockers", ctx);
+    requireUniqueStrings(receipt.human_action_request_ids, "human_action_request_ids", ctx);
+  })
+  .transform((receipt) => ({
+    ...receipt,
+    files_touched: [...receipt.files_touched].sort(compareCanonicalStrings),
+    acceptance_criteria_addressed: [...receipt.acceptance_criteria_addressed].sort(
+      compareCanonicalStrings
+    ),
+    claimed_checks: [...receipt.claimed_checks].sort((left, right) =>
+      compareCanonicalStrings(left.id, right.id)
+    ),
+    assumptions: [...receipt.assumptions].sort(compareCanonicalStrings),
+    blockers: [...receipt.blockers].sort(compareCanonicalStrings),
+    human_action_request_ids: [...receipt.human_action_request_ids].sort(compareCanonicalStrings),
+  }));
 export type AgentTaskReceipt_v2 = z.infer<typeof AgentTaskReceipt_v2>;
+
+/**
+ * Validate set membership that only the authoritative packet snapshot can establish.
+ *
+ * AgentTaskReceipt_v2 has no extra-check lane: every claimed check must name one
+ * packet-declared verification. A future extra-check lane requires a versioned
+ * contract rather than overloading the declared-check namespace.
+ */
+export function validateAgentTaskReceiptV2PacketReferences(
+  packet: AgentTaskPacket_v1,
+  receipt: AgentTaskReceipt_v2
+): { valid: boolean; errors: string[] } {
+  const criterionIds = new Set(packet.acceptance_criteria.map(({ id }) => id));
+  const declaredCheckIds = new Set(packet.verification.map(({ id }) => id));
+  const errors = [
+    ...receipt.acceptance_criteria_addressed
+      .filter((id) => !criterionIds.has(id))
+      .map((id) => `acceptance_criteria_addressed contains undeclared criterion: ${id}`),
+    ...receipt.claimed_checks
+      .filter(({ id }) => !declaredCheckIds.has(id))
+      .map(({ id }) => `claimed_checks contains undeclared verification: ${id}`),
+  ];
+  return { valid: errors.length === 0, errors };
+}
 
 export const VerificationOutcome = z.enum([
   "pass",
@@ -1176,6 +1241,7 @@ export function validateAgentTaskReceiptV2Binding(
     ["observed_base_sha", packet.repository.base_sha.toLowerCase(), receipt.observed_base_sha],
   ];
   errors.push(...mismatchErrors(expected));
+  errors.push(...validateAgentTaskReceiptV2PacketReferences(packet, receipt).errors);
 
   const terminalSession = new Set<WorkerSession_v1["status"]>([
     "completed",

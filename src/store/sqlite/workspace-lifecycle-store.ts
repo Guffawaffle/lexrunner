@@ -3,7 +3,11 @@ import { fileURLToPath } from "node:url";
 import type { ZodType } from "zod";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
-import { AgentTaskPacket_v1, AgentTaskReceipt_v2 } from "../../schemas/agent-work.js";
+import {
+  AgentTaskPacket_v1,
+  AgentTaskReceipt_v2,
+  validateAgentTaskReceiptV2PacketReferences,
+} from "../../schemas/agent-work.js";
 import { calculateExpiry, cloneJsonValue, parseInstant } from "../coordination-store.js";
 import type { JsonValue } from "../coordination-store.js";
 import {
@@ -1064,7 +1068,10 @@ export class SqliteWorkspaceLifecycleStore
       if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
         return this.receiptFailure("lease_expired");
       }
-      const fingerprint = canonicalJSONStringify(input as unknown as JsonValue);
+      const fingerprint = canonicalJSONStringify({
+        ...input,
+        receipt: parsed.data,
+      } as unknown as JsonValue);
       if (
         this.db
           .prepare(
@@ -1195,6 +1202,13 @@ export class SqliteWorkspaceLifecycleStore
     }
     if (this.attemptReceipt(claim.receipt_id) || this.getReceiptForAttempt(input.attemptId)) {
       return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    const packetBinding = this.taskPacketBinding(input.attemptId);
+    const packet = packetBinding
+      ? validateCanonicalTaskPacket(packetBinding.packetJson, attempt)
+      : null;
+    if (!packet || !validateAgentTaskReceiptV2PacketReferences(packet, claim).valid) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
     if (!validReceiptBinding(claim, input, attempt, lease, session)) {
       return this.receiptFailure("evidence_mismatch", attempt, lease, session);
