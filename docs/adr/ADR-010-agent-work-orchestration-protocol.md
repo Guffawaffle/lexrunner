@@ -659,6 +659,8 @@ and authority-gated.
 - ADR-007: Task Snapshot Contract
 - [LexRunner Principles](../PRINCIPLES.md): cumulative intelligence, durable delta,
   retry delta, and principle provenance
+- [Orchestration Primitives](../architecture/orchestration-primitives.md): Ecosystem 3.1
+  `adopt | adapt | defer | reject` research record
 - STFC `docs/AGENT_WORKTREE_BROKER.md`: executable workspace-lease prior art
 - STFC `docs/AGENT_ORCHESTRATION.md`: bridge/background-agent authority model
 - LexRunner issues #367, #390, #699, #706, #709, #766, #762, #767, and #801
