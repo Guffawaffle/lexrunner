@@ -107,11 +107,14 @@ premise—evidence, strategy, inputs, environment, authority, worker/runtime, or
 an explicit reason the same operation should now behave differently. A new
 identifier alone is not a retry delta. Blind replay is repetition, not recovery.
 
-The current orchestration schemas do not yet claim executable conformance with
-durable-delta or retry-delta enforcement. Canonical attempt evidence is tracked
-in #766 and #762; supervisor enforcement and reconciliation are tracked in
-#801, #767, and #699. This ADR states the protocol invariant without silently
-broadening a released schema.
+Executable retry-delta conformance is provided by `AttemptRetryDelta_v1` and the
+memory/SQLite lifecycle stores. A later Attempt for the same WorkItem revision
+must bind the immediate terminal Attempt, name a changed premise or explicit
+policy exception, and reference only evidence whose canonical identity and hash
+the store can validate. Supervisor reconciliation is implemented by the
+headless application boundary documented in
+`docs/architecture/headless-supervisor.md`; public CLI/MCP exposure and broader
+dogfood evidence remain separately tracked work.
 
 #### ControllerLease
 
@@ -665,10 +668,13 @@ an accepted assisted launch.
 
 ### Stage 4: Headless supervisor
 
-- Add the first non-interactive CLI worker adapter.
-- Persist exact session/process identity and structured events.
-- Implement cancellation, timeout, restart reconciliation, and explicit human
-  action requests.
+- Negotiate a versioned non-interactive worker adapter before launch.
+- Persist exact adapter/session identity and structured lifecycle evidence.
+- Reconstruct lifecycle state after restart and reconcile workspace/worker
+  observations with fenced durable state.
+- Implement bounded concurrency, explicit cancellation, heartbeat loss,
+  capped backoff, retry budgets, and retry-delta enforcement.
+- Keep reasons and reconciliation evidence behind explicit diagnostics.
 
 ### Stage 5: Fault injection and authority expansion
 

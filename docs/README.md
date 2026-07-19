@@ -50,6 +50,7 @@ New to lexrunner? Start here:
 ### Architecture
 
 - **[LexRunner Principles](./PRINCIPLES.md)** - Normative cumulative-intelligence and fail-forward design guidance
+- **[Headless Supervisor](./architecture/headless-supervisor.md)** - Restart reconciliation, bounded control, and retry-delta enforcement
 - **[Orchestration primitive decisions](./architecture/orchestration-primitives.md)** - Primary-source `adopt | adapt | defer | reject` record for leading agent orchestrators
 - **[Canonical CLI and MCP surface](./architecture/canonical-cli-mcp-surface.md)** - Registration-verified dispositions, parity, and ownership
 

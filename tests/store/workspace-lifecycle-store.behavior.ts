@@ -211,6 +211,87 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       await bindEnvelope();
     }
 
+    it("rejects blind work retries and atomically preserves a meaningful retry delta", async () => {
+      await createAttempt();
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "cancel-first-attempt",
+        now: T1,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 0,
+        status: "cancelled",
+      });
+      const retryInput = {
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "create-attempt-2",
+        now: T2,
+        attemptId: "attempt-2",
+        workItemId: "work-1",
+        workItemRevision: 7,
+        packetId: "packet-2",
+        packetHash: `sha256:${"b".repeat(64)}`,
+        baseSha: "a".repeat(40),
+      };
+
+      await expect(store.createAttempt(retryInput)).resolves.toMatchObject({
+        updated: false,
+        reason: "retry_delta_required",
+      });
+      const retry = {
+        schema_version: "1.0.0" as const,
+        previous_attempt_id: "attempt-1",
+        next_attempt_id: "attempt-2",
+        work_item_id: "work-1",
+        work_item_revision: 7,
+        changes: [
+          {
+            dimension: "strategy" as const,
+            before_hash: `sha256:${"1".repeat(64)}`,
+            after_hash: `sha256:${"2".repeat(64)}`,
+          },
+        ],
+        inherited_evidence: [],
+        summary: "Use the narrowed strategy learned from the cancelled attempt.",
+        created_at: T2,
+      };
+      await expect(
+        store.createAttempt({
+          ...retryInput,
+          retry: {
+            ...retry,
+            inherited_evidence: [
+              {
+                kind: "artifact" as const,
+                id: "caller-asserted-artifact",
+                hash: `sha256:${"3".repeat(64)}`,
+              },
+            ],
+          },
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "retry_delta_invalid" });
+      const created = await store.createAttempt({ ...retryInput, retry });
+      expect(created).toMatchObject({
+        updated: true,
+        attempt: { attemptId: "attempt-2", status: "prepared" },
+        event: { payload: { retryDeltaHash: expect.stringMatching(/^sha256:/u) } },
+      });
+      await expect(store.getAttemptRetryDelta("attempt-2")).resolves.toMatchObject({
+        attemptId: "attempt-2",
+        previousAttemptId: "attempt-1",
+        deltaHash: computeCanonicalHash(retry),
+        createdAt: T2,
+      });
+      await expect(store.getAttempt("attempt-1")).resolves.toMatchObject({
+        status: "cancelled",
+        completedAt: T1,
+      });
+      await expect(store.listAttempts("run-1")).resolves.toHaveLength(2);
+    });
+
     function envelopeBindingInput(overrides: Record<string, unknown> = {}) {
       const createdAt = "2026-07-11T12:00:02.250Z";
       const envelopeId = "envelope-1";

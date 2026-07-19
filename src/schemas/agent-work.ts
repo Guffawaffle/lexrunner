@@ -455,6 +455,84 @@ export const Attempt_v1 = z
   });
 export type Attempt_v1 = z.infer<typeof Attempt_v1>;
 
+export const AttemptRetryDeltaDimension_v1 = z.enum([
+  "evidence",
+  "premise",
+  "strategy",
+  "inputs",
+  "environment",
+  "authority",
+  "worker_runtime",
+]);
+export type AttemptRetryDeltaDimension_v1 = z.infer<typeof AttemptRetryDeltaDimension_v1>;
+
+const AttemptRetryDeltaChange_v1 = z
+  .object({
+    dimension: AttemptRetryDeltaDimension_v1,
+    before_hash: SHA256Hash,
+    after_hash: SHA256Hash,
+  })
+  .strict()
+  .refine((change) => change.before_hash !== change.after_hash, {
+    message: "A retry change must identify a different durable premise",
+  });
+
+const AttemptRetryEvidenceReference_v1 = z
+  .object({
+    kind: z.enum(["receipt", "verification", "artifact", "observation", "deviation"]),
+    id: Id.max(256),
+    hash: SHA256Hash,
+  })
+  .strict();
+
+/** Immutable fail-forward justification for creating a later Attempt. */
+export const AttemptRetryDelta_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    previous_attempt_id: Id.max(256),
+    next_attempt_id: Id.max(256),
+    work_item_id: Id.max(256),
+    work_item_revision: Revision,
+    changes: z.array(AttemptRetryDeltaChange_v1).max(16),
+    inherited_evidence: z.array(AttemptRetryEvidenceReference_v1).max(64),
+    policy_exception: z
+      .object({
+        policy_id: Id.max(256),
+        reason: z.string().min(1).max(1_024),
+      })
+      .strict()
+      .optional(),
+    summary: z.string().min(1).max(1_024),
+    created_at: Timestamp,
+  })
+  .strict()
+  .superRefine((delta, context) => {
+    if (delta.changes.length === 0 && !delta.policy_exception) {
+      context.addIssue({
+        code: "custom",
+        path: ["changes"],
+        message: "A retry requires a changed premise or an explicit policy exception",
+      });
+    }
+    const dimensions = delta.changes.map((change) => change.dimension);
+    if (new Set(dimensions).size !== dimensions.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["changes"],
+        message: "Retry change dimensions must be unique",
+      });
+    }
+    const evidence = delta.inherited_evidence.map((entry) => `${entry.kind}\u0000${entry.id}`);
+    if (new Set(evidence).size !== evidence.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["inherited_evidence"],
+        message: "Inherited evidence references must be unique",
+      });
+    }
+  });
+export type AttemptRetryDelta_v1 = z.infer<typeof AttemptRetryDelta_v1>;
+
 // =============================================================================
 // PORTABLE TASK PACKET AND LOCAL EXECUTION ENVELOPE
 // =============================================================================

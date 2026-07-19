@@ -132,6 +132,8 @@ export const WorkspaceMutationFailureReason = z.enum([
   "invalid_reconciliation",
   "invalid_attempt_transition",
   "evidence_mismatch",
+  "retry_delta_required",
+  "retry_delta_invalid",
 ]);
 export type WorkspaceMutationFailureReason = z.infer<typeof WorkspaceMutationFailureReason>;
 

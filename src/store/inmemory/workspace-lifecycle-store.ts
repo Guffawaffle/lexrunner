@@ -4,6 +4,7 @@ import {
   AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v2,
+  AttemptRetryDelta_v1,
   validateAgentEngineVerificationV2PacketReferences,
   validateAgentTaskReceiptV2PacketReferences,
 } from "../../schemas/agent-work.js";
@@ -27,6 +28,7 @@ import type {
   ApplyAttemptAcceptanceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
+  AttemptRetryDeltaRecord,
   AttemptReceiptEvent,
   AttemptReceiptEventType,
   AttemptReceiptFailureReason,
@@ -146,6 +148,7 @@ export class InMemoryWorkspaceLifecycleStore
     AttemptAcceptanceStore
 {
   private readonly attempts = new Map<string, AttemptRecord>();
+  private readonly attemptRetryDeltas = new Map<string, AttemptRetryDeltaRecord>();
   private readonly workspaceLeases = new Map<string, WorkspaceLifecycleLeaseRecord>();
   private readonly lifecycleEvents = new Map<string, WorkspaceLifecycleEvent[]>();
   private readonly mutations = new Map<string, StoredMutation>();
@@ -186,6 +189,9 @@ export class InMemoryWorkspaceLifecycleStore
       );
       if (conflict) return this.failure("live_attempt_conflict");
 
+      const retry = this.validateRetryDelta(input);
+      if (!retry.valid) return this.failure(retry.reason);
+
       const now = normalizeInstant(input.now);
       const attempt: AttemptRecord = {
         attemptId: input.attemptId,
@@ -206,8 +212,10 @@ export class InMemoryWorkspaceLifecycleStore
         completedAt: null,
       };
       this.attempts.set(attempt.attemptId, attempt);
+      if (retry.record) this.attemptRetryDeltas.set(attempt.attemptId, retry.record);
       return this.record(input, attempt, null, "attempt_created", {
         workItemId: input.workItemId,
+        retryDeltaHash: retry.record?.deltaHash ?? null,
       });
     });
   }
@@ -510,9 +518,26 @@ export class InMemoryWorkspaceLifecycleStore
     return attempt ? { ...attempt } : null;
   }
 
+  async listAttempts(runId: string): Promise<AttemptRecord[]> {
+    return [...this.attempts.values()]
+      .filter((attempt) => attempt.runId === runId)
+      .map((attempt) => ({ ...attempt }));
+  }
+
+  async getAttemptRetryDelta(attemptId: string): Promise<AttemptRetryDeltaRecord | null> {
+    const record = this.attemptRetryDeltas.get(attemptId);
+    return record ? { ...record } : null;
+  }
+
   async getWorkspaceLease(leaseId: string): Promise<WorkspaceLifecycleLeaseRecord | null> {
     const lease = this.workspaceLeases.get(leaseId);
     return lease ? cloneLease(lease) : null;
+  }
+
+  async listWorkspaceLeases(runId: string): Promise<WorkspaceLifecycleLeaseRecord[]> {
+    return [...this.workspaceLeases.values()]
+      .filter((lease) => lease.runId === runId)
+      .map(cloneLease);
   }
 
   async listWorkspaceLifecycleEvents(runId: string): Promise<WorkspaceLifecycleEvent[]> {
@@ -2199,6 +2224,71 @@ export class InMemoryWorkspaceLifecycleStore
     if (attempt.revision !== expectedRevision)
       return this.failure("stale_attempt_revision", attempt);
     return null;
+  }
+
+  private validateRetryDelta(
+    input: CreateAttemptInput
+  ):
+    | { valid: true; record?: AttemptRetryDeltaRecord }
+    | { valid: false; reason: "retry_delta_required" | "retry_delta_invalid" } {
+    const previous = [...this.attempts.values()].filter(
+      (attempt) =>
+        attempt.runId === input.runId &&
+        attempt.workItemId === input.workItemId &&
+        attempt.workItemRevision === input.workItemRevision
+    );
+    if (previous.length === 0) {
+      return input.retry ? { valid: false, reason: "retry_delta_invalid" } : { valid: true };
+    }
+    if (!input.retry) return { valid: false, reason: "retry_delta_required" };
+    const prior = previous[previous.length - 1]!;
+    const parsed = AttemptRetryDelta_v1.safeParse(input.retry);
+    if (
+      !parsed.success ||
+      !isTerminalAttemptStatus(prior.status) ||
+      parsed.data.previous_attempt_id !== prior.attemptId ||
+      parsed.data.next_attempt_id !== input.attemptId ||
+      parsed.data.work_item_id !== input.workItemId ||
+      parsed.data.work_item_revision !== input.workItemRevision ||
+      normalizeInstant(parsed.data.created_at) !== normalizeInstant(input.now) ||
+      !this.validInheritedRetryEvidence(prior, parsed.data.inherited_evidence)
+    ) {
+      return { valid: false, reason: "retry_delta_invalid" };
+    }
+    const deltaJson = canonicalJSONStringify(parsed.data);
+    return {
+      valid: true,
+      record: {
+        attemptId: input.attemptId,
+        previousAttemptId: prior.attemptId,
+        deltaHash: computeCanonicalHash(parsed.data),
+        deltaJson,
+        createdAt: normalizeInstant(input.now),
+      },
+    };
+  }
+
+  private validInheritedRetryEvidence(
+    prior: AttemptRecord,
+    references: import("../../schemas/agent-work.js").AttemptRetryDelta_v1["inherited_evidence"]
+  ): boolean {
+    return references.every((reference) => {
+      if (reference.kind === "receipt") {
+        const receipt = this.attemptReceipts.get(reference.id);
+        return receipt?.attemptId === prior.attemptId && receipt.receiptHash === reference.hash;
+      }
+      if (reference.kind === "verification") {
+        const verification = this.attemptVerifications.get(reference.id);
+        return (
+          verification?.attemptId === prior.attemptId &&
+          verification.verificationHash === reference.hash
+        );
+      }
+      // Artifact, observation, and deviation references are reserved schema
+      // lanes until their canonical evidence stores expose identity + hash
+      // lookup. Never accept an unresolvable caller assertion as inheritance.
+      return false;
+    });
   }
 
   private finishLease(
