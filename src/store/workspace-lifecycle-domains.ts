@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AgentTaskReceiptOutcome,
   AttemptStatus,
+  VerificationOutcome,
   WorkerSessionBackend,
   WorkerSessionStatus,
   WorkspaceCleanupDisposition,
@@ -14,6 +15,7 @@ import {
 export {
   AgentTaskReceiptOutcome,
   AttemptStatus,
+  VerificationOutcome,
   WorkerSessionBackend,
   WorkerSessionStatus,
   WorkspaceCleanupDisposition,
@@ -76,6 +78,13 @@ export const AttemptReceiptEventType = z.enum([
 ]);
 export type AttemptReceiptEventType = z.infer<typeof AttemptReceiptEventType>;
 
+export const AttemptVerificationEventType = z.enum([
+  "attempt_verification_started",
+  "attempt_verification_recorded",
+  "attempt_verification_replayed",
+]);
+export type AttemptVerificationEventType = z.infer<typeof AttemptVerificationEventType>;
+
 export const WorkspaceMutationFailureReason = z.enum([
   "not_found",
   "no_active_lease",
@@ -116,6 +125,13 @@ export const AttemptReceiptFailureReason = z.enum([
   "receipt_conflict",
 ]);
 export type AttemptReceiptFailureReason = z.infer<typeof AttemptReceiptFailureReason>;
+
+export const AttemptVerificationFailureReason = z.enum([
+  ...WorkspaceMutationFailureReason.options,
+  "stale_session_revision",
+  "verification_conflict",
+]);
+export type AttemptVerificationFailureReason = z.infer<typeof AttemptVerificationFailureReason>;
 
 export const WorkspaceObservationCleanliness = z.enum(["clean", "dirty"]);
 export type WorkspaceObservationCleanliness = z.infer<typeof WorkspaceObservationCleanliness>;

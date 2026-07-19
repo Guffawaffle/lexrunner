@@ -313,6 +313,12 @@ describe("SQLite workspace lifecycle concurrency", () => {
       await expect(legacy.getAttemptReceiptForAttempt("missing")).resolves.toBeNull();
       await expect(legacy.getAttemptReceiptByHash(`sha256:${"0".repeat(64)}`)).resolves.toBeNull();
       await expect(legacy.listAttemptReceiptEvents("missing")).resolves.toEqual([]);
+      await expect(legacy.getAttemptVerification("missing")).resolves.toBeNull();
+      await expect(legacy.getAttemptVerificationForAttempt("missing")).resolves.toBeNull();
+      await expect(
+        legacy.getAttemptVerificationByHash(`sha256:${"0".repeat(64)}`)
+      ).resolves.toBeNull();
+      await expect(legacy.listAttemptVerificationEvents("missing")).resolves.toEqual([]);
     } finally {
       await legacy.close();
     }

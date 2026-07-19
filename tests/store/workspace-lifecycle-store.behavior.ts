@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
-import { createAgentTaskPacket, parseAgentTaskReceiptV2 } from "../../src/schemas/agent-work.js";
+import {
+  createAgentTaskPacket,
+  parseAgentEngineVerificationV2,
+  parseAgentTaskReceiptV2,
+} from "../../src/schemas/agent-work.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
@@ -11,6 +15,7 @@ import type {
   LaunchEnvelopeBindingStore,
   TaskPacketBindingStore,
   AttemptReceiptStore,
+  AttemptVerificationStore,
   WorkspaceObservation,
   WorkerSessionStore,
 } from "../../src/store/workspace-lifecycle-store.js";
@@ -22,7 +27,8 @@ export interface WorkspaceLifecycleHarness
     LaunchEnvelopeBindingStore,
     TaskPacketBindingStore,
     WorkerSessionStore,
-    AttemptReceiptStore {
+    AttemptReceiptStore,
+    AttemptVerificationStore {
   acquireControllerLease(input: {
     runId: string;
     controllerId: string;
@@ -349,6 +355,126 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         receipt: receiptClaim(outcome),
         ...overrides,
       };
+    }
+
+    function verificationEvidence(
+      outcome: "pass" | "fail" | "inconclusive" | "infrastructure_error" | "cancelled" = "pass",
+      overrides: Record<string, unknown> = {}
+    ) {
+      const passing = outcome === "pass";
+      return parseAgentEngineVerificationV2({
+        schema_version: "2.0.0",
+        verification_id: "verification-1",
+        run_id: "run-1",
+        work_item_id: "work-1",
+        work_item_revision: 7,
+        attempt_id: "attempt-1",
+        packet_id: "packet-1",
+        packet_hash: DEFAULT_PACKET.packet_hash,
+        workspace_lease_id: "workspace-lease-1",
+        workspace_lease_revision: 0,
+        worker_session_id: "worker-session-1",
+        worker_session_revision: 1,
+        receipt_id: "receipt-1",
+        receipt_hash: computeCanonicalHash(parseAgentTaskReceiptV2(receiptClaim())),
+        observed_base_sha: "a".repeat(40),
+        verified_patch_hash: `sha256:${"c".repeat(64)}`,
+        workspace_observation_hash: `sha256:${"d".repeat(64)}`,
+        outcome,
+        summary: `Engine reported ${outcome}`,
+        checks: [
+          {
+            id: "check-1",
+            source: "packet",
+            outcome: passing ? "pass" : outcome,
+            command_hash: `sha256:${"e".repeat(64)}`,
+            environment_fingerprint: `sha256:${"f".repeat(64)}`,
+            ...(passing ? { exit_code: 0 } : {}),
+            duration_ms: 100,
+            retry_count: 0,
+            artifact_refs: [],
+            determinism: "deterministic",
+          },
+          {
+            id: "check-2",
+            source: "packet",
+            outcome: "pass",
+            command_hash: `sha256:${"1".repeat(64)}`,
+            environment_fingerprint: `sha256:${"2".repeat(64)}`,
+            exit_code: 0,
+            duration_ms: 50,
+            retry_count: 0,
+            artifact_refs: [],
+            determinism: "deterministic",
+          },
+        ],
+        failures: passing ? [] : [`Engine outcome: ${outcome}`],
+        trust_gap_reasons: passing ? [] : ["worker_outcome_disagrees", "claimed_check_disagrees"],
+        verifier_id: "lexrunner-engine",
+        verifier_version: "1.1.0",
+        started_at: "2026-07-11T12:00:05.100Z",
+        completed_at: "2026-07-11T12:00:05.500Z",
+        ...overrides,
+      });
+    }
+
+    function verificationInput(
+      outcome: "pass" | "fail" | "inconclusive" | "infrastructure_error" | "cancelled" = "pass",
+      overrides: Record<string, unknown> = {}
+    ) {
+      const verification = verificationEvidence(outcome);
+      return {
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "submit-verification-1",
+        now: "2026-07-11T12:00:05.750Z",
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 5,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        workerSessionId: "worker-session-1",
+        expectedWorkerSessionRevision: 1,
+        receiptId: "receipt-1",
+        receiptHash: verification.receipt_hash,
+        verification,
+        ...overrides,
+      };
+    }
+
+    async function receiptSubmittedAttempt() {
+      await endedWorker();
+      const submitted = await store.submitAttemptReceipt(receiptInput());
+      if (!submitted.submitted) throw new Error("receipt setup failed");
+      return submitted;
+    }
+
+    function verificationBeginInput(overrides: Record<string, unknown> = {}) {
+      const receiptHash = computeCanonicalHash(parseAgentTaskReceiptV2(receiptClaim()));
+      return {
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "begin-verification-1",
+        now: "2026-07-11T12:00:05.050Z",
+        verificationId: "verification-1",
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 4,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        workerSessionId: "worker-session-1",
+        expectedWorkerSessionRevision: 1,
+        receiptId: "receipt-1",
+        receiptHash,
+        ...overrides,
+      };
+    }
+
+    async function verificationStartedAttempt() {
+      await receiptSubmittedAttempt();
+      const started = await store.beginAttemptVerification(verificationBeginInput());
+      if (!started.started) throw new Error("verification authorization setup failed");
+      return started;
     }
 
     it("binds one canonical envelope to the audited launch authorization", async () => {
@@ -911,23 +1037,25 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           workspaceLeaseId: "other-lease",
         })
       ).resolves.toMatchObject({ submitted: false, reason: "receipt_conflict" });
+      await expect(store.beginAttemptVerification(verificationBeginInput())).resolves.toMatchObject(
+        {
+          started: true,
+          attempt: { status: "verifying", revision: 5 },
+        }
+      );
       await expect(
-        store.transitionAttempt({
-          runId: "run-1",
-          controller,
-          expectedRunRevision: 0,
-          mutationId: "begin-verification-after-receipt",
-          now: "2026-07-11T12:00:05.250Z",
-          attemptId: "attempt-1",
-          expectedAttemptRevision: 4,
-          status: "verifying",
-        })
-      ).resolves.toMatchObject({ updated: true, attempt: { status: "verifying", revision: 5 } });
+        store.submitAttemptVerification(
+          verificationInput("pass", { mutationId: "verify-before-receipt-replay" })
+        )
+      ).resolves.toMatchObject({
+        recorded: true,
+        attempt: { status: "verified", revision: 6 },
+      });
       await expect(
         store.submitAttemptReceipt({
           ...input,
           mutationId: "submit-receipt-hash-replay",
-          now: "2026-07-11T12:00:05.500Z",
+          now: "2026-07-11T12:00:05.900Z",
         })
       ).resolves.toMatchObject({
         submitted: true,
@@ -948,7 +1076,7 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           controller,
           expectedRunRevision: 0,
           mutationId: "submit-receipt-hash-replay",
-          now: "2026-07-11T12:00:05.500Z",
+          now: "2026-07-11T12:00:05.900Z",
           attemptId: "attempt-1",
           workspaceLeaseId: "workspace-lease-1",
           expectedAttemptRevision: 4,
@@ -1165,6 +1293,155 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
           expectedAttemptRevision: 3,
           status: "blocked",
           receiptId: "not-durable",
+        })
+      ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
+    });
+
+    it.each([
+      ["pass", "verified"],
+      ["fail", "rejected"],
+      ["inconclusive", "inconclusive"],
+      ["infrastructure_error", "inconclusive"],
+      ["cancelled", "inconclusive"],
+    ] as const)("atomically persists engine %s evidence as %s", async (outcome, status) => {
+      const started = await verificationStartedAttempt();
+      expect(started).toMatchObject({
+        attempt: { status: "verifying", revision: 5 },
+        event: { type: "attempt_verification_started", sequence: 1, outcome: null },
+      });
+      const input = verificationInput(outcome);
+      const recorded = await store.submitAttemptVerification(input);
+      expect(recorded).toMatchObject({
+        recorded: true,
+        idempotentReplay: false,
+        verification: {
+          verificationId: "verification-1",
+          outcome,
+          resultingAttemptStatus: status,
+          resultingAttemptRevision: 6,
+        },
+        attempt: { status, revision: 6, verificationId: "verification-1" },
+        event: { type: "attempt_verification_recorded", sequence: 2 },
+      });
+      if (!recorded.recorded) throw new Error("verification submission failed");
+      expect(recorded.verification.verificationHash).toBe(computeCanonicalHash(input.verification));
+      await expect(store.getAttemptVerification("verification-1")).resolves.toEqual(
+        recorded.verification
+      );
+      await expect(store.getAttemptVerificationForAttempt("attempt-1")).resolves.toEqual(
+        recorded.verification
+      );
+      await expect(
+        store.getAttemptVerificationByHash(recorded.verification.verificationHash)
+      ).resolves.toEqual(recorded.verification);
+      await expect(store.listAttemptVerificationEvents("run-1")).resolves.toEqual([
+        started.event,
+        recorded.event,
+      ]);
+    });
+
+    it("fences and replays the durable verification authorization", async () => {
+      await receiptSubmittedAttempt();
+      const input = verificationBeginInput();
+      await expect(store.beginAttemptVerification(input)).resolves.toMatchObject({
+        started: true,
+        idempotentReplay: false,
+        authorization: { verificationId: "verification-1", attemptRevision: 5 },
+        attempt: { status: "verifying", revision: 5 },
+      });
+      await expect(store.beginAttemptVerification(input)).resolves.toMatchObject({
+        started: true,
+        idempotentReplay: true,
+      });
+      await expect(
+        store.beginAttemptVerification({ ...input, receiptHash: `sha256:${"9".repeat(64)}` })
+      ).resolves.toMatchObject({ started: false, reason: "mutation_conflict" });
+    });
+
+    it("rejects completed evidence without a durable verification authorization", async () => {
+      await receiptSubmittedAttempt();
+      await expect(store.submitAttemptVerification(verificationInput())).resolves.toMatchObject({
+        recorded: false,
+        reason: "not_found",
+      });
+    });
+
+    it("replays immutable verification by mutation ID and canonical hash", async () => {
+      await verificationStartedAttempt();
+      const input = verificationInput();
+      await expect(store.submitAttemptVerification(input)).resolves.toMatchObject({
+        recorded: true,
+        idempotentReplay: false,
+      });
+      await expect(store.submitAttemptVerification(input)).resolves.toMatchObject({
+        recorded: true,
+        idempotentReplay: true,
+      });
+      await expect(
+        store.submitAttemptVerification({
+          ...input,
+          mutationId: "submit-verification-hash-replay",
+          now: "2026-07-11T12:00:05.900Z",
+        })
+      ).resolves.toMatchObject({
+        recorded: true,
+        idempotentReplay: true,
+        event: { type: "attempt_verification_replayed", sequence: 3 },
+      });
+      await expect(
+        store.submitAttemptVerification({
+          ...input,
+          mutationId: "submit-verification-conflict",
+          workspaceLeaseId: "other-lease",
+        })
+      ).resolves.toMatchObject({ recorded: false, reason: "verification_conflict" });
+    });
+
+    it("fences verification identity, revisions, packet checks, and trust gaps", async () => {
+      await verificationStartedAttempt();
+      await expect(
+        store.submitAttemptVerification(verificationInput("pass", { expectedAttemptRevision: 99 }))
+      ).resolves.toMatchObject({ recorded: false, reason: "stale_attempt_revision" });
+      await expect(
+        store.submitAttemptVerification(
+          verificationInput("pass", {
+            mutationId: "verification-dangling-check",
+            verification: verificationEvidence("fail", {
+              checks: [
+                {
+                  ...verificationEvidence().checks[0],
+                  id: "undeclared",
+                  outcome: "fail",
+                },
+              ],
+              failures: ["undeclared check failed"],
+              trust_gap_reasons: ["worker_outcome_disagrees", "claimed_check_disagrees"],
+            }),
+          })
+        )
+      ).resolves.toMatchObject({ recorded: false, reason: "evidence_mismatch" });
+      await expect(
+        store.submitAttemptVerification(
+          verificationInput("fail", {
+            mutationId: "verification-hidden-trust-gap",
+            verification: verificationEvidence("fail", { trust_gap_reasons: [] }),
+          })
+        )
+      ).resolves.toMatchObject({ recorded: false, reason: "evidence_mismatch" });
+    });
+
+    it("prevents generic transitions from manufacturing verification state", async () => {
+      await receiptSubmittedAttempt();
+      await expect(
+        store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: "bypass-verification-persistence",
+          now: "2026-07-11T12:00:05.500Z",
+          attemptId: "attempt-1",
+          expectedAttemptRevision: 4,
+          status: "verifying",
         })
       ).resolves.toMatchObject({ updated: false, reason: "evidence_mismatch" });
     });
