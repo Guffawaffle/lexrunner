@@ -120,8 +120,32 @@ export type { AttemptWorkerHandlers } from "./agent-work-worker-adapters.js";
 export { AgentWorkWorkerSessionService } from "./agent-work-worker-session-service.js";
 export type {
   AttachAttemptWorkerInput,
+  BoundedWorkerAdapterStatus,
   WorkerSessionStatusResult,
 } from "./agent-work-worker-session-service.js";
+export {
+  AgentWorkWorkerAdapterNegotiator,
+  HOST_ASSISTED_ADAPTER_MANIFEST,
+  PortBackedWorkerRuntimeAdapter,
+  WorkerAdapterAuthorityDimension,
+  WorkerAdapterEnforcement,
+  WorkerAdapterManifest_v1,
+  WorkerAdapterRegistry,
+  WorkerAdapterSelection_v1,
+  WorkerRuntimeArtifactSchema,
+  WorkerRuntimeSignalSchema,
+  WORKER_ADAPTER_CONTRACT_VERSION,
+} from "./agent-work-worker-runtime.js";
+export type {
+  WorkerAdapterManifest_v1 as WorkerAdapterManifest,
+  WorkerAdapterNegotiationDimension,
+  WorkerAdapterNegotiationResult,
+  WorkerAdapterSelection_v1 as WorkerAdapterSelection,
+  WorkerRuntimeAdapter,
+  WorkerRuntimeArtifact,
+  WorkerRuntimePort,
+  WorkerRuntimeSignal,
+} from "./agent-work-worker-runtime.js";
 export {
   AttemptReceiptStatusRequestJsonSchema,
   AttemptReceiptStatusRequestSchema,

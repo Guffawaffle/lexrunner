@@ -256,8 +256,10 @@ disposition, owner, smallest proof, and implementation/licensing boundary.
    or unenforceable dimensions reject attachment. LexRunner's packet-bound argv broker records
    direct-operation decisions, but `brokered` is not synonymous with sandboxed or `enforced`.
 6. **Owner:** LexRunner #804 on top of #794.
-7. **Proof:** one capable fake adapter attaches; adapters missing cancellation, identity, or an
-   authority control fail before worker launch.
+7. **Proof:** the assisted host adapter and a controlled subprocess fixture pass one conformance
+   suite for preparation, liveness loss, cancellation, teardown, artifacts, and receipts;
+   unsupported lifecycle or unaccepted authority gaps fail before GO. The packet-bound authority
+   broker separately proves prohibited operations never reach its process executor.
 8. **Boundary:** target the selected runtime's actual versioned protocol; never treat this research
    record as a wire schema.
 

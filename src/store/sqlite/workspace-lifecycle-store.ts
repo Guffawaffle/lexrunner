@@ -99,6 +99,7 @@ import type {
   WorkerSessionMutationResult,
   WorkerSessionRecord,
   WorkerSessionStore,
+  WorkerAdapterBindingRecord,
   RecordWorkerAuthorityDecisionInput,
   WorkerAuthorityDecisionResult,
   WorkerAuthorityDecisionStore,
@@ -375,6 +376,20 @@ INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
 VALUES(7,'worker-authority-events',datetime('now'));
 `;
 
+const INLINE_WORKER_ADAPTER_MIGRATION = `
+CREATE TABLE IF NOT EXISTS worker_adapter_bindings (
+ sessionId TEXT PRIMARY KEY,
+ adapterId TEXT NOT NULL CHECK(length(adapterId) BETWEEN 1 AND 128),
+ adapterVersion TEXT NOT NULL CHECK(length(adapterVersion) BETWEEN 1 AND 128),
+ enforcementSummaryHash TEXT NOT NULL,
+ trustGapDimensionsJson TEXT NOT NULL CHECK(length(trustGapDimensionsJson) <= 4096),
+ createdAt TEXT NOT NULL,
+ FOREIGN KEY(sessionId) REFERENCES worker_sessions(sessionId) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+VALUES(8,'worker-adapter-bindings',datetime('now'));
+`;
+
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
   workspaceLeaseId: string | null;
   status: string;
@@ -440,6 +455,10 @@ interface WorkerSessionRow extends Omit<
 interface WorkerEventRow extends Omit<WorkerSessionEvent, "payload" | "type"> {
   type: string;
   payloadJson: string;
+}
+
+interface WorkerAdapterBindingRow extends Omit<WorkerAdapterBindingRecord, "trustGapDimensions"> {
+  trustGapDimensionsJson: string;
 }
 
 interface WorkerAuthorityEventRow extends Omit<
@@ -1114,6 +1133,9 @@ export class SqliteWorkspaceLifecycleStore
       if (!Number.isFinite(Date.parse(input.startedAt))) {
         return this.workerFailure("invalid_time", attempt, lease);
       }
+      if (input.adapter && !validWorkerAdapterBinding(input.adapter)) {
+        return this.workerFailure("evidence_mismatch", attempt, lease);
+      }
       const now = instant(input.now);
       const startedAt = instant(input.startedAt);
       if (
@@ -1150,6 +1172,23 @@ export class SqliteWorkspaceLifecycleStore
           startedAt,
           now
         );
+      if (input.adapter) {
+        this.db
+          .prepare(
+            `INSERT INTO worker_adapter_bindings
+             (sessionId, adapterId, adapterVersion, enforcementSummaryHash,
+              trustGapDimensionsJson, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            input.sessionId,
+            input.adapter.adapterId,
+            input.adapter.adapterVersion,
+            input.adapter.enforcementSummaryHash,
+            json(input.adapter.trustGapDimensions),
+            now
+          );
+      }
       this.db
         .prepare(
           `UPDATE attempts SET revision = revision + 1, status = 'running', updatedAt = ?
@@ -1167,6 +1206,16 @@ export class SqliteWorkspaceLifecycleStore
           backend: session.backend,
           workerId: session.workerId,
           executionEnvelopeId: session.executionEnvelopeId,
+          ...(input.adapter
+            ? {
+                adapter: {
+                  id: input.adapter.adapterId,
+                  version: input.adapter.adapterVersion,
+                  enforcementSummaryHash: input.adapter.enforcementSummaryHash,
+                  trustGapDimensions: input.adapter.trustGapDimensions,
+                },
+              }
+            : {}),
         }
       );
     });
@@ -1262,6 +1311,34 @@ export class SqliteWorkspaceLifecycleStore
 
   async getWorkerSessionForAttempt(attemptId: string): Promise<WorkerSessionRecord | null> {
     return this.hasTable("worker_sessions") ? this.workerSessionForAttempt(attemptId, false) : null;
+  }
+
+  async getWorkerAdapterBinding(sessionId: string): Promise<WorkerAdapterBindingRecord | null> {
+    if (!this.hasTable("worker_adapter_bindings")) return null;
+    const row = this.db
+      .prepare(`SELECT * FROM worker_adapter_bindings WHERE sessionId = ?`)
+      .get(sessionId) as WorkerAdapterBindingRow | undefined;
+    if (!row) return null;
+    try {
+      const trustGapDimensions = JSON.parse(row.trustGapDimensionsJson) as unknown;
+      if (
+        !Array.isArray(trustGapDimensions) ||
+        !trustGapDimensions.every((value) => typeof value === "string")
+      ) {
+        return null;
+      }
+      const binding = {
+        sessionId: row.sessionId,
+        adapterId: row.adapterId,
+        adapterVersion: row.adapterVersion,
+        enforcementSummaryHash: row.enforcementSummaryHash,
+        trustGapDimensions,
+        createdAt: row.createdAt,
+      };
+      return validPersistedWorkerAdapterBinding(binding) ? binding : null;
+    } catch {
+      return null;
+    }
   }
 
   async listWorkerSessionEvents(runId: string): Promise<WorkerSessionEvent[]> {
@@ -3386,7 +3463,7 @@ export class SqliteWorkspaceLifecycleStore
   }
 
   private applyWorkspaceMigration(): void {
-    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}`;
+    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}\n${INLINE_WORKER_ADAPTER_MIGRATION}`;
     try {
       const workspacePath = fileURLToPath(
         new URL("./migrations/002-attempt-workspace-lifecycle.sql", import.meta.url)
@@ -3406,7 +3483,10 @@ export class SqliteWorkspaceLifecycleStore
       const authorityPath = fileURLToPath(
         new URL("./migrations/007-worker-authority-events.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}`;
+      const adapterPath = fileURLToPath(
+        new URL("./migrations/008-worker-adapter-bindings.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}\n${readFileSync(adapterPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -4076,6 +4156,30 @@ function validReceiptEventCategories(value: unknown): boolean {
     AttemptReceiptEventTypeSchema.safeParse(value.type).success &&
     AttemptReceiptDispositionSchema.safeParse(value.disposition).success &&
     AgentTaskReceiptOutcomeSchema.safeParse(value.outcome).success
+  );
+}
+
+function validWorkerAdapterBinding(
+  input: NonNullable<AttachWorkerSessionInput["adapter"]>
+): boolean {
+  return (
+    input.adapterId.length > 0 &&
+    input.adapterId.length <= 128 &&
+    input.adapterVersion.length > 0 &&
+    input.adapterVersion.length <= 128 &&
+    /^sha256:[0-9a-f]{64}$/u.test(input.enforcementSummaryHash) &&
+    input.trustGapDimensions.length <= 16 &&
+    new Set(input.trustGapDimensions).size === input.trustGapDimensions.length &&
+    input.trustGapDimensions.every((value) => value.length > 0 && value.length <= 128)
+  );
+}
+
+function validPersistedWorkerAdapterBinding(input: WorkerAdapterBindingRecord): boolean {
+  return (
+    validWorkerAdapterBinding(input) &&
+    input.sessionId.length > 0 &&
+    input.sessionId.length <= 128 &&
+    Number.isFinite(Date.parse(input.createdAt))
   );
 }
 

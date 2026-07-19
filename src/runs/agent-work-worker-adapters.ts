@@ -28,6 +28,7 @@ import {
   AgentWorkWorkerSessionService,
   type WorkerSessionStatusResult,
 } from "./agent-work-worker-session-service.js";
+import { WorkerAdapterSelection_v1 } from "./agent-work-worker-runtime.js";
 
 const MAX_INPUT_BYTES = 256 * 1024;
 const MAX_ISSUES = 20;
@@ -125,6 +126,7 @@ export const AttemptWorkerAttachRequestSchema = z
             startedAt: instant,
           })
           .strict(),
+        adapter: WorkerAdapterSelection_v1,
       })
       .strict(),
   })
@@ -145,6 +147,13 @@ export const AttemptWorkerAttachRequestSchema = z
         code: "custom",
         path: ["attach", "worker", "startedAt"],
         message: "must be between envelope creation and attachment",
+      });
+    }
+    if (value.attach.adapter.mode !== "assisted_attach") {
+      context.addIssue({
+        code: "custom",
+        path: ["attach", "adapter", "mode"],
+        message: "must be assisted_attach for the worker attach surface",
       });
     }
   });
@@ -224,6 +233,25 @@ export function createAttemptWorkerHandlers(): AttemptWorkerHandlers {
       }
       try {
         const input = parsed.data.attach;
+        const negotiation = await runtime.workerAdapters.negotiate(input.attemptId, input.adapter);
+        if (!negotiation.go) {
+          return {
+            ok: false,
+            error: {
+              code: "operation_failed",
+              message: `Worker adapter capability negotiation denied GO: ${negotiation.reason}`,
+            },
+          };
+        }
+        if (input.worker.backend !== negotiation.adapter.session_backend) {
+          return {
+            ok: false,
+            error: {
+              code: "operation_failed",
+              message: "Worker adapter backend identity does not match the requested worker",
+            },
+          };
+        }
         return {
           ok: true,
           result: await runtime.workerSessions.attach({
@@ -240,6 +268,12 @@ export function createAttemptWorkerHandlers(): AttemptWorkerHandlers {
             workerId: input.worker.workerId,
             ...(input.worker.model ? { model: input.worker.model } : {}),
             startedAt: input.worker.startedAt,
+            adapter: {
+              adapterId: negotiation.adapter.id,
+              adapterVersion: negotiation.adapter.version,
+              enforcementSummaryHash: negotiation.enforcementSummaryHash,
+              trustGapDimensions: negotiation.trustGaps,
+            },
             mutationId: input.mutation.mutationId,
             now: input.mutation.now,
           }),

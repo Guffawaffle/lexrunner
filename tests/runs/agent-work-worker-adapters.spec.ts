@@ -61,6 +61,12 @@ describe("Attempt worker adapter handlers", () => {
     expect(status).toMatchObject({
       ok: true,
       result: {
+        adapter: {
+          adapterId: "lexrunner.host-assisted",
+          adapterVersion: "1.0.0",
+          enforcement: "trust_gap",
+          trustGapDimensions: ["filesystem_read", "filesystem_write"],
+        },
         workerSession: {
           sessionId: "codex-task:/root/worker_session_adapter_tests",
           revision: 0,
@@ -145,6 +151,30 @@ describe("Attempt worker adapter handlers", () => {
     });
   });
 
+  it("denies GO before attachment when required enforcement gaps are not accepted", async () => {
+    const prepared = await prepare(await sandbox());
+    const request = attachRequest(prepared);
+    request.attach.adapter.accepted_trust_gaps = [];
+
+    await expect(createAttemptWorkerHandlers().attach(request)).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "operation_failed",
+        message: "Worker adapter capability negotiation denied GO: authority_unenforceable",
+      },
+    });
+    await expect(
+      createAttemptWorkerHandlers().status({
+        databasePath: prepared.request.runtime.databasePath,
+        runId: "run-worker",
+        attemptId: "attempt-worker",
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { workerSession: null, adapter: null },
+    });
+  });
+
   it("refuses attachment when the prepared worktree becomes dirty", async () => {
     const prepared = await prepare(await sandbox());
     await writeFile(
@@ -226,6 +256,13 @@ function attachRequest(prepared: Awaited<ReturnType<typeof prepare>>) {
         workerId: "/root/worker_session_adapter_tests",
         model: "gpt-5-codex",
         startedAt: "2026-07-12T12:00:08.000Z",
+      },
+      adapter: {
+        schema_version: "1.0.0" as const,
+        adapter_id: "lexrunner.host-assisted",
+        adapter_version: "1.0.0",
+        mode: "assisted_attach" as const,
+        accepted_trust_gaps: ["filesystem_read", "filesystem_write"],
       },
       mutation: { mutationId: "attach-worker", now: "2026-07-12T12:00:09.000Z" },
     },

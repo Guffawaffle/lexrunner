@@ -378,6 +378,25 @@ detected post-execution action outside the packet ceiling is a durable
 deviation and MUST surface as an engine-verification trust gap even when all
 declared checks pass.
 
+Worker runtimes cross this boundary through the versioned
+`WorkerAdapterManifest_v1` contract. The manifest declares backend identity,
+launch or assisted-attach support, liveness and teardown behavior, evidence
+collection, structured-signal bounds, and an enforcement level for every
+known authority dimension. Capability negotiation reads the durable packet;
+it never infers authority from environment variables, model names, provider
+identity, or adapter-local configuration. A required `unsupported` dimension
+blocks GO. A required `brokered` or `unenforced` dimension blocks GO unless the
+operator explicitly accepts that exact trust gap, which is then persisted
+atomically with the worker attachment.
+
+The host-assisted adapter therefore reports its real containment limits rather
+than claiming that the foreground host is a sandbox. The common port-backed
+lifecycle validates bounded signals, heartbeat loss, cancellation, teardown,
+artifacts, and receipts identically for assisted and subprocess runtimes.
+Default worker status exposes only the adapter ID/version, enforcement-summary
+hash, and accepted trust-gap dimensions. Provider configuration stays behind
+the adapter and cannot change canonical task identity.
+
 ### Concurrency and Revisioning
 
 LexRunner adopts **one logical writer per run, enforced by a renewable

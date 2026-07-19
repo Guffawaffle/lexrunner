@@ -11,6 +11,7 @@ import type {
   HeartbeatWorkerSessionInput,
   WorkerSessionMutationResult,
   WorkerSessionRecord,
+  WorkerAdapterBindingRecord,
   LaunchEnvelopeBindingResult,
   LaunchEnvelopeBindingStore,
   WorkerSessionStore,
@@ -36,6 +37,11 @@ export interface AttachAttemptWorkerInput extends Omit<
 
 export interface WorkerSessionStatusResult {
   workerSession: WorkerSessionRecord | null;
+  adapter: BoundedWorkerAdapterStatus | null;
+}
+
+export interface BoundedWorkerAdapterStatus extends WorkerAdapterBindingRecord {
+  enforcement: "enforced" | "trust_gap";
 }
 
 /** Shared assisted-worker service. Process launch remains owned by the foreground host. */
@@ -151,8 +157,21 @@ export class AgentWorkWorkerSessionService {
 
   async status(input: { runId: string; attemptId: string }): Promise<WorkerSessionStatusResult> {
     const session = await this.store.getWorkerSessionForAttempt(input.attemptId);
+    const adapter = session ? await this.store.getWorkerAdapterBinding(session.sessionId) : null;
     return {
       workerSession: session?.runId === input.runId ? boundedSession(session) : null,
+      adapter:
+        session?.runId === input.runId && adapter
+          ? {
+              ...adapter,
+              sessionId: bounded(adapter.sessionId),
+              adapterId: bounded(adapter.adapterId),
+              adapterVersion: bounded(adapter.adapterVersion),
+              enforcementSummaryHash: bounded(adapter.enforcementSummaryHash),
+              trustGapDimensions: adapter.trustGapDimensions.map(bounded),
+              enforcement: adapter.trustGapDimensions.length === 0 ? "enforced" : "trust_gap",
+            }
+          : null,
     };
   }
 }
