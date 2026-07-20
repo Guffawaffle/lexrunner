@@ -152,6 +152,16 @@ export type {
   CreateAgentWorkFanoutInput,
   DecideAgentWorkFanInInput,
 } from "./agent-work-fanout-service.js";
+export {
+  executeAgentWorkPreparation,
+  orderAgentWorkPreparationSteps,
+} from "./agent-work-preparation-service.js";
+export type {
+  AgentWorkPreparationCommandResult,
+  AgentWorkPreparationCommandRunner,
+  AgentWorkPreparationResult,
+  ExecuteAgentWorkPreparationInput,
+} from "./agent-work-preparation-service.js";
 export type {
   HeadlessSupervisorConfig as HeadlessSupervisorConfiguration,
   HeadlessSupervisorWorkerControl,

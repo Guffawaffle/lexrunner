@@ -2,7 +2,7 @@
  * Integration tests for Turn Cost tracking in gate execution
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { executeGate } from "../../src/gates.js";
 import { createTurnCostTracker } from "../../src/metrics/turncost.js";
 import type { Gate, Policy } from "../../src/schema.js";
@@ -19,6 +19,10 @@ describe("Turn Cost Tracking - Gate Integration", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "turncost-test-"));
     artifactDir = path.join(tempDir, "artifacts");
     fs.mkdirSync(artifactDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("should track latency for successful gate execution", async () => {

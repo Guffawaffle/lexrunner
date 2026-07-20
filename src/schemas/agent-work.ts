@@ -839,15 +839,74 @@ const AgentTaskPacketBase = z
     instructions: z.array(z.string()),
     scope: PortableScope,
     authority: AuthorityEnvelope,
+    preparation: z
+      .object({
+        policy: z
+          .object({
+            network: z.enum(["forbidden", "registry_only"]),
+            registries: z.array(z.string().url()).max(8),
+            cache: z.enum(["disabled", "read_only", "read_write"]),
+            lifecycle_scripts: z.enum(["forbidden", "allowed"]),
+          })
+          .strict()
+          .superRefine((policy, context) => {
+            if (policy.network === "forbidden" && policy.registries.length > 0) {
+              context.addIssue({
+                code: "custom",
+                path: ["registries"],
+                message: "Offline preparation must not declare registries",
+              });
+            }
+            if (policy.network === "registry_only" && policy.registries.length === 0) {
+              context.addIssue({
+                code: "custom",
+                path: ["registries"],
+                message: "Registry-only preparation requires at least one registry",
+              });
+            }
+            requireUniqueStrings(policy.registries, "registries", context);
+          }),
+        steps: z
+          .array(
+            z
+              .object({
+                id: Id,
+                kind: z.enum(["provision", "build"]),
+                argv: z.array(z.string()).min(1).max(128),
+                cwd_rel: AgentRepoRelativePath.optional(),
+                depends_on: z.array(Id).max(64),
+                expected_exit_codes: z.array(z.number().int()).min(1).max(32),
+              })
+              .strict()
+              .superRefine((step, context) => {
+                requireUniqueStrings(step.depends_on, "depends_on", context);
+                if (new Set(step.expected_exit_codes).size !== step.expected_exit_codes.length) {
+                  context.addIssue({
+                    code: "custom",
+                    path: ["expected_exit_codes"],
+                    message: "Expected exit codes must be unique",
+                  });
+                }
+              })
+          )
+          .min(1)
+          .max(64),
+      })
+      .strict()
+      .optional(),
     verification: z.array(
       z
         .object({
           id: Id,
           argv: z.array(z.string()).min(1),
           cwd_rel: AgentRepoRelativePath.optional(),
+          depends_on: z.array(Id).max(64).optional(),
           expected_exit_codes: z.array(z.number().int()).min(1),
         })
         .strict()
+        .superRefine((step, context) => {
+          requireUniqueStrings(step.depends_on ?? [], "depends_on", context);
+        })
     ),
     budget: z
       .object({
@@ -868,6 +927,7 @@ export const AgentTaskPacket_v1 = AgentTaskPacketBase.superRefine((packet, ctx) 
   rejectMachineLocalPaths(packet, ctx);
   requireUniqueIds(packet.acceptance_criteria, "acceptance_criteria", ctx);
   requireUniqueIds(packet.verification, "verification", ctx);
+  validatePacketExecutionGraph(packet, ctx);
   const { packet_hash: _packetHash, ...hashable } = packet;
   const expected = computeCanonicalHash(hashable);
   if (packet.packet_hash !== expected) {
@@ -892,6 +952,149 @@ export function createAgentTaskPacket(packet: AgentTaskPacketHashInput): AgentTa
     packet_hash: computeAgentTaskPacketHash(packet),
   });
 }
+
+function validatePacketExecutionGraph(
+  packet: z.infer<typeof AgentTaskPacketBase>,
+  context: z.RefinementCtx
+): void {
+  const preparation = packet.preparation?.steps ?? [];
+  const steps = [
+    ...preparation.map((step) => ({
+      id: step.id,
+      dependsOn: step.depends_on,
+      phase: "preparation",
+    })),
+    ...packet.verification.map((step) => ({
+      id: step.id,
+      dependsOn: step.depends_on ?? [],
+      phase: "verification",
+    })),
+  ];
+  const ids = new Set<string>();
+  for (const [index, step] of steps.entries()) {
+    if (ids.has(step.id)) {
+      context.addIssue({
+        code: "custom",
+        path: [step.phase === "preparation" ? "preparation" : "verification", index, "id"],
+        message: "Preparation and verification step IDs must be globally unique",
+      });
+    }
+    ids.add(step.id);
+  }
+  for (const step of steps) {
+    for (const dependency of step.dependsOn) {
+      if (!ids.has(dependency)) {
+        context.addIssue({
+          code: "custom",
+          path: [step.phase === "preparation" ? "preparation" : "verification"],
+          message: `Execution step ${step.id} references unknown dependency ${dependency}`,
+        });
+      }
+    }
+  }
+
+  const preparationIds = new Set(preparation.map(({ id }) => id));
+  for (const step of preparation) {
+    if (step.depends_on.some((dependency) => !preparationIds.has(dependency))) {
+      context.addIssue({
+        code: "custom",
+        path: ["preparation", "steps"],
+        message: "Preparation steps may depend only on other preparation steps",
+      });
+    }
+  }
+
+  const dependencies = new Map(steps.map((step) => [step.id, step.dependsOn]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) return false;
+    if (visited.has(id)) return true;
+    visiting.add(id);
+    for (const dependency of dependencies.get(id) ?? []) {
+      if (!visit(dependency)) return false;
+    }
+    visiting.delete(id);
+    visited.add(id);
+    return true;
+  };
+  if ([...dependencies.keys()].some((id) => !visit(id))) {
+    context.addIssue({
+      code: "custom",
+      path: ["preparation"],
+      message: "Preparation and verification dependencies must be acyclic",
+    });
+  }
+}
+
+export const AgentWorkPreparationReceipt_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    receipt_id: Id,
+    run_id: Id,
+    attempt_id: Id,
+    packet_id: Id,
+    packet_hash: SHA256Hash,
+    preparation_plan_hash: SHA256Hash,
+    policy_hash: SHA256Hash,
+    outcome: z.enum(["passed", "failed"]),
+    steps: z
+      .array(
+        z
+          .object({
+            id: Id,
+            outcome: z.enum(["passed", "failed", "blocked"]),
+            exit_code: z.number().int().optional(),
+            stdout_hash: SHA256Hash.optional(),
+            stderr_hash: SHA256Hash.optional(),
+            policy_hash: SHA256Hash.optional(),
+          })
+          .strict()
+          .superRefine((step, stepContext) => {
+            const executed = step.outcome !== "blocked";
+            if (
+              executed !==
+              [step.exit_code, step.stdout_hash, step.stderr_hash, step.policy_hash].every(
+                (value) => value !== undefined
+              )
+            ) {
+              stepContext.addIssue({
+                code: "custom",
+                message: "Executed preparation steps require bounded result and policy evidence",
+              });
+            }
+          })
+      )
+      .max(64),
+    started_at: Timestamp,
+    completed_at: Timestamp,
+    receipt_hash: SHA256Hash,
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    requireTimestampOrder(receipt.started_at, receipt.completed_at, "completed_at", context);
+    requireUniqueIds(receipt.steps, "steps", context);
+    if (
+      (receipt.outcome === "passed") !==
+      receipt.steps.every(({ outcome }) => outcome === "passed")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["outcome"],
+        message: "Preparation passes exactly when every declared step passes",
+      });
+    }
+    const { receipt_hash: _receiptHash, ...hashable } = receipt;
+    const expected = computeCanonicalHash(hashable);
+    if (receipt.receipt_hash !== expected) {
+      context.addIssue({
+        code: "custom",
+        path: ["receipt_hash"],
+        message: `Preparation receipt hash does not match canonical content; expected ${expected}`,
+      });
+    }
+  });
+export type AgentWorkPreparationReceipt_v1 = z.infer<typeof AgentWorkPreparationReceipt_v1>;
 
 const AbsolutePath = z.string().min(1).refine(isMachineLocalAbsolutePath, {
   message: "Must be an absolute machine-local path",
