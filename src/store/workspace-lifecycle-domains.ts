@@ -134,6 +134,7 @@ export const WorkspaceMutationFailureReason = z.enum([
   "evidence_mismatch",
   "retry_delta_required",
   "retry_delta_invalid",
+  "fanout_invalid",
 ]);
 export type WorkspaceMutationFailureReason = z.infer<typeof WorkspaceMutationFailureReason>;
 

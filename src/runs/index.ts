@@ -142,6 +142,16 @@ export {
   HeadlessSupervisorConfig,
   planSupervisorAttempt,
 } from "./agent-work-supervisor.js";
+export {
+  AgentWorkFanoutService,
+  STRICT_FANIN_POLICY_ID,
+  STRICT_FANIN_POLICY_VERSION,
+} from "./agent-work-fanout-service.js";
+export type {
+  AgentWorkFanInResult,
+  CreateAgentWorkFanoutInput,
+  DecideAgentWorkFanInInput,
+} from "./agent-work-fanout-service.js";
 export type {
   HeadlessSupervisorConfig as HeadlessSupervisorConfiguration,
   HeadlessSupervisorWorkerControl,

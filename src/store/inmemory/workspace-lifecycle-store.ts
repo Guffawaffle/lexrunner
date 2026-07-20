@@ -1,10 +1,15 @@
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
+import { evaluateStrictAgentWorkFanIn } from "../../agent-work-fanin-policy.js";
 import {
+  AgentWorkFanInDecision_v1,
+  AgentWorkFanoutPlan_v1,
   AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v2,
   AttemptRetryDelta_v1,
+  computeFanInEvidenceSetHash,
+  FanoutAttemptBinding_v1,
   validateAgentEngineVerificationV2PacketReferences,
   validateAgentTaskReceiptV2PacketReferences,
 } from "../../schemas/agent-work.js";
@@ -25,6 +30,7 @@ import type {
 } from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
+  AgentWorkFanoutStore,
   ApplyAttemptAcceptanceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
@@ -46,7 +52,14 @@ import type {
   BindLaunchEnvelopeInput,
   BeginAttemptVerificationInput,
   CreateAttemptInput,
+  CommitFanInDecisionInput,
+  CreateFanoutPlanInput,
   EndWorkerSessionInput,
+  FanInDecisionMutationResult,
+  FanInDecisionRecord,
+  FanoutAttemptBindingRecord,
+  FanoutPlanMutationResult,
+  FanoutPlanRecord,
   HeartbeatWorkerSessionInput,
   LaunchEnvelopeBindingRecord,
   LaunchEnvelopeBindingResult,
@@ -129,6 +142,12 @@ interface StoredVerificationBeginMutation {
   result: Extract<AttemptVerificationBeginResult, { started: true }>;
 }
 
+interface StoredFanoutMutation {
+  fingerprint: string;
+  kind: "plan" | "decision";
+  id: string;
+}
+
 /**
  * In-memory authoritative controller + workspace lifecycle store.
  *
@@ -145,10 +164,16 @@ export class InMemoryWorkspaceLifecycleStore
     WorkerSessionStore,
     WorkerAuthorityDecisionStore,
     AttemptVerificationStore,
-    AttemptAcceptanceStore
+    AttemptAcceptanceStore,
+    AgentWorkFanoutStore
 {
   private readonly attempts = new Map<string, AttemptRecord>();
   private readonly attemptRetryDeltas = new Map<string, AttemptRetryDeltaRecord>();
+  private readonly fanoutPlans = new Map<string, FanoutPlanRecord>();
+  private readonly fanoutBindings = new Map<string, FanoutAttemptBindingRecord>();
+  private readonly fanInDecisions = new Map<string, FanInDecisionRecord>();
+  private readonly fanInDecisionByFanout = new Map<string, string>();
+  private readonly fanoutMutations = new Map<string, StoredFanoutMutation>();
   private readonly workspaceLeases = new Map<string, WorkspaceLifecycleLeaseRecord>();
   private readonly lifecycleEvents = new Map<string, WorkspaceLifecycleEvent[]>();
   private readonly mutations = new Map<string, StoredMutation>();
@@ -181,15 +206,19 @@ export class InMemoryWorkspaceLifecycleStore
   async createAttempt(input: CreateAttemptInput): Promise<WorkspaceMutationResult> {
     return this.mutate(input, () => {
       if (this.attempts.has(input.attemptId)) return this.failure("live_attempt_conflict");
+      const fanout = this.validateFanoutBinding(input);
+      if (!fanout.valid) return this.failure("fanout_invalid");
       const conflict = [...this.attempts.values()].some(
         (attempt) =>
           attempt.runId === input.runId &&
           attempt.workItemId === input.workItemId &&
-          isLiveAttempt(attempt)
+          isLiveAttempt(attempt) &&
+          (!fanout.record ||
+            this.fanoutBindings.get(attempt.attemptId)?.fanoutId !== fanout.record.fanoutId)
       );
       if (conflict) return this.failure("live_attempt_conflict");
 
-      const retry = this.validateRetryDelta(input);
+      const retry = this.validateRetryDelta(input, fanout.record?.fanoutId);
       if (!retry.valid) return this.failure(retry.reason);
 
       const now = normalizeInstant(input.now);
@@ -213,7 +242,10 @@ export class InMemoryWorkspaceLifecycleStore
       };
       this.attempts.set(attempt.attemptId, attempt);
       if (retry.record) this.attemptRetryDeltas.set(attempt.attemptId, retry.record);
+      if (fanout.record) this.fanoutBindings.set(attempt.attemptId, fanout.record);
       return this.record(input, attempt, null, "attempt_created", {
+        fanoutId: fanout.record?.fanoutId ?? null,
+        premiseId: fanout.record?.premiseId ?? null,
         workItemId: input.workItemId,
         retryDeltaHash: retry.record?.deltaHash ?? null,
       });
@@ -522,6 +554,197 @@ export class InMemoryWorkspaceLifecycleStore
     return [...this.attempts.values()]
       .filter((attempt) => attempt.runId === runId)
       .map((attempt) => ({ ...attempt }));
+  }
+
+  async createFanoutPlan(input: CreateFanoutPlanInput): Promise<FanoutPlanMutationResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return { created: false, reason: "invalid_time" };
+    if (input.controller.runId !== input.runId) return { created: false, reason: "lease_mismatch" };
+    const authenticated = this.withActiveControllerCredential(
+      input.controller,
+      input.now,
+      input.expectedRunRevision,
+      () => {
+        const parsed = AgentWorkFanoutPlan_v1.safeParse(input.plan);
+        if (
+          !parsed.success ||
+          parsed.data.run_id !== input.runId ||
+          normalizeInstant(parsed.data.created_at) !== normalizeInstant(input.now)
+        ) {
+          return { created: false as const, reason: "fanout_invalid" as const };
+        }
+        const key = mutationKey(input.runId, input.mutationId);
+        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        if (this.hasNonFanoutMutation(key)) {
+          return { created: false as const, reason: "mutation_conflict" as const };
+        }
+        const prior = this.fanoutMutations.get(key);
+        if (prior) {
+          const record = this.fanoutPlans.get(prior.id);
+          return prior.fingerprint === fingerprint && prior.kind === "plan" && record
+            ? { created: true as const, plan: { ...record }, idempotentReplay: true }
+            : { created: false as const, reason: "mutation_conflict" as const };
+        }
+        const planJson = canonicalJSONStringify(parsed.data);
+        const planHash = computeCanonicalHash(parsed.data);
+        const existing = this.fanoutPlans.get(parsed.data.fanout_id);
+        if (existing) {
+          if (existing.planHash !== planHash || existing.planJson !== planJson) {
+            return { created: false as const, reason: "fanout_conflict" as const };
+          }
+          this.fanoutMutations.set(key, {
+            fingerprint,
+            kind: "plan",
+            id: existing.fanoutId,
+          });
+          return { created: true as const, plan: { ...existing }, idempotentReplay: true };
+        }
+        if (
+          parsed.data.premises.some(
+            ({ attempt_id }) => this.attempts.has(attempt_id) || this.fanoutBindings.has(attempt_id)
+          )
+        ) {
+          return { created: false as const, reason: "fanout_conflict" as const };
+        }
+        const record: FanoutPlanRecord = {
+          fanoutId: parsed.data.fanout_id,
+          runId: parsed.data.run_id,
+          workItemId: parsed.data.work_item_id,
+          workItemRevision: parsed.data.work_item_revision,
+          planHash,
+          planJson,
+          controllerId: input.controller.controllerId,
+          controllerLeaseId: input.controller.leaseId,
+          fencingToken: input.controller.fencingToken,
+          createdAt: normalizeInstant(input.now),
+        };
+        this.fanoutPlans.set(record.fanoutId, record);
+        this.fanoutMutations.set(key, { fingerprint, kind: "plan", id: record.fanoutId });
+        return { created: true as const, plan: { ...record }, idempotentReplay: false };
+      }
+    );
+    return authenticated.authenticated
+      ? authenticated.value
+      : {
+          created: false,
+          reason: authenticated.reason,
+          ...(authenticated.currentRunRevision !== undefined
+            ? { currentRunRevision: authenticated.currentRunRevision }
+            : {}),
+        };
+  }
+
+  async getFanoutPlan(fanoutId: string): Promise<FanoutPlanRecord | null> {
+    const record = this.fanoutPlans.get(fanoutId);
+    return record ? { ...record } : null;
+  }
+
+  async getAttemptFanoutBinding(attemptId: string): Promise<FanoutAttemptBindingRecord | null> {
+    const record = this.fanoutBindings.get(attemptId);
+    return record ? { ...record } : null;
+  }
+
+  async listFanoutAttemptBindings(fanoutId: string): Promise<FanoutAttemptBindingRecord[]> {
+    return [...this.fanoutBindings.values()]
+      .filter((binding) => binding.fanoutId === fanoutId)
+      .sort((left, right) => left.attemptId.localeCompare(right.attemptId))
+      .map((binding) => ({ ...binding }));
+  }
+
+  async commitFanInDecision(input: CommitFanInDecisionInput): Promise<FanInDecisionMutationResult> {
+    if (!Number.isFinite(Date.parse(input.now))) return { recorded: false, reason: "invalid_time" };
+    if (input.controller.runId !== input.runId)
+      return { recorded: false, reason: "lease_mismatch" };
+    const authenticated = this.withActiveControllerCredential(
+      input.controller,
+      input.now,
+      input.expectedRunRevision,
+      () => {
+        const parsed = AgentWorkFanInDecision_v1.safeParse(input.decision);
+        if (
+          !parsed.success ||
+          parsed.data.run_id !== input.runId ||
+          normalizeInstant(parsed.data.created_at) !== normalizeInstant(input.now)
+        ) {
+          return { recorded: false as const, reason: "fanout_evidence_mismatch" as const };
+        }
+        const key = mutationKey(input.runId, input.mutationId);
+        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        if (this.hasNonFanoutMutation(key)) {
+          return { recorded: false as const, reason: "mutation_conflict" as const };
+        }
+        const prior = this.fanoutMutations.get(key);
+        if (prior) {
+          const record = this.fanInDecisions.get(prior.id);
+          return prior.fingerprint === fingerprint && prior.kind === "decision" && record
+            ? { recorded: true as const, decision: { ...record }, idempotentReplay: true }
+            : { recorded: false as const, reason: "mutation_conflict" as const };
+        }
+        const plan = this.fanoutPlans.get(parsed.data.fanout_id);
+        if (!plan) return { recorded: false as const, reason: "fanout_not_found" as const };
+        if (!this.validFanInDecision(parsed.data, plan)) {
+          return { recorded: false as const, reason: "fanout_evidence_mismatch" as const };
+        }
+        const decisionJson = canonicalJSONStringify(parsed.data);
+        const decisionHash = computeCanonicalHash(parsed.data);
+        const existingId = this.fanInDecisionByFanout.get(plan.fanoutId);
+        const existing =
+          this.fanInDecisions.get(parsed.data.decision_id) ??
+          (existingId ? this.fanInDecisions.get(existingId) : undefined);
+        if (existing) {
+          if (existing.decisionHash !== decisionHash || existing.decisionJson !== decisionJson) {
+            return { recorded: false as const, reason: "fanout_conflict" as const };
+          }
+          this.fanoutMutations.set(key, {
+            fingerprint,
+            kind: "decision",
+            id: existing.decisionId,
+          });
+          return { recorded: true as const, decision: { ...existing }, idempotentReplay: true };
+        }
+        const record: FanInDecisionRecord = {
+          decisionId: parsed.data.decision_id,
+          fanoutId: parsed.data.fanout_id,
+          runId: parsed.data.run_id,
+          workItemId: parsed.data.work_item_id,
+          workItemRevision: parsed.data.work_item_revision,
+          decisionHash,
+          decisionJson,
+          selectedAttemptId: parsed.data.selected_attempt_id ?? null,
+          outcome: parsed.data.decision,
+          controllerId: input.controller.controllerId,
+          controllerLeaseId: input.controller.leaseId,
+          fencingToken: input.controller.fencingToken,
+          createdAt: normalizeInstant(input.now),
+        };
+        this.fanInDecisions.set(record.decisionId, record);
+        this.fanInDecisionByFanout.set(record.fanoutId, record.decisionId);
+        this.fanoutMutations.set(key, {
+          fingerprint,
+          kind: "decision",
+          id: record.decisionId,
+        });
+        return { recorded: true as const, decision: { ...record }, idempotentReplay: false };
+      }
+    );
+    return authenticated.authenticated
+      ? authenticated.value
+      : {
+          recorded: false,
+          reason: authenticated.reason,
+          ...(authenticated.currentRunRevision !== undefined
+            ? { currentRunRevision: authenticated.currentRunRevision }
+            : {}),
+        };
+  }
+
+  async getFanInDecision(decisionId: string): Promise<FanInDecisionRecord | null> {
+    const record = this.fanInDecisions.get(decisionId);
+    return record ? { ...record } : null;
+  }
+
+  async getFanInDecisionForFanout(fanoutId: string): Promise<FanInDecisionRecord | null> {
+    const id = this.fanInDecisionByFanout.get(fanoutId);
+    return id ? this.getFanInDecision(id) : null;
   }
 
   async getAttemptRetryDelta(attemptId: string): Promise<AttemptRetryDeltaRecord | null> {
@@ -1048,7 +1271,8 @@ export class InMemoryWorkspaceLifecycleStore
           this.workerMutations.has(key) ||
           this.verificationMutations.has(key) ||
           this.verificationBeginMutations.has(key) ||
-          this.workerAuthorityMutations.has(key)
+          this.workerAuthorityMutations.has(key) ||
+          this.fanoutMutations.has(key)
         ) {
           return this.receiptFailure("mutation_conflict");
         }
@@ -2227,7 +2451,8 @@ export class InMemoryWorkspaceLifecycleStore
   }
 
   private validateRetryDelta(
-    input: CreateAttemptInput
+    input: CreateAttemptInput,
+    currentFanoutId?: string
   ):
     | { valid: true; record?: AttemptRetryDeltaRecord }
     | { valid: false; reason: "retry_delta_required" | "retry_delta_invalid" } {
@@ -2235,7 +2460,9 @@ export class InMemoryWorkspaceLifecycleStore
       (attempt) =>
         attempt.runId === input.runId &&
         attempt.workItemId === input.workItemId &&
-        attempt.workItemRevision === input.workItemRevision
+        attempt.workItemRevision === input.workItemRevision &&
+        (currentFanoutId === undefined ||
+          this.fanoutBindings.get(attempt.attemptId)?.fanoutId !== currentFanoutId)
     );
     if (previous.length === 0) {
       return input.retry ? { valid: false, reason: "retry_delta_invalid" } : { valid: true };
@@ -2268,6 +2495,141 @@ export class InMemoryWorkspaceLifecycleStore
     };
   }
 
+  private validateFanoutBinding(
+    input: CreateAttemptInput
+  ): { valid: true; record?: FanoutAttemptBindingRecord } | { valid: false } {
+    if (!input.fanout) return { valid: true };
+    const binding = FanoutAttemptBinding_v1.safeParse(input.fanout);
+    if (!binding.success || binding.data.attempt_id !== input.attemptId) return { valid: false };
+    const planRecord = this.fanoutPlans.get(binding.data.fanout_id);
+    if (!planRecord || planRecord.planHash !== binding.data.fanout_plan_hash) {
+      return { valid: false };
+    }
+    const plan = AgentWorkFanoutPlan_v1.safeParse(JSON.parse(planRecord.planJson) as unknown);
+    const premise = plan.success
+      ? plan.data.premises.find(({ premise_id }) => premise_id === binding.data.premise_id)
+      : undefined;
+    if (
+      !plan.success ||
+      plan.data.run_id !== input.runId ||
+      plan.data.work_item_id !== input.workItemId ||
+      plan.data.work_item_revision !== input.workItemRevision ||
+      !premise ||
+      premise.attempt_id !== input.attemptId ||
+      computeCanonicalHash(premise) !== binding.data.premise_hash ||
+      [...this.fanoutBindings.values()].some(
+        (candidate) =>
+          candidate.fanoutId === binding.data.fanout_id &&
+          candidate.premiseId === binding.data.premise_id
+      )
+    ) {
+      return { valid: false };
+    }
+    return {
+      valid: true,
+      record: {
+        fanoutId: binding.data.fanout_id,
+        attemptId: binding.data.attempt_id,
+        premiseId: binding.data.premise_id,
+        premiseHash: binding.data.premise_hash,
+        planHash: binding.data.fanout_plan_hash,
+        createdAt: normalizeInstant(input.now),
+      },
+    };
+  }
+
+  private hasNonFanoutMutation(key: string): boolean {
+    return (
+      this.mutations.has(key) ||
+      this.workerMutations.has(key) ||
+      this.receiptMutations.has(key) ||
+      this.verificationMutations.has(key) ||
+      this.verificationBeginMutations.has(key) ||
+      this.workerAuthorityMutations.has(key)
+    );
+  }
+
+  private validFanInDecision(
+    decision: import("../../schemas/agent-work.js").AgentWorkFanInDecision_v1,
+    planRecord: FanoutPlanRecord
+  ): boolean {
+    let plan: import("../../schemas/agent-work.js").AgentWorkFanoutPlan_v1;
+    try {
+      plan = AgentWorkFanoutPlan_v1.parse(JSON.parse(planRecord.planJson) as unknown);
+    } catch {
+      return false;
+    }
+    if (
+      decision.fanout_plan_hash !== planRecord.planHash ||
+      decision.run_id !== plan.run_id ||
+      decision.work_item_id !== plan.work_item_id ||
+      decision.work_item_revision !== plan.work_item_revision ||
+      canonicalJSONStringify(decision.selection_criteria) !==
+        canonicalJSONStringify(plan.selection_criteria) ||
+      decision.candidates.length !== plan.premises.length ||
+      decision.evidence_set_hash !== computeFanInEvidenceSetHash(decision.candidates)
+    ) {
+      return false;
+    }
+    for (const premise of plan.premises) {
+      const binding = this.fanoutBindings.get(premise.attempt_id);
+      const attempt = this.attempts.get(premise.attempt_id);
+      const candidate = decision.candidates.find(
+        ({ attempt_id }) => attempt_id === premise.attempt_id
+      );
+      if (
+        !binding ||
+        binding.fanoutId !== plan.fanout_id ||
+        binding.premiseId !== premise.premise_id ||
+        !attempt ||
+        !isTerminalAttemptStatus(attempt.status) ||
+        !candidate ||
+        candidate.premise_id !== premise.premise_id ||
+        candidate.attempt_status !== attempt.status
+      ) {
+        return false;
+      }
+      const receiptId = this.receiptByAttempt.get(attempt.attemptId);
+      const receipt = receiptId ? this.attemptReceipts.get(receiptId) : undefined;
+      if (
+        candidate.receipt_id !== receipt?.receiptId ||
+        candidate.receipt_hash !== receipt?.receiptHash
+      ) {
+        return false;
+      }
+      const verificationId = this.verificationByAttempt.get(attempt.attemptId);
+      const verification = verificationId
+        ? this.attemptVerifications.get(verificationId)
+        : undefined;
+      if (
+        candidate.verification_id !== verification?.verificationId ||
+        candidate.verification_hash !== verification?.verificationHash ||
+        candidate.verification_outcome !== verification?.outcome ||
+        candidate.trust_gap_count !== (verification?.trustGapReasons.length ?? 0) ||
+        candidate.verified_result_identity !==
+          (verification?.verifiedPatchHash ?? verification?.verifiedHeadSha)
+      ) {
+        return false;
+      }
+      const artifacts = verification ? verificationArtifactRefs(verification) : [];
+      if (canonicalJSONStringify(candidate.artifact_refs) !== canonicalJSONStringify(artifacts)) {
+        return false;
+      }
+    }
+    const expected = evaluateStrictAgentWorkFanIn(
+      decision.candidates.map(
+        ({ conclusion: _conclusion, reason_codes: _reasonCodes, ...evidence }) => evidence
+      )
+    );
+    return (
+      decision.decision === expected.outcome &&
+      decision.selected_attempt_id === expected.selectedAttemptId &&
+      canonicalJSONStringify(decision.candidates) === canonicalJSONStringify(expected.candidates) &&
+      canonicalJSONStringify(decision.conflicts) === canonicalJSONStringify(expected.conflicts) &&
+      canonicalJSONStringify(decision.uncertainty) === canonicalJSONStringify(expected.uncertainty)
+    );
+  }
+
   private validInheritedRetryEvidence(
     prior: AttemptRecord,
     references: import("../../schemas/agent-work.js").AttemptRetryDelta_v1["inherited_evidence"]
@@ -2283,6 +2645,10 @@ export class InMemoryWorkspaceLifecycleStore
           verification?.attemptId === prior.attemptId &&
           verification.verificationHash === reference.hash
         );
+      }
+      if (reference.kind === "fan_in_decision") {
+        const decision = this.fanInDecisions.get(reference.id);
+        return decision?.decisionHash === reference.hash;
       }
       // Artifact, observation, and deviation references are reserved schema
       // lanes until their canonical evidence stores expose identity + hash
@@ -2734,6 +3100,18 @@ function parseStoredReceipt(record: AttemptReceiptRecord): AgentTaskReceipt_v2 |
       : null;
   } catch {
     return null;
+  }
+}
+
+function verificationArtifactRefs(record: AttemptVerificationRecord): string[] {
+  try {
+    const parsed = AgentEngineVerification_v2.safeParse(
+      JSON.parse(record.verificationJson) as unknown
+    );
+    if (!parsed.success) return [];
+    return [...new Set(parsed.data.checks.flatMap(({ artifact_refs }) => artifact_refs))].sort();
+  } catch {
+    return [];
   }
 }
 

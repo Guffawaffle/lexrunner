@@ -136,19 +136,70 @@ export type WorkerAdapterNegotiationResult =
       blockedDimensions: WorkerAdapterAuthorityDimension[];
     };
 
-export interface WorkerRuntimeSignal {
-  type: "heartbeat" | "progress" | "blocked" | "completed" | "failed";
-  summary: string;
-  at: string;
-}
+const workerSignalBase = {
+  summary: z.string().min(1).max(4_096),
+  at: z.string().datetime({ offset: true }),
+};
 
-export const WorkerRuntimeSignalSchema = z
-  .object({
-    type: z.enum(["heartbeat", "progress", "blocked", "completed", "failed"]),
-    summary: z.string().min(1).max(4_096),
-    at: z.string().datetime({ offset: true }),
-  })
-  .strict();
+export const WorkerRuntimeSignalSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.enum(["heartbeat", "progress", "completed", "failed"]),
+      ...workerSignalBase,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("blocked"),
+      ...workerSignalBase,
+      blocker: z
+        .object({
+          code: boundedText,
+          retryable: z.boolean(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("dependency_discovered"),
+      ...workerSignalBase,
+      dependency: z
+        .object({
+          work_item_id: boundedText,
+          relationship: z.enum(["blocks", "blocked_by", "related"]),
+          evidence_hash: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("evidence_discovered"),
+      ...workerSignalBase,
+      evidence: z
+        .object({
+          kind: z.enum(["artifact", "observation", "decision", "eliminated_hypothesis"]),
+          id: boundedText,
+          hash: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("human_action_requested"),
+      ...workerSignalBase,
+      request: z
+        .object({
+          request_id: boundedText,
+          action_class: boundedText,
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+export type WorkerRuntimeSignal = z.infer<typeof WorkerRuntimeSignalSchema>;
 
 export const WorkerRuntimeArtifactSchema = z
   .object({

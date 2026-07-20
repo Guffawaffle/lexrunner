@@ -1,8 +1,11 @@
 import type { ControllerLeaseCredential, JsonValue } from "./coordination-store.js";
 import { AGENT_WORK_CONTRACT_VERSION, Attempt_v1 } from "../schemas/agent-work.js";
 import type {
+  AgentWorkFanInDecision_v1,
+  AgentWorkFanoutPlan_v1,
   AttemptRetryDelta_v1,
   Attempt_v1 as AttemptContract_v1,
+  FanoutAttemptBinding_v1,
 } from "../schemas/agent-work.js";
 import type {
   AgentEngineVerification_v2,
@@ -93,6 +96,47 @@ export interface AttemptRetryDeltaRecord {
   previousAttemptId: string;
   deltaHash: string;
   deltaJson: string;
+  createdAt: string;
+}
+
+/** Canonical immutable declaration for one bounded parallel comparison. */
+export interface FanoutPlanRecord {
+  fanoutId: string;
+  runId: string;
+  workItemId: string;
+  workItemRevision: number;
+  planHash: string;
+  planJson: string;
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
+  createdAt: string;
+}
+
+/** Exact declared premise occupied by an Attempt. */
+export interface FanoutAttemptBindingRecord {
+  fanoutId: string;
+  attemptId: string;
+  premiseId: string;
+  premiseHash: string;
+  planHash: string;
+  createdAt: string;
+}
+
+/** Immutable engine-owned fan-in comparison. */
+export interface FanInDecisionRecord {
+  decisionId: string;
+  fanoutId: string;
+  runId: string;
+  workItemId: string;
+  workItemRevision: number;
+  decisionHash: string;
+  decisionJson: string;
+  selectedAttemptId: string | null;
+  outcome: AgentWorkFanInDecision_v1["decision"];
+  controllerId: string;
+  controllerLeaseId: string;
+  fencingToken: number;
   createdAt: string;
 }
 
@@ -654,7 +698,41 @@ export interface CreateAttemptInput extends AuthenticatedMutationInput {
   packetHash: string;
   baseSha: string;
   retry?: AttemptRetryDelta_v1;
+  fanout?: FanoutAttemptBinding_v1;
 }
+
+export interface CreateFanoutPlanInput extends AuthenticatedMutationInput {
+  plan: AgentWorkFanoutPlan_v1;
+}
+
+export interface CommitFanInDecisionInput extends AuthenticatedMutationInput {
+  decision: AgentWorkFanInDecision_v1;
+}
+
+export type FanoutPlanMutationResult =
+  | { created: true; plan: FanoutPlanRecord; idempotentReplay: boolean }
+  | {
+      created: false;
+      reason:
+        | WorkspaceMutationFailureReason
+        | "fanout_conflict"
+        | "fanout_not_found"
+        | "fanout_evidence_mismatch";
+      currentRunRevision?: number;
+    };
+
+export type FanInDecisionMutationResult =
+  | { recorded: true; decision: FanInDecisionRecord; idempotentReplay: boolean }
+  | {
+      recorded: false;
+      reason:
+        | WorkspaceMutationFailureReason
+        | "fanout_conflict"
+        | "fanout_not_found"
+        | "fanout_incomplete"
+        | "fanout_evidence_mismatch";
+      currentRunRevision?: number;
+    };
 
 export interface AcquireWorkspaceInput extends AuthenticatedMutationInput, WorkspaceIdentity {
   workspaceLeaseId: string;
@@ -741,6 +819,17 @@ export interface WorkspaceLifecycleStore {
   getWorkspaceLease(leaseId: string): Promise<WorkspaceLifecycleLeaseRecord | null>;
   listWorkspaceLeases(runId: string): Promise<WorkspaceLifecycleLeaseRecord[]>;
   listWorkspaceLifecycleEvents(runId: string): Promise<WorkspaceLifecycleEvent[]>;
+}
+
+/** Durable planning and comparison port for one-level bounded parallel Attempts. */
+export interface AgentWorkFanoutStore {
+  createFanoutPlan(input: CreateFanoutPlanInput): Promise<FanoutPlanMutationResult>;
+  getFanoutPlan(fanoutId: string): Promise<FanoutPlanRecord | null>;
+  getAttemptFanoutBinding(attemptId: string): Promise<FanoutAttemptBindingRecord | null>;
+  listFanoutAttemptBindings(fanoutId: string): Promise<FanoutAttemptBindingRecord[]>;
+  commitFanInDecision(input: CommitFanInDecisionInput): Promise<FanInDecisionMutationResult>;
+  getFanInDecision(decisionId: string): Promise<FanInDecisionRecord | null>;
+  getFanInDecisionForFanout(fanoutId: string): Promise<FanInDecisionRecord | null>;
 }
 
 /** Additive binding port for Stage 3 launch envelopes. */

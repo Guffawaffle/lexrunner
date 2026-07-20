@@ -479,7 +479,14 @@ const AttemptRetryDeltaChange_v1 = z
 
 const AttemptRetryEvidenceReference_v1 = z
   .object({
-    kind: z.enum(["receipt", "verification", "artifact", "observation", "deviation"]),
+    kind: z.enum([
+      "receipt",
+      "verification",
+      "fan_in_decision",
+      "artifact",
+      "observation",
+      "deviation",
+    ]),
     id: Id.max(256),
     hash: SHA256Hash,
   })
@@ -532,6 +539,281 @@ export const AttemptRetryDelta_v1 = z
     }
   });
 export type AttemptRetryDelta_v1 = z.infer<typeof AttemptRetryDelta_v1>;
+
+export const FanoutRationale_v1 = z.enum([
+  "separable_work",
+  "hypothesis_diversity",
+  "independent_review",
+  "risk_reduction",
+  "best_of_n",
+]);
+export type FanoutRationale_v1 = z.infer<typeof FanoutRationale_v1>;
+
+export const FanoutSelectionCriterion_v1 = z.enum([
+  "verification_outcome",
+  "trust_gap_count",
+  "verified_result_identity",
+]);
+export type FanoutSelectionCriterion_v1 = z.infer<typeof FanoutSelectionCriterion_v1>;
+
+export const STRICT_FANOUT_SELECTION_CRITERIA = [
+  "verification_outcome",
+  "trust_gap_count",
+  "verified_result_identity",
+] as const satisfies readonly FanoutSelectionCriterion_v1[];
+
+export const FanoutPremise_v1 = z
+  .object({
+    premise_id: Id.max(256),
+    attempt_id: Id.max(256),
+    strategy_hash: SHA256Hash,
+    summary: z.string().min(1).max(1_024),
+  })
+  .strict();
+export type FanoutPremise_v1 = z.infer<typeof FanoutPremise_v1>;
+
+/** Immutable one-level fanout declaration. It is scheduling intent, not acceptance truth. */
+export const AgentWorkFanoutPlan_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    fanout_id: Id.max(256),
+    run_id: Id.max(256),
+    work_item_id: Id.max(256),
+    work_item_revision: Revision,
+    rationale: FanoutRationale_v1,
+    selection_criteria: z.array(FanoutSelectionCriterion_v1).length(3),
+    budget: z
+      .object({
+        max_attempts: z.number().int().min(2).max(16),
+        max_concurrency: z.number().int().min(1).max(16),
+        max_elapsed_ms: z
+          .number()
+          .int()
+          .positive()
+          .max(7 * 24 * 60 * 60 * 1_000),
+        max_context_bytes_per_attempt: z
+          .number()
+          .int()
+          .positive()
+          .max(1024 * 1024),
+        max_judging_cost_units: z.number().int().nonnegative().max(1_000_000),
+      })
+      .strict(),
+    premises: z.array(FanoutPremise_v1).min(2).max(16),
+    direct_worker_communication: z.enum(["forbidden", "brokered"]),
+    created_at: Timestamp,
+  })
+  .strict()
+  .superRefine((plan, context) => {
+    if (plan.premises.length > plan.budget.max_attempts) {
+      context.addIssue({
+        code: "custom",
+        path: ["premises"],
+        message: "Fanout premises exceed the declared attempt budget",
+      });
+    }
+    if (plan.budget.max_concurrency > plan.budget.max_attempts) {
+      context.addIssue({
+        code: "custom",
+        path: ["budget", "max_concurrency"],
+        message: "Fanout concurrency cannot exceed the attempt budget",
+      });
+    }
+    requireUniqueStrings(plan.selection_criteria, "selection_criteria", context);
+    if (
+      !STRICT_FANOUT_SELECTION_CRITERIA.every((criterion) =>
+        plan.selection_criteria.includes(criterion)
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["selection_criteria"],
+        message: "Strict fan-in requires the complete canonical selection criteria",
+      });
+    }
+    const premiseIds = plan.premises.map(({ premise_id }) => premise_id);
+    if (new Set(premiseIds).size !== premiseIds.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["premises"],
+        message: "Fanout premise identities must be unique",
+      });
+    }
+    const attempts = plan.premises.map(({ attempt_id }) => attempt_id);
+    if (new Set(attempts).size !== attempts.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["premises"],
+        message: "Fanout premise Attempt identities must be unique",
+      });
+    }
+  })
+  .transform((plan) => ({
+    ...plan,
+    selection_criteria: [...plan.selection_criteria].sort(compareCanonicalStrings),
+    premises: [...plan.premises].sort((left, right) =>
+      compareCanonicalStrings(left.attempt_id, right.attempt_id)
+    ),
+  }));
+export type AgentWorkFanoutPlan_v1 = z.infer<typeof AgentWorkFanoutPlan_v1>;
+
+/** Exact plan slot persisted atomically with a sibling Attempt. */
+export const FanoutAttemptBinding_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    fanout_id: Id.max(256),
+    fanout_plan_hash: SHA256Hash,
+    premise_id: Id.max(256),
+    premise_hash: SHA256Hash,
+    attempt_id: Id.max(256),
+  })
+  .strict();
+export type FanoutAttemptBinding_v1 = z.infer<typeof FanoutAttemptBinding_v1>;
+
+export const FanInCandidateConclusion_v1 = z.enum([
+  "selected",
+  "equivalent",
+  "unselected",
+  "rejected",
+  "missing_evidence",
+]);
+export type FanInCandidateConclusion_v1 = z.infer<typeof FanInCandidateConclusion_v1>;
+
+const FanInCandidateEvidence_v1 = z
+  .object({
+    attempt_id: Id.max(256),
+    premise_id: Id.max(256),
+    attempt_status: AttemptStatus,
+    receipt_id: Id.max(256).optional(),
+    receipt_hash: SHA256Hash.optional(),
+    verification_id: Id.max(256).optional(),
+    verification_hash: SHA256Hash.optional(),
+    verification_outcome: z
+      .enum(["pass", "fail", "inconclusive", "infrastructure_error", "cancelled"])
+      .optional(),
+    verified_result_identity: z.union([CanonicalGitObjectId, SHA256Hash]).optional(),
+    trust_gap_count: z.number().int().nonnegative().max(64),
+    conclusion: FanInCandidateConclusion_v1,
+    reason_codes: z.array(Id.max(256)).max(16),
+    artifact_refs: z.array(Id.max(256)).max(64),
+  })
+  .strict()
+  .superRefine((candidate, context) => {
+    if ((candidate.receipt_id === undefined) !== (candidate.receipt_hash === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["receipt_id"],
+        message: "Receipt identity and hash must be present together",
+      });
+    }
+    if (
+      [candidate.verification_id, candidate.verification_hash, candidate.verification_outcome].some(
+        (value) => value === undefined
+      ) !==
+      [
+        candidate.verification_id,
+        candidate.verification_hash,
+        candidate.verification_outcome,
+      ].every((value) => value === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["verification_id"],
+        message: "Verification identity, hash, and outcome must be present together",
+      });
+    }
+    requireUniqueStrings(candidate.reason_codes, "reason_codes", context);
+    requireUniqueStrings(candidate.artifact_refs, "artifact_refs", context);
+  });
+
+/** Engine-owned deterministic comparison of a complete bounded fanout evidence set. */
+export const AgentWorkFanInDecision_v1 = z
+  .object({
+    schema_version: z.literal(AGENT_WORK_CONTRACT_VERSION),
+    decision_id: Id.max(256),
+    fanout_id: Id.max(256),
+    fanout_plan_hash: SHA256Hash,
+    run_id: Id.max(256),
+    work_item_id: Id.max(256),
+    work_item_revision: Revision,
+    policy_id: z.literal("lexrunner.engine-fanin.strict"),
+    policy_version: z.literal("1.0.0"),
+    selection_criteria: z.array(FanoutSelectionCriterion_v1).length(3),
+    decision: z.enum(["selected", "escalated", "no_viable_candidate"]),
+    selected_attempt_id: Id.max(256).optional(),
+    candidates: z.array(FanInCandidateEvidence_v1).min(2).max(16),
+    conflicts: z.array(Id.max(256)).max(32),
+    uncertainty: z.array(z.string().min(1).max(1_024)).max(32),
+    evidence_set_hash: SHA256Hash,
+    summary: z.string().min(1).max(2_048),
+    created_at: Timestamp,
+  })
+  .strict()
+  .superRefine((decision, context) => {
+    if ((decision.decision === "selected") !== (decision.selected_attempt_id !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["selected_attempt_id"],
+        message: "Exactly a selected decision identifies a selected Attempt",
+      });
+    }
+    const attemptIds = decision.candidates.map(({ attempt_id }) => attempt_id);
+    if (new Set(attemptIds).size !== attemptIds.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["candidates"],
+        message: "Fan-in candidate Attempt identities must be unique",
+      });
+    }
+    requireUniqueStrings(decision.conflicts, "conflicts", context);
+    requireUniqueStrings(decision.uncertainty, "uncertainty", context);
+    requireUniqueStrings(decision.selection_criteria, "selection_criteria", context);
+    if (
+      !STRICT_FANOUT_SELECTION_CRITERIA.every((criterion) =>
+        decision.selection_criteria.includes(criterion)
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["selection_criteria"],
+        message: "Strict fan-in requires the complete canonical selection criteria",
+      });
+    }
+    if (
+      decision.selected_attempt_id !== undefined &&
+      !decision.candidates.some(
+        (candidate) =>
+          candidate.attempt_id === decision.selected_attempt_id &&
+          candidate.conclusion === "selected"
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["selected_attempt_id"],
+        message: "The selected Attempt must have the selected candidate conclusion",
+      });
+    }
+  })
+  .transform((decision) => ({
+    ...decision,
+    selection_criteria: [...decision.selection_criteria].sort(compareCanonicalStrings),
+    candidates: [...decision.candidates].sort((left, right) =>
+      compareCanonicalStrings(left.attempt_id, right.attempt_id)
+    ),
+    conflicts: [...decision.conflicts].sort(compareCanonicalStrings),
+    uncertainty: [...decision.uncertainty].sort(compareCanonicalStrings),
+  }));
+export type AgentWorkFanInDecision_v1 = z.infer<typeof AgentWorkFanInDecision_v1>;
+
+export function computeFanInEvidenceSetHash(
+  candidates: AgentWorkFanInDecision_v1["candidates"]
+): string {
+  return computeCanonicalHash(
+    candidates.map(
+      ({ conclusion: _conclusion, reason_codes: _reasonCodes, ...evidence }) => evidence
+    )
+  );
+}
 
 // =============================================================================
 // PORTABLE TASK PACKET AND LOCAL EXECUTION ENVELOPE

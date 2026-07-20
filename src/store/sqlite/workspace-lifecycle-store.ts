@@ -3,11 +3,16 @@ import { fileURLToPath } from "node:url";
 import type { ZodType } from "zod";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
+import { evaluateStrictAgentWorkFanIn } from "../../agent-work-fanin-policy.js";
 import {
+  AgentWorkFanInDecision_v1,
+  AgentWorkFanoutPlan_v1,
   AgentEngineVerification_v2,
   AgentTaskPacket_v1,
   AgentTaskReceipt_v2,
   AttemptRetryDelta_v1,
+  FanoutAttemptBinding_v1,
+  computeFanInEvidenceSetHash,
   EngineVerificationTrustGapReason_v2 as EngineVerificationTrustGapReasonV2Schema,
   validateAgentEngineVerificationV2PacketReferences,
   validateAgentTaskReceiptV2PacketReferences,
@@ -51,6 +56,7 @@ import type {
 } from "../workspace-lifecycle-domains.js";
 import type {
   AcquireWorkspaceInput,
+  AgentWorkFanoutStore,
   ApplyAttemptAcceptanceInput,
   AttachWorkerSessionInput,
   AttemptRecord,
@@ -71,8 +77,15 @@ import type {
   AttemptAcceptanceStore,
   BindLaunchEnvelopeInput,
   BeginAttemptVerificationInput,
+  CommitFanInDecisionInput,
   CreateAttemptInput,
+  CreateFanoutPlanInput,
   EndWorkerSessionInput,
+  FanInDecisionMutationResult,
+  FanInDecisionRecord,
+  FanoutAttemptBindingRecord,
+  FanoutPlanMutationResult,
+  FanoutPlanRecord,
   HeartbeatWorkerSessionInput,
   LaunchEnvelopeBindingRecord,
   LaunchEnvelopeBindingResult,
@@ -406,6 +419,48 @@ INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
 VALUES(9,'attempt-retry-deltas',datetime('now'));
 `;
 
+const INLINE_AGENT_WORK_FANOUT_MIGRATION = `
+DROP INDEX IF EXISTS idx_attempts_one_live_work_item;
+CREATE INDEX IF NOT EXISTS idx_attempts_live_work_item
+ON attempts(runId,workItemId) WHERE status IN
+('prepared','leased','launching','running','receipt_submitted','verifying','verified');
+CREATE TABLE IF NOT EXISTS agent_work_fanout_plans (
+ fanoutId TEXT PRIMARY KEY, runId TEXT NOT NULL, workItemId TEXT NOT NULL,
+ workItemRevision INTEGER NOT NULL CHECK(workItemRevision>=0), planHash TEXT NOT NULL,
+ planJson TEXT NOT NULL CHECK(length(planJson)<=262144), controllerId TEXT NOT NULL,
+ controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ createdAt TEXT NOT NULL,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS agent_work_fanout_attempts (
+ attemptId TEXT PRIMARY KEY, fanoutId TEXT NOT NULL, premiseId TEXT NOT NULL,
+ premiseHash TEXT NOT NULL, planHash TEXT NOT NULL, createdAt TEXT NOT NULL,
+ UNIQUE(fanoutId,premiseId),
+ FOREIGN KEY(fanoutId) REFERENCES agent_work_fanout_plans(fanoutId) ON DELETE RESTRICT,
+ FOREIGN KEY(attemptId) REFERENCES attempts(attemptId) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS agent_work_fanin_decisions (
+ decisionId TEXT PRIMARY KEY, fanoutId TEXT NOT NULL UNIQUE, runId TEXT NOT NULL,
+ workItemId TEXT NOT NULL, workItemRevision INTEGER NOT NULL CHECK(workItemRevision>=0),
+ decisionHash TEXT NOT NULL, decisionJson TEXT NOT NULL CHECK(length(decisionJson)<=262144),
+ selectedAttemptId TEXT, outcome TEXT NOT NULL CHECK(outcome IN
+ ('selected','escalated','no_viable_candidate')), controllerId TEXT NOT NULL,
+ controllerLeaseId TEXT NOT NULL, fencingToken INTEGER NOT NULL CHECK(fencingToken>0),
+ createdAt TEXT NOT NULL,
+ FOREIGN KEY(fanoutId) REFERENCES agent_work_fanout_plans(fanoutId) ON DELETE RESTRICT,
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE,
+ FOREIGN KEY(selectedAttemptId) REFERENCES attempts(attemptId) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS agent_work_fanout_mutations (
+ runId TEXT NOT NULL, mutationId TEXT NOT NULL, fingerprint TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('plan','decision')), recordId TEXT NOT NULL,
+ PRIMARY KEY(runId,mutationId),
+ FOREIGN KEY(runId) REFERENCES run_coordination(runId) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+VALUES(10,'agent-work-fanout-fanin',datetime('now'));
+`;
+
 interface AttemptRow extends Omit<AttemptRecord, "workspaceLeaseId" | "status"> {
   workspaceLeaseId: string | null;
   status: string;
@@ -538,7 +593,8 @@ export class SqliteWorkspaceLifecycleStore
     WorkerSessionStore,
     WorkerAuthorityDecisionStore,
     AttemptVerificationStore,
-    AttemptAcceptanceStore
+    AttemptAcceptanceStore,
+    AgentWorkFanoutStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -555,14 +611,26 @@ export class SqliteWorkspaceLifecycleStore
   async createAttempt(input: CreateAttemptInput): Promise<WorkspaceMutationResult> {
     return this.mutate(input, () => {
       if (this.attempt(input.attemptId)) return this.failure("live_attempt_conflict");
-      const conflict = this.db
-        .prepare(
-          `SELECT 1 FROM attempts WHERE runId = ? AND workItemId = ?
-           AND status IN (${sqlEnumValues(LIVE_ATTEMPT_STATUSES)})`
-        )
-        .get(input.runId, input.workItemId);
+      const fanout = this.validateFanoutBinding(input);
+      if (!fanout.valid) return this.failure("fanout_invalid");
+      const conflict = fanout.record
+        ? this.db
+            .prepare(
+              `SELECT 1 FROM attempts AS a
+               LEFT JOIN agent_work_fanout_attempts AS f ON f.attemptId = a.attemptId
+               WHERE a.runId = ? AND a.workItemId = ?
+                 AND a.status IN (${sqlEnumValues(LIVE_ATTEMPT_STATUSES)})
+                 AND (f.fanoutId IS NULL OR f.fanoutId != ?) LIMIT 1`
+            )
+            .get(input.runId, input.workItemId, fanout.record.fanoutId)
+        : this.db
+            .prepare(
+              `SELECT 1 FROM attempts WHERE runId = ? AND workItemId = ?
+               AND status IN (${sqlEnumValues(LIVE_ATTEMPT_STATUSES)}) LIMIT 1`
+            )
+            .get(input.runId, input.workItemId);
       if (conflict) return this.failure("live_attempt_conflict");
-      const retry = this.validateRetryDelta(input);
+      const retry = this.validateRetryDelta(input, fanout.record?.fanoutId);
       if (!retry.valid) return this.failure(retry.reason);
       const now = instant(input.now);
       this.db
@@ -598,7 +666,25 @@ export class SqliteWorkspaceLifecycleStore
             retry.record.createdAt
           );
       }
+      if (fanout.record) {
+        this.db
+          .prepare(
+            `INSERT INTO agent_work_fanout_attempts
+             (attemptId,fanoutId,premiseId,premiseHash,planHash,createdAt)
+             VALUES (?,?,?,?,?,?)`
+          )
+          .run(
+            fanout.record.attemptId,
+            fanout.record.fanoutId,
+            fanout.record.premiseId,
+            fanout.record.premiseHash,
+            fanout.record.planHash,
+            fanout.record.createdAt
+          );
+      }
       return this.record(input, this.requireAttempt(input.attemptId), null, "attempt_created", {
+        fanoutId: fanout.record?.fanoutId ?? null,
+        premiseId: fanout.record?.premiseId ?? null,
         workItemId: input.workItemId,
         retryDeltaHash: retry.record?.deltaHash ?? null,
       });
@@ -904,6 +990,188 @@ export class SqliteWorkspaceLifecycleStore
       const status = AttemptStatusSchema.safeParse(row.status);
       return status.success ? [{ ...row, status: status.data }] : [];
     });
+  }
+
+  async createFanoutPlan(input: CreateFanoutPlanInput): Promise<FanoutPlanMutationResult> {
+    return this.withFanoutAuthority<FanoutPlanMutationResult>(
+      input,
+      (reason, currentRunRevision) => ({
+        created: false,
+        reason,
+        ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+      }),
+      () => {
+        const parsed = AgentWorkFanoutPlan_v1.safeParse(input.plan);
+        if (
+          !parsed.success ||
+          parsed.data.run_id !== input.runId ||
+          instant(parsed.data.created_at) !== instant(input.now)
+        ) {
+          return { created: false, reason: "fanout_invalid" };
+        }
+        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        const prior = this.fanoutMutation(input.runId, input.mutationId);
+        if (prior) {
+          const record = prior.kind === "plan" ? this.fanoutPlan(prior.recordId) : null;
+          return prior.fingerprint === fingerprint && record
+            ? { created: true, plan: record, idempotentReplay: true }
+            : { created: false, reason: "mutation_conflict" };
+        }
+        if (this.nonFanoutMutationClaim(input.runId, input.mutationId)) {
+          return { created: false, reason: "mutation_conflict" };
+        }
+        const planJson = canonicalJSONStringify(parsed.data);
+        const planHash = computeCanonicalHash(parsed.data);
+        const existing = this.fanoutPlan(parsed.data.fanout_id);
+        if (existing) {
+          if (existing.planHash !== planHash || existing.planJson !== planJson) {
+            return { created: false, reason: "fanout_conflict" };
+          }
+          this.insertFanoutMutation(input, fingerprint, "plan", existing.fanoutId);
+          return { created: true, plan: existing, idempotentReplay: true };
+        }
+        const occupied = parsed.data.premises.some(({ attempt_id }) =>
+          Boolean(
+            this.db
+              .prepare(
+                `SELECT 1 FROM attempts WHERE attemptId = ?
+                 UNION ALL SELECT 1 FROM agent_work_fanout_attempts WHERE attemptId = ?`
+              )
+              .get(attempt_id, attempt_id)
+          )
+        );
+        if (occupied) return { created: false, reason: "fanout_conflict" };
+        this.db
+          .prepare(
+            `INSERT INTO agent_work_fanout_plans
+             (fanoutId,runId,workItemId,workItemRevision,planHash,planJson,controllerId,
+              controllerLeaseId,fencingToken,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?)`
+          )
+          .run(
+            parsed.data.fanout_id,
+            parsed.data.run_id,
+            parsed.data.work_item_id,
+            parsed.data.work_item_revision,
+            planHash,
+            planJson,
+            input.controller.controllerId,
+            input.controller.leaseId,
+            input.controller.fencingToken,
+            instant(input.now)
+          );
+        this.insertFanoutMutation(input, fingerprint, "plan", parsed.data.fanout_id);
+        return {
+          created: true,
+          plan: this.fanoutPlan(parsed.data.fanout_id)!,
+          idempotentReplay: false,
+        };
+      }
+    );
+  }
+
+  async getFanoutPlan(fanoutId: string): Promise<FanoutPlanRecord | null> {
+    return this.hasTable("agent_work_fanout_plans") ? this.fanoutPlan(fanoutId) : null;
+  }
+
+  async getAttemptFanoutBinding(attemptId: string): Promise<FanoutAttemptBindingRecord | null> {
+    return this.hasTable("agent_work_fanout_attempts") ? this.fanoutBinding(attemptId) : null;
+  }
+
+  async listFanoutAttemptBindings(fanoutId: string): Promise<FanoutAttemptBindingRecord[]> {
+    if (!this.hasTable("agent_work_fanout_attempts")) return [];
+    return this.db
+      .prepare(
+        `SELECT fanoutId,attemptId,premiseId,premiseHash,planHash,createdAt
+         FROM agent_work_fanout_attempts WHERE fanoutId = ? ORDER BY attemptId`
+      )
+      .all(fanoutId) as FanoutAttemptBindingRecord[];
+  }
+
+  async commitFanInDecision(input: CommitFanInDecisionInput): Promise<FanInDecisionMutationResult> {
+    return this.withFanoutAuthority<FanInDecisionMutationResult>(
+      input,
+      (reason, currentRunRevision) => ({
+        recorded: false,
+        reason,
+        ...(currentRunRevision !== undefined ? { currentRunRevision } : {}),
+      }),
+      () => {
+        const parsed = AgentWorkFanInDecision_v1.safeParse(input.decision);
+        if (
+          !parsed.success ||
+          parsed.data.run_id !== input.runId ||
+          instant(parsed.data.created_at) !== instant(input.now)
+        ) {
+          return { recorded: false, reason: "fanout_evidence_mismatch" };
+        }
+        const fingerprint = canonicalJSONStringify(input as unknown as JsonRecord);
+        const prior = this.fanoutMutation(input.runId, input.mutationId);
+        if (prior) {
+          const record = prior.kind === "decision" ? this.fanInDecision(prior.recordId) : null;
+          return prior.fingerprint === fingerprint && record
+            ? { recorded: true, decision: record, idempotentReplay: true }
+            : { recorded: false, reason: "mutation_conflict" };
+        }
+        if (this.nonFanoutMutationClaim(input.runId, input.mutationId)) {
+          return { recorded: false, reason: "mutation_conflict" };
+        }
+        const plan = this.fanoutPlan(parsed.data.fanout_id);
+        if (!plan) return { recorded: false, reason: "fanout_not_found" };
+        if (!this.validFanInDecision(parsed.data, plan)) {
+          return { recorded: false, reason: "fanout_evidence_mismatch" };
+        }
+        const decisionJson = canonicalJSONStringify(parsed.data);
+        const decisionHash = computeCanonicalHash(parsed.data);
+        const existing =
+          this.fanInDecision(parsed.data.decision_id) ??
+          this.fanInDecisionForFanout(parsed.data.fanout_id);
+        if (existing) {
+          if (existing.decisionHash !== decisionHash || existing.decisionJson !== decisionJson) {
+            return { recorded: false, reason: "fanout_conflict" };
+          }
+          this.insertFanoutMutation(input, fingerprint, "decision", existing.decisionId);
+          return { recorded: true, decision: existing, idempotentReplay: true };
+        }
+        this.db
+          .prepare(
+            `INSERT INTO agent_work_fanin_decisions
+             (decisionId,fanoutId,runId,workItemId,workItemRevision,decisionHash,decisionJson,
+              selectedAttemptId,outcome,controllerId,controllerLeaseId,fencingToken,createdAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          )
+          .run(
+            parsed.data.decision_id,
+            parsed.data.fanout_id,
+            parsed.data.run_id,
+            parsed.data.work_item_id,
+            parsed.data.work_item_revision,
+            decisionHash,
+            decisionJson,
+            parsed.data.selected_attempt_id ?? null,
+            parsed.data.decision,
+            input.controller.controllerId,
+            input.controller.leaseId,
+            input.controller.fencingToken,
+            instant(input.now)
+          );
+        this.insertFanoutMutation(input, fingerprint, "decision", parsed.data.decision_id);
+        return {
+          recorded: true,
+          decision: this.fanInDecision(parsed.data.decision_id)!,
+          idempotentReplay: false,
+        };
+      }
+    );
+  }
+
+  async getFanInDecision(decisionId: string): Promise<FanInDecisionRecord | null> {
+    return this.hasTable("agent_work_fanin_decisions") ? this.fanInDecision(decisionId) : null;
+  }
+
+  async getFanInDecisionForFanout(fanoutId: string): Promise<FanInDecisionRecord | null> {
+    return this.hasTable("agent_work_fanin_decisions")
+      ? this.fanInDecisionForFanout(fanoutId)
+      : null;
   }
 
   async getAttemptRetryDelta(attemptId: string): Promise<AttemptRetryDeltaRecord | null> {
@@ -1488,7 +1756,9 @@ export class SqliteWorkspaceLifecycleStore
           input.runId,
           input.mutationId
         );
-      if (namespaceClaim) return this.authorityFailure("mutation_conflict");
+      if (namespaceClaim || this.fanoutMutation(input.runId, input.mutationId)) {
+        return this.authorityFailure("mutation_conflict");
+      }
       const prior = this.db
         .prepare(`SELECT * FROM worker_authority_events WHERE runId = ? AND mutationId = ?`)
         .get(input.runId, input.mutationId) as WorkerAuthorityEventRow | undefined;
@@ -1689,7 +1959,8 @@ export class SqliteWorkspaceLifecycleStore
             input.mutationId,
             input.runId,
             input.mutationId
-          )
+          ) ||
+        this.fanoutMutation(input.runId, input.mutationId)
       ) {
         return this.receiptFailure("mutation_conflict");
       }
@@ -1853,7 +2124,8 @@ export class SqliteWorkspaceLifecycleStore
             input.mutationId,
             input.runId,
             input.mutationId
-          )
+          ) ||
+        this.fanoutMutation(input.runId, input.mutationId)
       ) {
         return this.verificationBeginFailure("mutation_conflict");
       }
@@ -2055,7 +2327,8 @@ export class SqliteWorkspaceLifecycleStore
             input.mutationId,
             input.runId,
             input.mutationId
-          )
+          ) ||
+        this.fanoutMutation(input.runId, input.mutationId)
       ) {
         return this.verificationFailure("mutation_conflict");
       }
@@ -2886,7 +3159,9 @@ export class SqliteWorkspaceLifecycleStore
           input.runId,
           input.mutationId
         );
-      if (workspaceClaim) return this.workerFailure("mutation_conflict");
+      if (workspaceClaim || this.fanoutMutation(input.runId, input.mutationId)) {
+        return this.workerFailure("mutation_conflict");
+      }
       const prior = this.db
         .prepare(
           `SELECT fingerprint, resultJson FROM worker_session_mutations
@@ -3125,7 +3400,9 @@ export class SqliteWorkspaceLifecycleStore
           input.runId,
           input.mutationId
         );
-      if (workerClaim) return this.failure("mutation_conflict");
+      if (workerClaim || this.fanoutMutation(input.runId, input.mutationId)) {
+        return this.failure("mutation_conflict");
+      }
       const prior = this.db
         .prepare(
           `SELECT fingerprint, resultJson FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?`
@@ -3537,19 +3814,322 @@ export class SqliteWorkspaceLifecycleStore
       .run(now, id);
   }
 
-  private validateRetryDelta(
+  private withFanoutAuthority<T>(
+    input: {
+      runId: string;
+      expectedRunRevision: number;
+      controller: import("../coordination-store.js").ControllerLeaseCredential;
+      now: string;
+    },
+    failure: (reason: WorkspaceMutationFailureReason, currentRunRevision?: number) => T,
+    action: () => T
+  ): T {
+    if (!Number.isFinite(Date.parse(input.now))) return failure("invalid_time");
+    if (input.controller.runId !== input.runId) return failure("lease_mismatch");
+    return this.immediateTransaction(() => {
+      const coordination = this.db
+        .prepare(
+          `SELECT revision,controllerId,leaseId,fencingToken,expiresAt
+           FROM run_coordination WHERE runId = ?`
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!coordination?.controllerId) return failure("no_active_lease");
+      if (coordination.fencingToken !== input.controller.fencingToken)
+        return failure("stale_fence");
+      if (
+        coordination.controllerId !== input.controller.controllerId ||
+        coordination.leaseId !== input.controller.leaseId
+      ) {
+        return failure("lease_mismatch");
+      }
+      if (coordination.revision !== input.expectedRunRevision) {
+        return failure("stale_run_revision", coordination.revision);
+      }
+      if (parseInstant(coordination.expiresAt!, "expiresAt") <= parseInstant(input.now, "now")) {
+        return failure("lease_expired");
+      }
+      return action();
+    });
+  }
+
+  private fanoutPlan(fanoutId: string): FanoutPlanRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM agent_work_fanout_plans WHERE fanoutId = ?`)
+      .get(fanoutId) as FanoutPlanRecord | undefined;
+    if (!row) return null;
+    try {
+      const parsed = AgentWorkFanoutPlan_v1.safeParse(JSON.parse(row.planJson) as unknown);
+      return parsed.success &&
+        parsed.data.fanout_id === row.fanoutId &&
+        parsed.data.run_id === row.runId &&
+        parsed.data.work_item_id === row.workItemId &&
+        parsed.data.work_item_revision === row.workItemRevision &&
+        parsed.data.created_at === row.createdAt &&
+        canonicalJSONStringify(parsed.data) === row.planJson &&
+        computeCanonicalHash(parsed.data) === row.planHash
+        ? { ...row }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private fanoutBinding(attemptId: string): FanoutAttemptBindingRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT fanoutId,attemptId,premiseId,premiseHash,planHash,createdAt
+         FROM agent_work_fanout_attempts WHERE attemptId = ?`
+      )
+      .get(attemptId) as FanoutAttemptBindingRecord | undefined;
+    return row ? { ...row } : null;
+  }
+
+  private fanInDecision(decisionId: string): FanInDecisionRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM agent_work_fanin_decisions WHERE decisionId = ?`)
+      .get(decisionId) as FanInDecisionRecord | undefined;
+    return row ? this.validateFanInDecisionRow(row) : null;
+  }
+
+  private fanInDecisionForFanout(fanoutId: string): FanInDecisionRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM agent_work_fanin_decisions WHERE fanoutId = ?`)
+      .get(fanoutId) as FanInDecisionRecord | undefined;
+    return row ? this.validateFanInDecisionRow(row) : null;
+  }
+
+  private validateFanInDecisionRow(row: FanInDecisionRecord): FanInDecisionRecord | null {
+    try {
+      const parsed = AgentWorkFanInDecision_v1.safeParse(JSON.parse(row.decisionJson) as unknown);
+      return parsed.success &&
+        parsed.data.decision_id === row.decisionId &&
+        parsed.data.fanout_id === row.fanoutId &&
+        parsed.data.run_id === row.runId &&
+        parsed.data.work_item_id === row.workItemId &&
+        parsed.data.work_item_revision === row.workItemRevision &&
+        (parsed.data.selected_attempt_id ?? null) === row.selectedAttemptId &&
+        parsed.data.decision === row.outcome &&
+        parsed.data.created_at === row.createdAt &&
+        canonicalJSONStringify(parsed.data) === row.decisionJson &&
+        computeCanonicalHash(parsed.data) === row.decisionHash
+        ? { ...row }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private fanoutMutation(
+    runId: string,
+    mutationId: string
+  ): {
+    fingerprint: string;
+    kind: "plan" | "decision";
+    recordId: string;
+  } | null {
+    const row = this.db
+      .prepare(
+        `SELECT fingerprint,kind,recordId FROM agent_work_fanout_mutations
+         WHERE runId = ? AND mutationId = ?`
+      )
+      .get(runId, mutationId) as
+      { fingerprint: string; kind: "plan" | "decision"; recordId: string } | undefined;
+    return row ?? null;
+  }
+
+  private insertFanoutMutation(
+    input: { runId: string; mutationId: string },
+    fingerprint: string,
+    kind: "plan" | "decision",
+    recordId: string
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO agent_work_fanout_mutations
+         (runId,mutationId,fingerprint,kind,recordId) VALUES (?,?,?,?,?)`
+      )
+      .run(input.runId, input.mutationId, fingerprint, kind, recordId);
+  }
+
+  private nonFanoutMutationClaim(runId: string, mutationId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM workspace_lifecycle_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM worker_session_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_receipt_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_mutations WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM attempt_verification_begin_mutations
+             WHERE runId = ? AND mutationId = ?
+           UNION ALL SELECT 1 FROM worker_authority_events WHERE runId = ? AND mutationId = ?`
+        )
+        .get(
+          runId,
+          mutationId,
+          runId,
+          mutationId,
+          runId,
+          mutationId,
+          runId,
+          mutationId,
+          runId,
+          mutationId,
+          runId,
+          mutationId
+        )
+    );
+  }
+
+  private validateFanoutBinding(
     input: CreateAttemptInput
+  ): { valid: true; record?: FanoutAttemptBindingRecord } | { valid: false } {
+    if (!input.fanout) return { valid: true };
+    const binding = FanoutAttemptBinding_v1.safeParse(input.fanout);
+    if (!binding.success || binding.data.attempt_id !== input.attemptId) return { valid: false };
+    const planRecord = this.fanoutPlan(binding.data.fanout_id);
+    if (!planRecord || planRecord.planHash !== binding.data.fanout_plan_hash) {
+      return { valid: false };
+    }
+    const plan = AgentWorkFanoutPlan_v1.safeParse(JSON.parse(planRecord.planJson) as unknown);
+    const premise = plan.success
+      ? plan.data.premises.find(({ premise_id }) => premise_id === binding.data.premise_id)
+      : undefined;
+    const occupied = this.db
+      .prepare(`SELECT 1 FROM agent_work_fanout_attempts WHERE fanoutId = ? AND premiseId = ?`)
+      .get(binding.data.fanout_id, binding.data.premise_id);
+    if (
+      !plan.success ||
+      plan.data.run_id !== input.runId ||
+      plan.data.work_item_id !== input.workItemId ||
+      plan.data.work_item_revision !== input.workItemRevision ||
+      !premise ||
+      premise.attempt_id !== input.attemptId ||
+      computeCanonicalHash(premise) !== binding.data.premise_hash ||
+      occupied
+    ) {
+      return { valid: false };
+    }
+    return {
+      valid: true,
+      record: {
+        fanoutId: binding.data.fanout_id,
+        attemptId: binding.data.attempt_id,
+        premiseId: binding.data.premise_id,
+        premiseHash: binding.data.premise_hash,
+        planHash: binding.data.fanout_plan_hash,
+        createdAt: instant(input.now),
+      },
+    };
+  }
+
+  private validFanInDecision(
+    decision: import("../../schemas/agent-work.js").AgentWorkFanInDecision_v1,
+    planRecord: FanoutPlanRecord
+  ): boolean {
+    let plan: import("../../schemas/agent-work.js").AgentWorkFanoutPlan_v1;
+    try {
+      plan = AgentWorkFanoutPlan_v1.parse(JSON.parse(planRecord.planJson) as unknown);
+    } catch {
+      return false;
+    }
+    if (
+      decision.fanout_plan_hash !== planRecord.planHash ||
+      decision.run_id !== plan.run_id ||
+      decision.work_item_id !== plan.work_item_id ||
+      decision.work_item_revision !== plan.work_item_revision ||
+      canonicalJSONStringify(decision.selection_criteria) !==
+        canonicalJSONStringify(plan.selection_criteria) ||
+      decision.candidates.length !== plan.premises.length ||
+      decision.evidence_set_hash !== computeFanInEvidenceSetHash(decision.candidates)
+    ) {
+      return false;
+    }
+    for (const premise of plan.premises) {
+      const binding = this.fanoutBinding(premise.attempt_id);
+      const attempt = this.attempt(premise.attempt_id);
+      const candidate = decision.candidates.find(
+        ({ attempt_id }) => attempt_id === premise.attempt_id
+      );
+      if (
+        !binding ||
+        binding.fanoutId !== plan.fanout_id ||
+        binding.premiseId !== premise.premise_id ||
+        !attempt ||
+        !isTerminalAttemptStatus(attempt.status) ||
+        !candidate ||
+        candidate.premise_id !== premise.premise_id ||
+        candidate.attempt_status !== attempt.status
+      ) {
+        return false;
+      }
+      const receipt = this.getReceiptForAttempt(attempt.attemptId);
+      if (
+        candidate.receipt_id !== receipt?.receiptId ||
+        candidate.receipt_hash !== receipt?.receiptHash
+      ) {
+        return false;
+      }
+      const verification = this.getVerificationForAttempt(attempt.attemptId);
+      if (
+        candidate.verification_id !== verification?.verificationId ||
+        candidate.verification_hash !== verification?.verificationHash ||
+        candidate.verification_outcome !== verification?.outcome ||
+        candidate.trust_gap_count !== (verification?.trustGapReasons.length ?? 0) ||
+        candidate.verified_result_identity !==
+          (verification?.verifiedPatchHash ?? verification?.verifiedHeadSha)
+      ) {
+        return false;
+      }
+      const artifacts = verification ? verificationArtifactRefs(verification) : [];
+      if (canonicalJSONStringify(candidate.artifact_refs) !== canonicalJSONStringify(artifacts)) {
+        return false;
+      }
+    }
+    const expected = evaluateStrictAgentWorkFanIn(
+      decision.candidates.map(
+        ({ conclusion: _conclusion, reason_codes: _reasonCodes, ...evidence }) => evidence
+      )
+    );
+    return (
+      decision.decision === expected.outcome &&
+      decision.selected_attempt_id === expected.selectedAttemptId &&
+      canonicalJSONStringify(decision.candidates) === canonicalJSONStringify(expected.candidates) &&
+      canonicalJSONStringify(decision.conflicts) === canonicalJSONStringify(expected.conflicts) &&
+      canonicalJSONStringify(decision.uncertainty) === canonicalJSONStringify(expected.uncertainty)
+    );
+  }
+
+  private validateRetryDelta(
+    input: CreateAttemptInput,
+    currentFanoutId?: string
   ):
     | { valid: true; record?: AttemptRetryDeltaRecord }
     | { valid: false; reason: "retry_delta_required" | "retry_delta_invalid" } {
     const row = this.db
       .prepare(
-        `SELECT attemptId FROM attempts
-         WHERE runId = ? AND workItemId = ? AND workItemRevision = ?
+        `SELECT a.attemptId FROM attempts AS a
+         WHERE a.runId = ? AND a.workItemId = ? AND a.workItemRevision = ?
+           AND (? IS NULL OR NOT EXISTS (
+             SELECT 1 FROM agent_work_fanout_attempts AS f
+             WHERE f.attemptId = a.attemptId AND f.fanoutId = ?
+           ))
          ORDER BY rowid DESC LIMIT 1`
       )
-      .get(input.runId, input.workItemId, input.workItemRevision) as
-      { attemptId: string } | undefined;
+      .get(
+        input.runId,
+        input.workItemId,
+        input.workItemRevision,
+        currentFanoutId ?? null,
+        currentFanoutId ?? null
+      ) as { attemptId: string } | undefined;
     if (!row) {
       return input.retry ? { valid: false, reason: "retry_delta_invalid" } : { valid: true };
     }
@@ -3598,6 +4178,10 @@ export class SqliteWorkspaceLifecycleStore
           verification.verificationHash === reference.hash
         );
       }
+      if (reference.kind === "fan_in_decision") {
+        const decision = this.fanInDecision(reference.id);
+        return decision?.decisionHash === reference.hash;
+      }
       // Reserved evidence kinds fail closed until backed by a canonical store
       // whose identity and content hash can be verified here.
       return false;
@@ -3605,7 +4189,7 @@ export class SqliteWorkspaceLifecycleStore
   }
 
   private applyWorkspaceMigration(): void {
-    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}\n${INLINE_WORKER_ADAPTER_MIGRATION}\n${INLINE_ATTEMPT_RETRY_DELTA_MIGRATION}`;
+    let sql = `${INLINE_WORKSPACE_MIGRATION}\n${INLINE_WORKER_AUTHORITY_MIGRATION}\n${INLINE_WORKER_ADAPTER_MIGRATION}\n${INLINE_ATTEMPT_RETRY_DELTA_MIGRATION}\n${INLINE_AGENT_WORK_FANOUT_MIGRATION}`;
     try {
       const workspacePath = fileURLToPath(
         new URL("./migrations/002-attempt-workspace-lifecycle.sql", import.meta.url)
@@ -3631,7 +4215,10 @@ export class SqliteWorkspaceLifecycleStore
       const retryDeltaPath = fileURLToPath(
         new URL("./migrations/009-attempt-retry-deltas.sql", import.meta.url)
       );
-      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}\n${readFileSync(adapterPath, "utf8")}\n${readFileSync(retryDeltaPath, "utf8")}`;
+      const fanoutPath = fileURLToPath(
+        new URL("./migrations/010-agent-work-fanout-fanin.sql", import.meta.url)
+      );
+      sql = `${readFileSync(workspacePath, "utf8")}\n${readFileSync(workerPath, "utf8")}\n${readFileSync(receiptPath, "utf8")}\n${readFileSync(packetPath, "utf8")}\n${readFileSync(verificationPath, "utf8")}\n${readFileSync(authorityPath, "utf8")}\n${readFileSync(adapterPath, "utf8")}\n${readFileSync(retryDeltaPath, "utf8")}\n${readFileSync(fanoutPath, "utf8")}`;
     } catch {
       // Published bundles use the equivalent inline migration above.
     }
@@ -3841,6 +4428,18 @@ function parseStoredReceipt(record: AttemptReceiptRecord): AgentTaskReceipt_v2 |
       : null;
   } catch {
     return null;
+  }
+}
+
+function verificationArtifactRefs(record: AttemptVerificationRecord): string[] {
+  try {
+    const parsed = AgentEngineVerification_v2.safeParse(
+      JSON.parse(record.verificationJson) as unknown
+    );
+    if (!parsed.success) return [];
+    return [...new Set(parsed.data.checks.flatMap(({ artifact_refs }) => artifact_refs))].sort();
+  } catch {
+    return [];
   }
 }
 
