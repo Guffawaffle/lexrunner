@@ -1301,6 +1301,18 @@ export type {
   GateExecutionServiceInput,
   GateExecutionServiceResult,
 } from "./application/gate-execution-service.js";
+export {
+  DiscoveryQueryService,
+  IntegrationQueryServiceError,
+  IntegrationStatusQueryService,
+  MergeOrderQueryService,
+  PlanCreationService,
+} from "./application/integration-query-services.js";
+export type {
+  BoundedDiscoveryResult,
+  BoundedIntegrationStatus,
+  BoundedMergeOrderResult,
+} from "./application/integration-query-services.js";
 
 // LPR-037: Workflow guidance exports for MCP
 export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";

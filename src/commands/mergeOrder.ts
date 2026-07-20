@@ -5,7 +5,7 @@
 
 import { Command } from "commander";
 import { loadPlan } from "../schema.js";
-import { computeMergeOrder } from "../mergeOrder.js";
+import { MergeOrderQueryService } from "../application/integration-query-services.js";
 import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
 import * as fs from "fs";
@@ -39,13 +39,13 @@ export function registerMergeOrderCommand(
       try {
         const planContent = fs.readFileSync(planFile, "utf-8");
         const plan = loadPlan(planContent);
-        const levels = computeMergeOrder(plan);
+        const result = new MergeOrderQueryService().run(plan);
 
         if (opts.json || jsonModeActive()) {
-          writeJsonOutput({ levels });
+          writeJsonOutput(program.name() === "weave" ? result : { levels: result.levels });
         } else {
           console.log(`Merge order for ${plan.items.length} items:`);
-          levels.forEach((level: string[], index: number) => {
+          result.levels.forEach((level: string[], index: number) => {
             console.log(`Level ${index + 1}: [${level.join(", ")}]`);
           });
         }

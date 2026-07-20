@@ -320,7 +320,7 @@
       {
         "tool": "discover",
         "cli": "weave discover",
-        "owner": "planned shared discovery service"
+        "owner": "DiscoveryQueryService"
       },
       {
         "tool": "doctor",
@@ -375,7 +375,7 @@
       {
         "tool": "merge-order",
         "cli": "weave merge-order",
-        "owner": "planned shared plan query service"
+        "owner": "MergeOrderQueryService"
       },
       {
         "tool": "merge.apply",
@@ -385,7 +385,7 @@
       {
         "tool": "plan.create",
         "cli": "weave plan",
-        "owner": "planned shared plan creation service"
+        "owner": "PlanCreationService"
       },
       {
         "tool": "prepare_attempt",
@@ -405,7 +405,7 @@
       {
         "tool": "status",
         "cli": "weave status",
-        "owner": "planned shared integration status service"
+        "owner": "IntegrationStatusQueryService"
       },
       {
         "tool": "submit_attempt_receipt",
@@ -438,20 +438,6 @@
     ]
   },
   "implementationGaps": [
-    {
-      "issue": 780,
-      "title": "Share bounded discovery, planning, status, and merge-order query services",
-      "surface": [
-        "weave discover",
-        "discover",
-        "weave plan",
-        "plan.create",
-        "weave status",
-        "status",
-        "weave merge-order",
-        "merge-order"
-      ]
-    },
     {
       "issue": 781,
       "title": "Share bounded merge application service across CLI and MCP",

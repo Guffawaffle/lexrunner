@@ -12,7 +12,6 @@ import { Command } from "commander";
 import { throwExit } from "../cli/exitHandler.js";
 import { createGitHubAPI, GitHubAPI } from "../github/api.js";
 import { createGitHubClient } from "../github/client.js";
-import { generatePlanFromGitHub } from "../core/githubPlan.js";
 import { loadPlan } from "../schema.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { createGitOperations } from "../git/operations.js";
@@ -30,6 +29,10 @@ import { LocalWeaveResumeDriver } from "../weave/local-resume-driver.js";
 import { resumePersistedWeave } from "../weave/resume-service.js";
 import fs from "fs";
 import path from "path";
+import {
+  DiscoveryQueryService,
+  PlanCreationService,
+} from "../application/integration-query-services.js";
 
 interface WeaveCommandDeps {
   jsonModeActive: () => boolean;
@@ -106,45 +109,17 @@ Subcommands:
           throwExit(1);
         }
 
-        // Check authentication
-        const authStatus = await githubAPI.checkAuth();
-        if (!authStatus.authenticated) {
+        const result = await new DiscoveryQueryService().run({
+          github: githubAPI,
+          state: opts.state as "open" | "closed" | "all",
+          suggest: opts.suggest,
+        });
+        if (!result.authenticated) {
           console.warn(
             "⚠️  Warning: GitHub API not authenticated. Set GITHUB_TOKEN for better rate limits.\n"
           );
         }
-
-        // Fetch pull requests
-        const pullRequests = await githubAPI.discoverPullRequests(
-          opts.state as "open" | "closed" | "all"
-        );
-
-        let result: any = {
-          pullRequests,
-          total: pullRequests.length,
-        };
-
-        if (opts.suggest) {
-          // Generate dependency suggestions using heuristics
-          const { createFileAnalyzer } = await import("../planner/fileAnalysis.js");
-
-          const analyzer = createFileAnalyzer(
-            githubAPI.getOctokit(),
-            githubAPI.config.owner,
-            githubAPI.config.repo
-          );
-
-          const prs = pullRequests.map((pr) => ({
-            number: pr.number,
-            name: `PR-${pr.number}`,
-            sha: pr.sha,
-          }));
-
-          const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
-
-          result.suggestions = suggestions;
-          result.suggestionsCount = suggestions.length;
-        }
+        const pullRequests = result.pullRequests;
 
         // Output results
         const jsonOutput = canonicalJSONStringify(result);
@@ -222,7 +197,7 @@ Subcommands:
         });
 
         // Generate plan from GitHub
-        const plan = await generatePlanFromGitHub(client, {
+        const plan = await new PlanCreationService().fromGitHub(client, {
           query: opts.query,
           labels: opts.labels,
           excludePRs: opts.excludePrs?.map((n: string) => parseInt(n, 10)),

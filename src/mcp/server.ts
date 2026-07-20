@@ -16,21 +16,25 @@ import {
 import { z } from "zod";
 
 import { loadInputs, detectGitHubMode } from "../core/inputs.js";
-import { generatePlan } from "../core/plan.js";
 import { generateSnapshot, generateGitHubSnapshot } from "../core/snapshot.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import {
   GateExecutionService,
   GateExecutionServiceError,
 } from "../application/gate-execution-service.js";
+import {
+  DiscoveryQueryService,
+  IntegrationQueryServiceError,
+  IntegrationStatusQueryService,
+  MergeOrderQueryService,
+  PlanCreationService,
+} from "../application/integration-query-services.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { loadPlan, validatePlan } from "../schema.js";
 import { initLocalOverlay } from "../config/localOverlay.js";
 import { healthChecker } from "../monitoring/health.js";
-import { generatePlanFromGitHub } from "../core/githubPlan.js";
-import { generateMultiRepoPlan } from "../core/multiRepoPlan.js";
 import { createGitHubClient } from "../github/index.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
@@ -1256,7 +1260,7 @@ async function handlePlanCreate(
         // Multi-repo mode: discover PRs from multiple repositories
         console.error(`[mcp:plan.create] Multi-repo mode: ${args.repos.length} repositories`);
 
-        plan = await generateMultiRepoPlan(args.repos, {
+        plan = await new PlanCreationService().fromMultipleRepositories(args.repos, {
           query: args.query,
           labels: args.labels,
           excludePRs: args.excludePRs,
@@ -1293,7 +1297,7 @@ async function handlePlanCreate(
         });
 
         // Generate plan from GitHub
-        plan = await generatePlanFromGitHub(client, {
+        plan = await new PlanCreationService().fromGitHub(client, {
           query: args.query,
           labels: args.labels,
           excludePRs: args.excludePRs,
@@ -1325,7 +1329,7 @@ async function handlePlanCreate(
     } else {
       // Traditional mode: load from configuration files
       inputs = loadInputs(profilePath);
-      plan = generatePlan(inputs);
+      plan = new PlanCreationService().fromInputs(inputs);
     }
 
     // Determine output directory
@@ -2341,55 +2345,18 @@ async function handleDiscover(args: {
       throwMcpAXError(ErrorCode.InvalidRequest, axError);
     }
 
-    // Check authentication and warn if not authenticated
-    const authStatus = await githubAPI.checkAuth();
-    if (!authStatus.authenticated) {
+    const result = await new DiscoveryQueryService().run({
+      github: githubAPI,
+      state: (args.state || "open") as "open" | "closed" | "all",
+      suggest: args.suggest,
+    });
+    if (!result.authenticated) {
       // Log warning to stderr for MCP clients to surface
       console.error(
         "[mcp:discover] Warning: GitHub API not authenticated. Private repos will not be accessible.\n" +
           "To fix: Add GITHUB_TOKEN to your MCP server config env block.\n" +
           "See: README.mcp.md#github-authentication"
       );
-    }
-
-    // Fetch pull requests
-    const state = (args.state || "open") as "open" | "closed" | "all";
-    const pullRequests = await githubAPI.discoverPullRequests(state);
-
-    let result: Record<string, unknown>;
-
-    if (args.suggest) {
-      // Generate dependency suggestions using heuristics
-      const { createFileAnalyzer } = await import("../planner/fileAnalysis.js");
-
-      const analyzer = createFileAnalyzer(
-        githubAPI.getOctokit(),
-        githubAPI.config.owner,
-        githubAPI.config.repo
-      );
-      const prs = pullRequests.map((pr: { number: number; sha: string }) => ({
-        number: pr.number,
-        name: `PR-${pr.number}`,
-        sha: pr.sha,
-      }));
-
-      const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
-
-      result = {
-        pullRequests,
-        suggestions,
-        total: pullRequests.length,
-        suggestionsCount: suggestions.length,
-        authenticated: authStatus.authenticated,
-        user: authStatus.user,
-      };
-    } else {
-      result = {
-        pullRequests,
-        total: pullRequests.length,
-        authenticated: authStatus.authenticated,
-        user: authStatus.user,
-      };
     }
 
     return {
@@ -2403,6 +2370,12 @@ async function handleDiscover(args: {
   } catch (error) {
     if (error instanceof McpError) {
       throw error;
+    }
+    if (error instanceof IntegrationQueryServiceError) {
+      throwMcpAXError(
+        ErrorCode.InvalidParams,
+        mcpToolError(error.code, error.message, { tool: "discover" })
+      );
     }
     // Handle GitHub API errors specifically with status code context
     if (error instanceof GitHubAPIError) {
@@ -2432,10 +2405,7 @@ async function handleStatus(args: {
     const planContent = fs.readFileSync(planFile, "utf-8");
     const plan = loadPlan(planContent);
 
-    // Create execution state (for now, show plan structure)
-    const executionState = new ExecutionState(plan);
-    const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-    const mergeSummary = evaluator.getMergeSummary();
+    const status = new IntegrationStatusQueryService().run(plan);
 
     // Calculate tier metrics from plan items
     const tierAssignments = suggestTiersForPlan(plan.items);
@@ -2452,13 +2422,7 @@ async function handleStatus(args: {
     );
 
     const result = {
-      plan: {
-        schemaVersion: plan.schemaVersion,
-        target: plan.target,
-        itemCount: plan.items.length,
-        policy: plan.policy,
-      },
-      mergeSummary,
+      ...status,
       governance: governanceStatusToJSON(governanceStatus),
     };
 
@@ -2612,14 +2576,7 @@ async function handleMergeOrder(args: {
     const planContent = fs.readFileSync(planFile, "utf-8");
     const plan = loadPlan(planContent);
 
-    // Compute merge order using Kahn's algorithm
-    const levels = computeMergeOrder(plan);
-
-    const result = {
-      levels,
-      totalItems: plan.items.length,
-      maxParallelism: Math.max(...levels.map((level) => level.length)),
-    };
+    const result = new MergeOrderQueryService().run(plan);
 
     return {
       content: [
@@ -2632,6 +2589,12 @@ async function handleMergeOrder(args: {
   } catch (error) {
     if (error instanceof McpError) {
       throw error;
+    }
+    if (error instanceof IntegrationQueryServiceError) {
+      throwMcpAXError(
+        ErrorCode.InvalidParams,
+        mcpToolError(error.code, error.message, { tool: "merge-order" })
+      );
     }
     // Handle AXErrorException instances (including CycleError, UnknownDependencyError)
     if (isAXErrorException(error)) {
