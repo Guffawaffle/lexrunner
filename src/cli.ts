@@ -90,6 +90,7 @@ import {
   collectRegisteredCliSurface,
   type RegisteredCliCommand,
 } from "./cli/registered-surface.js";
+import { emitAliasWarning } from "./cli/alias-policy.js";
 import { registerWeaveCommand } from "./commands/weave.js";
 import { registerExplainCommand } from "./commands/explain.js";
 import { setFrameEmissionEnabled } from "./frames/controller.js";
@@ -231,7 +232,7 @@ program
     "Emit Frames to Lex memory during fanout/merge-weave operations (default: true, env: LEX_PR_EMIT_FRAMES)"
   )
   .option("--no-emit-frames", "Disable Frame emission")
-  .hook("preAction", (thisCommand) => {
+  .hook("preAction", (thisCommand, actionCommand) => {
     // Initialize color control based on global flags
     const opts = thisCommand.optsWithGlobals();
     const jsonMode = opts.json || false;
@@ -248,6 +249,7 @@ program
     if (globalFlags.emitFrames !== undefined) {
       setFrameEmissionEnabled(globalFlags.emitFrames);
     }
+    emitAliasWarning(actionCommand);
   })
   .addHelpText(
     "after",

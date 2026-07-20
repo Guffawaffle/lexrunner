@@ -39,12 +39,6 @@ Common Issues:
   • No PRs found: Check --state filter and repository permissions`
     )
     .action(async (opts) => {
-      // Show deprecation warning if called as top-level command (not as weave subcommand)
-      const isLegacyCommand = program.name() === "lex-pr";
-      if (isLegacyCommand && !opts.json && !deps.jsonModeActive()) {
-        console.warn("⚠️  'discover' is deprecated. Use: lex-pr weave discover");
-      }
-
       try {
         let githubAPI = await createGitHubAPI();
 

@@ -90,11 +90,6 @@ Common Issues:
   • Missing configuration: Run 'lex-pr init' to set up workspace`
     )
     .action(async (opts) => {
-      // Show deprecation warning if called as top-level command (not as weave subcommand)
-      if (program.name() === "lex-pr" && !opts.json && !deps.jsonModeActive()) {
-        console.warn("⚠️  'plan' is deprecated. Use: lex-pr weave plan");
-      }
-
       const previousJsonMode = deps.jsonModeActive();
       // jsonModeActive is already set by preAction hook from global --json
       // Command-level --json flag also sets it for backwards compatibility

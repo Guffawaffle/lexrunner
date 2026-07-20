@@ -122,11 +122,6 @@ export function registerAnalyzeIssuesCommand(
     .option("--labels <labels>", "Filter by labels (comma-separated)")
     .option("--json", "Output JSON format")
     .action(async (opts) => {
-      // Show deprecation warning
-      if (!opts.json && !jsonModeActive()) {
-        console.warn("⚠️  'orchestrate:analyze-issues' is deprecated. Use: lex-pr fanout analyze");
-      }
-
       try {
         // Parse repository option
         let owner: string | undefined;

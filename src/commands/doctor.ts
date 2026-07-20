@@ -141,11 +141,6 @@ export function registerDoctorCommand(program: Command, jsonModeActive?: () => b
     .option("--json", "Output JSON format")
     .option("--environment-quality", "Run environmental hostility scoring")
     .action(async (opts) => {
-      // Show deprecation warning if called as top-level command (not as workspace subcommand)
-      if (program.name() === "lex-pr" && !opts.json && !(jsonModeActive && jsonModeActive())) {
-        console.warn("⚠️  'doctor' is deprecated. Use: lex-pr workspace doctor");
-      }
-
       let hasErrors = false;
       const issues: string[] = [];
       const suggestions: string[] = [];
