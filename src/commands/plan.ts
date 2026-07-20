@@ -6,9 +6,7 @@ import { Command } from "commander";
 import { Plan, loadPlan } from "../schema.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { loadInputs, detectGitHubMode } from "../core/inputs.js";
-import { generatePlan, generateEmptyPlan } from "../core/plan.js";
 import { generateSnapshot, generatePlanSummary, generateGitHubSnapshot } from "../core/snapshot.js";
-import { generatePlanFromGitHub } from "../core/githubPlan.js";
 import { createGitHubClient } from "../github/index.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { resolveProfile, validateWriteOperation } from "../config/profileResolver.js";
@@ -19,6 +17,7 @@ import { formatSuggestions, type SuggestionFormat } from "../cli/formatSuggestio
 import { parseTierOverrides, calculateTierMetrics, formatTierMetrics } from "../tiers/index.js";
 import * as fs from "fs";
 import * as path from "path";
+import { PlanCreationService } from "../application/integration-query-services.js";
 
 interface PlanCommandDeps {
   jsonModeActive: () => boolean;
@@ -239,7 +238,7 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
     const maxWorkers = opts.maxWorkers || 2;
 
     // Generate plan from GitHub
-    plan = await generatePlanFromGitHub(client, {
+    plan = await new PlanCreationService().fromGitHub(client, {
       query: opts.query,
       labels,
       excludePRs,
@@ -278,10 +277,10 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
   } else {
     // Traditional mode: load from configuration files
     inputs = loadInputs();
-    plan =
-      inputs.items.length > 0
-        ? generatePlan(inputs, { tierOverrides })
-        : generateEmptyPlan(inputs.target);
+    plan = new PlanCreationService().fromInputs(inputs, {
+      tierOverrides,
+      preserveEmptyPlan: true,
+    });
   }
 
   // Validate plan structure

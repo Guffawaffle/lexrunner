@@ -281,7 +281,7 @@ const tools = {
 
         if (args.fromGithub) {
           // GitHub mode: auto-discover PRs
-          const { createGitHubClient, generatePlanFromGitHub } = await import("./dist/cli.js");
+          const { createGitHubClient, PlanCreationService } = await import("./dist/cli.js");
 
           const client = await createGitHubClient({
             token: args.githubToken,
@@ -296,7 +296,7 @@ const tools = {
           const maxWorkers = args.maxWorkers || 2;
 
           // Generate plan from GitHub
-          plan = await generatePlanFromGitHub(client, {
+          plan = await new PlanCreationService().fromGitHub(client, {
             query: args.query,
             labels: args.labels,
             excludePRs: args.excludePRs,
@@ -309,9 +309,9 @@ const tools = {
           });
         } else {
           // Traditional mode: load from configuration files
-          const { loadInputs, generatePlan } = await import("./dist/cli.js");
+          const { loadInputs, PlanCreationService } = await import("./dist/cli.js");
           inputs = loadInputs(profilePath);
-          plan = generatePlan(inputs);
+          plan = new PlanCreationService().fromInputs(inputs);
         }
 
         // Determine output directory
@@ -344,6 +344,7 @@ const tools = {
         writeFileSync(snapshotPath, snapshot);
 
         const result = {
+          contract: "bounded-ax-v1",
           plan: plan,
           outDir: outDir,
           files: {
@@ -356,7 +357,7 @@ const tools = {
           content: [
             {
               type: "text",
-              text: `Plan created successfully:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
@@ -397,61 +398,27 @@ const tools = {
           throw new Error("No plan found. Run plan.create first.");
         }
 
-        const { loadPlan, ExecutionState, executeGatesWithPolicy } = await import("./dist/cli.js");
+        const { loadPlan, GateExecutionService } = await import("./dist/cli.js");
         const planContent = readFileSync(planPath, "utf-8");
         const plan = loadPlan(planContent);
-
-        // Create execution state
-        const executionState = new ExecutionState(plan);
 
         // Determine output directory
         const outDir = args.outDir || resolve(resolved.path, "runner", "gates");
 
-        // Execute gates
-        await executeGatesWithPolicy(plan, executionState, outDir);
-
-        // Get results
-        const results = executionState.getResults();
-        const items = [];
-        let allGreen = true;
-
-        for (const [itemName, nodeResult] of results) {
-          // Filter by onlyItem if specified
-          if (args.onlyItem && itemName !== args.onlyItem) {
-            continue;
-          }
-
-          // Filter gates by onlyGate if specified
-          const gates =
-            nodeResult.gates
-              ?.filter((gate) => !args.onlyGate || gate.gate === args.onlyGate)
-              .map((gate) => ({
-                name: gate.gate,
-                status: gate.status,
-              })) || [];
-
-          items.push({
-            name: itemName,
-            status: nodeResult.status || "unknown",
-            gates: gates,
-          });
-
-          if (nodeResult.status !== "pass") {
-            allGreen = false;
-          }
-        }
-
-        const result = {
-          items,
-          allGreen,
-          outDir,
-        };
+        const result = (
+          await new GateExecutionService().run({
+            plan,
+            artifactDir: outDir,
+            onlyItem: args.onlyItem,
+            onlyGate: args.onlyGate,
+          })
+        ).summary;
 
         return {
           content: [
             {
               type: "text",
-              text: `Gates execution complete:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
@@ -807,7 +774,7 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { createGitHubAPI, GitHubAPI } = await import("./dist/cli.js");
+        const { createGitHubAPI, GitHubAPI, DiscoveryQueryService } = await import("./dist/cli.js");
 
         let githubAPI = await createGitHubAPI();
 
@@ -826,53 +793,17 @@ const tools = {
           );
         }
 
-        // Check authentication
-        const authStatus = await githubAPI.checkAuth();
-
-        // Fetch pull requests
-        const state = args.state || "open";
-        const pullRequests = await githubAPI.discoverPullRequests(state);
-
-        let result;
-
-        if (args.suggest) {
-          const { createFileAnalyzer } = await import("./dist/cli.js");
-
-          const analyzer = createFileAnalyzer(
-            githubAPI.getOctokit(),
-            githubAPI.config.owner,
-            githubAPI.config.repo
-          );
-          const prs = pullRequests.map((pr) => ({
-            number: pr.number,
-            name: `PR-${pr.number}`,
-            sha: pr.sha,
-          }));
-
-          const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
-
-          result = {
-            pullRequests,
-            suggestions,
-            total: pullRequests.length,
-            suggestionsCount: suggestions.length,
-            authenticated: authStatus.authenticated,
-            user: authStatus.user,
-          };
-        } else {
-          result = {
-            pullRequests,
-            total: pullRequests.length,
-            authenticated: authStatus.authenticated,
-            user: authStatus.user,
-          };
-        }
+        const result = await new DiscoveryQueryService().run({
+          github: githubAPI,
+          state: args.state || "open",
+          suggest: args.suggest,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: `Pull requests discovered:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
@@ -902,30 +833,17 @@ const tools = {
           throw new Error(`Plan file not found: ${planFile}`);
         }
 
-        const { loadPlan, ExecutionState, MergeEligibilityEvaluator } =
-          await import("./dist/cli.js");
+        const { loadPlan, IntegrationStatusQueryService } = await import("./dist/cli.js");
         const planContent = readFileSync(planFile, "utf-8");
         const plan = loadPlan(planContent);
 
-        const executionState = new ExecutionState(plan);
-        const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-        const mergeSummary = evaluator.getMergeSummary();
-
-        const result = {
-          plan: {
-            schemaVersion: plan.schemaVersion,
-            target: plan.target,
-            itemCount: plan.items.length,
-            policy: plan.policy,
-          },
-          mergeSummary,
-        };
+        const result = new IntegrationStatusQueryService().run(plan);
 
         return {
           content: [
             {
               type: "text",
-              text: `Plan status:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
@@ -1073,24 +991,17 @@ const tools = {
           throw new Error(`Plan file not found: ${planFile}`);
         }
 
-        const { loadPlan, computeMergeOrder } = await import("./dist/cli.js");
+        const { loadPlan, MergeOrderQueryService } = await import("./dist/cli.js");
         const planContent = readFileSync(planFile, "utf-8");
         const plan = loadPlan(planContent);
 
-        // Compute merge order using Kahn's algorithm
-        const levels = computeMergeOrder(plan);
-
-        const result = {
-          levels,
-          totalItems: plan.items.length,
-          maxParallelism: Math.max(...levels.map((level) => level.length)),
-        };
+        const result = new MergeOrderQueryService().run(plan);
 
         return {
           content: [
             {
               type: "text",
-              text: `Merge order:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };

@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { throwExit } from "../cli/exitHandler.js";
+import { DiscoveryQueryService } from "../application/integration-query-services.js";
 
 interface DiscoverCommandDeps {
   jsonModeActive: () => boolean;
@@ -64,9 +65,12 @@ Common Issues:
         }
         const resolvedAPI = githubAPI!;
 
-        // Check authentication
-        const authStatus = await resolvedAPI.checkAuth();
-        if (!authStatus.authenticated) {
+        const result = await new DiscoveryQueryService().run({
+          github: resolvedAPI,
+          state: opts.state as "open" | "closed" | "all",
+          suggest: opts.suggest,
+        });
+        if (!result.authenticated) {
           console.warn(
             "⚠️  Warning: GitHub API not authenticated. Set GITHUB_TOKEN environment variable for better rate limits.\n\n" +
               "To fix:\n" +
@@ -75,44 +79,24 @@ Common Issues:
           );
         }
 
-        // Fetch pull requests
-        const pullRequests = await resolvedAPI.discoverPullRequests(
-          opts.state as "open" | "closed" | "all"
-        );
+        const pullRequests = result.pullRequests;
 
         if (opts.suggest) {
-          // Generate dependency suggestions using heuristics
-          const { createFileAnalyzer } = await import("../planner/fileAnalysis.js");
-
-          // Reuse the existing Octokit instance from githubAPI
-          const analyzer = createFileAnalyzer(
-            resolvedAPI.getOctokit(),
-            resolvedAPI.config.owner,
-            resolvedAPI.config.repo
-          );
-          const prs = pullRequests.map((pr) => ({
-            number: pr.number,
-            name: `PR-${pr.number}`,
-            sha: pr.sha,
-          }));
-
-          const suggestions = await analyzer.suggestDependenciesWithHeuristics(prs);
+          const suggestions = result.suggestions as Array<{
+            from: string;
+            to: string;
+            confidence: number;
+            heuristic?: string;
+            reason: string;
+          }>;
 
           if (opts.json || deps.jsonModeActive()) {
-            console.log(
-              canonicalJSONStringify({
-                pullRequests,
-                suggestions,
-                total: pullRequests.length,
-                suggestionsCount: suggestions.length,
-                authenticated: authStatus.authenticated,
-                user: authStatus.user,
-              })
-            );
+            const { contract: _contract, ...legacyResult } = result;
+            console.log(canonicalJSONStringify(legacyResult));
           } else {
             console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
-            if (authStatus.authenticated) {
-              console.log(`✓ Authenticated as: ${authStatus.user}`);
+            if (result.authenticated) {
+              console.log(`✓ Authenticated as: ${result.user}`);
             }
             console.log("");
 
@@ -139,18 +123,12 @@ Common Issues:
         } else {
           // Original discover output
           if (opts.json || deps.jsonModeActive()) {
-            console.log(
-              canonicalJSONStringify({
-                pullRequests,
-                total: pullRequests.length,
-                authenticated: authStatus.authenticated,
-                user: authStatus.user,
-              })
-            );
+            const { contract: _contract, ...legacyResult } = result;
+            console.log(canonicalJSONStringify(legacyResult));
           } else {
             console.log(`🔍 Discovered ${pullRequests.length} ${opts.state} pull requests`);
-            if (authStatus.authenticated) {
-              console.log(`✓ Authenticated as: ${authStatus.user}`);
+            if (result.authenticated) {
+              console.log(`✓ Authenticated as: ${result.user}`);
             }
             console.log("");
 

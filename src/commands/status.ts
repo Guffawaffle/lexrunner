@@ -4,12 +4,11 @@
 
 import { Command } from "commander";
 import { loadPlan, SchemaValidationError } from "../schema.js";
-import { ExecutionState } from "../executionState.js";
-import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { IntegrationStatusQueryService } from "../application/integration-query-services.js";
 import * as fs from "fs";
 
 /**
@@ -43,23 +42,16 @@ Common Issues:
         const planContent = fs.readFileSync(planFile, "utf-8");
         const plan = loadPlan(planContent);
 
-        // For now, show plan structure and policy
-        // In a full implementation, this would load execution state from artifacts
-        const executionState = new ExecutionState(plan);
-        const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-        const mergeSummary = evaluator.getMergeSummary();
+        const result = new IntegrationStatusQueryService().run(plan);
+        const mergeSummary = result.mergeSummary;
 
         if (opts.json || jsonModeActive()) {
           console.log(
-            canonicalJSONStringify({
-              plan: {
-                schemaVersion: plan.schemaVersion,
-                target: plan.target,
-                itemCount: plan.items.length,
-                policy: plan.policy,
-              },
-              mergeSummary,
-            })
+            canonicalJSONStringify(
+              program.name() === "weave"
+                ? result
+                : { plan: result.plan, mergeSummary: result.mergeSummary }
+            )
           );
         } else {
           console.log(`Plan: ${plan.items.length} items targeting ${plan.target}`);

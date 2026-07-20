@@ -93,6 +93,8 @@ listed in the matrix own implementation gaps.
 
 - Canonical `gate run` and MCP `gates.run` share `GateExecutionService` and its
   bounded summary. `gate execute` and top-level `execute` remain migration aliases.
+- Discovery, plan creation, integration status, and merge-order pairs now share bounded
+  transport-neutral query services. Human output and legacy alias JSON remain adapter projections.
 - The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
   ADR-007 task tools that are not published by `mcp-server.mjs`.
 - `health` duplicates `doctor` and is deprecated.
@@ -109,7 +111,6 @@ drift.
 
 | Issue | Boundary                                                                  |
 | ----- | ------------------------------------------------------------------------- |
-| #780  | Shared bounded discovery, plan, status, and merge-order query services    |
 | #781  | Shared bounded merge application service                                  |
 | #782  | Shared workspace/config services and retirement of MCP `health`           |
 | #783  | Rename or retirement of frozen RunStore `lexrunner.*` compatibility tools |
