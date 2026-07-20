@@ -28,6 +28,10 @@ groups) and 28 published MCP tools.
 - **remove** is reserved for a registration that should disappear without a
   replacement. No current entry received that disposition.
 
+CLI warning and removal behavior is centralized in the
+[CLI alias migration policy](cli-alias-policy.md). Compatibility and deprecation guidance is
+always written to stderr, preserving canonical JSON stdout.
+
 Full CLI/MCP symmetry is not the goal. Semantic parity is required for approved
 machine operations. Interactive review, ideation, local administration, and
 terminal navigation remain deliberately CLI-only. `workflow.guide` remains

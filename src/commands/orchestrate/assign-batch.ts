@@ -109,11 +109,6 @@ export function registerAssignBatchCommand(program: Command): void {
       const globalOpts = command.optsWithGlobals();
       const isJsonMode = globalOpts.json || false;
 
-      // Show deprecation warning
-      if (!isJsonMode) {
-        console.warn("⚠️  'orchestrate:assign-batch' is deprecated. Use: lex-pr fanout assign");
-      }
-
       try {
         // Validate inputs
         if (!options.batch && !options.issues) {

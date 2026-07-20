@@ -37,11 +37,6 @@ Common Issues:
   • Missing execution state: Run 'lex-pr execute' first to populate status`
     )
     .action((file: string | undefined, opts) => {
-      // Show deprecation warning if called as top-level command (not as weave subcommand)
-      if (program.name() === "lex-pr" && !opts.json && !jsonModeActive()) {
-        console.warn("⚠️  'status' is deprecated. Use: lex-pr weave status");
-      }
-
       const planFile = opts.plan || file || "plan.json";
 
       try {
