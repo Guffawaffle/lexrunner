@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import {
+  AgentWorkFanoutPlan_v1,
   createAgentTaskPacket,
   parseAgentEngineVerificationV2,
   parseAgentTaskReceiptV2,
 } from "../../src/schemas/agent-work.js";
+import { AgentWorkFanoutService } from "../../src/runs/agent-work-fanout-service.js";
 import type {
   ControllerLease,
   ControllerLeaseCredential,
@@ -16,6 +18,7 @@ import type {
   TaskPacketBindingStore,
   AttemptReceiptStore,
   AttemptVerificationStore,
+  AgentWorkFanoutStore,
   WorkspaceObservation,
   WorkerSessionStore,
   WorkerAuthorityDecisionStore,
@@ -30,7 +33,8 @@ export interface WorkspaceLifecycleHarness
     WorkerSessionStore,
     WorkerAuthorityDecisionStore,
     AttemptReceiptStore,
-    AttemptVerificationStore {
+    AttemptVerificationStore,
+    AgentWorkFanoutStore {
   acquireControllerLease(input: {
     runId: string;
     controllerId: string;
@@ -290,6 +294,248 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         completedAt: T1,
       });
       await expect(store.listAttempts("run-1")).resolves.toHaveLength(2);
+    });
+
+    it("binds parallel Attempts to declared premises and persists deterministic fan-in", async () => {
+      const plan = AgentWorkFanoutPlan_v1.parse({
+        schema_version: "1.0.0",
+        fanout_id: "fanout-1",
+        run_id: "run-1",
+        work_item_id: "parallel-work",
+        work_item_revision: 1,
+        rationale: "hypothesis_diversity",
+        selection_criteria: ["verification_outcome", "trust_gap_count", "verified_result_identity"],
+        budget: {
+          max_attempts: 2,
+          max_concurrency: 2,
+          max_elapsed_ms: 60_000,
+          max_context_bytes_per_attempt: 32_768,
+          max_judging_cost_units: 10,
+        },
+        premises: [
+          {
+            premise_id: "premise-a",
+            attempt_id: "parallel-a",
+            strategy_hash: `sha256:${"a".repeat(64)}`,
+            summary: "Test the narrow implementation hypothesis.",
+          },
+          {
+            premise_id: "premise-b",
+            attempt_id: "parallel-b",
+            strategy_hash: `sha256:${"b".repeat(64)}`,
+            summary: "Test the compatibility-first hypothesis.",
+          },
+        ],
+        direct_worker_communication: "forbidden",
+        created_at: T0,
+      });
+      const fanout = new AgentWorkFanoutService(store);
+      await expect(
+        fanout.create({
+          runId: "run-1",
+          expectedRunRevision: 0,
+          controller,
+          mutationId: "create-fanout-1",
+          now: T0,
+          plan,
+        })
+      ).resolves.toMatchObject({ created: true, idempotentReplay: false });
+      const [bindingA, bindingB] = await Promise.all([
+        fanout.binding("fanout-1", "parallel-a"),
+        fanout.binding("fanout-1", "parallel-b"),
+      ]);
+      if (!bindingA || !bindingB) throw new Error("expected fanout bindings");
+      for (const [attemptId, packetId, binding] of [
+        ["parallel-a", "parallel-packet-a", bindingA],
+        ["parallel-b", "parallel-packet-b", bindingB],
+      ] as const) {
+        const created = await store.createAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: `create-${attemptId}`,
+          now: T0,
+          attemptId,
+          workItemId: "parallel-work",
+          workItemRevision: 1,
+          packetId,
+          packetHash: `sha256:${attemptId === "parallel-a" ? "c".repeat(64) : "d".repeat(64)}`,
+          baseSha: "a".repeat(40),
+          fanout: binding,
+        });
+        expect(created).toMatchObject({ updated: true, attempt: { attemptId } });
+        await expect(store.getAttemptFanoutBinding(attemptId)).resolves.toMatchObject({
+          fanoutId: "fanout-1",
+          attemptId,
+        });
+      }
+      for (const attemptId of ["parallel-a", "parallel-b"]) {
+        await store.transitionAttempt({
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: `cancel-${attemptId}`,
+          now: T1,
+          attemptId,
+          expectedAttemptRevision: 0,
+          status: "cancelled",
+        });
+      }
+      const decision = await fanout.decide({
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "decide-fanout-1",
+        now: T2,
+        fanoutId: "fanout-1",
+        decisionId: "fanin-1",
+      });
+      expect(decision).toMatchObject({
+        recorded: true,
+        outcome: "escalated",
+        candidateCount: 2,
+        idempotentReplay: false,
+      });
+      expect(decision).not.toHaveProperty("diagnostics");
+      const persisted = await store.getFanInDecisionForFanout("fanout-1");
+      expect(persisted).toMatchObject({
+        decisionId: "fanin-1",
+        outcome: "escalated",
+      });
+      if (!persisted) throw new Error("expected persisted fan-in decision");
+      const forged = JSON.parse(persisted.decisionJson) as {
+        decision_id: string;
+        candidates: Array<{ conclusion: string; reason_codes: string[] }>;
+      };
+      forged.decision_id = "fanin-forged";
+      forged.candidates[0]!.conclusion = "unselected";
+      forged.candidates[0]!.reason_codes = ["caller_selected_conclusion"];
+      await expect(
+        store.commitFanInDecision({
+          runId: "run-1",
+          expectedRunRevision: 0,
+          controller,
+          mutationId: "forge-fan-in",
+          now: T2,
+          decision: forged as never,
+        })
+      ).resolves.toMatchObject({ recorded: false, reason: "fanout_evidence_mismatch" });
+    });
+
+    it("requires every retry fanout sibling to bind the same prior terminal evidence", async () => {
+      await store.createAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "create-prior-fanout-attempt",
+        now: T0,
+        attemptId: "prior-fanout-attempt",
+        workItemId: "retry-fanout-work",
+        workItemRevision: 1,
+        packetId: "prior-fanout-packet",
+        packetHash: `sha256:${"8".repeat(64)}`,
+        baseSha: "a".repeat(40),
+      });
+      await store.transitionAttempt({
+        runId: "run-1",
+        controller,
+        expectedRunRevision: 0,
+        mutationId: "cancel-prior-fanout-attempt",
+        now: T1,
+        attemptId: "prior-fanout-attempt",
+        expectedAttemptRevision: 0,
+        status: "cancelled",
+      });
+      const plan = AgentWorkFanoutPlan_v1.parse({
+        schema_version: "1.0.0",
+        fanout_id: "retry-fanout",
+        run_id: "run-1",
+        work_item_id: "retry-fanout-work",
+        work_item_revision: 1,
+        rationale: "hypothesis_diversity",
+        selection_criteria: ["verification_outcome", "trust_gap_count", "verified_result_identity"],
+        budget: {
+          max_attempts: 2,
+          max_concurrency: 2,
+          max_elapsed_ms: 60_000,
+          max_context_bytes_per_attempt: 32_768,
+          max_judging_cost_units: 10,
+        },
+        premises: [
+          {
+            premise_id: "retry-premise-a",
+            attempt_id: "retry-parallel-a",
+            strategy_hash: `sha256:${"a".repeat(64)}`,
+            summary: "Apply the first changed premise.",
+          },
+          {
+            premise_id: "retry-premise-b",
+            attempt_id: "retry-parallel-b",
+            strategy_hash: `sha256:${"b".repeat(64)}`,
+            summary: "Apply the second changed premise.",
+          },
+        ],
+        direct_worker_communication: "forbidden",
+        created_at: T1,
+      });
+      const fanout = new AgentWorkFanoutService(store);
+      await fanout.create({
+        runId: "run-1",
+        expectedRunRevision: 0,
+        controller,
+        mutationId: "create-retry-fanout",
+        now: T1,
+        plan,
+      });
+
+      for (const attemptId of ["retry-parallel-a", "retry-parallel-b"]) {
+        const binding = await fanout.binding("retry-fanout", attemptId);
+        if (!binding) throw new Error("expected retry fanout binding");
+        const input = {
+          runId: "run-1",
+          controller,
+          expectedRunRevision: 0,
+          mutationId: `create-${attemptId}`,
+          now: T2,
+          attemptId,
+          workItemId: "retry-fanout-work",
+          workItemRevision: 1,
+          packetId: `packet-${attemptId}`,
+          packetHash: `sha256:${attemptId.endsWith("a") ? "c".repeat(64) : "d".repeat(64)}`,
+          baseSha: "a".repeat(40),
+          fanout: binding,
+        };
+        if (attemptId === "retry-parallel-a") {
+          await expect(store.createAttempt(input)).resolves.toMatchObject({
+            updated: false,
+            reason: "retry_delta_required",
+          });
+        }
+        const retry = {
+          schema_version: "1.0.0" as const,
+          previous_attempt_id: "prior-fanout-attempt",
+          next_attempt_id: attemptId,
+          work_item_id: "retry-fanout-work",
+          work_item_revision: 1,
+          changes: [
+            {
+              dimension: "premise" as const,
+              before_hash: `sha256:${"0".repeat(64)}`,
+              after_hash: binding.premise_hash,
+            },
+          ],
+          inherited_evidence: [],
+          summary: `Retry through ${binding.premise_id}.`,
+          created_at: T2,
+        };
+        await expect(
+          store.createAttempt({ ...input, mutationId: `retry-${attemptId}`, retry })
+        ).resolves.toMatchObject({ updated: true, attempt: { attemptId } });
+        await expect(store.getAttemptRetryDelta(attemptId)).resolves.toMatchObject({
+          previousAttemptId: "prior-fanout-attempt",
+          deltaHash: computeCanonicalHash(retry),
+        });
+      }
     });
 
     function envelopeBindingInput(overrides: Record<string, unknown> = {}) {

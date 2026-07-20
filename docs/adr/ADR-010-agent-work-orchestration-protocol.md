@@ -302,6 +302,45 @@ verification alone never implies delivery authority. Compact verification and
 acceptance status are the default, while check excerpts and trust-gap details
 require an explicit diagnostics request.
 
+#### Bounded fan-out and evidence-preserving fan-in
+
+Parallel Attempts are valid only inside one immutable `AgentWorkFanoutPlan_v1`.
+The plan names why concurrency is useful, binds every Attempt to a distinct
+premise and strategy hash, and sets explicit attempt, concurrency, elapsed-time,
+context, and judging-cost ceilings. Parallel Attempts keep the same WorkItem
+goal; a worker cannot redefine the requested outcome merely by occupying a
+different premise.
+
+If a fan-out follows an earlier terminal Attempt for the same WorkItem revision,
+every new parallel Attempt also binds its own `AttemptRetryDelta_v1` to that
+same prior Attempt. Sibling creation is not allowed to erase the retry boundary
+or make one sibling appear to be another sibling's predecessor.
+
+The first fan-in policy is `lexrunner.engine-fanin.strict@1.0.0`. Its complete
+selection criteria are engine verification outcome, unresolved trust-gap count,
+and verified result identity. Its deterministic matrix is:
+
+| Evidence set                                                                  | Decision                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| One or more strict passes with one shared result identity                     | Select the lexicographically first Attempt ID; retain other strict passes as equivalent evidence |
+| Strict passes with different result identities                                | Escalate the contradiction without selecting a winner                                            |
+| Missing engine verification or a passing verification without result identity | Escalate the incomplete comparison                                                               |
+| Complete engine evidence with no strict pass                                  | Record no viable candidate                                                                       |
+
+Every candidate remains in the immutable decision, including failed,
+inconclusive, cancelled, and unselected Attempts. Candidate records cite receipt
+and verification hashes plus bounded artifact references; they do not copy
+worker transcripts. The persistence boundary recomputes the policy result from
+the cited durable evidence and rejects caller-authored conclusions, arbitrary
+winner selection, or altered reason codes.
+
+Workers may emit bounded structured signals for blockers, discovered
+dependencies, reusable evidence, and requested human action. Signals are
+observations for the controller, not lifecycle authority. Default fan-in output
+contains only outcome, selected Attempt when applicable, candidate count, and
+the evidence-set hash. Conflicts, uncertainty, and the decision summary require
+an explicit diagnostics request.
+
 #### Delivery
 
 `Delivery` is the coordinator-owned process that turns a verified result into a
@@ -539,6 +578,12 @@ requested -> presented -> satisfied -> consumed
     that the orchestration failed to leave the work better positioned.
 14. Every retry identifies inherited evidence and a meaningful retry delta;
     a new Attempt identifier alone is insufficient.
+15. Parallel Attempts are bound to one bounded fan-out plan and distinct declared
+    premises without changing the WorkItem goal.
+16. Fan-in selection is recomputed from engine-owned evidence; contradictory or
+    incomplete passing evidence cannot produce an arbitrary winner.
+17. Failed and unselected Attempts remain durable bounded evidence, never
+    transcript dumps or accepted artifacts by implication.
 
 ---
 
@@ -578,6 +623,9 @@ AgentTaskReceipt_v1 (legacy general-work claim)
 AgentTaskReceipt_v2 (durable general-work ingestion claim)
 AgentEngineVerification_v1
 AgentEngineVerification_v2 (durable receipt-v2 engine evidence)
+AgentWorkFanoutPlan_v1 (bounded parallel premise declaration)
+FanoutAttemptBinding_v1 (Attempt-to-premise identity)
+AgentWorkFanInDecision_v1 (engine-owned evidence comparison)
 ```
 
 `AgentTaskReceipt_v1` remains readable for compatibility but is not accepted by
@@ -674,6 +722,8 @@ an accepted assisted launch.
   observations with fenced durable state.
 - Implement bounded concurrency, explicit cancellation, heartbeat loss,
   capped backoff, retry budgets, and retry-delta enforcement.
+- Bind one-level fan-out premises and persist deterministic, evidence-preserving
+  fan-in decisions before considering nested orchestration.
 - Keep reasons and reconciliation evidence behind explicit diagnostics.
 
 ### Stage 5: Fault injection and authority expansion

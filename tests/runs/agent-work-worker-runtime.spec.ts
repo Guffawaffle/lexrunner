@@ -8,6 +8,7 @@ import {
   PortBackedWorkerRuntimeAdapter,
   WorkerAdapterManifest_v1,
   WorkerAdapterRegistry,
+  WorkerRuntimeSignalSchema,
   type WorkerRuntimeArtifact,
   type WorkerRuntimePort,
   type WorkerRuntimeSignal,
@@ -187,6 +188,46 @@ describe("worker adapter capability negotiation", () => {
 });
 
 describe("worker adapter evidence bounds", () => {
+  it("accepts bounded blocker, dependency, evidence, and human-action signals", () => {
+    const common = { summary: "Bounded coordinator signal", at: "2026-07-19T12:00:01.000Z" };
+    const signals = [
+      {
+        ...common,
+        type: "blocked",
+        blocker: { code: "credential-unavailable", retryable: true },
+      },
+      {
+        ...common,
+        type: "dependency_discovered",
+        dependency: {
+          work_item_id: "work-dependency",
+          relationship: "blocked_by",
+          evidence_hash: `sha256:${"a".repeat(64)}`,
+        },
+      },
+      {
+        ...common,
+        type: "evidence_discovered",
+        evidence: {
+          kind: "eliminated_hypothesis",
+          id: "evidence-1",
+          hash: `sha256:${"b".repeat(64)}`,
+        },
+      },
+      {
+        ...common,
+        type: "human_action_requested",
+        request: { request_id: "request-1", action_class: "interactive-signing" },
+      },
+    ];
+    expect(signals.map((signal) => WorkerRuntimeSignalSchema.parse(signal).type)).toEqual([
+      "blocked",
+      "dependency_discovered",
+      "evidence_discovered",
+      "human_action_requested",
+    ]);
+  });
+
   it("rejects a provider signal that exceeds its declared limit", async () => {
     const port = new ControlledWorkerPort();
     port.signal.summary = "x".repeat(HOST_ASSISTED_ADAPTER_MANIFEST.signals.max_bytes);
