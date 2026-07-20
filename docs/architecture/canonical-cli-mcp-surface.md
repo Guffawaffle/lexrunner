@@ -14,7 +14,7 @@ groups) and 28 published MCP tools.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        84 |             9 |         15 |            15 |      0 |
+| CLI     |        85 |             9 |         15 |            15 |      0 |
 | MCP     |        24 |             3 |          1 |             0 |      0 |
 
 - **canonical** is supported vocabulary. Machine-facing canonical operations
@@ -91,9 +91,8 @@ listed in the matrix own implementation gaps.
 
 ## Audit findings
 
-- The live command is `gate execute`, while help and AX documentation claim the
-  canonical spelling is `gate run`. `gate execute` is therefore compatibility
-  surface until `gate run` exists and shares a gate service with `gates.run`.
+- Canonical `gate run` and MCP `gates.run` share `GateExecutionService` and its
+  bounded summary. `gate execute` and top-level `execute` remain migration aliases.
 - The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
   ADR-007 task tools that are not published by `mcp-server.mjs`.
 - `health` duplicates `doctor` and is deprecated.
@@ -110,7 +109,6 @@ drift.
 
 | Issue | Boundary                                                                  |
 | ----- | ------------------------------------------------------------------------- |
-| #779  | Canonical `gate run` and shared CLI/MCP gate execution service            |
 | #780  | Shared bounded discovery, plan, status, and merge-order query services    |
 | #781  | Shared bounded merge application service                                  |
 | #782  | Shared workspace/config services and retirement of MCP `health`           |

@@ -526,6 +526,15 @@ registerMonitorCommand(fanoutCmd);
 // Gate category - Quality gate execution
 const gateCmd = program.command("gate").description("Quality gate execution");
 
+registerExecuteCommand(
+  gateCmd,
+  {
+    jsonModeActive: () => jsonModeActive,
+    exitWith,
+    getProgramOpts: () => program.opts(),
+  },
+  { commandName: "run", canonicalOutput: true }
+);
 registerExecuteCommand(gateCmd, {
   jsonModeActive: () => jsonModeActive,
   exitWith,
@@ -1283,6 +1292,15 @@ export {
   getEnvironmentSuggestions,
 } from "./core/bootstrap.js";
 export { createFileAnalyzer } from "./planner/fileAnalysis.js";
+export {
+  GateExecutionService,
+  GateExecutionServiceError,
+} from "./application/gate-execution-service.js";
+export type {
+  BoundedGateRunResult,
+  GateExecutionServiceInput,
+  GateExecutionServiceResult,
+} from "./application/gate-execution-service.js";
 
 // LPR-037: Workflow guidance exports for MCP
 export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";

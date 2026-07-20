@@ -20,7 +20,7 @@ export const CLI_ALIAS_POLICY: readonly CliAliasPolicyEntry[] = [
   { path: "config:inspect", disposition: "compatibility", replacement: "config show" },
   { path: "deliverables:cleanup", disposition: "compatibility", replacement: "governance:cleanup" },
   { path: "deliverables:list", disposition: "compatibility", replacement: "weave report" },
-  { path: "gate execute", disposition: "compatibility", replacement: "planned canonical gate run" },
+  { path: "gate execute", disposition: "compatibility", replacement: "gate run" },
   {
     path: "init-local",
     disposition: "compatibility",
@@ -37,7 +37,7 @@ export const CLI_ALIAS_POLICY: readonly CliAliasPolicyEntry[] = [
   {
     path: "execute",
     disposition: "deprecated",
-    replacement: "planned canonical gate run",
+    replacement: "gate run",
     removeIn: "2.0.0",
   },
   { path: "init", disposition: "deprecated", replacement: "workspace init", removeIn: "2.0.0" },

@@ -19,7 +19,10 @@ import { loadInputs, detectGitHubMode } from "../core/inputs.js";
 import { generatePlan } from "../core/plan.js";
 import { generateSnapshot, generateGitHubSnapshot } from "../core/snapshot.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
-import { executeGatesWithPolicy } from "../gates.js";
+import {
+  GateExecutionService,
+  GateExecutionServiceError,
+} from "../application/gate-execution-service.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
@@ -1724,54 +1727,17 @@ async function handleGatesRun(
 
     const plan = loadPlan(planContent);
 
-    // Create execution state
-    const executionState = new ExecutionState(plan);
-
     // Determine output directory
     const outDir = args.outDir || path.join(outDirBase, "gates");
 
-    // Execute gates (this modifies executionState in place)
-    await executeGatesWithPolicy(plan, executionState, outDir);
-
-    // Get results from execution state
-    const results = executionState.getResults();
-
-    // Transform results to expected format
-    const items = [];
-    let allGreen = true;
-
-    for (const [itemName, nodeResult] of results) {
-      // Filter by onlyItem if specified
-      if (args.onlyItem && itemName !== args.onlyItem) {
-        continue;
-      }
-
-      // Filter gates by onlyGate if specified
-      const gates =
-        nodeResult.gates
-          ?.filter((gate) => !args.onlyGate || gate.gate === args.onlyGate)
-          .map((gate: any) => ({
-            name: gate.gate,
-            status: gate.status,
-          })) || [];
-
-      const itemResult = {
-        name: itemName,
-        status: nodeResult.status || "unknown",
-        gates: gates,
-      };
-
-      items.push(itemResult);
-
-      if (nodeResult.status !== "pass") {
-        allGreen = false;
-      }
-    }
-
-    const result: GatesRunResult = {
-      items,
-      allGreen,
-    };
+    const result: GatesRunResult = (
+      await new GateExecutionService().run({
+        plan,
+        artifactDir: outDir,
+        onlyItem: args.onlyItem,
+        onlyGate: args.onlyGate,
+      })
+    ).summary;
 
     return {
       content: [
@@ -1782,6 +1748,12 @@ async function handleGatesRun(
       ],
     };
   } catch (error) {
+    if (error instanceof GateExecutionServiceError) {
+      throwMcpAXError(
+        ErrorCode.InternalError,
+        mcpToolError(error.code, error.message, { tool: "gates.run" })
+      );
+    }
     // Check for plan not found specifically
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("Plan file not found") || message.includes("No plan found")) {
