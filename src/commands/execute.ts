@@ -5,7 +5,7 @@
 import { Command } from "commander";
 import { loadPlan } from "../schema.js";
 import { computeMergeOrder } from "../mergeOrder.js";
-import { executeGatesWithPolicy } from "../gates.js";
+import { GateExecutionService } from "../application/gate-execution-service.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import {
@@ -59,12 +59,21 @@ interface ExecuteCommandDeps {
   getProgramOpts: () => any;
 }
 
+interface ExecuteCommandRegistration {
+  commandName?: "run" | "execute";
+  canonicalOutput?: boolean;
+}
+
 /**
  * Register the execute command with the CLI program
  */
-export function registerExecuteCommand(program: Command, deps: ExecuteCommandDeps): void {
+export function registerExecuteCommand(
+  program: Command,
+  deps: ExecuteCommandDeps,
+  registration: ExecuteCommandRegistration = {}
+): void {
   program
-    .command("execute")
+    .command(registration.commandName ?? "execute")
     .description("Execute plan with policy-aware gate running and status tracking")
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .argument("[file]", "Path to plan.json file (alternative to --plan)")
@@ -381,55 +390,57 @@ Common Issues:
         const turnCostTracker = opts.trackTurncost ? createTurnCostTracker() : undefined;
 
         // Execute gates with policy
-        await executeGatesWithPolicy(
+        const gateExecution = await new GateExecutionService().run({
           plan,
           executionState,
-          opts.artifactDir,
+          artifactDir: opts.artifactDir,
           timeoutMs,
           progressReporter,
           skipValidation,
           repoRoot,
-          {
-            turnCostTracker,
-          }
-        );
+          options: { turnCostTracker },
+        });
 
         // Get final results
         const results = executionState.getResults();
         const mergeSummary = evaluator.getMergeSummary();
 
         if (opts.json || deps.jsonModeActive()) {
-          // Output JSON results with tier information
-          const tierAssignmentEntries = Object.fromEntries(
-            Array.from(tierAssignments.entries()).map(([name, assignment]) => [
-              name,
-              {
-                suggested: assignment.suggested,
-                actual: assignment.actual,
-                escalated: assignment.escalated,
-                mismatch: assignment.mismatch,
+          if (registration.canonicalOutput) {
+            writeJsonOutput(gateExecution.summary);
+          } else {
+            // Preserve the compatibility output while canonical gate run stays bounded.
+            const tierAssignmentEntries = Object.fromEntries(
+              Array.from(tierAssignments.entries()).map(([name, assignment]) => [
+                name,
+                {
+                  suggested: assignment.suggested,
+                  actual: assignment.actual,
+                  escalated: assignment.escalated,
+                  mismatch: assignment.mismatch,
+                },
+              ])
+            );
+            const output = {
+              plan: {
+                schemaVersion: plan.schemaVersion,
+                target: plan.target,
+                itemCount: plan.items.length,
               },
-            ])
-          );
-          const output = {
-            plan: {
-              schemaVersion: plan.schemaVersion,
-              target: plan.target,
-              itemCount: plan.items.length,
-            },
-            execution: {
-              results: Object.fromEntries(results),
-              mergeSummary,
-              artifactDir: opts.artifactDir,
-            },
-            tiers: {
-              assignments: tierAssignmentEntries,
-              metrics: tierMetricsToJSON(tierMetrics),
-            },
-            budget: budgetTracker.formatJSON(),
-            ...(turnCostTracker && { turnCost: turnCostTracker.toJSON() }),
-          };
-          writeJsonOutput(output);
+              execution: {
+                results: Object.fromEntries(results),
+                mergeSummary,
+                artifactDir: opts.artifactDir,
+              },
+              tiers: {
+                assignments: tierAssignmentEntries,
+                metrics: tierMetricsToJSON(tierMetrics),
+              },
+              budget: budgetTracker.formatJSON(),
+              ...(turnCostTracker && { turnCost: turnCostTracker.toJSON() }),
+            };
+            writeJsonOutput(output);
+          }
         } else if (opts.statusTable) {
           // Generate status table for PR comments
           console.log(formatStatusTable(results, mergeSummary));

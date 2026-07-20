@@ -93,6 +93,7 @@ export interface PlanCreateResult {
 }
 
 export interface GatesRunResult {
+  contract: "bounded-ax-v1";
   items: Array<{
     name: string;
     status: string;
@@ -102,6 +103,7 @@ export interface GatesRunResult {
     }>;
   }>;
   allGreen: boolean;
+  artifactRefs: Array<{ kind: "gate-results-directory"; path: string }>;
 }
 
 export interface MergeApplyResult {

@@ -49,7 +49,7 @@ describe("CLI alias policy", () => {
     expect(commandPath(execute)).toBe("gate execute");
     emitAliasWarning(execute, write);
     expect(write).toHaveBeenCalledOnce();
-    expect(write.mock.calls[0]![0]).toContain('use "planned canonical gate run"');
+    expect(write.mock.calls[0]![0]).toContain('use "gate run"');
   });
 
   it("gives deprecated aliases stable replacement and removal guidance", () => {

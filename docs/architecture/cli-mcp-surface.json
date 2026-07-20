@@ -95,6 +95,7 @@
       "gate attest",
       "gate import",
       "gate import-checks",
+      "gate run",
       "gate test",
       "gate-report",
       "gate-report validate",
@@ -153,7 +154,7 @@
       { "path": "config:inspect", "replacement": "config show" },
       { "path": "deliverables:cleanup", "replacement": "governance:cleanup" },
       { "path": "deliverables:list", "replacement": "weave report" },
-      { "path": "gate execute", "replacement": "planned canonical gate run" },
+      { "path": "gate execute", "replacement": "gate run" },
       { "path": "init-local", "replacement": "workspace init --non-interactive" },
       { "path": "merge", "replacement": "weave apply" },
       { "path": "migrate-profile", "replacement": "planned workspace migrate" }
@@ -161,7 +162,7 @@
     "deprecated": [
       { "path": "discover", "replacement": "weave discover" },
       { "path": "doctor", "replacement": "workspace doctor" },
-      { "path": "execute", "replacement": "planned canonical gate run" },
+      { "path": "execute", "replacement": "gate run" },
       { "path": "init", "replacement": "workspace init" },
       { "path": "merge-order", "replacement": "weave merge-order" },
       { "path": "orchestrate", "replacement": "weave and fanout command groups" },
@@ -333,8 +334,8 @@
       },
       {
         "tool": "gates.run",
-        "cli": "planned canonical gate run",
-        "owner": "planned shared gate execution service"
+        "cli": "gate run",
+        "owner": "GateExecutionService"
       },
       {
         "tool": "get_attempt_acceptance",
@@ -437,11 +438,6 @@
     ]
   },
   "implementationGaps": [
-    {
-      "issue": 779,
-      "title": "Add canonical gate run backed by a shared gate execution service",
-      "surface": ["gate run", "gate execute", "execute", "gates.run"]
-    },
     {
       "issue": 780,
       "title": "Share bounded discovery, planning, status, and merge-order query services",
