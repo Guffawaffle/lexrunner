@@ -2,7 +2,7 @@
  * Tests for conflict clustering - file+symbol groups with rename/whitespace awareness
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -316,6 +316,10 @@ export function  myFunc (  x : number  )  {  return x; }
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "conflict-test-"));
     });
 
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
     it("should cluster conflicts by file", async () => {
       // Create a test file
       const testFile = path.join(tempDir, "test.ts");
@@ -410,6 +414,10 @@ function newName(x: number) { return x; }
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "conflict-report-"));
     });
 
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
     it("should generate complete report structure", async () => {
       const conflicts = [{ file: "test.ts", lines: "10-20", type: "both-modified" }];
 
@@ -466,6 +474,10 @@ function funcC() {}
 
     beforeEach(() => {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "weave-"));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
     it("should create .weave directory if not exists", async () => {

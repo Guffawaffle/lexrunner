@@ -1251,6 +1251,20 @@ export {
   AttemptWorkerStatusRequestJsonSchema,
   createAttemptWorkerHandlers,
 } from "./runs/index.js";
+export {
+  AgentWorkFanoutService,
+  executeAgentWorkPreparation,
+  orderAgentWorkPreparationSteps,
+} from "./runs/index.js";
+export type {
+  AgentWorkFanInResult,
+  AgentWorkPreparationCommandResult,
+  AgentWorkPreparationCommandRunner,
+  AgentWorkPreparationResult,
+  CreateAgentWorkFanoutInput,
+  DecideAgentWorkFanInInput,
+  ExecuteAgentWorkPreparationInput,
+} from "./runs/index.js";
 
 // AX-004: MCP/CLI parity exports
 export { computeMergeOrder } from "./mergeOrder.js";

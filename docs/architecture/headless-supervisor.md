@@ -68,6 +68,8 @@ Adapter conformance supplies lifecycle loss/cancellation/teardown coverage. Work
 launch-envelope, receipt, verification, and coordination store suites retain their independent stale
 lease, observation mismatch, duplicate-delivery, and compare-and-set fault matrices.
 
-The first real ecosystem dogfood run and broader host/reboot fault injection remain release evidence
-owned by [#799](https://github.com/Guffawaffle/lexrunner/issues/799), not claims made by this
-application boundary.
+The repeatable published-package topology, packet-owned preparation receipt, fault-injected
+inspection, containment-safe reap, and parallel-suite isolation proof are documented in
+[Ecosystem provisioning and dogfood harness](ecosystem-dogfood.md). Broader native host/reboot
+fault injection remains separate release evidence rather than a claim made by this application
+boundary.
