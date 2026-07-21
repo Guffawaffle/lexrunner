@@ -33,7 +33,7 @@
     {
       "noun": "IntegrationRun",
       "owner": "frozen RunStore",
-      "surface": "compatibility-only lexrunner.* MCP tools",
+      "surface": "deprecated bounded lexrunner.* MCP record adapters through 2.0.0",
       "decision": "gate/artifact integration record; never orchestration authority"
     },
     {
@@ -260,24 +260,28 @@
       "verify_attempt",
       "workflow.guide"
     ],
-    "compatibility": [
+    "compatibility": [],
+    "deprecated": [
       {
         "tool": "lexrunner.getStatus",
-        "replacement": "ADR-010 Attempt status or stateless integration status, selected explicitly",
-        "owner": "frozen RunStore integration records"
+        "replacement": "status for integration; get_attempt_status for ADR-010 orchestration",
+        "owner": "frozen RunStore integration records",
+        "removeIn": "2.0.0"
       },
       {
         "tool": "lexrunner.listArtifacts",
-        "replacement": "bounded artifact references from the owning integration operation",
-        "owner": "frozen RunStore integration records"
+        "replacement": "bounded artifact references from the owning plan.create, gates.run, or merge.apply operation",
+        "owner": "frozen RunStore integration records",
+        "removeIn": "2.0.0"
       },
       {
         "tool": "lexrunner.startRun",
-        "replacement": "ADR-010 lifecycle services for orchestration; plan/gate services for integration",
-        "owner": "frozen RunStore integration records"
-      }
+        "replacement": "plan.create, gates.run, or merge.apply for integration; start_attempt for ADR-010 orchestration",
+        "owner": "frozen RunStore integration records",
+        "removeIn": "2.0.0"
+      },
+      { "tool": "health", "replacement": "doctor", "removeIn": "2.0.0" }
     ],
-    "deprecated": [{ "tool": "health", "replacement": "doctor", "removeIn": "2.0.0" }],
     "internal-only": [],
     "remove": [],
     "contractOverrides": [
@@ -438,11 +442,6 @@
     ]
   },
   "implementationGaps": [
-    {
-      "issue": 783,
-      "title": "Rename or retire compatibility lexrunner.* RunStore MCP tools",
-      "surface": ["lexrunner.startRun", "lexrunner.getStatus", "lexrunner.listArtifacts"]
-    },
     {
       "issue": 784,
       "title": "Enforce deprecated CLI alias warnings and removal windows",

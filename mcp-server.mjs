@@ -608,24 +608,28 @@ const tools = {
   },
 
   "lexrunner.startRun": {
-    description: "Start a new LexRunner procedure run and return a runId",
+    description: `DEPRECATED IntegrationRun record adapter; not ADR-010 orchestration authority. Use ${core.INTEGRATION_RECORD_REPLACEMENTS["lexrunner.startRun"]}. Remove in ${core.INTEGRATION_RECORD_REMOVAL_VERSION}.`,
     inputSchema: {
       type: "object",
       properties: {
         mode: {
           type: "string",
+          maxLength: 1024,
           description: "Persona mode (e.g., 'senior-dev', 'eager-pm')",
         },
         procedure: {
           type: "string",
+          maxLength: 1024,
           description: "Procedure identifier (e.g., 'merge-weave-main', 'pr-review')",
         },
         repo: {
           type: "string",
+          maxLength: 1024,
           description: "Repository in 'owner/repo' format",
         },
         task: {
           type: "string",
+          maxLength: 1024,
           description: "Human-readable task description",
         },
         params: {
@@ -637,9 +641,7 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { createRunManager } = await import("./dist/cli.js");
-        const manager = createRunManager();
-        const result = manager.startRun(args);
+        const result = new core.IntegrationRecordCompatibilityService(process.cwd()).start(args);
 
         return {
           content: [
@@ -650,18 +652,23 @@ const tools = {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to start run: ${error.message}`);
+        throw sharedServiceError(
+          error,
+          "lexrunner.startRun",
+          "INTEGRATION_RECORD_OPERATION_FAILED"
+        );
       }
     },
   },
 
   "lexrunner.getStatus": {
-    description: "Get current run state, summary, and next available actions",
+    description: `DEPRECATED bounded IntegrationRun record status; not ADR-010 Run status. Use ${core.INTEGRATION_RECORD_REPLACEMENTS["lexrunner.getStatus"]}. Remove in ${core.INTEGRATION_RECORD_REMOVAL_VERSION}.`,
     inputSchema: {
       type: "object",
       properties: {
         runId: {
           type: "string",
+          maxLength: 1024,
           description: "Unique run identifier",
         },
       },
@@ -669,9 +676,9 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { createRunManager } = await import("./dist/cli.js");
-        const manager = createRunManager();
-        const status = manager.getStatus(args);
+        const status = new core.IntegrationRecordCompatibilityService(process.cwd()).getStatus(
+          args
+        );
 
         return {
           content: [
@@ -682,18 +689,23 @@ const tools = {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to get status: ${error.message}`);
+        throw sharedServiceError(
+          error,
+          "lexrunner.getStatus",
+          "INTEGRATION_RECORD_OPERATION_FAILED"
+        );
       }
     },
   },
 
   "lexrunner.listArtifacts": {
-    description: "List and inspect artifacts and receipts for a run",
+    description: `DEPRECATED bounded IntegrationRun artifact metadata; never ADR-010 evidence authority. Use ${core.INTEGRATION_RECORD_REPLACEMENTS["lexrunner.listArtifacts"]}. Remove in ${core.INTEGRATION_RECORD_REMOVAL_VERSION}.`,
     inputSchema: {
       type: "object",
       properties: {
         runId: {
           type: "string",
+          maxLength: 1024,
           description: "Unique run identifier",
         },
         type: {
@@ -703,6 +715,7 @@ const tools = {
         },
         path: {
           type: "string",
+          maxLength: 1024,
           description: "Filter by path pattern (supports * and ** wildcards)",
         },
         latestOnly: {
@@ -711,16 +724,16 @@ const tools = {
         },
         inline: {
           type: "boolean",
-          description: "Include content for small artifacts (< 10KB)",
+          description: "Deprecated and ignored; compatibility responses never inline content",
         },
       },
       required: ["runId"],
     },
     call: async (args) => {
       try {
-        const { createRunManager } = await import("./dist/cli.js");
-        const manager = createRunManager();
-        const result = manager.listArtifacts(args);
+        const result = new core.IntegrationRecordCompatibilityService(process.cwd()).listArtifacts(
+          args
+        );
 
         return {
           content: [
@@ -731,7 +744,11 @@ const tools = {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to list artifacts: ${error.message}`);
+        throw sharedServiceError(
+          error,
+          "lexrunner.listArtifacts",
+          "INTEGRATION_RECORD_OPERATION_FAILED"
+        );
       }
     },
   },

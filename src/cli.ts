@@ -1358,6 +1358,12 @@ export {
   WorkspaceDiagnosticsService,
   WorkspaceInitializationService,
 } from "./application/workspace-config-services.js";
+export {
+  INTEGRATION_RECORD_REMOVAL_VERSION,
+  INTEGRATION_RECORD_REPLACEMENTS,
+  IntegrationRecordCompatibilityError,
+  IntegrationRecordCompatibilityService,
+} from "./application/integration-record-compatibility-service.js";
 export { mcpToolError } from "./errors/index.js";
 
 // LPR-037: Workflow guidance exports for MCP

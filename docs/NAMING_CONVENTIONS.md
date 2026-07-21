@@ -34,17 +34,17 @@ Pattern: `mcp_lexrunner_{category}_{action}`
 
 ### Current → Canonical Mapping
 
-| Current Name          | Canonical Name                   | Status  |
-| --------------------- | -------------------------------- | ------- |
-| `discover`            | `mcp_lexrunner_weave_discover`   | Planned |
-| `status`              | `mcp_lexrunner_weave_status`     | Planned |
-| `plan.create`         | `mcp_lexrunner_plan_create`      | Planned |
-| `gates.run`           | `mcp_lexrunner_gate_run`         | Planned |
-| `merge-order`         | `mcp_lexrunner_weave_order`      | Planned |
-| `doctor`              | `mcp_lexrunner_workspace_doctor` | Planned |
-| `local.init`          | `mcp_lexrunner_workspace_init`   | Planned |
-| `lexrunner.startRun`  | `mcp_lexrunner_run_start`        | Planned |
-| `lexrunner.getStatus` | `mcp_lexrunner_run_status`       | Planned |
+| Current Name          | Canonical Name                            | Status                      |
+| --------------------- | ----------------------------------------- | --------------------------- |
+| `discover`            | `mcp_lexrunner_weave_discover`            | Planned                     |
+| `status`              | `mcp_lexrunner_weave_status`              | Planned                     |
+| `plan.create`         | `mcp_lexrunner_plan_create`               | Planned                     |
+| `gates.run`           | `mcp_lexrunner_gate_run`                  | Planned                     |
+| `merge-order`         | `mcp_lexrunner_weave_order`               | Planned                     |
+| `doctor`              | `mcp_lexrunner_workspace_doctor`          | Planned                     |
+| `local.init`          | `mcp_lexrunner_workspace_init`            | Planned                     |
+| `lexrunner.startRun`  | Integration operations or `start_attempt` | Deprecated; remove in 2.0.0 |
+| `lexrunner.getStatus` | `status` or `get_attempt_status`          | Deprecated; remove in 2.0.0 |
 
 ---
 
