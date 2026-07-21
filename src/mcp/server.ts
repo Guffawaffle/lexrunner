@@ -33,20 +33,19 @@ import {
   MergeApplicationService,
   MergeApplicationServiceError,
 } from "../application/merge-application-service.js";
+import {
+  ConfigurationQueryService,
+  WorkspaceConfigServiceError,
+  WorkspaceDiagnosticsService,
+  WorkspaceInitializationService,
+} from "../application/workspace-config-services.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { loadPlan, validatePlan } from "../schema.js";
-import { initLocalOverlay } from "../config/localOverlay.js";
-import { healthChecker } from "../monitoring/health.js";
 import { createGitHubClient } from "../github/index.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
-import {
-  bootstrapWorkspace,
-  detectProjectType,
-  getEnvironmentSuggestions,
-} from "../core/bootstrap.js";
 import {
   getMCPEnvironment,
   PlanCreateArgs,
@@ -492,7 +491,8 @@ function createServer(options?: McpServerOptions): Server {
         },
         {
           name: "health",
-          description: "Get health status of the system with optional metrics",
+          description:
+            "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 2.0.0.",
           inputSchema: {
             type: "object",
             properties: {
@@ -1836,15 +1836,10 @@ async function handleLocalInit(
   args: InitLocalArgs
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
-    const force = args.force ?? false;
-    const result = initLocalOverlay(process.cwd(), force);
-
-    const output: InitLocalResult = {
-      created: result.created,
-      path: result.path,
-      config: result.config,
-      copiedFiles: result.copiedFiles,
-    };
+    const output = new WorkspaceInitializationService().run({
+      baseDir: process.cwd(),
+      force: args.force,
+    });
 
     return {
       content: [
@@ -1855,6 +1850,12 @@ async function handleLocalInit(
       ],
     };
   } catch (error) {
+    if (error instanceof WorkspaceConfigServiceError) {
+      throwMcpAXError(
+        ErrorCode.InternalError,
+        mcpToolError(error.code, error.message, { tool: "local.init" })
+      );
+    }
     throwMcpToolError(ErrorCode.InternalError, "local.init", error, "initialize local overlay");
   }
 }
@@ -1867,20 +1868,10 @@ async function handleProfileResolve(
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
     const env = getMCPEnvironment();
-
-    // Use profile directory from args, or fall back to env, or use resolveProfile default logic
-    const profileDirOverride = args.profileDir || env.LEX_PR_PROFILE_DIR;
-    const resolved = resolveProfile(profileDirOverride, process.cwd());
-
-    const output: ProfileResolveResult = {
-      path: resolved.path,
-      source: resolved.source,
-      manifest: {
-        role: resolved.manifest.role,
-        name: resolved.manifest.name,
-        version: resolved.manifest.version,
-      },
-    };
+    const output = new ConfigurationQueryService().resolveProfile({
+      baseDir: process.cwd(),
+      profileDir: args.profileDir || env.LEX_PR_PROFILE_DIR,
+    });
 
     return {
       content: [
@@ -1891,6 +1882,12 @@ async function handleProfileResolve(
       ],
     };
   } catch (error) {
+    if (error instanceof WorkspaceConfigServiceError) {
+      throwMcpAXError(
+        ErrorCode.InvalidParams,
+        mcpToolError(error.code, error.message, { tool: "profile.resolve" })
+      );
+    }
     throwMcpToolError(ErrorCode.InternalError, "profile.resolve", error, "resolve profile");
   }
 }
@@ -1901,13 +1898,27 @@ async function handleProfileResolve(
 async function handleHealth(args: {
   includeMetrics?: boolean;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
-  const health = healthChecker.getHealth(args.includeMetrics || false);
+  const doctor = await new WorkspaceDiagnosticsService().run({
+    baseDir: process.cwd(),
+    environmentQuality: args.includeMetrics,
+  });
 
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify(health, null, 2),
+        text: JSON.stringify(
+          {
+            ...doctor,
+            deprecation: {
+              tool: "health",
+              replacement: "doctor",
+              removeIn: "2.0.0",
+            },
+          },
+          null,
+          2
+        ),
       },
     ],
   };
@@ -2421,103 +2432,10 @@ async function handleDoctor(args: {
   environmentQuality?: boolean;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
-    const checks: Record<string, unknown> = {
-      hasErrors: false,
-      issues: [] as string[],
-      suggestions: [] as string[],
-    };
-
-    // Node.js version check
-    try {
-      const nvmrcContent = fs.readFileSync(".nvmrc", "utf-8").trim();
-      const currentVersion = process.version.slice(1);
-      const expectedVersion = nvmrcContent;
-
-      if (currentVersion === expectedVersion) {
-        checks.nodejs = {
-          status: "ok",
-          current: process.version,
-          expected: `v${expectedVersion}`,
-        };
-      } else {
-        checks.nodejs = {
-          status: "mismatch",
-          current: process.version,
-          expected: `v${expectedVersion}`,
-        };
-        checks.hasErrors = true;
-        (checks.issues as string[]).push(
-          `Node.js version mismatch: ${process.version} vs v${expectedVersion}`
-        );
-      }
-    } catch {
-      checks.nodejs = {
-        status: "no_constraint",
-        current: process.version,
-      };
-      (checks.suggestions as string[]).push(
-        "Consider adding .nvmrc file for Node.js version consistency"
-      );
-    }
-
-    // Configuration check
-    const bootstrap = bootstrapWorkspace();
-    checks.configuration = {
-      hasConfiguration: bootstrap.hasConfiguration,
-      missingFiles: bootstrap.missingFiles,
-      suggestions: bootstrap.suggestions,
-    };
-
-    // Project type detection
-    checks.projectType = detectProjectType();
-
-    // Environment suggestions
-    checks.environmentSuggestions = getEnvironmentSuggestions();
-
-    // GitHub integration check
-    try {
-      const githubAPI = await createGitHubAPI();
-      if (githubAPI) {
-        const authStatus = await githubAPI.checkAuth();
-        checks.github = {
-          detected: true,
-          authenticated: authStatus.authenticated,
-          user: authStatus.user,
-        };
-      } else {
-        checks.github = { detected: false };
-      }
-    } catch (error) {
-      checks.github = {
-        detected: false,
-        error: (error as Error).message,
-      };
-    }
-
-    // Git operations check
-    try {
-      const gitOps = createGitOperations();
-      const isClean = await gitOps.isClean();
-      const currentBranch = await gitOps.getCurrentBranch();
-
-      checks.git = {
-        status: "ok",
-        isClean,
-        currentBranch,
-      };
-    } catch (error) {
-      checks.git = {
-        status: "error",
-        error: (error as Error).message,
-      };
-      checks.hasErrors = true;
-      (checks.issues as string[]).push(`Git operations failed: ${(error as Error).message}`);
-    }
-
-    // Environment quality check (hostility scoring) if requested
-    if (args.environmentQuality) {
-      checks.environmentQuality = runEnvironmentQualityCheck();
-    }
+    const checks = await new WorkspaceDiagnosticsService().run({
+      baseDir: process.cwd(),
+      environmentQuality: args.environmentQuality,
+    });
 
     return {
       content: [
@@ -2528,6 +2446,12 @@ async function handleDoctor(args: {
       ],
     };
   } catch (error) {
+    if (error instanceof WorkspaceConfigServiceError) {
+      throwMcpAXError(
+        ErrorCode.InternalError,
+        mcpToolError(error.code, error.message, { tool: "doctor" })
+      );
+    }
     throwMcpToolError(ErrorCode.InternalError, "doctor", error, "run doctor");
   }
 }
@@ -2584,53 +2508,27 @@ async function handleConfigShow(args: {
   key?: string;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
-    // Load configuration with provenance tracking
-    const config = loadInputs();
-
-    const output: Record<string, unknown> = {
-      config: {
-        items: config.items,
-        target: config.target,
-        version: config.version,
-      },
-      provenance: config.provenance || {},
-      sources: config.sources.map((s) => ({
-        exists: s.exists,
-        file: s.file,
-      })),
-    };
-
-    // If specific key requested, extract just that value
-    if (args.key) {
-      const keys = args.key.split(".");
-      let value: unknown = output.config;
-      for (const k of keys) {
-        if (value && typeof value === "object" && k in value) {
-          value = (value as Record<string, unknown>)[k];
-        } else {
-          value = undefined;
-          break;
-        }
-      }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ key: args.key, value }, null, 2),
-          },
-        ],
-      };
-    }
+    const output = new ConfigurationQueryService().show({
+      baseDir: process.cwd(),
+      key: args.key,
+    });
+    const projected = args.key ? { contract: output.contract, ...output.configuration[0] } : output;
 
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(output, null, 2),
+          text: JSON.stringify(projected, null, 2),
         },
       ],
     };
   } catch (error) {
+    if (error instanceof WorkspaceConfigServiceError) {
+      throwMcpAXError(
+        error.code === "CONFIG_KEY_NOT_FOUND" ? ErrorCode.InvalidParams : ErrorCode.InternalError,
+        mcpToolError(error.code, error.message, { tool: "config.show" })
+      );
+    }
     throwMcpToolError(ErrorCode.InternalError, "config.show", error, "show config");
   }
 }

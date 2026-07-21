@@ -93,6 +93,10 @@ import {
 import { emitAliasWarning } from "./cli/alias-policy.js";
 import { registerWeaveCommand } from "./commands/weave.js";
 import { registerExplainCommand } from "./commands/explain.js";
+import {
+  WorkspaceConfigServiceError as WorkspaceConfigServiceFailure,
+  WorkspaceInitializationService,
+} from "./application/workspace-config-services.js";
 import { setFrameEmissionEnabled } from "./frames/controller.js";
 import {
   CLIExitSignal,
@@ -448,6 +452,24 @@ workspaceCmd
     const isJsonMode = opts.json || jsonModeActive;
 
     try {
+      if (opts.nonInteractive && !opts.enterprise && !opts.profileDir) {
+        const initialized = new WorkspaceInitializationService().run({
+          baseDir: process.cwd(),
+          force: opts.force,
+        });
+        if (isJsonMode) {
+          const { writeSuccessEnvelope } = await import("./cli/jsonEnvelope.js");
+          writeSuccessEnvelope("lex-pr workspace init", initialized);
+        } else {
+          console.log(
+            initialized.created
+              ? `Workspace initialized at ${initialized.path}`
+              : `Workspace already initialized at ${initialized.path}`
+          );
+        }
+        return;
+      }
+
       const result = await runInit({
         force: opts.force,
         nonInteractive: opts.nonInteractive,
@@ -490,6 +512,13 @@ workspaceCmd
 
       if (isJsonMode) {
         const { writeErrorEnvelope, errorToJsonError } = await import("./cli/jsonEnvelope.js");
+        if (error instanceof WorkspaceConfigServiceFailure) {
+          writeErrorEnvelope("lex-pr workspace init", {
+            code: error.code,
+            message: error.message,
+          });
+          throwExit(1);
+        }
         if (error instanceof WriteProtectionError) {
           writeErrorEnvelope("lex-pr workspace init", {
             code: "EWRITE_PROTECTED",
@@ -1323,6 +1352,13 @@ export type {
   MergeApplicationFailureCode,
   MergeApplicationRuntime,
 } from "./application/merge-application-service.js";
+export {
+  ConfigurationQueryService,
+  WorkspaceConfigServiceError,
+  WorkspaceDiagnosticsService,
+  WorkspaceInitializationService,
+} from "./application/workspace-config-services.js";
+export { mcpToolError } from "./errors/index.js";
 
 // LPR-037: Workflow guidance exports for MCP
 export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";
