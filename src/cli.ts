@@ -43,6 +43,7 @@ import { registerGateReportCommand } from "./commands/gateReport.js";
 import { registerGateAttestCommand } from "./commands/gateAttest.js";
 import { registerGateImportCommand } from "./commands/gateImport.js";
 import { registerGateImportChecksCommand } from "./commands/gateImportChecks.js";
+import { registerGateSelectCommand } from "./commands/gate-select.js";
 import { registerGateTestCommand } from "./cli/commands/gate/test.js";
 import { registerGovernanceReportCommand } from "./commands/governanceReport.js";
 import { registerGovernanceCleanupCommand } from "./commands/governanceCleanup.js";
@@ -573,6 +574,7 @@ registerGateTestCommand(gateCmd);
 registerGateAttestCommand(gateCmd);
 registerGateImportCommand(gateCmd);
 registerGateImportChecksCommand(gateCmd);
+registerGateSelectCommand(gateCmd, () => jsonModeActive);
 
 // ============================================================================
 // Legacy Commands (Deprecated - ALN-003 Phase 2)
@@ -1325,6 +1327,13 @@ export {
   GateExecutionService,
   GateExecutionServiceError,
 } from "./application/gate-execution-service.js";
+export {
+  GATE_IMPACT_MODEL,
+  GateImpactService,
+  GateImpactServiceError,
+  applyGateImpactSelection,
+  writeGateImpactReceipt,
+} from "./application/gate-impact-service.js";
 export type {
   BoundedGateRunResult,
   GateExecutionServiceInput,

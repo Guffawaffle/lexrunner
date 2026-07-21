@@ -96,6 +96,7 @@
       "gate import",
       "gate import-checks",
       "gate run",
+      "gate select",
       "gate test",
       "gate-report",
       "gate-report validate",

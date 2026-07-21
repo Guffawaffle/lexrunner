@@ -6,6 +6,12 @@ import { Command } from "commander";
 import { loadPlan } from "../schema.js";
 import { computeMergeOrder } from "../mergeOrder.js";
 import { GateExecutionService } from "../application/gate-execution-service.js";
+import {
+  applyGateImpactSelection,
+  GateImpactService,
+  type GateImpactSelection,
+  writeGateImpactReceipt,
+} from "../application/gate-impact-service.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import {
@@ -75,7 +81,7 @@ export function registerExecuteCommand(
   program
     .command(registration.commandName ?? "execute")
     .description("Execute plan with policy-aware gate running and status tracking")
-    .option("--plan <file>", "Path to plan.json file", "plan.json")
+    .option("--plan <file>", "Path to plan.json file")
     .argument("[file]", "Path to plan.json file (alternative to --plan)")
     .option("--artifact-dir <dir>", "Output directory for artifacts", "./artifacts")
     .option("--timeout <ms>", "Gate timeout in milliseconds", "30000")
@@ -107,6 +113,8 @@ export function registerExecuteCommand(
     )
     .option("--show-tiers", "Show suggested and actual tiers for plan items")
     .option("--track-turncost", "Track Turn Cost metrics during execution (coordination overhead)")
+    .option("--implementation-base <sha>", "Select implementation tests from this base SHA")
+    .option("--implementation-head <sha>", "Select implementation tests through this head SHA")
     .addHelpText(
       "after",
       `
@@ -124,7 +132,7 @@ Common Issues:
   • Permission errors: Ensure artifact directory is writable`
     )
     .action(async (file: string | undefined, opts) => {
-      const planFile = opts.plan || file || "plan.json";
+      const planFile = opts.plan ?? file ?? "plan.json";
       let auditEmitter: AuditEmitter | null = null;
 
       try {
@@ -176,8 +184,26 @@ Common Issues:
         }
 
         const planContent = fs.readFileSync(planFile, "utf-8");
-        const plan = loadPlan(planContent);
+        let plan = loadPlan(planContent);
         const timeoutMs = parseInt(opts.timeout);
+        let impactSelection: GateImpactSelection | undefined;
+        let impactReceiptPath: string | undefined;
+        if (opts.implementationBase || opts.implementationHead) {
+          if (!opts.implementationBase || !opts.implementationHead) {
+            throw new Error(
+              "--implementation-base and --implementation-head must be supplied together"
+            );
+          }
+          impactSelection = await new GateImpactService().select({
+            repoRoot: process.cwd(),
+            baseSha: opts.implementationBase,
+            headSha: opts.implementationHead,
+          });
+          plan = applyGateImpactSelection(plan, impactSelection);
+          if (!opts.dryRun) {
+            impactReceiptPath = writeGateImpactReceipt(impactSelection, opts.artifactDir);
+          }
+        }
 
         // Parse tier overrides from CLI
         const tierOverrides = opts.tierOverride ? parseTierOverrides(opts.tierOverride) : [];
@@ -326,6 +352,7 @@ Common Issues:
                 metrics: tierMetricsToJSON(tierMetrics),
               },
               budget: budgetTracker.formatJSON(),
+              ...(impactSelection && { impactSelection }),
             };
             writeJsonOutput(output);
           } else {
@@ -370,6 +397,11 @@ Common Issues:
 
         if (!(opts.json || deps.jsonModeActive())) {
           console.log(`Executing plan: ${plan.items.length} items, ${levels.length} levels`);
+          if (impactSelection) {
+            console.log(
+              `Implementation selection: ${impactSelection.mode} (${impactSelection.selectedTests.length} tests)`
+            );
+          }
         }
 
         // Check for input validation skip flag
@@ -407,7 +439,18 @@ Common Issues:
 
         if (opts.json || deps.jsonModeActive()) {
           if (registration.canonicalOutput) {
-            writeJsonOutput(gateExecution.summary);
+            writeJsonOutput({
+              ...gateExecution.summary,
+              ...(impactSelection && {
+                impactSelection: {
+                  mode: impactSelection.mode,
+                  changedFiles: impactSelection.changedFiles,
+                  selectedTests: impactSelection.selectedTests,
+                  fallbackReason: impactSelection.fallbackReason,
+                  receipt: impactReceiptPath,
+                },
+              }),
+            });
           } else {
             // Preserve the compatibility output while canonical gate run stays bounded.
             const tierAssignmentEntries = Object.fromEntries(

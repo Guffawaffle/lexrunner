@@ -25,6 +25,14 @@ export const GateResult = z.object({
   duration: z.number().optional(), // milliseconds
   stdout: z.string().optional(),
   stderr: z.string().optional(),
+  failureKind: z.enum(["nonzero_exit", "spawn_error", "timeout"]).optional(),
+  timeoutCleanup: z
+    .object({
+      method: z.enum(["process-group", "taskkill", "direct-child"]),
+      forceKilled: z.boolean(),
+      descendantsReaped: z.boolean(),
+    })
+    .optional(),
   artifacts: z.array(z.string()).optional(),
   attempts: z.number().default(1),
   lastAttempt: z.string().optional(), // ISO timestamp
