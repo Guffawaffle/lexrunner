@@ -22,12 +22,20 @@ describe("LexRunner 1.2 release readiness", () => {
       version: string;
       engines: { node: string };
       dependencies: Record<string, string>;
+      bin: Record<string, string>;
       exports: Record<string, unknown>;
+      repository: { url: string };
+      scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("1.2.0");
+    expect(packageJson.version).toBe("1.2.1");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^3.0.1");
+    expect(packageJson.bin["lexrunner-mcp"]).toBe("mcp-server.mjs");
+    expect(packageJson.repository.url).toBe("git+https://github.com/Guffawaffle/lexrunner.git");
+    expect(packageJson.scripts["release:publish:check"]).toBe(
+      "tsx scripts/release-publish-check.ts"
+    );
     expect(Object.keys(packageJson.exports).sort()).toEqual(previousPackageExportKeys.sort());
   });
 
@@ -53,20 +61,26 @@ describe("LexRunner 1.2 release readiness", () => {
   });
 
   it("keeps release notes, migration guidance, and current version documentation consistent", async () => {
-    const [readme, changelog, releaseNotes, migration] = await Promise.all([
-      read("README.md"),
-      read("CHANGELOG.md"),
-      read("docs/releases/1.2.0.md"),
-      read("docs/node-24-migration.md"),
-    ]);
+    const [readme, changelog, releaseNotes, priorReleaseNotes, migration, instructions] =
+      await Promise.all([
+        read("README.md"),
+        read("CHANGELOG.md"),
+        read("docs/releases/1.2.1.md"),
+        read("docs/releases/1.2.0.md"),
+        read("docs/node-24-migration.md"),
+        read("AGENTS.md"),
+      ]);
 
-    expect(readme).toContain("Current repository package version: **1.2.0**");
-    expect(changelog).toContain("## [1.2.0] - 2026-07-21");
-    expect(releaseNotes).toContain("The next version is **1.2.0**");
-    expect(releaseNotes).toContain("public unattended/headless worker-launch");
-    expect(releaseNotes).toContain("separate explicitly authorized action");
-    expect(migration).toContain("@smartergpt/lexrunner@1.2.0");
+    expect(readme).toContain("Current repository package version: **1.2.1**");
+    expect(changelog).toContain("## [1.2.1] - 2026-07-21");
+    expect(releaseNotes).toContain("human-only publication gate");
+    expect(priorReleaseNotes).toContain("public unattended/headless worker-launch");
+    expect(priorReleaseNotes).toContain("separate explicitly authorized action");
+    expect(priorReleaseNotes).toContain("not published to npm");
+    expect(migration).toContain("@smartergpt/lexrunner@1.2.1");
     expect(migration).not.toContain("@smartergpt/lexrunner@3.1.0");
+    expect(instructions).toContain("MUST NOT");
+    expect(instructions).toContain("npm publish` without `--dry-run");
   });
 });
 

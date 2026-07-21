@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/lexrunner",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -10,7 +10,7 @@
   "description": "Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Guffawaffle/lexrunner.git"
+    "url": "git+https://github.com/Guffawaffle/lexrunner.git"
   },
   "publishConfig": {
     "access": "restricted",
@@ -29,7 +29,7 @@
   ],
   "bin": {
     "lex-pr": "dist/cli.js",
-    "lexrunner-mcp": "./mcp-server.mjs"
+    "lexrunner-mcp": "mcp-server.mjs"
   },
   "types": "dist/cli.d.ts",
   "exports": {
@@ -108,6 +108,7 @@
     "benchmark:smoke": "tsx scripts/benchmark-ci.ts --mode=smoke",
     "benchmark:compare": "tsx scripts/benchmark-ci.ts --mode=compare",
     "release:prepare": "tsx scripts/release-prepare.ts",
+    "release:publish:check": "tsx scripts/release-publish-check.ts",
     "generate:mcp-servers": "python3 scripts/gen_mcp_servers.py -r /srv -r /home/guff --recursive -o servers.json --workspace-out servers.workspace.json",
     "generate:mcp-servers:dry": "python3 scripts/gen_mcp_servers.py --dry-run --recursive -r /srv -r /home/guff",
     "ci:minimal": "npm run lint && npm run typecheck",

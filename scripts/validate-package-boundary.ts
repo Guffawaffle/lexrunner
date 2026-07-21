@@ -5,10 +5,12 @@ import { pathToFileURL } from "node:url";
 
 import { collectPackageArtifactTargets } from "./validate-build-artifacts.js";
 
-interface PackageManifest {
+export interface PackageManifest {
   bin?: string | Record<string, string>;
   exports?: unknown;
   files?: string[];
+  name?: string;
+  repository?: { type?: string; url?: string } | string;
   types?: string;
 }
 
@@ -60,6 +62,46 @@ const REQUIRED_RUNTIME_ASSETS = [
 const MAX_FILE_COUNT = 120;
 const MAX_UNPACKED_SIZE = 7_000_000;
 
+const CANONICAL_REPOSITORY_URL = "git+https://github.com/Guffawaffle/lexrunner.git";
+
+export function validatePackageManifestForPublish(
+  manifest: PackageManifest,
+  projectRoot = process.cwd()
+): void {
+  const bins =
+    typeof manifest.bin === "string"
+      ? { [manifest.name ?? "package"]: manifest.bin }
+      : (manifest.bin ?? {});
+
+  for (const [name, target] of Object.entries(bins)) {
+    if (target.startsWith("./")) {
+      throw new Error(
+        `package.json bin.${name} must omit the leading './' so npm publish does not remove it`
+      );
+    }
+    if (target.includes("\\")) {
+      throw new Error(`package.json bin.${name} must use portable forward slashes`);
+    }
+
+    const targetPath = path.join(projectRoot, target);
+    if (!fs.existsSync(targetPath)) {
+      throw new Error(`package.json bin.${name} target does not exist: ${target}`);
+    }
+    const firstLine = fs.readFileSync(targetPath, "utf8").split(/\r?\n/, 1)[0];
+    if (!firstLine?.startsWith("#!")) {
+      throw new Error(`package.json bin.${name} target must begin with a shebang: ${target}`);
+    }
+  }
+
+  const repositoryUrl =
+    typeof manifest.repository === "string" ? manifest.repository : manifest.repository?.url;
+  if (repositoryUrl !== CANONICAL_REPOSITORY_URL) {
+    throw new Error(
+      `package.json repository.url must use npm's canonical form: ${CANONICAL_REPOSITORY_URL}`
+    );
+  }
+}
+
 export function inspectPackedBoundary(projectRoot = process.cwd()): PackResult {
   const output = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
     cwd: projectRoot,
@@ -79,6 +121,7 @@ export function validatePackedBoundary(projectRoot = process.cwd()): PackResult 
   if (JSON.stringify(manifest.files) !== JSON.stringify(PACKAGE_FILES_ALLOWLIST)) {
     throw new Error("package.json files allowlist does not match the enforced package boundary");
   }
+  validatePackageManifestForPublish(manifest, projectRoot);
 
   const packed = inspectPackedBoundary(projectRoot);
   const paths = new Set(packed.files.map((file) => file.path));

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ---
 
+## [1.2.1] - 2026-07-21
+
+### Fixed
+
+- **npm executable metadata** - Removed the leading `./` from the `lexrunner-mcp` bin target and
+  normalized the repository URL so npm preserves both CLI executables without publish-time repair.
+- **Human publication gate** - Added a package-boundary validation for npm-normalized metadata and
+  a dry-run release gate that prints, but never executes, the final authenticated publish command.
+
+### Release note
+
+- `v1.2.0` remains an immutable GitHub release but was not published to npm after the dry run exposed
+  the removable MCP bin metadata. Use `1.2.1` for the private npm release and downstream proof.
+
+---
+
 ## [1.2.0] - 2026-07-21
 
 ### Added

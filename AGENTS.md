@@ -69,6 +69,10 @@ should remain stable even as implementation details evolve.
 
 - _Owner:_ Maintainers/automation
 - _Artifacts:_ Changelog, tags, release notes
+- _npm publication boundary:_ Agents and automation may prepare candidates, run
+  `npm run release:publish:check`, create signed tags, and create GitHub releases. They MUST NOT
+  execute `npm publish` without `--dry-run`. After the tagged-candidate gate passes, stop and hand
+  the exact printed publish command to the authenticated human release owner.
 
 ---
 
