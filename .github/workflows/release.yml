@@ -79,12 +79,6 @@ jobs:
         run: |
           npm version ${{ steps.canary_version.outputs.version }} --no-git-tag-version
 
-      # Uncomment when ready to publish to npm
-      # - name: Publish to npm (canary)
-      #   run: npm publish --tag canary
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Create canary release summary
         run: |
           echo "## 🚀 Canary Candidate Prepared" >> $GITHUB_STEP_SUMMARY
@@ -166,11 +160,8 @@ jobs:
           fi
           echo "✅ Version match confirmed: $TAG_VERSION"
 
-      # Uncomment when ready to publish to npm
-      # - name: Publish to npm (stable)
-      #   run: npm publish
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Validate human npm publication handoff
+        run: npm run release:publish:check
 
       - name: Extract changelog for this version
         id: changelog
@@ -200,6 +191,10 @@ jobs:
           echo "**Version:** \`${TAG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** \`${TAG_NAME}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Human npm publication gate" >> $GITHUB_STEP_SUMMARY
+          echo "The workflow validated the dry-run but cannot publish. The authenticated release owner runs:" >> $GITHUB_STEP_SUMMARY
+          echo "\`npm publish --access restricted --tag latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation after an authorized npm publish" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "npm install @smartergpt/lexrunner@${TAG_VERSION}" >> $GITHUB_STEP_SUMMARY
@@ -208,7 +203,7 @@ jobs:
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
           cat release_notes.md >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> npm publication is disabled in this workflow pending #795." >> $GITHUB_STEP_SUMMARY
+          echo "> npm publication is a human-only authority gate; this workflow did not publish." >> $GITHUB_STEP_SUMMARY
 
   # Manual release job - for workflow_dispatch events
   manual-release:
@@ -251,6 +246,8 @@ jobs:
             echo "2. Review and commit changes" >> $GITHUB_STEP_SUMMARY
             echo "3. Create signed tag: \`git tag -s vX.Y.Z -m 'Release X.Y.Z'\`" >> $GITHUB_STEP_SUMMARY
             echo "4. Push tag: \`git push origin vX.Y.Z\`" >> $GITHUB_STEP_SUMMARY
+            echo "5. After the tag workflow passes, run \`npm run release:publish:check\` locally" >> $GITHUB_STEP_SUMMARY
+            echo "6. The authenticated human executes the exact command printed by the gate" >> $GITHUB_STEP_SUMMARY
           else
             echo "Canary candidates are validated on main branch pushes; npm publication remains a separate authorized step" >> $GITHUB_STEP_SUMMARY
           fi

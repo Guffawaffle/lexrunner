@@ -186,6 +186,8 @@ New to LexRunner? Start here:
 
 ### Release and distribution
 
+- **[LexRunner 1.2.1 publication repair](./releases/1.2.1.md)** - npm metadata repair and explicit
+  human publication gate
 - **[LexRunner 1.2.0 release decision](./releases/1.2.0.md)** - Compatibility inventory, semver,
   maturity boundary, issue disposition, and required evidence
 - **[Release and private npm publishing](./release-process.md)** - Scoped package, human npm auth,

@@ -4,11 +4,12 @@ LexRunner is distributed as the restricted npm package `@smartergpt/lexrunner`. 
 has two distinct outcomes:
 
 1. GitHub Actions validates a candidate and, for a signed stable tag, creates the GitHub release.
-2. An authenticated human publishes that exact candidate to the private npm package.
+2. The publish gate validates that exact candidate and prints the command for an authenticated
+   human to execute.
 
-Automated npm publication is deliberately disabled in `.github/workflows/release.yml` until the
-Ecosystem 3.1 release proof in issue #795 is complete. A successful workflow does **not** currently
-mean that npm contains the candidate.
+Automated npm publication is deliberately disabled. A successful workflow does **not** mean that
+npm contains the candidate. Agents and automation must stop after the gate and hand its command to
+the human release owner.
 
 ## Release types
 
@@ -61,20 +62,24 @@ git push origin vX.Y.Z
 ```
 
 Wait for the release workflow to finish. It builds, tests, checks determinism, verifies the version,
-and creates the GitHub release. Because npm publication is disabled, inspect the package before the
-manual publish:
+validates npm's exact dry-run publication behavior, and creates the GitHub release. From a clean
+checkout of the signed tag, run the same final gate locally:
 
 ```bash
-npm pack --dry-run
-npm publish --dry-run
+npm run release:publish:check
 ```
 
-Publish only after the release issue authorizes it:
+The gate verifies the tarball boundary, rejects npm metadata-normalization warnings, requires the
+matching `vX.Y.Z` tag at `HEAD`, performs `npm publish --dry-run`, and prints the exact command. It
+never publishes. Only the authenticated human release owner executes the printed command:
 
 ```bash
 npm publish --access restricted --tag latest
 npm view @smartergpt/lexrunner@X.Y.Z version
 ```
+
+For pre-tag candidate work, `npm run release:publish:check -- --allow-untagged` runs the package and
+dry-run checks but deliberately withholds a publish command.
 
 For an authorized canary, prepare the exact canary version on a clean release checkout and use:
 
@@ -84,7 +89,8 @@ npm view @smartergpt/lexrunner@canary version
 ```
 
 The `publishConfig` in `package.json` pins the npm registry and restricted access; the explicit
-flags make the operator's intent visible in the receipt.
+flags make the operator's intent visible in the receipt. An agent must not type, proxy, or retry the
+non-dry-run command for the human, including when npm requests an OTP or browser confirmation.
 
 ## Consumer proof
 
@@ -128,9 +134,9 @@ not silently retarget an existing version or rewrite a published tag.
 ## Automation boundary
 
 The workflow already has the permissions needed to create GitHub releases. Future automated npm
-publication requires an approved npm authentication design (for example trusted publishing or a
-scoped automation token), uncommented publish steps, and successful native-consumer proof. Until
-then, workflow summaries say **candidate prepared**, not **package published**.
+publication would require a separately approved change to this human-only authority boundary as
+well as an authentication design and consumer proof. Until then, workflow summaries say
+**candidate prepared**, not **package published**.
 
 ## Related records
 
