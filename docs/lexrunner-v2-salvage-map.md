@@ -1,7 +1,12 @@
 # LexRunner v2 Salvage Map
 
+> **Historical / superseded:** This inventory informed later in-place work but is not a current
+> porting checklist. The proposed sibling v2 package was not created. Use the
+> [canonical CLI/MCP surface](./architecture/canonical-cli-mcp-surface.md),
+> [ADR-010](./adr/ADR-010-agent-work-orchestration-protocol.md), and current tests as authority.
+>
 > **Purpose:** Enumerate what should be carried from v1 to v2, what tests encode real contracts, and what stays in v1 only.
-> **Status:** Phase 3 deliverable for Bluefield transition
+> **Status:** Historical superseded inventory
 > **Date:** 2025-12-08
 
 ---

@@ -10,18 +10,18 @@ defers those principles.
 
 ## Index
 
-| ID  | Title                                                                               | Status   | Date       |
-| --- | ----------------------------------------------------------------------------------- | -------- | ---------- |
-| 000 | [Product Naming & Branding](./ADR-000-product-naming-and-branding.md)               | Accepted | 2025-11-06 |
-| 001 | [Plan.json as Frozen Runtime Input](./ADR-001-plan-json-frozen-input.md)            | Accepted | 2025-11-25 |
-| 002 | [Two-Track Separation](./ADR-002-two-track-separation.md)                           | Accepted | 2025-11-25 |
-| 003 | [Gate Uniform Execution](./ADR-003-gate-uniform-execution.md)                       | Accepted | 2025-11-25 |
-| 004 | [Runner State Model](./ADR-004-runner-state-model.md)                               | Accepted | 2025-11-25 |
-| 005 | [Merge Pyramid Ordering](./ADR-005-merge-pyramid-ordering.md)                       | Accepted | 2025-11-25 |
-| 006 | [Schema Versioning with SemVer](./ADR-006-schema-versioning-semver.md)              | Accepted | 2025-11-25 |
-| 007 | [Task Snapshot Contract](./ADR-007-task-snapshot-contract.md)                       | Accepted | 2025-12-19 |
-| 008 | [Lex Packaging Strategy](./ADR-008-lex-packaging.md)                                | Accepted | 2026-01-01 |
-| 010 | [Agent Work Orchestration Protocol](./ADR-010-agent-work-orchestration-protocol.md) | Proposed | 2026-07-11 |
+| ID  | Title                                                                               | Status                                                                 | Date       |
+| --- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------- |
+| 000 | [Product Naming & Branding](./ADR-000-product-naming-and-branding.md)               | Accepted                                                               | 2025-11-06 |
+| 001 | [Plan.json as Frozen Runtime Input](./ADR-001-plan-json-frozen-input.md)            | Accepted                                                               | 2025-11-25 |
+| 002 | [Two-Track Separation](./ADR-002-two-track-separation.md)                           | Accepted                                                               | 2025-11-25 |
+| 003 | [Gate Uniform Execution](./ADR-003-gate-uniform-execution.md)                       | Accepted                                                               | 2025-11-25 |
+| 004 | [Runner State Model](./ADR-004-runner-state-model.md)                               | Accepted                                                               | 2025-11-25 |
+| 005 | [Merge Pyramid Ordering](./ADR-005-merge-pyramid-ordering.md)                       | Accepted                                                               | 2025-11-25 |
+| 006 | [Schema Versioning with SemVer](./ADR-006-schema-versioning-semver.md)              | Accepted                                                               | 2025-11-25 |
+| 007 | [Task Snapshot Contract](./ADR-007-task-snapshot-contract.md)                       | Accepted                                                               | 2025-12-19 |
+| 008 | [Lex Packaging Strategy](./ADR-008-lex-packaging.md)                                | Accepted                                                               | 2026-01-01 |
+| 010 | [Agent Work Orchestration Protocol](./ADR-010-agent-work-orchestration-protocol.md) | Accepted incrementally (assisted implemented; headless proof deferred) | 2026-07-11 |
 
 ## Conventions
 

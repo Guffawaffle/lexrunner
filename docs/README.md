@@ -1,27 +1,32 @@
 # lexrunner Documentation
 
-Complete documentation for lexrunner - automated PR merge workflows with dependency management.
+Complete documentation for LexRunner's dependency-aware integration and coordination workflows.
 
 ## 🚀 Getting Started
 
-New to lexrunner? Start here:
+New to LexRunner? Start here:
 
-1. **[Quickstart Guide](./quickstart.md)** (5 minutes)
+1. **[Read-only agent evaluation](./agent-evaluation.md)**
+   - Decide `adopt`, `pilot`, `defer`, or `not a fit`
+   - Compare existing automation, authority, platform limits, and operating cost
+   - Define the smallest reversible trial without installing or editing anything
+
+2. **[Quickstart Guide](./quickstart.md)** (5 minutes)
    - Installation and setup
    - First successful merge
    - Basic workflow
 
-2. **[Architecture Overview](./architecture.md)**
+3. **[Architecture Overview](./architecture.md)**
    - System design and philosophy
    - Core components
    - Data flow
 
-3. **[LexRunner Principles](./PRINCIPLES.md)**
+4. **[LexRunner Principles](./PRINCIPLES.md)**
    - Leave the work better than you found it
    - Durable-delta and retry-delta invariants
    - Ecosystem responsibilities and executable follow-ups
 
-4. **[CLI Reference](./cli.md)**
+5. **[CLI Reference](./cli.md)**
    - Complete command documentation
    - Options and flags
    - JSON output schemas
@@ -178,6 +183,11 @@ New to lexrunner? Start here:
   - Team training
   - Rollback strategies
   - Success metrics
+
+### Release and distribution
+
+- **[Release and private npm publishing](./release-process.md)** - Scoped package, human npm auth,
+  candidate validation, LexSona boundary, and native Windows consumer proof
 
 ## 📖 Reference
 

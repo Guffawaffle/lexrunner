@@ -9,13 +9,13 @@ explains the decisions behind that inventory.
 
 ## Dispositions
 
-The audited registration set contains 123 CLI entries (100 operations and 23
-groups) and 28 published MCP tools.
+The audited registration set contains 125 CLI entries and 28 published MCP
+tools. Exact disposition counts are generated into [`../AX.md`](../AX.md).
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        85 |             9 |         15 |            15 |      0 |
-| MCP     |        24 |             3 |          1 |             0 |      0 |
+| CLI     |        86 |             9 |         15 |            15 |      0 |
+| MCP     |        24 |             0 |          4 |             0 |      0 |
 
 - **canonical** is supported vocabulary. Machine-facing canonical operations
   must resolve to a contract profile in the JSON matrix.
@@ -121,8 +121,11 @@ drift.
 
 | Issue | Boundary                                                        |
 | ----- | --------------------------------------------------------------- |
+| #781  | Shared merge application service and authority                  |
 | #782  | Shared workspace/config services and retirement of MCP `health` |
+| #783  | Bounded IntegrationRun compatibility adapters                   |
 | #784  | CLI alias warnings and removal windows                          |
+| #822  | Touched/adjacent implementation gate selection                  |
 
-Each issue is independently testable and requires a fresh branch. Documentation
-reconciliation remains tracked by #772.
+These focused slices are merged. Documentation reconciliation is owned by #772;
+release-wide evidence and the final version remain owned by #795.

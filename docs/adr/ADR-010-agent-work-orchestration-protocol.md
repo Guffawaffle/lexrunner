@@ -1,6 +1,6 @@
 # ADR-010: Agent Work Orchestration Protocol
 
-**Status:** Proposed
+**Status:** Accepted incrementally — assisted lifecycle implemented; headless production proof deferred
 **Date:** 2026-07-11
 **Authors:** lexrunner team
 
@@ -70,6 +70,19 @@ WorkSource snapshot
 The shared engine is the protocol above, not a common worker-launch call.
 Worker runtimes are replaceable executors. They do not own run state,
 verification truth, authority policy, or merge authority.
+
+### Implementation maturity (July 2026)
+
+The protocol and its assisted vertical slice are implemented: canonical WorkItem/Run/Attempt
+contracts, revision-fenced coordination and workspace stores, packet/envelope preparation,
+assisted worker attachment and heartbeat, receipt ingestion, independent verification, strict
+acceptance, and CLI/MCP Attempt adapters share application services.
+
+The headless reconciliation planner and application boundary are also implemented and tested with
+controlled subprocess/restart fixtures. That is not the same claim as a supported autonomous
+operator. Public headless launch/control adapters, native host and reboot recovery, broad runtime
+integration, and the full Stage 5 fault-injection/authority-expansion matrix remain proposed release
+work. Documentation must describe those as proof boundaries, not shipped guarantees.
 
 ### Ontology
 
@@ -673,30 +686,30 @@ credential loss, and reboot reconciliation.
 
 ---
 
-## Staged Rollout
+## Staged Rollout and current status
 
-### Stage 0: Contracts and fixtures
+### Stage 0: Contracts and fixtures — implemented
 
 - Define WorkItem, Run, Attempt, packet, envelope, receipt, verification,
   authority, lease, and human-action schemas.
 - Add canonical hashing and golden fixtures.
 - Preserve ADR-007 contracts unchanged.
 
-### Stage 1: Revision-safe state and workspace leases
+### Stage 1: Revision-safe state and workspace leases — implemented
 
 - Introduce the RunStore transaction and event contract.
 - Add controller leases, Attempt records, workspace allocation, heartbeat,
   expiry, reconciliation, and dirty-worktree quarantine.
 - Port STFC broker semantics into a cross-platform Node implementation.
 
-### Stage 2: Shared CLI and MCP lifecycle services
+### Stage 2: Shared CLI and MCP lifecycle services — implemented for the Attempt-rooted public surface
 
 - Expose `work`, `run`, and `attempt` operations through shared application
   services.
 - Complete run and handoff CLI/MCP parity without duplicating state logic.
 - Make all machine-facing output bounded and JSON-safe.
 
-### Stage 3: Assisted vertical slice
+### Stage 3: Assisted vertical slice — implemented and tested
 
 - Import one bounded real WorkItem.
 - Acquire controller and workspace leases.
@@ -714,7 +727,7 @@ This ordering prevents work from beginning before its durable Attempt and lease
 binding exists; a task-bearing spawn followed by best-effort attachment is not
 an accepted assisted launch.
 
-### Stage 4: Headless supervisor
+### Stage 4: Headless supervisor — application boundary implemented; public/operator proof incomplete
 
 - Negotiate a versioned non-interactive worker adapter before launch.
 - Persist exact adapter/session identity and structured lifecycle evidence.
@@ -726,7 +739,7 @@ an accepted assisted launch.
   fan-in decisions before considering nested orchestration.
 - Keep reasons and reconciliation evidence behind explicit diagnostics.
 
-### Stage 5: Fault injection and authority expansion
+### Stage 5: Fault injection and authority expansion — proposed/unproven
 
 - Prove all supervisor failure cases listed above.
 - Expand delivery permissions only after audit evidence supports it.

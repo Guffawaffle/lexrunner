@@ -1,11 +1,18 @@
 # LexRunner v2 Contract
 
+> **Historical / superseded:** This December 2025 design was not adopted as an active sibling
+> package or migration contract. It is retained only as decision provenance. Current authority is
+> the [canonical CLI/MCP surface](./architecture/canonical-cli-mcp-surface.md), the
+> [stateless integration boundary](./TERMS.md), and
+> [ADR-010](./adr/ADR-010-agent-work-orchestration-protocol.md). Do not implement or plan releases
+> from this document.
+>
 > **Purpose:** Define what LexRunner v2 is, what it does, what it guarantees, and what it does not do.
-> **Status:** Draft for Guff sign-off
+> **Status:** Historical superseded draft
 > **Date:** 2025-12-08
 > **Version:** Draft 0.1
 
-> **Scope note (Doc Lockdown):** This document is **forward-looking** (v2 design).
+> **Original scope note:** This document was **forward-looking** (v2 design).
 > For the currently shipped v0.1 behavior (including local Frame emission details), see [`docs/MIGRATION_v0.1.md`](./MIGRATION_v0.1.md).
 
 ---

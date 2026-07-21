@@ -1,310 +1,140 @@
-# Release Process
+# Release and private npm publishing
 
-This document describes the release and distribution pipeline for lexrunner.
+LexRunner is distributed as the restricted npm package `@smartergpt/lexrunner`. The release path
+has two distinct outcomes:
 
-## Overview
+1. GitHub Actions validates a candidate and, for a signed stable tag, creates the GitHub release.
+2. An authenticated human publishes that exact candidate to the private npm package.
 
-The release process is designed to be:
+Automated npm publication is deliberately disabled in `.github/workflows/release.yml` until the
+Ecosystem 3.1 release proof in issue #795 is complete. A successful workflow does **not** currently
+mean that npm contains the candidate.
 
-- **Deterministic**: Reproducible builds and consistent versioning
-- **Auditable**: Signed tags and changelog tracking
-- **Semi-automated**: Critical steps require manual review and approval
+## Release types
 
-## Release Types
+- **Canary candidate:** each merge to `main` validates a version shaped like
+  `X.Y.Z-canary.<commit>`. Publishing it with the `canary` dist-tag is a separate authenticated
+  action.
+- **Stable release:** a signed `vX.Y.Z` tag validates the matching package version and creates a
+  GitHub release. Publishing it with the `latest` dist-tag is a separate authenticated action.
 
-### 1. Canary Releases (Automated)
+LexRunner follows Semantic Versioning. Breaking changes normally require a major release; an
+explicitly governed pre-release or ecosystem release may declare a narrower migration policy in
+its release issue. Conventional commits guide the proposed bump, but the release owner reviews the
+version and changelog before tagging.
 
-Triggered automatically on every merge to `main`:
+## Human prerequisites
 
-- Published to npm with `@canary` tag
-- Version format: `0.1.0-canary.{commit-sha}`
-- Useful for testing upcoming changes
-- Not recommended for production use
-
-### 2. Stable Releases (Manual)
-
-Triggered manually when ready for a stable release:
-
-- Follows semantic versioning (SemVer)
-- Published to npm with `@latest` tag
-- Includes changelog and signed git tag
-- Recommended for production use
-
-## Versioning Strategy
-
-This project follows [Semantic Versioning](https://semver.org/):
-
-- **MAJOR** (x.0.0): Breaking changes
-- **MINOR** (0.x.0): New features (backwards compatible)
-- **PATCH** (0.0.x): Bug fixes (backwards compatible)
-
-Version bumps are determined automatically from [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` → MINOR bump
-- `fix:` → PATCH bump
-- `feat!:` or `BREAKING CHANGE:` → MAJOR bump
-- Other types (`docs:`, `chore:`, etc.) → PATCH bump (if no other changes)
-
-## Manual Release Workflow
-
-### Prerequisites
-
-1. **GPG key configured** for signing tags:
-
-   ```bash
-   git config --global user.signingkey YOUR_KEY_ID
-   git config --global commit.gpgsign true
-   git config --global tag.gpgsign true
-   ```
-
-2. **npm authentication** configured:
-
-   ```bash
-   npm login
-   ```
-
-3. **Clean working directory**:
-   ```bash
-   git status  # Should show no uncommitted changes
-   ```
-
-### Steps
-
-#### 1. Run Release Preparation Script
+Use Node 24 and npm 11 as pinned by `.nvmrc` and `packageManager`. Configure signed commits/tags,
+start from a clean `main`, and authenticate the npm CLI for the SmarterGPT scope:
 
 ```bash
+npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
+npm whoami
+npm view @smartergpt/lexrunner versions --json
+```
+
+Authentication is intentionally a human step. Do not commit an npm token or a generated `.npmrc`.
+Downstream machines also need permission to read the private `@smartergpt` scope.
+
+## Prepare a stable candidate
+
+```bash
+git status --short
 npm run release:prepare
+git diff -- CHANGELOG.md package.json package-lock.json README.md docs/AX.md
+npm run docs:surface
+npm run build
+npm test
 ```
 
-This script will:
-
-- Analyze commits since the last tag
-- Determine the next version based on conventional commits
-- Update `CHANGELOG.md` with grouped changes
-- Update `package.json` version
-- Display next steps
-
-#### 2. Review Generated Changes
+Review the version, changelog, generated documentation, and package contents. Then commit the
+release changes, create a signed tag whose version exactly matches `package.json`, and push both:
 
 ```bash
-git diff CHANGELOG.md package.json
-```
-
-Verify:
-
-- Version number is correct
-- Changelog entries are accurate and complete
-- Breaking changes are clearly marked
-
-#### 3. Commit Release Changes
-
-```bash
-git add CHANGELOG.md package.json
-git commit -m "chore(release): prepare vX.Y.Z"
-```
-
-#### 4. Create Signed Tag
-
-```bash
+git add CHANGELOG.md package.json package-lock.json README.md docs/AX.md
+git commit -S -m "chore(release): prepare vX.Y.Z"
 git tag -s vX.Y.Z -m "Release X.Y.Z"
-```
-
-The tag should be **signed** (`-s` flag) for security and authenticity.
-
-To verify the tag signature:
-
-```bash
 git tag -v vX.Y.Z
-```
-
-#### 5. Push Changes and Tag
-
-```bash
 git push origin main
 git push origin vX.Y.Z
 ```
 
-#### 6. Verify CI Pipeline
-
-The GitHub Actions release workflow will automatically:
-
-- Build the package
-- Run all tests
-- Publish to npm (if configured)
-- Create GitHub release
-
-Monitor the workflow at: `https://github.com/Guffawaffle/LexRunner/actions`
-
-#### 7. Create GitHub Release (Optional)
-
-Navigate to: `https://github.com/Guffawaffle/LexRunner/releases/new`
-
-1. Select the tag: `vX.Y.Z`
-2. Title: `Release X.Y.Z`
-3. Copy changelog entry from `CHANGELOG.md`
-4. Attach build artifacts (optional)
-5. Publish release
-
-## Automated Release Workflow (GitHub Actions)
-
-### Canary Release (On Main Merge)
-
-```yaml
-# Triggered automatically on push to main
-on:
-  push:
-    branches: [main]
-
-jobs:
-  canary-release:
-    - Build and test
-    - Publish to npm with @canary tag
-    - Version: {current}-canary.{sha}
-```
-
-### Stable Release (Manual Trigger)
-
-```yaml
-# Triggered manually via workflow_dispatch
-on:
-  push:
-    tags:
-      - "v*.*.*"
-
-jobs:
-  release:
-    - Verify tag signature
-    - Build and test
-    - Publish to npm with @latest tag
-    - Create GitHub release
-```
-
-## Rollback Procedure
-
-If a release has critical issues:
-
-### 1. Unpublish from npm (if published recently)
+Wait for the release workflow to finish. It builds, tests, checks determinism, verifies the version,
+and creates the GitHub release. Because npm publication is disabled, inspect the package before the
+manual publish:
 
 ```bash
-npm unpublish lexrunner@X.Y.Z
-```
-
-**Note**: npm only allows unpublishing within 72 hours.
-
-### 2. Deprecate the version
-
-```bash
-npm deprecate lexrunner@X.Y.Z "Critical bug - use vX.Y.Z-1 instead"
-```
-
-### 3. Delete the Git tag
-
-```bash
-git tag -d vX.Y.Z
-git push origin :refs/tags/vX.Y.Z
-```
-
-### 4. Revert the release commit
-
-```bash
-git revert HEAD  # If release commit is at HEAD
-git push origin main
-```
-
-### 5. Publish a patch release
-
-Follow the manual release workflow to publish a fixed version.
-
-## Changelog Maintenance
-
-The `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/) format:
-
-- **[Unreleased]**: Accumulates changes during development
-- **[X.Y.Z]**: Released versions with date stamps
-- Sections: Added, Changed, Fixed, Deprecated, Removed, Security, Internal
-
-### Manual Changelog Updates
-
-If the automated changelog needs adjustments:
-
-1. Edit `CHANGELOG.md` directly
-2. Follow the existing format and conventions
-3. Keep entries in reverse chronological order
-4. Include commit references where helpful
-
-## CI/CD Integration
-
-### Required Secrets
-
-Configure these in GitHub repository settings:
-
-- `NPM_TOKEN`: npm authentication token for publishing
-- `GPG_PRIVATE_KEY`: GPG key for signing (if automated)
-
-### Workflow Permissions
-
-The release workflow requires:
-
-```yaml
-permissions:
-  contents: write # For creating releases
-  packages: write # For publishing packages
-```
-
-## Troubleshooting
-
-### Tag Signing Fails
-
-```bash
-# Verify GPG is configured
-git config --get user.signingkey
-
-# List GPG keys
-gpg --list-secret-keys
-
-# Test signing
-echo "test" | gpg --clearsign
-```
-
-### npm Publish Fails
-
-```bash
-# Verify authentication
-npm whoami
-
-# Check package version
-npm view lexrunner versions
-
-# Verify package.json
+npm pack --dry-run
 npm publish --dry-run
 ```
 
-### Version Conflict
+Publish only after the release issue authorizes it:
 
-If the calculated version already exists:
+```bash
+npm publish --access restricted --tag latest
+npm view @smartergpt/lexrunner@X.Y.Z version
+```
 
-1. Check if there are unreleased commits:
+For an authorized canary, prepare the exact canary version on a clean release checkout and use:
 
-   ```bash
-   git log $(git describe --tags --abbrev=0)..HEAD --oneline
-   ```
+```bash
+npm publish --access restricted --tag canary
+npm view @smartergpt/lexrunner@canary version
+```
 
-2. Manually bump version if needed:
+The `publishConfig` in `package.json` pins the npm registry and restricted access; the explicit
+flags make the operator's intent visible in the receipt.
 
-   ```bash
-   npm version patch --no-git-tag-version
-   ```
+## Consumer proof
 
-3. Update CHANGELOG.md manually
+The release is not complete at “npm accepted the package.” Issue #795 owns the final proof:
 
-## References
+1. install the scoped package from the private registry in a clean native Windows consumer;
+2. verify ESM, CommonJS, CLI version/help, and MCP startup/tool inventory;
+3. exercise the bounded read-only smoke path; and
+4. record versions, commands, outcomes, and cleanup without recording credentials.
 
+The consumer install shape is:
+
+```bash
+npm install @smartergpt/lexrunner@X.Y.Z
+```
+
+## LexSona is a separate release
+
+LexSona is versioned, built, and published from the LexSona repository under its own package name
+and release gates. The same authenticated SmarterGPT npm identity may be reused, but LexRunner's
+scripts, tag, workflow, and changelog must never publish or version LexSona. Coordinate compatible
+versions in the ecosystem release receipt rather than coupling the two publish operations.
+
+## Rollback and recovery
+
+Prefer deprecation plus a fixed patch over unpublishing:
+
+```bash
+npm deprecate @smartergpt/lexrunner@X.Y.Z "Critical issue; use X.Y.Z+1"
+```
+
+If npm policy permits and the release owner explicitly approves unpublishing:
+
+```bash
+npm unpublish @smartergpt/lexrunner@X.Y.Z
+```
+
+Revert faulty repository changes with a normal signed revert and publish a corrected release. Do
+not silently retarget an existing version or rewrite a published tag.
+
+## Automation boundary
+
+The workflow already has the permissions needed to create GitHub releases. Future automated npm
+publication requires an approved npm authentication design (for example trusted publishing or a
+scoped automation token), uncommented publish steps, and successful native-consumer proof. Until
+then, workflow summaries say **candidate prepared**, not **package published**.
+
+## Related records
+
+- [Ecosystem release and native Windows proof (#795)](https://github.com/Guffawaffle/lexrunner/issues/795)
+- [Node 24 runtime migration (#823)](https://github.com/Guffawaffle/lexrunner/issues/823)
+- [npm publish documentation](https://docs.npmjs.com/cli/commands/npm-publish)
 - [Semantic Versioning](https://semver.org/)
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- [Keep a Changelog](https://keepachangelog.com/)
-- [npm Publishing Guide](https://docs.npmjs.com/cli/v9/commands/npm-publish)
-- [Git Tag Signing](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
-
-## Related Issues
-
-- [#132 Release & Distribution Pipeline](https://github.com/Guffawaffle/LexRunner/issues/132)

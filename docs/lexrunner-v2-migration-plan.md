@@ -1,7 +1,13 @@
 # LexRunner v2 Migration Plan
 
+> **Historical / superseded:** The sibling-package transition below was never executed as the
+> active LexRunner migration. It is retained only as decision provenance. The maintained package is
+> `@smartergpt/lexrunner`; current release planning is owned by issue #795 and current architecture
+> by [ADR-010](./adr/ADR-010-agent-work-orchestration-protocol.md). Do not use these phases as an
+> implementation plan.
+>
 > **Purpose:** Define the phased transition from LexRunner v1 to v2.
-> **Status:** Phase 4 deliverable for Bluefield transition
+> **Status:** Historical superseded plan
 > **Date:** 2025-12-08
 
 ---

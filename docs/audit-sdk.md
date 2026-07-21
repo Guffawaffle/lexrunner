@@ -43,7 +43,7 @@ The Audit SDK provides **two distinct APIs**:
 ## Installation (Consumer SDK)
 
 ```bash
-npm install lexrunner
+npm install @smartergpt/lexrunner
 ```
 
 Then import the consumer SDK from the source (until published as separate package):
@@ -532,7 +532,7 @@ The Audit SDK is included in the `lexrunner` package:
 
 ```bash
 # Already available if you have lexrunner installed
-npm install lexrunner
+npm install @smartergpt/lexrunner
 ```
 
 Or import directly from the source:

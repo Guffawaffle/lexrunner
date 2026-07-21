@@ -3,7 +3,12 @@
 ## Project & Components
 
 - **lexrunner (project/repo)**: The repository you're reading.
-- **Runner CLI (core runner)**: TypeScript command-line app under `src/**`. Shorthand: "the runner".
+- **Runner CLI**: TypeScript command-line adapter under `src/**`. Shorthand: "the runner".
+- **Stateless integration core**: Plan, gate, status, and weave application services. It consumes a
+  frozen plan and never reads coordination state as integration authority.
+- **Stateful coordination service**: ADR-010 application services backed by `CoordinationStore` and
+  workspace lifecycle stores. It owns implementation-time WorkItems, Runs, Attempts, leases,
+  receipts, and verification; it does not alter a frozen integration plan.
 - **MCP server (adapter)**: Optional adapter that exposes selected runner operations over MCP. Shorthand:
   "lex-pr MCP".
 - **Workspace profile**: Portable examples and developer tooling under `.smartergpt/**`. It is not the app,
@@ -43,6 +48,10 @@
   pushing, PR operations, gates, weave, and merge under explicit authority policy.
 - **Assisted control**: A foreground developer-chat controller dispatches native background agents.
 - **Headless control**: A supervised CLI controller dispatches and recovers external worker runtimes.
+
+**Maturity:** Assisted Attempt control is implemented. A headless reconciliation application
+boundary is implemented against controlled adapters, but public headless launch, native/reboot
+recovery, and Stage 5 fault-injection/authority expansion are not production guarantees.
 
 ## Repo Rules (Firm)
 
