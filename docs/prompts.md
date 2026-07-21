@@ -82,7 +82,7 @@ LexRunner now integrates with the `@smartergpt/lex` npm package to provide canon
 
 ```bash
 # Install lexrunner (includes @smartergpt/lex)
-npm install lexrunner
+npm install @smartergpt/lexrunner
 
 # Prompts are automatically available - no setup needed
 lex-pr plan --from-github

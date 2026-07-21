@@ -43,10 +43,10 @@ The Audit SDK provides **two distinct APIs**:
 ## Installation (Consumer SDK)
 
 ```bash
-npm install lexrunner
+npm install @smartergpt/lexrunner
 ```
 
-Then import the consumer SDK from the source (until published as separate package):
+Import the published consumer SDK subpath:
 
 ```typescript
 import {
@@ -56,14 +56,14 @@ import {
   validateAuditManifest,
   EventQuery,
   type AuditEvent,
-} from "lexrunner/src/sdk/index.js";
+} from "@smartergpt/lexrunner/audit-sdk";
 ```
 
 Or use the types and parsers directly:
 
 ```typescript
-import { parseAuditEvent, type AuditEvent } from "lexrunner/src/audit/schema/events.js";
-import { parseAuditManifest } from "lexrunner/src/audit/schema/manifest.js";
+import { parseAuditEvent, type AuditEvent } from "@smartergpt/lexrunner/audit-sdk";
+import { parseAuditManifest } from "@smartergpt/lexrunner/audit-sdk";
 ```
 
 ## Quick Start (Consumer SDK)
@@ -71,7 +71,7 @@ import { parseAuditManifest } from "lexrunner/src/audit/schema/manifest.js";
 ### Example 1: Read and Filter Events
 
 ```typescript
-import { readAuditNDJSON, filterEvents } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSON, filterEvents } from "@smartergpt/lexrunner/audit-sdk";
 
 // Read all events from audit output
 for await (const event of readAuditNDJSON("./audit.ndjson")) {
@@ -84,7 +84,7 @@ for await (const event of readAuditNDJSON("./audit.ndjson")) {
 ### Example 2: Load into Memory and Query
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, EventQuery } from "@smartergpt/lexrunner/audit-sdk";
 
 // Load all events into memory
 const events = await readAuditNDJSONSync("./audit.ndjson");
@@ -102,7 +102,7 @@ console.log(`Found ${failedGates.length} failed gates`);
 ### Example 3: Compute Statistics
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, computeStatistics } from "@smartergpt/lexrunner/audit-sdk";
 
 const events = await readAuditNDJSONSync("./audit.ndjson");
 const stats = computeStatistics(events);
@@ -116,7 +116,7 @@ console.log(`Time range: ${stats.timeRange.start} to ${stats.timeRange.end}`);
 ### Example 4: Validate Manifest
 
 ```typescript
-import { validateAuditManifest } from "lexrunner/src/sdk/index.js";
+import { validateAuditManifest } from "@smartergpt/lexrunner/audit-sdk";
 import * as fs from "fs";
 
 const manifestData = JSON.parse(fs.readFileSync("./audit-manifest.json", "utf8"));
@@ -329,7 +329,7 @@ console.log(`Gate pass rate: ${(stats.gateStats.passed / stats.gateStats.total) 
 ### Example 1: CI/CD Integration - Report Failed Gates
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, filterEvents } from "@smartergpt/lexrunner/audit-sdk";
 
 async function reportFailedGates() {
   const events = await readAuditNDJSONSync("./audit.ndjson");
@@ -356,7 +356,11 @@ reportFailedGates();
 ### Example 2: Generate HTML Report
 
 ```typescript
-import { readAuditNDJSONSync, computeStatistics, filterEvents } from "lexrunner/src/sdk/index.js";
+import {
+  readAuditNDJSONSync,
+  computeStatistics,
+  filterEvents,
+} from "@smartergpt/lexrunner/audit-sdk";
 import * as fs from "fs";
 
 async function generateReport() {
@@ -399,7 +403,7 @@ generateReport();
 ### Example 3: SIEM Integration - Export to JSON
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, filterEvents } from "@smartergpt/lexrunner/audit-sdk";
 import * as fs from "fs";
 
 async function exportToSIEM() {
@@ -430,7 +434,11 @@ exportToSIEM();
 ### Example 4: Compliance Dashboard - Aggregate Metrics
 
 ```typescript
-import { readAuditNDJSONSync, EventQuery, computeStatistics } from "lexrunner/src/sdk/index.js";
+import {
+  readAuditNDJSONSync,
+  EventQuery,
+  computeStatistics,
+} from "@smartergpt/lexrunner/audit-sdk";
 
 async function complianceDashboard() {
   const events = await readAuditNDJSONSync("./audit.ndjson");
@@ -470,7 +478,7 @@ complianceDashboard();
 ### Example 5: Filter by Time Range
 
 ```typescript
-import { readAuditNDJSONSync, filterEvents } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, filterEvents } from "@smartergpt/lexrunner/audit-sdk";
 
 async function eventsInTimeRange() {
   const events = await readAuditNDJSONSync("./audit.ndjson");
@@ -491,7 +499,7 @@ eventsInTimeRange();
 ### Example 6: Type-Safe Event Handling
 
 ```typescript
-import { readAuditNDJSONSync, type GateFinishedEvent } from "lexrunner/src/sdk/index.js";
+import { readAuditNDJSONSync, type GateFinishedEvent } from "@smartergpt/lexrunner/audit-sdk";
 
 async function analyzeGatePerformance() {
   const events = await readAuditNDJSONSync("./audit.ndjson");
@@ -526,19 +534,23 @@ analyzeGatePerformance();
 
 # Gate SDK
 
+The Gate SDK implementation is currently repository-internal and is not a supported package
+export. The examples below apply to contributors working from a LexRunner checkout; adapt the
+relative source path to the location of the local script. Package consumers should use the
+published Consumer SDK above.
+
 ## Installation
 
-The Audit SDK is included in the `lexrunner` package:
+From a LexRunner checkout, install repository dependencies:
 
 ```bash
-# Already available if you have lexrunner installed
-npm install lexrunner
+npm ci
 ```
 
-Or import directly from the source:
+Then import the internal implementation from source:
 
 ```typescript
-import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { initAuditSDK } from "./src/audit/sdk/index.js";
 ```
 
 ---
@@ -549,7 +561,7 @@ import { initAuditSDK } from "lexrunner/src/audit/sdk";
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { initAuditSDK } from "./src/audit/sdk/index.js";
 
 const audit = initAuditSDK("my-gate");
 
@@ -839,7 +851,7 @@ finally:
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { initAuditSDK } from "./src/audit/sdk/index.js";
 import { execSync } from "child_process";
 
 const audit = initAuditSDK("vuln");
@@ -891,7 +903,7 @@ scanVulnerabilities(process.argv[2] || "package.json");
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { initAuditSDK } from "./src/audit/sdk/index.js";
 import { execSync } from "child_process";
 
 const audit = initAuditSDK("test");
@@ -948,7 +960,7 @@ runTests();
 
 ```typescript
 #!/usr/bin/env node
-import { initAuditSDK } from "lexrunner/src/audit/sdk";
+import { initAuditSDK } from "./src/audit/sdk/index.js";
 import { execSync } from "child_process";
 
 const audit = initAuditSDK("lint");
@@ -1092,7 +1104,7 @@ import {
   AuditSDK,
   VulnFoundPayload,
   TestResultPayload,
-} from "lexrunner/src/audit/sdk";
+} from "./src/audit/sdk/index.js";
 
 const audit: AuditSDK = initAuditSDK("my-gate");
 
@@ -1128,7 +1140,7 @@ This would enable:
 
 ## Related Documentation
 
-- [Epic #189: Audit Outputs for Change Management & Compliance](../issues/189)
-- [Phase 1: Core Emitter](../issues/190)
+- [Epic #189: Audit Outputs for Change Management & Compliance](https://github.com/Guffawaffle/lexrunner/issues/189)
+- [Phase 1: Core Emitter](https://github.com/Guffawaffle/lexrunner/issues/190)
 - [Monitoring & Audit Trail](./monitoring-examples.md)
 - [Security & Compliance](./SECURITY_IMPLEMENTATION.md)

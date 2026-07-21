@@ -17,7 +17,8 @@ should remain stable even as implementation details evolve.
 2. **Merge Pyramid.** Decompose work into many small PRs, compute a **dependency‑ordered pyramid** (topological order), and integrate bottom‑up.
 3. **Uniform Gates.** Execute the same **gates** (lint/type/test, policy checks, etc.) **locally and in CI**, with the same inputs and expectations.
 4. **Two‑Track Separation (Firm).**
-   - **Core runner** lives in the repository root (`src/*`, CLI, MCP adapter, packaging, CI). It is **stateless** and **packageable**.
+   - **Stateless integration core** is the plan/gate/status/weave portion of `src/*` plus its CLI and MCP adapters. It is **packageable** and reads no coordination state as integration truth.
+   - **Coordination service** is explicitly stateful behind ADR-010 `CoordinationStore` and workspace-lifecycle adapters. It owns WorkItems, Runs, Attempts, leases, receipts, and verification during implementation, but is never an integration-time input.
    - **`.smartergpt/` is a portable user workspace** and canonical profile. It is **not read at runtime** by the runner. It can contain example profiles, prompts, policies, and developer tooling.
 5. **Reproducibility Over Magic.** No hidden state, no “auto inference.” Integration inputs are explicit; outputs are traceable.
 6. **Auditability.** Every decision is inspectable (plan, gates, logs, outcomes).
@@ -46,6 +47,10 @@ should remain stable even as implementation details evolve.
 - _Surfaces:_ Branches/PRs, tests, docs, `.smartergpt/` workspace tools
 - _Inputs:_ Issue descriptions + project principles (this document)
 - _Outputs:_ One or more focused PRs per task
+- _Optional coordination:_ ADR-010 services may persist WorkItems, Runs, Attempts, leases, worker
+  sessions, receipts, and verification. Assisted control is implemented. The headless supervisor
+  application boundary is tested, but public headless launch and Stage 5 native/reboot fault
+  injection are not production claims.
 
 **Stage C — Plan Synthesis (Out of Runner Scope)**
 
@@ -74,6 +79,9 @@ should remain stable even as implementation details evolve.
 - **Outputs:** Deterministic artifacts (gate results, merge decisions). Post as **PR comments or CI artifacts**, **not** as code changes in the runner path.
 - **Side‑Effects:** Only those declared in `plan.json` (e.g., which PR to merge, in what order). No implicit network calls or mutations.
 - **Idempotence:** Same `plan.json` → same decisions (modulo external state, e.g., a PR already merged).
+- **State boundary:** Integration services MUST NOT consult `CoordinationStore`. Coordination may
+  produce verified PRs before plan synthesis, but it cannot alter dependency order, gates, or
+  merge authority after the plan is frozen.
 
 ---
 
@@ -162,7 +170,10 @@ The constraint applies only to the **final push to main**.
 
 ## 6) Two‑Track Separation (Enforced)
 
-- **Core Runner (Track A):** `src/`, CLI, adapters (e.g., MCP), packaging, CI recipes. _Never_ hard‑link or read `.smartergpt/` at runtime.
+- **Core Runner (Track A):** stateless plan/gate/weave services, CLI, MCP adapters, packaging, and CI recipes. _Never_ hard‑link or read `.smartergpt/` at runtime.
+- **Coordination Service (explicit stateful boundary):** ADR-010 application services and their
+  injected stores coordinate implementation Attempts. Durable state is authoritative only for
+  that lifecycle and cannot become hidden input to Track A integration.
 - **Portable Workspace (Track B):** `.smartergpt/` contains examples, profiles, prompts, policies, local tooling, and deliverables for **humans and agents**. It is **replaceable** and **repo‑portable**.
 
 **Why this matters:** Repos can adopt lex‑pr‑runner without inheriting your personal workspace, and your workspace can travel across repos without changing the runner. This is the foundation for determinism and portability.
@@ -186,6 +197,8 @@ The constraint applies only to the **final push to main**.
 
 - Treat `plan.json` as the **only integration‑time input** for the runner.
 - Keep the runner **stateless**; derive integration state from inputs and external APIs declared in the plan.
+- Keep coordination state behind explicit store interfaces, fenced revisions, bounded adapters,
+  and independently verified evidence.
 - Prefer **pure functions** and small modules. TS‑first with Zod schemas.
 - Emit artifacts to **deliverables or PR comments**, not into source directories.
 - Uphold **imperative commit messages** (e.g., “Add…”, “Fix…”, “Refactor…”).
@@ -194,6 +207,8 @@ The constraint applies only to the **final push to main**.
 
 - Don’t read `.smartergpt/` at runtime.
 - Don’t infer dependencies from file paths or heuristics. Only the plan decides.
+- Don’t let WorkItem, Run, Attempt, worker-session, or receipt state influence a frozen integration
+  plan except through an explicit plan-synthesis step before integration.
 - Don’t hide side‑effects behind environment variables. All effects must be declared in the plan or policy.
 - Don’t fork logic between local and CI paths.
 
@@ -289,6 +304,7 @@ Yes. Keep your CI; point it at the runner CLI. The runner remains deterministic 
 ## 15) Invariants (Quick Reference)
 
 - Runner reads **only `plan.json`** at integration time.
+- Coordination state is explicit and stateful during implementation; it is never integration truth.
 - `.smartergpt/` is never a runtime dependency.
 - Local and CI gate semantics are identical.
 - No hidden side‑effects; everything is declared.
@@ -361,10 +377,11 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 1. **Open Issues** with crisp acceptance criteria.
 2. **Implement** in **small PRs**; add `Depends-on:` footers if needed.
 3. **Generate plan:** Run your plan generator to emit `plan.json`.
-4. **Dry run locally:** `lexrunner --plan plan.json --dry-run`
-5. **Run gates:** Same CLI locally and in CI; confirm artifacts appear under `<nodeId>/<gateName>/`.
-6. **Merge pyramid:** Runner computes topo order, merges eligible nodes.
-7. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
+4. **Validate and order:** `lex-pr schema validate plan.json` then `lex-pr weave merge-order plan.json`.
+5. **Dry run locally:** `lex-pr gate run plan.json --dry-run`.
+6. **Run gates:** Same canonical CLI locally and in CI; confirm bounded results and artifact references.
+7. **Merge pyramid:** `lex-pr weave apply --execute` only with explicit mutation authority.
+8. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
 
 ## 16) Security Dependency Policy
 

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- **Documentation and ADR-010 reconciliation** - Reframed LexRunner around its progressive
+  integration workflow, distinguished the stateless integration core from optional stateful
+  coordination, documented assisted-versus-headless maturity honestly, added a bounded read-only
+  agent evaluation, generated CLI/MCP surface and package-version facts from repository authority,
+  and corrected private npm publishing guidance for `@smartergpt/lexrunner`.
 - **Node.js 24 runtime floor** - Ecosystem 3.1 requires Node.js 24 or newer for the CLI,
   MCP server, SDK package, and downstream consumers. Node.js 20 is EOL and Node.js 22 is no
   longer a supported LexRunner runtime. Upgrade local, CI, and Windows consumer environments

@@ -87,17 +87,17 @@ jobs:
 
       - name: Create canary release summary
         run: |
-          echo "## 🚀 Canary Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Canary Candidate Prepared" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${{ steps.canary_version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation after an authorized npm publish" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install lexrunner@canary" >> $GITHUB_STEP_SUMMARY
+          echo "npm install @smartergpt/lexrunner@canary" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> ⚠️ Canary releases are for testing only. Use stable releases for production." >> $GITHUB_STEP_SUMMARY
+          echo "> ⚠️ npm publication is disabled in this workflow pending #795. Canary releases are for testing only." >> $GITHUB_STEP_SUMMARY
 
   # Stable release job - runs on version tags
   stable-release:
@@ -195,18 +195,20 @@ jobs:
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#v}
 
-          echo "## 🎉 Stable Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Stable GitHub Release Prepared" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${TAG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** \`${TAG_NAME}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation after an authorized npm publish" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "npm install lexrunner@${TAG_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "npm install @smartergpt/lexrunner@${TAG_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
           cat release_notes.md >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> npm publication is disabled in this workflow pending #795." >> $GITHUB_STEP_SUMMARY
 
   # Manual release job - for workflow_dispatch events
   manual-release:
@@ -250,5 +252,5 @@ jobs:
             echo "3. Create signed tag: \`git tag -s vX.Y.Z -m 'Release X.Y.Z'\`" >> $GITHUB_STEP_SUMMARY
             echo "4. Push tag: \`git push origin vX.Y.Z\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "Canary releases are automated on main branch pushes" >> $GITHUB_STEP_SUMMARY
+            echo "Canary candidates are validated on main branch pushes; npm publication remains a separate authorized step" >> $GITHUB_STEP_SUMMARY
           fi
