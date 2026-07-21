@@ -61,15 +61,27 @@ describe("LexRunner 1.2 release readiness", () => {
   });
 
   it("keeps release notes, migration guidance, and current version documentation consistent", async () => {
-    const [readme, changelog, releaseNotes, priorReleaseNotes, migration, instructions] =
-      await Promise.all([
-        read("README.md"),
-        read("CHANGELOG.md"),
-        read("docs/releases/1.2.1.md"),
-        read("docs/releases/1.2.0.md"),
-        read("docs/node-24-migration.md"),
-        read("AGENTS.md"),
-      ]);
+    const [
+      readme,
+      changelog,
+      releaseNotes,
+      priorReleaseNotes,
+      migration,
+      instructions,
+      releaseWorkflow,
+      releaseProcess,
+      releaseDriftCheck,
+    ] = await Promise.all([
+      read("README.md"),
+      read("CHANGELOG.md"),
+      read("docs/releases/1.2.1.md"),
+      read("docs/releases/1.2.0.md"),
+      read("docs/node-24-migration.md"),
+      read("AGENTS.md"),
+      read(".github/workflows/release.yml"),
+      read("docs/release-process.md"),
+      read("scripts/check-release-drift.mjs"),
+    ]);
 
     expect(readme).toContain("Current repository package version: **1.2.1**");
     expect(changelog).toContain("## [1.2.1] - 2026-07-21");
@@ -81,6 +93,10 @@ describe("LexRunner 1.2 release readiness", () => {
     expect(migration).not.toContain("@smartergpt/lexrunner@3.1.0");
     expect(instructions).toContain("MUST NOT");
     expect(instructions).toContain("npm publish` without `--dry-run");
+    expect(releaseWorkflow).toContain('"lexrunner-v*.*.*"');
+    expect(releaseWorkflow).not.toContain('"v*.*.*"');
+    expect(releaseProcess).toContain("lexrunner-vX.Y.Z");
+    expect(releaseDriftCheck).toContain("lexrunner-v${version}");
   });
 });
 

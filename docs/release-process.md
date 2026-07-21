@@ -16,8 +16,9 @@ the human release owner.
 - **Canary candidate:** each merge to `main` validates a version shaped like
   `X.Y.Z-canary.<commit>`. Publishing it with the `canary` dist-tag is a separate authenticated
   action.
-- **Stable release:** a signed `vX.Y.Z` tag validates the matching package version and creates a
-  GitHub release. Publishing it with the `latest` dist-tag is a separate authenticated action.
+- **Stable release:** a signed `lexrunner-vX.Y.Z` tag validates the matching package version and
+  creates a GitHub release. Publishing it with the `latest` dist-tag is a separate authenticated
+  action.
 
 LexRunner follows Semantic Versioning. Breaking changes normally require a major release; an
 explicitly governed pre-release or ecosystem release may declare a narrower migration policy in
@@ -54,11 +55,11 @@ release changes, create a signed tag whose version exactly matches `package.json
 
 ```bash
 git add CHANGELOG.md package.json package-lock.json README.md docs/AX.md
-git commit -S -m "chore(release): prepare vX.Y.Z"
-git tag -s vX.Y.Z -m "Release X.Y.Z"
-git tag -v vX.Y.Z
+git commit -S -m "chore(release): prepare X.Y.Z"
+git tag -s lexrunner-vX.Y.Z -m "Release X.Y.Z"
+git tag -v lexrunner-vX.Y.Z
 git push origin main
-git push origin vX.Y.Z
+git push origin lexrunner-vX.Y.Z
 ```
 
 Wait for the release workflow to finish. It builds, tests, checks determinism, verifies the version,
@@ -70,8 +71,9 @@ npm run release:publish:check
 ```
 
 The gate verifies the tarball boundary, rejects npm metadata-normalization warnings, requires the
-matching `vX.Y.Z` tag at `HEAD`, performs `npm publish --dry-run`, and prints the exact command. It
-never publishes. Only the authenticated human release owner executes the printed command:
+matching `lexrunner-vX.Y.Z` tag at `HEAD`, performs `npm publish --dry-run`, and prints the exact
+command. It never publishes. Only the authenticated human release owner executes the printed
+command:
 
 ```bash
 npm publish --access restricted --tag latest

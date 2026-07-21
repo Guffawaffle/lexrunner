@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   normalized the repository URL so npm preserves both CLI executables without publish-time repair.
 - **Human publication gate** - Added a package-boundary validation for npm-normalized metadata and
   a dry-run release gate that prints, but never executes, the final authenticated publish command.
+- **Canonical release tags** - Reconciled the release workflow, preparation and drift scripts,
+  publication gate, and operator guidance on the required `lexrunner-v*` tag prefix.
 
 ### Release note
 

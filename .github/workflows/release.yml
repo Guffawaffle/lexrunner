@@ -6,8 +6,8 @@ on:
       - main
     tags:
       # Stable releases on version tags
-      # Tag format: v*.*.* (e.g., v0.1.0, v1.0.0)
-      - "v*.*.*"
+      # Tag format: lexrunner-v*.*.* (e.g., lexrunner-v0.1.0, lexrunner-v1.0.0)
+      - "lexrunner-v*.*.*"
 
   # Manual release trigger
   workflow_dispatch:
@@ -97,7 +97,7 @@ jobs:
   stable-release:
     name: Stable Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/lexrunner-v')
 
     steps:
       - name: Checkout code
@@ -108,8 +108,8 @@ jobs:
       - name: Verify tag format
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          if ! [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Tag must follow format: v*.*.* (e.g., v1.2.3)"
+          if ! [[ "$TAG_NAME" =~ ^lexrunner-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Tag must follow format: lexrunner-v*.*.* (e.g., lexrunner-v1.2.3)"
             exit 1
           fi
           echo "✅ Tag format is valid: $TAG_NAME"
@@ -151,7 +151,7 @@ jobs:
       - name: Verify version matches tag
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          TAG_VERSION=${TAG_NAME#v}
+          TAG_VERSION=${TAG_NAME#lexrunner-v}
           PKG_VERSION=$(node -p "require('./package.json').version")
 
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
@@ -167,7 +167,7 @@ jobs:
         id: changelog
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          TAG_VERSION=${TAG_NAME#v}
+          TAG_VERSION=${TAG_NAME#lexrunner-v}
 
           # Extract changelog section for this version (exclude section headers)
           awk "/## \[${TAG_VERSION}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
@@ -184,7 +184,7 @@ jobs:
       - name: Create release summary
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          TAG_VERSION=${TAG_NAME#v}
+          TAG_VERSION=${TAG_NAME#lexrunner-v}
 
           echo "## 🎉 Stable GitHub Release Prepared" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -244,8 +244,8 @@ jobs:
           if [ "${{ github.event.inputs.release_type }}" == "stable" ]; then
             echo "1. Run \`npm run release:prepare\` locally" >> $GITHUB_STEP_SUMMARY
             echo "2. Review and commit changes" >> $GITHUB_STEP_SUMMARY
-            echo "3. Create signed tag: \`git tag -s vX.Y.Z -m 'Release X.Y.Z'\`" >> $GITHUB_STEP_SUMMARY
-            echo "4. Push tag: \`git push origin vX.Y.Z\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. Create signed tag: \`git tag -s lexrunner-vX.Y.Z -m 'Release X.Y.Z'\`" >> $GITHUB_STEP_SUMMARY
+            echo "4. Push tag: \`git push origin lexrunner-vX.Y.Z\`" >> $GITHUB_STEP_SUMMARY
             echo "5. After the tag workflow passes, run \`npm run release:publish:check\` locally" >> $GITHUB_STEP_SUMMARY
             echo "6. The authenticated human executes the exact command printed by the gate" >> $GITHUB_STEP_SUMMARY
           else
