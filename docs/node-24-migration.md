@@ -1,7 +1,8 @@
 # Node 24 Migration for Ecosystem 3.1
 
-LexRunner 3.1 requires Node.js 24 or newer. This intentional compatibility change applies to
-the `lex-pr` CLI, `lexrunner-mcp`, SDK imports, local contributors, CI, and downstream consumers.
+Ecosystem 3.1 releases LexRunner 1.2.0 with a Node.js 24 floor. This intentional compatibility
+change applies to the `lex-pr` CLI, `lexrunner-mcp`, SDK imports, local contributors, CI, and
+downstream consumers. “3.1” is the ecosystem sprint name, not the LexRunner package major/minor.
 
 Node 20 reached end of life on March 24, 2026. Node 24 is an LTS release line supported through
 April 2028. GitHub-hosted runners also began forcing Node-20-based JavaScript actions onto Node 24
@@ -51,16 +52,17 @@ $smoke = Join-Path $env:TEMP ("lexrunner-node24-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $smoke | Out-Null
 Push-Location $smoke
 npm init -y
-npm install @smartergpt/lexrunner@3.1.0
+npm install @smartergpt/lexrunner@1.2.0
 npx lex-pr --help
 node -e "import('@smartergpt/lexrunner').then(m => { if (typeof m.canonicalJSONStringify !== 'function') process.exit(1) })"
+'{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | npx lexrunner-mcp
 Pop-Location
 ```
 
 The release owner records the Windows version, Node/npm versions, installed package integrity,
 CLI result, MCP `tools/list` result, and timestamp in the release evidence tracked by issue #795.
-Until a private 3.1 package exists, use `npm run test:package` on Node 24 for the equivalent packed
-tarball import, require, CLI, and MCP smoke.
+Before the private 1.2.0 package is published, use `npm run test:package` on Node 24 for the
+equivalent packed-tarball import, require, CLI, bounded Attempt status, and MCP smoke.
 
 ## GitHub Actions generations
 

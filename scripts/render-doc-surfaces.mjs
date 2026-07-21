@@ -58,8 +58,8 @@ const surface = await formatMarkdown(
 const version = await formatMarkdown(
   [
     "<!-- BEGIN GENERATED PACKAGE VERSION -->",
-    `Current repository package version: **${packageJson.version}**. The Ecosystem 3.1 sprint does not become a`,
-    "published package version until the release decision and gates in issue #795 are complete.",
+    `Current repository package version: **${packageJson.version}**. npm availability and dist-tags are separate`,
+    "release evidence; inspect the registry rather than inferring publication from source metadata.",
     "<!-- END GENERATED PACKAGE VERSION -->",
   ].join("\n")
 );

@@ -32,7 +32,7 @@ We adopt **npm registry publish** as the packaging strategy for Lex.
 Lex is published to the public npm registry as:
 
 - **Package name:** `@smartergpt/lex`
-- **Current version:** `2.1.1` (used by LexRunner)
+- **Current supported line:** `3.0.1` (used by LexRunner 1.2)
 - **License:** MIT
 - **Registry:** https://registry.npmjs.org
 
@@ -41,7 +41,7 @@ LexRunner consumes Lex via standard npm dependency mechanism:
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^2.1.1"
+    "@smartergpt/lex": "^3.0.1"
   }
 }
 ```
@@ -64,7 +64,8 @@ Lex provides modular exports for selective imports:
   - **MAJOR** — Breaking API changes
   - **MINOR** — New features, backward compatible
   - **PATCH** — Bug fixes, backward compatible
-- **LexRunner Pinning:** Use caret range (`^2.1.1`) to allow MINOR/PATCH updates
+- **LexRunner Pinning:** Use caret range (`^3.0.1`) to allow MINOR/PATCH updates within the
+  compatibility-tested Lex 3 line
 - **Testing:** CI validates LexRunner against pinned Lex version before merge
 
 ---
@@ -127,7 +128,7 @@ Lex provides modular exports for selective imports:
 
 ### Versioning & Updates
 
-1. **Controlled Updates** — Use caret range (`^2.1.1`) to allow PATCH/MINOR, block MAJOR
+1. **Controlled Updates** — Use caret range (`^3.0.1`) to allow PATCH/MINOR, block MAJOR
 2. **Testing Gate** — CI must pass before merging Lex updates
 3. **Review Process** — PRs with Lex updates require maintainer approval
 4. **Rollback** — Revert package.json change if update breaks LexRunner
@@ -137,7 +138,7 @@ Lex provides modular exports for selective imports:
 If a Lex update breaks LexRunner:
 
 1. **Immediate Rollback** — Revert package.json to previous version
-2. **Lock Specific Version** — Change `^2.1.1` to `2.1.1` to prevent auto-updates
+2. **Lock Specific Version** — Change `^3.0.1` to `3.0.1` to prevent auto-updates
 3. **Root Cause Analysis** — Identify breaking change in Lex
 4. **Upstream Issue** — File issue in Lex repository
 5. **Fix Forward** — Once Lex releases patch, update LexRunner
@@ -166,14 +167,14 @@ npm outdated @smartergpt/lex
 npm update @smartergpt/lex
 
 # 3. Or update to specific version
-npm install @smartergpt/lex@2.1.1
+npm install @smartergpt/lex@3.0.1
 
 # 4. Run tests
 npm test
 
 # 5. Commit if tests pass
 git add package.json package-lock.json
-git commit -m "chore: update @smartergpt/lex to 2.1.1"
+git commit -m "Update Lex dependency to 3.0.1"
 ```
 
 Automated update (via Dependabot):
@@ -196,7 +197,7 @@ Automated update (via Dependabot):
 
 ### LexRunner (Source-Available)
 
-- **Package:** `lexrunner`
+- **Package:** `@smartergpt/lexrunner`
 - **License:** SmarterGPT Source-Available Personal Use License
 - **Attribution:** Uses Lex (MIT) as dependency
 - **Repository:** https://github.com/Guffawaffle/lexrunner

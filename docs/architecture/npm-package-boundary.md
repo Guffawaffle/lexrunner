@@ -1,6 +1,6 @@
 # npm package boundary
 
-Status: **Normative for LexRunner 1.1**
+Status: **Normative for LexRunner 1.2**
 
 The published npm package contains executable runtime material, not a copy of
 the development repository. `package.json#files` is the source boundary and
@@ -40,7 +40,8 @@ The packaging job:
    unpacked;
 4. installs the real tarball into a clean consumer, preferring the npm cache;
    and
-5. smokes ESM imports, CommonJS require, the CLI bin, and MCP `tools/list`.
+5. smokes ESM imports, CommonJS require, the CLI bin, a bounded read-only Attempt status, and MCP
+   `tools/list`, including all published Attempt lifecycle tools.
 
 The audited baseline before this boundary was 1,340 files, 3,243,620 bytes
 packed, and 13,837,669 bytes unpacked. The initial bounded artifact is 90 files,

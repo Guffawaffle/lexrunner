@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] - 2026-07-21
+
+### Added
+
+- **Assisted agent-work lifecycle** - Added ADR-010 WorkItem, Run, Attempt, packet, envelope,
+  workspace, WorkerSession, receipt, engine-verification, acceptance, retry-delta, and fan-in
+  contracts with fenced memory and SQLite persistence.
+- **Public lifecycle surfaces** - Added bounded CLI and MCP adapters for Attempt preparation,
+  start/status, worker attachment and heartbeat, receipt submission, independent verification,
+  and policy acceptance.
+- **Recovery and containment** - Added native worktree brokering, physical directory identity,
+  incomplete-launch reconciliation, runtime authority negotiation/enforcement, fail-forward
+  supervisor services, and persisted merge-weave resume.
+- **Shared integration services** - Added canonical shared services for gate execution, discovery,
+  planning, status, merge order/application, workspace configuration, and bounded IntegrationRun
+  compatibility.
+- **Release evidence** - Added generated CLI/MCP documentation, touched/adjacent implementation
+  gate selection, deterministic package-boundary validation, clean packed-package smoke, and
+  ecosystem dogfood isolation.
+
 ### Changed
 
 - **Documentation and ADR-010 reconciliation** - Reframed LexRunner around its progressive
@@ -18,6 +40,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   longer a supported LexRunner runtime. Upgrade local, CI, and Windows consumer environments
   before installing this release. The package intentionally has no speculative upper bound;
   Node 24 is the validated release line and later majors remain installable for forward testing.
+- **Lex 3 compatibility** - Updated the runtime dependency from `@smartergpt/lex@^2.10.0` to
+  `@smartergpt/lex@^3.0.1` after validating that every LexRunner-imported export remains present
+  and the Node 24 build, integration tests, and packed consumer succeed.
+
+### Fixed
+
+- **Published package boundary** - Replaced broken `.smartergpt` schema export targets with built
+  ESM/CommonJS/declaration artifacts, bounded the tarball allowlist, and verified the real packed
+  CLI and MCP bins.
+- **Canonical surface drift** - Centralized CLI alias warnings/removal windows and verified all
+  125 CLI registrations and 28 MCP tools against explicit dispositions and application-service
+  ownership.
+
+### Compatibility
+
+- No canonical CLI command, MCP tool, or package export key from 1.1 is removed. Deprecated aliases
+  remain migration-only and retain their declared 2.0 removal window.
+- The Node 24 floor is an intentional minor-release migration for Ecosystem 3.1. Node 20 and 22
+  consumers must upgrade before installing LexRunner 1.2.0.
+- Assisted orchestration is supported. A general public headless launcher, native reboot recovery,
+  and the complete Stage 5 hostile fault-injection/authority-expansion matrix remain deferred.
 
 ---
 

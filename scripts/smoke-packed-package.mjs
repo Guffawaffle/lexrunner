@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +6,21 @@ import path from "node:path";
 const projectRoot = process.cwd();
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexrunner-packed-smoke-"));
 const consumerRoot = path.join(temporaryRoot, "consumer");
+const requiredAttemptTools = [
+  "prepare_attempt",
+  "start_attempt",
+  "get_attempt_status",
+  "attach_attempt_worker",
+  "heartbeat_attempt_worker",
+  "end_attempt_worker",
+  "get_attempt_worker",
+  "submit_attempt_receipt",
+  "get_attempt_receipt",
+  "verify_attempt",
+  "get_attempt_verification",
+  "accept_attempt",
+  "get_attempt_acceptance",
+];
 
 try {
   const packed = JSON.parse(
@@ -84,6 +99,8 @@ try {
   });
   if (!cliHelp.includes("Usage: lex-pr")) throw new Error("Packed CLI bin did not render help");
 
+  smokeBoundedAttemptStatus(path.join(binRoot, "lex-pr"), consumerRoot);
+
   const toolCount = await smokeMcp(path.join(binRoot, "lexrunner-mcp"), consumerRoot);
   process.stdout.write(
     `${JSON.stringify({
@@ -91,11 +108,47 @@ try {
       import: "passed",
       require: "passed",
       cli: "passed",
+      assistedLifecycle: "bounded_read_only_status_passed",
       mcpTools: toolCount,
+      mcpAttemptTools: requiredAttemptTools.length,
     })}\n`
   );
 } finally {
   fs.rmSync(temporaryRoot, { recursive: true, force: true });
+}
+
+function smokeBoundedAttemptStatus(cliPath, cwd) {
+  const databasePath = path.join(cwd, "missing-attempt.db");
+  const result = spawnSync(
+    cliPath,
+    [
+      "attempt",
+      "status",
+      "--database-path",
+      databasePath,
+      "--run-id",
+      "run-missing",
+      "--attempt-id",
+      "attempt-missing",
+      "--json",
+    ],
+    { cwd, encoding: "utf8" }
+  );
+
+  if (result.error) throw result.error;
+  if (result.status !== 2) {
+    throw new Error(`Packed Attempt status exited ${result.status}: ${result.stderr}`);
+  }
+  const output = JSON.parse(result.stdout);
+  if (output?.ok !== false || output?.error?.code !== "invalid_input") {
+    throw new Error(`Packed Attempt status was not bounded: ${result.stdout}`);
+  }
+  if (Buffer.byteLength(result.stdout, "utf8") >= 4_096) {
+    throw new Error("Packed Attempt status exceeded the bounded-output budget");
+  }
+  if (fs.existsSync(databasePath)) {
+    throw new Error("Packed read-only Attempt status created lifecycle state");
+  }
 }
 
 async function smokeMcp(binPath, cwd) {
@@ -145,6 +198,10 @@ async function smokeMcp(binPath, cwd) {
   const tools = response?.result?.tools;
   if (!Array.isArray(tools) || tools.length === 0) {
     throw new Error(`Packed MCP returned no tools: ${JSON.stringify(response)}`);
+  }
+  const publishedToolNames = new Set(tools.map(({ name }) => name));
+  for (const name of requiredAttemptTools) {
+    if (!publishedToolNames.has(name)) throw new Error(`Packed MCP omitted Attempt tool ${name}`);
   }
   await new Promise((resolve, reject) => {
     if (child.exitCode !== null) return resolve();
