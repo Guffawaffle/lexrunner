@@ -58,4 +58,10 @@ describe("CLI alias policy", () => {
     );
     expect(aliasWarning("weave status")).toBeNull();
   });
+
+  it("keeps merge as a tested compatibility alias for weave apply", () => {
+    expect(aliasWarning("merge")).toBe(
+      '[lex-pr] compatibility alias "merge"; use "weave apply"; supported through 1.x and reviewed at 2.0.0.'
+    );
+  });
 });

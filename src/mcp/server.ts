@@ -29,6 +29,10 @@ import {
   MergeOrderQueryService,
   PlanCreationService,
 } from "../application/integration-query-services.js";
+import {
+  MergeApplicationService,
+  MergeApplicationServiceError,
+} from "../application/merge-application-service.js";
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
@@ -52,7 +56,6 @@ import {
   ProfileResolveArgs,
   PlanCreateResult,
   GatesRunResult,
-  MergeApplyResult,
   InitLocalResult,
   ProfileResolveResult,
   WorkflowGuideArgs,
@@ -1785,24 +1788,7 @@ async function handleMergeApply(
     // Get CI-aware mutation policy
     const allowMutations = getCIMutationPolicy(resolved.manifest);
 
-    // Check if mutations are allowed
-    if (!allowMutations && !args.dryRun) {
-      const result: MergeApplyResult = {
-        allowed: false,
-        message: "Mutations not allowed. Set ALLOW_MUTATIONS=true or use dryRun=true.",
-      };
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    }
-
-    // Load plan and execution state
+    // Load the canonical plan before entering the shared mutation boundary.
     const planPath = path.join(resolved.path, "runner", "plan.json");
     if (!fs.existsSync(planPath)) {
       throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
@@ -1811,34 +1797,14 @@ async function handleMergeApply(
     const planContent = fs.readFileSync(planPath, "utf-8");
     const plan = loadPlan(planContent);
 
-    const executionState = new ExecutionState(plan);
-
-    // Load gate results from directory if available
-    const gateResultsDir = path.join(resolved.path, "gate-results");
-    if (fs.existsSync(gateResultsDir)) {
-      try {
-        const loadedCount = executionState.loadGateResultsFromDirectory(gateResultsDir);
-        console.log(`📊 Loaded ${loadedCount} gate result(s) from ${gateResultsDir}`);
-      } catch (error) {
-        console.warn(
-          `⚠️  Failed to load gate results from ${gateResultsDir}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-
-    const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-    const decisions = evaluator.evaluateAllNodes();
-
-    const summary = evaluator.getMergeSummary();
-
-    const result: MergeApplyResult = {
-      allowed: allowMutations && !args.dryRun,
-      message: args.dryRun
-        ? `Dry run: ${summary.eligible.length} items eligible, ${summary.failed.length} failed`
-        : allowMutations
-          ? `Ready to merge ${summary.eligible.length} eligible items`
-          : "Mutations disabled. Set ALLOW_MUTATIONS=true to enable merging.",
-    };
+    const result = (
+      await new MergeApplicationService().run({
+        plan,
+        workingDir: process.cwd(),
+        dryRun: args.dryRun ?? true,
+        mutationAuthorized: allowMutations,
+      })
+    ).summary;
 
     return {
       content: [
@@ -1849,6 +1815,12 @@ async function handleMergeApply(
       ],
     };
   } catch (error) {
+    if (error instanceof MergeApplicationServiceError) {
+      throwMcpAXError(
+        error.code === "MERGE_MUTATION_DENIED" ? ErrorCode.InvalidRequest : ErrorCode.InternalError,
+        mcpToolError(error.code, error.message, { tool: "merge.apply" })
+      );
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("No plan found")) {
       throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError());

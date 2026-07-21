@@ -380,7 +380,7 @@
       {
         "tool": "merge.apply",
         "cli": "weave apply",
-        "owner": "planned shared merge application service"
+        "owner": "MergeApplicationService"
       },
       {
         "tool": "plan.create",
@@ -438,11 +438,6 @@
     ]
   },
   "implementationGaps": [
-    {
-      "issue": 781,
-      "title": "Share bounded merge application service across CLI and MCP",
-      "surface": ["weave apply", "merge", "merge.apply"]
-    },
     {
       "issue": 782,
       "title": "Share workspace/config services and retire the MCP health duplicate",

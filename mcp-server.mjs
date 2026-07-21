@@ -442,18 +442,6 @@ const tools = {
     },
     call: async (args) => {
       try {
-        // Check if mutations are allowed
-        if (!config.allowMutations && !args.dryRun) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Mutations not allowed. Set ALLOW_MUTATIONS=true or use dryRun=true.`,
-              },
-            ],
-          };
-        }
-
         // Resolve profile directory
         const { resolveProfile } = await import("./dist/cli.js");
         const resolved = resolveProfile(config.profileDir, process.cwd());
@@ -464,38 +452,36 @@ const tools = {
           throw new Error("No plan found. Run plan.create first.");
         }
 
-        const { loadPlan, ExecutionState, MergeEligibilityEvaluator } =
-          await import("./dist/cli.js");
+        const { loadPlan, MergeApplicationService } = await import("./dist/cli.js");
         const planContent = readFileSync(planPath, "utf-8");
         const plan = loadPlan(planContent);
 
-        const executionState = new ExecutionState(plan);
-        const evaluator = new MergeEligibilityEvaluator(plan, executionState);
-        const decisions = evaluator.evaluateAllNodes();
-        const summary = evaluator.getMergeSummary();
-
-        const result = {
-          allowed: config.allowMutations && !args.dryRun,
-          dryRun: args.dryRun || false,
-          eligible: summary.eligible.length,
-          failed: summary.failed.length,
-          blocked: summary.blocked.length,
-          message: args.dryRun
-            ? `Dry run: ${summary.eligible.length} items eligible, ${summary.failed.length} failed, ${summary.blocked.length} blocked`
-            : config.allowMutations
-              ? `Ready to merge ${summary.eligible.length} eligible items`
-              : "Mutations disabled. Set ALLOW_MUTATIONS=true to enable merging.",
-        };
+        const result = (
+          await new MergeApplicationService().run({
+            plan,
+            workingDir: process.cwd(),
+            dryRun: args.dryRun ?? true,
+            mutationAuthorized: config.allowMutations,
+          })
+        ).summary;
 
         return {
           content: [
             {
               type: "text",
-              text: `Merge evaluation complete:\n${JSON.stringify(result, null, 2)}`,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
       } catch (error) {
+        if (error?.name === "MergeApplicationServiceError" && typeof error.code === "string") {
+          const { mcpToolError } = await import("./dist/errors/index.js");
+          throw new Error(
+            core.canonicalJSONStringify(
+              mcpToolError(error.code, error.message, { tool: "merge.apply" })
+            )
+          );
+        }
         throw new Error(`Failed to apply merge: ${error.message}`);
       }
     },

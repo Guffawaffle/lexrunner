@@ -55,10 +55,11 @@ describe("End-to-End Integration Tests", () => {
     it("should show help for merge command", async () => {
       const { stdout } = await runCLI("merge --help");
 
-      expect(stdout).toContain("Execute merge pyramid with git operations");
+      expect(stdout).toContain("Compatibility alias for weave apply");
       expect(stdout).toContain("--plan");
       expect(stdout).toContain("--dry-run");
       expect(stdout).toContain("--execute");
+      expect(stdout).toContain('Use "lex-pr weave apply" for new automation');
     });
 
     it("should show help for bootstrap command", async () => {
@@ -178,13 +179,12 @@ describe("End-to-End Integration Tests", () => {
 
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run`);
 
-      expect(stdout).toContain("🔍 DRY RUN: Merge Execution Plan");
-      expect(stdout).toContain("### Batch 1");
-      expect(stdout).toContain("- Items: feature-a");
-      expect(stdout).toContain("### Batch 2");
-      expect(stdout).toContain("- Items: feature-b");
-      expect(stdout).toContain("- Dependencies: feature-a");
-      expect(stdout).toContain("Use --execute to perform actual merges");
+      expect(stdout).toContain("🔍 Merge-Weave Dry Run");
+      expect(stdout).toContain("Level 1:");
+      expect(stdout).toContain("- feature-a");
+      expect(stdout).toContain("Level 2:");
+      expect(stdout).toContain("- feature-b");
+      expect(stdout).toContain(`lex-pr weave apply --plan ${planPath} --execute`);
     });
 
     it("should output JSON format for merge dry run", async () => {
@@ -210,11 +210,12 @@ describe("End-to-End Integration Tests", () => {
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run --json`);
 
       const result = JSON.parse(stdout);
-      expect(result.summary).toBeDefined();
-      expect(result.summary.targetBranch).toBe("main");
-      expect(result.summary.totalItems).toBe(1);
-      expect(result.batches).toBeDefined();
-      expect(result.batches).toHaveLength(1);
+      expect(result.contract).toBe("bounded-ax-v1");
+      expect(result.mode).toBe("dry-run");
+      expect(result.dryRun).toBe(true);
+      expect(result.totalItems).toBe(1);
+      expect(result.levels).toEqual([["test-item"]]);
+      expect(result.artifactRefs).toEqual([]);
     });
   });
 
