@@ -31,11 +31,11 @@
 
 **[Screen: Terminal]**
 
-> "First, let's install lexrunner. It's a Node.js package, so you'll need Node 20 or later."
+> "First, let's install lexrunner. It's a Node.js package, so you'll need Node 24 or later."
 
 ```bash
 $ node --version
-v20.18.0
+v24.18.0
 
 $ npm install -g lexrunner
 [installation output]

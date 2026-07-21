@@ -72,14 +72,14 @@ npm install
 ```bash
 # Check required version
 cat .nvmrc
-# Output: 20.18.0
+# Output: 24
 
 # Use nvm to switch
-nvm install 20.18.0
-nvm use 20.18.0
+nvm install 24
+nvm use 24
 
 # Or use volta
-volta install node@20.18.0
+volta install node@24
 ```
 
 ### Configuration Issues

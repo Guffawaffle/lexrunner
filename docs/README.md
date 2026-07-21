@@ -171,6 +171,7 @@ New to lexrunner? Start here:
 
 ### Migration
 
+- **[Node 24 Migration](./node-24-migration.md)** - Ecosystem 3.1 runtime and Windows consumer validation
 - **[Migration Guide](./migration-guide.md)** - From manual to automated
   - Migration paths (gradual vs big bang)
   - Scenario mapping

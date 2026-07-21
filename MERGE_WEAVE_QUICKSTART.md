@@ -13,7 +13,7 @@ Merge-weave is LexRunner's workflow for merging multiple parallel PRs into a sin
 
 ## Prerequisites
 
-- Node.js 20+ installed
+- Node.js 24+ installed
 - GitHub repository with open PRs
 - `GITHUB_TOKEN` environment variable set (for API access)
 

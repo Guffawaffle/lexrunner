@@ -85,8 +85,8 @@ Plan Version: 1.0.0
   "generated": "2025-10-13T02:00:00Z",
   "tools": [
     { "name": "git", "version": "2.45.2", "path": "/usr/bin/git" },
-    { "name": "Node.js", "version": "20.18.0", "path": "/usr/bin/node" },
-    { "name": "npm", "version": "10.8.2", "path": "/usr/bin/npm" },
+    { "name": "Node.js", "version": "24.18.0", "path": "/usr/bin/node" },
+    { "name": "npm", "version": "11.16.0", "path": "/usr/bin/npm" },
     { "name": "TypeScript", "version": "5.6.3" },
     { "name": "ESLint", "version": "9.14.0" }
   ],
@@ -95,7 +95,7 @@ Plan Version: 1.0.0
     "locale": "en_US.UTF-8",
     "platform": "linux",
     "arch": "x64",
-    "nodeVersion": "20.18.0"
+    "nodeVersion": "24.18.0"
   }
 }
 ```
@@ -117,8 +117,8 @@ To verify reproducibility, compare this hash with a re-execution.
 | Tool       | Version |
 | ---------- | ------- |
 | git        | 2.45.2  |
-| Node.js    | 20.18.0 |
-| npm        | 10.8.2  |
+| Node.js    | 24.18.0 |
+| npm        | 11.16.0 |
 | TypeScript | 5.6.3   |
 | ESLint     | 9.14.0  |
 

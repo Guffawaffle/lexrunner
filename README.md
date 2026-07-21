@@ -202,11 +202,13 @@ See [`docs/TERMS.md`](docs/TERMS.md) for complete canonical terms and separation
 
 ## Requirements
 
-- **Node.js**: Version specified in `.nvmrc` (currently 22)
-- **npm**: Version specified in `packageManager` field of `package.json` (currently 10.0.0)
+- **Node.js**: Version specified in `.nvmrc` (currently 24 LTS)
+- **npm**: Version specified in `packageManager` field of `package.json` (currently 11.16.0)
 - **Git**: Configured with `user.name` and `user.email`
 
 Use `npm run cli -- doctor` to verify your environment meets all requirements.
+See the [Node 24 migration guide](docs/node-24-migration.md) when upgrading an existing
+workspace or preparing a Windows consumer.
 
 ## Quick start
 

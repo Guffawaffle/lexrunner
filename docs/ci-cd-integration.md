@@ -38,12 +38,12 @@ jobs:
   autopilot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install lexrunner
         run: npm install -g lexrunner
@@ -57,14 +57,14 @@ jobs:
         run: lex-pr autopilot plan.json --level 1
 
       - name: Upload Deliverables
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: autopilot-deliverables-${{ github.run_id }}
           path: .smartergpt/deliverables/latest/
           retention-days: 30
 
       - name: Comment PR with Results
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -97,7 +97,7 @@ jobs:
       matrix:
         level: [0, 1, 2]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run Autopilot Level ${{ matrix.level }}
         run: |
@@ -106,7 +106,7 @@ jobs:
             --deliverables-dir ./deliverables/level-${{ matrix.level }}
 
       - name: Upload Level ${{ matrix.level }} Deliverables
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: level-${{ matrix.level }}-deliverables
           path: ./deliverables/level-${{ matrix.level }}/latest/
@@ -511,7 +511,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: lex-pr deliverables:cleanup --max-age 30 --max-count 100
 ```
 

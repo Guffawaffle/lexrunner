@@ -3,9 +3,9 @@
   "version": "1.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22 <25"
+    "node": ">=24"
   },
-  "packageManager": "npm@10.0.0",
+  "packageManager": "npm@11.16.0",
   "auditSchemaVersion": "1.0.0",
   "description": "Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.",
   "repository": {
@@ -86,7 +86,7 @@
     "build": "npm run clean:dist && tsup && npm run validate:build-artifacts",
     "pretest": "npm run build",
     "generate:schemas": "tsx scripts/generate-plan-schema.ts && tsx scripts/generate-gate-schema.ts && tsx scripts/generate-flake-schema.ts && tsx scripts/generate-executor-manifest-schema.ts && tsx scripts/generate-run-schemas.ts",
-    "lint": "npm run typecheck && npm run format:check",
+    "lint": "npm run check:node-runtime && npm run typecheck && npm run format:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -116,6 +116,7 @@
     "ci:local": "npm run ci",
     "ci:docker": "echo '⚠️ Docker CI not configured, falling back to local' && npm run ci",
     "test:run": "vitest run",
+    "check:node-runtime": "node scripts/check-node-runtime-drift.mjs",
     "check:release-drift": "node scripts/check-release-drift.mjs",
     "prepare": "husky"
   },

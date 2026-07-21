@@ -421,7 +421,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Setup profile
         run: |
@@ -439,7 +439,7 @@ jobs:
         run: npm run cli -- gates run
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: gate-results
           path: ${{ env.LEX_PR_PROFILE_DIR }}/runner/gates/

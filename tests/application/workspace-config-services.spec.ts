@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   ConfigurationQueryService,
+  evaluateNodeRuntime,
   WorkspaceConfigServiceError,
   WorkspaceDiagnosticsService,
   WorkspaceInitializationService,
@@ -106,7 +107,22 @@ describe("workspace/config application services", () => {
 
     expect(result).toMatchObject({
       contract: "bounded-ax-v1",
-      nodejs: { status: "ok", current: process.version },
+      nodejs: { status: "ok", current: process.version, required: ">=24" },
+    });
+  });
+
+  it("interprets major-only pins while enforcing and reporting the package floor", () => {
+    expect(evaluateNodeRuntime("v24.18.0", "24")).toEqual({
+      status: "ok",
+      current: "v24.18.0",
+      required: ">=24",
+      expected: "v24",
+    });
+    expect(evaluateNodeRuntime("v22.22.1", "22")).toEqual({
+      status: "mismatch",
+      current: "v22.22.1",
+      required: ">=24",
+      expected: "v22",
     });
   });
 });

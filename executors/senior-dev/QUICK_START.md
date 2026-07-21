@@ -4,7 +4,7 @@ Get up and running with the Senior Dev executor in 5 minutes.
 
 ## Prerequisites
 
-- Node.js 20 LTS
+- Node.js 24 LTS
 - `lexrunner` installed
 - Lex CLI available (optional, for memory features)
 - GitHub CLI (`gh`) authenticated

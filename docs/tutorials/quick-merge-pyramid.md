@@ -6,7 +6,7 @@ This tutorial walks you through the complete lexrunner workflow: **discover → 
 
 ## Prerequisites
 
-- Node.js 20+ installed
+- Node.js 24+ installed
 - Git configured with your name and email
 - A GitHub repository with open PRs (or use our sample)
 - GitHub token (optional but recommended for discovery)

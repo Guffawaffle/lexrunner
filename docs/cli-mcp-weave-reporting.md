@@ -177,7 +177,7 @@ jobs:
     outputs:
       matrix: ${{ steps.parse.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - id: parse
         run: |
           MATRIX=$(echo '${{ inputs.matrix_json }}' | jq -c '.execution.gates | map({item, gate, command})')
@@ -190,7 +190,7 @@ jobs:
       matrix:
         gate: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Run gate ${{ matrix.gate.gate }} for ${{ matrix.gate.item }}
         run: ${{ matrix.gate.command }}
 ```

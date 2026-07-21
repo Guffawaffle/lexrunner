@@ -284,15 +284,15 @@ jobs:
 
     steps:
       - name: Checkout automation repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: acmecorp/enterprise-automation
           token: ${{ secrets.AUTOMATION_PAT }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies
         run: |
@@ -314,7 +314,7 @@ jobs:
           fi
 
       - name: Upload audit logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: audit-logs-${{ github.run_number }}
           path: audit-logs/
