@@ -38,14 +38,13 @@ This document establishes parity between the CLI interface and MCP server tools 
 | `senior-dev.capture-frame`   | `senior-dev capture-frame`   | Full parity via CLI subcommand |
 | `senior-dev.modes`           | `senior-dev modes`           | Full parity via CLI subcommand |
 
-### Run Management Tools
+### Deprecated IntegrationRun Record Tools
 
-| MCP Tool                  | CLI Equivalent | Notes                                        |
-| ------------------------- | -------------- | -------------------------------------------- |
-| `lexrunner.startRun`      | n/a            | MCP orchestration tool                       |
-| `lexrunner.getStatus`     | n/a            | MCP orchestration tool                       |
-| `lexrunner.listRuns`      | n/a            | MCP orchestration tool                       |
-| `lexrunner.listArtifacts` | n/a            | MCP orchestration tool (mcp-server.mjs only) |
+| MCP Tool                  | CLI Equivalent | Notes                                                               |
+| ------------------------- | -------------- | ------------------------------------------------------------------- |
+| `lexrunner.startRun`      | n/a            | Deprecated IntegrationRun record adapter; remove in 2.0.0           |
+| `lexrunner.getStatus`     | n/a            | Deprecated bounded IntegrationRun status; remove in 2.0.0           |
+| `lexrunner.listArtifacts` | n/a            | Deprecated bounded artifact metadata, without inline content; 2.0.0 |
 
 ## Intentional Gaps
 
@@ -68,15 +67,15 @@ These commands are intentionally CLI-only due to their interactive or local-only
 
 ### MCP-Only Tools
 
-These tools are intentionally MCP-only for orchestration purposes:
+These surfaces are MCP-only. The `lexrunner.*` entries are legacy IntegrationRun record adapters,
+not orchestration authority:
 
-| Tool                      | Reason                                      |
-| ------------------------- | ------------------------------------------- |
-| `lexrunner.startRun`      | Run lifecycle management for agents         |
-| `lexrunner.getStatus`     | Agent status queries                        |
-| `lexrunner.listRuns`      | Run enumeration for orchestration           |
-| `lexrunner.listArtifacts` | Artifact inspection for agents              |
-| `profile.resolve`         | Internal resolution exposed for MCP clients |
+| Tool                      | Reason                                                    |
+| ------------------------- | --------------------------------------------------------- |
+| `lexrunner.startRun`      | Deprecated; use integration operations or `start_attempt` |
+| `lexrunner.getStatus`     | Deprecated; use `status` or `get_attempt_status`          |
+| `lexrunner.listArtifacts` | Deprecated; use owning operation artifact references      |
+| `profile.resolve`         | Internal resolution exposed for MCP clients               |
 
 ## Semantic Equivalence
 

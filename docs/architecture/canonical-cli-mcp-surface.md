@@ -47,9 +47,10 @@ approved yet.
 
 The frozen `RunStore` is different. It records stateless integration runs,
 steps, receipts, and artifacts; it cannot authorize or advance ADR-010 state.
-The three published `lexrunner.*` MCP tools are compatibility-only RunStore
-adapters and must be renamed or retired rather than presented as ADR-010 Run
-operations.
+The three published `lexrunner.*` MCP tools are deprecated bounded IntegrationRun
+record adapters. They are scheduled for removal in `2.0.0`; the checked-in
+[migration decision](integration-run-compatibility.md) names the owning integration and Attempt
+replacements rather than inventing another generic Run surface.
 
 ADR-007 `TaskSnapshot_v1` and `TaskReceipt_v1` remain supported contracts for
 bounded repair procedures. There is no currently registered `task` CLI command
@@ -115,11 +116,10 @@ drift.
 
 ## Focused implementation issues
 
-| Issue | Boundary                                                                  |
-| ----- | ------------------------------------------------------------------------- |
-| #782  | Shared workspace/config services and retirement of MCP `health`           |
-| #783  | Rename or retirement of frozen RunStore `lexrunner.*` compatibility tools |
-| #784  | CLI alias warnings and removal windows                                    |
+| Issue | Boundary                                                        |
+| ----- | --------------------------------------------------------------- |
+| #782  | Shared workspace/config services and retirement of MCP `health` |
+| #784  | CLI alias warnings and removal windows                          |
 
 Each issue is independently testable and requires a fresh branch. Documentation
 reconciliation remains tracked by #772.
