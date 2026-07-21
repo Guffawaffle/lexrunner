@@ -439,4 +439,4 @@ This feature is marked **P0 (Critical)** for security:
 - **Schema**: `schemas/edit-plan.schema.json`
 - **Implementation**: `src/planner/scopeValidator.ts`
 - **Tests**: `tests/scopeValidator.spec.ts`
-- **Issue**: [GitHub Issue #XXX](link-to-issue)
+- **Issue**: GitHub issue reference pending

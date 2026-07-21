@@ -540,6 +540,6 @@ gh pr create \
 
 ## Related Documentation
 
-- [Large Team Workflow](./large-team.md) - Scaling patterns
+- Large Team Workflow - Scaling patterns guide planned
 - [CI/CD Integrations](../integrations/) - Platform setup
 - [Troubleshooting](../troubleshooting.md) - Issue resolution

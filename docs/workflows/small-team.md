@@ -394,5 +394,5 @@ lex-pr plan --from-github --json | jq '.items[] | {name, deps}'
 ## Related Workflows
 
 - [Solo Developer](./solo-developer.md) - Simpler setup for individuals
-- [Medium Team](./medium-team.md) - More advanced coordination
-- [Trunk-Based Development](./trunk-based.md) - Alternative branching strategy
+- Medium Team - More advanced coordination guide planned
+- Trunk-Based Development - Alternative branching strategy guide planned
