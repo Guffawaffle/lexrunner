@@ -327,7 +327,7 @@ jobs:
       # ALLOW_MUTATIONS not set → defaults to false (safe)
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup CI Profile
         run: |
@@ -363,7 +363,7 @@ jobs:
       ALLOW_MUTATIONS: true # Explicit override
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup CI Profile
         run: |
@@ -593,7 +593,7 @@ jobs:
       # ALLOW_MUTATIONS not set → defaults to false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup CI Profile
         run: |

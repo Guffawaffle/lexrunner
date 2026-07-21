@@ -4,7 +4,7 @@ Get started with lexrunner in less than 5 minutes! This guide will walk you thro
 
 ## Prerequisites
 
-- **Node.js**: 20 LTS or later
+- **Node.js**: 24 LTS or later
 - **Git**: Properly configured with `user.name` and `user.email`
 - **GitHub**: Repository access and optional personal access token
 
@@ -191,7 +191,7 @@ Expected output:
 ```
 🩺 Doctor - Environment and config sanity checks
 
-✓ Node.js version: v20.x.x (matches .nvmrc)
+✓ Node.js version: v24.x.x (matches .nvmrc)
 ✓ npm version: 10.0.0 (matches packageManager)
 ✓ Git config: user.name="Your Name", user.email="you@example.com"
 ✓ Platform: linux

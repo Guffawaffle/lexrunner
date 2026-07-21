@@ -12,6 +12,7 @@ import { resolveProfile, type ResolvedProfile } from "../config/profileResolver.
 import { createGitHubAPI } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
 import { runEnvironmentQualityCheck } from "../hostility/index.js";
+import { NODE_ENGINE_RANGE, NODE_RUNTIME_MAJOR } from "../runtime-contract.js";
 import { getEnvWithAlias } from "../util/envUtils.js";
 
 const MAX_CONFIG_VALUES = 256;
@@ -75,7 +76,12 @@ export interface BoundedDoctorResult {
   hasErrors: boolean;
   issues: string[];
   suggestions: string[];
-  nodejs: { status: "ok" | "mismatch" | "no_constraint"; current: string; expected?: string };
+  nodejs: {
+    status: "ok" | "mismatch" | "no_constraint";
+    current: string;
+    required: string;
+    expected?: string;
+  };
   configuration: ReturnType<typeof bootstrapWorkspace>;
   projectType: string;
   environmentSuggestions: string[];
@@ -114,24 +120,19 @@ export class WorkspaceDiagnosticsService {
     const suggestions: string[] = [];
     let hasErrors = false;
     let nodejs: BoundedDoctorResult["nodejs"];
+    let expectedPin: string | undefined;
     try {
-      const expected = fs.readFileSync(path.join(input.baseDir, ".nvmrc"), "utf8").trim();
-      const current = process.version.slice(1);
-      const matches = expected.includes(".")
-        ? current === expected.replace(/^v/, "")
-        : current.split(".")[0] === expected.replace(/^v/, "");
-      nodejs = {
-        status: matches ? "ok" : "mismatch",
-        current: process.version,
-        expected: `v${expected.replace(/^v/, "")}`,
-      };
-      if (!matches) {
-        hasErrors = true;
-        issues.push(`Node.js version mismatch: ${process.version} vs ${nodejs.expected}`);
-      }
+      expectedPin = fs.readFileSync(path.join(input.baseDir, ".nvmrc"), "utf8").trim();
     } catch {
-      nodejs = { status: "no_constraint", current: process.version };
       suggestions.push("Consider adding .nvmrc for Node.js version consistency");
+    }
+    nodejs = evaluateNodeRuntime(process.version, expectedPin);
+    if (nodejs.status === "mismatch") {
+      hasErrors = true;
+      const pinDetail = nodejs.expected ? ` and workspace pin ${nodejs.expected}` : "";
+      issues.push(
+        `Node.js version ${process.version} does not satisfy package floor ${nodejs.required}${pinDetail}`
+      );
     }
 
     const configuration = bootstrapWorkspace(input.baseDir);
@@ -181,6 +182,33 @@ export class WorkspaceDiagnosticsService {
       ...(input.environmentQuality ? { environmentQuality: runEnvironmentQualityCheck() } : {}),
     });
   }
+}
+
+export function evaluateNodeRuntime(
+  currentVersion: string,
+  expectedPin?: string
+): BoundedDoctorResult["nodejs"] {
+  const current = currentVersion.replace(/^v/, "");
+  const currentMajor = Number.parseInt(current.split(".")[0] ?? "", 10);
+  const normalizedPin = expectedPin?.trim().replace(/^v/, "");
+  const floorMatches = Number.isInteger(currentMajor) && currentMajor >= NODE_RUNTIME_MAJOR;
+  const pinMatches = normalizedPin
+    ? normalizedPin.includes(".")
+      ? current === normalizedPin
+      : String(currentMajor) === normalizedPin
+    : true;
+
+  return {
+    status:
+      !normalizedPin && floorMatches
+        ? "no_constraint"
+        : floorMatches && pinMatches
+          ? "ok"
+          : "mismatch",
+    current: currentVersion.startsWith("v") ? currentVersion : `v${currentVersion}`,
+    required: NODE_ENGINE_RANGE,
+    ...(normalizedPin ? { expected: `v${normalizedPin}` } : {}),
+  };
 }
 
 /** Transport-neutral owner for configuration and profile queries. */

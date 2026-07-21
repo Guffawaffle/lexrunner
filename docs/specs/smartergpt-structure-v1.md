@@ -606,12 +606,12 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install dependencies
         run: npm ci
@@ -633,7 +633,7 @@ jobs:
         run: npm run cli -- execute $LEX_PR_PROFILE_DIR/runner/plan.json
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: gate-results
           path: ${{ env.LEX_PR_PROFILE_DIR }}/runner/

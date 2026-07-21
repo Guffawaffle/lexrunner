@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Changed
+
+- **Node.js 24 runtime floor** - Ecosystem 3.1 requires Node.js 24 or newer for the CLI,
+  MCP server, SDK package, and downstream consumers. Node.js 20 is EOL and Node.js 22 is no
+  longer a supported LexRunner runtime. Upgrade local, CI, and Windows consumer environments
+  before installing this release. The package intentionally has no speculative upper bound;
+  Node 24 is the validated release line and later majors remain installable for forward testing.
 
 ---
 

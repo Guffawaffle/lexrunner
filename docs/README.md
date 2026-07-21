@@ -98,22 +98,22 @@ New to lexrunner? Start here:
 
 - **[Solo Developer](./workflows/solo-developer.md)** - Personal projects
 - **[Small Team](./workflows/small-team.md)** - 2-5 developers
-- **[Medium Team](./workflows/medium-team.md)** - 6-20 developers
-- **[Large Team](./workflows/large-team.md)** - 20+ developers
+- **Medium Team** - 6-20 developers (guide planned)
+- **Large Team** - 20+ developers (guide planned)
 - **[Enterprise](./workflows/enterprise.md)** - Multi-repository
 
 ### Workflows by Project Type
 
-- **[Open Source](./workflows/open-source.md)** - Community projects
-- **[SaaS Application](./workflows/saas-application.md)** - Continuous deployment
-- **[Mobile App](./workflows/mobile-app.md)** - Platform-specific gates
-- **[Library/SDK](./workflows/library-sdk.md)** - API compatibility
+- **Open Source** - Community projects (guide planned)
+- **SaaS Application** - Continuous deployment (guide planned)
+- **Mobile App** - Platform-specific gates (guide planned)
+- **Library/SDK** - API compatibility (guide planned)
 
 ### Workflows by Strategy
 
-- **[Trunk-Based Development](./workflows/trunk-based.md)** - Short-lived branches
-- **[GitFlow](./workflows/gitflow.md)** - Release branches
-- **[GitHub Flow](./workflows/github-flow.md)** - Deploy from main
+- **Trunk-Based Development** - Short-lived branches (guide planned)
+- **GitFlow** - Release branches (guide planned)
+- **GitHub Flow** - Deploy from main (guide planned)
 
 ## 🔌 Integrations
 
@@ -171,6 +171,7 @@ New to lexrunner? Start here:
 
 ### Migration
 
+- **[Node 24 Migration](./node-24-migration.md)** - Ecosystem 3.1 runtime and Windows consumer validation
 - **[Migration Guide](./migration-guide.md)** - From manual to automated
   - Migration paths (gradual vs big bang)
   - Scenario mapping
@@ -245,8 +246,8 @@ Help others by sharing:
 ### Downloads
 
 - **[Latest Release](https://github.com/Guffawaffle/LexRunner/releases/latest)**
-- **[Example Configurations](../../examples/)**
-- **[Sample Fixtures](../../fixtures/)**
+- **[Example Configurations](../examples/)**
+- **[Sample Fixtures](../tests/fixtures/)**
 
 ### External Links
 

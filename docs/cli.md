@@ -1627,7 +1627,7 @@ lex-pr doctor --json
     {
       "name": "node_version",
       "status": "pass|warn|fail",
-      "message": "Node.js 20.10.0 (OK)",
+      "message": "Node.js 24.18.0 (OK; required >=24)",
       "expected": ">=18.0.0",
       "actual": "20.10.0"
     },

@@ -345,7 +345,7 @@ groups:
     lex-pr metrics --output metrics.json
 
 - name: Upload metrics artifact
-  uses: actions/upload-artifact@v4
+  uses: actions/upload-artifact@v7
   with:
     name: governance-metrics
     path: metrics.json

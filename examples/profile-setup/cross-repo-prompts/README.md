@@ -65,12 +65,12 @@ jobs:
 
     steps:
       - name: Checkout LexRunner
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           path: lexrunner
 
       - name: Checkout Lex (for prompts)
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: Guffawaffle/lex
           path: lex
@@ -319,7 +319,7 @@ env:
 
 steps:
   - name: Checkout shared prompts
-    uses: actions/checkout@v3
+    uses: actions/checkout@v7
     with:
       repository: org/shared-prompts
       path: /opt/shared-prompts

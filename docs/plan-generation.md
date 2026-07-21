@@ -327,7 +327,7 @@ lex-pr plan --from-github \
   run: lex-pr validate plan.json
 
 - name: Upload Plan
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v7
   with:
     name: execution-plan
     path: plan.json

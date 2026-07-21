@@ -45,7 +45,9 @@ export function registerDoctorCommand(program: Command, jsonModeActive?: () => b
       }
 
       console.log("🩺 Doctor - Environment and config sanity checks\n");
-      console.log(`${result.nodejs.status === "ok" ? "✓" : "✗"} Node.js: ${result.nodejs.current}`);
+      console.log(
+        `${result.nodejs.status === "mismatch" ? "✗" : "✓"} Node.js: ${result.nodejs.current} (required ${result.nodejs.required}${result.nodejs.expected ? `; workspace pin ${result.nodejs.expected}` : ""})`
+      );
       console.log(`✓ Project type: ${result.projectType}`);
       console.log(
         `${result.git?.status === "ok" ? "✓" : "✗"} Git: ${result.git?.currentBranch ?? result.git?.error ?? "unavailable"}`

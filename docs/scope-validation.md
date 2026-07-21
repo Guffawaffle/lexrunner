@@ -365,10 +365,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies
         run: npm ci
@@ -439,4 +439,4 @@ This feature is marked **P0 (Critical)** for security:
 - **Schema**: `schemas/edit-plan.schema.json`
 - **Implementation**: `src/planner/scopeValidator.ts`
 - **Tests**: `tests/scopeValidator.spec.ts`
-- **Issue**: [GitHub Issue #XXX](link-to-issue)
+- **Issue**: GitHub issue reference pending

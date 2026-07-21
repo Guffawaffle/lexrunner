@@ -251,12 +251,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install lexrunner
         run: npm install -g lexrunner
@@ -394,5 +394,5 @@ lex-pr plan --from-github --json | jq '.items[] | {name, deps}'
 ## Related Workflows
 
 - [Solo Developer](./solo-developer.md) - Simpler setup for individuals
-- [Medium Team](./medium-team.md) - More advanced coordination
-- [Trunk-Based Development](./trunk-based.md) - Alternative branching strategy
+- Medium Team - More advanced coordination guide planned
+- Trunk-Based Development - Alternative branching strategy guide planned

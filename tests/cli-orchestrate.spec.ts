@@ -127,8 +127,8 @@ describe("CLI orchestrate:pin-toolchain", () => {
         ".tool-versions",
         `
 git 2.45.2
-node 20.18.0
-npm 10.8.2
+node 24
+npm 11.16.0
 `
       );
 
@@ -146,8 +146,8 @@ npm 10.8.2
         const npmResult = json.tools.find((t: any) => t.name === "npm");
 
         expect(gitResult.pinned).toBe("2.45.2");
-        expect(nodeResult.pinned).toBe("20.18.0");
-        expect(npmResult.pinned).toBe("10.8.2");
+        expect(nodeResult.pinned).toBe("24");
+        expect(npmResult.pinned).toBe("11.16.0");
       }
     });
 

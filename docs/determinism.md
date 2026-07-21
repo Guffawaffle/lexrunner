@@ -18,8 +18,8 @@ This project pins the following toolchain versions in `.tool-versions` and `.nvm
 | Tool       | Version | Source                      |
 | ---------- | ------- | --------------------------- |
 | git        | 2.45.2  | `.tool-versions`            |
-| Node.js    | 20.18.0 | `.nvmrc` + `.tool-versions` |
-| npm        | 10.8.2  | `.tool-versions`            |
+| Node.js    | 24      | `.nvmrc` + `.tool-versions` |
+| npm        | 11.16.0 | `.tool-versions`            |
 | TypeScript | 5.6.3   | `package.json`              |
 | ESLint     | 9.10.0  | `package.json`              |
 
@@ -40,7 +40,7 @@ asdf plugin add git
 asdf install
 
 # Set as global or local
-asdf local nodejs 20.18.0
+asdf local nodejs 24
 asdf local git 2.45.2
 ```
 
@@ -53,7 +53,7 @@ asdf local git 2.45.2
 mise install
 
 # Or manually
-mise use node@20.18.0
+mise use node@24
 mise use git@2.45.2
 ```
 
@@ -67,7 +67,7 @@ nvm install
 nvm use
 
 # Install npm separately
-npm install -g npm@10.8.2
+npm install -g npm@11.16.0
 ```
 
 #### Option 4: volta (Node.js only)
@@ -76,8 +76,8 @@ npm install -g npm@10.8.2
 # Install volta: https://volta.sh/
 
 # Pin Node.js version
-volta pin node@20.18.0
-volta pin npm@10.8.2
+volta pin node@24
+volta pin npm@11.16.0
 ```
 
 ### Verifying Your Toolchain
@@ -94,8 +94,8 @@ Expected output when everything matches:
 🔧 Toolchain Version Verification
 
 ✅ git          2.45.2       (pinned: 2.45.2)
-✅ node         20.18.0      (pinned: 20.18.0)
-✅ npm          10.8.2       (pinned: 10.8.2)
+✅ node         24.18.0      (pinned: 24)
+✅ npm          11.16.0      (pinned: 11.16.0)
 ✅ typescript   5.6.3        (pinned: 5.6.3)
 ✅ eslint       9.10.0       (pinned: 9.10.0)
 
@@ -152,8 +152,8 @@ Every merge-weave run records a **toolchain manifest** for audit trails:
   },
   "tools": {
     "git": "2.45.2",
-    "node": "20.18.0",
-    "npm": "10.8.2",
+    "node": "24.18.0",
+    "npm": "11.16.0",
     "typescript": "5.6.3",
     "eslint": "9.10.0"
   },
@@ -236,7 +236,7 @@ diff -u run1.log run2.log  # Should be identical
 ### Mismatch: Node.js version
 
 ```
-❌ node         20.19.5      (pinned: 20.18.0) [MISMATCH]
+❌ node         22.22.1      (pinned: 24) [MISMATCH]
 ```
 
 **Fix**: Install pinned version via nvm/asdf/mise, or update `.nvmrc` if intentional.
@@ -244,10 +244,10 @@ diff -u run1.log run2.log  # Should be identical
 ### Mismatch: npm version
 
 ```
-❌ npm          10.9.0       (pinned: 10.8.2) [MISMATCH]
+❌ npm          10.9.0       (pinned: 11.16.0) [MISMATCH]
 ```
 
-**Fix**: `npm install -g npm@10.8.2`
+**Fix**: `npm install -g npm@11.16.0`
 
 ### Mismatch: git version
 

@@ -6,7 +6,7 @@ This guide keeps contributions small, deterministic, and easy to review.
 
 ## Quick start
 
-- Node.js: 20.x (see `.nvmrc` and `package.json` engines)
+- Node.js: 24.x (see `.nvmrc` and `package.json` engines)
 - npm: 10.x (see `package.json` packageManager)
 
 Setup:

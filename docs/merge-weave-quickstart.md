@@ -6,7 +6,7 @@ This guide provides an end-to-end walkthrough for executing merge-weave operatio
 
 - **Clean working tree**: Your repository must have no uncommitted changes
 - **Remote branches**: All branches in your plan must exist as remote branches
-- **Node.js 20+**: Required for running lexrunner
+- **Node.js 24+**: Required for running lexrunner
 - **Plan file location**: Store plan files outside your working tree (e.g., `/tmp/plan.json` or `.smartergpt.local/runner/plan.json`) to avoid dirty status
 
 ## Quick Reference
@@ -707,13 +707,13 @@ jobs:
   validate-plan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Need full history for branch checks
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install lexrunner
         run: npm install -g lexrunner
@@ -736,7 +736,7 @@ jobs:
           echo "✅ No conflicts detected"
 
       - name: Upload dry-run results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: merge-weave-dry-run
           path: dry-run.json

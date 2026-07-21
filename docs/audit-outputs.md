@@ -1009,7 +1009,7 @@ lex-pr audit verify --manifest audit-manifest.json --format json
     lex-pr audit verify --manifest .smartergpt.local/deliverables/weave-*/audit/audit-manifest.json
 
 - name: Upload verified manifest
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v7
   with:
     name: verified-audit-manifest
     path: .smartergpt.local/deliverables/weave-*/audit/

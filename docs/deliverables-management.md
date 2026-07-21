@@ -262,7 +262,7 @@ lex-pr deliverables:cleanup --max-count 30 --max-age 90
   run: lex-pr autopilot plan.json
 
 - name: Upload Deliverables
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v7
   with:
     name: autopilot-deliverables
     path: .smartergpt/deliverables/latest/
@@ -362,7 +362,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - run: lex-pr deliverables:cleanup --max-age 30
 ```
 

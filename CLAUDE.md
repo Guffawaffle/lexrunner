@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **lexrunner** is a TypeScript CLI tool for parallel PR workflows with dependency management and quality gates. The tagline: _Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly._
 
-**Tech Stack**: TypeScript, ESM modules, Node.js 20+, Commander.js, Vitest
+**Tech Stack**: TypeScript, ESM modules, Node.js 24+, Commander.js, Vitest
 
 ## Build & Test Commands
 

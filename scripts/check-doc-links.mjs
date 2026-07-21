@@ -38,7 +38,7 @@ const markdownFiles = base
     ];
 const failures = [];
 for (const file of markdownFiles.sort()) {
-  const content = readFileSync(file, "utf8");
+  const content = withoutCode(readFileSync(file, "utf8"));
   for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     const rawTarget = match[1].trim().replace(/^<|>$/g, "");
     if (
@@ -57,6 +57,23 @@ for (const file of markdownFiles.sort()) {
       failures.push(`${file.slice(root.length + 1)} -> ${rawTarget}`);
     }
   }
+}
+
+function withoutCode(content) {
+  let fence;
+  return content
+    .split(/\r?\n/)
+    .map((line) => {
+      const marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
+      if (marker) {
+        if (!fence) fence = marker[0];
+        else if (marker[0] === fence) fence = undefined;
+        return "";
+      }
+      if (fence) return "";
+      return line.replace(/`[^`\n]*`/g, "");
+    })
+    .join("\n");
 }
 
 function option(name) {

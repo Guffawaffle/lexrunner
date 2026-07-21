@@ -241,7 +241,7 @@ lex-pr execute plan.json --artifact-dir ./gate-results
     npm run cli -- autopilot plan.json --level 1 --profile-dir ./workspace --json > autopilot-result.json
 
 - name: Upload artifacts
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v7
   with:
     name: autopilot-deliverables
     path: ./workspace/deliverables/

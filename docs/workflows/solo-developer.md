@@ -249,11 +249,11 @@ jobs:
     if: github.event.label.name == 'ready'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Install and run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -377,8 +377,8 @@ Once comfortable with solo workflow:
 ## Related Workflows
 
 - [Small Team](./small-team.md) - When you add teammates
-- [Trunk-Based Development](./trunk-based.md) - Continuous integration
-- [Open Source](./open-source.md) - Public project management
+- Trunk-Based Development - Continuous integration guide planned
+- Open Source - Public project management guide planned
 
 ## Example Configuration
 

@@ -635,12 +635,12 @@ jobs:
   merge-prs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Run merge-weave with Frame emission
         env:
@@ -653,7 +653,7 @@ jobs:
           lex-pr merge plan.json --execute
 
       - name: Upload Frame artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: execution-frames
           path: .lexrunner/frames/*.json
