@@ -1313,6 +1313,16 @@ export type {
   BoundedIntegrationStatus,
   BoundedMergeOrderResult,
 } from "./application/integration-query-services.js";
+export {
+  MergeApplicationService,
+  MergeApplicationServiceError,
+} from "./application/merge-application-service.js";
+export type {
+  BoundedMergeApplicationResult,
+  MergeApplicationExecution,
+  MergeApplicationFailureCode,
+  MergeApplicationRuntime,
+} from "./application/merge-application-service.js";
 
 // LPR-037: Workflow guidance exports for MCP
 export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";

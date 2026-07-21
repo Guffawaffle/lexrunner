@@ -15,7 +15,6 @@ import { createGitHubClient } from "../github/client.js";
 import { loadPlan } from "../schema.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { createGitOperations } from "../git/operations.js";
-import { computeMergeOrder } from "../mergeOrder.js";
 import { ExecutionState } from "../executionState.js";
 import { executeGatesWithPolicy } from "../gates.js";
 import { registerStatusCommand } from "./status.js";
@@ -33,10 +32,26 @@ import {
   DiscoveryQueryService,
   PlanCreationService,
 } from "../application/integration-query-services.js";
+import {
+  MergeApplicationService,
+  MergeApplicationServiceError,
+} from "../application/merge-application-service.js";
+import { mcpToolError } from "../errors/index.js";
 
-interface WeaveCommandDeps {
+export interface WeaveCommandDeps {
   jsonModeActive: () => boolean;
   getProgramOpts: () => any;
+  mergeApplicationService?: Pick<MergeApplicationService, "run">;
+  executeGates?: typeof executeGatesWithPolicy;
+}
+
+export interface WeaveApplyOptions {
+  plan: string;
+  dryRun?: boolean;
+  execute?: boolean;
+  constraints?: boolean;
+  skipGates?: boolean;
+  json?: boolean;
 }
 
 /**
@@ -54,10 +69,10 @@ Examples:
   $ lex-pr weave discover                  # Find open PRs
   $ lex-pr weave plan --from-github        # Generate merge plan
   $ lex-pr weave apply --dry-run           # Preview merge execution
-  $ lex-pr weave apply                     # Execute merge
+  $ lex-pr weave apply --execute           # Execute merge
 
   # One-liner workflow
-  $ lex-pr weave discover && lex-pr weave plan --from-github --output plan.json && lex-pr weave apply
+  $ lex-pr weave discover && lex-pr weave plan --from-github --output plan.json && lex-pr weave apply --execute
 
   # Resume from checkpoint (after interruption)
   $ lex-pr weave resume --latest           # Resume most recent run
@@ -230,7 +245,7 @@ Subcommands:
           console.log("Next steps:");
           console.log(`  1. Review: lex-pr plan-review ${opts.output}`);
           console.log(`  2. Dry-run: lex-pr weave apply --plan ${opts.output} --dry-run`);
-          console.log(`  3. Execute: lex-pr weave apply --plan ${opts.output}\n`);
+          console.log(`  3. Execute: lex-pr weave apply --plan ${opts.output} --execute\n`);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -245,145 +260,11 @@ Subcommands:
     .description("Execute merge pyramid with gates and merging")
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .option("--dry-run", "Show what would happen without executing")
+    .option("--execute", "Apply merges through the persisted merge service")
     .option("--no-constraints", "Skip constraint preview in dry-run mode")
     .option("--skip-gates", "Skip gate execution (not recommended)")
     .option("--json", "Output JSON format")
-    .action(async (opts) => {
-      try {
-        // Load plan
-        if (!fs.existsSync(opts.plan)) {
-          console.error(`\n❌ Error: Plan file not found: ${opts.plan}\n`);
-          console.error("Generate a plan first:");
-          console.error("  lex-pr weave plan --from-github --output plan.json\n");
-          throwExit(1);
-        }
-
-        const planContent = fs.readFileSync(opts.plan, "utf-8");
-        const plan = loadPlan(planContent);
-
-        // Compute merge order
-        const levels = computeMergeOrder(plan);
-
-        if (opts.dryRun) {
-          // Dry-run mode: show execution plan with constraint preview
-          const showConstraints = opts.constraints !== false;
-
-          if (opts.json || deps.jsonModeActive()) {
-            const output: any = {
-              dryRun: true,
-              levels,
-              totalItems: plan.items?.length || 0,
-              maxParallelism: Math.max(...levels.map((level) => level.length)),
-            };
-
-            // Add constraint preview to JSON output if enabled
-            if (showConstraints) {
-              const { previewConstraints } = await import("../preview/constraints.js");
-              const constraintPreview = await previewConstraints(plan);
-              output.constraints = constraintPreview;
-            }
-
-            console.log(canonicalJSONStringify(output));
-          } else {
-            console.log(`\n🔍 Merge-Weave Dry Run\n`);
-
-            // Show constraint preview first if enabled
-            if (showConstraints) {
-              const { previewConstraints, formatConstraintPreview } =
-                await import("../preview/constraints.js");
-              const constraintPreview = await previewConstraints(plan);
-              console.log(formatConstraintPreview(constraintPreview));
-            }
-
-            console.log(`Plan: ${opts.plan}`);
-            console.log(`Items: ${plan.items?.length || 0}`);
-            console.log(`Target: ${plan.target || "main"}\n`);
-
-            console.log("📦 Execution Plan\n");
-            console.log("Execution Order (topological):\n");
-            levels.forEach((level, idx) => {
-              console.log(`  Level ${idx + 1}:`);
-              level.forEach((item) => {
-                console.log(`    - ${item}`);
-              });
-            });
-
-            console.log("\nGates to run:");
-            const gates = plan.policy?.requiredGates || ["lint", "typecheck", "test"];
-            gates.forEach((gate) => {
-              console.log(`  - ${gate}`);
-            });
-
-            console.log("\nTo execute:");
-            console.log(`  lex-pr weave apply --plan ${opts.plan}\n`);
-          }
-        } else {
-          // Execute mode
-          if (!opts.json && !deps.jsonModeActive()) {
-            console.log(`\n🚀 Executing Merge-Weave\n`);
-            console.log(`Plan: ${opts.plan}`);
-            console.log(`Items: ${plan.items?.length || 0}\n`);
-          }
-
-          // Execute gates if not skipped
-          if (!opts.skipGates) {
-            if (!opts.json && !deps.jsonModeActive()) {
-              console.log("Running gates...\n");
-            }
-
-            const executionState = new ExecutionState(plan);
-            const gatesDir = path.join(process.cwd(), ".smartergpt", "runner", "gates");
-
-            await executeGatesWithPolicy(plan, executionState, gatesDir);
-
-            const results = executionState.getResults();
-            let allPassed = true;
-
-            for (const [itemName, nodeResult] of results) {
-              if (nodeResult.status !== "pass") {
-                allPassed = false;
-                if (!opts.json && !deps.jsonModeActive()) {
-                  console.log(`❌ ${itemName}: ${nodeResult.status}`);
-                }
-              } else {
-                if (!opts.json && !deps.jsonModeActive()) {
-                  console.log(`✅ ${itemName}: passed`);
-                }
-              }
-            }
-
-            if (!allPassed) {
-              console.error("\n❌ Some gates failed. Fix issues before merging.\n");
-              throwExit(1);
-            }
-
-            if (!opts.json && !deps.jsonModeActive()) {
-              console.log("\n✅ All gates passed!\n");
-            }
-          }
-
-          // Note: Actual merge execution would be handled by merge command
-          // For now, we show the next step
-          if (!opts.json && !deps.jsonModeActive()) {
-            console.log("Merge pyramid ready to execute.");
-            console.log("\nNext step:");
-            console.log(`  lex-pr merge --plan ${opts.plan} --execute\n`);
-          } else {
-            console.log(
-              canonicalJSONStringify({
-                success: true,
-                gatesCompleted: !opts.skipGates,
-                readyToMerge: true,
-              })
-            );
-          }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`\n❌ Apply failed: ${message}\n`);
-        throwExit(1);
-      }
-    });
+    .action(async (opts) => runWeaveApply(opts as WeaveApplyOptions, deps));
 
   // ALN-003 Phase 2: Add additional weave subcommands for full category coverage
   // These were originally intended to be added by PR #584
@@ -473,4 +354,137 @@ Subcommands:
 
   // weave checkpoints - Checkpoint management
   registerCheckpointCommands(weave, { jsonModeActive: deps.jsonModeActive });
+}
+
+/** Shared canonical CLI adapter used by `weave apply` and its `merge` compatibility alias. */
+export async function runWeaveApply(
+  opts: WeaveApplyOptions,
+  deps: WeaveCommandDeps
+): Promise<void> {
+  const json = Boolean(opts.json || deps.jsonModeActive());
+  const service = deps.mergeApplicationService ?? new MergeApplicationService();
+  try {
+    if (!fs.existsSync(opts.plan)) {
+      console.error(`\n❌ Error: Plan file not found: ${opts.plan}\n`);
+      console.error("Generate a plan first:");
+      console.error("  lex-pr weave plan --from-github --output plan.json\n");
+      throwExit(1);
+    }
+
+    const plan = loadPlan(fs.readFileSync(opts.plan, "utf-8"));
+    const preview = await service.run({
+      plan,
+      workingDir: process.cwd(),
+      dryRun: true,
+      mutationAuthorized: false,
+    });
+    const levels = preview.summary.levels ?? [];
+
+    if (opts.dryRun) {
+      const showConstraints = opts.constraints !== false;
+      if (json) {
+        const output: Record<string, unknown> = { ...preview.summary };
+        if (showConstraints) {
+          const { previewConstraints } = await import("../preview/constraints.js");
+          output.constraints = await previewConstraints(plan);
+        }
+        console.log(canonicalJSONStringify(output));
+        return;
+      }
+
+      console.log(`\n🔍 Merge-Weave Dry Run\n`);
+      if (showConstraints) {
+        const { previewConstraints, formatConstraintPreview } =
+          await import("../preview/constraints.js");
+        console.log(formatConstraintPreview(await previewConstraints(plan)));
+      }
+      console.log(`Plan: ${opts.plan}`);
+      console.log(`Items: ${plan.items.length}`);
+      console.log(`Target: ${plan.target}\n`);
+      console.log("📦 Execution Plan\n");
+      console.log("Execution Order (topological):\n");
+      levels.forEach((level, index) => {
+        console.log(`  Level ${index + 1}:`);
+        level.forEach((item) => console.log(`    - ${item}`));
+      });
+      console.log("\nGates to run:");
+      for (const gate of plan.policy?.requiredGates ?? ["lint", "typecheck", "test"]) {
+        console.log(`  - ${gate}`);
+      }
+      console.log("\nTo execute:");
+      console.log(`  lex-pr weave apply --plan ${opts.plan} --execute\n`);
+      return;
+    }
+
+    if (!json) {
+      console.log(`\n🚀 Executing Merge-Weave\n`);
+      console.log(`Plan: ${opts.plan}`);
+      console.log(`Items: ${plan.items.length}\n`);
+    }
+
+    if (!opts.skipGates) {
+      if (!json) console.log("Running gates...\n");
+      const executionState = new ExecutionState(plan);
+      const gatesDir = path.join(process.cwd(), ".smartergpt", "runner", "gates");
+      await (deps.executeGates ?? executeGatesWithPolicy)(plan, executionState, gatesDir);
+      const results = executionState.getResults();
+      const allPassed = [...results.values()].every(({ status }) => status === "pass");
+      if (!json) {
+        for (const [itemName, result] of results) {
+          console.log(`${result.status === "pass" ? "✅" : "❌"} ${itemName}: ${result.status}`);
+        }
+      }
+      if (!allPassed) {
+        console.error("\n❌ Some gates failed. Fix issues before merging.\n");
+        throwExit(1);
+      }
+      if (!json) console.log("\n✅ All gates passed!\n");
+    }
+
+    if (!opts.execute) {
+      if (json) {
+        console.log(
+          canonicalJSONStringify({
+            contract: "bounded-ax-v1",
+            mode: "gates-only",
+            ok: true,
+            gatesCompleted: !opts.skipGates,
+            readyToMerge: true,
+          })
+        );
+      } else {
+        console.log("Merge pyramid ready to execute.");
+        console.log("\nNext step:");
+        console.log(`  lex-pr weave apply --plan ${opts.plan} --execute\n`);
+      }
+      return;
+    }
+
+    const application = await service.run({
+      plan,
+      workingDir: process.cwd(),
+      dryRun: false,
+      mutationAuthorized: true,
+    });
+    if (json) {
+      console.log(canonicalJSONStringify(application.summary));
+    } else {
+      console.log(
+        application.summary.ok
+          ? `✅ Merge application completed (${application.summary.runId})`
+          : `❌ Merge application stopped (${application.summary.failureCode})`
+      );
+    }
+    if (!application.summary.ok) throwExit(1);
+  } catch (error) {
+    if (error instanceof MergeApplicationServiceError && json) {
+      console.error(
+        canonicalJSONStringify(mcpToolError(error.code, error.message, { tool: "merge.apply" }))
+      );
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`\n❌ Apply failed: ${message}\n`);
+    }
+    throwExit(1);
+  }
 }

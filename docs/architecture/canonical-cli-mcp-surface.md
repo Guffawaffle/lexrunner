@@ -95,6 +95,9 @@ listed in the matrix own implementation gaps.
   bounded summary. `gate execute` and top-level `execute` remain migration aliases.
 - Discovery, plan creation, integration status, and merge-order pairs now share bounded
   transport-neutral query services. Human output and legacy alias JSON remain adapter projections.
+- Canonical `weave apply`, MCP `merge.apply`, and compatibility `merge` share the persisted
+  `MergeApplicationService`; previews cannot enter its mutation runtime, and execution requires
+  explicit authority.
 - The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
   ADR-007 task tools that are not published by `mcp-server.mjs`.
 - `health` duplicates `doctor` and is deprecated.
@@ -111,7 +114,6 @@ drift.
 
 | Issue | Boundary                                                                  |
 | ----- | ------------------------------------------------------------------------- |
-| #781  | Shared bounded merge application service                                  |
 | #782  | Shared workspace/config services and retirement of MCP `health`           |
 | #783  | Rename or retirement of frozen RunStore `lexrunner.*` compatibility tools |
 | #784  | CLI alias warnings and removal windows                                    |

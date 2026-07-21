@@ -289,15 +289,13 @@ describe("Comprehensive E2E Automation Pipeline", () => {
 
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run`);
 
-      expect(stdout).toContain("🔍 DRY RUN: Merge Execution Plan");
-      expect(stdout).toContain("### Batch 1");
-      expect(stdout).toContain("- Items: setup");
-      expect(stdout).toContain("### Batch 2");
-      expect(stdout).toContain("- Items: build");
-      expect(stdout).toContain("- Dependencies: setup");
-      expect(stdout).toContain("### Batch 3");
-      expect(stdout).toContain("- Items: test");
-      expect(stdout).toContain("- Dependencies: build");
+      expect(stdout).toContain("🔍 Merge-Weave Dry Run");
+      expect(stdout).toContain("Level 1:");
+      expect(stdout).toContain("- setup");
+      expect(stdout).toContain("Level 2:");
+      expect(stdout).toContain("- build");
+      expect(stdout).toContain("Level 3:");
+      expect(stdout).toContain("- test");
     });
 
     it("should aggregate gate results correctly", async (ctx) => {
@@ -476,13 +474,12 @@ describe("Comprehensive E2E Automation Pipeline", () => {
       const { stdout } = await runCLI(`merge --plan ${planPath} --dry-run --json`);
       const result = JSON.parse(stdout);
 
-      expect(result).toHaveProperty("summary");
-      expect(result).toHaveProperty("batches");
-      expect(result).toHaveProperty("prs");
-      expect(result).toHaveProperty("checks");
-      expect(result.batches).toBeInstanceOf(Array);
-      expect(result.batches).toHaveLength(2);
-      expect(result.summary.totalItems).toBe(2);
+      expect(result.contract).toBe("bounded-ax-v1");
+      expect(result.mode).toBe("dry-run");
+      expect(result.dryRun).toBe(true);
+      expect(result.totalItems).toBe(2);
+      expect(result.levels).toEqual([["item-1"], ["item-2"]]);
+      expect(result.artifactRefs).toEqual([]);
     });
 
     it("should support status reporting format", async (ctx) => {

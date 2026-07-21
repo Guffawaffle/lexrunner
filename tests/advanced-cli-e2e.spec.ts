@@ -182,16 +182,17 @@ describe("Advanced CLI Features E2E", () => {
     });
   });
 
-  describe("enhanced merge command", () => {
-    it("should accept batch options", () => {
+  describe("merge compatibility command", () => {
+    it("should expose only canonical weave apply options", () => {
       const helpOutput = execSync(`node ${cliPath} merge --help`, {
         encoding: "utf8",
       });
 
-      expect(helpOutput).toContain("--batch");
-      expect(helpOutput).toContain("--filter");
-      expect(helpOutput).toContain("--levels");
-      expect(helpOutput).toContain("--items");
+      expect(helpOutput).toContain("Compatibility alias for weave apply");
+      expect(helpOutput).toContain("--plan");
+      expect(helpOutput).toContain("--dry-run");
+      expect(helpOutput).toContain("--execute");
+      expect(helpOutput).not.toContain("--batch");
     });
   });
 
