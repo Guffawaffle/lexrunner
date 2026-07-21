@@ -257,5 +257,20 @@ describe("Weave Receipt Helper", () => {
       expect(errorNote!.length).toBeLessThan(250); // Should be truncated
       expect(errorNote).toContain("...");
     });
+
+    it("should distinguish timeout cleanup from assertion failure", () => {
+      const receipt = emitGateReceipt(
+        "test",
+        "PR-456",
+        false,
+        180000,
+        "run-456",
+        { log: false },
+        { error: "GATE_TIMEOUT", exitCode: 124, failureKind: "timeout", descendantsReaped: true }
+      );
+
+      expect(receipt.uncertaintyNotes).toContain("Failure kind: timeout");
+      expect(receipt.uncertaintyNotes).toContain("Descendants reaped: true");
+    });
   });
 });

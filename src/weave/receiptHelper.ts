@@ -211,6 +211,10 @@ export interface GateReceiptContext {
   exitCode?: number;
   /** Artifacts collected from gate execution */
   artifacts?: string[];
+  /** Stable failure classification. */
+  failureKind?: "nonzero_exit" | "spawn_error" | "timeout";
+  /** Whether timeout cleanup reaped the descendant tree. */
+  descendantsReaped?: boolean;
 }
 
 /**
@@ -263,6 +267,10 @@ export function emitGateReceipt(
     }
     if (context?.exitCode !== undefined && context.exitCode !== 0) {
       uncertaintyNotes.push(`Exit code: ${context.exitCode}`);
+    }
+    if (context?.failureKind) uncertaintyNotes.push(`Failure kind: ${context.failureKind}`);
+    if (context?.descendantsReaped !== undefined) {
+      uncertaintyNotes.push(`Descendants reaped: ${context.descendantsReaped}`);
     }
 
     return emitFailureReceipt(

@@ -27,7 +27,16 @@ export interface BoundedGateRunResult {
   items: Array<{
     name: string;
     status: string;
-    gates: Array<{ name: string; status: string }>;
+    gates: Array<{
+      name: string;
+      status: string;
+      failureKind?: "nonzero_exit" | "spawn_error" | "timeout";
+      timeoutCleanup?: {
+        method: "process-group" | "taskkill" | "direct-child";
+        forceKilled: boolean;
+        descendantsReaped: boolean;
+      };
+    }>;
   }>;
   allGreen: boolean;
   artifactRefs: Array<{ kind: "gate-results-directory"; path: string }>;
@@ -82,6 +91,8 @@ export class GateExecutionService {
           .map((gate) => ({
             name: bounded(gate.gate, MAX_LABEL_BYTES),
             status: bounded(gate.status, MAX_LABEL_BYTES),
+            ...(gate.failureKind ? { failureKind: gate.failureKind } : {}),
+            ...(gate.timeoutCleanup ? { timeoutCleanup: gate.timeoutCleanup } : {}),
           })),
       }));
     if (items.length > MAX_ITEMS || items.some(({ gates }) => gates.length > MAX_GATES_PER_ITEM)) {

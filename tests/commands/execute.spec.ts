@@ -94,7 +94,8 @@ describe("Execute Command", () => {
       const executeCommand = commands.find((cmd) => cmd.name() === "execute");
 
       const planOption = executeCommand?.options.find((opt) => opt.long === "--plan");
-      expect(planOption?.defaultValue).toBe("plan.json");
+      // The fallback is resolved by the action so a positional plan path can take precedence.
+      expect(planOption?.defaultValue).toBeUndefined();
 
       const artifactDirOption = executeCommand?.options.find(
         (opt) => opt.long === "--artifact-dir"

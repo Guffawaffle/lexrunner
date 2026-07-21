@@ -37,6 +37,7 @@ import {
   createAutoRecordClassification,
 } from "./learning/prompts.js";
 import { storeCounterExample } from "./learning/storage.js";
+import { terminateProcessTree, type ProcessTreeTerminationResult } from "./process/process-tree.js";
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -305,6 +306,7 @@ async function executeLocalGate(
       cwd: workingDirectory,
       env: { ...process.env, ...gate.env },
       stdio: ["pipe", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
 
     let stdout = "";
@@ -318,14 +320,15 @@ async function executeLocalGate(
       stderr += data.toString();
     });
 
+    let timeoutCleanup: Promise<ProcessTreeTerminationResult> | undefined;
     const timeout = setTimeout(() => {
       timedOut = true;
-      childProcess.kill("SIGTERM");
-      setTimeout(() => childProcess.kill("SIGKILL"), 5000);
+      timeoutCleanup = terminateProcessTree(childProcess);
     }, timeoutMs);
 
-    childProcess.on("close", (exitCode) => {
+    childProcess.on("close", async (exitCode) => {
       clearTimeout(timeout);
+      const cleanup = timeoutCleanup ? await timeoutCleanup : undefined;
       const duration = Date.now() - startTime;
 
       // Collect artifacts if specified
@@ -334,10 +337,14 @@ async function executeLocalGate(
       resolve({
         gate: gate.name,
         status: exitCode === 0 && !timedOut ? "pass" : "fail",
-        exitCode: exitCode || 0,
+        exitCode: timedOut ? 124 : (exitCode ?? 1),
         duration,
         stdout: stdout.trim(),
-        stderr: stderr.trim(),
+        stderr: timedOut
+          ? `GATE_TIMEOUT: exceeded ${timeoutMs}ms; descendantsReaped=${cleanup?.descendantsReaped ?? false}`
+          : stderr.trim(),
+        failureKind: timedOut ? "timeout" : exitCode === 0 ? undefined : "nonzero_exit",
+        ...(cleanup ? { timeoutCleanup: cleanup } : {}),
         artifacts,
         attempts: attempt,
         lastAttempt: startedAt,
@@ -359,6 +366,7 @@ async function executeLocalGate(
         duration,
         stdout: stdout.trim(),
         stderr: `${classified.context}: ${error.message}`,
+        failureKind: "spawn_error",
         artifacts: [],
         attempts: attempt,
         lastAttempt: startedAt,
@@ -612,6 +620,8 @@ async function emitGateExecutionFrame(
           error: result.stderr,
           exitCode: result.exitCode,
           artifacts: result.artifacts,
+          failureKind: result.failureKind,
+          descendantsReaped: result.timeoutCleanup?.descendantsReaped,
         }
       : undefined
   );

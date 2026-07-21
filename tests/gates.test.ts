@@ -133,8 +133,49 @@ describe("Gate Execution", () => {
     const result = await executeGate(gate, defaultPolicy, tempDir, 100); // 100ms timeout
 
     expect(result.gate).toBe("test-timeout");
-    expect(result.status).toBe("fail"); // Timeout should result in fail status
+    expect(result.status).toBe("fail");
+    expect(result.exitCode).toBe(124);
+    expect(result.failureKind).toBe("timeout");
+    expect(result.stderr).toContain("GATE_TIMEOUT");
+    expect(result.timeoutCleanup?.descendantsReaped).toBe(true);
   });
+
+  it.skipIf(process.platform === "win32")(
+    "leaves no descendant process alive after a timeout",
+    async () => {
+      const pidFile = path.join(tempDir, "descendant.pid");
+      const script = path.join(tempDir, "spawn-descendant.mjs");
+      fs.writeFileSync(
+        script,
+        [
+          'import { spawn } from "node:child_process";',
+          'import { writeFileSync } from "node:fs";',
+          'const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });',
+          "writeFileSync(process.argv[2], String(child.pid));",
+          "setInterval(() => {}, 1000);",
+        ].join("\n")
+      );
+      const gate: Gate = {
+        name: "test-process-tree-timeout",
+        run: `node ${JSON.stringify(script)} ${JSON.stringify(pidFile)}`,
+        env: {},
+        runtime: "local",
+        artifacts: [],
+      };
+
+      const result = await executeGate(gate, defaultPolicy, tempDir, 250);
+      const descendantPid = Number(fs.readFileSync(pidFile, "utf8"));
+
+      expect(result).toMatchObject({
+        status: "fail",
+        exitCode: 124,
+        failureKind: "timeout",
+        timeoutCleanup: { method: "process-group", descendantsReaped: true },
+      });
+      expect(processExists(descendantPid)).toBe(false);
+    },
+    10_000
+  );
 
   it("executes item gates sequentially", async () => {
     const item = {
@@ -253,3 +294,12 @@ describe("Gate Execution", () => {
     expect(failures[0].error.retryable).toBe(true);
   });
 });
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

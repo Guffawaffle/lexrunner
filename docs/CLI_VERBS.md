@@ -86,9 +86,8 @@ lex-pr workspace status  # Summarize profiles, gates, config
 ### Gate Domain
 
 ```bash
-lex-pr gate run <name>       # Execute a specific gate
-lex-pr gate status [--item]  # Show gate results
-lex-pr gate report           # Aggregate pass/fail, durations
+lex-pr gate select --base <sha> --head <sha>  # Resolve touched/adjacent tests
+lex-pr gate run plan.json                    # Execute frozen plan gates
 ```
 
 ### Security Domain
