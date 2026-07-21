@@ -98,9 +98,12 @@ listed in the matrix own implementation gaps.
 - Canonical `weave apply`, MCP `merge.apply`, and compatibility `merge` share the persisted
   `MergeApplicationService`; previews cannot enter its mutation runtime, and execution requires
   explicit authority.
+- Workspace initialization, diagnostics, configuration queries, and profile resolution now share
+  bounded application services across CLI and MCP. Interactive initialization remains CLI-only.
 - The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
   ADR-007 task tools that are not published by `mcp-server.mjs`.
-- `health` duplicates `doctor` and is deprecated.
+- `health` delegates to `doctor`, emits a replacement warning, and is scheduled for removal in
+  `2.0.0`.
 - Top-level `discover`, `plan`, `status`, `report`, `merge-order`, `execute`,
   `doctor`, and `init` remain deprecated aliases for category/action commands.
 - `orchestrate:*` commands are legacy aliases; `senior-dev`, budget,

@@ -277,7 +277,7 @@
         "owner": "frozen RunStore integration records"
       }
     ],
-    "deprecated": [{ "tool": "health", "replacement": "doctor" }],
+    "deprecated": [{ "tool": "health", "replacement": "doctor", "removeIn": "2.0.0" }],
     "internal-only": [],
     "remove": [],
     "contractOverrides": [
@@ -315,7 +315,7 @@
       {
         "tool": "config.show",
         "cli": "config show",
-        "owner": "planned shared configuration query service"
+        "owner": "ConfigurationQueryService"
       },
       {
         "tool": "discover",
@@ -325,7 +325,7 @@
       {
         "tool": "doctor",
         "cli": "workspace doctor",
-        "owner": "planned shared workspace diagnostics service"
+        "owner": "WorkspaceDiagnosticsService"
       },
       {
         "tool": "end_attempt_worker",
@@ -370,7 +370,7 @@
       {
         "tool": "local.init",
         "cli": "workspace init",
-        "owner": "planned shared workspace initialization service"
+        "owner": "WorkspaceInitializationService"
       },
       {
         "tool": "merge-order",
@@ -395,7 +395,7 @@
       {
         "tool": "profile.resolve",
         "cli": "config show",
-        "owner": "planned shared configuration query service"
+        "owner": "ConfigurationQueryService"
       },
       {
         "tool": "start_attempt",
@@ -438,20 +438,6 @@
     ]
   },
   "implementationGaps": [
-    {
-      "issue": 782,
-      "title": "Share workspace/config services and retire the MCP health duplicate",
-      "surface": [
-        "workspace init",
-        "local.init",
-        "workspace doctor",
-        "doctor",
-        "health",
-        "config show",
-        "config.show",
-        "profile.resolve"
-      ]
-    },
     {
       "issue": 783,
       "title": "Rename or retire compatibility lexrunner.* RunStore MCP tools",

@@ -49,6 +49,23 @@ const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
 const attemptReceiptHandlers = core.createAttemptReceiptHandlers();
 const attemptVerificationHandlers = core.createAttemptVerificationHandlers();
 
+function sharedServiceError(error, tool, fallbackCode) {
+  if (error && typeof error === "object" && typeof error.code === "string") {
+    return new Error(
+      core.canonicalJSONStringify(
+        core.mcpToolError(error.code, error.message || "Shared service failed", { tool })
+      )
+    );
+  }
+  return new Error(
+    core.canonicalJSONStringify(
+      core.mcpToolError(fallbackCode, error instanceof Error ? error.message : String(error), {
+        tool,
+      })
+    )
+  );
+}
+
 // MCP Tool implementations
 const tools = {
   verify_attempt: {
@@ -501,27 +518,21 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { initLocalOverlay } = await import("./dist/cli.js");
-        const force = args.force ?? false;
-        const result = initLocalOverlay(process.cwd(), force);
-
-        const output = {
-          created: result.created,
-          path: result.path,
-          config: result.config,
-          copiedFiles: result.copiedFiles,
-        };
+        const output = new core.WorkspaceInitializationService().run({
+          baseDir: process.cwd(),
+          force: args.force,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: `Local overlay initialized:\n${JSON.stringify(output, null, 2)}`,
+              text: JSON.stringify(output, null, 2),
             },
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to initialize local overlay: ${error.message}`);
+        throw sharedServiceError(error, "local.init", "WORKSPACE_INIT_FAILED");
       }
     },
   },
@@ -540,36 +551,27 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { resolveProfile } = await import("./dist/cli.js");
-        const profileDirOverride = args.profileDir || config.profileDir;
-        const resolved = resolveProfile(profileDirOverride, process.cwd());
-
-        const output = {
-          path: resolved.path,
-          source: resolved.source,
-          manifest: {
-            role: resolved.manifest.role,
-            name: resolved.manifest.name,
-            version: resolved.manifest.version,
-          },
-        };
+        const output = new core.ConfigurationQueryService().resolveProfile({
+          baseDir: process.cwd(),
+          profileDir: args.profileDir || config.profileDir,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: `Profile resolved:\n${JSON.stringify(output, null, 2)}`,
+              text: JSON.stringify(output, null, 2),
             },
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to resolve profile: ${error.message}`);
+        throw sharedServiceError(error, "profile.resolve", "PROFILE_RESOLUTION_FAILED");
       }
     },
   },
 
   health: {
-    description: "Get health status of the system with optional metrics",
+    description: "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 2.0.0.",
     inputSchema: {
       type: "object",
       properties: {
@@ -582,19 +584,25 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { healthChecker } = await import("./dist/cli.js");
-        const health = healthChecker.getHealth(args.includeMetrics || false);
+        const doctor = await new core.WorkspaceDiagnosticsService().run({
+          baseDir: process.cwd(),
+          environmentQuality: args.includeMetrics,
+        });
+        const health = {
+          ...doctor,
+          deprecation: { tool: "health", replacement: "doctor", removeIn: "2.0.0" },
+        };
 
         return {
           content: [
             {
               type: "text",
-              text: `Health check:\n${JSON.stringify(health, null, 2)}`,
+              text: JSON.stringify(health, null, 2),
             },
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to get health status: ${error.message}`);
+        throw sharedServiceError(error, "health", "WORKSPACE_DIAGNOSTICS_FAILED");
       }
     },
   },
@@ -847,112 +855,21 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const {
-          bootstrapWorkspace,
-          detectProjectType,
-          getEnvironmentSuggestions,
-          createGitHubAPI,
-          createGitOperations,
-        } = await import("./dist/cli.js");
-
-        const checks = {
-          hasErrors: false,
-          issues: [],
-          suggestions: [],
-        };
-
-        // Node.js version check
-        try {
-          const nvmrcContent = readFileSync(".nvmrc", "utf-8").trim();
-          const currentVersion = process.version.slice(1);
-          const expectedVersion = nvmrcContent;
-
-          if (currentVersion === expectedVersion) {
-            checks.nodejs = {
-              status: "ok",
-              current: process.version,
-              expected: `v${expectedVersion}`,
-            };
-          } else {
-            checks.nodejs = {
-              status: "mismatch",
-              current: process.version,
-              expected: `v${expectedVersion}`,
-            };
-            checks.hasErrors = true;
-            checks.issues.push(
-              `Node.js version mismatch: ${process.version} vs v${expectedVersion}`
-            );
-          }
-        } catch {
-          checks.nodejs = {
-            status: "no_constraint",
-            current: process.version,
-          };
-          checks.suggestions.push("Consider adding .nvmrc file for Node.js version consistency");
-        }
-
-        // Configuration check
-        const bootstrap = bootstrapWorkspace();
-        checks.configuration = {
-          hasConfiguration: bootstrap.hasConfiguration,
-          missingFiles: bootstrap.missingFiles,
-          suggestions: bootstrap.suggestions,
-        };
-
-        // Project type detection
-        checks.projectType = detectProjectType();
-
-        // Environment suggestions
-        checks.environmentSuggestions = getEnvironmentSuggestions();
-
-        // GitHub integration check
-        try {
-          const githubAPI = await createGitHubAPI();
-          if (githubAPI) {
-            const authStatus = await githubAPI.checkAuth();
-            checks.github = {
-              detected: true,
-              authenticated: authStatus.authenticated,
-              user: authStatus.user,
-            };
-          } else {
-            checks.github = { detected: false };
-          }
-        } catch (error) {
-          checks.github = { detected: false, error: error.message };
-        }
-
-        // Git operations check
-        try {
-          const gitOps = createGitOperations();
-          const isClean = await gitOps.isClean();
-          const currentBranch = await gitOps.getCurrentBranch();
-
-          checks.git = {
-            status: "ok",
-            isClean,
-            currentBranch,
-          };
-        } catch (error) {
-          checks.git = {
-            status: "error",
-            error: error.message,
-          };
-          checks.hasErrors = true;
-          checks.issues.push(`Git operations failed: ${error.message}`);
-        }
+        const checks = await new core.WorkspaceDiagnosticsService().run({
+          baseDir: process.cwd(),
+          environmentQuality: args.environmentQuality,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: `Doctor checks:\n${JSON.stringify(checks, null, 2)}`,
+              text: JSON.stringify(checks, null, 2),
             },
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to run doctor: ${error.message}`);
+        throw sharedServiceError(error, "doctor", "WORKSPACE_DIAGNOSTICS_FAILED");
       }
     },
   },
@@ -1010,56 +927,24 @@ const tools = {
     },
     call: async (args) => {
       try {
-        const { loadInputs } = await import("./dist/cli.js");
-
-        // Load configuration with provenance tracking
-        const config = loadInputs();
-
-        const output = {
-          config: {
-            items: config.items,
-            target: config.target,
-            version: config.version,
-          },
-          provenance: config.provenance || {},
-          sources: config.sources.map((s) => ({
-            exists: s.exists,
-            file: s.file,
-          })),
-        };
-
-        // If specific key requested, extract just that value
-        if (args.key) {
-          const keys = args.key.split(".");
-          let value = output.config;
-          for (const k of keys) {
-            if (value && typeof value === "object" && k in value) {
-              value = value[k];
-            } else {
-              value = undefined;
-              break;
-            }
-          }
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Configuration:\n${JSON.stringify({ key: args.key, value }, null, 2)}`,
-              },
-            ],
-          };
-        }
+        const result = new core.ConfigurationQueryService().show({
+          baseDir: process.cwd(),
+          key: args.key,
+        });
+        const output = args.key
+          ? { contract: result.contract, ...result.configuration[0] }
+          : result;
 
         return {
           content: [
             {
               type: "text",
-              text: `Configuration:\n${JSON.stringify(output, null, 2)}`,
+              text: JSON.stringify(output, null, 2),
             },
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to show config: ${error.message}`);
+        throw sharedServiceError(error, "config.show", "WORKSPACE_DIAGNOSTICS_FAILED");
       }
     },
   },

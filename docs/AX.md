@@ -132,35 +132,35 @@ For every CLI command, there SHOULD be an MCP tool with identical semantics.
 
 ### MCP Tools
 
-| Tool                   | Has CLI              | AXError | Status         |
-| ---------------------- | -------------------- | ------- | -------------- |
-| `plan_create`          | ✅ `weave plan`      | ✅      | ✅ Compliant   |
-| `pr_list`              | ✅ `discover`        | ✅      | ✅ Compliant   |
-| `plan_validate`        | ✅ `schema validate` | ✅      | ✅ Compliant   |
-| `plan_analyze`         | —                    | ✅      | ⚠️ Missing CLI |
-| `gates_run`            | ✅ `gate run`        | ✅      | ✅ Compliant   |
-| `merge_apply`          | ✅ `weave apply`     | ✅      | ✅ Compliant   |
-| `local_init`           | ✅ `init`            | ✅      | ✅ Compliant   |
-| `profile_resolve`      | ⚠️                   | ✅      | ⚠️ Partial CLI |
-| `health`               | ✅ `doctor`          | ✅      | ✅ Compliant   |
-| `discover`             | ✅ `weave discover`  | ✅      | ✅ Compliant   |
-| `weave_status`         | ✅ `weave status`    | ✅      | ✅ Compliant   |
-| `doctor`               | ✅ `doctor`          | ✅      | ✅ Compliant   |
-| `merge_order`          | ✅ `merge-order`     | ✅      | ✅ Compliant   |
-| `config_show`          | ✅ `config:inspect`  | ✅      | ✅ Compliant   |
-| `workflow_guide`       | —                    | ✅      | ⚠️ Missing CLI |
-| `metrics`              | ✅ `metrics`         | ✅      | ✅ Compliant   |
-| `executor_*`           | ⚠️ `senior-dev`      | ✅      | ⚠️ Partial     |
-| `start_run`            | —                    | ✅      | ⚠️ Missing CLI |
-| `get_status`           | —                    | ✅      | ⚠️ Missing CLI |
-| `list_artifacts`       | —                    | ✅      | ⚠️ Missing CLI |
-| `run_decision`         | —                    | ✅      | ⚠️ Missing CLI |
-| `create_task_snapshot` | —                    | ✅      | ⚠️ Missing CLI |
-| `submit_task_receipt`  | —                    | ✅      | ⚠️ Missing CLI |
-| `get_task_status`      | —                    | ✅      | ⚠️ Missing CLI |
-| `list_pending_tasks`   | —                    | ✅      | ⚠️ Missing CLI |
-| `fanout_harvest`       | ✅                   | ✅      | ✅ Compliant   |
-| `fanout_analyze`       | ✅                   | ✅      | ✅ Compliant   |
+| Tool                   | Has CLI              | AXError | Status                      |
+| ---------------------- | -------------------- | ------- | --------------------------- |
+| `plan_create`          | ✅ `weave plan`      | ✅      | ✅ Compliant                |
+| `pr_list`              | ✅ `discover`        | ✅      | ✅ Compliant                |
+| `plan_validate`        | ✅ `schema validate` | ✅      | ✅ Compliant                |
+| `plan_analyze`         | —                    | ✅      | ⚠️ Missing CLI              |
+| `gates_run`            | ✅ `gate run`        | ✅      | ✅ Compliant                |
+| `merge_apply`          | ✅ `weave apply`     | ✅      | ✅ Compliant                |
+| `local_init`           | ✅ `init`            | ✅      | ✅ Compliant                |
+| `profile_resolve`      | ⚠️                   | ✅      | ⚠️ Partial CLI              |
+| `health`               | ⚠️ `doctor`          | ✅      | Deprecated; remove in 2.0.0 |
+| `discover`             | ✅ `weave discover`  | ✅      | ✅ Compliant                |
+| `weave_status`         | ✅ `weave status`    | ✅      | ✅ Compliant                |
+| `doctor`               | ✅ `doctor`          | ✅      | ✅ Compliant                |
+| `merge_order`          | ✅ `merge-order`     | ✅      | ✅ Compliant                |
+| `config_show`          | ✅ `config:inspect`  | ✅      | ✅ Compliant                |
+| `workflow_guide`       | —                    | ✅      | ⚠️ Missing CLI              |
+| `metrics`              | ✅ `metrics`         | ✅      | ✅ Compliant                |
+| `executor_*`           | ⚠️ `senior-dev`      | ✅      | ⚠️ Partial                  |
+| `start_run`            | —                    | ✅      | ⚠️ Missing CLI              |
+| `get_status`           | —                    | ✅      | ⚠️ Missing CLI              |
+| `list_artifacts`       | —                    | ✅      | ⚠️ Missing CLI              |
+| `run_decision`         | —                    | ✅      | ⚠️ Missing CLI              |
+| `create_task_snapshot` | —                    | ✅      | ⚠️ Missing CLI              |
+| `submit_task_receipt`  | —                    | ✅      | ⚠️ Missing CLI              |
+| `get_task_status`      | —                    | ✅      | ⚠️ Missing CLI              |
+| `list_pending_tasks`   | —                    | ✅      | ⚠️ Missing CLI              |
+| `fanout_harvest`       | ✅                   | ✅      | ✅ Compliant                |
+| `fanout_analyze`       | ✅                   | ✅      | ✅ Compliant                |
 
 ---
 
