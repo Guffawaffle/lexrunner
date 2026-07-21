@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,6 +36,17 @@ describe("build artifact validation", () => {
         "./dist/hooks/events.d.ts",
       ])
     );
+  });
+
+  it("loads the CommonJS root with bundled ESM dependency metadata intact", () => {
+    const require = createRequire(import.meta.url);
+    const entry = require("../dist/cli.cjs") as {
+      canonicalJSONStringify?: (value: unknown) => string;
+    };
+
+    expect(JSON.parse(entry.canonicalJSONStringify?.({ ok: true }) ?? "null")).toEqual({
+      ok: true,
+    });
   });
 
   it("reports the declaration that points at each missing artifact", () => {

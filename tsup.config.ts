@@ -47,5 +47,22 @@ export default defineConfig([
     // Lex publishes ESM-only conditions. Bundle the Lex APIs used by
     // LexRunner only in CJS so the advertised require targets remain executable.
     noExternal: [/^@smartergpt\/lex(?:\/.*)?$/],
+    esbuildOptions(options) {
+      options.logOverride = {
+        ...options.logOverride,
+        "empty-import-meta": "silent",
+      };
+      // Bundled ESM dependencies may use import.meta.url at module scope. CJS has no
+      // import.meta, so bind those calls to the emitted artifact URL instead of esbuild's
+      // undefined compatibility shim.
+      options.define = {
+        ...options.define,
+        "import.meta.url": "__lexrunnerImportMetaUrl",
+      };
+      options.banner = {
+        ...options.banner,
+        js: 'var __lexrunnerImportMetaUrl = require("node:url").pathToFileURL(__filename).href;',
+      };
+    },
   },
 ]);
