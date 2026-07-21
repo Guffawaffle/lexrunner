@@ -30,7 +30,7 @@ function getPackageVersion() {
 
 function getGitTags() {
   try {
-    const output = execSync('git tag -l "v*"', {
+    const output = execSync('git tag -l "lexrunner-v*"', {
       cwd: rootDir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -43,7 +43,7 @@ function getGitTags() {
 
 function main() {
   const version = getPackageVersion();
-  const expectedTag = `v${version}`;
+  const expectedTag = `lexrunner-v${version}`;
   const tags = getGitTags();
 
   console.log(`📦 package.json version: ${version}`);
@@ -55,14 +55,14 @@ function main() {
   } else {
     console.log(`\n❌ DRIFT DETECTED: Tag ${expectedTag} does not exist.`);
     console.log(`\nExisting tags:`);
-    const semverTags = tags.filter((t) => /^v\d+\.\d+\.\d+/.test(t));
+    const semverTags = tags.filter((t) => /^lexrunner-v\d+\.\d+\.\d+/.test(t));
     if (semverTags.length > 0) {
       semverTags.slice(-5).forEach((t) => console.log(`  - ${t}`));
       if (semverTags.length > 5) {
         console.log(`  ... and ${semverTags.length - 5} more`);
       }
     } else {
-      console.log("  (none matching vX.Y.Z pattern)");
+      console.log("  (none matching lexrunner-vX.Y.Z pattern)");
     }
 
     console.log(`\nTo fix, create the missing tag:`);

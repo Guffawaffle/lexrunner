@@ -14,6 +14,10 @@ export interface ReleaseManifest {
 const EXPECTED_PACKAGE = "@smartergpt/lexrunner";
 const EXPECTED_REGISTRY = "https://registry.npmjs.org/";
 
+export function releaseTagForVersion(version: string): string {
+  return `lexrunner-v${version}`;
+}
+
 export function humanPublishCommand(distTag = "latest"): string {
   if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(distTag)) {
     throw new Error(`Invalid npm dist-tag: ${distTag}`);
@@ -47,7 +51,7 @@ function verifyTaggedHead(projectRoot: string, version: string): void {
   });
   if (status.trim()) throw new Error("Publish gate requires a clean worktree");
 
-  const expectedTag = `v${version}`;
+  const expectedTag = releaseTagForVersion(version);
   const tags = execFileSync("git", ["tag", "--points-at", "HEAD"], {
     cwd: projectRoot,
     encoding: "utf8",

@@ -7,7 +7,11 @@ import {
   type PackageManifest,
   validatePackageManifestForPublish,
 } from "../scripts/validate-package-boundary.js";
-import { humanPublishCommand, validateReleaseManifest } from "../scripts/release-publish-check.js";
+import {
+  humanPublishCommand,
+  releaseTagForVersion,
+  validateReleaseManifest,
+} from "../scripts/release-publish-check.js";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 
@@ -46,6 +50,10 @@ describe("npm publication boundary", () => {
     expect(humanPublishCommand()).toBe("npm publish --access restricted --tag latest");
     expect(humanPublishCommand("canary")).toBe("npm publish --access restricted --tag canary");
     expect(() => humanPublishCommand("not a tag")).toThrow("Invalid npm dist-tag");
+  });
+
+  it("uses the repository-scoped release tag prefix", () => {
+    expect(releaseTagForVersion("1.2.1")).toBe("lexrunner-v1.2.1");
   });
 });
 
