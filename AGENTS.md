@@ -62,8 +62,23 @@ should remain stable even as implementation details evolve.
 
 - _Owner:_ lex‑pr‑runner (TS core)
 - _Input:_ `plan.json` only
-- _Behavior:_ Compute topo order, run gates uniformly, respect policy, merge cleanly
+- _Behavior:_ Compute topo order, run command gates uniformly, and prepare an exact replayed
+  candidate for review
 - _Artifacts:_ Gate logs (JUnit/SARIF/etc.), status tables, PR comments
+
+**Stage D.5 — Independent Review Gate (Mandatory by Default)**
+
+- _Owner:_ A reviewer agent or human who did not implement the candidate under review
+- _Input:_ Exact candidate head, exact base head, scoped review task, command-gate evidence
+- _Behavior:_ Review the replayed diff, run targeted read-only checks, and return `PASS` or `BLOCK`
+- _Artifacts:_ Findings with severity and file/line evidence, tested evidence, residual risks, and
+  an auditable review receipt
+- _Invalidation:_ Any candidate-head change invalidates the prior verdict and requires a fresh
+  review
+- _Bypass:_ Allowed only as an explicit authorized override. It must warn all acting agents,
+  record authority and reason, and report `review_bypassed`; it MUST NOT be represented as
+  `PASS`
+- _Runbook:_ [Independent merge review gate](docs/review-gate.md)
 
 **Stage E — Merge & Release**
 
@@ -272,6 +287,10 @@ The constraint applies only to the **final push to main**.
 - [ ] Validate `plan.json` against Schema v1.
 - [ ] Compute topo order; verify DAG (no cycles).
 - [ ] Execute gates uniformly; collect artifacts.
+- [ ] Replay the candidate onto the exact current base before review.
+- [ ] Obtain an independent `PASS` review for the exact candidate head, or record an explicit
+      authorized `review_bypassed` receipt.
+- [ ] If review returns `BLOCK`, fix the finding and repeat replay, gates, and review.
 - [ ] Respect policy; merge only when eligible.
 - [ ] Emit artifacts/logs outside source; post results back to PR.
 
@@ -313,6 +332,8 @@ Yes. Keep your CI; point it at the runner CLI. The runner remains deterministic 
 - Local and CI gate semantics are identical.
 - No hidden side‑effects; everything is declared.
 - Same inputs → same outputs.
+- Review is mandatory by default and binds to the exact candidate/base pair.
+- Review bypass is explicit, warned, justified, and never reported as a pass.
 - Terminal executions leave an inspectable durable delta; retries identify their changed premise.
 
 #### CI-Bound Resources & Environments
@@ -384,8 +405,12 @@ Some gates need secrets (e.g., databases, SaaS tokens) or services unavailable l
 4. **Validate and order:** `lex-pr schema validate plan.json` then `lex-pr weave merge-order plan.json`.
 5. **Dry run locally:** `lex-pr gate run plan.json --dry-run`.
 6. **Run gates:** Same canonical CLI locally and in CI; confirm bounded results and artifact references.
-7. **Merge pyramid:** `lex-pr weave apply --execute` only with explicit mutation authority.
-8. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
+7. **Review exact candidates:** Follow the
+   [independent merge review gate](docs/review-gate.md); fix every blocking finding and re-review
+   the replacement head.
+8. **Merge pyramid:** `lex-pr weave apply --execute` only with explicit mutation authority and a
+   `PASS` review receipt (or an explicit authorized `review_bypassed` receipt).
+9. **Commit messages:** Imperative mood (e.g., “Add…”, “Fix…”).
 
 ## 16) Security Dependency Policy
 

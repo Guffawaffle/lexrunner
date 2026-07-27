@@ -38,6 +38,8 @@ New to LexRunner? Start here:
 - **[Dependency Parser](./dependency-parser.md)** - Understanding PR dependencies
 - **[Schemas](./schemas.md)** - Plan and configuration schemas
 - **[Gates](./gates.md)** - Quality gates and input validation
+- **[Independent Review Gate](./review-gate.md)** - Mandatory-by-default exact-head review between
+  validation and merge
 - **[Error Taxonomy](./errors.md)** - Error codes and handling
 - **[Counter-Examples](./counter-examples.md)** - Failure learning and capture
 
