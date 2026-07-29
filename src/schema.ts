@@ -243,6 +243,26 @@ export interface ValidationError {
   code: string;
 }
 
+export interface PlanValidationFailure {
+  contract: "bounded-ax-v1";
+  valid: false;
+  code: string;
+  message: string;
+  errorCount: number;
+  errors: ValidationError[];
+  errorsTruncated: boolean;
+  nextActions: string[];
+  context: {
+    errorCount: number;
+    errorsTruncated: boolean;
+  };
+}
+
+const MAX_SCHEMA_VALIDATION_ERRORS = 50;
+const MAX_SCHEMA_VALIDATION_PATH_BYTES = 256;
+const MAX_SCHEMA_VALIDATION_MESSAGE_BYTES = 512;
+const MAX_SCHEMA_VALIDATION_ACTION_BYTES = 512;
+
 /**
  * Schema validation error - thrown when Zod validation fails
  * Now extends AXErrorException to provide structured error with nextActions
@@ -250,17 +270,19 @@ export interface ValidationError {
 export class SchemaValidationError extends AXErrorException {
   public readonly issues: z.ZodIssue[];
   public readonly errors: ValidationError[];
+  public readonly errorCount: number;
+  public readonly errorsTruncated: boolean;
 
   constructor(issues: z.ZodIssue[]) {
-    const errors = issues.map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message,
-      code: issue.code,
-    }));
+    const errorCount = issues.length;
+    const errors = issues.slice(0, MAX_SCHEMA_VALIDATION_ERRORS).map(normalizeValidationIssue);
+    const errorsTruncated = errorCount > errors.length;
 
     const errorStrings = errors.map((e) => `${e.path}: ${e.message}`);
     const axError = planValidationError({
       errors: errorStrings,
+      errorCount,
+      errorsTruncated,
       // planPath is omitted as it's not available in this context
     });
 
@@ -268,6 +290,8 @@ export class SchemaValidationError extends AXErrorException {
     this.name = "SchemaValidationError";
     this.issues = issues;
     this.errors = errors;
+    this.errorCount = errorCount;
+    this.errorsTruncated = errorsTruncated;
   }
 
   /**
@@ -279,6 +303,143 @@ export class SchemaValidationError extends AXErrorException {
       errors: this.errors,
     };
   }
+}
+
+/**
+ * Return the stable, bounded validation envelope used by CLI and MCP surfaces.
+ *
+ * Raw Zod issues are intentionally not returned because they can contain the
+ * rejected input. The normalized error list retains only path, message, and
+ * code, with deterministic count and byte limits.
+ */
+export function formatPlanValidationFailure(error: SchemaValidationError): PlanValidationFailure {
+  const nextActions = error.axError.nextActions
+    .filter((action) => !action.startsWith("Errors:"))
+    .slice(0, 10)
+    .map((action) => boundDiagnostic(action, MAX_SCHEMA_VALIDATION_ACTION_BYTES));
+
+  return {
+    contract: "bounded-ax-v1",
+    valid: false,
+    code: error.axError.code,
+    message: boundDiagnostic(error.message, MAX_SCHEMA_VALIDATION_MESSAGE_BYTES),
+    errorCount: error.errorCount,
+    errors: error.errors,
+    errorsTruncated: error.errorsTruncated,
+    nextActions:
+      nextActions.length > 0 ? nextActions : ["Review each validation path and update the plan"],
+    context: {
+      errorCount: error.errorCount,
+      errorsTruncated: error.errorsTruncated,
+    },
+  };
+}
+
+export function asPlanValidationFailure(error: unknown): PlanValidationFailure | undefined {
+  if (error instanceof SchemaValidationError) return formatPlanValidationFailure(error);
+  if (!(error instanceof AXErrorException) || error.axError.code !== "CONFIG_INVALID") {
+    return undefined;
+  }
+
+  const message = boundDiagnostic(error.message, MAX_SCHEMA_VALIDATION_MESSAGE_BYTES);
+  return {
+    contract: "bounded-ax-v1",
+    valid: false,
+    code: error.axError.code,
+    message,
+    errorCount: 1,
+    errors: [{ path: "root", message, code: error.axError.code }],
+    errorsTruncated: false,
+    nextActions: error.axError.nextActions
+      .slice(0, 10)
+      .map((action) => boundDiagnostic(action, MAX_SCHEMA_VALIDATION_ACTION_BYTES)),
+    context: {
+      errorCount: 1,
+      errorsTruncated: false,
+    },
+  };
+}
+
+export function formatPlanValidationFailureText(failure: PlanValidationFailure): string {
+  const lines = [failure.message];
+  for (const error of failure.errors) {
+    lines.push(`  - ${error.path} [${error.code}]: ${error.message}`);
+  }
+  if (failure.errorsTruncated) {
+    lines.push(
+      `  - … ${failure.errorCount - failure.errors.length} additional validation error(s) omitted`
+    );
+  }
+  return lines.join("\n");
+}
+
+function normalizeValidationIssue(issue: z.ZodIssue): ValidationError {
+  const path = normalizeValidationPath(issue.path);
+  return {
+    path: boundDiagnostic(path, MAX_SCHEMA_VALIDATION_PATH_BYTES),
+    message: boundDiagnostic(
+      safeValidationMessage(issue.code),
+      MAX_SCHEMA_VALIDATION_MESSAGE_BYTES
+    ),
+    code: issue.code,
+  };
+}
+
+function normalizeValidationPath(segments: PropertyKey[]): string {
+  if (segments.length === 0) return "root";
+
+  return segments
+    .map((segment, index) => {
+      const previous = segments[index - 1];
+      if (previous === "retries" || previous === "env" || previous === "input") {
+        return "<key>";
+      }
+      return String(segment);
+    })
+    .join(".");
+}
+
+function safeValidationMessage(code: string): string {
+  switch (code) {
+    case "invalid_type":
+      return "Value has an invalid type";
+    case "invalid_value":
+      return "Value is not an allowed option";
+    case "too_big":
+      return "Value exceeds the allowed maximum";
+    case "too_small":
+      return "Value is below the allowed minimum";
+    case "invalid_format":
+      return "Value does not match the required format";
+    case "not_multiple_of":
+      return "Value is not an allowed multiple";
+    case "unrecognized_keys":
+      return "Object contains one or more unrecognized keys";
+    case "invalid_union":
+      return "Value does not match any allowed shape";
+    case "invalid_key":
+      return "Object contains an invalid key";
+    case "invalid_element":
+      return "Collection contains an invalid element";
+    case "custom":
+      return "Value failed schema validation";
+    default:
+      return "Value does not satisfy schema requirements";
+  }
+}
+
+function boundDiagnostic(value: string, maxBytes: number): string {
+  const singleLine = value.replace(/[\u0000-\u001f\u007f]/g, (character) =>
+    JSON.stringify(character).slice(1, -1)
+  );
+  const encoded = Buffer.from(singleLine, "utf8");
+  if (encoded.length <= maxBytes) return singleLine;
+
+  const suffix = "… [truncated]";
+  const suffixBytes = Buffer.byteLength(suffix, "utf8");
+  let end = Math.max(0, maxBytes - suffixBytes);
+  while (end > 0 && (encoded[end] & 0xc0) === 0x80) end -= 1;
+  return `${encoded.subarray(0, end).toString("utf8")}${suffix}`;
 }
 
 /**
@@ -306,8 +467,8 @@ export function loadPlan(planContent: string): Plan {
     return validatePlan(planData);
   } catch (error) {
     if (error instanceof SyntaxError) {
-      const axError = configInvalidError(`Invalid JSON: ${error.message}`, {
-        parseError: error.message,
+      const axError = configInvalidError("Invalid JSON: plan content could not be parsed", {
+        parseError: "MALFORMED_JSON",
       });
       throw new AXErrorException(
         axError.code,

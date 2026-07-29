@@ -305,12 +305,22 @@ export interface PrListResult {
 }
 
 export interface PlanValidateResult {
+  contract: "bounded-ax-v1";
   valid: boolean;
+  code?: string;
+  message?: string;
+  errorCount?: number;
   errors?: Array<{
     path: string;
     message: string;
     code?: string;
   }>;
+  errorsTruncated?: boolean;
+  nextActions?: string[];
+  context?: {
+    errorCount: number;
+    errorsTruncated: boolean;
+  };
   warnings?: string[];
   plan?: {
     schemaVersion: string;

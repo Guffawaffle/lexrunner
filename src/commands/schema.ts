@@ -3,7 +3,12 @@
  */
 
 import { Command } from "commander";
-import { Plan, loadPlan, SchemaValidationError } from "../schema.js";
+import {
+  asPlanValidationFailure,
+  formatPlanValidationFailureText,
+  Plan,
+  loadPlan,
+} from "../schema.js";
 import { throwExit, CLIExitSignal } from "../cli/exitHandler.js";
 import { validatePlan as validatePlanDeps, formatValidationResult } from "../planner/validation.js";
 import * as fs from "fs";
@@ -48,22 +53,25 @@ export function registerSchemaCommand(
             try {
               plan = loadPlan(content);
             } catch (error) {
-              if (opts.json || deps.jsonModeActive()) {
-                const err = error as any;
-                if (err instanceof SchemaValidationError && err.issues) {
-                  console.log(JSON.stringify({ valid: false, errors: err.issues }, null, 2));
+              const failure = asPlanValidationFailure(error);
+              if (failure) {
+                if (opts.json || deps.jsonModeActive()) {
+                  console.log(JSON.stringify(failure, null, 2));
                 } else {
-                  console.log(
-                    JSON.stringify(
-                      {
-                        valid: false,
-                        errors: [{ path: "root", message: String(err?.message || error) }],
-                      },
-                      null,
-                      2
-                    )
-                  );
+                  console.error(formatPlanValidationFailureText(failure));
                 }
+              } else if (opts.json || deps.jsonModeActive()) {
+                const err = error as any;
+                console.log(
+                  JSON.stringify(
+                    {
+                      valid: false,
+                      errors: [{ path: "root", message: String(err?.message || error) }],
+                    },
+                    null,
+                    2
+                  )
+                );
               } else {
                 console.error(
                   `Validation failed: ${error instanceof Error ? error.message : String(error)}`

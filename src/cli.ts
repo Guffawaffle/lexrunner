@@ -5,7 +5,14 @@ import { Command, CommanderError } from "commander";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import chalk from "chalk";
-import { Plan, loadPlan, SchemaValidationError } from "./schema.js";
+import {
+  asPlanValidationFailure,
+  formatPlanValidationFailure,
+  formatPlanValidationFailureText,
+  Plan,
+  loadPlan,
+  SchemaValidationError,
+} from "./schema.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "./mergeOrder.js";
 import { executeGatesWithPolicy } from "./gates.js";
 import { ExecutionState } from "./executionState.js";
@@ -161,7 +168,13 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
     e instanceof AutopilotConfigError
   ) {
     const prefix = jsonModeActive ? "[lex-pr]" : "❌";
-    console.error(`\n${prefix} Error: ${String(err?.message ?? e)}\n`);
+    if (e instanceof SchemaValidationError && !jsonModeActive) {
+      console.error(
+        `\n${prefix} Error:\n${formatPlanValidationFailureText(formatPlanValidationFailure(e))}\n`
+      );
+    } else {
+      console.error(`\n${prefix} Error: ${String(err?.message ?? e)}\n`);
+    }
 
     // Add helpful suggestions based on error type (suppress in JSON mode)
     if (!jsonModeActive) {
@@ -1249,6 +1262,9 @@ export {
   generatePlan,
   generateSnapshot,
   loadPlan,
+  asPlanValidationFailure,
+  formatPlanValidationFailure,
+  formatPlanValidationFailureText,
 
   // Execution
   executeGatesWithPolicy,

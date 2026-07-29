@@ -283,6 +283,8 @@ export function gitOperationError(ctx: GitOperationContext): AXError {
 export interface PlanValidationContext {
   errors: string[];
   planPath?: string;
+  errorCount?: number;
+  errorsTruncated?: boolean;
 }
 
 /**
@@ -290,18 +292,26 @@ export interface PlanValidationContext {
  */
 export function planValidationError(ctx: PlanValidationContext): AXError {
   const nextActions: string[] = ["Review the plan file for schema violations"];
+  const errorCount = ctx.errorCount ?? ctx.errors.length;
 
   if (ctx.planPath) {
     nextActions.push(`Plan file: ${ctx.planPath}`);
   }
 
-  nextActions.push(`Errors: ${ctx.errors.join("; ")}`);
+  if (ctx.errors.length > 0) {
+    nextActions.push(`Errors: ${ctx.errors.join("; ")}`);
+  }
+  if (ctx.errorsTruncated) {
+    nextActions.push(
+      `Only the first ${ctx.errors.length} of ${errorCount} validation errors are included`
+    );
+  }
 
   return createAXError(
     ErrorCodes.PLAN_VALIDATION_FAILED,
-    `Plan validation failed with ${ctx.errors.length} error(s)`,
+    `Plan validation failed with ${errorCount} error(s)`,
     nextActions,
-    { ...ctx }
+    { ...ctx, errorCount, errorsTruncated: ctx.errorsTruncated ?? false }
   );
 }
 
