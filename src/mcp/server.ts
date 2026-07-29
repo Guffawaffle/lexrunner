@@ -42,7 +42,13 @@ import {
 import { ExecutionState } from "../executionState.js";
 import { MergeEligibilityEvaluator } from "../mergeEligibility.js";
 import { computeMergeOrder, CycleError, UnknownDependencyError } from "../mergeOrder.js";
-import { loadPlan, validatePlan } from "../schema.js";
+import {
+  asPlanValidationFailure,
+  formatPlanValidationFailure,
+  loadPlan,
+  SchemaValidationError,
+  validatePlan,
+} from "../schema.js";
 import { createGitHubClient } from "../github/index.js";
 import { createGitHubAPI, GitHubAPI, GitHubAPIError } from "../github/api.js";
 import { createGitOperations } from "../git/operations.js";
@@ -199,6 +205,22 @@ function throwMcpToolError(
     operation,
   });
   throwMcpAXError(mcpErrorCode, axError);
+}
+
+type McpTextToolResult = { content: [{ type: "text"; text: string }] };
+
+function planValidationToolResult(error: unknown): McpTextToolResult | undefined {
+  const failure = asPlanValidationFailure(error);
+  if (!failure) return undefined;
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(failure, null, 2),
+      },
+    ],
+  };
 }
 
 /**
@@ -1511,6 +1533,7 @@ async function handlePlanValidate(
 
     // Try to validate the plan
     const result: PlanValidateResult = {
+      contract: "bounded-ax-v1",
       valid: true,
       warnings: [],
     };
@@ -1541,32 +1564,49 @@ async function handlePlanValidate(
       }
       if (duplicates.length > 0) {
         result.valid = false;
-        result.errors = result.errors || [];
-        result.errors.push({
-          path: "items",
-          message: `Duplicate item names found: ${duplicates.join(", ")}`,
-          code: "DUPLICATE_NAMES",
-        });
+        result.code = ErrorCodes.PLAN_VALIDATION_FAILED;
+        result.message = "Plan validation failed with 1 error(s)";
+        result.errorCount = 1;
+        result.errors = [
+          {
+            path: "items",
+            message: "Plan item names must be unique",
+            code: "DUPLICATE_NAMES",
+          },
+        ];
+        result.errorsTruncated = false;
+        result.nextActions = ["Give each plan item a unique name"];
+        result.context = { errorCount: 1, errorsTruncated: false };
       }
 
       console.error(
         `[mcp:plan_validate] validated plan with ${plan.items.length} items, valid=${result.valid}`
       );
     } catch (error) {
-      result.valid = false;
-      result.errors = [];
-
-      if (error instanceof AXErrorException) {
-        result.errors.push({
-          path: "root",
-          message: error.message,
-          code: error.axError.code,
-        });
+      if (error instanceof SchemaValidationError) {
+        Object.assign(result, formatPlanValidationFailure(error));
+      } else if (error instanceof AXErrorException) {
+        result.valid = false;
+        result.code = error.axError.code;
+        result.message = error.message;
+        result.errorCount = 1;
+        result.errors = [
+          {
+            path: "root",
+            message: error.message,
+            code: error.axError.code,
+          },
+        ];
+        result.errorsTruncated = false;
+        result.nextActions = error.axError.nextActions;
+        result.context = { errorCount: 1, errorsTruncated: false };
       } else if (error instanceof Error) {
-        result.errors.push({
-          path: "root",
-          message: error.message,
-        });
+        result.valid = false;
+        result.message = error.message;
+        result.errorCount = 1;
+        result.errors = [{ path: "root", message: error.message }];
+        result.errorsTruncated = false;
+        result.context = { errorCount: 1, errorsTruncated: false };
       }
 
       console.error(`[mcp:plan_validate] validation failed: ${error}`);
@@ -1681,6 +1721,9 @@ async function handlePlanAnalyze(
       ],
     };
   } catch (error) {
+    const validationFailure = planValidationToolResult(error);
+    if (validationFailure) return validationFailure;
+
     throwMcpToolError(ErrorCode.InternalError, "plan_analyze", error, "analyze plan");
   }
 }
@@ -1755,6 +1798,9 @@ async function handleGatesRun(
       ],
     };
   } catch (error) {
+    const validationFailure = planValidationToolResult(error);
+    if (validationFailure) return validationFailure;
+
     if (error instanceof GateExecutionServiceError) {
       throwMcpAXError(
         ErrorCode.InternalError,
@@ -1815,6 +1861,9 @@ async function handleMergeApply(
       ],
     };
   } catch (error) {
+    const validationFailure = planValidationToolResult(error);
+    if (validationFailure) return validationFailure;
+
     if (error instanceof MergeApplicationServiceError) {
       throwMcpAXError(
         error.code === "MERGE_MUTATION_DENIED" ? ErrorCode.InvalidRequest : ErrorCode.InternalError,
@@ -2418,6 +2467,9 @@ async function handleStatus(args: {
       ],
     };
   } catch (error) {
+    const validationFailure = planValidationToolResult(error);
+    if (validationFailure) return validationFailure;
+
     if (error instanceof McpError) {
       throw error;
     }
@@ -2483,6 +2535,9 @@ async function handleMergeOrder(args: {
       ],
     };
   } catch (error) {
+    const validationFailure = planValidationToolResult(error);
+    if (validationFailure) return validationFailure;
+
     if (error instanceof McpError) {
       throw error;
     }

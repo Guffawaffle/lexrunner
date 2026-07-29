@@ -3,7 +3,7 @@
  */
 
 import { Command } from "commander";
-import { loadPlan, SchemaValidationError } from "../schema.js";
+import { asPlanValidationFailure, formatPlanValidationFailureText, loadPlan } from "../schema.js";
 import { CycleError, UnknownDependencyError } from "../mergeOrder.js";
 import { writeJsonOutput } from "../cli/output.js";
 import { throwExit } from "../cli/exitHandler.js";
@@ -66,15 +66,21 @@ Common Issues:
           );
         }
       } catch (error) {
+        const failure = asPlanValidationFailure(error);
+        if (failure) {
+          if (opts.json || jsonModeActive()) {
+            console.log(canonicalJSONStringify(failure));
+          } else {
+            console.error(formatPlanValidationFailureText(failure));
+          }
+          throwExit(2);
+        }
+
         console.error(
           `Error getting status: ${error instanceof Error ? error.message : String(error)}`
         );
         // Use exit code 2 for validation errors, 1 for others
-        if (
-          error instanceof SchemaValidationError ||
-          error instanceof CycleError ||
-          error instanceof UnknownDependencyError
-        ) {
+        if (error instanceof CycleError || error instanceof UnknownDependencyError) {
           throwExit(2);
         } else {
           throwExit(1);

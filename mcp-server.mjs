@@ -440,6 +440,8 @@ const tools = {
           ],
         };
       } catch (error) {
+        const validationFailure = planValidationToolResult(error);
+        if (validationFailure) return validationFailure;
         throw new Error(`Failed to run gates: ${error.message}`);
       }
     },
@@ -491,6 +493,8 @@ const tools = {
           ],
         };
       } catch (error) {
+        const validationFailure = planValidationToolResult(error);
+        if (validationFailure) return validationFailure;
         if (error?.name === "MergeApplicationServiceError" && typeof error.code === "string") {
           const { mcpToolError } = await import("./dist/errors/index.js");
           throw new Error(
@@ -859,6 +863,8 @@ const tools = {
           ],
         };
       } catch (error) {
+        const validationFailure = planValidationToolResult(error);
+        if (validationFailure) return validationFailure;
         throw new Error(`Failed to get status: ${error.message}`);
       }
     },
@@ -926,6 +932,8 @@ const tools = {
           ],
         };
       } catch (error) {
+        const validationFailure = planValidationToolResult(error);
+        if (validationFailure) return validationFailure;
         throw new Error(`Failed to compute merge order: ${error.message}`);
       }
     },
@@ -1011,6 +1019,11 @@ function canonicalToolResult(result) {
   return {
     content: [{ type: "text", text: core.canonicalJSONStringify(result) }],
   };
+}
+
+function planValidationToolResult(error) {
+  const failure = core.asPlanValidationFailure(error);
+  return failure ? canonicalToolResult(failure) : null;
 }
 
 async function mutationToolCall(action, call) {
