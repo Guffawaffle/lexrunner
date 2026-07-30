@@ -123,7 +123,9 @@ identity-anchored native Git directory, binding the receipt to its complete curr
 observation and immutable manifest.
 Canonical hashes alone are not treated as provenance: launch accepts only the selection digest
 and resolves the engine-owned record itself. A failed observation therefore cannot be
-caller-relabeled as `reused`.
+caller-relabeled as `reused`. Revocation and publication sync the anchored parent directory. A
+publication-sync failure removes the record, syncs that cleanup, and fails closed; temporary
+authority filenames use only validated engine tokens.
 
 This engine does not relax the same-principal limitation above. It also does not confer Attempt
 authority. Launch preparation resolves the current engine-owned selection and binds its manifest,

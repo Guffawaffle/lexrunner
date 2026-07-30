@@ -33,6 +33,7 @@ const WINDOWS_SOURCE = "D:\\dev\\stfc-mod";
 const REMOTE_URL = "https://example.invalid/Guffawaffle/stfc-mod.git";
 const DEAD_PROCESS_ID = 2_147_483_647;
 const OWNER_FILE = "lexrunner-native-wsl-owner.json";
+const SELECTION_FILE = "lexrunner-native-wsl-selection.json";
 const STAGING_DIRECTORY = ".lexrunner-projection-staging";
 const LOCK_DIRECTORY = ".lexrunner-projection-locks";
 const QUARANTINE_DIRECTORY = ".lexrunner-projection-quarantine";
@@ -281,6 +282,90 @@ describe("NativeWslProjectionEngine real Git integration", () => {
         projection: { selectionDigest: fabricatedSelection.selection_digest },
       })
     ).toThrow(/selection authority/iu);
+  });
+
+  it("rejects a traversal token before constructing a selection filename", async () => {
+    const tokens = ["1111111111111111", "2222222222222222", "../../escape"];
+    const request = makeRequest();
+
+    const result = await new NativeWslProjectionEngine({
+      token: () => tokens.shift() ?? "3333333333333333",
+    }).prepare(request);
+
+    expect(result).toMatchObject({
+      ok: false,
+      outcome: "rejected",
+      reasonCode: "operation_failed",
+    });
+    expect(
+      await pathExists(
+        join(projectionRoot, nativeWslProjectionId(request.request_digest), ".git", SELECTION_FILE)
+      )
+    ).toBe(false);
+    expect(await pathExists(join(sandbox, "escape.tmp"))).toBe(false);
+  });
+
+  it("removes a published selection and syncs that cleanup when publication sync fails", async () => {
+    let syncCalls = 0;
+    const request = makeRequest();
+    const result = await new NativeWslProjectionEngine({
+      syncDirectory: () => {
+        syncCalls += 1;
+        if (syncCalls === 1) throw new Error("simulated selection publication sync failure");
+      },
+    }).prepare(request);
+    const selectionPath = join(
+      projectionRoot,
+      nativeWslProjectionId(request.request_digest),
+      ".git",
+      SELECTION_FILE
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      outcome: "rejected",
+      reasonCode: "operation_failed",
+    });
+    expect(syncCalls).toBe(2);
+    expect(await pathExists(selectionPath)).toBe(false);
+    await expect(new NativeWslProjectionEngine().prepare(request)).resolves.toMatchObject({
+      ok: true,
+      outcome: "reused",
+    });
+  });
+
+  it("syncs revocation cleanup and fails before observation when the first sync fails", async () => {
+    const request = makeRequest();
+    const prepared = await new NativeWslProjectionEngine().prepare(request);
+    expect(prepared).toMatchObject({ ok: true, outcome: "prepared" });
+    const selectionPath = join(
+      projectionRoot,
+      nativeWslProjectionId(request.request_digest),
+      ".git",
+      SELECTION_FILE
+    );
+    expect(await pathExists(selectionPath)).toBe(true);
+
+    let syncCalls = 0;
+    const failed = await new NativeWslProjectionEngine({
+      syncDirectory: () => {
+        syncCalls += 1;
+        if (syncCalls === 1) throw new Error("simulated selection revocation sync failure");
+      },
+    }).prepare(request);
+
+    expect(failed).toMatchObject({
+      ok: false,
+      outcome: "rejected",
+      reasonCode: "operation_failed",
+    });
+    expect(failed.commandEvidence).toEqual([]);
+    expect(syncCalls).toBe(2);
+    expect(await pathExists(selectionPath)).toBe(false);
+    await expect(new NativeWslProjectionEngine().prepare(request)).resolves.toMatchObject({
+      ok: true,
+      outcome: "reused",
+    });
   });
 
   it("rejects dirty, mismatched-head, missing, non-commit, and wrong-remote sources before staging", async () => {

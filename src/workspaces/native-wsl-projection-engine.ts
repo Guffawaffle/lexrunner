@@ -3,6 +3,7 @@ import {
   closeSync,
   constants,
   fstatSync,
+  fsyncSync,
   lstatSync,
   openSync,
   readFileSync,
@@ -120,6 +121,7 @@ export interface NativeWslProjectionEngineOptions {
   gitExecutable?: string;
   runner?: CommandRunner;
   stateWriter?: NativeWslProjectionStateWriter;
+  syncDirectory?: (directory: AnchoredDirectory) => void;
   defaultTimeoutMs?: number;
   now?: () => string;
   token?: () => string;
@@ -239,6 +241,7 @@ export class NativeWslProjectionEngine {
   private readonly gitExecutable: string;
   private readonly runner: CommandRunner;
   private readonly stateWriter: NativeWslProjectionStateWriter;
+  private readonly syncDirectory: (directory: AnchoredDirectory) => void;
   private readonly defaultTimeoutMs: number;
   private readonly now: () => string;
   private readonly token: () => string;
@@ -253,6 +256,7 @@ export class NativeWslProjectionEngine {
     this.stateWriter = options.stateWriter ?? {
       writeExclusive: writeExclusiveText,
     };
+    this.syncDirectory = options.syncDirectory ?? syncAnchoredDirectory;
     this.defaultTimeoutMs = timeout;
     this.now = options.now ?? (() => new Date().toISOString());
     this.token =
@@ -295,7 +299,7 @@ export class NativeWslProjectionEngine {
       }
       if (recovered.recovered) recoveredReason = "staging_interrupted";
 
-      await invalidateProjectionSelection(boundary, request);
+      await invalidateProjectionSelection(boundary, request, this.syncDirectory);
       const sourceIdentity = captureSourceIdentity(request.source.wsl_repository_path);
       const observed = await this.observeSource(request, sourceIdentity, evidence, options);
       sourceObservation = observed.observation;
@@ -1630,7 +1634,7 @@ export class NativeWslProjectionEngine {
       receipt,
       source_observation: sourceObservation,
     });
-    await persistProjectionSelection(manifest, selection, this.token());
+    await persistProjectionSelection(manifest, selection, this.token(), this.syncDirectory);
     return {
       ok: true,
       outcome,
@@ -1971,7 +1975,8 @@ export function loadNativeWslProjectionSelection(
 
 async function invalidateProjectionSelection(
   boundary: NativeBoundary,
-  request: NativeWslProjectionRequest
+  request: NativeWslProjectionRequest,
+  syncDirectory: (directory: AnchoredDirectory) => void
 ): Promise<void> {
   const repository = tryOpenChildDirectory(
     boundary.projectionRoot,
@@ -1985,10 +1990,28 @@ async function invalidateProjectionSelection(
       tryOpenChildDirectory(repository, ".git", "native projection Git directory") ?? undefined;
     if (!gitDirectory) return;
     assertAnchoredDirectoryLocation(gitDirectory, "native projection Git directory");
+    let removed = false;
     try {
       await unlink(procChildPath(gitDirectory, SELECTION_FILE));
+      removed = true;
     } catch (error) {
       if (!isNodeError(error) || error.code !== "ENOENT") throw error;
+    }
+    if (removed) {
+      try {
+        syncDirectory(gitDirectory);
+      } catch (error) {
+        // A failed first sync cannot be reported as a durable revocation.
+        // Retry the directory sync to make the already-absent authority
+        // durable, but still fail this preparation attempt.
+        try {
+          syncDirectory(gitDirectory);
+        } catch {
+          // Preserve the first durability error; current-process lookup is
+          // already fail-closed because the authority file is absent.
+        }
+        throw error;
+      }
     }
   } finally {
     gitDirectory?.close();
@@ -1999,8 +2022,10 @@ async function invalidateProjectionSelection(
 async function persistProjectionSelection(
   manifest: NativeWslProjectionManifest,
   selection: NativeWslProjectionSelection,
-  token: string
+  token: string,
+  syncDirectory: (directory: AnchoredDirectory) => void
 ): Promise<void> {
+  const safeToken = validToken(token);
   const repository = reopenDirectoryIdentity(
     directoryIdentityFromClaim(
       manifest.native_repository.path,
@@ -2009,7 +2034,8 @@ async function persistProjectionSelection(
     "native projection repository"
   );
   let gitDirectory: AnchoredDirectory | undefined;
-  const temporaryFile = `${SELECTION_FILE}.${token}.tmp`;
+  const temporaryFile = `${SELECTION_FILE}.${safeToken}.tmp`;
+  let published = false;
   try {
     gitDirectory = openChildDirectory(repository, ".git", "native projection Git directory");
     if (!matchesIdentityClaim(gitDirectory, manifest.native_repository.git_directory_identity)) {
@@ -2024,6 +2050,8 @@ async function persistProjectionSelection(
       procChildPath(gitDirectory, temporaryFile),
       procChildPath(gitDirectory, SELECTION_FILE)
     );
+    published = true;
+    syncDirectory(gitDirectory);
     const resolved = loadNativeWslProjectionSelection(
       manifest.native_repository.path,
       selection.selection_digest
@@ -2037,12 +2065,27 @@ async function persistProjectionSelection(
   } catch (error) {
     if (gitDirectory) {
       await unlink(procChildPath(gitDirectory, temporaryFile)).catch(() => undefined);
+      if (published) {
+        try {
+          await unlink(procChildPath(gitDirectory, SELECTION_FILE));
+        } catch (cleanupError) {
+          if (!isNodeError(cleanupError) || cleanupError.code !== "ENOENT") {
+            throw cleanupError;
+          }
+        }
+        syncDirectory(gitDirectory);
+      }
     }
     throw error;
   } finally {
     gitDirectory?.close();
     repository.close();
   }
+}
+
+function syncAnchoredDirectory(directory: AnchoredDirectory): void {
+  assertAnchoredDirectoryLocation(directory, "native projection state directory");
+  fsyncSync(directory.fd);
 }
 
 function readAnchoredJson(directory: AnchoredDirectory, file: string): unknown {

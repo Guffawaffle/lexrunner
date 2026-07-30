@@ -576,6 +576,10 @@ Canonical hashes prove content integrity, not engine provenance. Before every
 fresh source observation, the engine invalidates the prior selection record.
 Only after a successful `prepared` or `reused` result does it atomically
 publish a replacement under the identity-anchored native Git directory.
+Revocation and publication both sync that parent directory; a failed
+publication sync removes the selection and syncs the cleanup before the
+operation fails closed. Selection temporary names accept only validated
+engine tokens.
 Launch callers supply only that record's digest; launch preparation resolves
 the durable record itself and verifies receipt → current observation →
 repository/request/base/commit plus the immutable manifest and native
