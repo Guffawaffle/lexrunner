@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import Database from "better-sqlite3-multiple-ciphers";
 import { createAgentTaskPacket } from "../../../src/schemas/agent-work.js";
+import { createNativeExecutionPathMapping } from "../../../src/schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../../../src/schemas/task-contract.js";
 import { SqliteWorkspaceLifecycleStore } from "../../../src/store/sqlite/workspace-lifecycle-store.js";
 import { canonicalJSONStringify } from "../../../src/util/canonicalJson.js";
@@ -126,6 +127,7 @@ describe("SQLite workspace lifecycle concurrency", () => {
         status: "launching",
       });
       const envelope = {
+        schema_version: "1.0.0",
         envelope_id: "worker-race-envelope",
         run_id: "worker-race-run",
         attempt_id: "worker-race-attempt",
@@ -135,8 +137,35 @@ describe("SQLite workspace lifecycle concurrency", () => {
         workspace_lease_revision: 0,
         expected_head_sha: "a".repeat(40),
         branch: "agent/worker-race",
-        runtime: { host_id: "host", git_runtime: "git", worker_runtime: "native" },
-        paths: { worktree_root: "/trees/worker-race" },
+        runtime: {
+          host_id: "host",
+          os: "linux",
+          architecture: "x64",
+          git_runtime: "git",
+          worker_runtime: "native",
+        },
+        paths: {
+          project_root: "/trees/worker-race",
+          execution_root: "/trees/worker-race",
+          allocation_root: "/trees",
+          worktree_root: "/trees/worker-race",
+        },
+        path_mappings: [
+          createNativeExecutionPathMapping({
+            schema_version: "1.0.0",
+            mapping_kind: "native_linux",
+            repository_id: "repo",
+            base_sha: "a".repeat(40),
+            native_host_id: "host",
+            git_runtime: "git",
+            roots: {
+              native_repository: verifiedRoot("git", "/repo", "11"),
+              native_allocation_root: verifiedRoot("git", "/trees", "12"),
+              native_worktree: verifiedRoot("git", "/trees/worker-race", "13"),
+            },
+          }),
+        ],
+        exposed_environment_keys: [],
         created_at: "2026-07-11T12:00:02.250Z",
       };
       const envelopeJson = canonicalJSONStringify(envelope);
@@ -730,6 +759,15 @@ describe("SQLite workspace lifecycle concurrency", () => {
     }
   });
 });
+
+function verifiedRoot(runtimeId: string, path: string, inode: string) {
+  return {
+    runtime_id: runtimeId,
+    path,
+    verification: "directory_identity" as const,
+    directory_identity: { device: "1", inode },
+  };
+}
 
 afterAll(async () => {
   await Promise.all(

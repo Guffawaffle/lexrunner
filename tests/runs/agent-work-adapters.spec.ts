@@ -10,7 +10,17 @@ import {
   AttemptStartRequestSchema,
   createAttemptLifecycleHandlers,
 } from "../../src/runs/agent-work-adapters.js";
+import {
+  createNativeWslProjectionManifest,
+  createNativeWslProjectionPathMapping,
+  createNativeWslProjectionReceipt,
+  createNativeWslProjectionRequest,
+  createNativeWslSourceObservation,
+  nativeWslProjectionId,
+} from "../../src/schemas/agent-work-projection.js";
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
+import { captureDirectoryIdentity } from "../../src/workspaces/linux-directory-identity.js";
 
 const roots: string[] = [];
 
@@ -50,7 +60,7 @@ describe("attempt lifecycle adapter handlers", () => {
           attempt_id: "attempt-assisted",
           branch: "lexrunner/attempt-assisted",
           runtime: { host_id: "host-adapter", worker_runtime: "codex-native" },
-          path_mappings: [],
+          path_mappings: [{ mapping_kind: "native_linux" }],
         },
       },
     });
@@ -65,7 +75,19 @@ describe("attempt lifecycle adapter handlers", () => {
     expect(first.result.envelope.paths).toEqual({
       project_root: request.envelope.projectRoot,
       execution_root: request.envelope.executionRoot,
+      allocation_root: request.runtime.worktreeRoot,
       worktree_root: request.attempt.workspace.worktreePath,
+    });
+    expect(first.result.envelope.path_mappings[0]).toMatchObject({
+      repository_id: request.runtime.repositoryId,
+      base_sha: request.identity.baseSha,
+      native_host_id: request.runtime.hostId,
+      git_runtime: request.runtime.gitRuntime,
+      roots: {
+        native_repository: { path: request.runtime.repositoryRoot },
+        native_allocation_root: { path: request.runtime.worktreeRoot },
+        native_worktree: { path: request.attempt.workspace.worktreePath },
+      },
     });
     expect(replay.result.packet).toEqual(first.result.packet);
     expect(replay.result.envelope).toEqual(first.result.envelope);
@@ -78,6 +100,45 @@ describe("attempt lifecycle adapter handlers", () => {
     ).resolves.toMatchObject({
       ok: true,
       result: { launch: { state: "bound", reconciliationRequired: false } },
+    });
+  });
+
+  it("emits one source-to-native mapping only from a selected projection receipt", async () => {
+    const root = await sandbox();
+    const request = await prepareFixture(root);
+    const projection = projectionSelection(request);
+    const projectedRequest = {
+      ...request,
+      envelope: { ...request.envelope, projection },
+    };
+
+    const result = await createAttemptLifecycleHandlers().prepare(projectedRequest);
+
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        envelope: {
+          path_mappings: [
+            {
+              projection_id: projection.manifest.projection_id,
+              repository_id: request.runtime.repositoryId,
+              base_sha: request.identity.baseSha,
+              native_host_id: request.runtime.hostId,
+              request_digest: projection.manifest.request_digest,
+              projection_digest: projection.manifest.manifest_digest,
+              projection_mapping_digest: projection.manifest.path_mapping.mapping_digest,
+              roots: {
+                windows_source: { path: "D:\\dev\\lexrunner" },
+                wsl_source: { path: "/mnt/d/dev/lexrunner" },
+                native_repository: { path: request.runtime.repositoryRoot },
+                native_allocation_root: { path: request.runtime.worktreeRoot },
+                native_worktree: { path: request.attempt.workspace.worktreePath },
+              },
+            },
+          ],
+        },
+      },
     });
   });
 
@@ -535,6 +596,119 @@ async function prepareFixture(root: string) {
         ttlMs: started.attempt.workspace.ttlMs,
       },
       mutations: started.attempt.mutations,
+    },
+  };
+}
+
+function projectionSelection(request: Awaited<ReturnType<typeof prepareFixture>>) {
+  const projectionRequest = createNativeWslProjectionRequest({
+    schema_version: "1.0.0",
+    request_id: "projection-request-assisted",
+    repository: {
+      id: request.runtime.repositoryId,
+      expected_remote_hash: computeCanonicalHash("https://example.invalid/owner/repo.git"),
+    },
+    source: {
+      windows_runtime: "windows:host-adapter",
+      windows_repository_path: "D:\\dev\\lexrunner",
+      wsl_distribution: "Ubuntu-24.04",
+      wsl_git_runtime: "wsl:Ubuntu-24.04",
+      wsl_repository_path: "/mnt/d/dev/lexrunner",
+      head_policy: "require_base",
+      dirty_policy: "committed_base_only",
+    },
+    native: {
+      host_id: request.runtime.hostId,
+      git_runtime: request.runtime.gitRuntime,
+      projection_root: "/var/lib/lexrunner/projections",
+      worktree_root: request.runtime.worktreeRoot,
+    },
+    base_sha: request.identity.baseSha,
+  });
+  const observation = createNativeWslSourceObservation({
+    schema_version: "1.0.0",
+    repository_id: request.runtime.repositoryId,
+    request_digest: projectionRequest.request_digest,
+    observed_remote_hash: projectionRequest.repository.expected_remote_hash,
+    source_head_sha: request.identity.baseSha,
+    requested_object_sha: request.identity.baseSha,
+    requested_object_type: "commit",
+    cleanliness: "dirty",
+    observed_at: "2026-07-12T12:00:05.000Z",
+  });
+  const pathMapping = createNativeWslProjectionPathMapping({
+    schema_version: "1.0.0",
+    projection_id: nativeWslProjectionId(projectionRequest.request_digest),
+    repository_id: request.runtime.repositoryId,
+    base_sha: request.identity.baseSha,
+    request_digest: projectionRequest.request_digest,
+    roots: {
+      windows_source: {
+        runtime_id: projectionRequest.source.windows_runtime,
+        path: projectionRequest.source.windows_repository_path,
+        verification: "declared",
+      },
+      wsl_source: {
+        runtime_id: projectionRequest.source.wsl_git_runtime,
+        path: projectionRequest.source.wsl_repository_path,
+        verification: "git_observed",
+        observation_digest: observation.observation_digest,
+      },
+      native_repository: verifiedRoot(request.runtime.gitRuntime, request.runtime.repositoryRoot),
+      native_worktree_root: verifiedRoot(request.runtime.gitRuntime, request.runtime.worktreeRoot),
+    },
+  });
+  const gitIdentity = captureDirectoryIdentity(
+    join(request.runtime.repositoryRoot, ".git"),
+    "projected Git directory"
+  );
+  const manifest = createNativeWslProjectionManifest({
+    schema_version: "1.0.0",
+    projection_id: pathMapping.projection_id,
+    repository_id: request.runtime.repositoryId,
+    base_sha: request.identity.baseSha,
+    request_digest: projectionRequest.request_digest,
+    source_observation: observation,
+    native_host_id: request.runtime.hostId,
+    native_repository: {
+      path: request.runtime.repositoryRoot,
+      directory_identity: pathMapping.roots.native_repository.directory_identity,
+      git_directory_identity: {
+        device: gitIdentity.device.toString(10),
+        inode: gitIdentity.inode.toString(10),
+      },
+      head_sha: request.identity.baseSha,
+    },
+    native_worktree_root: {
+      path: request.runtime.worktreeRoot,
+      directory_identity: pathMapping.roots.native_worktree_root.directory_identity,
+    },
+    path_mapping: pathMapping,
+    created_at: "2026-07-12T12:00:05.000Z",
+  });
+  const receipt = createNativeWslProjectionReceipt({
+    schema_version: "1.0.0",
+    request_id: projectionRequest.request_id,
+    request_digest: projectionRequest.request_digest,
+    outcome: "prepared",
+    reason_code: "projection_prepared",
+    source_observation_digest: observation.observation_digest,
+    projection_digest: manifest.manifest_digest,
+    mapping_digest: pathMapping.mapping_digest,
+    completed_at: "2026-07-12T12:00:06.000Z",
+  });
+  return { manifest, receipt };
+}
+
+function verifiedRoot(runtimeId: string, path: string) {
+  const identity = captureDirectoryIdentity(path, "projected native root");
+  return {
+    runtime_id: runtimeId,
+    path,
+    verification: "directory_identity" as const,
+    directory_identity: {
+      device: identity.device.toString(10),
+      inode: identity.inode.toString(10),
     },
   };
 }

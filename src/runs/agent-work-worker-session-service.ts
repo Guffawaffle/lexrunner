@@ -3,6 +3,7 @@ import { realpath, stat } from "node:fs/promises";
 
 import type { ExecutionEnvelope_v1 } from "../schemas/agent-work.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type {
   AttachWorkerSessionInput,
@@ -19,6 +20,7 @@ import type {
   WorkspaceMutationFailureReason,
 } from "../store/workspace-lifecycle-store.js";
 import type { AgentWorkRuntime } from "./agent-work-runtime.js";
+import { verifyAttemptExecutionPathMapping } from "./agent-work-path-mapping.js";
 
 const MAX_OUTPUT_BYTES = 4_096;
 
@@ -38,6 +40,11 @@ export interface AttachAttemptWorkerInput extends Omit<
 export interface WorkerSessionStatusResult {
   workerSession: WorkerSessionRecord | null;
   adapter: BoundedWorkerAdapterStatus | null;
+  pathMapping: null | {
+    state: "bound" | "invalid";
+    kind?: "native_wsl_projection" | "native_linux";
+    mappingDigest?: string;
+  };
 }
 
 export interface BoundedWorkerAdapterStatus extends WorkerAdapterBindingRecord {
@@ -79,6 +86,7 @@ export class AgentWorkWorkerSessionService {
       ["branch", lease.branch, envelope.branch],
       ["runtime.host_id", lease.hostId, envelope.runtime.host_id],
       ["runtime.git_runtime", lease.gitRuntime, envelope.runtime.git_runtime],
+      ["paths.allocation_root", this.runtime.config.worktreeRoot, envelope.paths.allocation_root],
       ["paths.worktree_root", lease.worktreePath, envelope.paths.worktree_root],
     ];
     if (expected.some(([, wanted, actual]) => wanted !== actual)) {
@@ -101,6 +109,18 @@ export class AgentWorkWorkerSessionService {
       binding.envelopeHash !== envelopeHash ||
       binding.envelopeJson !== envelopeJson
     ) {
+      return failure("evidence_mismatch", attempt.revision, lease.revision);
+    }
+    const pathBinding = verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+      repositoryId: lease.repositoryId,
+      baseSha: attempt.baseSha,
+      hostId: lease.hostId,
+      gitRuntime: lease.gitRuntime,
+      repositoryRoot: lease.projectRoot,
+      allocationRoot: this.runtime.config.worktreeRoot,
+      worktreePath: lease.worktreePath,
+    });
+    if (!pathBinding.valid) {
       return failure("evidence_mismatch", attempt.revision, lease.revision);
     }
     const { envelope: _envelope, ...storeInput } = input;
@@ -147,17 +167,60 @@ export class AgentWorkWorkerSessionService {
     return this.store.attachWorkerSession(attachInput);
   }
 
-  heartbeat(input: HeartbeatWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+  async heartbeat(input: HeartbeatWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+    const valid = await this.validatePersistedMapping(
+      input.attemptId,
+      input.workspaceLeaseId,
+      true
+    );
+    if (!valid) return failure("evidence_mismatch");
     return this.store.heartbeatWorkerSession(input);
   }
 
-  end(input: EndWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+  async end(input: EndWorkerSessionInput): Promise<WorkerSessionMutationResult> {
+    const valid = await this.validatePersistedMapping(
+      input.attemptId,
+      input.workspaceLeaseId,
+      true
+    );
+    if (!valid) return failure("evidence_mismatch");
     return this.store.endWorkerSession(input);
   }
 
   async status(input: { runId: string; attemptId: string }): Promise<WorkerSessionStatusResult> {
-    const session = await this.store.getWorkerSessionForAttempt(input.attemptId);
+    const [session, attempt] = await Promise.all([
+      this.store.getWorkerSessionForAttempt(input.attemptId),
+      this.store.getAttempt(input.attemptId),
+    ]);
     const adapter = session ? await this.store.getWorkerAdapterBinding(session.sessionId) : null;
+    let pathMapping: WorkerSessionStatusResult["pathMapping"] = null;
+    if (attempt?.runId === input.runId && attempt.workspaceLeaseId) {
+      const lease = await this.store.getWorkspaceLease(attempt.workspaceLeaseId);
+      const binding = await this.store.getLaunchEnvelopeBinding(attempt.attemptId);
+      if (lease && binding) {
+        const envelope = validatePersistedCanonicalEnvelope(binding, attempt, lease);
+        if (!envelope?.paths.allocation_root) {
+          pathMapping = { state: "invalid" };
+        } else {
+          const validation = verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+            repositoryId: lease.repositoryId,
+            baseSha: attempt.baseSha,
+            hostId: lease.hostId,
+            gitRuntime: lease.gitRuntime,
+            repositoryRoot: lease.projectRoot,
+            allocationRoot: envelope.paths.allocation_root,
+            worktreePath: lease.worktreePath,
+          });
+          pathMapping = validation.valid
+            ? {
+                state: "bound",
+                kind: validation.kind,
+                mappingDigest: validation.mappingDigest,
+              }
+            : { state: "invalid" };
+        }
+      }
+    }
     return {
       workerSession: session?.runId === input.runId ? boundedSession(session) : null,
       adapter:
@@ -172,7 +235,33 @@ export class AgentWorkWorkerSessionService {
               enforcement: adapter.trustGapDimensions.length === 0 ? "enforced" : "trust_gap",
             }
           : null,
+      pathMapping,
     };
+  }
+
+  private async validatePersistedMapping(
+    attemptId: string,
+    workspaceLeaseId: string,
+    verifyDirectories: boolean
+  ): Promise<boolean> {
+    const [attempt, lease, binding] = await Promise.all([
+      this.store.getAttempt(attemptId),
+      this.store.getWorkspaceLease(workspaceLeaseId),
+      this.store.getLaunchEnvelopeBinding(attemptId),
+    ]);
+    if (!attempt || !lease || !binding || attempt.workspaceLeaseId !== lease.leaseId) return false;
+    const envelope = validatePersistedCanonicalEnvelope(binding, attempt, lease);
+    if (!envelope?.paths.allocation_root) return false;
+    if (!verifyDirectories) return true;
+    return verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+      repositoryId: lease.repositoryId,
+      baseSha: attempt.baseSha,
+      hostId: lease.hostId,
+      gitRuntime: lease.gitRuntime,
+      repositoryRoot: lease.projectRoot,
+      allocationRoot: envelope.paths.allocation_root,
+      worktreePath: lease.worktreePath,
+    }).valid;
   }
 }
 

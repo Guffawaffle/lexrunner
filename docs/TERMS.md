@@ -38,7 +38,8 @@
 - **AgentTaskPacket**: Portable, immutable, canonically hashed instructions for an Attempt. It contains no
   machine-local absolute paths.
 - **ExecutionEnvelope**: Attempt-local execution details such as execution root, branch, workspace lease,
-  worker runtime, and sandbox policy. It is not part of the portable task-packet hash.
+  worker runtime, sandbox policy, and one explicit native or native-WSL path mapping. It is not part of
+  the portable task-packet hash.
 - **WorkerSession**: Runtime-specific handle for a worker process or native background agent.
 - **AgentTaskReceipt**: Attempt-bound claims about what a worker did. A receipt is evidence to inspect, not
   operational truth.

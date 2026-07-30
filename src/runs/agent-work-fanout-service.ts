@@ -17,8 +17,11 @@ import type {
   FanInDecisionRecord,
   FanInDecisionMutationResult,
   FanoutPlanMutationResult,
+  LaunchEnvelopeBindingStore,
+  WorkerSessionStore,
   WorkspaceLifecycleStore,
 } from "../store/workspace-lifecycle-store.js";
+import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import { isTerminalAttemptStatus } from "../store/workspace-lifecycle-domains.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import {
@@ -31,6 +34,8 @@ export const STRICT_FANIN_POLICY_VERSION = "1.0.0" as const;
 
 type FanoutServiceStore = AgentWorkFanoutStore &
   WorkspaceLifecycleStore &
+  LaunchEnvelopeBindingStore &
+  WorkerSessionStore &
   AttemptReceiptStore &
   AttemptVerificationStore;
 
@@ -144,6 +149,25 @@ export class AgentWorkFanoutService {
         this.store.getAttemptReceiptForAttempt(attempt.attemptId),
         this.store.getAttemptVerificationForAttempt(attempt.attemptId),
       ]);
+      if (receipt || verification) {
+        const workspaceLeaseId = verification?.workspaceLeaseId ?? receipt?.workspaceLeaseId;
+        const workerSessionId = verification?.workerSessionId ?? receipt?.workerSessionId;
+        const [lease, session, envelopeBinding] = await Promise.all([
+          workspaceLeaseId ? this.store.getWorkspaceLease(workspaceLeaseId) : null,
+          workerSessionId ? this.store.getWorkerSession(workerSessionId) : null,
+          this.store.getLaunchEnvelopeBinding(attempt.attemptId),
+        ]);
+        if (
+          !lease ||
+          !session ||
+          !envelopeBinding ||
+          !validatePersistedCanonicalEnvelope(envelopeBinding, attempt, lease) ||
+          session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+          session.executionEnvelopeHash !== envelopeBinding.envelopeHash
+        ) {
+          return { recorded: false, reason: "fanout_evidence_mismatch" };
+        }
+      }
       const verified = verification ? verificationEvidence(verification, receipt) : null;
       if (verification && verified === null) {
         return { recorded: false, reason: "fanout_evidence_mismatch" };

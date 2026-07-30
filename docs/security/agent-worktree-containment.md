@@ -119,8 +119,17 @@ identity-safe removal cannot be proven, the residue is quarantined or rejected a
 Only a `prepared` or `reused` result carries the verified `NodeGitWorktreeBroker`.
 
 This engine does not relax the same-principal limitation above. It also does not confer Attempt
-authority: #874 must bind the selected manifest and mapping into the execution envelope before a
-worker can receive a task packet.
+authority. Launch preparation binds a selected manifest and its `prepared` or `reused` receipt
+into exactly one execution-envelope mapping. That mapping includes repository/base/host/runtime,
+projection and mapping digests, the native repository and allocation root, and the final brokered
+worktree identity. Native-only Attempts emit the equivalent explicit native mapping.
+
+Worker attachment and later heartbeat/status, receipt, verification, acceptance, and fan-in
+boundaries all consume the persisted canonical mapping; no adapter derives a replacement from
+path strings or ambient mounts. Authority-bearing boundaries recheck the current native directory
+identities, while public status exposes only bounded mapping state, kind, and digest. Previously
+stored v1 envelopes with an empty mapping list remain parseable for migration but cannot authorize
+a new lifecycle operation.
 
 ## Platform matrix
 

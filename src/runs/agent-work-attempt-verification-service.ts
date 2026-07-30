@@ -8,6 +8,7 @@ import {
   type VerificationOutcome,
 } from "../schemas/agent-work.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import type {
   ApplyAttemptAcceptanceInput,
   AttemptAcceptanceStore,
@@ -34,6 +35,7 @@ import type {
   VerificationCommandResult,
   VerificationWorkspaceObservation,
 } from "./agent-work-attempt-verification-runtime.js";
+import { verifyAttemptExecutionPathMapping } from "./agent-work-path-mapping.js";
 
 const DEFAULT_CHECK_TIMEOUT_MS = 60_000;
 const DEFAULT_INFRASTRUCTURE_RETRIES = 1;
@@ -469,15 +471,28 @@ export class AgentWorkAttemptVerificationService {
     }
     let receipt: AgentTaskReceipt_v2;
     let packet: AgentTaskPacket_v1;
-    let envelope: ExecutionEnvelope_v1;
+    const envelope = validatePersistedCanonicalEnvelope(envelopeBinding, attempt, lease);
     try {
       receipt = AgentTaskReceipt_v2.parse(JSON.parse(receiptRecord.receiptJson) as unknown);
       packet = AgentTaskPacket_v1.parse(JSON.parse(packetBinding.packetJson) as unknown);
-      envelope = ExecutionEnvelope_v1.parse(JSON.parse(envelopeBinding.envelopeJson) as unknown);
     } catch {
       return { ok: false, failure: { recorded: false, reason: "evidence_mismatch" } };
     }
+    const pathBinding =
+      envelope?.paths.allocation_root &&
+      verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+        repositoryId: lease.repositoryId,
+        baseSha: attempt.baseSha,
+        hostId: lease.hostId,
+        gitRuntime: lease.gitRuntime,
+        repositoryRoot: lease.projectRoot,
+        allocationRoot: envelope.paths.allocation_root,
+        worktreePath: lease.worktreePath,
+      });
     if (
+      !envelope ||
+      !pathBinding ||
+      !pathBinding.valid ||
       attempt.runId !== input.runId ||
       attempt.workspaceLeaseId !== input.workspaceLeaseId ||
       attempt.receiptId !== input.receiptId ||
@@ -494,6 +509,8 @@ export class AgentWorkAttemptVerificationService {
       // would reject valid long-running sessions.
       receipt.workspace_lease_revision !== session.workspaceLeaseRevision ||
       receipt.worker_session_id !== input.workerSessionId ||
+      session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+      session.executionEnvelopeHash !== envelopeBinding.envelopeHash ||
       receipt.packet_hash !== packet.packet_hash ||
       envelope.packet_hash !== packet.packet_hash ||
       envelope.paths.worktree_root !== lease.worktreePath ||
@@ -551,12 +568,48 @@ export class AgentWorkAttemptVerificationService {
 export class AgentWorkAttemptAcceptanceService {
   constructor(
     private readonly store: WorkspaceLifecycleStore &
+      LaunchEnvelopeBindingStore &
+      WorkerSessionStore &
       AttemptVerificationStore &
       AttemptAcceptanceStore,
     private readonly now: () => string = () => new Date().toISOString()
   ) {}
 
   async apply(input: ApplyAttemptAcceptanceRequest): Promise<AttemptAcceptanceResult> {
+    const [attempt, lease, session, binding] = await Promise.all([
+      this.store.getAttempt(input.attemptId),
+      this.store.getWorkspaceLease(input.workspaceLeaseId),
+      this.store.getWorkerSession(input.workerSessionId),
+      this.store.getLaunchEnvelopeBinding(input.attemptId),
+    ]);
+    if (!attempt || !lease || !session || !binding) {
+      return { applied: false, reason: "not_found" };
+    }
+    const envelope = validatePersistedCanonicalEnvelope(binding, attempt, lease);
+    const pathBinding =
+      envelope?.paths.allocation_root &&
+      verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+        repositoryId: lease.repositoryId,
+        baseSha: attempt.baseSha,
+        hostId: lease.hostId,
+        gitRuntime: lease.gitRuntime,
+        repositoryRoot: lease.projectRoot,
+        allocationRoot: envelope.paths.allocation_root,
+        worktreePath: lease.worktreePath,
+      });
+    if (
+      !pathBinding ||
+      !pathBinding.valid ||
+      session.executionEnvelopeId !== binding.envelopeId ||
+      session.executionEnvelopeHash !== binding.envelopeHash
+    ) {
+      return {
+        applied: false,
+        reason: "evidence_mismatch",
+        currentAttemptRevision: attempt.revision,
+        currentWorkspaceLeaseRevision: lease.revision,
+      };
+    }
     const verification = await this.store.getAttemptVerification(input.verificationId);
     const result = await this.store.applyAttemptAcceptance({
       ...input,

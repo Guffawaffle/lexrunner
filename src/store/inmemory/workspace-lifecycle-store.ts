@@ -98,7 +98,10 @@ import {
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION,
 } from "../workspace-lifecycle-store.js";
-import { validateCanonicalEnvelope } from "../workspace-lifecycle-evidence.js";
+import {
+  validateCanonicalEnvelope,
+  validatePersistedCanonicalEnvelope,
+} from "../workspace-lifecycle-evidence.js";
 import { InMemoryCoordinationStore } from "./coordination-store.js";
 
 type MutationInput =
@@ -1667,6 +1670,15 @@ export class InMemoryWorkspaceLifecycleStore
       if (!lease || !session || !receipt || !verification) {
         return this.failure("not_found", attempt!);
       }
+      const envelopeBinding = this.launchEnvelopeBindings.get(input.attemptId);
+      if (
+        !envelopeBinding ||
+        !validatePersistedCanonicalEnvelope(envelopeBinding, attempt!, lease) ||
+        session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+        session.executionEnvelopeHash !== envelopeBinding.envelopeHash
+      ) {
+        return this.failure("evidence_mismatch", attempt!, lease);
+      }
       if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
         return this.failure("stale_workspace_revision", attempt!, lease);
       }
@@ -2022,6 +2034,15 @@ export class InMemoryWorkspaceLifecycleStore
     }
     if (this.receiptByAttempt.has(input.attemptId)) {
       return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    const envelopeBinding = this.launchEnvelopeBindings.get(input.attemptId);
+    if (
+      !envelopeBinding ||
+      !validatePersistedCanonicalEnvelope(envelopeBinding, attempt, lease) ||
+      session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+      session.executionEnvelopeHash !== envelopeBinding.envelopeHash
+    ) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
     const packetBinding = this.taskPacketBindings.get(input.attemptId);
     const packet = packetBinding

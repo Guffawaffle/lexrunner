@@ -180,7 +180,22 @@ sandbox configuration, allowed process capabilities, and worker-session
 bootstrap data.
 
 The envelope is not part of the packet hash. It is separately integrity-bound
-to the attempt and lease.
+to the attempt and lease. Every newly authorized envelope carries exactly one
+versioned execution path mapping. A projected mapping preserves the declared
+Windows and WSL source views while binding the selected projection digest,
+repository/base/host/runtime identity, native repository, broker allocation
+root, and final worktree directory identity. A non-projected native-Linux
+Attempt carries the compatible native subset explicitly rather than an empty
+placeholder.
+
+Attachment and every later evidence handoff consume that same immutable
+mapping. Heartbeat/status, receipt submission, engine verification,
+acceptance, and fan-in do not reconstruct path equivalence or infer mount
+translations. Canonical mapping digests and durable identities are revalidated,
+and authority-bearing local services also recheck the current native directory
+identities. Diagnostics expose only bounded state, mapping kind, and digest.
+Legacy v1 envelopes with an empty mapping array remain structurally readable
+for migration, but fail closed at new lifecycle authority boundaries.
 
 Launch authorization and immutable envelope/packet binding are distinct
 durable boundaries. Status MUST distinguish an authorized `launching` Attempt
@@ -567,8 +582,11 @@ the verified native repository and allocation root without weakening its
 existing procfs directory-descriptor boundary.
 
 The engine does not open SQLite, create an Attempt, construct a worker packet,
-or authorize execution. Execution-envelope binding and operator-facing CLI/MCP
-workflow remain separate gates.
+or authorize execution. Launch preparation accepts only a canonical selected
+manifest plus its `prepared` or `reused` receipt and turns it into the single
+immutable execution mapping. The lifecycle then binds and revalidates that
+mapping without asking adapters to recreate it. Operator-facing CLI/MCP
+workflow remains a separate gate.
 
 ---
 

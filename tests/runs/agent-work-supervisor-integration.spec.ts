@@ -1,10 +1,11 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAgentTaskPacket, ExecutionEnvelope_v1 } from "../../src/schemas/agent-work.js";
+import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import {
   AgentWorkHeadlessSupervisor,
@@ -23,6 +24,7 @@ import {
 import { InMemoryWorkspaceLifecycleStore } from "../../src/store/inmemory/workspace-lifecycle-store.js";
 import type { ControllerLeaseCredential, WorkspaceObservation } from "../../src/store/index.js";
 import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
+import { captureDirectoryIdentity } from "../../src/workspaces/linux-directory-identity.js";
 
 const roots: string[] = [];
 
@@ -79,9 +81,14 @@ describe("headless supervisor restart reconciliation", () => {
   it("re-delivers an uncertain launch with one stable operation and then heartbeats after restart", async () => {
     const root = await mkdtemp(join(tmpdir(), "lexrunner-supervisor-"));
     roots.push(root);
-    const worktreePath = join(root, "worktree");
+    const repositoryRoot = join(root, "repository");
+    const allocationRoot = join(root, "worktrees");
+    const worktreePath = join(allocationRoot, "worktree");
     const projectRoot = join(worktreePath, "project");
-    await mkdir(projectRoot, { recursive: true });
+    await Promise.all([
+      mkdir(repositoryRoot, { recursive: true }),
+      mkdir(projectRoot, { recursive: true }),
+    ]);
 
     const store = new InMemoryWorkspaceLifecycleStore();
     const setup = await store.acquireControllerLease({
@@ -136,7 +143,7 @@ describe("headless supervisor restart reconciliation", () => {
       packetHash: packet.packet_hash,
       baseSha: "a".repeat(40),
     });
-    const observed = observation(worktreePath, projectRoot);
+    const observed = observation(worktreePath, repositoryRoot);
     await store.acquireWorkspace({
       runId: "run-supervisor",
       expectedRunRevision: 0,
@@ -152,7 +159,7 @@ describe("headless supervisor restart reconciliation", () => {
       repositoryId: "owner/repo",
       hostId: "host-supervisor",
       gitRuntime: "git-fixture",
-      projectRoot,
+      projectRoot: repositoryRoot,
       branch: "agent/supervisor",
       worktreePath,
       observation: observed,
@@ -188,9 +195,24 @@ describe("headless supervisor restart reconciliation", () => {
       paths: {
         project_root: projectRoot,
         execution_root: projectRoot,
+        allocation_root: allocationRoot,
         worktree_root: worktreePath,
       },
-      path_mappings: [],
+      path_mappings: [
+        createNativeExecutionPathMapping({
+          schema_version: "1.0.0",
+          mapping_kind: "native_linux",
+          repository_id: "owner/repo",
+          base_sha: "a".repeat(40),
+          native_host_id: "host-supervisor",
+          git_runtime: "git-fixture",
+          roots: {
+            native_repository: verifiedRoot("git-fixture", repositoryRoot),
+            native_allocation_root: verifiedRoot("git-fixture", allocationRoot),
+            native_worktree: verifiedRoot("git-fixture", worktreePath),
+          },
+        }),
+      ],
       exposed_environment_keys: [],
       created_at: "2026-07-19T12:00:00.300Z",
     });
@@ -391,7 +413,7 @@ function makeSupervisor(
     reproducibility: { backend_identity: "controlled-fixture", backend_version: "1.0.0" },
   });
   const workerSessions = new AgentWorkWorkerSessionService(store, {
-    config: {} as never,
+    config: { worktreeRoot: dirname(observed.worktreePath) } as never,
     observeWorkspace: async () => ({ ok: true as const, observation: observed }),
   });
   return new AgentWorkHeadlessSupervisor(
@@ -407,6 +429,19 @@ function makeSupervisor(
     { observe: async () => observed },
     control
   );
+}
+
+function verifiedRoot(runtimeId: string, path: string) {
+  const identity = captureDirectoryIdentity(path, "supervisor fixture path");
+  return {
+    runtime_id: runtimeId,
+    path,
+    verification: "directory_identity" as const,
+    directory_identity: {
+      device: identity.device.toString(10),
+      inode: identity.inode.toString(10),
+    },
+  };
 }
 
 class FixtureVerificationRuntime implements AttemptVerificationRuntime {

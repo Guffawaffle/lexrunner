@@ -1,4 +1,5 @@
 import { AgentTaskReceipt_v2 } from "../schemas/agent-work.js";
+import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import type {
   AgentTaskReceiptOutcome,
   AttemptReceiptDisposition,
@@ -6,9 +7,11 @@ import type {
   AttemptReceiptStore,
   AttemptReceiptSubmissionResult,
   AttemptStatus,
+  LaunchEnvelopeBindingStore,
   WorkerSessionStore,
   WorkspaceLifecycleStore,
 } from "../store/workspace-lifecycle-store.js";
+import { verifyAttemptExecutionPathMapping } from "./agent-work-path-mapping.js";
 
 const MAX_OUTPUT_BYTES = 4_096;
 
@@ -72,12 +75,50 @@ export interface AttemptReceiptStatusProjection {
 /** Shared application boundary for immutable worker receipt claims. */
 export class AgentWorkAttemptReceiptService {
   constructor(
-    private readonly store: WorkspaceLifecycleStore & AttemptReceiptStore & WorkerSessionStore
+    private readonly store: WorkspaceLifecycleStore &
+      LaunchEnvelopeBindingStore &
+      AttemptReceiptStore &
+      WorkerSessionStore
   ) {}
 
   async submit(
     input: Parameters<AttemptReceiptStore["submitAttemptReceipt"]>[0]
   ): Promise<AttemptReceiptSubmissionAcknowledgement> {
+    const [attempt, lease, session, binding] = await Promise.all([
+      this.store.getAttempt(input.attemptId),
+      this.store.getWorkspaceLease(input.workspaceLeaseId),
+      this.store.getWorkerSession(input.workerSessionId),
+      this.store.getLaunchEnvelopeBinding(input.attemptId),
+    ]);
+    if (!attempt || !lease || !session || !binding) {
+      return { submitted: false, reason: "not_found" };
+    }
+    const envelope = validatePersistedCanonicalEnvelope(binding, attempt, lease);
+    const pathBinding =
+      envelope?.paths.allocation_root &&
+      verifyAttemptExecutionPathMapping(envelope.path_mappings, {
+        repositoryId: lease.repositoryId,
+        baseSha: attempt.baseSha,
+        hostId: lease.hostId,
+        gitRuntime: lease.gitRuntime,
+        repositoryRoot: lease.projectRoot,
+        allocationRoot: envelope.paths.allocation_root,
+        worktreePath: lease.worktreePath,
+      });
+    if (
+      !pathBinding ||
+      !pathBinding.valid ||
+      session.executionEnvelopeId !== binding.envelopeId ||
+      session.executionEnvelopeHash !== binding.envelopeHash
+    ) {
+      return {
+        submitted: false,
+        reason: "evidence_mismatch",
+        currentAttemptRevision: attempt.revision,
+        currentWorkspaceLeaseRevision: lease.revision,
+        currentSessionRevision: session.revision,
+      };
+    }
     const result = await this.store.submitAttemptReceipt(input);
     if (!result.submitted) return result;
     return {
