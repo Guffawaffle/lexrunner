@@ -67,7 +67,7 @@ Results use one of three capability states:
 - `native_ready` — procfs plus all repository, repository-Git, and worktree-root identities were
   verified on a supported native Linux filesystem;
 - `broker_required` — native Windows or a WSL DrvFS/9P path requires the identity-anchored
-  native-WSL projection tracked in #863; or
+  native-WSL projection tracked by #867 and its #872–#875 delivery stack; or
 - `unsupported` — the runtime, path syntax, root relationship, directory identity, or filesystem
   could not satisfy the boundary.
 
@@ -78,8 +78,17 @@ the exact repository ID, paths, Git runtime, and comparison declaration without 
 values.
 
 `broker_required` is not a containment override. It stops local allocation and directs the caller
-to provision a native-WSL projection, then rerun preflight. Provisioning authority and
-Windows-to-WSL path mappings remain separate work under #863.
+to provision a native-WSL projection, then rerun preflight. The versioned request, observation,
+manifest, receipt, and path-mapping contracts are defined by #872. They do not themselves grant
+provisioning authority: the rollback-safe engine, execution-envelope enforcement, and operator
+surfaces remain separately gated by #873, #874, and #875.
+
+The projection request binds repository identity, the declared Windows and WSL views, native
+projection/worktree roots, dirty and HEAD policies, and one full Git object ID. A projection
+manifest is selectable only when its canonical request, source observation, repository, commit,
+path roles, and native directory identities all agree. Stale, interrupted, invalid, and
+conflicting inventory states produce an explicit pure plan; none is silently repaired or treated
+as a usable checkout.
 
 ## Platform matrix
 

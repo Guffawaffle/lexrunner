@@ -79,6 +79,7 @@ export type {
   AgentWorkContainmentPreflightResult,
   AgentWorkContainmentReasonCode,
 } from "./agent-work-containment-preflight.js";
+export * from "./agent-work-projection-planner.js";
 export type {
   AgentWorkLifecycleFailure,
   AgentWorkLifecycleResult,
