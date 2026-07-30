@@ -542,11 +542,33 @@ bindings still match the request is selectable. Stale, invalid, or interrupted
 material must be quarantined before replacement; same-request staging is
 retried; concurrent or identity-conflicting state fails closed.
 
-These contracts do not invoke Git, inspect or mutate the filesystem, open
-SQLite, allocate a worktree, or confer provisioning authority. The projection
-engine must later prove these claims using the declared runtimes and preserve
-the existing native-Linux directory-identity boundary before an Attempt packet
-can be constructed.
+The broker-owned projection engine is the only component that may turn those
+claims into native state. It observes the mapped source through bounded,
+non-interactive, read-only Git commands; verifies the repository remote, exact
+source directory identity, HEAD, requested commit object, and cleanliness
+policy; and clones with `--no-local --no-hardlinks`. Request validation rejects
+every overlap between the mapped source and either native root before native
+control state is created. Git runs with an explicit environment allowlist, not
+the broker's ambient Git object, repository, or config variables. The engine
+checks out the requested full commit detached, removes the source remote and
+moving local branch references, rejects alternates, and publishes only after
+the repository, manifest, mapping, native roots, and directory identities
+agree.
+
+Preparation occurs in identity-anchored staging directories under a
+same-request lease. Repository and allocation-root publication use atomic
+renames; a retry removes proven-owned interrupted staging, verifies and reuses
+an exact immutable publication, or quarantines stale and ambiguous material
+before replacement. Initial staging remains exact-created until its durable
+ownership marker succeeds; marker-write failure removes that exact directory
+or fails closed through quarantine/conflict handling. A failed preparation
+never returns a broker. A successful preparation hands `NodeGitWorktreeBroker`
+the verified native repository and allocation root without weakening its
+existing procfs directory-descriptor boundary.
+
+The engine does not open SQLite, create an Attempt, construct a worker packet,
+or authorize execution. Execution-envelope binding and operator-facing CLI/MCP
+workflow remain separate gates.
 
 ---
 

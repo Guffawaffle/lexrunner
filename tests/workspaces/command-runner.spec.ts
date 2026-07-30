@@ -154,4 +154,44 @@ describe("ExecaCommandRunner", () => {
 
     expect(result).toMatchObject({ ok: true, stdout: shellSyntax });
   });
+
+  it("adds an explicit bounded environment without exposing it as arguments", async () => {
+    const result = await runner.run({
+      executable: process.execPath,
+      args: ["-e", 'process.stdout.write(process.env.LEXRUNNER_TEST_BOUNDARY ?? "missing")'],
+      cwd,
+      env: { LEXRUNNER_TEST_BOUNDARY: "isolated" },
+      timeoutMs: 2_000,
+    });
+
+    expect(result).toMatchObject({ ok: true, stdout: "isolated" });
+  });
+
+  it("can replace the parent environment with an explicit allowlist", async () => {
+    const inheritedKey = `LEXRUNNER_INHERITED_${process.pid}`;
+    process.env[inheritedKey] = "must-not-cross";
+    try {
+      const result = await runner.run({
+        executable: process.execPath,
+        args: [
+          "-e",
+          `process.stdout.write(JSON.stringify({
+            explicit: process.env.LEXRUNNER_TEST_BOUNDARY,
+            inherited: process.env[${JSON.stringify(inheritedKey)}] ?? null
+          }))`,
+        ],
+        cwd,
+        env: { LEXRUNNER_TEST_BOUNDARY: "isolated" },
+        extendEnv: false,
+        timeoutMs: 2_000,
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        stdout: '{"explicit":"isolated","inherited":null}',
+      });
+    } finally {
+      delete process.env[inheritedKey];
+    }
+  });
 });

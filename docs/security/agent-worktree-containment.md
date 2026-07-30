@@ -80,15 +80,47 @@ values.
 `broker_required` is not a containment override. It stops local allocation and directs the caller
 to provision a native-WSL projection, then rerun preflight. The versioned request, observation,
 manifest, receipt, and path-mapping contracts are defined by #872. They do not themselves grant
-provisioning authority: the rollback-safe engine, execution-envelope enforcement, and operator
-surfaces remain separately gated by #873, #874, and #875.
+provisioning authority: execution-envelope enforcement and operator surfaces remain separately
+gated by #874 and #875.
 
 The projection request binds repository identity, the declared Windows and WSL views, native
 projection/worktree roots, dirty and HEAD policies, and one full Git object ID. A projection
 manifest is selectable only when its canonical request, source observation, repository, commit,
 path roles, and native directory identities all agree. Stale, interrupted, invalid, and
 conflicting inventory states produce an explicit pure plan; none is silently repaired or treated
-as a usable checkout.
+as a usable checkout. The mapped source must not overlap either native root in either direction;
+validation rejects that topology before any native control directory can be opened or created.
+
+## Broker-owned native-WSL projection
+
+`NativeWslProjectionEngine` reads the declared mapped source but publishes only committed Git
+state to the native roots. Source observation runs with interactive credentials, system/global
+Git configuration, optional index locks, and shell interpretation disabled. Git receives a
+fixed, explicit environment allowlist rather than a merge with the broker process environment,
+so ambient object directories, alternates, repository selectors, and command-scoped config
+cannot cross the boundary. Each command checks the mapped source directory device and inode
+immediately before process creation; replacement or remote-identity drift fails closed. Source
+dirt is observed according to request policy and is never copied into the native repository.
+
+The transport uses `git clone --no-local --no-hardlinks --no-checkout --no-tags`. The engine
+checks out only the requested full commit in detached mode, removes the source remote and moving
+local branches, and rejects object alternates. Git command evidence contains action names,
+canonical argument/output hashes, bounded exit and duration facts, and no source path or Git
+output.
+
+Native mutation remains inside procfs-anchored projection, staging, lease, allocation, and
+quarantine roots. An exact ready manifest is reverified against the request, repository HEAD and
+cleanliness, directory identities, and lack of alternates before reuse. Preparation publishes by
+atomic directory renames only after manifest construction and identity checks. Owned interrupted
+staging is removed on retry; stale, invalid, partially published, or ownership-ambiguous state is
+quarantined rather than selected or overwritten. If the initial ownership marker cannot be
+durably written, the engine removes the exact-created staging directory before returning; if
+identity-safe removal cannot be proven, the residue is quarantined or rejected as a conflict.
+Only a `prepared` or `reused` result carries the verified `NodeGitWorktreeBroker`.
+
+This engine does not relax the same-principal limitation above. It also does not confer Attempt
+authority: #874 must bind the selected manifest and mapping into the execution envelope before a
+worker can receive a task packet.
 
 ## Platform matrix
 

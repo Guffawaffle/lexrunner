@@ -6,6 +6,10 @@ export interface CommandRequest {
   executable: string;
   args: readonly string[];
   cwd: string;
+  /** Explicit process environment additions. Never included in command evidence. */
+  env?: Readonly<Record<string, string>>;
+  /** Whether to merge env with the parent process environment. Defaults to true. */
+  extendEnv?: boolean;
   timeoutMs: number;
   signal?: AbortSignal;
   /** Maximum buffered bytes for each output stream. */
@@ -80,6 +84,8 @@ export class ExecaCommandRunner implements CommandRunner {
       }
       const result = await execa(request.executable, [...request.args], {
         cwd: request.cwd,
+        ...(request.env ? { env: request.env } : {}),
+        extendEnv: request.extendEnv ?? true,
         timeout: request.timeoutMs,
         cancelSignal: request.signal,
         maxBuffer: maxOutputBytes,
