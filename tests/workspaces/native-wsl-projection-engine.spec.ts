@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { execa } from "execa";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { createAttemptExecutionPathMapping } from "../../src/runs/agent-work-path-mapping.js";
 import {
   NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
   NATIVE_WSL_PROJECTION_HASH_PROFILE,
@@ -147,7 +148,11 @@ describe("NativeWslProjectionEngine real Git integration", () => {
 
   it("reuses an exact immutable projection without cloning again", async () => {
     const request = makeRequest();
-    const engine = new NativeWslProjectionEngine();
+    let clockTick = 0;
+    const engine = new NativeWslProjectionEngine({
+      now: () =>
+        new Date(Date.parse("2026-07-29T12:00:00.000Z") + clockTick++ * 1_000).toISOString(),
+    });
     const first = await engine.prepare(request);
     const second = await engine.prepare(request);
 
@@ -157,6 +162,43 @@ describe("NativeWslProjectionEngine real Git integration", () => {
     expect(second.manifest).toEqual(first.manifest);
     expect(second.commandEvidence.map((entry) => entry.action)).not.toContain("clone_nonlocal");
     expect(second.receipt.projection_digest).toBe(first.manifest.manifest_digest);
+    expect(second.receipt.source_observation_digest).not.toBe(
+      first.manifest.source_observation.observation_digest
+    );
+
+    const target: WorktreeTarget = {
+      repositoryId: request.repository.id,
+      hostId: request.native.host_id,
+      gitRuntime: request.native.git_runtime,
+      projectRoot: first.manifest.native_repository.path,
+      worktreePath: join(first.manifest.native_worktree_root.path, "attempt-reuse"),
+      branch: "agent/projection-reuse",
+      attemptId: "attempt-projection-reuse",
+      baseSha,
+    };
+    await expect(first.broker.create(target)).resolves.toMatchObject({
+      ok: true,
+      outcome: "created",
+    });
+    const context = {
+      repositoryId: request.repository.id,
+      baseSha,
+      hostId: request.native.host_id,
+      gitRuntime: request.native.git_runtime,
+      repositoryRoot: first.manifest.native_repository.path,
+      allocationRoot: first.manifest.native_worktree_root.path,
+      worktreePath: target.worktreePath,
+    };
+    const preparedMapping = createAttemptExecutionPathMapping({
+      ...context,
+      projection: { manifest: first.manifest, receipt: first.receipt },
+    });
+    const reusedMapping = createAttemptExecutionPathMapping({
+      ...context,
+      projection: { manifest: second.manifest, receipt: second.receipt },
+    });
+
+    expect(reusedMapping).toEqual(preparedMapping);
   });
 
   it("rejects dirty, mismatched-head, missing, non-commit, and wrong-remote sources before staging", async () => {

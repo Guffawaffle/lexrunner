@@ -111,7 +111,8 @@ function assertSelectedProjection(
   if (
     (receipt.outcome !== "prepared" && receipt.outcome !== "reused") ||
     receipt.request_digest !== manifest.request_digest ||
-    receipt.source_observation_digest !== manifest.source_observation.observation_digest ||
+    (receipt.outcome === "prepared" &&
+      receipt.source_observation_digest !== manifest.source_observation.observation_digest) ||
     receipt.projection_digest !== manifest.manifest_digest ||
     receipt.mapping_digest !== manifest.path_mapping.mapping_digest
   ) {
