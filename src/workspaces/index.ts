@@ -36,6 +36,17 @@ export type { NodeGitWorktreeBrokerOptions } from "./node-git-worktree-broker.js
 export { NodeGitWorktreeBroker } from "./node-git-worktree-broker.js";
 
 export type {
+  NativeWslProjectionCommandEvidence,
+  NativeWslProjectionEngineOptions,
+  NativeWslProjectionFailure,
+  NativeWslProjectionPrepareOptions,
+  NativeWslProjectionResult,
+  NativeWslProjectionStateWriter,
+  NativeWslProjectionSuccess,
+} from "./native-wsl-projection-engine.js";
+export { NativeWslProjectionEngine } from "./native-wsl-projection-engine.js";
+
+export type {
   AllocateWorkspaceInput,
   HeartbeatCoordinatedWorkspaceInput,
   ReleaseCoordinatedWorkspaceInput,

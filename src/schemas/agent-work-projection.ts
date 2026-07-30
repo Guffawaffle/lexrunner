@@ -608,14 +608,27 @@ function requireSeparateRequestRoots(
   request: z.output<z.ZodObject<typeof ProjectionRequestShape>>,
   context: z.RefinementCtx
 ): void {
-  if (!linuxPathsOverlap(request.native.projection_root, request.native.worktree_root)) {
-    return;
+  if (linuxPathsOverlap(request.native.projection_root, request.native.worktree_root)) {
+    context.addIssue({
+      code: "custom",
+      path: ["native", "worktree_root"],
+      message: "native projection and worktree roots must not overlap",
+    });
   }
-  context.addIssue({
-    code: "custom",
-    path: ["native", "worktree_root"],
-    message: "native projection and worktree roots must not overlap",
-  });
+  if (linuxPathsOverlap(request.source.wsl_repository_path, request.native.projection_root)) {
+    context.addIssue({
+      code: "custom",
+      path: ["native", "projection_root"],
+      message: "native projection root must not overlap the mapped source repository",
+    });
+  }
+  if (linuxPathsOverlap(request.source.wsl_repository_path, request.native.worktree_root)) {
+    context.addIssue({
+      code: "custom",
+      path: ["native", "worktree_root"],
+      message: "native worktree root must not overlap the mapped source repository",
+    });
+  }
 }
 
 function requireValidProjectionPathMapping(

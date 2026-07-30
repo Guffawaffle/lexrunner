@@ -65,7 +65,7 @@ describe("native WSL projection contracts", () => {
     });
   });
 
-  it("rejects digest tampering, ambiguous Linux paths, and overlapping native roots", () => {
+  it("rejects digest tampering, ambiguous Linux paths, and every source/native overlap", () => {
     const valid = request();
 
     expect(
@@ -89,6 +89,26 @@ describe("native WSL projection contracts", () => {
         worktreeRoot: "/var/lib/lexrunner/worktrees",
       })
     ).toThrow(/must not overlap/u);
+    expect(() =>
+      request({
+        projectionRoot: "/mnt/d/dev/stfc-mod",
+      })
+    ).toThrow(/must not overlap the mapped source repository/u);
+    expect(() =>
+      request({
+        projectionRoot: "/mnt/d/dev/stfc-mod/native",
+      })
+    ).toThrow(/must not overlap the mapped source repository/u);
+    expect(() =>
+      request({
+        wslRepositoryPath: "/var/lib/lexrunner",
+      })
+    ).toThrow(/must not overlap the mapped source repository/u);
+    expect(() =>
+      request({
+        worktreeRoot: "/mnt/d/dev/stfc-mod/worktrees",
+      })
+    ).toThrow(/must not overlap the mapped source repository/u);
   });
 
   it("binds source observations and path mappings to canonical content", () => {
@@ -575,6 +595,7 @@ interface RequestOverrides {
   projectionRoot?: string;
   worktreeRoot?: string;
   windowsRepositoryPath?: string;
+  wslRepositoryPath?: string;
   wslGitRuntime?: string;
   dirtyPolicy?: "require_clean" | "committed_base_only";
 }
@@ -592,7 +613,7 @@ function request(overrides: RequestOverrides = {}): NativeWslProjectionRequest {
       windows_repository_path: overrides.windowsRepositoryPath ?? "D:\\dev\\stfc-mod",
       wsl_distribution: "Ubuntu-24.04",
       wsl_git_runtime: overrides.wslGitRuntime ?? "wsl:Ubuntu-24.04",
-      wsl_repository_path: "/mnt/d/dev/stfc-mod",
+      wsl_repository_path: overrides.wslRepositoryPath ?? "/mnt/d/dev/stfc-mod",
       head_policy: "observe",
       dirty_policy: overrides.dirtyPolicy ?? "committed_base_only",
     },
