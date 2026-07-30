@@ -61,7 +61,7 @@ export const PlanCreateArgs = z.object({
 export type PlanCreateArgs = z.infer<typeof PlanCreateArgs>;
 
 export const GatesRunArgs = z.object({
-  planFile: z.string().optional(),
+  planFile: z.string().min(1).max(4096).optional(),
   onlyItem: z.string().optional(),
   onlyGate: z.string().optional(),
   outDir: z.string().optional(),
@@ -69,6 +69,7 @@ export const GatesRunArgs = z.object({
 export type GatesRunArgs = z.infer<typeof GatesRunArgs>;
 
 export const MergeApplyArgs = z.object({
+  planFile: z.string().min(1).max(4096).optional(),
   dryRun: z.boolean().optional(),
 });
 export type MergeApplyArgs = z.infer<typeof MergeApplyArgs>;
@@ -104,6 +105,7 @@ export interface GatesRunResult {
   }>;
   allGreen: boolean;
   artifactRefs: Array<{ kind: "gate-results-directory"; path: string }>;
+  planArtifact: import("../application/plan-artifact-service.js").PlanArtifactIdentity;
 }
 
 export interface MergeApplyResult {

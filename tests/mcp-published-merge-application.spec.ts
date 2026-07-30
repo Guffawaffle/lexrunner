@@ -30,8 +30,10 @@ describe("published merge application parity", () => {
       { cwd: root }
     );
     const response = await invokeMcp(root, false, { dryRun: true });
+    const mcpResult = JSON.parse(response.result.content[0].text);
 
-    expect(JSON.parse(canonical.stdout)).toEqual(JSON.parse(response.result.content[0].text));
+    expect(withoutPlanArtifact(mcpResult)).toEqual(JSON.parse(canonical.stdout));
+    expect(mcpResult.planArtifact.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(JSON.parse(compatibility.stdout)).toEqual(JSON.parse(canonical.stdout));
     expect(compatibility.stderr).toContain('compatibility alias "merge"; use "weave apply"');
   });
@@ -148,12 +150,18 @@ async function invokeMcp(
 }
 
 function normalizeExecution(result: Record<string, any>): Record<string, any> {
+  const { planArtifact: _planArtifact, ...withoutIdentity } = result;
   return {
-    ...result,
+    ...withoutIdentity,
     runId: "<run-id>",
     artifactRefs: result.artifactRefs.map(({ kind }: { kind: string }) => ({
       kind,
       id: "<run-id>",
     })),
   };
+}
+
+function withoutPlanArtifact(result: Record<string, any>): Record<string, any> {
+  const { planArtifact: _planArtifact, ...summary } = result;
+  return summary;
 }

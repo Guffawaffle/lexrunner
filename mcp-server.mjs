@@ -51,9 +51,19 @@ const attemptVerificationHandlers = core.createAttemptVerificationHandlers();
 
 function sharedServiceError(error, tool, fallbackCode) {
   if (error && typeof error === "object" && typeof error.code === "string") {
+    const planArtifactContext =
+      error.name === "PlanArtifactServiceError"
+        ? {
+            operation: "resolve plan artifact",
+            details: error.source ? { source: error.source } : undefined,
+          }
+        : {};
     return new Error(
       core.canonicalJSONStringify(
-        core.mcpToolError(error.code, error.message || "Shared service failed", { tool })
+        core.mcpToolError(error.code, error.message || "Shared service failed", {
+          tool,
+          ...planArtifactContext,
+        })
       )
     );
   }
@@ -389,6 +399,11 @@ const tools = {
     inputSchema: {
       type: "object",
       properties: {
+        planFile: {
+          type: "string",
+          description:
+            "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
+        },
         onlyItem: {
           type: "string",
           description: "Run gates for specific item only",
@@ -405,31 +420,25 @@ const tools = {
     },
     call: async (args) => {
       try {
-        // Resolve profile directory
-        const { resolveProfile } = await import("./dist/cli.js");
-        const resolved = resolveProfile(config.profileDir, process.cwd());
-
-        // Load plan
-        const planPath = resolve(resolved.path, "runner", "plan.json");
-        if (!existsSync(planPath)) {
-          throw new Error("No plan found. Run plan.create first.");
-        }
-
-        const { loadPlan, GateExecutionService } = await import("./dist/cli.js");
-        const planContent = readFileSync(planPath, "utf-8");
-        const plan = loadPlan(planContent);
+        const artifact = new core.PlanArtifactService().resolve({
+          planFile: args.planFile,
+          workingDir: process.cwd(),
+          profileDir: config.profileDir,
+        });
 
         // Determine output directory
-        const outDir = args.outDir || resolve(resolved.path, "runner", "gates");
+        const outDir = args.outDir || resolve(dirname(artifact.filePath), "gates");
 
-        const result = (
-          await new GateExecutionService().run({
-            plan,
+        const summary = (
+          await new core.GateExecutionService().run({
+            plan: artifact.plan,
             artifactDir: outDir,
             onlyItem: args.onlyItem,
             onlyGate: args.onlyGate,
+            options: { emitReceipt: false, suppressStdout: true },
           })
         ).summary;
+        const result = { ...summary, planArtifact: artifact.identity };
 
         return {
           content: [
@@ -442,7 +451,7 @@ const tools = {
       } catch (error) {
         const validationFailure = planValidationToolResult(error);
         if (validationFailure) return validationFailure;
-        throw new Error(`Failed to run gates: ${error.message}`);
+        throw sharedServiceError(error, "gates.run", "GATE_EXECUTION_FAILED");
       }
     },
   },
@@ -452,6 +461,11 @@ const tools = {
     inputSchema: {
       type: "object",
       properties: {
+        planFile: {
+          type: "string",
+          description:
+            "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
+        },
         dryRun: {
           type: "boolean",
           description: "Simulate merge without making changes",
@@ -461,28 +475,21 @@ const tools = {
     },
     call: async (args) => {
       try {
-        // Resolve profile directory
-        const { resolveProfile } = await import("./dist/cli.js");
-        const resolved = resolveProfile(config.profileDir, process.cwd());
+        const artifact = new core.PlanArtifactService().resolve({
+          planFile: args.planFile,
+          workingDir: process.cwd(),
+          profileDir: config.profileDir,
+        });
 
-        // Load plan
-        const planPath = resolve(resolved.path, "runner", "plan.json");
-        if (!existsSync(planPath)) {
-          throw new Error("No plan found. Run plan.create first.");
-        }
-
-        const { loadPlan, MergeApplicationService } = await import("./dist/cli.js");
-        const planContent = readFileSync(planPath, "utf-8");
-        const plan = loadPlan(planContent);
-
-        const result = (
-          await new MergeApplicationService().run({
-            plan,
+        const summary = (
+          await new core.MergeApplicationService().run({
+            plan: artifact.plan,
             workingDir: process.cwd(),
             dryRun: args.dryRun ?? true,
             mutationAuthorized: config.allowMutations,
           })
         ).summary;
+        const result = { ...summary, planArtifact: artifact.identity };
 
         return {
           content: [
@@ -503,7 +510,7 @@ const tools = {
             )
           );
         }
-        throw new Error(`Failed to apply merge: ${error.message}`);
+        throw sharedServiceError(error, "merge.apply", "MERGE_APPLICATION_FAILED");
       }
     },
   },
@@ -835,24 +842,22 @@ const tools = {
       properties: {
         planFile: {
           type: "string",
-          description: "Path to plan.json file (default: plan.json)",
-          default: "plan.json",
+          description:
+            "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
         },
       },
     },
     call: async (args) => {
       try {
-        const planFile = args.planFile || "plan.json";
-
-        if (!existsSync(planFile)) {
-          throw new Error(`Plan file not found: ${planFile}`);
-        }
-
-        const { loadPlan, IntegrationStatusQueryService } = await import("./dist/cli.js");
-        const planContent = readFileSync(planFile, "utf-8");
-        const plan = loadPlan(planContent);
-
-        const result = new IntegrationStatusQueryService().run(plan);
+        const artifact = new core.PlanArtifactService().resolve({
+          planFile: args.planFile,
+          workingDir: process.cwd(),
+          profileDir: config.profileDir,
+        });
+        const result = {
+          ...new core.IntegrationStatusQueryService().run(artifact.plan),
+          planArtifact: artifact.identity,
+        };
 
         return {
           content: [
@@ -865,7 +870,7 @@ const tools = {
       } catch (error) {
         const validationFailure = planValidationToolResult(error);
         if (validationFailure) return validationFailure;
-        throw new Error(`Failed to get status: ${error.message}`);
+        throw sharedServiceError(error, "status", "INTEGRATION_STATUS_FAILED");
       }
     },
   },
@@ -904,24 +909,22 @@ const tools = {
       properties: {
         planFile: {
           type: "string",
-          description: "Path to plan.json file (default: plan.json)",
-          default: "plan.json",
+          description:
+            "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
         },
       },
     },
     call: async (args) => {
       try {
-        const planFile = args.planFile || "plan.json";
-
-        if (!existsSync(planFile)) {
-          throw new Error(`Plan file not found: ${planFile}`);
-        }
-
-        const { loadPlan, MergeOrderQueryService } = await import("./dist/cli.js");
-        const planContent = readFileSync(planFile, "utf-8");
-        const plan = loadPlan(planContent);
-
-        const result = new MergeOrderQueryService().run(plan);
+        const artifact = new core.PlanArtifactService().resolve({
+          planFile: args.planFile,
+          workingDir: process.cwd(),
+          profileDir: config.profileDir,
+        });
+        const result = {
+          ...new core.MergeOrderQueryService().run(artifact.plan),
+          planArtifact: artifact.identity,
+        };
 
         return {
           content: [
@@ -934,7 +937,7 @@ const tools = {
       } catch (error) {
         const validationFailure = planValidationToolResult(error);
         if (validationFailure) return validationFailure;
-        throw new Error(`Failed to compute merge order: ${error.message}`);
+        throw sharedServiceError(error, "merge-order", "MERGE_ORDER_FAILED");
       }
     },
   },

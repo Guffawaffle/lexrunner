@@ -138,9 +138,8 @@ describe("MCP gates.run with external plan files", () => {
       expect(() => GatesRunArgs.parse({ planFile: {} })).toThrow();
     });
 
-    it("should allow empty string planFile (edge case)", () => {
-      // Empty string is technically a valid string type, though not useful
-      expect(() => GatesRunArgs.parse({ planFile: "" })).not.toThrow();
+    it("should reject an empty explicit planFile", () => {
+      expect(() => GatesRunArgs.parse({ planFile: "" })).toThrow();
     });
   });
 });
