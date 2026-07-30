@@ -53,6 +53,13 @@ They share `AgentWorkContainmentCapabilityService`, inspect only the declared ru
 repository/worktree roots, and never open `CoordinationStore`, invoke Git, or acquire mutation
 authority.
 
+When preflight reports `broker_required`, CLI `attempt projection
+prepare|status|cleanup|quarantine` and the four native-WSL projection MCP tools call
+`NativeWslProjectionLifecycleHandlers`. Status and quarantine inspection are read-only. Prepare
+and cleanup require explicit mutation authority, and all results are path-private bounded
+projections. A successful selection digest is resolved into the immutable Attempt execution
+mapping; the adapter never accepts caller-supplied projection evidence as launch authority.
+
 The frozen `RunStore` is different. It records stateless integration runs,
 steps, receipts, and artifacts; it cannot authorize or advance ADR-010 state.
 The three published `lexrunner.*` MCP tools are deprecated bounded IntegrationRun

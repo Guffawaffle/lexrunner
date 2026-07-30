@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registerAttemptCommand } from "../../src/commands/attempt.js";
 import type { AgentWorkContainmentPreflightHandler } from "../../src/runs/agent-work-containment-preflight.js";
+import type { NativeWslProjectionLifecycleHandlers } from "../../src/runs/agent-work-projection-lifecycle.js";
 import type {
   AttemptLifecycleHandlers,
   AttemptPreparationHandler,
@@ -19,6 +20,7 @@ describe("attempt commands", () => {
   let directory: string;
   let program: Command;
   let containmentHandler: AgentWorkContainmentPreflightHandler;
+  let projectionHandlers: NativeWslProjectionLifecycleHandlers;
   let handlers: AttemptLifecycleHandlers;
   let preparationHandler: AttemptPreparationHandler;
   let workerHandlers: AttemptWorkerHandlers;
@@ -38,6 +40,35 @@ describe("attempt commands", () => {
         result: {
           state: "native_ready",
           physicalContainmentAvailable: true,
+        } as never,
+      })),
+    };
+    projectionHandlers = {
+      prepare: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.projection.prepare",
+          state: "ready",
+        } as never,
+      })),
+      status: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.projection.status",
+          state: "ready",
+        } as never,
+      })),
+      cleanup: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.projection.cleanup",
+          outcome: "cleaned",
+        } as never,
+      })),
+      quarantine: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.projection.quarantine.inspect",
         } as never,
       })),
     };
@@ -91,6 +122,7 @@ describe("attempt commands", () => {
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       containmentHandler,
+      projectionHandlers,
       handlers,
       preparationHandler,
       workerHandlers,
@@ -185,10 +217,11 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers preflight, worker, receipt, verification, acceptance, prepare, start, and status beneath attempt", () => {
+  it("registers projection and Attempt lifecycle commands beneath one machine-facing surface", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
       "preflight",
+      "projection",
       "worker",
       "receipt",
       "verification",
@@ -202,40 +235,74 @@ describe("attempt commands", () => {
       "--json",
     ]);
     expect(attempt?.commands[1].commands.map((command) => command.name())).toEqual([
+      "prepare",
+      "status",
+      "cleanup",
+      "quarantine",
+    ]);
+    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
       "attach",
       "heartbeat",
       "end",
       "status",
     ]);
-    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
       "submit",
       "status",
     ]);
-    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[4].commands.map((command) => command.name())).toEqual([
       "run",
       "status",
     ]);
-    expect(attempt?.commands[3].commands[1].options.map((option) => option.long)).toContain(
+    expect(attempt?.commands[4].commands[1].options.map((option) => option.long)).toContain(
       "--diagnostics"
     );
-    expect(attempt?.commands[4].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[5].commands.map((command) => command.name())).toEqual([
       "apply",
       "status",
-    ]);
-    expect(attempt?.commands[5].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
     ]);
     expect(attempt?.commands[6].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[7].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[8].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
+  });
+
+  it("forwards every projection operation through the shared lifecycle handler", async () => {
+    const requests = {
+      prepare: { request: { request_id: "projection" }, mutation: { authorized: true } },
+      status: { request: { request_id: "projection" } },
+      cleanup: { request: { request_id: "projection" }, mutation: { authorized: true } },
+      quarantine: { request: { request_id: "projection" } },
+    };
+    for (const [operation, request] of Object.entries(requests)) {
+      const input = join(directory, `projection-${operation}.json`);
+      await fs.writeFile(input, JSON.stringify(request));
+      await program.parseAsync([
+        "node",
+        "lex-pr",
+        "attempt",
+        "projection",
+        operation,
+        "--input",
+        input,
+        "--json",
+      ]);
+    }
+
+    expect(projectionHandlers.prepare).toHaveBeenCalledWith(requests.prepare);
+    expect(projectionHandlers.status).toHaveBeenCalledWith(requests.status);
+    expect(projectionHandlers.cleanup).toHaveBeenCalledWith(requests.cleanup);
+    expect(projectionHandlers.quarantine).toHaveBeenCalledWith(requests.quarantine);
   });
 
   it("forwards containment preflight input and maps broker-required capability to exit one", async () => {

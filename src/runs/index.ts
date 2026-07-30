@@ -81,6 +81,29 @@ export type {
 } from "./agent-work-containment-preflight.js";
 export * from "./agent-work-projection-planner.js";
 export {
+  NativeWslProjectionCleanupRequestJsonSchema,
+  NativeWslProjectionCleanupRequestSchema,
+  NativeWslProjectionPrepareRequestJsonSchema,
+  NativeWslProjectionPrepareRequestSchema,
+  NativeWslProjectionQuarantineRequestJsonSchema,
+  NativeWslProjectionQuarantineRequestSchema,
+  NativeWslProjectionStatusRequestJsonSchema,
+  NativeWslProjectionStatusRequestSchema,
+  createNativeWslProjectionLifecycleHandlers,
+} from "./agent-work-projection-lifecycle.js";
+export type {
+  NativeWslProjectionCleanupPublicResult,
+  NativeWslProjectionCleanupRequest,
+  NativeWslProjectionLifecycleHandlers,
+  NativeWslProjectionPrepareRequest,
+  NativeWslProjectionPrepareResult,
+  NativeWslProjectionPublicNextAction,
+  NativeWslProjectionQuarantineResult,
+  NativeWslProjectionStatusRequest,
+  NativeWslProjectionStatusResult,
+  ProjectionLifecycleEngine,
+} from "./agent-work-projection-lifecycle.js";
+export {
   createAttemptExecutionPathMapping,
   verifyAttemptExecutionPathMapping,
 } from "./agent-work-path-mapping.js";

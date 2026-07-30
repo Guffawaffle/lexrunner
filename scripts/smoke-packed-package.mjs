@@ -21,6 +21,10 @@ const requiredAttemptTools = [
   "get_attempt_verification",
   "accept_attempt",
   "get_attempt_acceptance",
+  "prepare_native_wsl_projection",
+  "get_native_wsl_projection_status",
+  "cleanup_native_wsl_projection",
+  "inspect_native_wsl_projection_quarantine",
 ];
 
 try {
@@ -69,6 +73,17 @@ try {
         if (typeof main.planNativeWslProjection !== "function") {
           throw new Error("missing native WSL projection planner root API");
         }
+        if (typeof main.createNativeWslProjectionLifecycleHandlers !== "function") {
+          throw new Error("missing native WSL projection lifecycle root API");
+        }
+        for (const name of [
+          "NativeWslProjectionPrepareRequestJsonSchema",
+          "NativeWslProjectionStatusRequestJsonSchema",
+          "NativeWslProjectionCleanupRequestJsonSchema",
+          "NativeWslProjectionQuarantineRequestJsonSchema",
+        ]) {
+          if (!main[name]) throw new Error("missing " + name + " root API");
+        }
         const checks = [
           ["@smartergpt/lexrunner/audit-sdk", "AUDIT_SCHEMA_VERSION"],
           ["@smartergpt/lexrunner/frames", "ExecutionFrameSchema"],
@@ -101,6 +116,9 @@ try {
         if (typeof main.planNativeWslProjection !== "function") {
           throw new Error("missing CJS native WSL projection planner root API");
         }
+        if (typeof main.createNativeWslProjectionLifecycleHandlers !== "function") {
+          throw new Error("missing CJS native WSL projection lifecycle root API");
+        }
         const schema = require("@smartergpt/lexrunner/schemas/runner-stack");
         if (!schema.RunnerStackSchema) throw new Error("missing CJS schema API");
       `,
@@ -116,6 +134,7 @@ try {
   if (!cliHelp.includes("Usage: lex-pr")) throw new Error("Packed CLI bin did not render help");
 
   smokeBoundedAttemptStatus(path.join(binRoot, "lex-pr"), consumerRoot);
+  smokeProjectionCliSurface(path.join(binRoot, "lex-pr"), consumerRoot);
 
   const toolCount = await smokeMcp(path.join(binRoot, "lexrunner-mcp"), consumerRoot);
   process.stdout.write(
@@ -164,6 +183,29 @@ function smokeBoundedAttemptStatus(cliPath, cwd) {
   }
   if (fs.existsSync(databasePath)) {
     throw new Error("Packed read-only Attempt status created lifecycle state");
+  }
+}
+
+function smokeProjectionCliSurface(cliPath, cwd) {
+  const inputPath = path.join(cwd, "invalid-projection-request.json");
+  fs.writeFileSync(inputPath, "{}\n");
+  for (const operation of ["prepare", "status", "cleanup", "quarantine"]) {
+    const result = spawnSync(
+      cliPath,
+      ["attempt", "projection", operation, "--input", inputPath, "--json"],
+      { cwd, encoding: "utf8" }
+    );
+    if (result.error) throw result.error;
+    if (result.status !== 2) {
+      throw new Error(`Packed projection ${operation} exited ${result.status}: ${result.stderr}`);
+    }
+    const output = JSON.parse(result.stdout);
+    if (output?.ok !== false || output?.error?.code !== "invalid_input") {
+      throw new Error(`Packed projection ${operation} was not bounded: ${result.stdout}`);
+    }
+    if (Buffer.byteLength(result.stdout, "utf8") >= 8_192) {
+      throw new Error(`Packed projection ${operation} exceeded the output budget`);
+    }
   }
 }
 

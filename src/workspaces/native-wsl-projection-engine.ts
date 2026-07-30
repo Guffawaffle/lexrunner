@@ -63,6 +63,7 @@ import { NodeGitWorktreeBroker } from "./node-git-worktree-broker.js";
 const MANIFEST_FILE = "lexrunner-native-wsl-projection.json";
 const SELECTION_FILE = "lexrunner-native-wsl-selection.json";
 const OWNER_FILE = "lexrunner-native-wsl-owner.json";
+const QUARANTINE_OWNER_FILE = "lexrunner-native-wsl-quarantine-owner.json";
 const CONTROL_STAGING = ".lexrunner-projection-staging";
 const CONTROL_LOCKS = ".lexrunner-projection-locks";
 const CONTROL_QUARANTINE = ".lexrunner-projection-quarantine";
@@ -70,6 +71,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_COMMAND_OUTPUT_BYTES = 64 * 1024;
 const MAX_STATE_FILE_BYTES = 256 * 1024;
 const MAX_CONTROL_ENTRIES = 256;
+const MAX_PUBLIC_QUARANTINE_ENTRIES = 64;
 const FULL_GIT_OBJECT_ID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const SAFE_GIT_ENV = Object.freeze({
   PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
@@ -155,6 +157,52 @@ export interface NativeWslProjectionFailure {
 
 export type NativeWslProjectionResult = NativeWslProjectionSuccess | NativeWslProjectionFailure;
 
+export type NativeWslProjectionLifecycleState =
+  "absent" | "preparing" | "ready" | "ready_unselected" | "stale" | "invalid" | "conflicting";
+
+export interface NativeWslProjectionQuarantineSummary {
+  count: number;
+  entryDigests: string[];
+  truncated: boolean;
+}
+
+export interface NativeWslProjectionInspection {
+  state: NativeWslProjectionLifecycleState;
+  projectionId: string;
+  requestDigest: string;
+  manifestDigest?: string;
+  selectionDigest?: string;
+  mappingDigest?: string;
+  sourceObservationDigest?: string;
+  activeWorktreeCount: number;
+  quarantine: {
+    repository: NativeWslProjectionQuarantineSummary;
+    allocation: NativeWslProjectionQuarantineSummary;
+  };
+  commandEvidence: NativeWslProjectionCommandEvidence[];
+}
+
+export type NativeWslProjectionCleanupReason =
+  | "cleanup_complete"
+  | "projection_absent"
+  | "active_worktrees"
+  | "concurrent_request"
+  | "state_quarantined"
+  | "cleanup_failed";
+
+export interface NativeWslProjectionCleanupResult {
+  outcome: "cleaned" | "absent" | "refused" | "quarantined" | "failed";
+  reasonCode: NativeWslProjectionCleanupReason;
+  projectionId: string;
+  requestDigest: string;
+  removed: {
+    repository: boolean;
+    allocation: boolean;
+    quarantineEntries: number;
+  };
+  remainingQuarantine: number;
+}
+
 export interface VerifiedNativeWslProjectionSelection {
   manifest: NativeWslProjectionManifest;
   receipt: NativeWslProjectionReceipt;
@@ -173,9 +221,12 @@ interface SourceObservationResult {
   failureReason?: NativeWslProjectionFailure["reasonCode"];
 }
 
-interface NativeBoundary {
+interface NativeRoots {
   projectionRoot: AnchoredDirectory;
   worktreeRoot: AnchoredDirectory;
+}
+
+interface NativeBoundary extends NativeRoots {
   projectionStaging: AnchoredDirectory;
   worktreeStaging: AnchoredDirectory;
   projectionLocks: AnchoredDirectory;
@@ -196,6 +247,16 @@ interface OwnerMarker {
   requestDigest: string;
   token: string;
   pid: number;
+  createdAt: string;
+}
+
+interface QuarantineOwnerMarker {
+  schemaVersion: 1;
+  kind: "quarantine";
+  role: "repository" | "allocation";
+  projectionId: string;
+  requestDigest: string;
+  token: string;
   createdAt: string;
 }
 
@@ -402,6 +463,228 @@ export class NativeWslProjectionEngine {
     }
   }
 
+  /** Read bounded projection state without creating control directories or durable state. */
+  async inspect(
+    requestInput: NativeWslProjectionRequest,
+    options: NativeWslProjectionPrepareOptions = {}
+  ): Promise<NativeWslProjectionInspection> {
+    const request = NativeWslProjectionRequest_v1.parse(requestInput);
+    const roots = openNativeRoots(request);
+    const evidence: NativeWslProjectionCommandEvidence[] = [];
+    try {
+      const projectionId = nativeWslProjectionId(request.request_digest);
+      const [quarantine, preparing] = await Promise.all([
+        inspectProjectionQuarantine(roots, projectionId),
+        hasProjectionPreparationState(roots.projectionRoot, projectionId),
+      ]);
+      const repository = tryOpenChildDirectory(
+        roots.projectionRoot,
+        projectionId,
+        "native projection"
+      );
+      const allocation = tryOpenChildDirectory(
+        roots.worktreeRoot,
+        projectionId,
+        "native allocation"
+      );
+      if (!repository || !allocation) {
+        repository?.close();
+        allocation?.close();
+        if (repository || allocation) {
+          return inspectionResult(request, "invalid", quarantine, evidence);
+        }
+        return inspectionResult(request, preparing ? "preparing" : "absent", quarantine, evidence);
+      }
+      allocation.close();
+
+      let manifest: NativeWslProjectionManifest | null;
+      try {
+        manifest = await readProjectionManifest(repository);
+      } finally {
+        repository.close();
+      }
+      if (!manifest) {
+        return inspectionResult(request, "invalid", quarantine, evidence);
+      }
+      const plan = planNativeWslProjection(request, { state: "ready", manifest });
+      if (!plan.selection_allowed) {
+        return inspectionResult(request, "conflicting", quarantine, evidence, manifest);
+      }
+      if (preparing) {
+        return inspectionResult(request, "preparing", quarantine, evidence, manifest);
+      }
+
+      const activeWorktreeCount = await countActiveProjectionWorktrees(roots, manifest);
+      const verified = await this.verifyReady(roots, request, manifest, evidence, options);
+      if (!verified) {
+        return inspectionResult(
+          request,
+          "stale",
+          quarantine,
+          evidence,
+          manifest,
+          activeWorktreeCount
+        );
+      }
+      const selection = readCurrentProjectionSelection(manifest.native_repository.path);
+      return inspectionResult(
+        request,
+        selection ? "ready" : "ready_unselected",
+        quarantine,
+        evidence,
+        manifest,
+        activeWorktreeCount,
+        selection?.selectionDigest
+      );
+    } finally {
+      closeNativeRoots(roots);
+    }
+  }
+
+  /** Remove exact-owned idle state and explicitly retire matching quarantine entries. */
+  async cleanup(
+    requestInput: NativeWslProjectionRequest,
+    includeQuarantine = true
+  ): Promise<NativeWslProjectionCleanupResult> {
+    const request = NativeWslProjectionRequest_v1.parse(requestInput);
+    const projectionId = nativeWslProjectionId(request.request_digest);
+    let boundary: NativeBoundary | undefined;
+    let lock: ProjectionLock | undefined;
+    const removed = { repository: false, allocation: false, quarantineEntries: 0 };
+    try {
+      boundary = openNativeBoundary(request);
+      lock = (await this.acquireLock(boundary, request)) ?? undefined;
+      if (!lock) {
+        return cleanupResult(
+          request,
+          "refused",
+          "concurrent_request",
+          removed,
+          await countMatchingQuarantine(boundary, projectionId)
+        );
+      }
+
+      const repository = tryOpenChildDirectory(
+        boundary.projectionRoot,
+        projectionId,
+        "native projection cleanup"
+      );
+      const allocation = tryOpenChildDirectory(
+        boundary.worktreeRoot,
+        projectionId,
+        "native allocation cleanup"
+      );
+      const manifest = repository ? await readProjectionManifest(repository) : null;
+      if (
+        (repository || allocation) &&
+        (!repository ||
+          !allocation ||
+          !manifest ||
+          !projectionManifestMatchesOwnedState(repository, allocation, manifest, request))
+      ) {
+        repository?.close();
+        allocation?.close();
+        await this.quarantineInvalidReady(boundary, request);
+        return cleanupResult(
+          request,
+          "quarantined",
+          "state_quarantined",
+          removed,
+          await countMatchingQuarantine(boundary, projectionId)
+        );
+      }
+
+      if (repository && allocation && manifest) {
+        const activeWorktreeCount = await countActiveProjectionWorktrees(boundary, manifest);
+        if (activeWorktreeCount > 0) {
+          repository.close();
+          allocation.close();
+          return cleanupResult(
+            request,
+            "refused",
+            "active_worktrees",
+            removed,
+            await countMatchingQuarantine(boundary, projectionId)
+          );
+        }
+        await invalidateProjectionSelection(boundary, request, this.syncDirectory);
+        const allocationMarker = await readOwnerMarker(allocation);
+        const allocationRemoved =
+          allocationMarker?.kind === "allocation_staging" &&
+          allocationMarker.projectionId === projectionId &&
+          allocationMarker.requestDigest === request.request_digest &&
+          (await removeOwnedDirectory(
+            boundary.worktreeRoot,
+            projectionId,
+            allocation,
+            allocationMarker
+          ));
+        if (!allocationRemoved) {
+          repository.close();
+          return cleanupResult(
+            request,
+            "failed",
+            "cleanup_failed",
+            removed,
+            await countMatchingQuarantine(boundary, projectionId)
+          );
+        }
+        removed.allocation = true;
+        this.syncDirectory(boundary.worktreeRoot);
+
+        if (
+          !(await removeManifestOwnedProjection(
+            boundary.projectionRoot,
+            projectionId,
+            repository,
+            manifest
+          ))
+        ) {
+          return cleanupResult(
+            request,
+            "failed",
+            "cleanup_failed",
+            removed,
+            await countMatchingQuarantine(boundary, projectionId)
+          );
+        }
+        removed.repository = true;
+        this.syncDirectory(boundary.projectionRoot);
+      }
+
+      if (includeQuarantine) {
+        removed.quarantineEntries = await removeMatchingQuarantine(
+          boundary,
+          request,
+          this.syncDirectory
+        );
+      }
+      const remaining = await countMatchingQuarantine(boundary, projectionId);
+      const changed = removed.repository || removed.allocation || removed.quarantineEntries > 0;
+      if (remaining > 0) {
+        return cleanupResult(request, "failed", "cleanup_failed", removed, remaining);
+      }
+      return cleanupResult(
+        request,
+        changed ? "cleaned" : "absent",
+        changed ? "cleanup_complete" : "projection_absent",
+        removed,
+        remaining
+      );
+    } catch {
+      return cleanupResult(
+        request,
+        "failed",
+        "cleanup_failed",
+        removed,
+        boundary ? await countMatchingQuarantine(boundary, projectionId).catch(() => 0) : 0
+      );
+    } finally {
+      if (boundary && lock) await this.releaseLock(boundary, lock);
+      closeNativeBoundary(boundary);
+    }
+  }
+
   private async observeSource(
     request: NativeWslProjectionRequest,
     sourceIdentity: SourceIdentity,
@@ -552,7 +835,7 @@ export class NativeWslProjectionEngine {
   }
 
   private async verifyReady(
-    boundary: NativeBoundary,
+    boundary: NativeRoots,
     request: NativeWslProjectionRequest,
     manifest: NativeWslProjectionManifest,
     evidence: NativeWslProjectionCommandEvidence[],
@@ -705,7 +988,9 @@ export class NativeWslProjectionEngine {
             boundary.projectionStaging,
             component,
             remaining,
-            boundary.projectionQuarantine
+            boundary.projectionQuarantine,
+            request,
+            "repository"
           ))
         ) {
           throw new ProjectionPreparationError(
@@ -1255,7 +1540,9 @@ export class NativeWslProjectionEngine {
             directory,
             kind === "projection_staging"
               ? boundary.projectionQuarantine
-              : boundary.worktreeQuarantine
+              : boundary.worktreeQuarantine,
+            request,
+            kind === "projection_staging" ? "repository" : "allocation"
           );
           return {
             ok: false,
@@ -1299,7 +1586,9 @@ export class NativeWslProjectionEngine {
           boundary.projectionRoot,
           projectionId,
           repository,
-          boundary.projectionQuarantine
+          boundary.projectionQuarantine,
+          request,
+          "repository"
         );
         clean = false;
       }
@@ -1315,7 +1604,9 @@ export class NativeWslProjectionEngine {
           boundary.worktreeRoot,
           projectionId,
           allocation,
-          boundary.worktreeQuarantine
+          boundary.worktreeQuarantine,
+          request,
+          "allocation"
         );
         clean = false;
       }
@@ -1348,7 +1639,9 @@ export class NativeWslProjectionEngine {
               boundary.worktreeStaging,
               staging.component,
               remaining,
-              boundary.worktreeQuarantine
+              boundary.worktreeQuarantine,
+              request,
+              "allocation"
             );
           }
           clean = false;
@@ -1378,7 +1671,9 @@ export class NativeWslProjectionEngine {
           boundary.projectionStaging,
           staging.component,
           remaining,
-          boundary.projectionQuarantine
+          boundary.projectionQuarantine,
+          request,
+          "repository"
         );
       }
       clean = false;
@@ -1441,7 +1736,9 @@ export class NativeWslProjectionEngine {
           boundary.worktreeRoot,
           projectionId,
           allocation,
-          boundary.worktreeQuarantine
+          boundary.worktreeQuarantine,
+          request,
+          "allocation"
         );
         if (!allocationQuarantined) {
           throw new ProjectionPreparationError(
@@ -1454,7 +1751,9 @@ export class NativeWslProjectionEngine {
         boundary.projectionRoot,
         projectionId,
         repository,
-        boundary.projectionQuarantine
+        boundary.projectionQuarantine,
+        request,
+        "repository"
       );
       if (!repositoryQuarantined) {
         throw new ProjectionPreparationError(
@@ -1474,7 +1773,7 @@ export class NativeWslProjectionEngine {
     request: NativeWslProjectionRequest
   ): Promise<void> {
     const projectionId = nativeWslProjectionId(request.request_digest);
-    const repository = openChildDirectory(
+    const repository = tryOpenChildDirectory(
       boundary.projectionRoot,
       projectionId,
       "invalid native projection"
@@ -1489,7 +1788,9 @@ export class NativeWslProjectionEngine {
         boundary.worktreeRoot,
         projectionId,
         allocation,
-        boundary.worktreeQuarantine
+        boundary.worktreeQuarantine,
+        request,
+        "allocation"
       );
       if (!allocationQuarantined) {
         throw new ProjectionPreparationError(
@@ -1498,17 +1799,21 @@ export class NativeWslProjectionEngine {
         );
       }
     }
-    const repositoryQuarantined = await this.quarantineDirectory(
-      boundary.projectionRoot,
-      projectionId,
-      repository,
-      boundary.projectionQuarantine
-    );
-    if (!repositoryQuarantined) {
-      throw new ProjectionPreparationError(
-        "cleanup_failed_quarantined",
-        "invalid native repository could not be quarantined"
+    if (repository) {
+      const repositoryQuarantined = await this.quarantineDirectory(
+        boundary.projectionRoot,
+        projectionId,
+        repository,
+        boundary.projectionQuarantine,
+        request,
+        "repository"
       );
+      if (!repositoryQuarantined) {
+        throw new ProjectionPreparationError(
+          "cleanup_failed_quarantined",
+          "invalid native repository could not be quarantined"
+        );
+      }
     }
   }
 
@@ -1516,18 +1821,51 @@ export class NativeWslProjectionEngine {
     parent: AnchoredDirectory,
     component: string,
     directory: AnchoredDirectory,
-    quarantineRoot: AnchoredDirectory
+    quarantineRoot: AnchoredDirectory,
+    request: NativeWslProjectionRequest,
+    role: QuarantineOwnerMarker["role"]
   ): Promise<boolean> {
-    const quarantineComponent = `${component}-${validToken(this.token())}`;
+    const token = validToken(this.token());
+    const quarantineComponent = `${component}-${token}`;
+    let quarantined: AnchoredDirectory | undefined;
     try {
+      const expectedIdentity = identityOf(directory);
       assertAnchoredDirectoryLocation(directory, "quarantined projection state");
       await rename(
         procChildPath(parent, component),
         procChildPath(quarantineRoot, quarantineComponent)
       );
       directory.close();
+      quarantined = openChildDirectory(
+        quarantineRoot,
+        quarantineComponent,
+        "quarantined projection state"
+      );
+      if (!sameDirectoryIdentity(identityOf(quarantined), expectedIdentity)) {
+        quarantined.close();
+        return false;
+      }
+      await writeQuarantineOwnerMarker(
+        quarantined,
+        {
+          schemaVersion: 1,
+          kind: "quarantine",
+          role,
+          projectionId: nativeWslProjectionId(request.request_digest),
+          requestDigest: request.request_digest,
+          token,
+          createdAt: this.now(),
+        },
+        this.stateWriter
+      );
+      this.syncDirectory(quarantined);
+      quarantined.close();
+      quarantined = undefined;
+      this.syncDirectory(quarantineRoot);
+      this.syncDirectory(parent);
       return true;
     } catch {
+      quarantined?.close();
       directory.close();
       return false;
     }
@@ -1679,7 +2017,7 @@ export class NativeWslProjectionEngine {
   }
 }
 
-function openNativeBoundary(request: NativeWslProjectionRequest): NativeBoundary {
+function openNativeRoots(request: NativeWslProjectionRequest): NativeRoots {
   assertDirectoryIdentityBoundarySupported("case-sensitive");
   const projectionIdentity = captureDirectoryIdentity(
     request.native.projection_root,
@@ -1687,14 +2025,32 @@ function openNativeBoundary(request: NativeWslProjectionRequest): NativeBoundary
   );
   const worktreeIdentity = captureDirectoryIdentity(request.native.worktree_root, "worktree root");
   const projectionRoot = reopenDirectoryIdentity(projectionIdentity, "projection root");
-  let worktreeRoot: AnchoredDirectory | undefined;
+  try {
+    return {
+      projectionRoot,
+      worktreeRoot: reopenDirectoryIdentity(worktreeIdentity, "worktree root"),
+    };
+  } catch (error) {
+    projectionRoot.close();
+    throw error;
+  }
+}
+
+function closeNativeRoots(roots?: NativeRoots): void {
+  if (!roots) return;
+  roots.worktreeRoot.close();
+  roots.projectionRoot.close();
+}
+
+function openNativeBoundary(request: NativeWslProjectionRequest): NativeBoundary {
+  const roots = openNativeRoots(request);
+  const { projectionRoot, worktreeRoot } = roots;
   let projectionStaging: AnchoredDirectory | undefined;
   let worktreeStaging: AnchoredDirectory | undefined;
   let projectionLocks: AnchoredDirectory | undefined;
   let projectionQuarantine: AnchoredDirectory | undefined;
   let worktreeQuarantine: AnchoredDirectory | undefined;
   try {
-    worktreeRoot = reopenDirectoryIdentity(worktreeIdentity, "worktree root");
     projectionStaging = ensureControlDirectory(projectionRoot, CONTROL_STAGING);
     worktreeStaging = ensureControlDirectory(worktreeRoot, CONTROL_STAGING);
     projectionLocks = ensureControlDirectory(projectionRoot, CONTROL_LOCKS);
@@ -1715,8 +2071,7 @@ function openNativeBoundary(request: NativeWslProjectionRequest): NativeBoundary
     projectionLocks?.close();
     worktreeStaging?.close();
     projectionStaging?.close();
-    worktreeRoot?.close();
-    projectionRoot.close();
+    closeNativeRoots(roots);
     throw error;
   }
 }
@@ -1753,6 +2108,253 @@ function childDirectoryExists(
   if (!directory) return false;
   directory.close();
   return true;
+}
+
+function inspectionResult(
+  request: NativeWslProjectionRequest,
+  state: NativeWslProjectionLifecycleState,
+  quarantine: NativeWslProjectionInspection["quarantine"],
+  commandEvidence: NativeWslProjectionCommandEvidence[],
+  manifest?: NativeWslProjectionManifest,
+  activeWorktreeCount = 0,
+  selectionDigest?: string
+): NativeWslProjectionInspection {
+  return {
+    state,
+    projectionId: nativeWslProjectionId(request.request_digest),
+    requestDigest: request.request_digest,
+    ...(manifest
+      ? {
+          manifestDigest: manifest.manifest_digest,
+          mappingDigest: manifest.path_mapping.mapping_digest,
+          sourceObservationDigest: manifest.source_observation.observation_digest,
+        }
+      : {}),
+    ...(selectionDigest ? { selectionDigest } : {}),
+    activeWorktreeCount,
+    quarantine,
+    commandEvidence,
+  };
+}
+
+function cleanupResult(
+  request: NativeWslProjectionRequest,
+  outcome: NativeWslProjectionCleanupResult["outcome"],
+  reasonCode: NativeWslProjectionCleanupReason,
+  removed: NativeWslProjectionCleanupResult["removed"],
+  remainingQuarantine: number
+): NativeWslProjectionCleanupResult {
+  return {
+    outcome,
+    reasonCode,
+    projectionId: nativeWslProjectionId(request.request_digest),
+    requestDigest: request.request_digest,
+    removed: { ...removed },
+    remainingQuarantine,
+  };
+}
+
+async function hasProjectionPreparationState(
+  projectionRoot: AnchoredDirectory,
+  projectionId: string
+): Promise<boolean> {
+  const locks = tryOpenChildDirectory(projectionRoot, CONTROL_LOCKS, "projection lock inventory");
+  if (locks) {
+    try {
+      if (childDirectoryExists(locks, projectionId, "projection lock")) return true;
+    } finally {
+      locks.close();
+    }
+  }
+  const staging = tryOpenChildDirectory(
+    projectionRoot,
+    CONTROL_STAGING,
+    "projection staging inventory"
+  );
+  if (!staging) return false;
+  try {
+    return (await boundedDirectoryEntries(staging)).some((entry) =>
+      entry.startsWith(`${projectionId}-`)
+    );
+  } finally {
+    staging.close();
+  }
+}
+
+async function inspectProjectionQuarantine(
+  roots: NativeRoots,
+  projectionId: string
+): Promise<NativeWslProjectionInspection["quarantine"]> {
+  return {
+    repository: await summarizeQuarantine(roots.projectionRoot, projectionId, "repository"),
+    allocation: await summarizeQuarantine(roots.worktreeRoot, projectionId, "allocation"),
+  };
+}
+
+async function summarizeQuarantine(
+  parent: AnchoredDirectory,
+  projectionId: string,
+  kind: "repository" | "allocation"
+): Promise<NativeWslProjectionQuarantineSummary> {
+  const quarantine = tryOpenChildDirectory(
+    parent,
+    CONTROL_QUARANTINE,
+    "projection quarantine inventory"
+  );
+  if (!quarantine) return { count: 0, entryDigests: [], truncated: false };
+  try {
+    const entries = (await boundedDirectoryEntries(quarantine))
+      .filter((entry) => entry.startsWith(`${projectionId}-`))
+      .sort();
+    return {
+      count: entries.length,
+      entryDigests: entries
+        .slice(0, MAX_PUBLIC_QUARANTINE_ENTRIES)
+        .map((entry) => computeCanonicalHash({ kind, entry })),
+      truncated: entries.length > MAX_PUBLIC_QUARANTINE_ENTRIES,
+    };
+  } finally {
+    quarantine.close();
+  }
+}
+
+function readCurrentProjectionSelection(
+  repositoryPath: string
+): VerifiedNativeWslProjectionSelection | null {
+  let repository: AnchoredDirectory | undefined;
+  let gitDirectory: AnchoredDirectory | undefined;
+  try {
+    const identity = captureDirectoryIdentity(repositoryPath, "native projection repository");
+    repository = reopenDirectoryIdentity(identity, "native projection repository");
+    gitDirectory = openChildDirectory(repository, ".git", "native projection Git directory");
+    const selection = NativeWslProjectionSelection_v1.parse(
+      readAnchoredJson(gitDirectory, SELECTION_FILE)
+    );
+    return loadNativeWslProjectionSelection(repositoryPath, selection.selection_digest);
+  } catch {
+    return null;
+  } finally {
+    gitDirectory?.close();
+    repository?.close();
+  }
+}
+
+async function countActiveProjectionWorktrees(
+  roots: NativeRoots,
+  manifest: NativeWslProjectionManifest
+): Promise<number> {
+  let allocation: AnchoredDirectory | undefined;
+  let repository: AnchoredDirectory | undefined;
+  let gitDirectory: AnchoredDirectory | undefined;
+  let registered: AnchoredDirectory | undefined;
+  try {
+    allocation =
+      tryOpenChildDirectory(roots.worktreeRoot, manifest.projection_id, "native allocation root") ??
+      undefined;
+    const allocationEntries = allocation
+      ? (await boundedDirectoryEntries(allocation)).filter((entry) => entry !== OWNER_FILE).length
+      : 0;
+    repository =
+      tryOpenChildDirectory(roots.projectionRoot, manifest.projection_id, "native projection") ??
+      undefined;
+    if (!repository) return allocationEntries;
+    gitDirectory = openChildDirectory(repository, ".git", "native projection Git directory");
+    registered =
+      tryOpenChildDirectory(gitDirectory, "worktrees", "native projection worktree inventory") ??
+      undefined;
+    const registeredEntries = registered ? (await boundedDirectoryEntries(registered)).length : 0;
+    return Math.max(allocationEntries, registeredEntries);
+  } finally {
+    registered?.close();
+    gitDirectory?.close();
+    repository?.close();
+    allocation?.close();
+  }
+}
+
+function projectionManifestMatchesOwnedState(
+  repository: AnchoredDirectory,
+  allocation: AnchoredDirectory,
+  manifest: NativeWslProjectionManifest,
+  request: NativeWslProjectionRequest
+): boolean {
+  const plan = planNativeWslProjection(request, { state: "ready", manifest });
+  return (
+    plan.selection_allowed &&
+    matchesClaim(repository, manifest.native_repository.directory_identity) &&
+    matchesClaim(allocation, manifest.native_worktree_root.directory_identity)
+  );
+}
+
+async function removeManifestOwnedProjection(
+  parent: AnchoredDirectory,
+  component: string,
+  repository: AnchoredDirectory,
+  manifest: NativeWslProjectionManifest
+): Promise<boolean> {
+  try {
+    const current = await readProjectionManifest(repository);
+    if (
+      !current ||
+      current.manifest_digest !== manifest.manifest_digest ||
+      !matchesClaim(repository, manifest.native_repository.directory_identity)
+    ) {
+      repository.close();
+      return false;
+    }
+    assertAnchoredDirectoryLocation(repository, "native projection cleanup");
+    await clearAnchoredDirectory(repository);
+    assertAnchoredDirectoryLocation(repository, "native projection cleanup");
+    repository.close();
+    await rmdir(procChildPath(parent, component));
+    return true;
+  } catch {
+    repository.close();
+    return false;
+  }
+}
+
+async function countMatchingQuarantine(
+  boundary: NativeBoundary,
+  projectionId: string
+): Promise<number> {
+  const [repository, allocation] = await Promise.all([
+    matchingQuarantineEntries(boundary.projectionQuarantine, projectionId),
+    matchingQuarantineEntries(boundary.worktreeQuarantine, projectionId),
+  ]);
+  return repository.length + allocation.length;
+}
+
+async function matchingQuarantineEntries(
+  quarantine: AnchoredDirectory,
+  projectionId: string
+): Promise<string[]> {
+  return (await boundedDirectoryEntries(quarantine))
+    .filter((entry) => entry.startsWith(`${projectionId}-`))
+    .sort();
+}
+
+async function removeMatchingQuarantine(
+  boundary: NativeBoundary,
+  request: NativeWslProjectionRequest,
+  syncDirectory: (directory: AnchoredDirectory) => void
+): Promise<number> {
+  let removed = 0;
+  const projectionId = nativeWslProjectionId(request.request_digest);
+  for (const [quarantine, role] of [
+    [boundary.projectionQuarantine, "repository"],
+    [boundary.worktreeQuarantine, "allocation"],
+  ] as const) {
+    for (const entry of await matchingQuarantineEntries(quarantine, projectionId)) {
+      const directory = tryOpenChildDirectory(quarantine, entry, "quarantined projection cleanup");
+      if (!directory) continue;
+      if (await removeQuarantinedDirectory(quarantine, entry, directory, request, role)) {
+        syncDirectory(quarantine);
+        removed += 1;
+      }
+    }
+  }
+  return removed;
 }
 
 function captureSourceIdentity(sourcePath: string): SourceIdentity {
@@ -1863,6 +2465,14 @@ async function writeOwnerMarker(
   await writer.writeExclusive(directory, OWNER_FILE, `${JSON.stringify(marker)}\n`);
 }
 
+async function writeQuarantineOwnerMarker(
+  directory: AnchoredDirectory,
+  marker: QuarantineOwnerMarker,
+  writer: NativeWslProjectionStateWriter
+): Promise<void> {
+  await writer.writeExclusive(directory, QUARANTINE_OWNER_FILE, `${JSON.stringify(marker)}\n`);
+}
+
 async function writeExclusiveText(
   directory: AnchoredDirectory,
   file: string,
@@ -1893,6 +2503,19 @@ async function readOwnerMarker(directory: AnchoredDirectory): Promise<OwnerMarke
   }
 }
 
+async function readQuarantineOwnerMarker(
+  directory: AnchoredDirectory
+): Promise<QuarantineOwnerMarker | null> {
+  try {
+    const parsed: unknown = JSON.parse(
+      await readBoundedText(path.join(directory.procPath, QUARANTINE_OWNER_FILE))
+    );
+    return isQuarantineOwnerMarker(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function isOwnerMarker(value: unknown): value is OwnerMarker {
   if (typeof value !== "object" || value === null) return false;
   const marker = value as Partial<OwnerMarker>;
@@ -1909,6 +2532,24 @@ function isOwnerMarker(value: unknown): value is OwnerMarker {
     /^[a-f0-9]{16,64}$/u.test(marker.token) &&
     Number.isSafeInteger(marker.pid) &&
     marker.pid! > 0 &&
+    typeof marker.createdAt === "string" &&
+    marker.createdAt.length <= 64
+  );
+}
+
+function isQuarantineOwnerMarker(value: unknown): value is QuarantineOwnerMarker {
+  if (typeof value !== "object" || value === null) return false;
+  const marker = value as Partial<QuarantineOwnerMarker>;
+  return (
+    marker.schemaVersion === 1 &&
+    marker.kind === "quarantine" &&
+    (marker.role === "repository" || marker.role === "allocation") &&
+    typeof marker.projectionId === "string" &&
+    marker.projectionId.length <= 128 &&
+    typeof marker.requestDigest === "string" &&
+    /^sha256:[a-f0-9]{64}$/u.test(marker.requestDigest) &&
+    typeof marker.token === "string" &&
+    /^[a-f0-9]{16,64}$/u.test(marker.token) &&
     typeof marker.createdAt === "string" &&
     marker.createdAt.length <= 64
   );
@@ -2193,6 +2834,36 @@ async function removeExactlyCreatedDirectory(
     assertAnchoredDirectoryLocation(directory, "newly created projection directory");
     await clearAnchoredDirectory(directory);
     assertAnchoredDirectoryLocation(directory, "newly created projection directory");
+    directory.close();
+    await rmdir(procChildPath(parent, component));
+    return true;
+  } catch {
+    directory.close();
+    return false;
+  }
+}
+
+async function removeQuarantinedDirectory(
+  parent: AnchoredDirectory,
+  component: string,
+  directory: AnchoredDirectory,
+  request: NativeWslProjectionRequest,
+  role: QuarantineOwnerMarker["role"]
+): Promise<boolean> {
+  try {
+    const marker = await readQuarantineOwnerMarker(directory);
+    if (
+      !marker ||
+      marker.role !== role ||
+      marker.projectionId !== nativeWslProjectionId(request.request_digest) ||
+      marker.requestDigest !== request.request_digest
+    ) {
+      directory.close();
+      return false;
+    }
+    assertAnchoredDirectoryLocation(directory, "quarantined projection cleanup");
+    await clearAnchoredDirectory(directory);
+    assertAnchoredDirectoryLocation(directory, "quarantined projection cleanup");
     directory.close();
     await rmdir(procChildPath(parent, component));
     return true;

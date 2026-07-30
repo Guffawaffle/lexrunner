@@ -5,6 +5,9 @@ import { join, resolve } from "node:path";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createNativeWslProjectionRequest } from "../src/schemas/agent-work-projection.js";
+import { computeCanonicalHash } from "../src/schemas/task-contract.js";
+
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const roots: string[] = [];
 
@@ -21,6 +24,12 @@ describe("published MCP Attempt lifecycle", () => {
     }>;
 
     const preflight = tools.find((tool) => tool.name === "preflight_attempt_containment");
+    const projectionPrepare = tools.find((tool) => tool.name === "prepare_native_wsl_projection");
+    const projectionStatus = tools.find((tool) => tool.name === "get_native_wsl_projection_status");
+    const projectionCleanup = tools.find((tool) => tool.name === "cleanup_native_wsl_projection");
+    const projectionQuarantine = tools.find(
+      (tool) => tool.name === "inspect_native_wsl_projection_quarantine"
+    );
     const start = tools.find((tool) => tool.name === "start_attempt");
     const prepare = tools.find((tool) => tool.name === "prepare_attempt");
     const status = tools.find((tool) => tool.name === "get_attempt_status");
@@ -36,6 +45,12 @@ describe("published MCP Attempt lifecycle", () => {
     const acceptanceStatus = tools.find((tool) => tool.name === "get_attempt_acceptance");
 
     expect(preflight?.inputSchema.required).toEqual(["runtime"]);
+    expect(projectionPrepare?.inputSchema.required).toEqual(["request", "mutation"]);
+    expect(projectionStatus?.inputSchema.required).toEqual(["request"]);
+    expect(projectionCleanup?.inputSchema.required).toEqual(["request", "mutation"]);
+    expect(projectionQuarantine?.inputSchema.required).toEqual(["request"]);
+    expect(projectionPrepare?.inputSchema.properties?.request).toBeDefined();
+    expect(projectionPrepare?.inputSchema.properties?.mutation).toBeDefined();
     expect(preflight?.inputSchema.properties?.runtime).toBeDefined();
     expect(verificationRun?.inputSchema.required).toEqual(["databasePath", "verification"]);
     expect(verificationStatus?.inputSchema.required).toEqual([
@@ -117,6 +132,82 @@ describe("published MCP Attempt lifecycle", () => {
     });
     expect(output).not.toContain(repositoryRoot);
     expect(after).toEqual(before);
+  });
+
+  it("reads projection status without mutation authority or control-state creation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "lexrunner-mcp-projection-status-"));
+    roots.push(root);
+    const sourceRoot = join(root, "mapped-source");
+    const projectionRoot = join(root, "native-projections");
+    const worktreeRoot = join(root, "native-worktrees");
+    await Promise.all([mkdir(sourceRoot), mkdir(projectionRoot), mkdir(worktreeRoot)]);
+    const request = createNativeWslProjectionRequest({
+      schema_version: "1.0.0",
+      request_id: "mcp-projection-status",
+      repository: {
+        id: "repo-1",
+        expected_remote_hash: computeCanonicalHash("https://example.invalid/repo.git"),
+      },
+      source: {
+        windows_runtime: "windows-git",
+        windows_repository_path: "D:\\dev\\repo",
+        wsl_distribution: "Ubuntu",
+        wsl_git_runtime: "wsl-git",
+        wsl_repository_path: sourceRoot,
+        head_policy: "observe",
+        dirty_policy: "committed_base_only",
+      },
+      native: {
+        host_id: "native-wsl",
+        git_runtime: "wsl-git",
+        projection_root: projectionRoot,
+        worktree_root: worktreeRoot,
+      },
+      base_sha: "a".repeat(40),
+    });
+    const before = (await readdir(root, { recursive: true })).map(String).sort();
+
+    const [response] = await invoke({
+      id: 16,
+      method: "tools/call",
+      params: {
+        name: "get_native_wsl_projection_status",
+        arguments: { request },
+      },
+    });
+    const output = response.result.content[0].text as string;
+
+    expect(JSON.parse(output)).toMatchObject({
+      ok: true,
+      result: {
+        operation: "agent-work.projection.status",
+        state: "absent",
+        nextActions: ["prepare_projection"],
+      },
+    });
+    expect(output).not.toContain(root);
+    expect(output).not.toContain("D:\\dev\\repo");
+    expect((await readdir(root, { recursive: true })).map(String).sort()).toEqual(before);
+  });
+
+  it("keeps projection prepare and cleanup behind the published mutation gate", async () => {
+    for (const [name, action] of [
+      ["prepare_native_wsl_projection", "prepare a native WSL projection"],
+      ["cleanup_native_wsl_projection", "clean up a native WSL projection"],
+    ] as const) {
+      const [response] = await invoke({
+        id: 17,
+        method: "tools/call",
+        params: { name, arguments: {} },
+      });
+      expect(JSON.parse(response.result.content[0].text)).toEqual({
+        error: {
+          code: "mutations_disabled",
+          message: `Mutations not allowed. Set ALLOW_MUTATIONS=true to ${action}.`,
+        },
+        ok: false,
+      });
+    }
   });
 
   it("keeps receipt submission behind the mutation gate", async () => {

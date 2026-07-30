@@ -125,9 +125,13 @@ rationale, supported assisted behavior, and deferred headless guarantees.
   `weave merge-order`, and `gate run`.
 - **Agent/MCP:** use the matching canonical tools and bounded contracts in
   [`docs/AX.md`](docs/AX.md) and [`README.mcp.md`](README.mcp.md).
-- **Assisted agent work:** run `attempt preflight` before packet construction, then use
-  `attempt prepare`, `attempt start`, worker attachment/heartbeat, receipt submission,
-  verification, and acceptance. The foreground host still owns worker launch.
+- **Assisted agent work:** run `attempt preflight` before packet construction. When it reports
+  `broker_required`, use `attempt projection status|prepare` to bind the exact committed base into
+  native WSL, then continue with `attempt prepare`, `attempt start`, worker
+  attachment/heartbeat, receipt submission, verification, and acceptance. The foreground host
+  still owns worker launch. Follow the
+  [native Windows-to-WSL projection workflow](docs/workflows/native-wsl-projection.md) for recovery
+  and cleanup.
 - **Advanced operators:** read the
   [orchestration primitives](docs/architecture/orchestration-primitives.md),
   [headless supervisor boundary](docs/architecture/headless-supervisor.md), and

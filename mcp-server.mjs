@@ -46,6 +46,7 @@ try {
 
 const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
 const containmentPreflightHandler = core.createAgentWorkContainmentPreflightHandler();
+const projectionLifecycleHandlers = core.createNativeWslProjectionLifecycleHandlers();
 const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
 const attemptReceiptHandlers = core.createAttemptReceiptHandlers();
 const attemptVerificationHandlers = core.createAttemptVerificationHandlers();
@@ -84,6 +85,36 @@ const tools = {
       "Read physical-containment capability before constructing an agent-work Attempt packet",
     inputSchema: core.AgentWorkContainmentPreflightRequestJsonSchema,
     call: async (args) => canonicalToolResult(await containmentPreflightHandler.preflight(args)),
+  },
+
+  prepare_native_wsl_projection: {
+    description: "Prepare or exactly reuse an identity-anchored native WSL projection",
+    inputSchema: core.NativeWslProjectionPrepareRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("prepare a native WSL projection", () =>
+        projectionLifecycleHandlers.prepare(args)
+      ),
+  },
+
+  get_native_wsl_projection_status: {
+    description: "Read bounded native WSL projection status without creating state",
+    inputSchema: core.NativeWslProjectionStatusRequestJsonSchema,
+    call: async (args) => canonicalToolResult(await projectionLifecycleHandlers.status(args)),
+  },
+
+  cleanup_native_wsl_projection: {
+    description: "Remove exact idle native WSL projection and quarantine state",
+    inputSchema: core.NativeWslProjectionCleanupRequestJsonSchema,
+    call: async (args) =>
+      mutationToolCall("clean up a native WSL projection", () =>
+        projectionLifecycleHandlers.cleanup(args)
+      ),
+  },
+
+  inspect_native_wsl_projection_quarantine: {
+    description: "Inspect privacy-bounded native WSL projection quarantine state",
+    inputSchema: core.NativeWslProjectionQuarantineRequestJsonSchema,
+    call: async (args) => canonicalToolResult(await projectionLifecycleHandlers.quarantine(args)),
   },
 
   verify_attempt: {

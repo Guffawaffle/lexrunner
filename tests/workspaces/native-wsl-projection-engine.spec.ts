@@ -368,6 +368,249 @@ describe("NativeWslProjectionEngine real Git integration", () => {
     });
   });
 
+  it("inspects absent state without creating control directories", async () => {
+    const request = makeRequest();
+    const before = {
+      projection: await readdir(projectionRoot),
+      worktree: await readdir(worktreeRoot),
+    };
+
+    const inspected = await new NativeWslProjectionEngine().inspect(request);
+
+    expect(inspected).toMatchObject({
+      state: "absent",
+      projectionId: nativeWslProjectionId(request.request_digest),
+      requestDigest: request.request_digest,
+      activeWorktreeCount: 0,
+      quarantine: {
+        repository: { count: 0, entryDigests: [], truncated: false },
+        allocation: { count: 0, entryDigests: [], truncated: false },
+      },
+      commandEvidence: [],
+    });
+    expect(await readdir(projectionRoot)).toEqual(before.projection);
+    expect(await readdir(worktreeRoot)).toEqual(before.worktree);
+  });
+
+  it("reports asymmetric published state as invalid", async () => {
+    const request = makeRequest();
+    const projectionId = nativeWslProjectionId(request.request_digest);
+    await mkdir(join(worktreeRoot, projectionId));
+
+    await expect(new NativeWslProjectionEngine().inspect(request)).resolves.toMatchObject({
+      state: "invalid",
+      projectionId,
+      activeWorktreeCount: 0,
+    });
+  });
+
+  it("reports selected state without exposing machine-local paths", async () => {
+    const request = makeRequest();
+    const prepared = await new NativeWslProjectionEngine().prepare(request);
+    expect(prepared).toMatchObject({ ok: true, outcome: "prepared" });
+    if (!prepared.ok) return;
+
+    const inspected = await new NativeWslProjectionEngine().inspect(request);
+    const serialized = JSON.stringify(inspected);
+
+    expect(inspected).toMatchObject({
+      state: "ready",
+      manifestDigest: prepared.manifest.manifest_digest,
+      selectionDigest: prepared.selection.selection_digest,
+      mappingDigest: prepared.manifest.path_mapping.mapping_digest,
+      sourceObservationDigest: prepared.sourceObservation.observation_digest,
+      activeWorktreeCount: 0,
+    });
+    expect(serialized).not.toContain(sandbox);
+    expect(serialized).not.toContain(WINDOWS_SOURCE);
+  });
+
+  it("cleans exact idle state idempotently", async () => {
+    const request = makeRequest();
+    await expect(new NativeWslProjectionEngine().prepare(request)).resolves.toMatchObject({
+      ok: true,
+      outcome: "prepared",
+    });
+
+    const cleaned = await new NativeWslProjectionEngine().cleanup(request);
+    const replay = await new NativeWslProjectionEngine().cleanup(request);
+
+    expect(cleaned).toMatchObject({
+      outcome: "cleaned",
+      reasonCode: "cleanup_complete",
+      removed: { repository: true, allocation: true, quarantineEntries: 0 },
+      remainingQuarantine: 0,
+    });
+    expect(replay).toMatchObject({
+      outcome: "absent",
+      reasonCode: "projection_absent",
+      removed: { repository: false, allocation: false, quarantineEntries: 0 },
+      remainingQuarantine: 0,
+    });
+    await expect(new NativeWslProjectionEngine().inspect(request)).resolves.toMatchObject({
+      state: "absent",
+    });
+  });
+
+  it("reports cleanup durability failure and remains recoverable on retry", async () => {
+    const request = makeRequest();
+    await expect(new NativeWslProjectionEngine().prepare(request)).resolves.toMatchObject({
+      ok: true,
+      outcome: "prepared",
+    });
+    const failed = await new NativeWslProjectionEngine({
+      syncDirectory: () => {
+        throw new Error("simulated cleanup directory sync failure");
+      },
+    }).cleanup(request);
+
+    expect(failed).toMatchObject({
+      outcome: "failed",
+      reasonCode: "cleanup_failed",
+      removed: { repository: false, allocation: false, quarantineEntries: 0 },
+    });
+    await expect(new NativeWslProjectionEngine().inspect(request)).resolves.toMatchObject({
+      state: "ready_unselected",
+    });
+    await expect(new NativeWslProjectionEngine().cleanup(request)).resolves.toMatchObject({
+      outcome: "cleaned",
+      reasonCode: "cleanup_complete",
+      removed: { repository: true, allocation: true },
+    });
+  });
+
+  it("refuses cleanup while an allocated worktree remains", async () => {
+    const request = makeRequest();
+    const prepared = await new NativeWslProjectionEngine().prepare(request);
+    expect(prepared).toMatchObject({ ok: true, outcome: "prepared" });
+    if (!prepared.ok) return;
+    const target: WorktreeTarget = {
+      repositoryId: request.repository.id,
+      hostId: request.native.host_id,
+      gitRuntime: request.native.git_runtime,
+      projectRoot: prepared.manifest.native_repository.path,
+      worktreePath: join(prepared.manifest.native_worktree_root.path, "attempt-cleanup"),
+      branch: "agent/projection-cleanup",
+      attemptId: "attempt-projection-cleanup",
+      baseSha,
+    };
+    await expect(prepared.broker.create(target)).resolves.toMatchObject({
+      ok: true,
+      outcome: "created",
+    });
+
+    await expect(new NativeWslProjectionEngine().cleanup(request)).resolves.toMatchObject({
+      outcome: "refused",
+      reasonCode: "active_worktrees",
+    });
+    await expect(new NativeWslProjectionEngine().inspect(request)).resolves.toMatchObject({
+      state: "ready",
+      activeWorktreeCount: 1,
+    });
+
+    await expect(prepared.broker.remove(target)).resolves.toMatchObject({
+      ok: true,
+      outcome: "removed",
+    });
+    await expect(new NativeWslProjectionEngine().cleanup(request)).resolves.toMatchObject({
+      outcome: "cleaned",
+      reasonCode: "cleanup_complete",
+    });
+  });
+
+  it("quarantines ambiguous active state before explicit quarantine cleanup", async () => {
+    const request = makeRequest();
+    const projectionId = nativeWslProjectionId(request.request_digest);
+    await mkdir(join(projectionRoot, projectionId));
+    await mkdir(join(worktreeRoot, projectionId));
+    await writeFile(join(projectionRoot, projectionId, "sentinel"), "ambiguous\n");
+    await writeFile(join(worktreeRoot, projectionId, "sentinel"), "ambiguous\n");
+
+    const quarantined = await new NativeWslProjectionEngine().cleanup(request);
+    const inspected = await new NativeWslProjectionEngine().inspect(request);
+    const cleaned = await new NativeWslProjectionEngine().cleanup(request);
+
+    expect(quarantined).toMatchObject({
+      outcome: "quarantined",
+      reasonCode: "state_quarantined",
+      remainingQuarantine: 2,
+    });
+    expect(inspected).toMatchObject({
+      state: "absent",
+      quarantine: {
+        repository: { count: 1 },
+        allocation: { count: 1 },
+      },
+    });
+    expect(inspected.quarantine.repository.entryDigests[0]).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(cleaned).toMatchObject({
+      outcome: "cleaned",
+      reasonCode: "cleanup_complete",
+      removed: { quarantineEntries: 2 },
+      remainingQuarantine: 0,
+    });
+  });
+
+  it("leaves quarantine without exact engine ownership visible and untouched", async () => {
+    const request = makeRequest();
+    const projectionId = nativeWslProjectionId(request.request_digest);
+    await expect(new NativeWslProjectionEngine().cleanup(request)).resolves.toMatchObject({
+      outcome: "absent",
+    });
+    const unknown = join(projectionRoot, QUARANTINE_DIRECTORY, `${projectionId}-aaaaaaaaaaaaaaaa`);
+    await mkdir(unknown);
+    await writeFile(join(unknown, "sentinel"), "not engine-owned\n", "utf8");
+
+    await expect(new NativeWslProjectionEngine().cleanup(request)).resolves.toMatchObject({
+      outcome: "failed",
+      reasonCode: "cleanup_failed",
+      removed: { quarantineEntries: 0 },
+      remainingQuarantine: 1,
+    });
+    await expect(readFile(join(unknown, "sentinel"), "utf8")).resolves.toBe("not engine-owned\n");
+    await expect(new NativeWslProjectionEngine().inspect(request)).resolves.toMatchObject({
+      state: "absent",
+      quarantine: { repository: { count: 1 } },
+    });
+  });
+
+  it("recovers quarantine cleanup after ownership-directory sync failure", async () => {
+    const request = makeRequest();
+    const projectionId = nativeWslProjectionId(request.request_digest);
+    await mkdir(join(projectionRoot, projectionId));
+    await mkdir(join(worktreeRoot, projectionId));
+    await writeFile(join(projectionRoot, projectionId, "sentinel"), "ambiguous\n");
+    await writeFile(join(worktreeRoot, projectionId, "sentinel"), "ambiguous\n");
+    let failedSync = false;
+    const first = await new NativeWslProjectionEngine({
+      syncDirectory: () => {
+        if (!failedSync) {
+          failedSync = true;
+          throw new Error("simulated quarantine ownership-directory sync failure");
+        }
+      },
+    }).cleanup(request);
+    const reconciled = await new NativeWslProjectionEngine().cleanup(request);
+    const cleaned = await new NativeWslProjectionEngine().cleanup(request);
+
+    expect(first).toMatchObject({
+      outcome: "failed",
+      reasonCode: "cleanup_failed",
+      remainingQuarantine: 1,
+    });
+    expect(reconciled).toMatchObject({
+      outcome: "quarantined",
+      reasonCode: "state_quarantined",
+      remainingQuarantine: 2,
+    });
+    expect(cleaned).toMatchObject({
+      outcome: "cleaned",
+      reasonCode: "cleanup_complete",
+      removed: { quarantineEntries: 2 },
+      remainingQuarantine: 0,
+    });
+  });
+
   it("rejects dirty, mismatched-head, missing, non-commit, and wrong-remote sources before staging", async () => {
     await writeFile(join(sourceRoot, "dirty.txt"), "dirty\n", "utf8");
     const dirty = await new NativeWslProjectionEngine().prepare(

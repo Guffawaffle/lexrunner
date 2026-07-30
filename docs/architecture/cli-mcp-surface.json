@@ -67,6 +67,11 @@
       "attempt acceptance apply",
       "attempt acceptance status",
       "attempt preflight",
+      "attempt projection",
+      "attempt projection cleanup",
+      "attempt projection prepare",
+      "attempt projection quarantine",
+      "attempt projection status",
       "attempt prepare",
       "attempt receipt",
       "attempt receipt status",
@@ -219,6 +224,10 @@
           "attempt acceptance apply",
           "attempt acceptance status",
           "attempt preflight",
+          "attempt projection cleanup",
+          "attempt projection prepare",
+          "attempt projection quarantine",
+          "attempt projection status",
           "attempt prepare",
           "attempt receipt status",
           "attempt receipt submit",
@@ -240,6 +249,7 @@
     "canonical": [
       "accept_attempt",
       "attach_attempt_worker",
+      "cleanup_native_wsl_projection",
       "config.show",
       "discover",
       "doctor",
@@ -250,17 +260,20 @@
       "get_attempt_status",
       "get_attempt_verification",
       "get_attempt_worker",
+      "get_native_wsl_projection_status",
       "heartbeat_attempt_worker",
       "local.init",
       "merge-order",
       "merge.apply",
       "plan.create",
       "preflight_attempt_containment",
+      "prepare_native_wsl_projection",
       "prepare_attempt",
       "profile.resolve",
       "start_attempt",
       "status",
       "submit_attempt_receipt",
+      "inspect_native_wsl_projection_quarantine",
       "verify_attempt",
       "workflow.guide"
     ],
@@ -294,17 +307,21 @@
         "operations": [
           "accept_attempt",
           "attach_attempt_worker",
+          "cleanup_native_wsl_projection",
           "end_attempt_worker",
           "get_attempt_acceptance",
           "get_attempt_receipt",
           "get_attempt_status",
           "get_attempt_verification",
           "get_attempt_worker",
+          "get_native_wsl_projection_status",
           "heartbeat_attempt_worker",
           "preflight_attempt_containment",
+          "prepare_native_wsl_projection",
           "prepare_attempt",
           "start_attempt",
           "submit_attempt_receipt",
+          "inspect_native_wsl_projection_quarantine",
           "verify_attempt"
         ]
       }
@@ -320,6 +337,11 @@
         "tool": "attach_attempt_worker",
         "cli": "attempt worker attach",
         "owner": "AgentWorkWorkerSessionService"
+      },
+      {
+        "tool": "cleanup_native_wsl_projection",
+        "cli": "attempt projection cleanup",
+        "owner": "NativeWslProjectionLifecycleHandlers"
       },
       {
         "tool": "config.show",
@@ -372,6 +394,11 @@
         "owner": "AgentWorkWorkerSessionService"
       },
       {
+        "tool": "get_native_wsl_projection_status",
+        "cli": "attempt projection status",
+        "owner": "NativeWslProjectionLifecycleHandlers"
+      },
+      {
         "tool": "heartbeat_attempt_worker",
         "cli": "attempt worker heartbeat",
         "owner": "AgentWorkWorkerSessionService"
@@ -402,6 +429,11 @@
         "owner": "AgentWorkContainmentCapabilityService"
       },
       {
+        "tool": "prepare_native_wsl_projection",
+        "cli": "attempt projection prepare",
+        "owner": "NativeWslProjectionLifecycleHandlers"
+      },
+      {
         "tool": "prepare_attempt",
         "cli": "attempt prepare",
         "owner": "AgentWorkLifecycleService"
@@ -425,6 +457,11 @@
         "tool": "submit_attempt_receipt",
         "cli": "attempt receipt submit",
         "owner": "AgentWorkAttemptReceiptService"
+      },
+      {
+        "tool": "inspect_native_wsl_projection_quarantine",
+        "cli": "attempt projection quarantine",
+        "owner": "NativeWslProjectionLifecycleHandlers"
       },
       {
         "tool": "verify_attempt",
