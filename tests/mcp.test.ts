@@ -109,12 +109,14 @@ describe("MCP Parameter Validation", () => {
   it("should validate MergeApplyArgs", () => {
     // Valid args
     expect(() => MergeApplyArgs.parse({})).not.toThrow();
+    expect(() => MergeApplyArgs.parse({ planFile: "plan.json", dryRun: true })).not.toThrow();
     expect(() => MergeApplyArgs.parse({ dryRun: true })).not.toThrow();
     expect(() => MergeApplyArgs.parse({ dryRun: false })).not.toThrow();
 
     // Invalid args
     expect(() => MergeApplyArgs.parse({ dryRun: "true" })).toThrow();
     expect(() => MergeApplyArgs.parse({ dryRun: 1 })).toThrow();
+    expect(() => MergeApplyArgs.parse({ planFile: "" })).toThrow();
   });
 });
 

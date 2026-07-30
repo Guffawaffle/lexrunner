@@ -132,6 +132,12 @@ export const ErrorCodes = {
   PLAN_VALIDATION_FAILED: "PLAN_VALIDATION_FAILED",
   /** Plan file not found */
   PLAN_NOT_FOUND: "PLAN_NOT_FOUND",
+  /** Explicit plan reference is empty, overlong, or otherwise invalid */
+  PLAN_REFERENCE_INVALID: "PLAN_REFERENCE_INVALID",
+  /** Plan reference exists but cannot be read as a bounded regular file */
+  PLAN_UNREADABLE: "PLAN_UNREADABLE",
+  /** Plan exceeds the bounded integration artifact limits */
+  PLAN_ARTIFACT_LIMIT_EXCEEDED: "PLAN_ARTIFACT_LIMIT_EXCEEDED",
   /** Cycle detected in plan item dependencies */
   PLAN_CYCLE_DETECTED: "PLAN_CYCLE_DETECTED",
   /** Referenced dependency not found in plan */

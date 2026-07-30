@@ -49,7 +49,8 @@ export interface GateExecutionServiceResult {
 
 export class GateExecutionServiceError extends Error {
   constructor(
-    readonly code: "GATE_EXECUTION_FAILED" | "GATE_RESULT_LIMIT_EXCEEDED",
+    readonly code:
+      "GATE_EXECUTION_FAILED" | "GATE_RESULT_LIMIT_EXCEEDED" | "GATE_SELECTION_NOT_FOUND",
     message: string
   ) {
     super(message);
@@ -62,6 +63,7 @@ export class GateExecutionService {
   constructor(private readonly execute: GateExecutor = executeGatesWithPolicy) {}
 
   async run(input: GateExecutionServiceInput): Promise<GateExecutionServiceResult> {
+    assertSelectionExists(input);
     const executionState = input.executionState ?? new ExecutionState(input.plan);
     try {
       await this.execute(
@@ -72,7 +74,11 @@ export class GateExecutionService {
         input.progressReporter,
         input.skipValidation,
         input.repoRoot,
-        input.options
+        {
+          ...input.options,
+          onlyItem: input.onlyItem,
+          onlyGate: input.onlyGate,
+        }
       );
     } catch {
       throw new GateExecutionServiceError(
@@ -115,6 +121,27 @@ export class GateExecutionService {
         ],
       },
     };
+  }
+}
+
+function assertSelectionExists(input: GateExecutionServiceInput): void {
+  const selectedItems = input.onlyItem
+    ? input.plan.items.filter(({ name }) => name === input.onlyItem)
+    : input.plan.items;
+  if (input.onlyItem && selectedItems.length === 0) {
+    throw new GateExecutionServiceError(
+      "GATE_SELECTION_NOT_FOUND",
+      "The selected plan item does not exist"
+    );
+  }
+  if (
+    input.onlyGate &&
+    !selectedItems.some(({ gates }) => gates.some(({ name }) => name === input.onlyGate))
+  ) {
+    throw new GateExecutionServiceError(
+      "GATE_SELECTION_NOT_FOUND",
+      "The selected gate does not exist on the selected plan items"
+    );
   }
 }
 

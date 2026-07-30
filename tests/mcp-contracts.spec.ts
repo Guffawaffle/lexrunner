@@ -114,12 +114,14 @@ describe("MCP Contract Tests", () => {
     it("should validate MergeApplyArgs schema correctly", () => {
       // Valid arguments
       expect(() => MergeApplyArgs.parse({})).not.toThrow();
+      expect(() => MergeApplyArgs.parse({ planFile: "plan.json", dryRun: true })).not.toThrow();
       expect(() => MergeApplyArgs.parse({ dryRun: true })).not.toThrow();
       expect(() => MergeApplyArgs.parse({ dryRun: false })).not.toThrow();
 
       // Invalid arguments
       expect(() => MergeApplyArgs.parse({ dryRun: "true" })).toThrow();
       expect(() => MergeApplyArgs.parse({ dryRun: 1 })).toThrow();
+      expect(() => MergeApplyArgs.parse({ planFile: "" })).toThrow();
     });
   });
 

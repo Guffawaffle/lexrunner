@@ -62,6 +62,11 @@ silently alias Task to Work/Run/Attempt.
 
 `Plan`, `Gate`, and `Weave` belong to the stateless integration core. Their
 services consume frozen inputs and must not read CoordinationStore authority.
+Overlapping MCP integration operations resolve one immutable plan artifact by
+explicit reference, repository-root `plan.json`, then the legacy profile runner
+fallback. Their path-independent canonical identity lets callers prove that
+status, ordering, gate execution, and merge preview consumed the same content
+without introducing mutable active-plan state.
 
 ## Adapter rule
 

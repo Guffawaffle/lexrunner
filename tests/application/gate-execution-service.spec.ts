@@ -21,7 +21,7 @@ describe("GateExecutionService", () => {
       });
     });
     const result = await new GateExecutionService(execute).run({
-      plan: plan(["one"]),
+      plan: plan(["one"], ["test"]),
       artifactDir: "/tmp/gate-artifacts",
     });
     expect(result.summary).toEqual({
@@ -34,11 +34,10 @@ describe("GateExecutionService", () => {
   });
 
   it("applies the same item and gate filters used by MCP", async () => {
-    const execute = vi.fn(async (_plan: Plan, state: ExecutionState) => {
-      for (const item of ["one", "two"]) {
-        state.updateGateResult(item, { gate: "test", status: "pass", attempts: 1 });
-        state.updateGateResult(item, { gate: "lint", status: "pass", attempts: 1 });
-      }
+    const execute = vi.fn(async (_plan: Plan, state: ExecutionState, ...args: unknown[]) => {
+      const options = args[5] as { onlyItem?: string; onlyGate?: string };
+      expect(options).toMatchObject({ onlyItem: "two", onlyGate: "lint" });
+      state.updateGateResult("two", { gate: "lint", status: "pass", attempts: 1 });
     });
     const result = await new GateExecutionService(execute).run({
       plan: plan(["one", "two"]),
@@ -47,8 +46,22 @@ describe("GateExecutionService", () => {
       onlyGate: "lint",
     });
     expect(result.summary.items).toEqual([
-      { name: "two", status: "pass", gates: [{ name: "lint", status: "pass" }] },
+      { name: "two", status: "skipped", gates: [{ name: "lint", status: "pass" }] },
     ]);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("rejects item and gate selections that do not exist", async () => {
+    const execute = vi.fn(async () => undefined);
+    const service = new GateExecutionService(execute);
+
+    await expect(
+      service.run({ plan: plan(["one"]), artifactDir: "artifacts", onlyItem: "two" })
+    ).rejects.toMatchObject({ code: "GATE_SELECTION_NOT_FOUND" });
+    await expect(
+      service.run({ plan: plan(["one"]), artifactDir: "artifacts", onlyGate: "missing" })
+    ).rejects.toMatchObject({ code: "GATE_SELECTION_NOT_FOUND" });
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("maps executor failures and excessive collections to stable bounded codes", async () => {
@@ -73,10 +86,18 @@ describe("GateExecutionService", () => {
   });
 });
 
-function plan(names: string[]): Plan {
+function plan(names: string[], gateNames = ["test", "lint"]): Plan {
   return {
     schemaVersion: "1.0.0",
     target: "main",
-    items: names.map((name) => ({ name, sha: "a".repeat(40), deps: [], gates: [] })),
+    items: names.map((name) => ({
+      name,
+      deps: [],
+      gates: gateNames.map((gateName) => ({
+        name: gateName,
+        run: 'node -e "process.exit(0)"',
+        env: {},
+      })),
+    })),
   };
 }

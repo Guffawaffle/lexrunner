@@ -428,11 +428,21 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 
 > **Deprecated alias:** `gates.run`
 
+All overlapping integration tools use the same plan-reference precedence:
+
+1. `planFile`, when supplied. The explicit reference is authoritative and never falls through.
+2. `plan.json` in the repository root.
+3. `<profile>/runner/plan.json` as the backward-compatible `plan_create` fallback.
+
+Their results include the same path-independent `planArtifact` identity. Compare its canonical
+`digest` to verify that status, merge ordering, gate execution, and merge preview consumed the
+same frozen plan.
+
 **Parameters:**
 
-- `planFile` (string, optional): Path to external plan.json file. If not provided, uses internal state from the profile directory.
-- `onlyItem` (string, optional): Run gates for specific item only
-- `onlyGate` (string, optional): Run specific gate only
+- `planFile` (string, optional): Explicit path to an authored plan
+- `onlyItem` (string, optional): Execute gates for this item only
+- `onlyGate` (string, optional): Execute this gate only
 - `outDir` (string, optional): Output directory for gate results
 
 **Returns:**
@@ -451,11 +461,20 @@ Executes gates for plan items. Can work with either an internal plan (created vi
       ]
     }
   ],
-  "allGreen": true
+  "allGreen": true,
+  "planArtifact": {
+    "contract": "plan-artifact-identity-v1",
+    "kind": "execution-plan",
+    "schema": "lexrunner.execution-plan",
+    "schemaVersion": "1.0.0",
+    "digest": "sha256:...",
+    "target": "main",
+    "itemCount": 1
+  }
 }
 ```
 
-**Example (using internal plan):**
+**Example (using repository or profile fallback):**
 
 ```json
 {
@@ -481,7 +500,8 @@ Executes gates for plan items. Can work with either an internal plan (created vi
 
 **Use Cases:**
 
-- **Internal state**: Run gates on a plan created via `mcp_lexrunner_plan_create` (default behavior)
+- **Authored plan**: Run gates directly from a repository-root or explicitly referenced plan
+- **Profile fallback**: Continue using a plan created via `mcp_lexrunner_plan_create`
 - **External orchestration**: Run gates on programmatically-created or externally-managed plan files
 - **Parallel workflows**: Execute gates on multiple independent plans in parallel merge-weave operations
 
@@ -493,14 +513,29 @@ Applies merge operations with environment-based gating.
 
 **Parameters:**
 
+- `planFile` (string, optional): Explicit path to an authored plan, using the same fallback precedence as gate execution
 - `dryRun` (boolean, optional): Simulate merge without making changes (default: `true`)
 
 **Returns:**
 
 ```json
 {
-  "allowed": false,
-  "message": "Mutations not allowed. Set ALLOW_MUTATIONS=true or use dryRun=true."
+  "mode": "dry-run",
+  "dryRun": true,
+  "ok": true,
+  "status": "preview",
+  "totalItems": 1,
+  "levels": [["item1"]],
+  "artifactRefs": [],
+  "planArtifact": {
+    "contract": "plan-artifact-identity-v1",
+    "kind": "execution-plan",
+    "schema": "lexrunner.execution-plan",
+    "schemaVersion": "1.0.0",
+    "digest": "sha256:...",
+    "target": "main",
+    "itemCount": 1
+  }
 }
 ```
 
@@ -510,6 +545,7 @@ Applies merge operations with environment-based gating.
 {
   "name": "mcp_lexrunner_weave_apply",
   "arguments": {
+    "planFile": "plan.json",
     "dryRun": true
   }
 }
@@ -580,6 +616,7 @@ const externalGatesResult = await client.callTool("mcp_lexrunner_gate_run", {
 
 // Check merge eligibility (dry run)
 const mergeResult = await client.callTool("mcp_lexrunner_weave_apply", {
+  planFile: "/tmp/merge-batch/plan.json",
   dryRun: true,
 });
 ```

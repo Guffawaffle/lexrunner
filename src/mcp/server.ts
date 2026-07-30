@@ -34,6 +34,10 @@ import {
   MergeApplicationServiceError,
 } from "../application/merge-application-service.js";
 import {
+  PlanArtifactService,
+  PlanArtifactServiceError,
+} from "../application/plan-artifact-service.js";
+import {
   ConfigurationQueryService,
   WorkspaceConfigServiceError,
   WorkspaceDiagnosticsService,
@@ -221,6 +225,17 @@ function planValidationToolResult(error: unknown): McpTextToolResult | undefined
       },
     ],
   };
+}
+
+function throwPlanArtifactError(tool: string, error: PlanArtifactServiceError): never {
+  throwMcpAXError(
+    error.code === "PLAN_UNREADABLE" ? ErrorCode.InternalError : ErrorCode.InvalidParams,
+    mcpToolError(error.code, error.message, {
+      tool,
+      operation: "resolve plan artifact",
+      details: error.source ? { source: error.source } : undefined,
+    })
+  );
 }
 
 /**
@@ -451,7 +466,7 @@ function createServer(options?: McpServerOptions): Server {
               planFile: {
                 type: "string",
                 description:
-                  "Path to external plan.json file (optional, uses internal state if not provided)",
+                  "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
               },
               onlyItem: {
                 type: "string",
@@ -474,6 +489,11 @@ function createServer(options?: McpServerOptions): Server {
           inputSchema: {
             type: "object",
             properties: {
+              planFile: {
+                type: "string",
+                description:
+                  "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
+              },
               dryRun: {
                 type: "boolean",
                 description: "Simulate merge without making changes",
@@ -786,8 +806,8 @@ function createServer(options?: McpServerOptions): Server {
             properties: {
               planFile: {
                 type: "string",
-                description: "Path to plan.json file (default: plan.json)",
-                default: "plan.json",
+                description:
+                  "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
               },
             },
           },
@@ -815,8 +835,8 @@ function createServer(options?: McpServerOptions): Server {
             properties: {
               planFile: {
                 type: "string",
-                description: "Path to plan.json file (default: plan.json)",
-                default: "plan.json",
+                description:
+                  "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
               },
             },
           },
@@ -1736,58 +1756,25 @@ async function handleGatesRun(
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
     const env = getMCPEnvironment();
-
-    let planPath: string;
-    let outDirBase: string;
-
-    // Use planFile if provided, otherwise fall back to internal state
-    if (args.planFile) {
-      // Validate that the plan file exists
-      if (!fs.existsSync(args.planFile)) {
-        throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
-      }
-
-      planPath = args.planFile;
-      // For external plans, use the plan file's directory as the base for output
-      outDirBase = path.dirname(args.planFile);
-    } else {
-      // Resolve profile directory for internal state
-      const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
-
-      // Load plan from resolved profile directory
-      planPath = path.join(resolved.path, "runner", "plan.json");
-      if (!fs.existsSync(planPath)) {
-        throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
-      }
-
-      outDirBase = path.join(resolved.path, "runner");
-    }
-
-    let planContent: string;
-    try {
-      planContent = fs.readFileSync(planPath, "utf-8");
-    } catch (error) {
-      const axError = mcpToolError(
-        ErrorCodes.PLAN_NOT_FOUND,
-        `Failed to read plan file ${planPath}`,
-        { tool: "gates.run", operation: "read plan file" }
-      );
-      throwMcpAXError(ErrorCode.InternalError, axError);
-    }
-
-    const plan = loadPlan(planContent);
+    const artifact = new PlanArtifactService().resolve({
+      planFile: args.planFile,
+      workingDir: process.cwd(),
+      profileDir: env.LEX_PR_PROFILE_DIR,
+    });
 
     // Determine output directory
-    const outDir = args.outDir || path.join(outDirBase, "gates");
+    const outDir = args.outDir || path.join(path.dirname(artifact.filePath), "gates");
 
-    const result: GatesRunResult = (
+    const summary = (
       await new GateExecutionService().run({
-        plan,
+        plan: artifact.plan,
         artifactDir: outDir,
         onlyItem: args.onlyItem,
         onlyGate: args.onlyGate,
+        options: { emitReceipt: false, suppressStdout: true },
       })
     ).summary;
+    const result: GatesRunResult = { ...summary, planArtifact: artifact.identity };
 
     return {
       content: [
@@ -1807,10 +1794,11 @@ async function handleGatesRun(
         mcpToolError(error.code, error.message, { tool: "gates.run" })
       );
     }
-    // Check for plan not found specifically
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("Plan file not found") || message.includes("No plan found")) {
-      throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(args.planFile));
+    if (error instanceof PlanArtifactServiceError) {
+      throwPlanArtifactError("gates.run", error);
+    }
+    if (error instanceof McpError) {
+      throw error;
     }
     throwMcpToolError(ErrorCode.InternalError, "gates.run", error, "run gates");
   }
@@ -1824,33 +1812,28 @@ async function handleMergeApply(
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
     const env = getMCPEnvironment();
+    const artifact = new PlanArtifactService().resolve({
+      planFile: args.planFile,
+      workingDir: process.cwd(),
+      profileDir: env.LEX_PR_PROFILE_DIR,
+    });
 
-    // Resolve profile directory first to check role
-    const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
-
-    // Validate CI environment if role is 'ci'
-    validateCIEnvironment(resolved.manifest);
-
-    // Get CI-aware mutation policy
-    const allowMutations = getCIMutationPolicy(resolved.manifest);
-
-    // Load the canonical plan before entering the shared mutation boundary.
-    const planPath = path.join(resolved.path, "runner", "plan.json");
-    if (!fs.existsSync(planPath)) {
-      throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planPath));
+    let allowMutations = false;
+    if (args.dryRun === false) {
+      const resolved = resolveProfile(env.LEX_PR_PROFILE_DIR, process.cwd());
+      validateCIEnvironment(resolved.manifest);
+      allowMutations = getCIMutationPolicy(resolved.manifest);
     }
 
-    const planContent = fs.readFileSync(planPath, "utf-8");
-    const plan = loadPlan(planContent);
-
-    const result = (
+    const summary = (
       await new MergeApplicationService().run({
-        plan,
+        plan: artifact.plan,
         workingDir: process.cwd(),
         dryRun: args.dryRun ?? true,
         mutationAuthorized: allowMutations,
       })
     ).summary;
+    const result = { ...summary, planArtifact: artifact.identity };
 
     return {
       content: [
@@ -1870,9 +1853,11 @@ async function handleMergeApply(
         mcpToolError(error.code, error.message, { tool: "merge.apply" })
       );
     }
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("No plan found")) {
-      throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError());
+    if (error instanceof PlanArtifactServiceError) {
+      throwPlanArtifactError("merge.apply", error);
+    }
+    if (error instanceof McpError) {
+      throw error;
     }
     throwMcpToolError(ErrorCode.InternalError, "merge.apply", error, "apply merge");
   }
@@ -2428,19 +2413,15 @@ async function handleStatus(args: {
   planFile?: string;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
-    const planFile = args.planFile || "plan.json";
-
-    if (!fs.existsSync(planFile)) {
-      throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
-    }
-
-    const planContent = fs.readFileSync(planFile, "utf-8");
-    const plan = loadPlan(planContent);
-
-    const status = new IntegrationStatusQueryService().run(plan);
+    const artifact = new PlanArtifactService().resolve({
+      planFile: args.planFile,
+      workingDir: process.cwd(),
+      profileDir: getMCPEnvironment().LEX_PR_PROFILE_DIR,
+    });
+    const status = new IntegrationStatusQueryService().run(artifact.plan);
 
     // Calculate tier metrics from plan items
-    const tierAssignments = suggestTiersForPlan(plan.items);
+    const tierAssignments = suggestTiersForPlan(artifact.plan.items);
     const tierMetrics = calculateTierMetrics(tierAssignments);
 
     // Run environment quality check for hostility score
@@ -2455,6 +2436,7 @@ async function handleStatus(args: {
 
     const result = {
       ...status,
+      planArtifact: artifact.identity,
       governance: governanceStatusToJSON(governanceStatus),
     };
 
@@ -2472,6 +2454,9 @@ async function handleStatus(args: {
 
     if (error instanceof McpError) {
       throw error;
+    }
+    if (error instanceof PlanArtifactServiceError) {
+      throwPlanArtifactError("status", error);
     }
     throwMcpToolError(ErrorCode.InternalError, "status", error, "get status");
   }
@@ -2515,16 +2500,15 @@ async function handleMergeOrder(args: {
   planFile?: string;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
-    const planFile = args.planFile || "plan.json";
-
-    if (!fs.existsSync(planFile)) {
-      throwMcpAXError(ErrorCode.InvalidParams, planNotFoundError(planFile));
-    }
-
-    const planContent = fs.readFileSync(planFile, "utf-8");
-    const plan = loadPlan(planContent);
-
-    const result = new MergeOrderQueryService().run(plan);
+    const artifact = new PlanArtifactService().resolve({
+      planFile: args.planFile,
+      workingDir: process.cwd(),
+      profileDir: getMCPEnvironment().LEX_PR_PROFILE_DIR,
+    });
+    const result = {
+      ...new MergeOrderQueryService().run(artifact.plan),
+      planArtifact: artifact.identity,
+    };
 
     return {
       content: [
@@ -2546,6 +2530,9 @@ async function handleMergeOrder(args: {
         ErrorCode.InvalidParams,
         mcpToolError(error.code, error.message, { tool: "merge-order" })
       );
+    }
+    if (error instanceof PlanArtifactServiceError) {
+      throwPlanArtifactError("merge-order", error);
     }
     // Handle AXErrorException instances (including CycleError, UnknownDependencyError)
     if (isAXErrorException(error)) {

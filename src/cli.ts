@@ -1371,6 +1371,17 @@ export {
   MergeApplicationService,
   MergeApplicationServiceError,
 } from "./application/merge-application-service.js";
+export {
+  PlanArtifactService,
+  PlanArtifactServiceError,
+} from "./application/plan-artifact-service.js";
+export type {
+  PlanArtifactFailureCode,
+  PlanArtifactIdentity,
+  PlanArtifactSource,
+  ResolvedPlanArtifact,
+  ResolvePlanArtifactInput,
+} from "./application/plan-artifact-service.js";
 export type {
   BoundedMergeApplicationResult,
   MergeApplicationExecution,

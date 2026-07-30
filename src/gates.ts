@@ -54,7 +54,8 @@ export async function executeGate(
   itemName?: string,
   skipValidation: boolean = false,
   repoRoot?: string,
-  turnCostTracker?: MergeWeaveTurnCost
+  turnCostTracker?: MergeWeaveTurnCost,
+  suppressStdout: boolean = false
 ): Promise<GateResult> {
   // Validate gate input before execution (unless explicitly skipped)
   if (!skipValidation && gate.input) {
@@ -85,9 +86,11 @@ export async function executeGate(
     // Add backoff delay for retries
     if (attempt > 1 && retryConfig.backoffSeconds > 0) {
       const delayMs = retryConfig.backoffSeconds * 1000;
-      console.log(
-        `⏳ Retrying gate '${gate.name}' (attempt ${attempt}/${retryConfig.maxAttempts}) after ${retryConfig.backoffSeconds}s delay...`
-      );
+      if (!suppressStdout) {
+        console.log(
+          `⏳ Retrying gate '${gate.name}' (attempt ${attempt}/${retryConfig.maxAttempts}) after ${retryConfig.backoffSeconds}s delay...`
+        );
+      }
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
@@ -126,7 +129,14 @@ export async function executeGate(
 
         // Write flake report if there were retries
         if (itemName && attemptRecords.length > 1) {
-          await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+          await writeFlakeReport(
+            itemName,
+            gate.name,
+            attemptRecords,
+            totalDuration,
+            artifactDir,
+            suppressStdout
+          );
         }
 
         return result;
@@ -148,11 +158,20 @@ export async function executeGate(
     // If successful, return immediately
     if (result.status === "pass") {
       if (attempt > 1) {
-        console.log(`✅ Gate '${gate.name}' succeeded on attempt ${attempt}`);
+        if (!suppressStdout) {
+          console.log(`✅ Gate '${gate.name}' succeeded on attempt ${attempt}`);
+        }
 
         // Write flake report for successful retry
         if (itemName) {
-          await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+          await writeFlakeReport(
+            itemName,
+            gate.name,
+            attemptRecords,
+            totalDuration,
+            artifactDir,
+            suppressStdout
+          );
         }
       }
       return result;
@@ -165,7 +184,14 @@ export async function executeGate(
 
         // Write flake report for failed retries
         if (itemName) {
-          await writeFlakeReport(itemName, gate.name, attemptRecords, totalDuration, artifactDir);
+          await writeFlakeReport(
+            itemName,
+            gate.name,
+            attemptRecords,
+            totalDuration,
+            artifactDir,
+            suppressStdout
+          );
         }
       }
       return result;
@@ -186,7 +212,8 @@ async function writeFlakeReport(
   gateName: string,
   attempts: AttemptRecord[],
   totalDuration: number,
-  artifactDir: string
+  artifactDir: string,
+  suppressStdout: boolean = false
 ): Promise<void> {
   // Only write flake report if there were multiple attempts
   if (attempts.length <= 1) {
@@ -214,7 +241,9 @@ async function writeFlakeReport(
   const reportContent = canonicalJSONStringify(flakeReport);
   fs.writeFileSync(reportPath, reportContent, "utf-8");
 
-  console.log(`📊 Flake report written: ${reportPath}`);
+  if (!suppressStdout) {
+    console.log(`📊 Flake report written: ${reportPath}`);
+  }
 }
 
 /**
@@ -594,7 +623,8 @@ async function emitGateExecutionFrame(
   gateName: string,
   itemName: string,
   result: GateResult,
-  runId?: string
+  runId?: string,
+  emitReceipt: boolean = true
 ): Promise<FrameEmitResult | undefined> {
   // Skip emitting frame for blocked or skipped gates - they didn't actually execute
   if (result.status === "blocked" || result.status === "skipped" || result.status === "retrying") {
@@ -606,25 +636,28 @@ async function emitGateExecutionFrame(
   const outcome = passed ? "success" : "failure";
 
   // Emit ActionReceipt for disciplined failure pattern (Wave 3)
-  // Receipt is always emitted for completed gates, regardless of runId
-  emitGateReceipt(
-    gateName,
-    itemName,
-    passed,
-    duration,
-    runId,
-    { log: true, json: true },
-    // Include detailed context for failure receipts
-    !passed
-      ? {
-          error: result.stderr,
-          exitCode: result.exitCode,
-          artifacts: result.artifacts,
-          failureKind: result.failureKind,
-          descendantsReaped: result.timeoutCleanup?.descendantsReaped,
-        }
-      : undefined
-  );
+  // CLI callers emit a receipt even without a runId. Transport adapters may
+  // suppress console emission to preserve their framing contract.
+  if (emitReceipt) {
+    emitGateReceipt(
+      gateName,
+      itemName,
+      passed,
+      duration,
+      runId,
+      { log: true, json: true },
+      // Include detailed context for failure receipts
+      !passed
+        ? {
+            error: result.stderr,
+            exitCode: result.exitCode,
+            artifacts: result.artifacts,
+            failureKind: result.failureKind,
+            descendantsReaped: result.timeoutCleanup?.descendantsReaped,
+          }
+        : undefined
+    );
+  }
 
   // Only emit Frame if runId is provided
   if (!runId) {
@@ -662,6 +695,9 @@ export async function executeItemGates(
     planPath?: string;
     activeConstraints?: string[];
     scope?: string[];
+    onlyGate?: string;
+    emitReceipt?: boolean;
+    suppressStdout?: boolean;
   }
 ): Promise<GateResult[]> {
   if (!item.gates || item.gates.length === 0) {
@@ -677,6 +713,9 @@ export async function executeItemGates(
   }
 
   for (const gate of item.gates) {
+    if (options?.onlyGate && gate.name !== options.onlyGate) {
+      continue;
+    }
     // Check if gate should be blocked based on policy
     if (shouldBlockGate(gate, policy)) {
       const blockedResult: GateResult = {
@@ -715,7 +754,13 @@ export async function executeItemGates(
       }
 
       // Emit Frame for gate execution (AX-005)
-      await emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
+      await emitGateExecutionFrame(
+        gate.name,
+        item.name,
+        result,
+        options?.runId,
+        options?.emitReceipt !== false
+      );
       continue;
     }
 
@@ -727,7 +772,8 @@ export async function executeItemGates(
       item.name,
       skipValidation,
       repoRoot,
-      options?.turnCostTracker
+      options?.turnCostTracker,
+      options?.suppressStdout
     );
     results.push(result);
 
@@ -754,7 +800,13 @@ export async function executeItemGates(
     }
 
     // Emit Frame for gate execution (AX-005)
-    await emitGateExecutionFrame(gate.name, item.name, result, options?.runId);
+    await emitGateExecutionFrame(
+      gate.name,
+      item.name,
+      result,
+      options?.runId,
+      options?.emitReceipt !== false
+    );
   }
   return results;
 }
@@ -787,6 +839,10 @@ export async function executeGatesWithPolicy(
     runId?: string;
     baseDir?: string;
     turnCostTracker?: MergeWeaveTurnCost;
+    onlyItem?: string;
+    onlyGate?: string;
+    emitReceipt?: boolean;
+    suppressStdout?: boolean;
   }
 ): Promise<void> {
   // Capture repository root once at the start of execution
@@ -798,7 +854,9 @@ export async function executeGatesWithPolicy(
   try {
     const hostilityScore = runEnvironmentQualityCheck({ cwd: workingDir });
     const adjustment = calculateHostilityAdjustedTimeout(timeoutMs, hostilityScore);
-    logTimeoutAdjustment(adjustment, "all_gates");
+    if (!options?.suppressStdout) {
+      logTimeoutAdjustment(adjustment, "all_gates");
+    }
     effectiveTimeoutMs = adjustment.adjustedTimeoutMs;
   } catch {
     // Ignore hostility scoring errors to avoid blocking gate execution.
@@ -823,7 +881,9 @@ export async function executeGatesWithPolicy(
   }
 
   // Build execution order based on dependencies
-  const executionOrder = buildExecutionOrder(plan);
+  const executionOrder = buildExecutionOrder(plan).filter(
+    (itemName) => !options?.onlyItem || itemName === options.onlyItem
+  );
 
   // Execute gates in dependency order with concurrency control
   const maxWorkers = policy.maxWorkers;
