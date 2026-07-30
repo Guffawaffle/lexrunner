@@ -80,6 +80,14 @@ export type {
   AgentWorkContainmentReasonCode,
 } from "./agent-work-containment-preflight.js";
 export * from "./agent-work-projection-planner.js";
+export {
+  createAttemptExecutionPathMapping,
+  verifyAttemptExecutionPathMapping,
+} from "./agent-work-path-mapping.js";
+export type {
+  CreateAttemptExecutionPathMappingInput,
+  NativeWslProjectionLaunchSelection,
+} from "./agent-work-path-mapping.js";
 export type {
   AgentWorkLifecycleFailure,
   AgentWorkLifecycleResult,

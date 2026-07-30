@@ -31,6 +31,7 @@ import {
   validateHumanActionReceiptBinding,
   type AgentTaskPacketHashInput,
 } from "../../../src/schemas/agent-work.js";
+import { createNativeExecutionPathMapping } from "../../../src/schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../../../src/schemas/task-contract.js";
 
 const BASE_SHA = "a".repeat(40);
@@ -493,6 +494,36 @@ describe("agent work protocol contracts", () => {
   it("keeps machine-local roots in the execution envelope", () => {
     const taskPacket = packet();
     const lease = workspaceLease();
+    const allocationRoot = "/srv/lex-mcp/lexrunner-agent-worktrees";
+    const worktreeRoot = `${allocationRoot}/contracts-v1`;
+    const mapping = createNativeExecutionPathMapping({
+      schema_version: "1.0.0",
+      mapping_kind: "native_linux",
+      repository_id: taskPacket.repository.id,
+      base_sha: BASE_SHA,
+      native_host_id: "devbox-1",
+      git_runtime: "wsl-git",
+      roots: {
+        native_repository: {
+          runtime_id: "wsl-git",
+          path: "/srv/lex-mcp/lexrunner",
+          verification: "directory_identity",
+          directory_identity: { device: "2049", inode: "4001" },
+        },
+        native_allocation_root: {
+          runtime_id: "wsl-git",
+          path: allocationRoot,
+          verification: "directory_identity",
+          directory_identity: { device: "2049", inode: "5000" },
+        },
+        native_worktree: {
+          runtime_id: "wsl-git",
+          path: worktreeRoot,
+          verification: "directory_identity",
+          directory_identity: { device: "2049", inode: "5001" },
+        },
+      },
+    });
     const envelope = ExecutionEnvelope_v1.parse({
       schema_version: AGENT_WORK_CONTRACT_VERSION,
       envelope_id: "envelope-1",
@@ -514,18 +545,16 @@ describe("agent work protocol contracts", () => {
       paths: {
         project_root: "/mnt/d/dev/lexrunner",
         execution_root: "/srv/lex-mcp",
-        worktree_root: "/srv/lex-mcp/lexrunner-agent-worktrees/contracts-v1",
+        allocation_root: allocationRoot,
+        worktree_root: worktreeRoot,
       },
-      path_mappings: [
-        { runtime: "wsl", worktree_root: "/srv/lex-mcp/lexrunner-agent-worktrees/contracts-v1" },
-        { runtime: "windows", worktree_root: "D:\\dev\\lexrunner-contracts-v1" },
-      ],
+      path_mappings: [mapping],
       exposed_environment_keys: ["PATH"],
       created_at: NOW,
     });
 
     expect(envelope.paths.worktree_root).toContain("lexrunner-agent-worktrees");
-    expect(envelope.path_mappings).toHaveLength(2);
+    expect(envelope.path_mappings).toHaveLength(1);
   });
 
   it("models independent controller and workspace leases", () => {

@@ -180,7 +180,22 @@ sandbox configuration, allowed process capabilities, and worker-session
 bootstrap data.
 
 The envelope is not part of the packet hash. It is separately integrity-bound
-to the attempt and lease.
+to the attempt and lease. Every newly authorized envelope carries exactly one
+versioned execution path mapping. A projected mapping preserves the declared
+Windows and WSL source views while binding the selected projection digest,
+repository/base/host/runtime identity, native repository, broker allocation
+root, and final worktree directory identity. A non-projected native-Linux
+Attempt carries the compatible native subset explicitly rather than an empty
+placeholder.
+
+Attachment and every later evidence handoff consume that same immutable
+mapping. Heartbeat/status, receipt submission, engine verification,
+acceptance, and fan-in do not reconstruct path equivalence or infer mount
+translations. Canonical mapping digests and durable identities are revalidated,
+and authority-bearing local services also recheck the current native directory
+identities. Diagnostics expose only bounded state, mapping kind, and digest.
+Legacy v1 envelopes with an empty mapping array remain structurally readable
+for migration, but fail closed at new lifecycle authority boundaries.
 
 Launch authorization and immutable envelope/packet binding are distinct
 durable boundaries. Status MUST distinguish an authorized `launching` Attempt
@@ -519,7 +534,7 @@ native Linux filesystem. The source checkout remains the source of repository
 identity and the requested full Git object ID; the projection is neither a
 second user-maintained checkout nor independent orchestration truth.
 
-The versioned projection protocol separates five claims:
+The versioned projection protocol separates six claims:
 
 1. a request binds repository identity, declared Windows and WSL source views,
    native roots, Git runtimes, dirty/HEAD policy, and one exact full object ID;
@@ -531,7 +546,9 @@ The versioned projection protocol separates five claims:
 4. a manifest binds the prepared repository and worktree-root directory
    identities to that request and observation; and
 5. a receipt records the bounded outcome and reason. Only `prepared` or
-   `reused` receipts may identify selectable projection material.
+   `reused` receipts may identify selectable projection material; and
+6. an engine-authored selection record binds that successful receipt, its
+   complete current source observation, and the immutable manifest digest.
 
 Every claim has a domain-separated canonical digest. The pure projection
 planner accepts only a validated request plus bounded inventory state and
@@ -555,6 +572,21 @@ moving local branch references, rejects alternates, and publishes only after
 the repository, manifest, mapping, native roots, and directory identities
 agree.
 
+Canonical hashes prove content integrity, not engine provenance. Before every
+fresh source observation, the engine invalidates the prior selection record.
+Only after a successful `prepared` or `reused` result does it atomically
+publish a replacement under the identity-anchored native Git directory.
+Revocation and publication both sync that parent directory; a failed
+publication sync removes the selection and syncs the cleanup before the
+operation fails closed. Selection temporary names accept only validated
+engine tokens.
+Launch callers supply only that record's digest; launch preparation resolves
+the durable record itself and verifies receipt → current observation →
+repository/request/base/commit plus the immutable manifest and native
+directory identities. Raw caller-supplied manifests, observations, or
+receipts cannot authorize a projected launch, and a failed observation cannot
+be relabeled as `reused`.
+
 Preparation occurs in identity-anchored staging directories under a
 same-request lease. Repository and allocation-root publication use atomic
 renames; a retry removes proven-owned interrupted staging, verifies and reuses
@@ -567,8 +599,12 @@ the verified native repository and allocation root without weakening its
 existing procfs directory-descriptor boundary.
 
 The engine does not open SQLite, create an Attempt, construct a worker packet,
-or authorize execution. Execution-envelope binding and operator-facing CLI/MCP
-workflow remain separate gates.
+or authorize execution. Launch preparation accepts only the digest reference
+for the engine's current durable selection, resolves its manifest, observation,
+and `prepared` or `reused` receipt, and turns them into the single immutable
+execution mapping. The lifecycle then binds and revalidates that mapping
+without asking adapters to recreate it. Operator-facing CLI/MCP workflow
+remains a separate gate.
 
 ---
 

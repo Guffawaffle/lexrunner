@@ -7,6 +7,7 @@ import {
   parseAgentEngineVerificationV2,
   parseAgentTaskReceiptV2,
 } from "../../src/schemas/agent-work.js";
+import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
 import { AgentWorkFanoutService } from "../../src/runs/agent-work-fanout-service.js";
 import type {
   ControllerLease,
@@ -127,6 +128,15 @@ function observation(overrides: Partial<WorkspaceObservation> = {}): WorkspaceOb
     headSha: "a".repeat(40),
     cleanliness: "clean",
     ...overrides,
+  };
+}
+
+function verifiedTestRoot(runtimeId: string, path: string, inode: string) {
+  return {
+    runtime_id: runtimeId,
+    path,
+    verification: "directory_identity" as const,
+    directory_identity: { device: "1", inode },
   };
 }
 
@@ -541,6 +551,19 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
     function envelopeBindingInput(overrides: Record<string, unknown> = {}) {
       const createdAt = "2026-07-11T12:00:02.250Z";
       const envelopeId = "envelope-1";
+      const pathMapping = createNativeExecutionPathMapping({
+        schema_version: "1.0.0",
+        mapping_kind: "native_linux",
+        repository_id: "repo-1",
+        base_sha: "a".repeat(40),
+        native_host_id: "host-1",
+        git_runtime: "wsl-git",
+        roots: {
+          native_repository: verifiedTestRoot("wsl-git", "/srv/repo", "11"),
+          native_allocation_root: verifiedTestRoot("wsl-git", "/srv/worktrees", "12"),
+          native_worktree: verifiedTestRoot("wsl-git", "/srv/worktrees/work-1", "13"),
+        },
+      });
       const envelope = {
         schema_version: "1.0.0",
         envelope_id: envelopeId,
@@ -552,8 +575,21 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
         workspace_lease_revision: 0,
         expected_head_sha: "a".repeat(40),
         branch: "agent/work-1",
-        runtime: { host_id: "host-1", git_runtime: "wsl-git", worker_runtime: "codex-native" },
-        paths: { worktree_root: "/srv/worktrees/work-1" },
+        runtime: {
+          host_id: "host-1",
+          os: "linux",
+          architecture: "x64",
+          git_runtime: "wsl-git",
+          worker_runtime: "codex-native",
+        },
+        paths: {
+          project_root: "/srv/worktrees/work-1",
+          execution_root: "/srv/worktrees/work-1",
+          allocation_root: "/srv/worktrees",
+          worktree_root: "/srv/worktrees/work-1",
+        },
+        path_mappings: [pathMapping],
+        exposed_environment_keys: [],
         created_at: createdAt,
       };
       const envelopeJson = canonicalJSONStringify(envelope);
@@ -1419,7 +1455,25 @@ export function runWorkspaceLifecycleStoreBehaviorTests(
       secondEnvelope.packet_hash = secondPacket.packet_hash;
       secondEnvelope.workspace_lease_id = "workspace-lease-2";
       secondEnvelope.branch = "agent/work-2";
-      (secondEnvelope.paths as Record<string, unknown>).worktree_root = "/srv/worktrees/work-2";
+      const secondPaths = secondEnvelope.paths as Record<string, unknown>;
+      secondPaths.project_root = "/srv/worktrees/work-2";
+      secondPaths.execution_root = "/srv/worktrees/work-2";
+      secondPaths.worktree_root = "/srv/worktrees/work-2";
+      secondEnvelope.path_mappings = [
+        createNativeExecutionPathMapping({
+          schema_version: "1.0.0",
+          mapping_kind: "native_linux",
+          repository_id: "repo-1",
+          base_sha: "a".repeat(40),
+          native_host_id: "host-1",
+          git_runtime: "wsl-git",
+          roots: {
+            native_repository: verifiedTestRoot("wsl-git", "/srv/repo", "11"),
+            native_allocation_root: verifiedTestRoot("wsl-git", "/srv/worktrees", "12"),
+            native_worktree: verifiedTestRoot("wsl-git", "/srv/worktrees/work-2", "14"),
+          },
+        }),
+      ];
       const secondEnvelopeJson = canonicalJSONStringify(secondEnvelope);
       const secondEnvelopeHash = computeCanonicalHash(secondEnvelope);
       const duplicateIdEnvelope = { ...secondEnvelope, envelope_id: "envelope-1" };

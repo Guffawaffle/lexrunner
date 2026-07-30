@@ -17,6 +17,10 @@ import type {
   StartAttemptInput,
 } from "./agent-work-lifecycle-service.js";
 import type { AgentWorkRuntime } from "./agent-work-runtime.js";
+import {
+  createAttemptExecutionPathMapping,
+  type NativeWslProjectionLaunchSelection,
+} from "./agent-work-path-mapping.js";
 
 export interface AttemptLaunchPacketPolicy {
   packetId: string;
@@ -59,6 +63,7 @@ export interface AttemptLaunchEnvelopePolicy {
   executionRoot: string;
   exposedEnvironmentKeys: string[];
   createdAt: string;
+  projection?: NativeWslProjectionLaunchSelection;
 }
 
 export interface PrepareAttemptLaunchInput {
@@ -150,6 +155,16 @@ export async function prepareAttemptLaunchBundle(
     input.envelope.projectRoot,
     "envelope.executionRoot"
   );
+  const pathMapping = createAttemptExecutionPathMapping({
+    repositoryId: config.repositoryId,
+    baseSha: input.identity.baseSha,
+    hostId: config.hostId,
+    gitRuntime: config.gitRuntime,
+    repositoryRoot: config.repositoryRoot,
+    allocationRoot: config.worktreeRoot,
+    worktreePath: lifecycle.workspace.worktreePath,
+    ...(input.envelope.projection ? { projection: input.envelope.projection } : {}),
+  });
 
   const envelope = ExecutionEnvelope_v1.parse({
     schema_version: AGENT_WORK_CONTRACT_VERSION,
@@ -172,9 +187,10 @@ export async function prepareAttemptLaunchBundle(
     paths: {
       project_root: input.envelope.projectRoot,
       execution_root: input.envelope.executionRoot,
+      allocation_root: config.worktreeRoot,
       worktree_root: lifecycle.workspace.worktreePath,
     },
-    path_mappings: [],
+    path_mappings: [pathMapping],
     exposed_environment_keys: input.envelope.exposedEnvironmentKeys,
     created_at: input.envelope.createdAt,
   });

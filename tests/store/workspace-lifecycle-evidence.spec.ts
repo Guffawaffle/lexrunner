@@ -3,6 +3,7 @@ import {
   computeCanonicalHash,
   computeCanonicalHashFromCompactJSON,
 } from "../../src/schemas/task-contract.js";
+import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
 import {
   MAX_CANONICAL_ENVELOPE_BYTES,
   validateCanonicalEnvelope,
@@ -60,6 +61,19 @@ const lease: WorkspaceLifecycleLeaseRecord = {
 };
 
 function envelopeFixture(): Record<string, unknown> {
+  const pathMapping = createNativeExecutionPathMapping({
+    schema_version: "1.0.0",
+    mapping_kind: "native_linux",
+    repository_id: "repository-1",
+    base_sha: "b".repeat(40),
+    native_host_id: "host-1",
+    git_runtime: "wsl-git",
+    roots: {
+      native_repository: verifiedRoot("/srv/project", "11"),
+      native_allocation_root: verifiedRoot("/srv/worktrees", "12"),
+      native_worktree: verifiedRoot("/srv/worktrees/work-1", "13"),
+    },
+  });
   return {
     schema_version: "1.0.0",
     envelope_id: "envelope-1",
@@ -73,11 +87,29 @@ function envelopeFixture(): Record<string, unknown> {
     branch: "agent/work-1",
     runtime: {
       host_id: "host-1",
+      os: "linux",
+      architecture: "x64",
       git_runtime: "wsl-git",
       worker_runtime: "codex-native",
     },
-    paths: { worktree_root: "/srv/worktrees/work-1" },
+    paths: {
+      project_root: "/srv/worktrees/work-1",
+      execution_root: "/srv/worktrees/work-1",
+      allocation_root: "/srv/worktrees",
+      worktree_root: "/srv/worktrees/work-1",
+    },
+    path_mappings: [pathMapping],
+    exposed_environment_keys: [],
     created_at: "2026-07-17T12:00:02.250Z",
+  };
+}
+
+function verifiedRoot(path: string, inode: string) {
+  return {
+    runtime_id: "wsl-git",
+    path,
+    verification: "directory_identity" as const,
+    directory_identity: { device: "1", inode },
   };
 }
 
@@ -172,6 +204,51 @@ describe("canonical workspace launch-envelope evidence", () => {
     ],
   ])("rejects a mismatched %s binding", (_label, mutate) => {
     const input = mutatedEnvelope(mutate);
+
+    expect(validateCanonicalEnvelope(input, attempt, lease)).toBeNull();
+  });
+
+  it("fails closed for a structurally readable legacy envelope with empty mappings", () => {
+    const input = mutatedEnvelope((value) => {
+      value.path_mappings = [];
+    });
+
+    expect(validateCanonicalEnvelope(input, attempt, lease)).toBeNull();
+  });
+
+  it.each([
+    ["repository identity", { repository_id: "repository-other" }],
+    ["base identity", { base_sha: "c".repeat(40) }],
+    ["host identity", { native_host_id: "host-other" }],
+    ["Git runtime", { git_runtime: "git-other" }],
+  ])("rejects a digest-valid mapping with a mismatched %s", (_label, overrides) => {
+    const input = mutatedEnvelope((value) => {
+      value.path_mappings = [
+        createNativeExecutionPathMapping({
+          schema_version: "1.0.0",
+          mapping_kind: "native_linux",
+          repository_id: "repository-1",
+          base_sha: "b".repeat(40),
+          native_host_id: "host-1",
+          git_runtime: overrides.git_runtime ?? "wsl-git",
+          roots: {
+            native_repository: {
+              ...verifiedRoot("/srv/project", "11"),
+              runtime_id: overrides.git_runtime ?? "wsl-git",
+            },
+            native_allocation_root: {
+              ...verifiedRoot("/srv/worktrees", "12"),
+              runtime_id: overrides.git_runtime ?? "wsl-git",
+            },
+            native_worktree: {
+              ...verifiedRoot("/srv/worktrees/work-1", "13"),
+              runtime_id: overrides.git_runtime ?? "wsl-git",
+            },
+          },
+          ...overrides,
+        }),
+      ];
+    });
 
     expect(validateCanonicalEnvelope(input, attempt, lease)).toBeNull();
   });

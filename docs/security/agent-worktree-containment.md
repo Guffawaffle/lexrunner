@@ -117,10 +117,29 @@ quarantined rather than selected or overwritten. If the initial ownership marker
 durably written, the engine removes the exact-created staging directory before returning; if
 identity-safe removal cannot be proven, the residue is quarantined or rejected as a conflict.
 Only a `prepared` or `reused` result carries the verified `NodeGitWorktreeBroker`.
+Before each fresh source observation, preparation invalidates the prior launch-selection
+authority. A successful result atomically writes a new bounded selection record under the
+identity-anchored native Git directory, binding the receipt to its complete current source
+observation and immutable manifest.
+Canonical hashes alone are not treated as provenance: launch accepts only the selection digest
+and resolves the engine-owned record itself. A failed observation therefore cannot be
+caller-relabeled as `reused`. Revocation and publication sync the anchored parent directory. A
+publication-sync failure removes the record, syncs that cleanup, and fails closed; temporary
+authority filenames use only validated engine tokens.
 
 This engine does not relax the same-principal limitation above. It also does not confer Attempt
-authority: #874 must bind the selected manifest and mapping into the execution envelope before a
-worker can receive a task packet.
+authority. Launch preparation resolves the current engine-owned selection and binds its manifest,
+full source observation, and `prepared` or `reused` receipt into exactly one execution-envelope
+mapping. That mapping includes repository/base/host/runtime, projection and mapping digests, the
+native repository and allocation root, and the final brokered worktree identity. Native-only
+Attempts emit the equivalent explicit native mapping.
+
+Worker attachment and later heartbeat/status, receipt, verification, acceptance, and fan-in
+boundaries all consume the persisted canonical mapping; no adapter derives a replacement from
+path strings or ambient mounts. Authority-bearing boundaries recheck the current native directory
+identities, while public status exposes only bounded mapping state, kind, and digest. Previously
+stored v1 envelopes with an empty mapping list remain parseable for migration but cannot authorize
+a new lifecycle operation.
 
 ## Platform matrix
 

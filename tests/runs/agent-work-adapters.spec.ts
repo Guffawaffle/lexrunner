@@ -7,10 +7,14 @@ import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  AttemptPrepareRequestSchema,
   AttemptStartRequestSchema,
   createAttemptLifecycleHandlers,
 } from "../../src/runs/agent-work-adapters.js";
+import { createNativeWslProjectionRequest } from "../../src/schemas/agent-work-projection.js";
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
+import { NativeWslProjectionEngine } from "../../src/workspaces/native-wsl-projection-engine.js";
 
 const roots: string[] = [];
 
@@ -50,7 +54,7 @@ describe("attempt lifecycle adapter handlers", () => {
           attempt_id: "attempt-assisted",
           branch: "lexrunner/attempt-assisted",
           runtime: { host_id: "host-adapter", worker_runtime: "codex-native" },
-          path_mappings: [],
+          path_mappings: [{ mapping_kind: "native_linux" }],
         },
       },
     });
@@ -65,7 +69,19 @@ describe("attempt lifecycle adapter handlers", () => {
     expect(first.result.envelope.paths).toEqual({
       project_root: request.envelope.projectRoot,
       execution_root: request.envelope.executionRoot,
+      allocation_root: request.runtime.worktreeRoot,
       worktree_root: request.attempt.workspace.worktreePath,
+    });
+    expect(first.result.envelope.path_mappings[0]).toMatchObject({
+      repository_id: request.runtime.repositoryId,
+      base_sha: request.identity.baseSha,
+      native_host_id: request.runtime.hostId,
+      git_runtime: request.runtime.gitRuntime,
+      roots: {
+        native_repository: { path: request.runtime.repositoryRoot },
+        native_allocation_root: { path: request.runtime.worktreeRoot },
+        native_worktree: { path: request.attempt.workspace.worktreePath },
+      },
     });
     expect(replay.result.packet).toEqual(first.result.packet);
     expect(replay.result.envelope).toEqual(first.result.envelope);
@@ -79,6 +95,62 @@ describe("attempt lifecycle adapter handlers", () => {
       ok: true,
       result: { launch: { state: "bound", reconciliationRequired: false } },
     });
+  });
+
+  it("emits one source-to-native mapping only from the current selection authority", async () => {
+    const root = await sandbox();
+    const { request, selection } = await projectedPrepareFixture(root);
+
+    const result = await createAttemptLifecycleHandlers().prepare(request);
+
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        envelope: {
+          path_mappings: [
+            {
+              projection_id: selection.manifest.projection_id,
+              repository_id: request.runtime.repositoryId,
+              base_sha: request.identity.baseSha,
+              native_host_id: request.runtime.hostId,
+              request_digest: selection.manifest.request_digest,
+              projection_digest: selection.manifest.manifest_digest,
+              projection_mapping_digest: selection.manifest.path_mapping.mapping_digest,
+              roots: {
+                windows_source: {
+                  path: selection.manifest.path_mapping.roots.windows_source.path,
+                },
+                wsl_source: {
+                  path: selection.manifest.path_mapping.roots.wsl_source.path,
+                },
+                native_repository: { path: request.runtime.repositoryRoot },
+                native_allocation_root: { path: request.runtime.worktreeRoot },
+                native_worktree: { path: request.attempt.workspace.worktreePath },
+              },
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("rejects caller-supplied projection evidence in place of an authority reference", async () => {
+    const root = await sandbox();
+    const { request, selection } = await projectedPrepareFixture(root);
+
+    expect(
+      AttemptPrepareRequestSchema.safeParse({
+        ...request,
+        envelope: {
+          ...request.envelope,
+          projection: {
+            manifest: selection.manifest,
+            receipt: selection.receipt,
+          },
+        },
+      }).success
+    ).toBe(false);
   });
 
   it("reports a durable launch binding as stale after controller authority changes", async () => {
@@ -537,6 +609,53 @@ async function prepareFixture(root: string) {
       mutations: started.attempt.mutations,
     },
   };
+}
+
+async function projectedPrepareFixture(root: string) {
+  const request = await prepareFixture(root);
+  const projectionRoot = join(root, "native-projections");
+  const worktreeRoot = join(root, "native-worktrees");
+  const remote = "https://example.invalid/owner/repo.git";
+  await Promise.all([mkdir(projectionRoot), mkdir(worktreeRoot)]);
+  await git(request.runtime.repositoryRoot, "remote", "add", "origin", remote);
+  const projectionRequest = createNativeWslProjectionRequest({
+    schema_version: "1.0.0",
+    request_id: "projection-request-assisted",
+    repository: {
+      id: request.runtime.repositoryId,
+      expected_remote_hash: computeCanonicalHash(remote),
+    },
+    source: {
+      windows_runtime: "windows:host-adapter",
+      windows_repository_path: "D:\\dev\\lexrunner",
+      wsl_distribution: "Ubuntu-24.04",
+      wsl_git_runtime: "wsl:Ubuntu-24.04",
+      wsl_repository_path: request.runtime.repositoryRoot,
+      head_policy: "require_base",
+      dirty_policy: "committed_base_only",
+    },
+    native: {
+      host_id: request.runtime.hostId,
+      git_runtime: request.runtime.gitRuntime,
+      projection_root: projectionRoot,
+      worktree_root: worktreeRoot,
+    },
+    base_sha: request.identity.baseSha,
+  });
+  const selection = await new NativeWslProjectionEngine().prepare(projectionRequest);
+  if (!selection.ok) {
+    throw new Error(`expected native projection: ${selection.reasonCode}`);
+  }
+  const worktreePath = join(selection.manifest.native_worktree_root.path, "attempt-assisted");
+  request.runtime.repositoryRoot = selection.manifest.native_repository.path;
+  request.runtime.worktreeRoot = selection.manifest.native_worktree_root.path;
+  request.attempt.workspace.worktreePath = worktreePath;
+  request.envelope.projectRoot = join(worktreePath, "..project");
+  request.envelope.executionRoot = join(worktreePath, "..project");
+  request.envelope.projection = {
+    selectionDigest: selection.selection.selection_digest,
+  };
+  return { request, selection };
 }
 
 async function git(cwd: string, ...args: string[]): Promise<void> {

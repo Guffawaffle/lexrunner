@@ -10,6 +10,7 @@
  */
 
 import { z } from "zod";
+import { AgentExecutionPathMapping_v1 } from "./agent-work-projection.js";
 import { computeCanonicalHash, RepoRelativePath, SHA256Hash } from "./task-contract.js";
 
 export const AGENT_WORK_CONTRACT_VERSION = "1.0.0" as const;
@@ -1129,17 +1130,16 @@ export const ExecutionEnvelope_v1 = z
       .object({
         project_root: AbsolutePath,
         execution_root: AbsolutePath,
+        /** Required on new envelopes; optional only so legacy v1 records can be read fail-closed. */
+        allocation_root: AbsolutePath.optional(),
         worktree_root: AbsolutePath,
       })
       .strict(),
-    path_mappings: z.array(
-      z
-        .object({
-          runtime: z.string().min(1),
-          worktree_root: AbsolutePath,
-        })
-        .strict()
-    ),
+    /**
+     * New launch bindings require exactly one mapping. Empty legacy arrays remain
+     * structurally readable, but lifecycle evidence validation rejects them.
+     */
+    path_mappings: z.array(AgentExecutionPathMapping_v1).max(1),
     exposed_environment_keys: z.array(z.string().min(1)),
     created_at: Timestamp,
   })

@@ -7,6 +7,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
+import {
+  createNativeExecutionPathMapping,
+  createNativeWslExecutionPathMapping,
+  nativeWslProjectionId,
+} from "../../src/schemas/agent-work-projection.js";
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 
 const roots: string[] = [];
 
@@ -149,6 +155,99 @@ describe("Attempt worker adapter handlers", () => {
       ok: true,
       result: { updated: false, reason: "worker_session_conflict" },
     });
+  });
+
+  it.each([
+    "mapping_digest",
+    "repository_id",
+    "base_sha",
+    "native_host_id",
+    "git_runtime",
+    "projection_digest",
+    "worktree_path",
+  ] as const)("rejects %s tampering before worker authority", async (dimension) => {
+    const prepared = await prepare(await sandbox());
+    const handlers = createAttemptWorkerHandlers();
+    const request = attachRequest(prepared);
+    const envelope = request.attach.envelope;
+    const current = envelope.path_mappings[0]!;
+    if (!("mapping_kind" in current)) throw new Error("expected native mapping fixture");
+
+    if (dimension === "mapping_digest") {
+      current.mapping_digest = `sha256:${"f".repeat(64)}`;
+    } else if (dimension === "projection_digest") {
+      const requestDigest = computeCanonicalHash("projection-request");
+      const observationDigest = computeCanonicalHash("source-observation");
+      envelope.path_mappings = [
+        createNativeWslExecutionPathMapping({
+          schema_version: "1.0.0",
+          projection_id: nativeWslProjectionId(requestDigest),
+          repository_id: current.repository_id,
+          base_sha: current.base_sha,
+          native_host_id: current.native_host_id,
+          request_digest: requestDigest,
+          projection_digest: computeCanonicalHash("tampered-projection"),
+          projection_mapping_digest: computeCanonicalHash("projection-mapping"),
+          roots: {
+            windows_source: {
+              runtime_id: "windows:host-worker",
+              path: "D:\\dev\\repo",
+              verification: "declared",
+            },
+            wsl_source: {
+              runtime_id: "wsl:Ubuntu-24.04",
+              path: "/mnt/d/dev/repo",
+              verification: "git_observed",
+              observation_digest: observationDigest,
+            },
+            native_repository: current.roots.native_repository,
+            native_allocation_root: current.roots.native_allocation_root,
+            native_worktree: current.roots.native_worktree,
+          },
+        }),
+      ];
+    } else {
+      const gitRuntime = dimension === "git_runtime" ? "git-other" : current.git_runtime;
+      envelope.path_mappings = [
+        createNativeExecutionPathMapping({
+          schema_version: "1.0.0",
+          mapping_kind: "native_linux",
+          repository_id: dimension === "repository_id" ? "owner/other" : current.repository_id,
+          base_sha: dimension === "base_sha" ? "f".repeat(40) : current.base_sha,
+          native_host_id: dimension === "native_host_id" ? "host-other" : current.native_host_id,
+          git_runtime: gitRuntime,
+          roots: {
+            native_repository: {
+              ...current.roots.native_repository,
+              runtime_id: gitRuntime,
+            },
+            native_allocation_root: {
+              ...current.roots.native_allocation_root,
+              runtime_id: gitRuntime,
+            },
+            native_worktree: {
+              ...current.roots.native_worktree,
+              runtime_id: gitRuntime,
+              path:
+                dimension === "worktree_path"
+                  ? join(current.roots.native_allocation_root.path, "other-attempt")
+                  : current.roots.native_worktree.path,
+            },
+          },
+        }),
+      ];
+    }
+
+    const response = await handlers.attach(request);
+
+    expect(response.ok && response.result.updated).toBe(false);
+    await expect(
+      handlers.status({
+        databasePath: prepared.request.runtime.databasePath,
+        runId: "run-worker",
+        attemptId: "attempt-worker",
+      })
+    ).resolves.toMatchObject({ ok: true, result: { workerSession: null } });
   });
 
   it("denies GO before attachment when required enforcement gaps are not accepted", async () => {

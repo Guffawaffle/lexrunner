@@ -11,7 +11,7 @@ import {
   createAgentTaskPacket,
 } from "../schemas/agent-work.js";
 import { RunStateSchema } from "./types.js";
-import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type {
   AgentWorkLifecycleResult,
@@ -140,6 +140,12 @@ const AttemptLaunchEnvelopePolicySchema = z
     executionRoot: absoluteNativePath,
     exposedEnvironmentKeys: z.array(text).max(256),
     createdAt: instant,
+    projection: z
+      .object({
+        selectionDigest: SHA256Hash,
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

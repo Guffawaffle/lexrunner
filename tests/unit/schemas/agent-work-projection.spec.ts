@@ -10,12 +10,15 @@ import {
   NativeWslProjectionReceipt_v1,
   NativeWslProjectionRequestJsonSchema,
   NativeWslProjectionRequest_v1,
+  NativeWslProjectionSelection_v1,
   NativeWslSourceObservation_v1,
   createNativeWslExecutionPathMapping,
+  createNativeExecutionPathMapping,
   createNativeWslProjectionManifest,
   createNativeWslProjectionPathMapping,
   createNativeWslProjectionReceipt,
   createNativeWslProjectionRequest,
+  createNativeWslProjectionSelection,
   createNativeWslSourceObservation,
   nativeWslProjectionId,
   type NativeWslProjectionManifest_v1 as NativeWslProjectionManifest,
@@ -177,6 +180,7 @@ describe("native WSL projection contracts", () => {
       projection_id: nativeWslProjectionId(projectionRequest.request_digest),
       repository_id: projectionRequest.repository.id,
       base_sha: projectionRequest.base_sha,
+      native_host_id: projectionRequest.native.host_id,
       request_digest: projectionRequest.request_digest,
       projection_digest: manifest.manifest_digest,
       projection_mapping_digest: manifest.path_mapping.mapping_digest,
@@ -184,9 +188,10 @@ describe("native WSL projection contracts", () => {
         windows_source: manifest.path_mapping.roots.windows_source,
         wsl_source: manifest.path_mapping.roots.wsl_source,
         native_repository: manifest.path_mapping.roots.native_repository,
+        native_allocation_root: manifest.path_mapping.roots.native_worktree_root,
         native_worktree: {
           runtime_id: "wsl:Ubuntu-24.04",
-          path: "/var/lib/lexrunner/worktrees/run-1/attempt-1",
+          path: `${manifest.native_worktree_root.path}/run-1/attempt-1`,
           verification: "directory_identity",
           directory_identity: { device: "2049", inode: "5001" },
         },
@@ -212,6 +217,26 @@ describe("native WSL projection contracts", () => {
         },
       })
     ).toThrow(/must not overlap/u);
+
+    const nativeMapping = createNativeExecutionPathMapping({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      mapping_kind: "native_linux",
+      repository_id: projectionRequest.repository.id,
+      base_sha: projectionRequest.base_sha,
+      native_host_id: projectionRequest.native.host_id,
+      git_runtime: projectionRequest.native.git_runtime,
+      roots: {
+        native_repository: manifest.path_mapping.roots.native_repository,
+        native_allocation_root: manifest.path_mapping.roots.native_worktree_root,
+        native_worktree: {
+          runtime_id: projectionRequest.native.git_runtime,
+          path: `${manifest.native_worktree_root.path}/native-attempt`,
+          verification: "directory_identity",
+          directory_identity: { device: "2049", inode: "6001" },
+        },
+      },
+    });
+    expect(nativeMapping.mapping_kind).toBe("native_linux");
   });
 
   it("permits selection fields only on prepared or reused receipts", () => {
@@ -231,6 +256,21 @@ describe("native WSL projection contracts", () => {
     });
 
     expect(NativeWslProjectionReceipt_v1.parse(selected)).toEqual(selected);
+    const selection = createNativeWslProjectionSelection({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      manifest_digest: manifest.manifest_digest,
+      receipt: selected,
+      source_observation: source,
+    });
+    expect(NativeWslProjectionSelection_v1.parse(selection)).toEqual(selection);
+    expect(
+      NativeWslProjectionSelection_v1.safeParse({
+        ...selection,
+        source_observation: observation(projectionRequest, {
+          observedAt: "2026-07-29T20:00:01.000Z",
+        }),
+      }).success
+    ).toBe(false);
     expect(
       NativeWslProjectionReceipt_v1.safeParse({
         ...selected,
@@ -632,6 +672,7 @@ function observation(
   overrides: {
     repositoryId?: string;
     requestedObjectType?: "commit" | "missing" | "other";
+    observedAt?: string;
   } = {}
 ): NativeWslSourceObservation {
   return createNativeWslSourceObservation({
@@ -643,7 +684,7 @@ function observation(
     requested_object_sha: projectionRequest.base_sha,
     requested_object_type: overrides.requestedObjectType ?? "commit",
     cleanliness: "dirty",
-    observed_at: OBSERVED_AT,
+    observed_at: overrides.observedAt ?? OBSERVED_AT,
   });
 }
 

@@ -124,7 +124,10 @@ import {
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_ID,
   STRICT_ATTEMPT_ACCEPTANCE_POLICY_VERSION,
 } from "../workspace-lifecycle-store.js";
-import { validateCanonicalEnvelope } from "../workspace-lifecycle-evidence.js";
+import {
+  validateCanonicalEnvelope,
+  validatePersistedCanonicalEnvelope,
+} from "../workspace-lifecycle-evidence.js";
 import {
   SqliteCoordinationStore,
   type SqliteCoordinationStoreOptions,
@@ -2456,6 +2459,15 @@ export class SqliteWorkspaceLifecycleStore
       if (!lease || !session || !receipt || !verification) {
         return this.failure("not_found", attempt!);
       }
+      const envelopeBinding = this.launchEnvelopeBinding(input.attemptId);
+      if (
+        !envelopeBinding ||
+        !validatePersistedCanonicalEnvelope(envelopeBinding, attempt!, lease) ||
+        session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+        session.executionEnvelopeHash !== envelopeBinding.envelopeHash
+      ) {
+        return this.failure("evidence_mismatch", attempt!, lease);
+      }
       if (lease.revision !== input.expectedWorkspaceLeaseRevision) {
         return this.failure("stale_workspace_revision", attempt!, lease);
       }
@@ -2884,6 +2896,15 @@ export class SqliteWorkspaceLifecycleStore
     }
     if (this.attemptReceipt(claim.receipt_id) || this.getReceiptForAttempt(input.attemptId)) {
       return this.receiptFailure("receipt_conflict", attempt, lease, session);
+    }
+    const envelopeBinding = this.launchEnvelopeBinding(input.attemptId);
+    if (
+      !envelopeBinding ||
+      !validatePersistedCanonicalEnvelope(envelopeBinding, attempt, lease) ||
+      session.executionEnvelopeId !== envelopeBinding.envelopeId ||
+      session.executionEnvelopeHash !== envelopeBinding.envelopeHash
+    ) {
+      return this.receiptFailure("evidence_mismatch", attempt, lease, session);
     }
     const packetBinding = this.taskPacketBinding(input.attemptId);
     const packet = packetBinding

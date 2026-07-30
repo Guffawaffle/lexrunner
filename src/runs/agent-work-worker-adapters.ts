@@ -8,6 +8,7 @@ import {
   ExecutionEnvironmentOS,
   WorkerSessionBackend,
 } from "../schemas/agent-work.js";
+import { AgentExecutionPathMapping_v1 } from "../schemas/agent-work-projection.js";
 import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
 import {
   EndWorkerSessionStatus,
@@ -41,11 +42,6 @@ const nativePath = z
   .refine((value) => !value.includes("\0") && path.isAbsolute(value), {
     message: "must be a runtime-native absolute path",
   });
-const mappedPath = z
-  .string()
-  .min(1)
-  .max(16_384)
-  .refine((value) => !value.includes("\0"), { message: "must not contain NUL bytes" });
 const instant = z.string().datetime({ offset: true });
 const revision = z.number().int().nonnegative();
 const mutation = z.object({ mutationId: text, now: instant }).strict();
@@ -94,10 +90,11 @@ const BoundedExecutionEnvelopeSchema = z
       .object({
         project_root: nativePath,
         execution_root: nativePath,
+        allocation_root: nativePath.optional(),
         worktree_root: nativePath,
       })
       .strict(),
-    path_mappings: z.array(z.object({ runtime: text, worktree_root: mappedPath }).strict()).max(64),
+    path_mappings: z.array(AgentExecutionPathMapping_v1).max(1),
     exposed_environment_keys: z.array(text).max(256),
     created_at: instant,
   })
