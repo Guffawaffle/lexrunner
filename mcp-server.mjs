@@ -45,6 +45,7 @@ try {
 }
 
 const attemptLifecycleHandlers = core.createAttemptLifecycleHandlers();
+const containmentPreflightHandler = core.createAgentWorkContainmentPreflightHandler();
 const attemptWorkerHandlers = core.createAttemptWorkerHandlers();
 const attemptReceiptHandlers = core.createAttemptReceiptHandlers();
 const attemptVerificationHandlers = core.createAttemptVerificationHandlers();
@@ -78,6 +79,13 @@ function sharedServiceError(error, tool, fallbackCode) {
 
 // MCP Tool implementations
 const tools = {
+  preflight_attempt_containment: {
+    description:
+      "Read physical-containment capability before constructing an agent-work Attempt packet",
+    inputSchema: core.AgentWorkContainmentPreflightRequestJsonSchema,
+    call: async (args) => canonicalToolResult(await containmentPreflightHandler.preflight(args)),
+  },
+
   verify_attempt: {
     description: "Run packet-declared engine verification for one fenced Attempt",
     inputSchema: core.AttemptVerificationRunRequestJsonSchema,

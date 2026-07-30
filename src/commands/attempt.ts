@@ -5,6 +5,10 @@ import type { Command } from "commander";
 import { throwExit } from "../cli/exitHandler.js";
 import { writeJsonOutput } from "../cli/output.js";
 import {
+  createAgentWorkContainmentPreflightHandler,
+  type AgentWorkContainmentPreflightHandler,
+} from "../runs/agent-work-containment-preflight.js";
+import {
   createAttemptLifecycleHandlers,
   type AttemptPreparationHandler,
   type AttemptLifecycleHandlers,
@@ -25,6 +29,7 @@ import {
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
 export interface AttemptCommandDependencies {
+  containmentHandler?: AgentWorkContainmentPreflightHandler;
   handlers?: AttemptLifecycleHandlers;
   preparationHandler?: AttemptPreparationHandler;
   workerHandlers?: AttemptWorkerHandlers;
@@ -41,6 +46,8 @@ export function registerAttemptCommand(
   dependencies: AttemptCommandDependencies
 ): void {
   const defaults = createAttemptLifecycleHandlers();
+  const containmentHandler =
+    dependencies.containmentHandler ?? createAgentWorkContainmentPreflightHandler();
   const handlers = dependencies.handlers ?? defaults;
   const preparationHandler = dependencies.preparationHandler ?? defaults;
   const workerHandlers = dependencies.workerHandlers ?? createAttemptWorkerHandlers();
@@ -48,6 +55,29 @@ export function registerAttemptCommand(
   const verificationHandlers =
     dependencies.verificationHandlers ?? createAttemptVerificationHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
+
+  attempt
+    .command("preflight")
+    .description("Check physical-containment capability before constructing an Attempt packet")
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES
+      );
+      const output = await containmentHandler.preflight(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+      if (
+        output.ok &&
+        output.result.state !== "native_ready" &&
+        (process.exitCode === undefined || process.exitCode === 0)
+      ) {
+        process.exitCode = 1;
+      }
+    });
 
   const worker = attempt.command("worker").description("Manage attached native worker sessions");
   registerWorkerInputCommand(

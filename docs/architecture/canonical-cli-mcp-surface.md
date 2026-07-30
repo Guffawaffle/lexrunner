@@ -9,13 +9,13 @@ explains the decisions behind that inventory.
 
 ## Dispositions
 
-The audited registration set contains 125 CLI entries and 28 published MCP
+The audited registration set contains 126 CLI entries and 29 published MCP
 tools. Exact disposition counts are generated into [`../AX.md`](../AX.md).
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        86 |             9 |         15 |            15 |      0 |
-| MCP     |        24 |             0 |          4 |             0 |      0 |
+| CLI     |        87 |             9 |         15 |            15 |      0 |
+| MCP     |        25 |             0 |          4 |             0 |      0 |
 
 - **canonical** is supported vocabulary. Machine-facing canonical operations
   must resolve to a contract profile in the JSON matrix.
@@ -47,6 +47,11 @@ deliberately MCP-only because humans have CLI help and checked-in documentation.
 authority. Current public orchestration is rooted at `attempt`: preparation may
 create/bind the WorkItem and Run, but no separate Work or Run adapter is
 approved yet.
+
+`attempt preflight` and MCP `preflight_attempt_containment` run before that durable lifecycle.
+They share `AgentWorkContainmentCapabilityService`, inspect only the declared runtime and
+repository/worktree roots, and never open `CoordinationStore`, invoke Git, or acquire mutation
+authority.
 
 The frozen `RunStore` is different. It records stateless integration runs,
 steps, receipts, and artifacts; it cannot authorize or advance ADR-010 state.

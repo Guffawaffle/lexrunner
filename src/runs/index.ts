@@ -61,6 +61,24 @@ export {
 } from "./coordinated-manager.js";
 
 export { AgentWorkLifecycleService, readAgentWorkStatus } from "./agent-work-lifecycle-service.js";
+export {
+  AgentWorkContainmentCapabilityService,
+  AgentWorkContainmentPreflightRequestJsonSchema,
+  AgentWorkContainmentPreflightRequestSchema,
+  createAgentWorkContainmentPreflightHandler,
+} from "./agent-work-containment-preflight.js";
+export type {
+  AgentWorkContainmentCapabilityDependencies,
+  AgentWorkContainmentCapabilityState,
+  AgentWorkContainmentNextAction,
+  AgentWorkContainmentPathStatus,
+  AgentWorkContainmentPreflightHandler,
+  AgentWorkContainmentPreflightHandlerResult,
+  AgentWorkContainmentPreflightInputError,
+  AgentWorkContainmentPreflightRequest,
+  AgentWorkContainmentPreflightResult,
+  AgentWorkContainmentReasonCode,
+} from "./agent-work-containment-preflight.js";
 export type {
   AgentWorkLifecycleFailure,
   AgentWorkLifecycleResult,

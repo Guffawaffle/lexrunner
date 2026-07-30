@@ -1285,6 +1285,10 @@ export {
 // Run management exports for MCP tools
 export { createRunManager } from "./runs/index.js";
 export {
+  AgentWorkContainmentPreflightRequestJsonSchema,
+  createAgentWorkContainmentPreflightHandler,
+} from "./runs/index.js";
+export {
   AttemptPrepareRequestJsonSchema,
   AttemptStartRequestJsonSchema,
   AttemptStatusInputJsonSchema,

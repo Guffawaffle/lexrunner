@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -20,6 +20,7 @@ describe("published MCP Attempt lifecycle", () => {
       inputSchema: { required?: string[]; properties?: Record<string, unknown> };
     }>;
 
+    const preflight = tools.find((tool) => tool.name === "preflight_attempt_containment");
     const start = tools.find((tool) => tool.name === "start_attempt");
     const prepare = tools.find((tool) => tool.name === "prepare_attempt");
     const status = tools.find((tool) => tool.name === "get_attempt_status");
@@ -34,6 +35,8 @@ describe("published MCP Attempt lifecycle", () => {
     const acceptanceApply = tools.find((tool) => tool.name === "accept_attempt");
     const acceptanceStatus = tools.find((tool) => tool.name === "get_attempt_acceptance");
 
+    expect(preflight?.inputSchema.required).toEqual(["runtime"]);
+    expect(preflight?.inputSchema.properties?.runtime).toBeDefined();
     expect(verificationRun?.inputSchema.required).toEqual(["databasePath", "verification"]);
     expect(verificationStatus?.inputSchema.required).toEqual([
       "databasePath",
@@ -73,6 +76,47 @@ describe("published MCP Attempt lifecycle", () => {
     expect(start?.inputSchema.properties).toHaveProperty("runtime");
     expect(start?.inputSchema.properties).toHaveProperty("attempt");
     expect(status?.inputSchema.required).toEqual(["databasePath", "runId", "attemptId"]);
+  });
+
+  it("runs containment preflight read-only without mutation authority or durable state", async () => {
+    const root = await mkdtemp(join(tmpdir(), "lexrunner-mcp-containment-"));
+    roots.push(root);
+    const repositoryRoot = join(root, "repository");
+    const worktreeRoot = join(root, "worktrees");
+    await mkdir(join(repositoryRoot, ".git"), { recursive: true });
+    await mkdir(worktreeRoot);
+    const before = (await readdir(root, { recursive: true })).map(String).sort();
+
+    const [response] = await invoke({
+      id: 15,
+      method: "tools/call",
+      params: {
+        name: "preflight_attempt_containment",
+        arguments: {
+          runtime: {
+            repositoryId: "repo-1",
+            repositoryRoot,
+            worktreeRoot,
+            gitRuntime: "native-linux",
+            pathComparison: "case-sensitive",
+          },
+        },
+      },
+    });
+    const output = response.result.content[0].text as string;
+    const after = (await readdir(root, { recursive: true })).map(String).sort();
+
+    expect(JSON.parse(output)).toMatchObject({
+      ok: true,
+      result: {
+        operation: "agent-work.containment.preflight",
+        state: "native_ready",
+        reasonCode: "native_linux_ready",
+        physicalContainmentAvailable: true,
+      },
+    });
+    expect(output).not.toContain(repositoryRoot);
+    expect(after).toEqual(before);
   });
 
   it("keeps receipt submission behind the mutation gate", async () => {
