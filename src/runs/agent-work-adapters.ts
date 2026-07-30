@@ -10,12 +10,8 @@ import {
   WorkItem_v1,
   createAgentTaskPacket,
 } from "../schemas/agent-work.js";
-import {
-  NativeWslProjectionManifest_v1,
-  NativeWslProjectionReceipt_v1,
-} from "../schemas/agent-work-projection.js";
 import { RunStateSchema } from "./types.js";
-import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type {
   AgentWorkLifecycleResult,
@@ -146,8 +142,7 @@ const AttemptLaunchEnvelopePolicySchema = z
     createdAt: instant,
     projection: z
       .object({
-        manifest: NativeWslProjectionManifest_v1,
-        receipt: NativeWslProjectionReceipt_v1,
+        selectionDigest: SHA256Hash,
       })
       .strict()
       .optional(),

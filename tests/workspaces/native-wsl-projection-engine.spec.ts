@@ -10,7 +10,9 @@ import { createAttemptExecutionPathMapping } from "../../src/runs/agent-work-pat
 import {
   NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
   NATIVE_WSL_PROJECTION_HASH_PROFILE,
+  createNativeWslProjectionReceipt,
   createNativeWslProjectionRequest,
+  createNativeWslProjectionSelection,
   nativeWslProjectionId,
   type NativeWslProjectionRequest_v1 as NativeWslProjectionRequest,
 } from "../../src/schemas/agent-work-projection.js";
@@ -154,17 +156,8 @@ describe("NativeWslProjectionEngine real Git integration", () => {
         new Date(Date.parse("2026-07-29T12:00:00.000Z") + clockTick++ * 1_000).toISOString(),
     });
     const first = await engine.prepare(request);
-    const second = await engine.prepare(request);
-
     expect(first.ok && first.outcome).toBe("prepared");
-    expect(second.ok && second.outcome).toBe("reused");
-    if (!first.ok || !second.ok) return;
-    expect(second.manifest).toEqual(first.manifest);
-    expect(second.commandEvidence.map((entry) => entry.action)).not.toContain("clone_nonlocal");
-    expect(second.receipt.projection_digest).toBe(first.manifest.manifest_digest);
-    expect(second.receipt.source_observation_digest).not.toBe(
-      first.manifest.source_observation.observation_digest
-    );
+    if (!first.ok) return;
 
     const target: WorktreeTarget = {
       repositoryId: request.repository.id,
@@ -191,14 +184,103 @@ describe("NativeWslProjectionEngine real Git integration", () => {
     };
     const preparedMapping = createAttemptExecutionPathMapping({
       ...context,
-      projection: { manifest: first.manifest, receipt: first.receipt },
+      projection: { selectionDigest: first.selection.selection_digest },
+    });
+    const second = await engine.prepare(request);
+
+    expect(second.ok && second.outcome).toBe("reused");
+    if (!second.ok) return;
+    expect(second.manifest).toEqual(first.manifest);
+    expect(second.commandEvidence.map((entry) => entry.action)).not.toContain("clone_nonlocal");
+    expect(second.receipt.projection_digest).toBe(first.manifest.manifest_digest);
+    expect(second.receipt.source_observation_digest).not.toBe(
+      first.manifest.source_observation.observation_digest
+    );
+    await expect(second.broker.create(target)).resolves.toMatchObject({
+      ok: true,
+      outcome: "reused",
     });
     const reusedMapping = createAttemptExecutionPathMapping({
       ...context,
-      projection: { manifest: second.manifest, receipt: second.receipt },
+      projection: { selectionDigest: second.selection.selection_digest },
     });
 
     expect(reusedMapping).toEqual(preparedMapping);
+  });
+
+  it("cannot relabel a failed fresh observation as a reusable selection", async () => {
+    const request = makeRequest({ dirtyPolicy: "require_clean" });
+    const engine = new NativeWslProjectionEngine();
+    const prepared = await engine.prepare(request);
+    expect(prepared.ok && prepared.outcome).toBe("prepared");
+    if (!prepared.ok) return;
+
+    const target: WorktreeTarget = {
+      repositoryId: request.repository.id,
+      hostId: request.native.host_id,
+      gitRuntime: request.native.git_runtime,
+      projectRoot: prepared.manifest.native_repository.path,
+      worktreePath: join(prepared.manifest.native_worktree_root.path, "attempt-failed-relabel"),
+      branch: "agent/projection-failed-relabel",
+      attemptId: "attempt-projection-failed-relabel",
+      baseSha,
+    };
+    await expect(prepared.broker.create(target)).resolves.toMatchObject({
+      ok: true,
+      outcome: "created",
+    });
+    const context = {
+      repositoryId: request.repository.id,
+      baseSha,
+      hostId: request.native.host_id,
+      gitRuntime: request.native.git_runtime,
+      repositoryRoot: prepared.manifest.native_repository.path,
+      allocationRoot: prepared.manifest.native_worktree_root.path,
+      worktreePath: target.worktreePath,
+    };
+    expect(
+      createAttemptExecutionPathMapping({
+        ...context,
+        projection: { selectionDigest: prepared.selection.selection_digest },
+      })
+    ).toMatchObject({ projection_digest: prepared.manifest.manifest_digest });
+
+    await writeFile(join(sourceRoot, "dirty.txt"), "policy failure\n", "utf8");
+    const failed = await engine.prepare(request);
+    expect(failed).toMatchObject({ ok: false, reasonCode: "source_dirty" });
+    if (failed.ok || !failed.sourceObservation) return;
+
+    expect(() =>
+      createAttemptExecutionPathMapping({
+        ...context,
+        projection: { selectionDigest: prepared.selection.selection_digest },
+      })
+    ).toThrow(/selection authority/iu);
+
+    const fabricatedReceipt = createNativeWslProjectionReceipt({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      request_id: request.request_id,
+      request_digest: request.request_digest,
+      outcome: "reused",
+      reason_code: "projection_reused",
+      source_observation_digest: failed.sourceObservation.observation_digest,
+      projection_digest: prepared.manifest.manifest_digest,
+      mapping_digest: prepared.manifest.path_mapping.mapping_digest,
+      completed_at: "2026-07-29T23:59:00.000Z",
+    });
+    const fabricatedSelection = createNativeWslProjectionSelection({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      manifest_digest: prepared.manifest.manifest_digest,
+      receipt: fabricatedReceipt,
+      source_observation: failed.sourceObservation,
+    });
+
+    expect(() =>
+      createAttemptExecutionPathMapping({
+        ...context,
+        projection: { selectionDigest: fabricatedSelection.selection_digest },
+      })
+    ).toThrow(/selection authority/iu);
   });
 
   it("rejects dirty, mismatched-head, missing, non-commit, and wrong-remote sources before staging", async () => {

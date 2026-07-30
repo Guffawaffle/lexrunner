@@ -1,6 +1,4 @@
 import {
-  NativeWslProjectionManifest_v1,
-  NativeWslProjectionReceipt_v1,
   createNativeExecutionPathMapping,
   createNativeWslExecutionPathMapping,
   validateAgentExecutionPathBinding,
@@ -9,16 +7,15 @@ import {
   type AgentExecutionPathMapping_v1,
   type NativeDirectoryIdentityClaim_v1,
   type NativeWslProjectionManifest_v1 as NativeWslProjectionManifest,
-  type NativeWslProjectionReceipt_v1 as NativeWslProjectionReceipt,
 } from "../schemas/agent-work-projection.js";
 import {
   captureDirectoryIdentity,
   type DirectoryIdentity,
 } from "../workspaces/linux-directory-identity.js";
+import { loadNativeWslProjectionSelection } from "../workspaces/native-wsl-projection-engine.js";
 
 export interface NativeWslProjectionLaunchSelection {
-  manifest: NativeWslProjectionManifest;
-  receipt: NativeWslProjectionReceipt;
+  selectionDigest: string;
 }
 
 export interface CreateAttemptExecutionPathMappingInput extends AgentExecutionPathBindingContext {
@@ -54,9 +51,12 @@ export function createAttemptExecutionPathMapping(
     });
   }
 
-  const manifest = NativeWslProjectionManifest_v1.parse(input.projection.manifest);
-  const receipt = NativeWslProjectionReceipt_v1.parse(input.projection.receipt);
-  assertSelectedProjection(manifest, receipt, input, identities);
+  const selection = loadNativeWslProjectionSelection(
+    input.repositoryRoot,
+    input.projection.selectionDigest
+  );
+  const manifest = selection.manifest;
+  assertSelectedProjection(manifest, input, identities);
   return createNativeWslExecutionPathMapping({
     schema_version: "1.0.0",
     projection_id: manifest.projection_id,
@@ -104,20 +104,9 @@ export function verifyAttemptExecutionPathMapping(
 
 function assertSelectedProjection(
   manifest: NativeWslProjectionManifest,
-  receipt: NativeWslProjectionReceipt,
   input: AgentExecutionPathBindingContext,
   identities: BoundDirectoryIdentities
 ): void {
-  if (
-    (receipt.outcome !== "prepared" && receipt.outcome !== "reused") ||
-    receipt.request_digest !== manifest.request_digest ||
-    (receipt.outcome === "prepared" &&
-      receipt.source_observation_digest !== manifest.source_observation.observation_digest) ||
-    receipt.projection_digest !== manifest.manifest_digest ||
-    receipt.mapping_digest !== manifest.path_mapping.mapping_digest
-  ) {
-    throw new Error("Projection selection evidence does not identify a prepared mapping");
-  }
   if (
     manifest.repository_id !== input.repositoryId ||
     manifest.base_sha !== input.baseSha.toLowerCase() ||

@@ -117,12 +117,20 @@ quarantined rather than selected or overwritten. If the initial ownership marker
 durably written, the engine removes the exact-created staging directory before returning; if
 identity-safe removal cannot be proven, the residue is quarantined or rejected as a conflict.
 Only a `prepared` or `reused` result carries the verified `NodeGitWorktreeBroker`.
+Before each fresh source observation, preparation invalidates the prior launch-selection
+authority. A successful result atomically writes a new bounded selection record under the
+identity-anchored native Git directory, binding the receipt to its complete current source
+observation and immutable manifest.
+Canonical hashes alone are not treated as provenance: launch accepts only the selection digest
+and resolves the engine-owned record itself. A failed observation therefore cannot be
+caller-relabeled as `reused`.
 
 This engine does not relax the same-principal limitation above. It also does not confer Attempt
-authority. Launch preparation binds a selected manifest and its `prepared` or `reused` receipt
-into exactly one execution-envelope mapping. That mapping includes repository/base/host/runtime,
-projection and mapping digests, the native repository and allocation root, and the final brokered
-worktree identity. Native-only Attempts emit the equivalent explicit native mapping.
+authority. Launch preparation resolves the current engine-owned selection and binds its manifest,
+full source observation, and `prepared` or `reused` receipt into exactly one execution-envelope
+mapping. That mapping includes repository/base/host/runtime, projection and mapping digests, the
+native repository and allocation root, and the final brokered worktree identity. Native-only
+Attempts emit the equivalent explicit native mapping.
 
 Worker attachment and later heartbeat/status, receipt, verification, acceptance, and fan-in
 boundaries all consume the persisted canonical mapping; no adapter derives a replacement from

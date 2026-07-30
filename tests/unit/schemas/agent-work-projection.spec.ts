@@ -10,6 +10,7 @@ import {
   NativeWslProjectionReceipt_v1,
   NativeWslProjectionRequestJsonSchema,
   NativeWslProjectionRequest_v1,
+  NativeWslProjectionSelection_v1,
   NativeWslSourceObservation_v1,
   createNativeWslExecutionPathMapping,
   createNativeExecutionPathMapping,
@@ -17,6 +18,7 @@ import {
   createNativeWslProjectionPathMapping,
   createNativeWslProjectionReceipt,
   createNativeWslProjectionRequest,
+  createNativeWslProjectionSelection,
   createNativeWslSourceObservation,
   nativeWslProjectionId,
   type NativeWslProjectionManifest_v1 as NativeWslProjectionManifest,
@@ -254,6 +256,21 @@ describe("native WSL projection contracts", () => {
     });
 
     expect(NativeWslProjectionReceipt_v1.parse(selected)).toEqual(selected);
+    const selection = createNativeWslProjectionSelection({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      manifest_digest: manifest.manifest_digest,
+      receipt: selected,
+      source_observation: source,
+    });
+    expect(NativeWslProjectionSelection_v1.parse(selection)).toEqual(selection);
+    expect(
+      NativeWslProjectionSelection_v1.safeParse({
+        ...selection,
+        source_observation: observation(projectionRequest, {
+          observedAt: "2026-07-29T20:00:01.000Z",
+        }),
+      }).success
+    ).toBe(false);
     expect(
       NativeWslProjectionReceipt_v1.safeParse({
         ...selected,
@@ -655,6 +672,7 @@ function observation(
   overrides: {
     repositoryId?: string;
     requestedObjectType?: "commit" | "missing" | "other";
+    observedAt?: string;
   } = {}
 ): NativeWslSourceObservation {
   return createNativeWslSourceObservation({
@@ -666,7 +684,7 @@ function observation(
     requested_object_sha: projectionRequest.base_sha,
     requested_object_type: overrides.requestedObjectType ?? "commit",
     cleanliness: "dirty",
-    observed_at: OBSERVED_AT,
+    observed_at: overrides.observedAt ?? OBSERVED_AT,
   });
 }
 

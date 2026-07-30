@@ -534,7 +534,7 @@ native Linux filesystem. The source checkout remains the source of repository
 identity and the requested full Git object ID; the projection is neither a
 second user-maintained checkout nor independent orchestration truth.
 
-The versioned projection protocol separates five claims:
+The versioned projection protocol separates six claims:
 
 1. a request binds repository identity, declared Windows and WSL source views,
    native roots, Git runtimes, dirty/HEAD policy, and one exact full object ID;
@@ -546,7 +546,9 @@ The versioned projection protocol separates five claims:
 4. a manifest binds the prepared repository and worktree-root directory
    identities to that request and observation; and
 5. a receipt records the bounded outcome and reason. Only `prepared` or
-   `reused` receipts may identify selectable projection material.
+   `reused` receipts may identify selectable projection material; and
+6. an engine-authored selection record binds that successful receipt, its
+   complete current source observation, and the immutable manifest digest.
 
 Every claim has a domain-separated canonical digest. The pure projection
 planner accepts only a validated request plus bounded inventory state and
@@ -570,6 +572,17 @@ moving local branch references, rejects alternates, and publishes only after
 the repository, manifest, mapping, native roots, and directory identities
 agree.
 
+Canonical hashes prove content integrity, not engine provenance. Before every
+fresh source observation, the engine invalidates the prior selection record.
+Only after a successful `prepared` or `reused` result does it atomically
+publish a replacement under the identity-anchored native Git directory.
+Launch callers supply only that record's digest; launch preparation resolves
+the durable record itself and verifies receipt → current observation →
+repository/request/base/commit plus the immutable manifest and native
+directory identities. Raw caller-supplied manifests, observations, or
+receipts cannot authorize a projected launch, and a failed observation cannot
+be relabeled as `reused`.
+
 Preparation occurs in identity-anchored staging directories under a
 same-request lease. Repository and allocation-root publication use atomic
 renames; a retry removes proven-owned interrupted staging, verifies and reuses
@@ -582,11 +595,12 @@ the verified native repository and allocation root without weakening its
 existing procfs directory-descriptor boundary.
 
 The engine does not open SQLite, create an Attempt, construct a worker packet,
-or authorize execution. Launch preparation accepts only a canonical selected
-manifest plus its `prepared` or `reused` receipt and turns it into the single
-immutable execution mapping. The lifecycle then binds and revalidates that
-mapping without asking adapters to recreate it. Operator-facing CLI/MCP
-workflow remains a separate gate.
+or authorize execution. Launch preparation accepts only the digest reference
+for the engine's current durable selection, resolves its manifest, observation,
+and `prepared` or `reused` receipt, and turns them into the single immutable
+execution mapping. The lifecycle then binds and revalidates that mapping
+without asking adapters to recreate it. Operator-facing CLI/MCP workflow
+remains a separate gate.
 
 ---
 

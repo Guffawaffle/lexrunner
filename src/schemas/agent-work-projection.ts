@@ -622,6 +622,47 @@ export function createNativeWslProjectionReceipt(
   });
 }
 
+const ProjectionSelectionShape = {
+  schema_version: z.literal(NATIVE_WSL_PROJECTION_CONTRACT_VERSION),
+  manifest_digest: SHA256Hash,
+  receipt: NativeWslProjectionReceipt_v1,
+  source_observation: NativeWslSourceObservation_v1,
+} as const;
+const ProjectionSelectionBody = boundedStrictObject(ProjectionSelectionShape).superRefine(
+  requireValidProjectionSelection
+);
+
+/**
+ * Engine-authored current selection authority. Its public digest is only an
+ * integrity identifier; provenance comes from the identity-anchored engine
+ * record that launch preparation resolves.
+ */
+export const NativeWslProjectionSelection_v1 = boundedStrictObject({
+  ...ProjectionSelectionShape,
+  selection_digest: SHA256Hash,
+})
+  .superRefine(requireValidProjectionSelection)
+  .superRefine((selection, context) => {
+    const { selection_digest: _selectionDigest, ...hashable } = selection;
+    requireDigest(
+      selection.selection_digest,
+      projectionHash("selection-authority", hashable),
+      "selection_digest",
+      context
+    );
+  });
+export type NativeWslProjectionSelection_v1 = z.infer<typeof NativeWslProjectionSelection_v1>;
+
+export function createNativeWslProjectionSelection(
+  input: z.input<z.ZodObject<typeof ProjectionSelectionShape>>
+): NativeWslProjectionSelection_v1 {
+  const body = ProjectionSelectionBody.parse(input);
+  return NativeWslProjectionSelection_v1.parse({
+    ...body,
+    selection_digest: projectionHash("selection-authority", body),
+  });
+}
+
 function requireValidProjectionReceipt(
   receipt: z.output<z.ZodObject<typeof ProjectionReceiptShape>>,
   context: z.RefinementCtx
@@ -657,6 +698,54 @@ function requireValidProjectionReceipt(
       path: ["reason_code"],
       message: "reused outcome requires projection_reused reason",
     });
+  }
+}
+
+function requireValidProjectionSelection(
+  selection: z.output<z.ZodObject<typeof ProjectionSelectionShape>>,
+  context: z.RefinementCtx
+): void {
+  const receipt = selection.receipt;
+  if (receipt.outcome !== "prepared" && receipt.outcome !== "reused") {
+    context.addIssue({
+      code: "custom",
+      path: ["receipt", "outcome"],
+      message: "selection authority requires a successful projection receipt",
+    });
+  }
+  if (receipt.source_observation_digest === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["receipt", "source_observation_digest"],
+      message: "selection authority requires the source observation digest",
+    });
+  } else {
+    requireEqual(
+      receipt.source_observation_digest,
+      selection.source_observation.observation_digest,
+      ["receipt", "source_observation_digest"],
+      context
+    );
+  }
+  requireEqual(
+    receipt.request_digest,
+    selection.source_observation.request_digest,
+    ["source_observation", "request_digest"],
+    context
+  );
+  if (receipt.projection_digest === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["receipt", "projection_digest"],
+      message: "selection authority requires the projection digest",
+    });
+  } else {
+    requireEqual(
+      receipt.projection_digest,
+      selection.manifest_digest,
+      ["receipt", "projection_digest"],
+      context
+    );
   }
 }
 

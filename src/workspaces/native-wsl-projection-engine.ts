@@ -1,5 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { constants, lstatSync, realpathSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+} from "node:fs";
 import { lstat, open, readFile, readdir, rename, rmdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
@@ -7,18 +15,22 @@ import {
   NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
   NativeWslProjectionManifest_v1,
   NativeWslProjectionRequest_v1,
+  NativeWslProjectionSelection_v1,
   createNativeWslProjectionManifest,
   createNativeWslProjectionPathMapping,
   createNativeWslProjectionReceipt,
+  createNativeWslProjectionSelection,
   createNativeWslSourceObservation,
   nativeWslProjectionId,
   type NativeWslProjectionManifest_v1 as NativeWslProjectionManifest,
   type NativeWslProjectionReasonCode,
   type NativeWslProjectionReceipt_v1 as NativeWslProjectionReceipt,
   type NativeWslProjectionRequest_v1 as NativeWslProjectionRequest,
+  type NativeWslProjectionSelection_v1 as NativeWslProjectionSelection,
   type NativeWslSourceObservation_v1 as NativeWslSourceObservation,
 } from "../schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import {
   NativeWslProjectionInventoryObservation_v1,
   planNativeWslProjection,
@@ -48,6 +60,7 @@ import {
 import { NodeGitWorktreeBroker } from "./node-git-worktree-broker.js";
 
 const MANIFEST_FILE = "lexrunner-native-wsl-projection.json";
+const SELECTION_FILE = "lexrunner-native-wsl-selection.json";
 const OWNER_FILE = "lexrunner-native-wsl-owner.json";
 const CONTROL_STAGING = ".lexrunner-projection-staging";
 const CONTROL_LOCKS = ".lexrunner-projection-locks";
@@ -122,6 +135,8 @@ export interface NativeWslProjectionSuccess {
   outcome: "prepared" | "reused";
   manifest: NativeWslProjectionManifest;
   receipt: NativeWslProjectionReceipt;
+  sourceObservation: NativeWslSourceObservation;
+  selection: NativeWslProjectionSelection;
   broker: GitWorktreeBroker;
   commandEvidence: NativeWslProjectionCommandEvidence[];
   recoveredReason?: NativeWslProjectionReasonCode;
@@ -132,10 +147,18 @@ export interface NativeWslProjectionFailure {
   outcome: "rejected" | "quarantined";
   reasonCode: Exclude<NativeWslProjectionReasonCode, "projection_prepared" | "projection_reused">;
   receipt: NativeWslProjectionReceipt;
+  sourceObservation?: NativeWslSourceObservation;
   commandEvidence: NativeWslProjectionCommandEvidence[];
 }
 
 export type NativeWslProjectionResult = NativeWslProjectionSuccess | NativeWslProjectionFailure;
+
+export interface VerifiedNativeWslProjectionSelection {
+  manifest: NativeWslProjectionManifest;
+  receipt: NativeWslProjectionReceipt;
+  sourceObservation: NativeWslSourceObservation;
+  selectionDigest: string;
+}
 
 interface SourceIdentity {
   path: string;
@@ -272,6 +295,7 @@ export class NativeWslProjectionEngine {
       }
       if (recovered.recovered) recoveredReason = "staging_interrupted";
 
+      await invalidateProjectionSelection(boundary, request);
       const sourceIdentity = captureSourceIdentity(request.source.wsl_repository_path);
       const observed = await this.observeSource(request, sourceIdentity, evidence, options);
       sourceObservation = observed.observation;
@@ -294,7 +318,7 @@ export class NativeWslProjectionEngine {
             options
           );
           if (reused) {
-            return this.success(
+            return await this.success(
               request,
               "reused",
               existing.manifest,
@@ -343,7 +367,7 @@ export class NativeWslProjectionEngine {
       }
       await this.removeProjectionContainer(boundary, staging);
       staging = undefined;
-      return this.success(
+      return await this.success(
         request,
         "prepared",
         manifest,
@@ -1580,7 +1604,7 @@ export class NativeWslProjectionEngine {
     return { ok: false, kind: result.kind };
   }
 
-  private success(
+  private async success(
     request: NativeWslProjectionRequest,
     outcome: "prepared" | "reused",
     manifest: NativeWslProjectionManifest,
@@ -1588,7 +1612,7 @@ export class NativeWslProjectionEngine {
     sourceObservation: NativeWslSourceObservation,
     commandEvidence: NativeWslProjectionCommandEvidence[],
     recoveredReason?: NativeWslProjectionReasonCode
-  ): NativeWslProjectionSuccess {
+  ): Promise<NativeWslProjectionSuccess> {
     const receipt = createNativeWslProjectionReceipt({
       schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
       request_id: request.request_id,
@@ -1600,11 +1624,20 @@ export class NativeWslProjectionEngine {
       mapping_digest: manifest.path_mapping.mapping_digest,
       completed_at: this.now(),
     });
+    const selection = createNativeWslProjectionSelection({
+      schema_version: NATIVE_WSL_PROJECTION_CONTRACT_VERSION,
+      manifest_digest: manifest.manifest_digest,
+      receipt,
+      source_observation: sourceObservation,
+    });
+    await persistProjectionSelection(manifest, selection, this.token());
     return {
       ok: true,
       outcome,
       manifest,
       receipt,
+      sourceObservation,
+      selection,
       broker,
       commandEvidence,
       ...(recoveredReason ? { recoveredReason } : {}),
@@ -1636,6 +1669,7 @@ export class NativeWslProjectionEngine {
       outcome,
       reasonCode,
       receipt,
+      ...(sourceObservation ? { sourceObservation } : {}),
       commandEvidence,
     };
   }
@@ -1874,6 +1908,176 @@ function isOwnerMarker(value: unknown): value is OwnerMarker {
     typeof marker.createdAt === "string" &&
     marker.createdAt.length <= 64
   );
+}
+
+/**
+ * Resolve the engine-authored current selection through the identity-anchored
+ * native repository. Caller-supplied canonical hashes are not provenance.
+ */
+export function loadNativeWslProjectionSelection(
+  repositoryRoot: string,
+  expectedSelectionDigest: string
+): VerifiedNativeWslProjectionSelection {
+  if (!/^sha256:[a-f0-9]{64}$/u.test(expectedSelectionDigest)) {
+    throw new Error("Projection selection authority is invalid");
+  }
+
+  const repositoryIdentity = captureDirectoryIdentity(
+    repositoryRoot,
+    "native projection repository"
+  );
+  const repository = reopenDirectoryIdentity(repositoryIdentity, "native projection repository");
+  let gitDirectory: AnchoredDirectory | undefined;
+  try {
+    gitDirectory = openChildDirectory(repository, ".git", "native projection Git directory");
+    const manifest = NativeWslProjectionManifest_v1.parse(
+      readAnchoredJson(gitDirectory, MANIFEST_FILE)
+    );
+    const selection = NativeWslProjectionSelection_v1.parse(
+      readAnchoredJson(gitDirectory, SELECTION_FILE)
+    );
+    if (
+      selection.selection_digest !== expectedSelectionDigest ||
+      manifest.native_repository.path !== repositoryRoot ||
+      !matchesIdentityClaim(repository, manifest.native_repository.directory_identity) ||
+      !matchesIdentityClaim(gitDirectory, manifest.native_repository.git_directory_identity) ||
+      selection.manifest_digest !== manifest.manifest_digest ||
+      selection.receipt.request_digest !== manifest.request_digest ||
+      selection.receipt.projection_digest !== manifest.manifest_digest ||
+      selection.receipt.mapping_digest !== manifest.path_mapping.mapping_digest ||
+      selection.source_observation.repository_id !== manifest.repository_id ||
+      selection.source_observation.request_digest !== manifest.request_digest ||
+      selection.source_observation.requested_object_sha !== manifest.base_sha ||
+      selection.source_observation.requested_object_type !== "commit" ||
+      (selection.receipt.outcome === "prepared" &&
+        selection.source_observation.observation_digest !==
+          manifest.source_observation.observation_digest)
+    ) {
+      throw new Error("Projection selection authority does not match the native projection");
+    }
+    return {
+      manifest,
+      receipt: selection.receipt,
+      sourceObservation: selection.source_observation,
+      selectionDigest: selection.selection_digest,
+    };
+  } catch {
+    throw new Error("Projection selection authority is unavailable");
+  } finally {
+    gitDirectory?.close();
+    repository.close();
+  }
+}
+
+async function invalidateProjectionSelection(
+  boundary: NativeBoundary,
+  request: NativeWslProjectionRequest
+): Promise<void> {
+  const repository = tryOpenChildDirectory(
+    boundary.projectionRoot,
+    nativeWslProjectionId(request.request_digest),
+    "native projection"
+  );
+  if (!repository) return;
+  let gitDirectory: AnchoredDirectory | undefined;
+  try {
+    gitDirectory =
+      tryOpenChildDirectory(repository, ".git", "native projection Git directory") ?? undefined;
+    if (!gitDirectory) return;
+    assertAnchoredDirectoryLocation(gitDirectory, "native projection Git directory");
+    try {
+      await unlink(procChildPath(gitDirectory, SELECTION_FILE));
+    } catch (error) {
+      if (!isNodeError(error) || error.code !== "ENOENT") throw error;
+    }
+  } finally {
+    gitDirectory?.close();
+    repository.close();
+  }
+}
+
+async function persistProjectionSelection(
+  manifest: NativeWslProjectionManifest,
+  selection: NativeWslProjectionSelection,
+  token: string
+): Promise<void> {
+  const repository = reopenDirectoryIdentity(
+    directoryIdentityFromClaim(
+      manifest.native_repository.path,
+      manifest.native_repository.directory_identity
+    ),
+    "native projection repository"
+  );
+  let gitDirectory: AnchoredDirectory | undefined;
+  const temporaryFile = `${SELECTION_FILE}.${token}.tmp`;
+  try {
+    gitDirectory = openChildDirectory(repository, ".git", "native projection Git directory");
+    if (!matchesIdentityClaim(gitDirectory, manifest.native_repository.git_directory_identity)) {
+      throw new ProjectionPreparationError(
+        "native_state_stale",
+        "native projection Git directory identity changed before selection"
+      );
+    }
+    await writeExclusiveText(gitDirectory, temporaryFile, `${canonicalJSONStringify(selection)}\n`);
+    assertAnchoredDirectoryLocation(gitDirectory, "native projection Git directory");
+    await rename(
+      procChildPath(gitDirectory, temporaryFile),
+      procChildPath(gitDirectory, SELECTION_FILE)
+    );
+    const resolved = loadNativeWslProjectionSelection(
+      manifest.native_repository.path,
+      selection.selection_digest
+    );
+    if (resolved.selectionDigest !== selection.selection_digest) {
+      throw new ProjectionPreparationError(
+        "native_state_stale",
+        "native projection selection could not be verified"
+      );
+    }
+  } catch (error) {
+    if (gitDirectory) {
+      await unlink(procChildPath(gitDirectory, temporaryFile)).catch(() => undefined);
+    }
+    throw error;
+  } finally {
+    gitDirectory?.close();
+    repository.close();
+  }
+}
+
+function readAnchoredJson(directory: AnchoredDirectory, file: string): unknown {
+  assertAnchoredDirectoryLocation(directory, "native projection state directory");
+  const descriptor = openSync(
+    procChildPath(directory, file),
+    constants.O_RDONLY | constants.O_NOFOLLOW
+  );
+  try {
+    const stats = fstatSync(descriptor);
+    if (!stats.isFile() || stats.size > MAX_STATE_FILE_BYTES) {
+      throw new Error("projection state file is invalid");
+    }
+    return JSON.parse(readFileSync(descriptor, "utf8")) as unknown;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+function directoryIdentityFromClaim(
+  pathValue: string,
+  claim: { device: string; inode: string }
+): DirectoryIdentity {
+  return {
+    path: pathValue,
+    device: BigInt(claim.device),
+    inode: BigInt(claim.inode),
+  };
+}
+
+function matchesIdentityClaim(
+  actual: Pick<DirectoryIdentity, "device" | "inode">,
+  claim: { device: string; inode: string }
+): boolean {
+  return actual.device.toString(10) === claim.device && actual.inode.toString(10) === claim.inode;
 }
 
 async function readProjectionManifest(
