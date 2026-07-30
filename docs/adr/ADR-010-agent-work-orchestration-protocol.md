@@ -511,6 +511,43 @@ Therefore:
 The first implementation MUST NOT infer Windows/WSL path equivalence by string
 rewriting.
 
+### Native-WSL Projection Contract
+
+When the authoritative source checkout is on Windows or visible to WSL only
+through DrvFS/9P, LexRunner may derive a disposable repository projection on a
+native Linux filesystem. The source checkout remains the source of repository
+identity and the requested full Git object ID; the projection is neither a
+second user-maintained checkout nor independent orchestration truth.
+
+The versioned projection protocol separates five claims:
+
+1. a request binds repository identity, declared Windows and WSL source views,
+   native roots, Git runtimes, dirty/HEAD policy, and one exact full object ID;
+2. a source observation records the remote identity hash, current source HEAD,
+   requested object type, and cleanliness without treating a dirty worktree as
+   projection content;
+3. a path mapping gives the Windows source, WSL source, native repository, and
+   native worktree roots distinct roles and verification levels;
+4. a manifest binds the prepared repository and worktree-root directory
+   identities to that request and observation; and
+5. a receipt records the bounded outcome and reason. Only `prepared` or
+   `reused` receipts may identify selectable projection material.
+
+Every claim has a domain-separated canonical digest. The pure projection
+planner accepts only a validated request plus bounded inventory state and
+returns an explicit action for absent, exact-ready, stale, staging,
+quarantined, invalid, interrupted, or conflicting material. Only an exact-ready
+manifest whose remote, source policy, runtime, path-role, native-root, and host
+bindings still match the request is selectable. Stale, invalid, or interrupted
+material must be quarantined before replacement; same-request staging is
+retried; concurrent or identity-conflicting state fails closed.
+
+These contracts do not invoke Git, inspect or mutate the filesystem, open
+SQLite, allocate a worktree, or confer provisioning authority. The projection
+engine must later prove these claims using the declared runtimes and preserve
+the existing native-Linux directory-identity boundary before an Attempt packet
+can be constructed.
+
 ---
 
 ## Lifecycle Expectations

@@ -30,6 +30,11 @@ of runtime JSON validation assets and is therefore allowed as a whole. Adding a
 new top-level package directory requires updating both the `files` allowlist and
 the boundary validator.
 
+The package root also exposes the native-WSL projection Zod contracts,
+canonical constructors, inventory schema, and pure planner. These APIs compile
+into the existing `dist/cli` root entry and do not add a source-tree or
+filesystem runtime dependency to the tarball.
+
 ## Enforced release checks
 
 The packaging job:
@@ -41,7 +46,8 @@ The packaging job:
 4. rejects paths outside the allowlist, more than 120 files, or more than 7 MB
    unpacked;
 5. installs the real tarball into a clean consumer, preferring the npm cache; and
-6. smokes ESM imports, CommonJS require, the CLI bin, a bounded read-only Attempt status, and MCP
+6. smokes ESM imports and CommonJS require (including the projection contract
+   and planner), the CLI bin, a bounded read-only Attempt status, and MCP
    `tools/list`, including all published Attempt lifecycle tools.
 
 The separate `release:publish:check` gate runs npm's own publication dry-run and fails on metadata

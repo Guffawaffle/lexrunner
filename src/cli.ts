@@ -1411,3 +1411,5 @@ export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";
 
 // Portable agent-work protocol contracts for orchestrators and worker runtimes.
 export * from "./schemas/agent-work.js";
+export * from "./schemas/agent-work-projection.js";
+export * from "./runs/agent-work-projection-planner.js";

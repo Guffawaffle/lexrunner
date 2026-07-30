@@ -63,6 +63,12 @@ try {
         if (typeof main.createAgentWorkContainmentPreflightHandler !== "function") {
           throw new Error("missing containment preflight root API");
         }
+        if (!main.NativeWslProjectionRequest_v1) {
+          throw new Error("missing native WSL projection contract root API");
+        }
+        if (typeof main.planNativeWslProjection !== "function") {
+          throw new Error("missing native WSL projection planner root API");
+        }
         const checks = [
           ["@smartergpt/lexrunner/audit-sdk", "AUDIT_SCHEMA_VERSION"],
           ["@smartergpt/lexrunner/frames", "ExecutionFrameSchema"],
@@ -89,6 +95,12 @@ try {
       `
         const main = require("@smartergpt/lexrunner");
         if (typeof main.canonicalJSONStringify !== "function") throw new Error("missing CJS root API");
+        if (!main.NativeWslProjectionRequest_v1) {
+          throw new Error("missing CJS native WSL projection contract root API");
+        }
+        if (typeof main.planNativeWslProjection !== "function") {
+          throw new Error("missing CJS native WSL projection planner root API");
+        }
         const schema = require("@smartergpt/lexrunner/schemas/runner-stack");
         if (!schema.RunnerStackSchema) throw new Error("missing CJS schema API");
       `,
