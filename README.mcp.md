@@ -124,6 +124,29 @@ next actions, verification depth for each root, and a privacy-safe binding diges
 and WSL DrvFS/9P inputs recommend a native-WSL projection without weakening the containment
 boundary.
 
+### Native WSL projection lifecycle
+
+Four tools share one bounded lifecycle service with the matching
+`lex-pr attempt projection <operation> --input <file|-> --json` commands:
+
+- `get_native_wsl_projection_status` reads exact lifecycle state without creating control, lock,
+  projection, or SQLite state.
+- `inspect_native_wsl_projection_quarantine` reads privacy-bounded quarantine counts and entry
+  digests.
+- `prepare_native_wsl_projection` prepares or exactly reuses the requested committed base.
+- `cleanup_native_wsl_projection` removes an exact idle projection and its matching quarantine
+  state; active worktrees are refused.
+
+Prepare and cleanup require both `"mutation": {"authorized": true}` in the input and the MCP
+server mutation gate. Status and quarantine inspection remain available when mutations are
+disabled. All results omit source/native paths and expose stable digests, reason codes, bounded
+command evidence, counts, and next actions.
+
+On success, pass the returned `selectionDigest` to projected `attempt prepare`. Launch resolves
+the engine-authored selection, emits the machine-verifiable execution path mapping, and preserves
+the request's exact `base_sha` even when the Windows source HEAD or dirty state later changes.
+See the [native Windows-to-WSL projection workflow](docs/workflows/native-wsl-projection.md).
+
 ### mcp_lexrunner_plan_create
 
 Creates a plan from configuration files or auto-discovers from GitHub PRs. This is a **convenience wrapper** that combines PR discovery (`pr_list`), plan generation, validation, and file writing into a single operation.

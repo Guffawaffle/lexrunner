@@ -9,6 +9,10 @@ import {
   type AgentWorkContainmentPreflightHandler,
 } from "../runs/agent-work-containment-preflight.js";
 import {
+  createNativeWslProjectionLifecycleHandlers,
+  type NativeWslProjectionLifecycleHandlers,
+} from "../runs/agent-work-projection-lifecycle.js";
+import {
   createAttemptLifecycleHandlers,
   type AttemptPreparationHandler,
   type AttemptLifecycleHandlers,
@@ -30,6 +34,7 @@ const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
 export interface AttemptCommandDependencies {
   containmentHandler?: AgentWorkContainmentPreflightHandler;
+  projectionHandlers?: NativeWslProjectionLifecycleHandlers;
   handlers?: AttemptLifecycleHandlers;
   preparationHandler?: AttemptPreparationHandler;
   workerHandlers?: AttemptWorkerHandlers;
@@ -48,6 +53,8 @@ export function registerAttemptCommand(
   const defaults = createAttemptLifecycleHandlers();
   const containmentHandler =
     dependencies.containmentHandler ?? createAgentWorkContainmentPreflightHandler();
+  const projectionHandlers =
+    dependencies.projectionHandlers ?? createNativeWslProjectionLifecycleHandlers();
   const handlers = dependencies.handlers ?? defaults;
   const preparationHandler = dependencies.preparationHandler ?? defaults;
   const workerHandlers = dependencies.workerHandlers ?? createAttemptWorkerHandlers();
@@ -78,6 +85,38 @@ export function registerAttemptCommand(
         process.exitCode = 1;
       }
     });
+
+  const projection = attempt
+    .command("projection")
+    .description("Manage native WSL projection lifecycle state");
+  registerProjectionInputCommand(
+    projection,
+    "prepare",
+    "Prepare or exactly reuse a native WSL projection",
+    (input) => projectionHandlers.prepare(input),
+    dependencies
+  );
+  registerProjectionInputCommand(
+    projection,
+    "status",
+    "Read bounded projection status without creating state",
+    (input) => projectionHandlers.status(input),
+    dependencies
+  );
+  registerProjectionInputCommand(
+    projection,
+    "cleanup",
+    "Remove exact idle projection and quarantine state",
+    (input) => projectionHandlers.cleanup(input),
+    dependencies
+  );
+  registerProjectionInputCommand(
+    projection,
+    "quarantine",
+    "Inspect privacy-bounded projection quarantine state",
+    (input) => projectionHandlers.quarantine(input),
+    dependencies
+  );
 
   const worker = attempt.command("worker").description("Manage attached native worker sessions");
   registerWorkerInputCommand(
@@ -290,6 +329,31 @@ export function registerAttemptCommand(
     );
 }
 
+function registerProjectionInputCommand(
+  projection: Command,
+  name: string,
+  description: string,
+  dispatch: (input: unknown) => Promise<unknown>,
+  dependencies: AttemptCommandDependencies
+): void {
+  projection
+    .command(name)
+    .description(description)
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES
+      );
+      const output = await dispatch(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+      setProjectionExitCode(output);
+    });
+}
+
 function registerWorkerInputCommand(
   worker: Command,
   name: string,
@@ -409,6 +473,37 @@ function setFailureExitCode(output: unknown): void {
     process.exitCode = 1;
   }
   if (output.ok === true && isRecord(output.result) && output.result.applied === false) {
+    process.exitCode = 1;
+  }
+}
+
+function setProjectionExitCode(output: unknown): void {
+  if (
+    !isRecord(output) ||
+    output.ok !== true ||
+    !isRecord(output.result) ||
+    typeof output.result.operation !== "string"
+  ) {
+    return;
+  }
+  if (
+    output.result.operation === "agent-work.projection.prepare" &&
+    output.result.state !== "ready"
+  ) {
+    process.exitCode = 1;
+  }
+  if (
+    output.result.operation === "agent-work.projection.status" &&
+    output.result.state !== "ready"
+  ) {
+    process.exitCode = 1;
+  }
+  if (
+    output.result.operation === "agent-work.projection.cleanup" &&
+    (output.result.outcome === "refused" ||
+      output.result.outcome === "quarantined" ||
+      output.result.outcome === "failed")
+  ) {
     process.exitCode = 1;
   }
 }

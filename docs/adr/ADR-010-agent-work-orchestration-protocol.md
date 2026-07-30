@@ -587,6 +587,14 @@ directory identities. Raw caller-supplied manifests, observations, or
 receipts cannot authorize a projected launch, and a failed observation cannot
 be relabeled as `reused`.
 
+The public lifecycle is one shared application seam exposed as CLI
+`attempt projection prepare|status|cleanup|quarantine` and the corresponding
+MCP tools. Status and quarantine inspection are read-only and create no control
+state. Prepare and cleanup require explicit mutation authority. Results expose
+bounded digests, command evidence, counts, reason codes, and next actions
+without returning source or native paths. Cleanup refuses active worktrees and
+keeps incomplete or quarantined removal visible for explicit recovery.
+
 Preparation occurs in identity-anchored staging directories under a
 same-request lease. Repository and allocation-root publication use atomic
 renames; a retry removes proven-owned interrupted staging, verifies and reuses
@@ -603,8 +611,8 @@ or authorize execution. Launch preparation accepts only the digest reference
 for the engine's current durable selection, resolves its manifest, observation,
 and `prepared` or `reused` receipt, and turns them into the single immutable
 execution mapping. The lifecycle then binds and revalidates that mapping
-without asking adapters to recreate it. Operator-facing CLI/MCP workflow
-remains a separate gate.
+without asking adapters to recreate it. The operator workflow and recovery
+contract are documented in `docs/workflows/native-wsl-projection.md`.
 
 ---
 

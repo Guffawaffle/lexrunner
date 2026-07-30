@@ -6,6 +6,10 @@ import Database from "better-sqlite3-multiple-ciphers";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  createNativeWslProjectionRequest,
+  nativeWslProjectionId,
+} from "../../src/schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { createAttemptLifecycleHandlers } from "../../src/runs/agent-work-adapters.js";
 import { createAttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
@@ -16,10 +20,12 @@ import type {
   VerificationCommandResult,
   VerificationWorkspaceObservation,
 } from "../../src/runs/agent-work-attempt-verification-runtime.js";
+import { createNativeWslProjectionLifecycleHandlers } from "../../src/runs/agent-work-projection-lifecycle.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
 
 const roots: string[] = [];
+const STFC_REMOTE_URL = "https://example.invalid/Guffawaffle/stfc-mod.git";
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -299,6 +305,206 @@ describe("Attempt receipt adapter handlers", () => {
     ).resolves.toMatchObject({
       ok: true,
       result: { acceptance: { decision: "accepted", attemptRevision: 8 } },
+    });
+  });
+
+  it("carries a moved dirty Windows source through projection to fan-in-ready evidence", async () => {
+    const root = await sandbox();
+    const prepared = await prepareProjected(root);
+
+    expect(prepared.sourceHead).not.toBe(prepared.request.identity.baseSha);
+    expect(
+      (await execa("git", ["status", "--porcelain=v1"], { cwd: prepared.sourceRoot })).stdout
+    ).toContain("source-dirty.txt");
+    expect(
+      (
+        await execa("git", ["rev-parse", "HEAD"], {
+          cwd: prepared.request.runtime.repositoryRoot,
+        })
+      ).stdout.trim()
+    ).toBe(prepared.request.identity.baseSha);
+    expect(prepared.bundle.packet.repository.base_sha).toBe(prepared.request.identity.baseSha);
+    expect(prepared.bundle.envelope.expected_head_sha).toBe(prepared.request.identity.baseSha);
+    expect(prepared.bundle.envelope.path_mappings).toEqual([
+      expect.objectContaining({
+        projection_id: nativeWslProjectionId(prepared.projectionRequest.request_digest),
+        repository_id: "owner/repo",
+        base_sha: prepared.request.identity.baseSha,
+        request_digest: prepared.projectionRequest.request_digest,
+        roots: expect.objectContaining({
+          windows_source: {
+            runtime_id: "windows-git",
+            path: "D:\\dev\\stfc-mod",
+            verification: "declared",
+          },
+          wsl_source: expect.objectContaining({
+            runtime_id: "wsl-ubuntu-git",
+            verification: "git_observed",
+            observation_digest: prepared.projectionResult.sourceObservationDigest,
+          }),
+          native_repository: expect.objectContaining({
+            verification: "directory_identity",
+          }),
+          native_allocation_root: expect.objectContaining({
+            verification: "directory_identity",
+          }),
+          native_worktree: expect.objectContaining({
+            verification: "directory_identity",
+          }),
+        }),
+      }),
+    ]);
+    const serializedProjectionResult = JSON.stringify(prepared.projectionResult);
+    expect(serializedProjectionResult).not.toContain(root);
+    expect(serializedProjectionResult).not.toContain("D:\\dev\\stfc-mod");
+
+    const workerHandlers = createAttemptWorkerHandlers();
+    const attached = await workerHandlers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected attached worker");
+    await writeFile(
+      join(prepared.request.attempt.workspace.worktreePath, "project", "result.txt"),
+      "projected worker result\n",
+      "utf8"
+    );
+    const ended = await workerHandlers.end(endRequest(prepared, attached.result));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected ended worker");
+
+    const receiptRequest = submitRequest(prepared, ended.result);
+    const observingStore = new SqliteWorkspaceLifecycleStore(
+      prepared.request.runtime.databasePath,
+      { readOnly: true }
+    );
+    try {
+      const lease = await observingStore.getWorkspaceLease(
+        ended.result.workerSession.workspaceLeaseId
+      );
+      if (!lease) throw new Error("expected durable workspace lease");
+      const observation = await new LocalAttemptVerificationRuntime().observe({
+        lease,
+        receipt: receiptRequest.submission.receipt,
+      });
+      receiptRequest.submission.receipt.patch_hash = observation.patchHash;
+    } finally {
+      await observingStore.close();
+    }
+    const receipt = await createAttemptReceiptHandlers().submit(receiptRequest);
+    if (!receipt.ok || !receipt.result.submitted) throw new Error("expected submitted receipt");
+
+    const verificationHandlers = createAttemptVerificationHandlers({
+      now: times(
+        "2026-07-12T12:00:13.000Z",
+        "2026-07-12T12:00:14.000Z",
+        "2026-07-12T12:00:15.000Z"
+      ),
+    });
+    const verification = await verificationHandlers.run({
+      databasePath: prepared.request.runtime.databasePath,
+      verification: {
+        runId: receiptRequest.submission.runId,
+        expectedRunRevision: receiptRequest.submission.expectedRunRevision,
+        controller: receiptRequest.submission.controller,
+        verificationId: "verification-projected",
+        attemptId: receiptRequest.submission.attemptId,
+        expectedAttemptRevision: receipt.result.attemptRevision,
+        workspaceLeaseId: receiptRequest.submission.workspaceLeaseId,
+        expectedWorkspaceLeaseRevision: receiptRequest.submission.expectedWorkspaceLeaseRevision,
+        workerSessionId: receiptRequest.submission.workerSessionId,
+        expectedWorkerSessionRevision: receiptRequest.submission.expectedWorkerSessionRevision,
+        receiptId: receipt.result.receiptId,
+        receiptHash: receipt.result.receiptHash,
+        beginMutationId: "begin-projected-verification",
+        completeMutationId: "complete-projected-verification",
+      },
+    });
+    expect(verification).toMatchObject({
+      ok: true,
+      result: {
+        recorded: true,
+        outcome: "pass",
+        attemptStatus: "verified",
+        trustGapCount: 0,
+      },
+    });
+    if (!verification.ok || !verification.result.recorded) {
+      throw new Error("expected projected verification");
+    }
+
+    const accepted = await verificationHandlers.applyAcceptance({
+      databasePath: prepared.request.runtime.databasePath,
+      acceptance: {
+        runId: receiptRequest.submission.runId,
+        expectedRunRevision: receiptRequest.submission.expectedRunRevision,
+        controller: receiptRequest.submission.controller,
+        verificationId: verification.result.verificationId,
+        verificationHash: verification.result.verificationHash,
+        attemptId: receiptRequest.submission.attemptId,
+        expectedAttemptRevision: verification.result.attemptRevision,
+        workspaceLeaseId: receiptRequest.submission.workspaceLeaseId,
+        expectedWorkspaceLeaseRevision: receiptRequest.submission.expectedWorkspaceLeaseRevision,
+        workerSessionId: receiptRequest.submission.workerSessionId,
+        expectedWorkerSessionRevision: receiptRequest.submission.expectedWorkerSessionRevision,
+        receiptId: receipt.result.receiptId,
+        receiptHash: receipt.result.receiptHash,
+        mutationId: "accept-projected-verification",
+      },
+    });
+    expect(accepted).toMatchObject({
+      ok: true,
+      result: {
+        applied: true,
+        decision: "accepted",
+        reasonCodes: [],
+      },
+    });
+
+    const evidenceStore = new SqliteWorkspaceLifecycleStore(prepared.request.runtime.databasePath, {
+      readOnly: true,
+    });
+    try {
+      const [attempt, persistedReceipt, persistedVerification] = await Promise.all([
+        evidenceStore.getAttempt("attempt-receipt"),
+        evidenceStore.getAttemptReceiptForAttempt("attempt-receipt"),
+        evidenceStore.getAttemptVerificationForAttempt("attempt-receipt"),
+      ]);
+      expect({
+        attemptStatus: attempt?.status,
+        receiptId: persistedReceipt?.receiptId,
+        receiptHash: persistedReceipt?.receiptHash,
+        verificationId: persistedVerification?.verificationId,
+        verificationHash: persistedVerification?.verificationHash,
+        verificationOutcome: persistedVerification?.outcome,
+        trustGapCount: persistedVerification?.trustGapReasons.length,
+      }).toEqual({
+        attemptStatus: "accepted",
+        receiptId: "receipt-patch-only",
+        receiptHash: receipt.result.receiptHash,
+        verificationId: "verification-projected",
+        verificationHash: verification.result.verificationHash,
+        verificationOutcome: "pass",
+        trustGapCount: 0,
+      });
+    } finally {
+      await evidenceStore.close();
+    }
+
+    await expect(
+      prepared.projectionHandlers.status({ request: prepared.projectionRequest })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { state: "ready", activeWorktreeCount: 1 },
+    });
+    await expect(
+      prepared.projectionHandlers.cleanup({
+        request: prepared.projectionRequest,
+        mutation: { authorized: true, reason: "prove active Attempt containment" },
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: {
+        outcome: "refused",
+        reasonCode: "active_worktrees",
+        nextActions: ["remove_active_worktrees", "cleanup_projection"],
+      },
     });
   });
 
@@ -790,8 +996,89 @@ function passedCheck(): VerificationCommandResult {
 async function prepare(root: string, gitWrite = false) {
   const request = await prepareRequest(root, gitWrite);
   const response = await createAttemptLifecycleHandlers().prepare(request);
-  if (!response.ok || !response.result.ok) throw new Error("expected prepared Attempt");
+  if (!response.ok || !response.result.ok) {
+    throw new Error(`expected prepared Attempt: ${JSON.stringify(response)}`);
+  }
   return { request, bundle: response.result };
+}
+
+async function prepareProjected(root: string) {
+  const request = await prepareRequest(root);
+  const sourceRoot = request.runtime.repositoryRoot;
+  const projectionRoot = join(root, "native-projections");
+  const nativeWorktreeRoot = join(root, "native-worktrees");
+  await Promise.all([mkdir(projectionRoot), mkdir(nativeWorktreeRoot)]);
+  await git(sourceRoot, "remote", "add", "origin", STFC_REMOTE_URL);
+  const projectionRequest = createNativeWslProjectionRequest({
+    schema_version: "1.0.0",
+    request_id: "stfc-wl-006-e2e",
+    repository: {
+      id: request.runtime.repositoryId,
+      expected_remote_hash: computeCanonicalHash(STFC_REMOTE_URL),
+    },
+    source: {
+      windows_runtime: "windows-git",
+      windows_repository_path: "D:\\dev\\stfc-mod",
+      wsl_distribution: "Ubuntu",
+      wsl_git_runtime: "wsl-ubuntu-git",
+      wsl_repository_path: sourceRoot,
+      head_policy: "observe",
+      dirty_policy: "committed_base_only",
+    },
+    native: {
+      host_id: "wsl-ubuntu-host",
+      git_runtime: "wsl-ubuntu-git",
+      projection_root: projectionRoot,
+      worktree_root: nativeWorktreeRoot,
+    },
+    base_sha: request.identity.baseSha,
+  });
+
+  await writeFile(join(sourceRoot, "tracked.txt"), "source moved after base selection\n", "utf8");
+  await git(sourceRoot, "add", "tracked.txt");
+  await git(sourceRoot, "commit", "-m", "move source head");
+  const sourceHead = (await execa("git", ["rev-parse", "HEAD"], { cwd: sourceRoot })).stdout.trim();
+  await writeFile(join(sourceRoot, "source-dirty.txt"), "uncommitted source state\n", "utf8");
+
+  const projectionHandlers = createNativeWslProjectionLifecycleHandlers();
+  const projection = await projectionHandlers.prepare({
+    request: projectionRequest,
+    mutation: { authorized: true, reason: "WL-006 public end-to-end proof" },
+  });
+  if (
+    !projection.ok ||
+    projection.result.state !== "ready" ||
+    projection.result.selectionDigest === undefined
+  ) {
+    throw new Error("expected prepared native WSL projection");
+  }
+
+  const projectionId = nativeWslProjectionId(projectionRequest.request_digest);
+  request.runtime.repositoryRoot = join(projectionRoot, projectionId);
+  request.runtime.worktreeRoot = join(nativeWorktreeRoot, projectionId);
+  request.runtime.hostId = projectionRequest.native.host_id;
+  request.runtime.gitRuntime = projectionRequest.native.git_runtime;
+  request.attempt.workspace.worktreePath = join(
+    request.runtime.worktreeRoot,
+    request.identity.attemptId
+  );
+  request.envelope.projectRoot = join(request.attempt.workspace.worktreePath, "project");
+  request.envelope.executionRoot = request.envelope.projectRoot;
+  request.envelope.projection = { selectionDigest: projection.result.selectionDigest };
+
+  const response = await createAttemptLifecycleHandlers().prepare(request);
+  if (!response.ok || !response.result.ok) {
+    throw new Error(`expected projected Attempt: ${JSON.stringify(response)}`);
+  }
+  return {
+    request,
+    bundle: response.result,
+    projectionHandlers,
+    projectionRequest,
+    projectionResult: projection.result,
+    sourceRoot,
+    sourceHead,
+  };
 }
 
 function authority(prepared: Awaited<ReturnType<typeof prepare>>) {

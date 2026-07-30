@@ -67,7 +67,7 @@ Results use one of three capability states:
 - `native_ready` — procfs plus all repository, repository-Git, and worktree-root identities were
   verified on a supported native Linux filesystem;
 - `broker_required` — native Windows or a WSL DrvFS/9P path requires the identity-anchored
-  native-WSL projection tracked by #867 and its #872–#875 delivery stack; or
+  native-WSL projection; or
 - `unsupported` — the runtime, path syntax, root relationship, directory identity, or filesystem
   could not satisfy the boundary.
 
@@ -79,9 +79,9 @@ values.
 
 `broker_required` is not a containment override. It stops local allocation and directs the caller
 to provision a native-WSL projection, then rerun preflight. The versioned request, observation,
-manifest, receipt, and path-mapping contracts are defined by #872. They do not themselves grant
-provisioning authority: execution-envelope enforcement and operator surfaces remain separately
-gated by #874 and #875.
+manifest, receipt, and path-mapping contracts do not themselves grant provisioning authority.
+Execution-envelope enforcement and the public lifecycle surfaces retain separate, explicit
+authority checks.
 
 The projection request binds repository identity, the declared Windows and WSL views, native
 projection/worktree roots, dirty and HEAD policies, and one full Git object ID. A projection
@@ -140,6 +140,21 @@ path strings or ambient mounts. Authority-bearing boundaries recheck the current
 identities, while public status exposes only bounded mapping state, kind, and digest. Previously
 stored v1 envelopes with an empty mapping list remain parseable for migration but cannot authorize
 a new lifecycle operation.
+
+## Public projection lifecycle
+
+CLI `attempt projection prepare|status|cleanup|quarantine` and MCP
+`prepare_native_wsl_projection`, `get_native_wsl_projection_status`,
+`cleanup_native_wsl_projection`, and `inspect_native_wsl_projection_quarantine` call one shared
+application seam. Status and quarantine inspection are read-only and do not create control state.
+Prepare and cleanup require explicit mutation authority; the MCP adapter also applies its server
+mutation gate.
+
+Lifecycle results expose only bounded digests, command evidence, counts, reason codes, and next
+actions. Cleanup refuses active projected worktrees, is idempotent for absent state, and keeps
+failed or quarantined state visible for explicit recovery. The complete operator sequence and
+recovery table are in the
+[native Windows-to-WSL projection workflow](../workflows/native-wsl-projection.md).
 
 ## Platform matrix
 

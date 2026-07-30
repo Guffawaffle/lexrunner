@@ -1289,6 +1289,13 @@ export {
   createAgentWorkContainmentPreflightHandler,
 } from "./runs/index.js";
 export {
+  NativeWslProjectionCleanupRequestJsonSchema,
+  NativeWslProjectionPrepareRequestJsonSchema,
+  NativeWslProjectionQuarantineRequestJsonSchema,
+  NativeWslProjectionStatusRequestJsonSchema,
+  createNativeWslProjectionLifecycleHandlers,
+} from "./runs/index.js";
+export {
   AttemptPrepareRequestJsonSchema,
   AttemptStartRequestJsonSchema,
   AttemptStatusInputJsonSchema,
