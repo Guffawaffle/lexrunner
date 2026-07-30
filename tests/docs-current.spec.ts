@@ -57,7 +57,8 @@ describe("current documentation", () => {
     const release = await read("docs/release-process.md");
     expect(release).toContain("@smartergpt/lexrunner");
     expect(release).toContain("npm login --scope=@smartergpt");
-    expect(release).toContain("Automated npm publication is deliberately disabled");
+    expect(release).toContain("runs only for push events");
+    expect(release).toContain("release-owner primary fingerprint");
     expect(release).toContain("LexSona is a separate release");
   });
 });

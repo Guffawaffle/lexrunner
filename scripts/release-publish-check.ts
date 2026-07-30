@@ -18,7 +18,7 @@ export function releaseTagForVersion(version: string): string {
   return `lexrunner-v${version}`;
 }
 
-export function humanPublishCommand(distTag = "latest"): string {
+export function trustedPublishCommand(distTag = "latest"): string {
   if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(distTag)) {
     throw new Error(`Invalid npm dist-tag: ${distTag}`);
   }
@@ -119,7 +119,7 @@ function main(): void {
   }
 
   process.stdout.write(
-    `\nHUMAN ACTION REQUIRED\nRun this exact command from the tagged, clean checkout:\n${humanPublishCommand(distTag)}\n`
+    `\nTAGGED CANDIDATE VALIDATED\nThe verified stable-tag workflow may now run this exact command through npm trusted publishing:\n${trustedPublishCommand(distTag)}\nDo not run non-dry-run publication from an agent or local shell.\n`
   );
 }
 

@@ -19,9 +19,10 @@
 - Read files before editing → use `read_file` for context
 - Execute workflows completely → no mid-task questions when intent is clear
 - Follow two-track separation → core runner (`src/**`) vs workspace (`.smartergpt/**`)
-- Treat npm publication as a human-only release gate → run `npm run release:publish:check`, then
-  stop and hand its exact command to the authenticated release owner; never execute `npm publish`
-  without `--dry-run`
+- Treat npm publication as a release-owner-signed CI gate → agents and local shells may run
+  `npm run release:publish:check`, but only the stable-tag `release.yml` job may execute non-dry-run
+  `npm publish`. It requires the exact target commit to be signed by the authorized release-owner
+  GPG fingerprint and already contained in `main`; workflow dispatch never carries publish authority.
 
 ## Key Documents
 

@@ -1,24 +1,25 @@
 # Release and private npm publishing
 
 LexRunner is distributed as the restricted npm package `@smartergpt/lexrunner`. The release path
-has two distinct outcomes:
+has one signed-tag authority chain:
 
-1. GitHub Actions validates a candidate and, for a signed stable tag, creates the GitHub release.
-2. The publish gate validates that exact candidate and prints the command for an authenticated
-   human to execute.
+1. GitHub Actions validates the exact release-owner-signed stable-tag candidate after it is
+   contained in `main`.
+2. The same stable-tag job publishes through npm's package-scoped GitHub OIDC trusted publisher.
+3. The workflow creates the matching GitHub release and records the install command.
 
-Automated npm publication is deliberately disabled. A successful workflow does **not** mean that
-npm contains the candidate. Agents and automation must stop after the gate and hand its command to
-the human release owner.
+The workflow stores no npm token. Pull requests, branches, canaries, manual workflow dispatches,
+self-hosted runners, and local agents cannot publish. A human maintainer owns the one-time npm
+trusted-publisher configuration and any explicit recovery action.
 
 ## Release types
 
 - **Canary candidate:** each merge to `main` validates a version shaped like
-  `X.Y.Z-canary.<commit>`. Publishing it with the `canary` dist-tag is a separate authenticated
-  action.
-- **Stable release:** a signed `lexrunner-vX.Y.Z` tag validates the matching package version and
-  creates a GitHub release. Publishing it with the `latest` dist-tag is a separate authenticated
-  action.
+  `X.Y.Z-canary.<commit>`. Canary npm publication remains disabled.
+- **Stable release:** a signed `lexrunner-vX.Y.Z` tag targeting a commit signed by the authorized
+  release-owner GPG fingerprint and contained in `main` validates the matching package version and
+  permits `.github/workflows/release.yml` to publish with the `latest` dist-tag through npm trusted
+  publishing before creating the GitHub release.
 
 LexRunner follows Semantic Versioning. Breaking changes normally require a major release; an
 explicitly governed pre-release or ecosystem release may declare a narrower migration policy in
@@ -27,17 +28,27 @@ version and changelog before tagging.
 
 ## Human prerequisites
 
-Use Node 24 and npm 11 as pinned by `.nvmrc` and `packageManager`. Configure signed commits/tags,
-start from a clean `main`, and authenticate the npm CLI for the SmarterGPT scope:
+Use Node 24 and npm 11 as pinned by `.nvmrc` and `packageManager`. npm trusted-publisher management
+requires npm 11.15.0 or newer, package write access, and account-level 2FA. Authenticate once and
+bind this exact GitHub repository and workflow filename:
 
 ```bash
+npm install --global npm@^11.15.0
 npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
 npm whoami
-npm view @smartergpt/lexrunner versions --json
+npm trust list @smartergpt/lexrunner --json
+npm trust github @smartergpt/lexrunner --file release.yml --repo Guffawaffle/lexrunner --allow-publish
+npm trust list @smartergpt/lexrunner --json
 ```
 
-Authentication is intentionally a human step. Do not commit an npm token or a generated `.npmrc`.
-Downstream machines also need permission to read the private `@smartergpt` scope.
+If `npm trust list` already reports the exact GitHub repository and `release.yml`, do not create a
+second relationship. npm supports one trusted publisher per package; inspect and explicitly revoke
+an old relationship by its exact ID before replacing it. The configuration command may require a
+browser/2FA confirmation and is intentionally a human step.
+
+Do not create or store an npm write token in GitHub. Downstream machines still need ordinary
+permission to read the private `@smartergpt` scope because trusted publishing applies only to the
+CI `npm publish` operation.
 
 ## Prepare a stable candidate
 
@@ -50,53 +61,58 @@ npm run build
 npm test
 ```
 
-Review the version, changelog, generated documentation, and package contents. Then commit the
-release changes, create a signed tag whose version exactly matches `package.json`, and push both:
+Review the version, changelog, generated documentation, and package contents. The release owner
+then signs the release commit with primary fingerprint
+`65C94BA03E88F53D365C36CF7145A1CE635B1902`. Merge that exact commit into `main`, create a signed tag
+whose version exactly matches `package.json`, and push the tag:
 
 ```bash
 git add CHANGELOG.md package.json package-lock.json README.md docs/AX.md
 git commit -S -m "chore(release): prepare X.Y.Z"
+git verify-commit HEAD
+# Merge the reviewed commit into main before tagging it.
 git tag -s lexrunner-vX.Y.Z -m "Release X.Y.Z"
 git tag -v lexrunner-vX.Y.Z
-git push origin main
 git push origin lexrunner-vX.Y.Z
 ```
 
-Wait for the release workflow to finish. It builds, tests, checks determinism, verifies the version,
-validates npm's exact dry-run publication behavior, and creates the GitHub release. From a clean
-checkout of the signed tag, run the same final gate locally:
+Wait for the release workflow to finish. It rejects workflow dispatch, verifies the annotated tag
+and its exact API-reported target through GitHub, verifies the target commit against the authorized
+release-owner GPG fingerprint and `origin/main`, builds, tests, checks determinism and version
+alignment, and validates npm's exact dry-run publication behavior. It then executes:
+
+```bash
+npm publish --access restricted --tag latest --json
+```
+
+The npm CLI obtains a short-lived OIDC credential for this workflow; no `NODE_AUTH_TOKEN` or npm
+secret is configured. If npm accepts the package, the job creates the GitHub release. The
+pre-publication gate itself remains dry-run-only and may be replayed locally:
 
 ```bash
 npm run release:publish:check
 ```
 
-The gate verifies the tarball boundary, rejects npm metadata-normalization warnings, requires the
-matching `lexrunner-vX.Y.Z` tag at `HEAD`, performs `npm publish --dry-run`, and prints the exact
-command. It never publishes. Only the authenticated human release owner executes the printed
-command:
-
-```bash
-npm publish --access restricted --tag latest
-npm view @smartergpt/lexrunner@X.Y.Z version
-```
-
 For pre-tag candidate work, `npm run release:publish:check -- --allow-untagged` runs the package and
-dry-run checks but deliberately withholds a publish command.
+dry-run checks but does not authorize publication.
 
-For an authorized canary, prepare the exact canary version on a clean release checkout and use:
+Canary candidates are not published. Use the packed-package smoke or an explicit local tarball
+consumer when pre-stable validation is required:
 
 ```bash
-npm publish --access restricted --tag canary
-npm view @smartergpt/lexrunner@canary version
+npm run test:package
 ```
 
 The `publishConfig` in `package.json` pins the npm registry and restricted access; the explicit
-flags make the operator's intent visible in the receipt. An agent must not type, proxy, or retry the
-non-dry-run command for the human, including when npm requests an OTP or browser confirmation.
+flags make the workflow's intent visible in the receipt. Agents and local shells must not execute,
+proxy, or retry non-dry-run publication. If trusted publishing fails, inspect the workflow filename,
+repository, tag, OIDC permission, npm version, and package trust configuration before rerunning the
+exact failed tag workflow.
 
 ## Consumer proof
 
-The release is not complete at “npm accepted the package.” Issue #795 owns the final proof:
+The release is not complete at “npm accepted the package.” The release issue owns the final proof
+(#881 for 1.3.0):
 
 1. install the scoped package from the private registry in a clean native Windows consumer;
 2. verify ESM, CommonJS, CLI version/help, and MCP startup/tool inventory;
@@ -135,13 +151,18 @@ not silently retarget an existing version or rewrite a published tag.
 
 ## Automation boundary
 
-The workflow already has the permissions needed to create GitHub releases. Future automated npm
-publication would require a separately approved change to this human-only authority boundary as
-well as an authentication design and consumer proof. Until then, workflow summaries say
-**candidate prepared**, not **package published**.
+Only the `stable-release` job in `.github/workflows/release.yml` receives `id-token: write`, and it
+runs only for push events on `lexrunner-v*.*.*` tags. The job requires a GitHub-verified signed
+annotated tag, an exact API-reported target commit signed by release-owner primary fingerprint
+`65C94BA03E88F53D365C36CF7145A1CE635B1902`, containment of that commit in `origin/main`, exact
+tag/manifest version agreement, full tests, deterministic source, the package boundary, and the npm
+dry run before publishing. All other jobs inherit read-only repository permissions and cannot
+request an OIDC publish credential.
 
 ## Related records
 
+- [LexRunner 1.3.0 release (#881)](https://github.com/Guffawaffle/lexrunner/issues/881)
+- [Real Windows-to-native-WSL replay (#863)](https://github.com/Guffawaffle/lexrunner/issues/863)
 - [Ecosystem release and native Windows proof (#795)](https://github.com/Guffawaffle/lexrunner/issues/795)
 - [Node 24 runtime migration (#823)](https://github.com/Guffawaffle/lexrunner/issues/823)
 - [npm publish documentation](https://docs.npmjs.com/cli/commands/npm-publish)

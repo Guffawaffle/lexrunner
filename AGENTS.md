@@ -84,10 +84,15 @@ should remain stable even as implementation details evolve.
 
 - _Owner:_ Maintainers/automation
 - _Artifacts:_ Changelog, tags, release notes
-- _npm publication boundary:_ Agents and automation may prepare candidates, run
-  `npm run release:publish:check`, create signed tags, and create GitHub releases. They MUST NOT
-  execute `npm publish` without `--dry-run`. After the tagged-candidate gate passes, stop and hand
-  the exact printed publish command to the authenticated human release owner.
+- _npm publication boundary:_ Agents may prepare candidates, run
+  `npm run release:publish:check`, and create signed tags. The repository's exact
+  `.github/workflows/release.yml` stable-tag job may execute non-dry-run `npm publish` only through
+  npm's package-scoped GitHub OIDC trusted publisher after the target commit is signed by the
+  authorized release-owner GPG fingerprint, is contained in `main`, and passes the signed tag,
+  version, full gates, deterministic build, packed boundary, and dry-run checks. Agents, local
+  shells, pull requests, branch builds, canaries, workflow dispatches, and self-hosted runners MUST
+  NOT execute non-dry-run publication. A human maintainer owns the signing key, one-time npm trust
+  configuration, tag authorization, and any manual recovery.
 
 ---
 

@@ -188,6 +188,8 @@ New to LexRunner? Start here:
 
 ### Release and distribution
 
+- **[LexRunner 1.3.0 dogfood release](./releases/1.3.0.md)** - plan diagnostics, explicit plan
+  references, independent review gates, and broker-owned native-WSL projection
 - **[LexRunner 1.2.1 publication repair](./releases/1.2.1.md)** - npm metadata repair and explicit
   human publication gate
 - **[LexRunner 1.2.0 release decision](./releases/1.2.0.md)** - Compatibility inventory, semver,

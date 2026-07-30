@@ -22,9 +22,7 @@ on:
         default: "canary"
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: read
 
 jobs:
   # Canary release job - runs on main branch pushes
@@ -97,7 +95,12 @@ jobs:
   stable-release:
     name: Stable Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/lexrunner-v')
+    if: |
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/lexrunner-v')
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -114,22 +117,87 @@ jobs:
           fi
           echo "✅ Tag format is valid: $TAG_NAME"
 
-      - name: Verify tag signature
+      - name: Verify signed annotated tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          if git tag -v "$TAG_NAME" 2>&1 | grep -q "Good signature"; then
-            echo "✅ Tag signature is valid"
-          else
-            echo "⚠️ Warning: Tag is not signed or signature cannot be verified"
-            echo "Continuing anyway, but consider signing tags in the future"
+          TAG_OBJECT_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG_NAME}" --jq '.object.type')
+          TAG_OBJECT_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG_NAME}" --jq '.object.sha')
+
+          if [ "$TAG_OBJECT_TYPE" != "tag" ]; then
+            echo "❌ Stable publication requires a signed annotated tag"
+            exit 1
           fi
+
+          TAG_OBJECT=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_OBJECT_SHA}")
+          VERIFIED=$(jq -r '.verification.verified' <<< "$TAG_OBJECT")
+          REASON=$(jq -r '.verification.reason' <<< "$TAG_OBJECT")
+          API_TARGET_TYPE=$(jq -r '.object.type' <<< "$TAG_OBJECT")
+          API_TARGET_SHA=$(jq -r '.object.sha' <<< "$TAG_OBJECT")
+          if [ "$VERIFIED" != "true" ]; then
+            echo "❌ GitHub did not verify the tag signature (reason: ${REASON})"
+            exit 1
+          fi
+
+          if [ "$API_TARGET_TYPE" != "commit" ] || [ "$API_TARGET_SHA" != "$GITHUB_SHA" ]; then
+            echo "❌ Verified tag target (${API_TARGET_TYPE}:${API_TARGET_SHA}) does not match the workflow commit ($GITHUB_SHA)"
+            exit 1
+          fi
+
+          TAG_TARGET=$(git rev-list -n 1 "$TAG_NAME")
+          if [ "$TAG_TARGET" != "$GITHUB_SHA" ]; then
+            echo "❌ Tag target ($TAG_TARGET) does not match checked-out commit ($GITHUB_SHA)"
+            exit 1
+          fi
+          echo "✅ Signed annotated tag is verified and targets $GITHUB_SHA"
+
+      - name: Verify release-owner commit signature and main ancestry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SIGNER_FINGERPRINT: 65C94BA03E88F53D365C36CF7145A1CE635B1902
+          RELEASE_SIGNER_KEY_ID: 7145A1CE635B1902
+        run: |
+          COMMIT_VERIFIED=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${GITHUB_SHA}" --jq '.verification.verified')
+          COMMIT_REASON=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${GITHUB_SHA}" --jq '.verification.reason')
+          if [ "$COMMIT_VERIFIED" != "true" ]; then
+            echo "❌ GitHub did not verify the release commit signature (reason: ${COMMIT_REASON})"
+            exit 1
+          fi
+
+          RELEASE_PUBLIC_KEY=$(mktemp)
+          gh api users/Guffawaffle/gpg_keys \
+            --jq '.[] | select(.key_id == "7145A1CE635B1902") | .raw_key' \
+            > "$RELEASE_PUBLIC_KEY"
+          if [ ! -s "$RELEASE_PUBLIC_KEY" ]; then
+            echo "❌ Release-owner public signing key is unavailable from GitHub"
+            exit 1
+          fi
+          gpg --batch --import "$RELEASE_PUBLIC_KEY"
+
+          if ! git verify-commit "$GITHUB_SHA"; then
+            echo "❌ Release commit does not have a valid GPG signature"
+            exit 1
+          fi
+          COMMIT_SIGNER_FINGERPRINT=$(git log -1 --format='%GP' "$GITHUB_SHA")
+          if [ "$COMMIT_SIGNER_FINGERPRINT" != "$RELEASE_SIGNER_FINGERPRINT" ]; then
+            echo "❌ Release commit signer ($COMMIT_SIGNER_FINGERPRINT) is not the authorized release owner"
+            exit 1
+          fi
+
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "❌ Signed release commit is not contained in origin/main"
+            exit 1
+          fi
+          echo "✅ Release-owner signature and main ancestry are verified"
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
@@ -160,7 +228,7 @@ jobs:
           fi
           echo "✅ Version match confirmed: $TAG_VERSION"
 
-      - name: Validate human npm publication handoff
+      - name: Validate npm publication candidate
         run: npm run release:publish:check
 
       - name: Extract changelog for this version
@@ -176,6 +244,9 @@ jobs:
             echo "No changelog entry found for version ${TAG_VERSION}" > release_notes.md
           fi
 
+      - name: Publish private package through npm trusted publishing
+        run: npm publish --access restricted --tag latest --json
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -186,14 +257,14 @@ jobs:
           TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_VERSION=${TAG_NAME#lexrunner-v}
 
-          echo "## 🎉 Stable GitHub Release Prepared" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Stable Release Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** \`${TAG_VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** \`${TAG_NAME}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Human npm publication gate" >> $GITHUB_STEP_SUMMARY
-          echo "The workflow validated the dry-run but cannot publish. The authenticated release owner runs:" >> $GITHUB_STEP_SUMMARY
-          echo "\`npm publish --access restricted --tag latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "### npm trusted publication" >> $GITHUB_STEP_SUMMARY
+          echo "The signed-tag workflow published through npm's GitHub OIDC trusted publisher." >> $GITHUB_STEP_SUMMARY
+          echo "No long-lived npm token was used." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation after an authorized npm publish" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -203,7 +274,7 @@ jobs:
           echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
           cat release_notes.md >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> npm publication is a human-only authority gate; this workflow did not publish." >> $GITHUB_STEP_SUMMARY
+          echo "> npm publication was authorized only for this verified signed stable tag." >> $GITHUB_STEP_SUMMARY
 
   # Manual release job - for workflow_dispatch events
   manual-release:
@@ -246,8 +317,8 @@ jobs:
             echo "2. Review and commit changes" >> $GITHUB_STEP_SUMMARY
             echo "3. Create signed tag: \`git tag -s lexrunner-vX.Y.Z -m 'Release X.Y.Z'\`" >> $GITHUB_STEP_SUMMARY
             echo "4. Push tag: \`git push origin lexrunner-vX.Y.Z\`" >> $GITHUB_STEP_SUMMARY
-            echo "5. After the tag workflow passes, run \`npm run release:publish:check\` locally" >> $GITHUB_STEP_SUMMARY
-            echo "6. The authenticated human executes the exact command printed by the gate" >> $GITHUB_STEP_SUMMARY
+            echo "5. The signed-tag workflow validates and publishes through npm trusted publishing" >> $GITHUB_STEP_SUMMARY
+            echo "6. Verify the private registry and native Windows consumer" >> $GITHUB_STEP_SUMMARY
           else
             echo "Canary candidates are validated on main branch pushes; npm publication remains a separate authorized step" >> $GITHUB_STEP_SUMMARY
           fi

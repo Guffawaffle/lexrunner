@@ -16,7 +16,7 @@ const previousPackageExportKeys = [
   "./schemas/runner-stack",
 ];
 
-describe("LexRunner 1.2 release readiness", () => {
+describe("LexRunner 1.3 release readiness", () => {
   it("keeps package, runtime, dependency, and prior export identity aligned", async () => {
     const packageJson = await readJson<{
       version: string;
@@ -28,7 +28,7 @@ describe("LexRunner 1.2 release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("1.2.1");
+    expect(packageJson.version).toBe("1.3.0");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^3.0.1");
     expect(packageJson.bin["lexrunner-mcp"]).toBe("mcp-server.mjs");
@@ -66,6 +66,7 @@ describe("LexRunner 1.2 release readiness", () => {
       changelog,
       releaseNotes,
       priorReleaseNotes,
+      compatibilityDecision,
       migration,
       instructions,
       releaseWorkflow,
@@ -74,6 +75,7 @@ describe("LexRunner 1.2 release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
+      read("docs/releases/1.3.0.md"),
       read("docs/releases/1.2.1.md"),
       read("docs/releases/1.2.0.md"),
       read("docs/node-24-migration.md"),
@@ -83,19 +85,36 @@ describe("LexRunner 1.2 release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **1.2.1**");
-    expect(changelog).toContain("## [1.2.1] - 2026-07-21");
-    expect(releaseNotes).toContain("human-only publication gate");
-    expect(priorReleaseNotes).toContain("public unattended/headless worker-launch");
-    expect(priorReleaseNotes).toContain("separate explicitly authorized action");
-    expect(priorReleaseNotes).toContain("not published to npm");
-    expect(migration).toContain("@smartergpt/lexrunner@1.2.1");
+    expect(readme).toContain("Current repository package version: **1.3.0**");
+    expect(changelog).toContain("## [1.3.0] - 2026-07-30");
+    expect(releaseNotes).toContain("release-owner-signed, trusted-workflow npm publication");
+    expect(releaseNotes).toContain("real Windows/DrvFS");
+    expect(priorReleaseNotes).toContain("human-only publication gate");
+    expect(compatibilityDecision).toContain("public unattended/headless worker-launch");
+    expect(compatibilityDecision).toContain("separate explicitly authorized action");
+    expect(compatibilityDecision).toContain("not published to npm");
+    expect(migration).toContain("@smartergpt/lexrunner@1.3.0");
     expect(migration).not.toContain("@smartergpt/lexrunner@3.1.0");
     expect(instructions).toContain("MUST NOT");
-    expect(instructions).toContain("npm publish` without `--dry-run");
+    expect(instructions).toContain("npm's package-scoped GitHub OIDC trusted publisher");
     expect(releaseWorkflow).toContain('"lexrunner-v*.*.*"');
     expect(releaseWorkflow).not.toContain('"v*.*.*"');
+    expect(releaseWorkflow).toContain("npm publish --access restricted --tag latest --json");
+    expect(releaseWorkflow).toContain("id-token: write");
+    expect(releaseWorkflow).toContain("package-manager-cache: false");
+    expect(releaseWorkflow).toContain("github.event_name == 'push' &&");
+    expect(releaseWorkflow).toContain("API_TARGET_TYPE=$(jq -r '.object.type'");
+    expect(releaseWorkflow).toContain("API_TARGET_SHA=$(jq -r '.object.sha'");
+    expect(releaseWorkflow).toContain(
+      "RELEASE_SIGNER_FINGERPRINT: 65C94BA03E88F53D365C36CF7145A1CE635B1902"
+    );
+    expect(releaseWorkflow).toContain('git verify-commit "$GITHUB_SHA"');
+    expect(releaseWorkflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(releaseWorkflow).not.toContain("NODE_AUTH_TOKEN");
+    expect(releaseWorkflow).not.toContain("secrets.NPM_TOKEN");
+    expect(releaseProcess).toContain("npm trust github @smartergpt/lexrunner --file release.yml");
     expect(releaseProcess).toContain("lexrunner-vX.Y.Z");
+    expect(releaseProcess).toContain("runs only for push events");
     expect(releaseDriftCheck).toContain("lexrunner-v${version}");
   });
 });
