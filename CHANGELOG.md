@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-30
+
+### Added
+
+- **Windows-to-native-WSL Attempt projection** - Added a read-only containment preflight,
+  versioned projection and path-mapping contracts, rollback-safe native provisioning, and
+  identity-bound launch, worker, receipt, verification, acceptance, and cleanup behavior.
+- **Shared projection lifecycle** - Added matching CLI
+  `attempt projection prepare|status|cleanup|quarantine` operations and MCP lifecycle tools with
+  explicit mutation authority, path-private diagnostics, bounded quarantine inspection, and a
+  recovery runbook.
+- **Independent merge review gate** - Documented a mandatory-by-default, exact-head review step
+  whose verdict is invalidated by candidate changes and whose opt-out requires an explicit warned
+  `review_bypassed` receipt.
+
+### Fixed
+
+- **Plan validation diagnostics** - Return the individual validation failures instead of only an
+  aggregate count, preserving the dogfood evidence needed to repair invalid plans.
+- **Explicit plan references** - Resolve explicitly selected plan artifacts consistently across
+  MCP status, ordering, and gate operations.
+- **Projection durability and recovery** - Fail closed across selection revocation/publication,
+  staging ownership, quarantine marker persistence, directory sync failures, source refresh, and
+  active-worktree cleanup refusal.
+
 ---
 
 ## [1.2.1] - 2026-07-21

@@ -8,8 +8,8 @@ import {
   validatePackageManifestForPublish,
 } from "../scripts/validate-package-boundary.js";
 import {
-  humanPublishCommand,
   releaseTagForVersion,
+  trustedPublishCommand,
   validateReleaseManifest,
 } from "../scripts/release-publish-check.js";
 
@@ -46,10 +46,10 @@ describe("npm publication boundary", () => {
     );
   });
 
-  it("prints a stable, explicit command without executing publication", () => {
-    expect(humanPublishCommand()).toBe("npm publish --access restricted --tag latest");
-    expect(humanPublishCommand("canary")).toBe("npm publish --access restricted --tag canary");
-    expect(() => humanPublishCommand("not a tag")).toThrow("Invalid npm dist-tag");
+  it("prints the stable command reserved for the trusted workflow without executing it", () => {
+    expect(trustedPublishCommand()).toBe("npm publish --access restricted --tag latest");
+    expect(trustedPublishCommand("canary")).toBe("npm publish --access restricted --tag canary");
+    expect(() => trustedPublishCommand("not a tag")).toThrow("Invalid npm dist-tag");
   });
 
   it("uses the repository-scoped release tag prefix", () => {
