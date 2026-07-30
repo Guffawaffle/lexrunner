@@ -113,6 +113,17 @@ This MCP server follows the same architectural pattern as LexBrain and LexMap:
 
 ## Available Tools
 
+### preflight_attempt_containment
+
+Checks whether the current runtime and declared repository/worktree roots can host LexRunner's
+physical directory-identity boundary before an Attempt packet is constructed. This tool is always
+read-only and does not require `ALLOW_MUTATIONS`.
+
+It returns `native_ready`, `broker_required`, or `unsupported` with stable reason codes, bounded
+next actions, verification depth for each root, and a privacy-safe binding digest. Native Windows
+and WSL DrvFS/9P inputs recommend a native-WSL projection without weakening the containment
+boundary.
+
 ### mcp_lexrunner_plan_create
 
 Creates a plan from configuration files or auto-discovers from GitHub PRs. This is a **convenience wrapper** that combines PR discovery (`pr_list`), plan generation, validation, and file writing into a single operation.

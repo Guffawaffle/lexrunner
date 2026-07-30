@@ -41,6 +41,46 @@ principal safe to share writable Git internals. A process authorized to mutate
 the contents of the anchored repository `.git` directory remains inside the
 trusted repository boundary.
 
+## Read-only capability preflight
+
+Run `lex-pr attempt preflight --input <file|-> --json`, or call MCP
+`preflight_attempt_containment`, before constructing a WorkItem or Attempt packet. Both adapters
+call `AgentWorkContainmentCapabilityService`; the operation does not open SQLite, invoke Git,
+create a directory, branch, marker, worktree, or acquire mutation authority.
+
+The request contains only the repository/runtime binding needed by the physical boundary:
+
+```json
+{
+  "runtime": {
+    "repositoryId": "repo-identity",
+    "repositoryRoot": "/native/repository",
+    "worktreeRoot": "/native/lexrunner-worktrees",
+    "gitRuntime": "wsl-ubuntu",
+    "pathComparison": "case-sensitive"
+  }
+}
+```
+
+Results use one of three capability states:
+
+- `native_ready` — procfs plus all repository, repository-Git, and worktree-root identities were
+  verified on a supported native Linux filesystem;
+- `broker_required` — native Windows or a WSL DrvFS/9P path requires the identity-anchored
+  native-WSL projection tracked in #863; or
+- `unsupported` — the runtime, path syntax, root relationship, directory identity, or filesystem
+  could not satisfy the boundary.
+
+Stable reason codes and next-action identifiers are machine-readable. Path status distinguishes
+`identity_verified`, `filesystem_verified`, `syntactic_only`, `unverified`, and `not_checked`.
+The response never echoes a path or low-level OS message. Its `bindingDigest` binds the result to
+the exact repository ID, paths, Git runtime, and comparison declaration without exposing those
+values.
+
+`broker_required` is not a containment override. It stops local allocation and directs the caller
+to provision a native-WSL projection, then rerun preflight. Provisioning authority and
+Windows-to-WSL path mappings remain separate work under #863.
+
 ## Platform matrix
 
 | Runtime                                                                | Behavior                                                                                     |

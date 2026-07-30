@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registerAttemptCommand } from "../../src/commands/attempt.js";
+import type { AgentWorkContainmentPreflightHandler } from "../../src/runs/agent-work-containment-preflight.js";
 import type {
   AttemptLifecycleHandlers,
   AttemptPreparationHandler,
@@ -17,6 +18,7 @@ import type { AttemptVerificationHandlers } from "../../src/runs/agent-work-atte
 describe("attempt commands", () => {
   let directory: string;
   let program: Command;
+  let containmentHandler: AgentWorkContainmentPreflightHandler;
   let handlers: AttemptLifecycleHandlers;
   let preparationHandler: AttemptPreparationHandler;
   let workerHandlers: AttemptWorkerHandlers;
@@ -30,6 +32,15 @@ describe("attempt commands", () => {
     program.exitOverride();
     program.option("--json");
     outputs = [];
+    containmentHandler = {
+      preflight: vi.fn(async () => ({
+        ok: true,
+        result: {
+          state: "native_ready",
+          physicalContainmentAvailable: true,
+        } as never,
+      })),
+    };
     handlers = {
       start: vi.fn(async () => ({ ok: true, result: { outcome: "launch_authorized" } as never })),
       status: vi.fn(async () => ({
@@ -79,6 +90,7 @@ describe("attempt commands", () => {
     };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
+      containmentHandler,
       handlers,
       preparationHandler,
       workerHandlers,
@@ -173,9 +185,10 @@ describe("attempt commands", () => {
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  it("registers worker, receipt, verification, acceptance, prepare, start, and status beneath attempt", () => {
+  it("registers preflight, worker, receipt, verification, acceptance, prepare, start, and status beneath attempt", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
+      "preflight",
       "worker",
       "receipt",
       "verification",
@@ -184,41 +197,88 @@ describe("attempt commands", () => {
       "start",
       "status",
     ]);
-    expect(attempt?.commands[0].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[0].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[1].commands.map((command) => command.name())).toEqual([
       "attach",
       "heartbeat",
       "end",
       "status",
     ]);
-    expect(attempt?.commands[1].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
       "submit",
       "status",
     ]);
-    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
       "run",
       "status",
     ]);
-    expect(attempt?.commands[2].commands[1].options.map((option) => option.long)).toContain(
+    expect(attempt?.commands[3].commands[1].options.map((option) => option.long)).toContain(
       "--diagnostics"
     );
-    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[4].commands.map((command) => command.name())).toEqual([
       "apply",
       "status",
-    ]);
-    expect(attempt?.commands[4].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
     ]);
     expect(attempt?.commands[5].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[6].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[7].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
+  });
+
+  it("forwards containment preflight input and maps broker-required capability to exit one", async () => {
+    const request = {
+      runtime: {
+        repositoryId: "repo-1",
+        repositoryRoot: "D:\\dev\\stfc-mod",
+        worktreeRoot: "D:\\dev\\worktrees",
+        gitRuntime: "windows",
+        pathComparison: "case-insensitive",
+      },
+    };
+    const inputPath = join(directory, "containment-preflight.json");
+    await fs.writeFile(inputPath, JSON.stringify(request));
+    vi.mocked(containmentHandler.preflight).mockResolvedValueOnce({
+      ok: true,
+      result: {
+        state: "broker_required",
+        reasonCode: "windows_requires_native_wsl_broker",
+      } as never,
+    });
+
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "preflight",
+      "--input",
+      inputPath,
+      "--json",
+    ]);
+
+    expect(containmentHandler.preflight).toHaveBeenCalledWith(request);
+    expect(outputs).toEqual([
+      {
+        ok: true,
+        result: {
+          state: "broker_required",
+          reasonCode: "windows_requires_native_wsl_broker",
+        },
+      },
+    ]);
+    expect(process.exitCode).toBe(1);
   });
 
   it("forwards Attempt receipt submit and status input unchanged", async () => {

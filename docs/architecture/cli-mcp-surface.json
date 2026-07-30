@@ -66,6 +66,7 @@
       "attempt acceptance",
       "attempt acceptance apply",
       "attempt acceptance status",
+      "attempt preflight",
       "attempt prepare",
       "attempt receipt",
       "attempt receipt status",
@@ -217,6 +218,7 @@
         "operations": [
           "attempt acceptance apply",
           "attempt acceptance status",
+          "attempt preflight",
           "attempt prepare",
           "attempt receipt status",
           "attempt receipt submit",
@@ -253,6 +255,7 @@
       "merge-order",
       "merge.apply",
       "plan.create",
+      "preflight_attempt_containment",
       "prepare_attempt",
       "profile.resolve",
       "start_attempt",
@@ -298,6 +301,7 @@
           "get_attempt_verification",
           "get_attempt_worker",
           "heartbeat_attempt_worker",
+          "preflight_attempt_containment",
           "prepare_attempt",
           "start_attempt",
           "submit_attempt_receipt",
@@ -391,6 +395,11 @@
         "tool": "plan.create",
         "cli": "weave plan",
         "owner": "PlanCreationService"
+      },
+      {
+        "tool": "preflight_attempt_containment",
+        "cli": "attempt preflight",
+        "owner": "AgentWorkContainmentCapabilityService"
       },
       {
         "tool": "prepare_attempt",

@@ -18,11 +18,25 @@ const UNSUPPORTED_WSL_FILESYSTEM_TYPES = new Set([0x01021997n, 0x53464846n]);
 export type DirectoryBoundaryErrorCode =
   "unsupported_platform" | "invalid_path" | "identity_changed";
 
+export type DirectoryBoundaryReasonCode =
+  | "native_linux_ready"
+  | "windows_requires_native_wsl_broker"
+  | "macos_unsupported"
+  | "unsupported_platform"
+  | "case_insensitive_runtime"
+  | "procfs_unavailable"
+  | "invalid_native_path"
+  | "path_unavailable"
+  | "filesystem_unverified"
+  | "wsl_drvfs_9p"
+  | "identity_changed";
+
 export class DirectoryBoundaryError extends Error {
   constructor(
     readonly code: DirectoryBoundaryErrorCode,
     message: string,
-    readonly originalCause?: unknown
+    readonly originalCause?: unknown,
+    readonly reasonCode?: DirectoryBoundaryReasonCode
   ) {
     super(message);
     this.name = "DirectoryBoundaryError";
@@ -41,6 +55,114 @@ export interface AnchoredDirectory extends DirectoryIdentity {
   close(): void;
 }
 
+export type DirectoryIdentityBoundarySupport =
+  | {
+      readonly supported: true;
+      readonly platform: NodeJS.Platform;
+      readonly pathComparison: "case-sensitive";
+      readonly reasonCode: "native_linux_ready";
+    }
+  | {
+      readonly supported: false;
+      readonly platform: NodeJS.Platform;
+      readonly pathComparison: "case-sensitive" | "case-insensitive";
+      readonly reasonCode:
+        | "windows_requires_native_wsl_broker"
+        | "macos_unsupported"
+        | "unsupported_platform"
+        | "case_insensitive_runtime"
+        | "procfs_unavailable";
+    };
+
+export interface DirectoryIdentityPathProbe {
+  readonly verified: boolean;
+  readonly filesystem: "native_linux" | "wsl_drvfs_9p" | "unknown";
+  readonly reasonCode:
+    | "directory_verified"
+    | "wsl_drvfs_9p"
+    | "invalid_native_path"
+    | "path_unavailable"
+    | "filesystem_unverified";
+}
+
+export interface DirectoryIdentityBoundaryFacts {
+  readonly platform: NodeJS.Platform;
+  readonly pathComparison: "case-sensitive" | "case-insensitive";
+  readonly procfsAvailable: boolean;
+}
+
+/** Pure policy evaluation shared by construction-time checks and read-only preflight. */
+export function evaluateDirectoryIdentityBoundarySupport(
+  facts: DirectoryIdentityBoundaryFacts
+): DirectoryIdentityBoundarySupport {
+  if (facts.platform === "win32") {
+    return {
+      supported: false,
+      platform: facts.platform,
+      pathComparison: facts.pathComparison,
+      reasonCode: "windows_requires_native_wsl_broker",
+    };
+  }
+  if (facts.platform === "darwin") {
+    return {
+      supported: false,
+      platform: facts.platform,
+      pathComparison: facts.pathComparison,
+      reasonCode: "macos_unsupported",
+    };
+  }
+  if (facts.platform !== "linux") {
+    return {
+      supported: false,
+      platform: facts.platform,
+      pathComparison: facts.pathComparison,
+      reasonCode: "unsupported_platform",
+    };
+  }
+  if (facts.pathComparison !== "case-sensitive") {
+    return {
+      supported: false,
+      platform: facts.platform,
+      pathComparison: facts.pathComparison,
+      reasonCode: "case_insensitive_runtime",
+    };
+  }
+  if (!facts.procfsAvailable) {
+    return {
+      supported: false,
+      platform: facts.platform,
+      pathComparison: facts.pathComparison,
+      reasonCode: "procfs_unavailable",
+    };
+  }
+  return {
+    supported: true,
+    platform: facts.platform,
+    pathComparison: facts.pathComparison,
+    reasonCode: "native_linux_ready",
+  };
+}
+
+/** Inspect the current process boundary without creating directories or invoking Git. */
+export function probeDirectoryIdentityBoundarySupport(
+  pathComparison: "case-sensitive" | "case-insensitive"
+): DirectoryIdentityBoundarySupport {
+  const runtimePlatform = platform();
+  let procfsAvailable = false;
+  if (runtimePlatform === "linux" && pathComparison === "case-sensitive") {
+    try {
+      procfsAvailable = lstatSync(PROC_FD_ROOT).isDirectory();
+    } catch {
+      procfsAvailable = false;
+    }
+  }
+  return evaluateDirectoryIdentityBoundarySupport({
+    platform: runtimePlatform,
+    pathComparison,
+    procfsAvailable,
+  });
+}
+
 /**
  * The broker's identity boundary currently depends on Linux procfs directory
  * descriptors. Other kernels, case-insensitive runtimes, and WSL DrvFS/9P
@@ -49,27 +171,14 @@ export interface AnchoredDirectory extends DirectoryIdentity {
 export function assertDirectoryIdentityBoundarySupported(
   pathComparison: "case-sensitive" | "case-insensitive"
 ): void {
-  if (platform() !== "linux") {
-    throw new DirectoryBoundaryError(
-      "unsupported_platform",
-      "Physical worktree containment requires the Linux directory-identity boundary; macOS and Windows are disabled"
-    );
-  }
-  if (pathComparison !== "case-sensitive") {
-    throw new DirectoryBoundaryError(
-      "unsupported_platform",
-      "Physical worktree containment currently requires a case-sensitive Linux Git runtime"
-    );
-  }
-  try {
-    if (!lstatSync(PROC_FD_ROOT).isDirectory()) throw new Error("not a directory");
-  } catch (error) {
-    throw new DirectoryBoundaryError(
-      "unsupported_platform",
-      "Physical worktree containment requires an accessible Linux procfs file-descriptor namespace",
-      error
-    );
-  }
+  const support = probeDirectoryIdentityBoundarySupport(pathComparison);
+  if (support.supported) return;
+  throw new DirectoryBoundaryError(
+    "unsupported_platform",
+    boundarySupportMessage(support.reasonCode),
+    undefined,
+    support.reasonCode
+  );
 }
 
 /** Capture the exact directory object named by an absolute, symlink-free path. */
@@ -81,12 +190,38 @@ export function captureDirectoryIdentity(absolutePath: string, label: string): D
     if (currentPath !== directory.path) {
       throw new DirectoryBoundaryError(
         "invalid_path",
-        `${label} must use its exact native spelling and may not traverse aliases or symlinks`
+        `${label} must use its exact native spelling and may not traverse aliases or symlinks`,
+        undefined,
+        "path_unavailable"
       );
     }
     return identityOf(directory);
   } finally {
     directory.close();
+  }
+}
+
+/** Return a bounded path capability result without exposing the inspected path or OS error text. */
+export function probeDirectoryIdentityPath(
+  absolutePath: string,
+  label: string
+): DirectoryIdentityPathProbe {
+  try {
+    captureDirectoryIdentity(absolutePath, label);
+    return { verified: true, filesystem: "native_linux", reasonCode: "directory_verified" };
+  } catch (error) {
+    if (error instanceof DirectoryBoundaryError) {
+      if (error.reasonCode === "wsl_drvfs_9p") {
+        return { verified: false, filesystem: "wsl_drvfs_9p", reasonCode: "wsl_drvfs_9p" };
+      }
+      if (error.reasonCode === "invalid_native_path") {
+        return { verified: false, filesystem: "unknown", reasonCode: "invalid_native_path" };
+      }
+      if (error.reasonCode === "filesystem_unverified") {
+        return { verified: false, filesystem: "unknown", reasonCode: "filesystem_unverified" };
+      }
+    }
+    return { verified: false, filesystem: "unknown", reasonCode: "path_unavailable" };
   }
 }
 
@@ -96,7 +231,9 @@ function assertSupportedFilesystem(directory: AnchoredDirectory, label: string):
     if (UNSUPPORTED_WSL_FILESYSTEM_TYPES.has(type)) {
       throw new DirectoryBoundaryError(
         "unsupported_platform",
-        `${label} is on a WSL DrvFS/9P mount; physical worktree containment requires a native Linux filesystem`
+        `${label} is on a WSL DrvFS/9P mount; physical worktree containment requires a native Linux filesystem`,
+        undefined,
+        "wsl_drvfs_9p"
       );
     }
   } catch (error) {
@@ -104,7 +241,8 @@ function assertSupportedFilesystem(directory: AnchoredDirectory, label: string):
     throw new DirectoryBoundaryError(
       "unsupported_platform",
       `Could not verify the filesystem semantics for ${label}`,
-      error
+      error,
+      "filesystem_unverified"
     );
   }
 }
@@ -119,7 +257,9 @@ export function reopenDirectoryIdentity(
     directory.close();
     throw new DirectoryBoundaryError(
       "identity_changed",
-      `${label} was replaced after the broker captured its directory identity`
+      `${label} was replaced after the broker captured its directory identity`,
+      undefined,
+      "identity_changed"
     );
   }
   return directory;
@@ -194,7 +334,9 @@ export function assertAnchoredDirectoryLocation(directory: AnchoredDirectory, la
   if (currentPath !== directory.path) {
     throw new DirectoryBoundaryError(
       "identity_changed",
-      `${label} moved after its directory identity was anchored`
+      `${label} moved after its directory identity was anchored`,
+      undefined,
+      "identity_changed"
     );
   }
   const reopened = openAbsoluteDirectory(directory.path, label);
@@ -202,7 +344,9 @@ export function assertAnchoredDirectoryLocation(directory: AnchoredDirectory, la
     if (!sameDirectoryIdentity(directory, reopened)) {
       throw new DirectoryBoundaryError(
         "identity_changed",
-        `${label} now names a different directory identity`
+        `${label} now names a different directory identity`,
+        undefined,
+        "identity_changed"
       );
     }
   } finally {
@@ -219,14 +363,18 @@ function openAbsoluteDirectory(absolutePath: string, label: string): AnchoredDir
   if (!path.isAbsolute(absolutePath) || absolutePath.includes("\0")) {
     throw new DirectoryBoundaryError(
       "invalid_path",
-      `${label} must be a runtime-native absolute path`
+      `${label} must be a runtime-native absolute path`,
+      undefined,
+      "invalid_native_path"
     );
   }
   const normalized = path.resolve(absolutePath);
   if (path.parse(normalized).root !== path.sep) {
     throw new DirectoryBoundaryError(
       "invalid_path",
-      `${label} is not a supported Linux absolute path`
+      `${label} is not a supported Linux absolute path`,
+      undefined,
+      "invalid_native_path"
     );
   }
 
@@ -255,7 +403,12 @@ function directoryHandle(fd: number, expectedPath: string): AnchoredDirectory {
   const stats = fstatSync(fd, { bigint: true });
   if (!stats.isDirectory()) {
     closeSync(fd);
-    throw new DirectoryBoundaryError("invalid_path", `${expectedPath} is not a directory`);
+    throw new DirectoryBoundaryError(
+      "invalid_path",
+      `${expectedPath} is not a directory`,
+      undefined,
+      "path_unavailable"
+    );
   }
   return {
     fd,
@@ -278,7 +431,8 @@ function currentDirectoryPath(directory: AnchoredDirectory, label: string): stri
     throw new DirectoryBoundaryError(
       "invalid_path",
       `Could not resolve the anchored ${label} directory identity`,
-      error
+      error,
+      "path_unavailable"
     );
   }
 }
@@ -301,8 +455,22 @@ function boundaryPathError(label: string, error: unknown): DirectoryBoundaryErro
   return new DirectoryBoundaryError(
     "invalid_path",
     `${label} could not be opened as a symlink-free directory${suffix}`,
-    error
+    error,
+    "path_unavailable"
   );
+}
+
+function boundarySupportMessage(
+  reasonCode: DirectoryIdentityBoundarySupport["reasonCode"]
+): string {
+  switch (reasonCode) {
+    case "case_insensitive_runtime":
+      return "Physical worktree containment currently requires a case-sensitive Linux Git runtime";
+    case "procfs_unavailable":
+      return "Physical worktree containment requires an accessible Linux procfs file-descriptor namespace";
+    default:
+      return "Physical worktree containment requires the Linux directory-identity boundary; macOS and Windows are disabled";
+  }
 }
 
 function errorCause(error: unknown): unknown {

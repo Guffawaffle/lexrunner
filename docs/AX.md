@@ -45,40 +45,41 @@ itself is tested against `inspectRegisteredCliSurface()` and the published MCP `
 
 <!-- BEGIN GENERATED AX SURFACE -->
 
-Matrix schema: **1.0.0**. Live inventory: **125 CLI registrations** and **28 MCP tools**.
+Matrix schema: **1.0.0**. Live inventory: **126 CLI registrations** and **29 MCP tools**.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        86 |             9 |         15 |            15 |      0 |
-| MCP     |        24 |             0 |          4 |             0 |      0 |
+| CLI     |        87 |             9 |         15 |            15 |      0 |
+| MCP     |        25 |             0 |          4 |             0 |      0 |
 
 ### Canonical CLI/MCP semantic pairs
 
-| MCP tool                   | CLI operation                        | Owning application service            |
-| -------------------------- | ------------------------------------ | ------------------------------------- |
-| `accept_attempt`           | `lex-pr attempt acceptance apply`    | `AgentWorkAttemptAcceptanceService`   |
-| `attach_attempt_worker`    | `lex-pr attempt worker attach`       | `AgentWorkWorkerSessionService`       |
-| `config.show`              | `lex-pr config show`                 | `ConfigurationQueryService`           |
-| `discover`                 | `lex-pr weave discover`              | `DiscoveryQueryService`               |
-| `doctor`                   | `lex-pr workspace doctor`            | `WorkspaceDiagnosticsService`         |
-| `end_attempt_worker`       | `lex-pr attempt worker end`          | `AgentWorkWorkerSessionService`       |
-| `gates.run`                | `lex-pr gate run`                    | `GateExecutionService`                |
-| `get_attempt_acceptance`   | `lex-pr attempt acceptance status`   | `AgentWorkAttemptAcceptanceService`   |
-| `get_attempt_receipt`      | `lex-pr attempt receipt status`      | `AgentWorkAttemptReceiptService`      |
-| `get_attempt_status`       | `lex-pr attempt status`              | `AgentWorkLifecycleService`           |
-| `get_attempt_verification` | `lex-pr attempt verification status` | `AgentWorkAttemptVerificationService` |
-| `get_attempt_worker`       | `lex-pr attempt worker status`       | `AgentWorkWorkerSessionService`       |
-| `heartbeat_attempt_worker` | `lex-pr attempt worker heartbeat`    | `AgentWorkWorkerSessionService`       |
-| `local.init`               | `lex-pr workspace init`              | `WorkspaceInitializationService`      |
-| `merge-order`              | `lex-pr weave merge-order`           | `MergeOrderQueryService`              |
-| `merge.apply`              | `lex-pr weave apply`                 | `MergeApplicationService`             |
-| `plan.create`              | `lex-pr weave plan`                  | `PlanCreationService`                 |
-| `prepare_attempt`          | `lex-pr attempt prepare`             | `AgentWorkLifecycleService`           |
-| `profile.resolve`          | `lex-pr config show`                 | `ConfigurationQueryService`           |
-| `start_attempt`            | `lex-pr attempt start`               | `AgentWorkLifecycleService`           |
-| `status`                   | `lex-pr weave status`                | `IntegrationStatusQueryService`       |
-| `submit_attempt_receipt`   | `lex-pr attempt receipt submit`      | `AgentWorkAttemptReceiptService`      |
-| `verify_attempt`           | `lex-pr attempt verification run`    | `AgentWorkAttemptVerificationService` |
+| MCP tool                        | CLI operation                        | Owning application service              |
+| ------------------------------- | ------------------------------------ | --------------------------------------- |
+| `accept_attempt`                | `lex-pr attempt acceptance apply`    | `AgentWorkAttemptAcceptanceService`     |
+| `attach_attempt_worker`         | `lex-pr attempt worker attach`       | `AgentWorkWorkerSessionService`         |
+| `config.show`                   | `lex-pr config show`                 | `ConfigurationQueryService`             |
+| `discover`                      | `lex-pr weave discover`              | `DiscoveryQueryService`                 |
+| `doctor`                        | `lex-pr workspace doctor`            | `WorkspaceDiagnosticsService`           |
+| `end_attempt_worker`            | `lex-pr attempt worker end`          | `AgentWorkWorkerSessionService`         |
+| `gates.run`                     | `lex-pr gate run`                    | `GateExecutionService`                  |
+| `get_attempt_acceptance`        | `lex-pr attempt acceptance status`   | `AgentWorkAttemptAcceptanceService`     |
+| `get_attempt_receipt`           | `lex-pr attempt receipt status`      | `AgentWorkAttemptReceiptService`        |
+| `get_attempt_status`            | `lex-pr attempt status`              | `AgentWorkLifecycleService`             |
+| `get_attempt_verification`      | `lex-pr attempt verification status` | `AgentWorkAttemptVerificationService`   |
+| `get_attempt_worker`            | `lex-pr attempt worker status`       | `AgentWorkWorkerSessionService`         |
+| `heartbeat_attempt_worker`      | `lex-pr attempt worker heartbeat`    | `AgentWorkWorkerSessionService`         |
+| `local.init`                    | `lex-pr workspace init`              | `WorkspaceInitializationService`        |
+| `merge-order`                   | `lex-pr weave merge-order`           | `MergeOrderQueryService`                |
+| `merge.apply`                   | `lex-pr weave apply`                 | `MergeApplicationService`               |
+| `plan.create`                   | `lex-pr weave plan`                  | `PlanCreationService`                   |
+| `preflight_attempt_containment` | `lex-pr attempt preflight`           | `AgentWorkContainmentCapabilityService` |
+| `prepare_attempt`               | `lex-pr attempt prepare`             | `AgentWorkLifecycleService`             |
+| `profile.resolve`               | `lex-pr config show`                 | `ConfigurationQueryService`             |
+| `start_attempt`                 | `lex-pr attempt start`               | `AgentWorkLifecycleService`             |
+| `status`                        | `lex-pr weave status`                | `IntegrationStatusQueryService`         |
+| `submit_attempt_receipt`        | `lex-pr attempt receipt submit`      | `AgentWorkAttemptReceiptService`        |
+| `verify_attempt`                | `lex-pr attempt verification run`    | `AgentWorkAttemptVerificationService`   |
 
 ### Intentional parity exceptions
 

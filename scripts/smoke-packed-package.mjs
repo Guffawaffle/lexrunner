@@ -7,6 +7,7 @@ const projectRoot = process.cwd();
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexrunner-packed-smoke-"));
 const consumerRoot = path.join(temporaryRoot, "consumer");
 const requiredAttemptTools = [
+  "preflight_attempt_containment",
   "prepare_attempt",
   "start_attempt",
   "get_attempt_status",
@@ -59,6 +60,9 @@ try {
       `
         const main = await import("@smartergpt/lexrunner");
         if (typeof main.canonicalJSONStringify !== "function") throw new Error("missing ESM root API");
+        if (typeof main.createAgentWorkContainmentPreflightHandler !== "function") {
+          throw new Error("missing containment preflight root API");
+        }
         const checks = [
           ["@smartergpt/lexrunner/audit-sdk", "AUDIT_SCHEMA_VERSION"],
           ["@smartergpt/lexrunner/frames", "ExecutionFrameSchema"],
