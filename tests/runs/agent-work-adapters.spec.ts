@@ -17,6 +17,7 @@ import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-
 import { NativeWslProjectionEngine } from "../../src/workspaces/native-wsl-projection-engine.js";
 
 const roots: string[] = [];
+const directoryLinkType = process.platform === "win32" ? "junction" : "dir";
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -467,7 +468,7 @@ async function fixture(root: string) {
   await mkdir(join(root, "outside"));
   await writeFile(join(repositoryRoot, "tracked.txt"), "base\n", "utf8");
   await writeFile(join(repositoryRoot, "..project", "app.txt"), "app\n", "utf8");
-  await symlink(join(root, "outside"), join(repositoryRoot, "escape"), "dir");
+  await symlink(join(root, "outside"), join(repositoryRoot, "escape"), directoryLinkType);
   await git(repositoryRoot, "add", "tracked.txt", "..project/app.txt", "escape");
   await git(repositoryRoot, "commit", "-m", "initial");
   const baseSha = (

@@ -182,6 +182,39 @@ jobs:
           name: npm-pack-dry-run
           path: npm-pack-dry-run.json
 
+  # Native Windows bootstrap and independently portable regressions. The full shared
+  # native-host conformance lane is tracked by #893 and must not be simulated with skips.
+  windows-bootstrap:
+    runs-on: windows-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.level != 'minimal')
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - name: Activate pinned npm
+        run: npm install --global npm@11.16.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify install-script policy
+        run: npm run check:install-scripts
+      - name: Audit production dependencies
+        run: npm audit --audit-level=high
+      - name: Lint and typecheck
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Run portable Windows regressions
+        run: >-
+          npx vitest run
+          tests/unit/verification/engine-verifier.spec.ts
+          tests/dogfood-ecosystem.spec.ts
+          tests/release-readiness.spec.ts
+          tests/runs/agent-work-preparation-service.spec.ts
+
   # Full manual-only determinism and license gate.
   determinism-and-license:
     runs-on: ubuntu-latest
@@ -221,7 +254,7 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build-and-test, git-backed-tests, package-artifacts]
+    needs: [lint, typecheck, build-and-test, git-backed-tests, package-artifacts, windows-bootstrap]
     if: >-
       always() &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
@@ -242,5 +275,8 @@ jobs:
           fi
           if [[ "${{ needs.package-artifacts.result }}" != "success" && "${{ needs.package-artifacts.result }}" != "skipped" ]]; then
             echo "❌ package-artifacts did not pass"; exit 1
+          fi
+          if [[ "${{ needs.windows-bootstrap.result }}" != "success" && "${{ needs.windows-bootstrap.result }}" != "skipped" ]]; then
+            echo "❌ windows-bootstrap did not pass"; exit 1
           fi
           echo "✅ CI Complete (level: ${{ inputs.level || 'pull-request' }})"

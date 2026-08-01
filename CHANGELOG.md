@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **Lex 4 compatibility** - Upgrade `@smartergpt/lex` to the audited 4.x line while preserving all
+  directly consumed public exports.
+- **Deterministic install scripts** - Check in explicit npm allow/deny decisions for native SQLite,
+  esbuild, and Lex lifecycle scripts.
+
+### Fixed
+
+- **Native Windows bootstrap** - Validate clean installation, dependency policy, build, and focused
+  portable regressions in Windows CI without claiming runtime parity through skipped tests.
+- **Cross-platform patch application** - Apply unified diffs through argument-safe `git apply`
+  instead of requiring a separately installed GNU `patch` executable.
+- **Dependency audit** - Remove the high-severity Sharp/libvips advisory path by adopting Lex 4.
+
 ## [1.3.0] - 2026-07-30
 
 ### Added
