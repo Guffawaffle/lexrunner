@@ -54,6 +54,10 @@ internal static class ProofSuite
         ExpectBoundaryCode(
             "unsupported_filesystem",
             () => NativeDirectoryAuthority.Acquire(uncAlias).Dispose());
+        var extendedUncAlias = $@"\\?\UNC\localhost\{driveRoot[0]}$\{root[driveRoot.Length..]}";
+        ExpectBoundaryCode(
+            "unsupported_filesystem",
+            () => NativeDirectoryAuthority.Acquire(extendedUncAlias).Dispose());
         var volumeAlias = NativeDirectoryAuthority.GetVolumeAlias(root);
         ExpectBoundaryCode(
             "invalid_path",

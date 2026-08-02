@@ -222,6 +222,13 @@ internal sealed class NativeDirectoryAuthority : IDisposable
           "Volume aliases are ambiguous in the proof protocol");
     }
 
+    if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+    {
+      throw new BoundaryProofException(
+          "unsupported_filesystem",
+          "UNC paths require separate remote-filesystem conformance");
+    }
+
     if (path.StartsWith(@"\\", StringComparison.Ordinal) &&
         !path.StartsWith(@"\\?\", StringComparison.Ordinal))
     {
