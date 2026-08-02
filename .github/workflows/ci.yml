@@ -202,7 +202,7 @@ jobs:
       - name: Verify install-script policy
         run: npm run check:install-scripts
       - name: Audit production dependencies
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint and typecheck
         run: npm run lint
       - name: Build
