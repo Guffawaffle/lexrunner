@@ -176,9 +176,19 @@ describe("EngineVerifier", () => {
       const testFilePath = join(workingDir, "test.txt");
       await writeFile(testFilePath, "line 1\nline 2\nline 3\n", "utf8");
 
-      const snapshot = createTestSnapshot("test-004", `grep "line 2 modified" "${testFilePath}"`, {
-        exit_code: 0,
-      });
+      const verificationScript =
+        "const fs=require('node:fs');" +
+        "process.exit(fs.readFileSync(process.argv[1],'utf8').includes('line 2 modified')?0:1)";
+      const snapshot = createTestSnapshot(
+        "test-004",
+        [
+          JSON.stringify(process.execPath),
+          "-e",
+          JSON.stringify(verificationScript),
+          JSON.stringify(testFilePath),
+        ].join(" "),
+        { exit_code: 0 }
+      );
 
       const unifiedDiff = `--- a/test.txt
 +++ b/test.txt

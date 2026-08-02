@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 import { format, resolveConfig } from "prettier";
 
+import { replaceGeneratedMarkdownBlock } from "./generated-markdown-block.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const check = process.argv.includes("--check");
 const matrix = JSON.parse(read("docs/architecture/cli-mcp-surface.json"));
@@ -96,20 +98,17 @@ function read(path) {
 
 function updateBlock(path, name, replacement) {
   const current = read(path);
-  const pattern = new RegExp(
-    `<!-- BEGIN ${escapeRegExp(name)} -->[\\s\\S]*?<!-- END ${escapeRegExp(name)} -->`
-  );
-  if (!pattern.test(current)) throw new Error(`${path}: missing generated block ${name}`);
-  const next = `${current.replace(pattern, replacement).trimEnd()}\n`;
+  let next;
+  try {
+    next = replaceGeneratedMarkdownBlock(current, name, replacement);
+  } catch (error) {
+    throw new Error(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
   return { path, next, changed: next !== current };
 }
 
 function sum(counts) {
   return Object.values(counts).reduce((total, count) => total + count, 0);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function formatMarkdown(value) {

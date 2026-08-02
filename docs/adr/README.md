@@ -22,6 +22,7 @@ defers those principles.
 | 007 | [Task Snapshot Contract](./ADR-007-task-snapshot-contract.md)                       | Accepted                                                               | 2025-12-19 |
 | 008 | [Lex Packaging Strategy](./ADR-008-lex-packaging.md)                                | Accepted                                                               | 2026-01-01 |
 | 010 | [Agent Work Orchestration Protocol](./ADR-010-agent-work-orchestration-protocol.md) | Accepted incrementally (assisted implemented; headless proof deferred) | 2026-07-11 |
+| 011 | [Native-host WorkspaceBoundary](./ADR-011-native-host-workspace-boundary.md)        | Proposed                                                               | 2026-08-01 |
 
 ## Conventions
 

@@ -10,6 +10,7 @@ import { computeCanonicalHash } from "../src/schemas/task-contract.js";
 import { canonicalJSONStringify } from "../src/util/canonicalJson.js";
 
 const temporaryRoots: string[] = [];
+const directoryLinkType = process.platform === "win32" ? "junction" : "dir";
 
 afterEach(async () => {
   await Promise.all(
@@ -31,7 +32,7 @@ describe("ecosystem dogfood allocation lifecycle", () => {
     const diagnostic = await inspectDogfoodRun({ allocationRoot, runRoot, diagnostics: true });
     expect(diagnostic).toMatchObject({
       ok: true,
-      versions: { "@smartergpt/lex": "3.0.1" },
+      versions: { "@smartergpt/lex": "4.0.0" },
       steps: [{ id: "prepare", outcome: "passed" }],
     });
     expect(JSON.stringify(diagnostic)).not.toContain(allocationRoot);
@@ -61,7 +62,7 @@ describe("ecosystem dogfood allocation lifecycle", () => {
     const outside = await mkdtemp(path.join(os.tmpdir(), "lexrunner-dogfood-outside-"));
     temporaryRoots.push(outside);
     const link = path.join(allocationRoot, "run-link");
-    await symlink(outside, link);
+    await symlink(outside, link, directoryLinkType);
     await expect(reapDogfoodRun({ allocationRoot, runRoot: link })).rejects.toThrow(
       "allocation_not_directory"
     );
@@ -101,7 +102,7 @@ async function fixture(): Promise<{ allocationRoot: string; runRoot: string }> {
     status: "interrupted",
     phase: "prepare",
     allocation_root_hash: hashText(actualAllocationRoot),
-    versions: { "@smartergpt/lex": "3.0.1" },
+    versions: { "@smartergpt/lex": "4.0.0" },
     steps: [{ id: "prepare", outcome: "passed", evidence_hash: hashText("passed") }],
     started_at: "2026-07-20T10:00:00.000Z",
     completed_at: "2026-07-20T10:01:00.000Z",

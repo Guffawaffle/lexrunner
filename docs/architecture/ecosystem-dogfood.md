@@ -25,7 +25,7 @@ after a failure.
 
 ## Real ecosystem run
 
-The default baseline is Lex 3.0.1, Lex-MCP 3.0.1, AXF 2.0.0, and LexSona 1.0.0. LexRunner is built,
+The default baseline is Lex 4.0.0, Lex-MCP 3.0.1, AXF 2.0.0, and LexSona 1.0.0. LexRunner is built,
 packed, and installed from the current checkout's staged tarball. The clean consumer then exercises
 package imports, each user-facing CLI, the new preparation and fan-in exports, and Lex-MCP's stdio
 `tools/list` surface.

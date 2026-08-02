@@ -16,7 +16,7 @@ const previousPackageExportKeys = [
   "./schemas/runner-stack",
 ];
 
-describe("LexRunner 1.3 release readiness", () => {
+describe("LexRunner current release readiness", () => {
   it("keeps package, runtime, dependency, and prior export identity aligned", async () => {
     const packageJson = await readJson<{
       version: string;
@@ -30,7 +30,7 @@ describe("LexRunner 1.3 release readiness", () => {
 
     expect(packageJson.version).toBe("1.3.0");
     expect(packageJson.engines.node).toBe(">=24");
-    expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^3.0.1");
+    expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^4.0.0");
     expect(packageJson.bin["lexrunner-mcp"]).toBe("mcp-server.mjs");
     expect(packageJson.repository.url).toBe("git+https://github.com/Guffawaffle/lexrunner.git");
     expect(packageJson.scripts["release:publish:check"]).toBe(
@@ -39,13 +39,13 @@ describe("LexRunner 1.3 release readiness", () => {
     expect(Object.keys(packageJson.exports).sort()).toEqual(previousPackageExportKeys.sort());
   });
 
-  it("validates the installed Lex 3 line exposes every directly consumed public subpath", async () => {
+  it("validates the installed Lex 4 line exposes every directly consumed public subpath", async () => {
     const lexPackage = await readJson<{
       version: string;
       exports: Record<string, unknown>;
     }>("node_modules/@smartergpt/lex/package.json");
 
-    expect(lexPackage.version).toBe("3.0.1");
+    expect(lexPackage.version).toBe("4.0.0");
     for (const path of [
       ".",
       "./aliases",
@@ -56,7 +56,7 @@ describe("LexRunner 1.3 release readiness", () => {
       "./store",
       "./types",
     ]) {
-      expect(Object.keys(lexPackage.exports), `Lex 3 omitted ${path}`).toContain(path);
+      expect(Object.keys(lexPackage.exports), `Lex 4 omitted ${path}`).toContain(path);
     }
   });
 

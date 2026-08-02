@@ -30,7 +30,7 @@ const MARKER = ".lexrunner-dogfood-allocation.json";
 const RECEIPT = "dogfood-receipt.json";
 const DEFAULT_ALLOCATION_ROOT = path.join(os.tmpdir(), "lexrunner-ecosystem-dogfood");
 const DEFAULT_VERSIONS = {
-  lex: "3.0.1",
+  lex: "4.0.0",
   lexMcp: "3.0.1",
   axf: "2.0.0",
   lexsona: "1.0.0",

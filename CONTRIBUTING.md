@@ -7,13 +7,18 @@ This guide keeps contributions small, deterministic, and easy to review.
 ## Quick start
 
 - Node.js: 24.x (see `.nvmrc` and `package.json` engines)
-- npm: 10.x (see `package.json` packageManager)
+- npm: 11.16.0 (see `package.json` packageManager)
 
 Setup:
 
-- npm ci
-- npm run build
-- npm test
+- `npx --yes npm@11.16.0 ci`
+- `npx --yes npm@11.16.0 run build`
+- `npx --yes npm@11.16.0 test`
+
+The checked-in `allowScripts` policy permits the locked native SQLite and esbuild installers and
+denies Lex's informational postinstall. A dependency update that changes an approved installer
+version must be reviewed explicitly; `npm approve-scripts --allow-scripts-pending` should report no
+unreviewed scripts after a clean install.
 
 Useful scripts:
 
@@ -95,6 +100,11 @@ See `docs/cli.md` for the full command reference.
 
 - Run all tests: `npm test`
 - Run a specific file: `npm test -- tests/<file>.spec.ts`
+
+Native Windows CI validates clean installation, dependency policy, lint, build, and focused
+cross-platform regressions. It does not claim full runtime parity. The shared native Windows/Linux
+workspace-boundary conformance lane will replace that limitation as part of the native-host runtime
+program; platform skips are not an accepted substitute.
 
 If adding public behavior or fixing a bug, prefer tests first (happy path + 1-2 edge cases). Ensure outputs are deterministic.
 

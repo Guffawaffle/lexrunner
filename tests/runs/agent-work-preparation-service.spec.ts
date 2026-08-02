@@ -12,6 +12,7 @@ import {
 import { createAgentTaskPacket } from "../../src/schemas/agent-work.js";
 
 const roots: string[] = [];
+const directoryLinkType = process.platform === "win32" ? "junction" : "dir";
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -155,7 +156,7 @@ describe("agent-work preparation", () => {
     const outside = await mkdtemp(path.join(os.tmpdir(), "lexrunner-preparation-outside-"));
     roots.push(outside);
     await rm(path.join(root, "packages", "core"), { recursive: true });
-    await symlink(outside, path.join(root, "packages", "core"));
+    await symlink(outside, path.join(root, "packages", "core"), directoryLinkType);
     await expect(
       executeAgentWorkPreparation({
         packet: makePacket(),

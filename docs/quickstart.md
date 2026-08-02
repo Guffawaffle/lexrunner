@@ -192,7 +192,7 @@ Expected output:
 🩺 Doctor - Environment and config sanity checks
 
 ✓ Node.js version: v24.x.x (matches .nvmrc)
-✓ npm version: 10.0.0 (matches packageManager)
+✓ npm version: 11.16.0 (matches packageManager)
 ✓ Git config: user.name="Your Name", user.email="you@example.com"
 ✓ Platform: linux
 ✓ Working directory: /path/to/your/project
