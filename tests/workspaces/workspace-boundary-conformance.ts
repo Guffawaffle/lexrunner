@@ -2,11 +2,9 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished } from "vitest";
 
 import type { WorkspaceBoundary } from "../../src/workspaces/workspace-boundary.js";
-
-const temporaryRoots: string[] = [];
 
 export function workspaceBoundaryConformance(
   name: string,
@@ -18,17 +16,11 @@ export function workspaceBoundaryConformance(
 
     beforeEach(async () => {
       const sandbox = await mkdtemp(join(tmpdir(), "lexrunner-boundary-conformance-"));
-      temporaryRoots.push(sandbox);
+      onTestFinished(() => rm(sandbox, { recursive: true, force: true }));
       repositoryRoot = join(sandbox, "repository");
       allocationRoot = join(sandbox, "allocation");
       await mkdir(join(repositoryRoot, ".git"), { recursive: true });
       await mkdir(allocationRoot);
-    });
-
-    afterEach(async () => {
-      await Promise.all(
-        temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true }))
-      );
     });
 
     it("binds roots, child operations, file I/O, process paths, and receipts to one lease", async () => {
