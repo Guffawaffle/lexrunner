@@ -9,14 +9,15 @@ import type {
   WorkspaceMutationResult,
   WorkspaceObservation,
 } from "../store/workspace-lifecycle-store.js";
-import type {
-  BrokerFailure,
-  BrokerOperationOptions,
-  CreateWorktreeResult,
-  GitWorktreeBroker,
-  ObserveWorktreeResult,
-  RemoveWorktreeResult,
-  WorktreeTarget,
+import {
+  withBrokerBoundaryAuthority,
+  type BrokerFailure,
+  type BrokerOperationOptions,
+  type CreateWorktreeResult,
+  type GitWorktreeBroker,
+  type ObserveWorktreeResult,
+  type RemoveWorktreeResult,
+  type WorktreeTarget,
 } from "./git-worktree-broker.js";
 
 const MAX_REASON_LENGTH = 1_024;
@@ -166,7 +167,15 @@ export class WorkspaceCoordinator {
     }
 
     const target = targetFrom(current.lease);
-    const created = await this.create(target, input.broker);
+    const created = await this.create(
+      target,
+      boundaryBrokerOptions(
+        input.broker,
+        current.lease,
+        input.mutations.reserve.mutationId,
+        input.controller.controllerId
+      )
+    );
     if (!created.ok) {
       return this.quarantineAfterFailure(
         input,
@@ -228,7 +237,15 @@ export class WorkspaceCoordinator {
     const records = await this.readExpected(input, false, true);
     if (!records.ok) return records.failure;
     const target = targetFrom(records.lease);
-    const observed = await this.observe(target, input.broker);
+    const observed = await this.observe(
+      target,
+      boundaryBrokerOptions(
+        input.broker,
+        records.lease,
+        input.mutations.heartbeat.mutationId,
+        input.controller.controllerId
+      )
+    );
     if (!observed.ok) {
       if (records.replayCandidate) {
         return {
@@ -287,7 +304,15 @@ export class WorkspaceCoordinator {
     const records = await this.readExpected(input, true, true);
     if (!records.ok) return records.failure;
     const target = targetFrom(records.lease);
-    const observed = await this.observe(target, input.broker);
+    const observed = await this.observe(
+      target,
+      boundaryBrokerOptions(
+        input.broker,
+        records.lease,
+        input.mutation.mutationId,
+        input.controller.controllerId
+      )
+    );
     const observation = observed.ok
       ? observed.observation
       : (observed.observation ?? syntheticObservation(target, observed));
@@ -440,7 +465,15 @@ export class WorkspaceCoordinator {
       }
     }
 
-    const observed = await this.observe(target, input.broker);
+    const observed = await this.observe(
+      target,
+      boundaryBrokerOptions(
+        input.broker,
+        current.lease,
+        input.mutations.prepare.mutationId,
+        input.controller.controllerId
+      )
+    );
     if (!observed.ok) {
       return this.quarantineAfterFailure(
         input,
@@ -489,7 +522,15 @@ export class WorkspaceCoordinator {
       ? (current.lease.lastObservation ?? observed.observation)
       : observed.observation;
 
-    const removed = await this.remove(target, input.broker);
+    const removed = await this.remove(
+      target,
+      boundaryBrokerOptions(
+        input.broker,
+        preparedLease,
+        input.mutations.finalize.mutationId,
+        input.controller.controllerId
+      )
+    );
     if (!removed.ok || removed.outcome === "preserved") {
       const failure = removed.ok ? undefined : removed;
       const observation = removed.ok
@@ -757,6 +798,20 @@ function targetFrom(lease: WorkspaceLifecycleLeaseRecord): WorktreeTarget {
     attemptId: lease.attemptId,
     baseSha: lease.baseSha,
   };
+}
+
+function boundaryBrokerOptions(
+  options: BrokerOperationOptions | undefined,
+  lease: WorkspaceLifecycleLeaseRecord,
+  operationId: string,
+  ownerId: string
+): BrokerOperationOptions {
+  return withBrokerBoundaryAuthority(options, {
+    operationId,
+    orchestrationLeaseId: lease.leaseId,
+    orchestrationLeaseRevision: lease.revision,
+    ownerId,
+  });
 }
 
 function boundPair(attempt: AttemptRecord, lease: WorkspaceLifecycleLeaseRecord) {

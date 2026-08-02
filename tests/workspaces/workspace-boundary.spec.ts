@@ -198,6 +198,40 @@ describe("WorkspaceBoundary v1 contract", () => {
     expect(receipt).not.toHaveProperty("handle");
   });
 
+  it("canonicalizes receipt identity sets before hashing", () => {
+    const firstDigest = `sha256:${"a".repeat(64)}`;
+    const secondDigest = `sha256:${"b".repeat(64)}`;
+    const leaseInput = {
+      schema_version: WORKSPACE_BOUNDARY_CONTRACT_VERSION,
+      lease_id: "boundary-lease-1",
+      orchestration_lease_id: "workspace-lease-1",
+      orchestration_lease_revision: 4,
+      owner_id: "attempt-1",
+      backend_kind: "linux-native" as const,
+      capability_decision_digest: linuxDecision().decision_digest,
+      phase: "acquired" as const,
+      observed_at: NOW,
+    };
+
+    const firstLease = createWorkspaceBoundaryLeaseReceipt({
+      ...leaseInput,
+      root_identity_digests: [secondDigest, firstDigest, secondDigest],
+    });
+    const secondLease = createWorkspaceBoundaryLeaseReceipt({
+      ...leaseInput,
+      root_identity_digests: [firstDigest, secondDigest],
+    });
+    expect(firstLease).toEqual(secondLease);
+    expect(firstLease.root_identity_digests).toEqual([firstDigest, secondDigest]);
+
+    const firstOperation = operationReceipt({
+      identity_digests: [secondDigest, firstDigest, secondDigest],
+    });
+    const secondOperation = operationReceipt({ identity_digests: [firstDigest, secondDigest] });
+    expect(firstOperation).toEqual(secondOperation);
+    expect(firstOperation.identity_digests).toEqual([firstDigest, secondDigest]);
+  });
+
   it("classifies completed, rejected, and indeterminate operation effects", () => {
     const completed = operationReceipt();
     const rejected = operationReceipt({

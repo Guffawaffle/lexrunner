@@ -1,14 +1,7 @@
-import { constants } from "node:fs";
-import { open } from "node:fs/promises";
 import path from "node:path";
 
 import type { WorkspaceObservation } from "../store/workspace-lifecycle-store.js";
-import {
-  ExecaCommandRunner,
-  type CommandRequest,
-  type CommandResult,
-  type CommandRunner,
-} from "./command-runner.js";
+import { type CommandRequest, type CommandResult, type CommandRunner } from "./command-runner.js";
 import type {
   BrokerCommandEvidence,
   BrokerFailure,
@@ -29,18 +22,19 @@ import {
 } from "./git-worktree-porcelain.js";
 import {
   DirectoryBoundaryError,
-  assertAnchoredDirectoryLocation,
   captureDirectoryIdentity,
-  createChildDirectory,
   identityOf,
   openChildDirectory,
   reopenDirectoryIdentity,
-  sameDirectoryIdentity,
-  tryOpenChildDirectory,
-  assertDirectoryIdentityBoundarySupported,
-  type AnchoredDirectory,
   type DirectoryIdentity,
 } from "./linux-directory-identity.js";
+import { resolveWorkspaceBoundary } from "./workspace-boundary-resolver.js";
+import type {
+  WorkspaceBoundary,
+  WorkspaceBoundaryDirectoryCapability,
+  WorkspaceBoundaryLease,
+  WorkspaceBoundaryProcessArgument,
+} from "./workspace-boundary.js";
 
 const FULL_GIT_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -62,6 +56,8 @@ export interface NodeGitWorktreeBrokerOptions {
   runner?: CommandRunner;
   defaultTimeoutMs?: number;
   maxDirtyPaths?: number;
+  /** Enables synthetic lineage only for direct broker tests outside the coordinator. */
+  testOnlyAllowUnboundBoundaryAuthority?: boolean;
 }
 
 interface GitExecutionSuccess {
@@ -89,11 +85,14 @@ interface AttemptMarker {
 type GitExecutionResult = GitExecutionSuccess | BrokerFailure;
 
 interface OperationBoundary {
-  repository: AnchoredDirectory;
-  repositoryGit: AnchoredDirectory;
-  targetParent: AnchoredDirectory;
+  lease: WorkspaceBoundaryLease;
+  repository: WorkspaceBoundaryDirectoryCapability;
+  repositoryGit: WorkspaceBoundaryDirectoryCapability;
+  targetParent: WorkspaceBoundaryDirectoryCapability;
   targetName: string;
-  target: AnchoredDirectory | null;
+  target: WorkspaceBoundaryDirectoryCapability | null;
+  operationId: string;
+  operationSequence: number;
 }
 
 /**
@@ -109,9 +108,10 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
   private readonly gitRuntime: string;
   private readonly pathComparison: NodeGitWorktreeBrokerOptions["pathComparison"];
   private readonly gitExecutable: string;
-  private readonly runner: CommandRunner;
+  private readonly boundary: WorkspaceBoundary;
   private readonly defaultTimeoutMs: number;
   private readonly maxDirtyPaths: number;
+  private readonly testOnlyAllowUnboundBoundaryAuthority: boolean;
   private readonly repositoryIdentity: DirectoryIdentity;
   private readonly repositoryGitIdentity: DirectoryIdentity;
   private readonly worktreeRootIdentity: DirectoryIdentity;
@@ -152,7 +152,23 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       throw new Error("repositoryRoot and worktreeRoot must not overlap");
     }
 
-    assertDirectoryIdentityBoundarySupported(options.pathComparison);
+    const resolution = resolveWorkspaceBoundary(
+      { mode: "native" },
+      options.runner ? { runner: options.runner } : {}
+    );
+    if (!resolution.ok) {
+      throw new DirectoryBoundaryError(
+        "unsupported_platform",
+        `Native workspace boundary is unavailable (${resolution.decision.reason_code})`
+      );
+    }
+    if (resolution.boundary.capability.host.path_comparison !== options.pathComparison) {
+      throw new DirectoryBoundaryError(
+        "unsupported_platform",
+        "Physical worktree containment currently requires a case-sensitive Linux Git runtime"
+      );
+    }
+    this.boundary = resolution.boundary;
     this.repositoryIdentity = captureDirectoryIdentity(options.repositoryRoot, "repositoryRoot");
     this.worktreeRootIdentity = captureDirectoryIdentity(options.worktreeRoot, "worktreeRoot");
     const repository = reopenDirectoryIdentity(this.repositoryIdentity, "repositoryRoot");
@@ -174,9 +190,10 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
     this.gitRuntime = options.gitRuntime;
     this.pathComparison = options.pathComparison;
     this.gitExecutable = options.gitExecutable ?? "git";
-    this.runner = options.runner ?? new ExecaCommandRunner();
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxDirtyPaths = options.maxDirtyPaths ?? DEFAULT_MAX_DIRTY_PATHS;
+    this.testOnlyAllowUnboundBoundaryAuthority =
+      options.testOnlyAllowUnboundBoundaryAuthority ?? false;
   }
 
   async create(
@@ -193,7 +210,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       );
     }
 
-    const boundary = this.openOperationBoundary(target, "create");
+    const boundary = await this.openOperationBoundary(target, "create", options);
     if ("ok" in boundary) return boundary;
     try {
       const branchValidation = await this.gitMain(
@@ -291,12 +308,13 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       }
 
       try {
-        const targetDirectory = createChildDirectory(
+        const targetDirectory = await boundary.lease.createChild(
           boundary.targetParent,
           boundary.targetName,
-          "worktree target"
+          nextBoundaryOperationId(boundary, "create-target")
         );
-        boundary.target = targetDirectory;
+        if (!targetDirectory.ok) return this.containmentFailure("create", targetDirectory.error);
+        boundary.target = targetDirectory.value;
       } catch (error) {
         return this.containmentFailure("create", error);
       }
@@ -312,7 +330,14 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       const created = await this.gitMain(
         boundary,
         "create",
-        ["worktree", "add", "-b", target.branch, targetDirectory.procPath, target.baseSha],
+        [
+          { kind: "literal", value: "worktree" },
+          { kind: "literal", value: "add" },
+          { kind: "literal", value: "-b" },
+          { kind: "literal", value: target.branch },
+          { kind: "directory", directory: targetDirectory },
+          { kind: "literal", value: target.baseSha },
+        ],
         options
       );
       if (!created.ok) {
@@ -339,7 +364,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       }
       return { ok: true, outcome: "created", observation: after.observation };
     } finally {
-      closeOperationBoundary(boundary);
+      await closeOperationBoundary(boundary);
     }
   }
 
@@ -350,12 +375,12 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
     const runtimeFailure = this.runtimeFailure(target, "observe");
     if (runtimeFailure) return runtimeFailure;
 
-    const boundary = this.openOperationBoundary(target, "observe");
+    const boundary = await this.openOperationBoundary(target, "observe", options);
     if ("ok" in boundary) return boundary;
     try {
       return await this.observeAnchored(target, boundary, options);
     } finally {
-      closeOperationBoundary(boundary);
+      await closeOperationBoundary(boundary);
     }
   }
 
@@ -443,11 +468,11 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
           );
         }
 
-        const marker = await this.readAttemptMarker(target, worktreeGit);
+        const marker = await this.readAttemptMarker(target, worktreeGit, boundary);
         markerVerified = marker.matches;
         markerReason = marker.reason ?? markerReason;
       } finally {
-        worktreeGit.close();
+        // The lease owns the capability and closes it with the operation boundary.
       }
     }
 
@@ -503,7 +528,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
     const runtimeFailure = this.runtimeFailure(target, "remove");
     if (runtimeFailure) return runtimeFailure;
 
-    const boundary = this.openOperationBoundary(target, "remove");
+    const boundary = await this.openOperationBoundary(target, "remove", options);
     if ("ok" in boundary) return boundary;
     try {
       const observed = await this.observeAnchored(target, boundary, options);
@@ -522,22 +547,23 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       const removed = await this.gitMain(
         boundary,
         "remove",
-        ["worktree", "remove", targetDirectory.procPath],
+        [
+          { kind: "literal", value: "worktree" },
+          { kind: "literal", value: "remove" },
+          { kind: "directory", directory: targetDirectory },
+        ],
         options
       );
       if (!removed.ok) return removed;
 
-      targetDirectory.close();
       boundary.target = null;
-      try {
-        boundary.target = tryOpenChildDirectory(
-          boundary.targetParent,
-          boundary.targetName,
-          "worktree target"
-        );
-      } catch (error) {
-        return this.containmentFailure("remove", error);
-      }
+      const reopened = await boundary.lease.tryOpenChild(
+        boundary.targetParent,
+        boundary.targetName,
+        nextBoundaryOperationId(boundary, "reopen-removed-target")
+      );
+      if (!reopened.ok) return this.containmentFailure("remove", reopened.error);
+      boundary.target = reopened.value;
 
       const after = await this.observeAnchored(target, boundary, options);
       if (!after.ok) return { ...after, operation: "remove" };
@@ -552,7 +578,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       }
       return { ok: true, outcome: "removed", observation: after.observation };
     } finally {
-      closeOperationBoundary(boundary);
+      await closeOperationBoundary(boundary);
     }
   }
 
@@ -597,54 +623,113 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
     return null;
   }
 
-  private openOperationBoundary(
+  private async openOperationBoundary(
     target: WorktreeTarget,
-    operation: BrokerOperation
-  ): OperationBoundary | BrokerFailure {
-    let repository: AnchoredDirectory | null = null;
-    let repositoryGit: AnchoredDirectory | null = null;
-    let targetParent: AnchoredDirectory | null = null;
-    let targetDirectory: AnchoredDirectory | null = null;
+    operation: BrokerOperation,
+    options: BrokerOperationOptions
+  ): Promise<OperationBoundary | BrokerFailure> {
+    const authority = this.boundaryAuthority(target, operation, options);
+    if (!authority) {
+      return this.failure(
+        operation,
+        "containment_violation",
+        "Workspace boundary authority lineage is required"
+      );
+    }
+    const acquired = await this.boundary.acquire({
+      operationId: authority.operationId,
+      orchestrationLeaseId: authority.orchestrationLeaseId,
+      orchestrationLeaseRevision: authority.orchestrationLeaseRevision,
+      ownerId: authority.ownerId,
+      roots: [
+        { role: "repository", absolutePath: this.repositoryRoot },
+        { role: "allocation", absolutePath: this.worktreeRoot },
+      ],
+    });
+    if (!acquired.ok) return this.containmentFailure(operation, acquired.error);
+
+    const lease = acquired.lease;
+    const boundary: OperationBoundary = {
+      lease,
+      repository: lease.root("repository"),
+      repositoryGit: lease.root("repository"),
+      targetParent: lease.root("allocation"),
+      targetName: "",
+      target: null,
+      operationId: authority.operationId,
+      operationSequence: 0,
+    };
     try {
-      repository = reopenDirectoryIdentity(this.repositoryIdentity, "repositoryRoot");
-      repositoryGit = openChildDirectory(repository, ".git", "repository Git directory");
-      if (!sameDirectoryIdentity(repositoryGit, this.repositoryGitIdentity)) {
+      if (!sameBoundaryIdentity(boundary.repository, this.repositoryIdentity)) {
+        throw new DirectoryBoundaryError(
+          "identity_changed",
+          "The repository root was replaced after broker initialization"
+        );
+      }
+      const repositoryGit = await lease.openChild(
+        boundary.repository,
+        ".git",
+        nextBoundaryOperationId(boundary, "open-repository-git")
+      );
+      if (!repositoryGit.ok) throw new Error(repositoryGit.error.message);
+      boundary.repositoryGit = repositoryGit.value;
+      if (!sameBoundaryIdentity(boundary.repositoryGit, this.repositoryGitIdentity)) {
         throw new DirectoryBoundaryError(
           "identity_changed",
           "The repository Git directory was replaced after broker initialization"
         );
       }
 
-      const allocationRoot = reopenDirectoryIdentity(this.worktreeRootIdentity, "worktreeRoot");
+      if (!sameBoundaryIdentity(boundary.targetParent, this.worktreeRootIdentity)) {
+        throw new DirectoryBoundaryError(
+          "identity_changed",
+          "The worktree root was replaced after broker initialization"
+        );
+      }
       const relative = path.relative(this.worktreeRoot, path.resolve(target.worktreePath));
       const components = relative.split(path.sep);
       const targetName = components.pop();
       if (!targetName) {
-        allocationRoot.close();
         throw new DirectoryBoundaryError("invalid_path", "The worktree target has no basename");
       }
 
-      targetParent = allocationRoot;
+      boundary.targetName = targetName;
       for (const component of components) {
-        const child = openChildDirectory(targetParent, component, "worktree target ancestor");
-        targetParent.close();
-        targetParent = child;
+        const child = await lease.openChild(
+          boundary.targetParent,
+          component,
+          nextBoundaryOperationId(boundary, "open-target-ancestor")
+        );
+        if (!child.ok) throw new Error(child.error.message);
+        boundary.targetParent = child.value;
       }
-      targetDirectory = tryOpenChildDirectory(targetParent, targetName, "worktree target");
-      return {
-        repository,
-        repositoryGit,
-        targetParent,
+      const targetDirectory = await lease.tryOpenChild(
+        boundary.targetParent,
         targetName,
-        target: targetDirectory,
-      };
+        nextBoundaryOperationId(boundary, "open-target")
+      );
+      if (!targetDirectory.ok) throw new Error(targetDirectory.error.message);
+      boundary.target = targetDirectory.value;
+      return boundary;
     } catch (error) {
-      targetDirectory?.close();
-      targetParent?.close();
-      repositoryGit?.close();
-      repository?.close();
+      await lease.close("cancelled");
       return this.containmentFailure(operation, error);
     }
+  }
+
+  private boundaryAuthority(
+    target: WorktreeTarget,
+    operation: BrokerOperation,
+    options: BrokerOperationOptions
+  ) {
+    if (options.boundaryAuthority) return options.boundaryAuthority;
+    if (!this.testOnlyAllowUnboundBoundaryAuthority) return null;
+    return {
+      operationId: `test-${target.attemptId}-${operation}`,
+      orchestrationLeaseId: `test-${target.attemptId}`,
+      orchestrationLeaseRevision: 0,
+      ownerId: `test-${target.hostId}`,
+    };
   }
 
   private containmentFailure(operation: BrokerOperation, error: unknown): BrokerFailure {
@@ -658,36 +743,42 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
   private gitMain(
     boundary: OperationBoundary,
     operation: BrokerOperation,
-    args: readonly string[],
+    args: readonly (string | WorkspaceBoundaryProcessArgument)[],
     options: BrokerOperationOptions,
     allowedNonzeroExitCodes: readonly number[] = []
   ): Promise<GitExecutionResult> {
-    const anchoredArgs = [
-      `--git-dir=${boundary.repositoryGit.procPath}`,
-      `--work-tree=${boundary.repository.procPath}`,
-      ...args,
+    // Git persists its resolved Git directory in linked-worktree metadata. Bind
+    // that directory as cwd so `.` is replacement-resistant without persisting
+    // an ephemeral procfs capability path.
+    const boundaryArgs: WorkspaceBoundaryProcessArgument[] = [
+      {
+        kind: "directory",
+        directory: boundary.repositoryGit,
+        prefix: "--git-dir=",
+        relativeToCwd: true,
+      },
+      { kind: "directory", directory: boundary.repository, prefix: "--work-tree=" },
+      ...args.map(boundaryArgument),
     ];
     const evidenceArgs = [
       `--git-dir=${this.repositoryGitIdentity.path}`,
       `--work-tree=${this.repositoryRoot}`,
-      ...args.map((arg) =>
-        boundary.target && arg === boundary.target.procPath ? boundary.target.path : arg
-      ),
+      ...args.map(evidenceArgument),
     ];
     return this.git(
+      boundary,
       operation,
-      anchoredArgs,
-      boundary.repository.procPath,
+      boundaryArgs,
+      boundary.repositoryGit,
       options,
       allowedNonzeroExitCodes,
-      () => this.assertOperationBoundary(boundary),
       { args: evidenceArgs, cwd: this.repositoryRoot }
     );
   }
 
   private gitWorktree(
     boundary: OperationBoundary,
-    worktreeGit: AnchoredDirectory,
+    worktreeGit: WorkspaceBoundaryDirectoryCapability,
     operation: BrokerOperation,
     args: readonly string[],
     options: BrokerOperationOptions
@@ -701,42 +792,24 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
         )
       );
     }
-    const anchoredArgs = [
-      `--git-dir=${worktreeGit.procPath}`,
-      `--work-tree=${boundary.target.procPath}`,
-      ...args,
+    const boundaryArgs: WorkspaceBoundaryProcessArgument[] = [
+      { kind: "directory", directory: worktreeGit, prefix: "--git-dir=" },
+      { kind: "directory", directory: boundary.target, prefix: "--work-tree=" },
+      ...args.map(boundaryArgument),
     ];
     const evidenceArgs = [
       `--git-dir=${path.join(
         this.repositoryGitIdentity.path,
         "worktrees",
-        path.basename(boundary.target.path)
+        path.basename(boundary.target.identity.canonical_path)
       )}`,
-      `--work-tree=${boundary.target.path}`,
+      `--work-tree=${boundary.target.identity.canonical_path}`,
       ...args,
     ];
-    return this.git(
-      operation,
-      anchoredArgs,
-      boundary.target.procPath,
-      options,
-      [],
-      () => this.assertOperationBoundary(boundary, worktreeGit),
-      { args: evidenceArgs, cwd: boundary.target.path }
-    );
-  }
-
-  private assertOperationBoundary(
-    boundary: OperationBoundary,
-    worktreeGit?: AnchoredDirectory
-  ): void {
-    assertAnchoredDirectoryLocation(boundary.repository, "repositoryRoot");
-    assertAnchoredDirectoryLocation(boundary.repositoryGit, "repository Git directory");
-    assertAnchoredDirectoryLocation(boundary.targetParent, "worktree target parent");
-    if (boundary.target) assertAnchoredDirectoryLocation(boundary.target, "worktree target");
-    if (worktreeGit) {
-      assertAnchoredDirectoryLocation(worktreeGit, "worktree Git directory");
-    }
+    return this.git(boundary, operation, boundaryArgs, boundary.target, options, [], {
+      args: evidenceArgs,
+      cwd: boundary.target.identity.canonical_path,
+    });
   }
 
   private async writeAttemptMarker(
@@ -757,17 +830,15 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       baseSha: target.baseSha,
     };
     try {
-      this.assertOperationBoundary(boundary, gitDirectory);
-      const handle = await open(
-        path.join(gitDirectory.procPath, ATTEMPT_MARKER_FILE),
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-        0o600
-      );
-      try {
-        await handle.writeFile(`${JSON.stringify(marker)}\n`, "utf8");
-      } finally {
-        await handle.close();
-      }
+      const written = await boundary.lease.writeFile({
+        operationId: nextBoundaryOperationId(boundary, "write-attempt-marker"),
+        directory: gitDirectory,
+        component: ATTEMPT_MARKER_FILE,
+        content: Buffer.from(`${JSON.stringify(marker)}\n`, "utf8"),
+        mode: 0o600,
+        exclusive: true,
+      });
+      if (!written.ok) throw new Error(written.error.message);
       return null;
     } catch (error) {
       return this.failure(
@@ -775,31 +846,37 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
         "containment_violation",
         `Worktree was created but its Attempt marker could not be written: ${errorMessage(error)}`
       );
-    } finally {
-      gitDirectory.close();
     }
   }
 
   private async readAttemptMarker(
     target: WorktreeTarget,
-    gitDirectory: AnchoredDirectory
+    gitDirectory: WorkspaceBoundaryDirectoryCapability,
+    boundary: OperationBoundary
   ): Promise<{ matches: boolean; reason?: string }> {
     let marker: AttemptMarker;
     try {
-      const parsed: unknown = JSON.parse(
-        await readBoundedText(
-          path.join(gitDirectory.procPath, ATTEMPT_MARKER_FILE),
-          MAX_ATTEMPT_MARKER_BYTES
-        )
-      );
+      const read = await boundary.lease.readFile({
+        operationId: nextBoundaryOperationId(boundary, "read-attempt-marker"),
+        directory: gitDirectory,
+        component: ATTEMPT_MARKER_FILE,
+        maxBytes: MAX_ATTEMPT_MARKER_BYTES,
+      });
+      if (!read.ok) {
+        if (read.error.code === "invalid_path") {
+          return { matches: false, reason: "worktree Attempt marker is missing" };
+        }
+        return {
+          matches: false,
+          reason: `worktree Attempt marker is unreadable: ${read.error.message}`,
+        };
+      }
+      const parsed: unknown = JSON.parse(Buffer.from(read.value).toString("utf8"));
       if (!isAttemptMarker(parsed)) {
         return { matches: false, reason: "worktree Attempt marker is malformed" };
       }
       marker = parsed;
     } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        return { matches: false, reason: "worktree Attempt marker is missing" };
-      }
       return {
         matches: false,
         reason: `worktree Attempt marker is unreadable: ${errorMessage(error)}`,
@@ -825,7 +902,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
   private async openWorktreeGitDirectory(
     boundary: OperationBoundary,
     operation: BrokerOperation
-  ): Promise<AnchoredDirectory | BrokerFailure> {
+  ): Promise<WorkspaceBoundaryDirectoryCapability | BrokerFailure> {
     if (!boundary.target) {
       return this.failure(
         operation,
@@ -834,18 +911,16 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       );
     }
 
-    try {
-      this.assertOperationBoundary(boundary);
-    } catch (error) {
-      return this.containmentFailure(operation, error);
-    }
-
     let gitFile: string;
     try {
-      gitFile = await readBoundedText(
-        path.join(boundary.target.procPath, ".git"),
-        MAX_GITDIR_FILE_BYTES
-      );
+      const read = await boundary.lease.readFile({
+        operationId: nextBoundaryOperationId(boundary, "read-worktree-git-file"),
+        directory: boundary.target,
+        component: ".git",
+        maxBytes: MAX_GITDIR_FILE_BYTES,
+      });
+      if (!read.ok) throw new Error(read.error.message);
+      gitFile = Buffer.from(read.value).toString("utf8");
     } catch (error) {
       return this.containmentFailure(operation, error);
     }
@@ -875,21 +950,20 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       );
     }
 
-    let current: AnchoredDirectory | null = null;
+    let current: WorkspaceBoundaryDirectoryCapability | null = null;
     try {
       for (const component of relative.split(path.sep)) {
-        const child = openChildDirectory(
+        const child = await boundary.lease.openChild(
           current ?? boundary.repositoryGit,
           component,
-          "worktree Git directory"
+          nextBoundaryOperationId(boundary, "open-worktree-git-directory")
         );
-        current?.close();
-        current = child;
+        if (!child.ok) throw new Error(child.error.message);
+        current = child.value;
       }
       if (!current) throw new DirectoryBoundaryError("invalid_path", "Missing worktree Git path");
       return current;
     } catch (error) {
-      current?.close();
       return this.containmentFailure(operation, error);
     }
   }
@@ -969,44 +1043,48 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
   }
 
   private async git(
+    boundary: OperationBoundary,
     operation: BrokerOperation,
-    args: readonly string[],
-    cwd: string,
+    args: readonly WorkspaceBoundaryProcessArgument[],
+    cwd: WorkspaceBoundaryDirectoryCapability,
     options: BrokerOperationOptions,
     allowedNonzeroExitCodes: readonly number[] = [],
-    preflight?: () => void,
     evidence?: { args: readonly string[]; cwd: string }
   ): Promise<GitExecutionResult> {
-    const request: CommandRequest = {
+    const result = await boundary.lease.runProcess({
+      operationId: nextBoundaryOperationId(boundary, "run-git"),
       executable: this.gitExecutable,
       args,
       cwd,
       timeoutMs: options.timeoutMs ?? this.defaultTimeoutMs,
-      ...(preflight ? { preflight } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    if (!result.ok) return this.containmentFailure(operation, result.error);
+    const commandResult = result.value;
+    const commandEvidence: CommandRequest = {
+      executable: this.gitExecutable,
+      args: evidence?.args ?? args.map(evidenceArgument),
+      cwd: evidence?.cwd ?? cwd.identity.canonical_path,
+      timeoutMs: options.timeoutMs ?? this.defaultTimeoutMs,
       ...(options.signal ? { signal: options.signal } : {}),
     };
-    const result = await this.runner.run(request);
     if (
-      result.ok ||
-      (result.kind === "nonzero_exit" &&
-        result.exitCode !== null &&
-        allowedNonzeroExitCodes.includes(result.exitCode))
+      commandResult.ok ||
+      (commandResult.kind === "nonzero_exit" &&
+        commandResult.exitCode !== null &&
+        allowedNonzeroExitCodes.includes(commandResult.exitCode))
     ) {
       return {
         ok: true,
-        exitCode: result.exitCode ?? 0,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        executable: request.executable,
-        args: [...(evidence?.args ?? request.args)],
-        cwd: evidence?.cwd ?? request.cwd,
+        exitCode: commandResult.exitCode ?? 0,
+        stdout: commandResult.stdout,
+        stderr: commandResult.stderr,
+        executable: commandEvidence.executable,
+        args: [...commandEvidence.args],
+        cwd: commandEvidence.cwd,
       };
     }
-    return this.commandFailure(
-      operation,
-      evidence ? { ...request, args: evidence.args, cwd: evidence.cwd } : request,
-      result
-    );
+    return this.commandFailure(operation, commandEvidence, commandResult);
   }
 
   private commandFailure(
@@ -1064,11 +1142,42 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
   }
 }
 
-function closeOperationBoundary(boundary: OperationBoundary): void {
-  boundary.target?.close();
-  boundary.targetParent.close();
-  boundary.repositoryGit.close();
-  boundary.repository.close();
+async function closeOperationBoundary(boundary: OperationBoundary): Promise<void> {
+  await boundary.lease.close("completed");
+}
+
+function nextBoundaryOperationId(boundary: OperationBoundary, label: string): string {
+  boundary.operationSequence += 1;
+  const suffix = `:${boundary.operationSequence}:${label}`;
+  return `${boundary.operationId.slice(0, 4_096 - suffix.length)}${suffix}`;
+}
+
+function boundaryArgument(
+  argument: string | WorkspaceBoundaryProcessArgument
+): WorkspaceBoundaryProcessArgument {
+  return typeof argument === "string" ? { kind: "literal", value: argument } : argument;
+}
+
+function evidenceArgument(argument: string | WorkspaceBoundaryProcessArgument): string {
+  if (typeof argument === "string") return argument;
+  if (argument.kind === "literal") return argument.value;
+  const rendered = path.join(
+    argument.directory.identity.canonical_path,
+    ...(argument.components ?? [])
+  );
+  return `${argument.prefix ?? ""}${rendered}${argument.suffix ?? ""}`;
+}
+
+function sameBoundaryIdentity(
+  capability: WorkspaceBoundaryDirectoryCapability,
+  identity: DirectoryIdentity
+): boolean {
+  const observed = capability.identity;
+  return (
+    observed.identity_kind === "linux-device-inode" &&
+    observed.device === identity.device.toString(10) &&
+    observed.inode === identity.inode.toString(10)
+  );
 }
 
 function nativePathsOverlap(
@@ -1101,7 +1210,16 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
 }
 
 function isAttemptMarker(value: unknown): value is AttemptMarker {
@@ -1118,25 +1236,6 @@ function isAttemptMarker(value: unknown): value is AttemptMarker {
     typeof marker.branch === "string" &&
     typeof marker.baseSha === "string"
   );
-}
-
-async function readBoundedText(filePath: string, maxBytes: number): Promise<string> {
-  const handle = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
-  try {
-    const stats = await handle.stat();
-    if (!stats.isFile()) throw new Error(`${filePath} is not a regular file`);
-    const buffer = Buffer.alloc(maxBytes + 1);
-    let offset = 0;
-    while (offset < buffer.byteLength) {
-      const { bytesRead } = await handle.read(buffer, offset, buffer.byteLength - offset, offset);
-      if (bytesRead === 0) break;
-      offset += bytesRead;
-    }
-    if (offset > maxBytes) throw new Error(`Attempt marker exceeds ${maxBytes} bytes`);
-    return buffer.subarray(0, offset).toString("utf8");
-  } finally {
-    await handle.close();
-  }
 }
 
 function tail(value: string, maxBytes: number): string {

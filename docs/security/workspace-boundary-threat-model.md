@@ -2,8 +2,8 @@
 
 This document is normative for `WorkspaceBoundary` version `1.0.0`. It defines the path and
 directory-object authority that native Linux and native Windows backends must provide. The
-existing Linux implementation remains the reference guarantee until the shared runtime routing
-work in #889 is complete.
+Linux implementation is the reference guarantee and is exposed through the shared runtime
+boundary by #889.
 
 ## Security claim
 
@@ -54,21 +54,29 @@ otherwise capability detection reports `unsupported_filesystem`.
 
 ## Current authority inventory
 
-| Surface                             | Current Linux identity dependency                                                                                                                            | Contract destination                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| Broker construction                 | Capture repository, `.git`, and allocation-root device/inode through component-wise `O_NOFOLLOW` opens                                                       | `resolve` then `acquire` root capabilities                         |
-| Worktree create                     | Reopen roots, hold target ancestors, reserve the final child, run Git through `/proc/<pid>/fd`, and write the Attempt marker through held Git-admin identity | `openChild`, `createChild`, `assertCurrent`, `runProcess`          |
-| Worktree observe                    | Hold repository/worktree identities while reading the Git registry, marker, HEAD, and status                                                                 | lease-scoped read and process operations                           |
-| Worktree remove                     | Revalidate exact Attempt marker, branch, cleanliness, registry entry, and held target before removal; preserve ambiguity                                     | identity-bound mutation and receipt                                |
-| Native-WSL preparation              | Hold source/native/staging/lock/quarantine identities, run source Git after preflight, and sync selection publication                                        | explicit projection resolver plus Linux boundary                   |
-| Launch mapping                      | Recapture repository, allocation, and worktree device/inode and persist a digest-bound claim                                                                 | backend-neutral identity receipt in #891                           |
-| Worker attach/heartbeat/end/status  | Revalidate the persisted mapping and current directory identities before lifecycle authority advances                                                        | resolve stored backend identity and recapture through its boundary |
-| Receipt verification and acceptance | Revalidate the same mapping before verification or acceptance can advance                                                                                    | backend-neutral mapping verification                               |
-| Workspace reconciliation/restore    | Reconstruct targets only from the durable lease, observe through the broker, and preserve identity ambiguity                                                 | acquire from durable lease lineage; reconcile receipts             |
-| Fan-in/delivery authority           | Depends on accepted verification and canonical Attempt/lease/envelope evidence; it must not synthesize paths from adapter input                              | consume the already verified backend/mapping lineage               |
+| Surface                             | Current Linux identity dependency                                                                                                                 | Contract destination                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Broker construction                 | Resolve the actual native host, then snapshot repository, `.git`, and allocation-root device/inode through component-wise `O_NOFOLLOW` opens      | `resolve`; each operation must `acquire` capabilities matching the snapshot |
+| Worktree create                     | Acquire roots, hold target ancestors, reserve the final child, render Git `/proc/<pid>/fd` arguments in the backend, and write the Attempt marker | `openChild`, `createChild`, `writeFile`, `runProcess`                       |
+| Worktree observe                    | Hold repository/worktree capabilities while reading the Git registry, marker, HEAD, and status                                                    | lease-scoped `readFile` and `runProcess`                                    |
+| Worktree remove                     | Revalidate exact Attempt marker, branch, cleanliness, registry entry, and held target before removal; preserve ambiguity                          | lease-scoped identity-bound process mutation and receipts                   |
+| Native-WSL preparation              | Hold source/native/staging/lock/quarantine identities, run source Git after preflight, and sync selection publication                             | explicit projection resolver plus Linux boundary                            |
+| Launch mapping                      | Recapture repository, allocation, and worktree device/inode and persist a digest-bound claim                                                      | backend-neutral identity receipt in #891                                    |
+| Worker attach/heartbeat/end/status  | Revalidate the persisted mapping and current directory identities before lifecycle authority advances                                             | resolve stored backend identity and recapture through its boundary          |
+| Receipt verification and acceptance | Revalidate the same mapping before verification or acceptance can advance                                                                         | backend-neutral mapping verification                                        |
+| Workspace reconciliation/restore    | Reconstruct targets only from the durable lease, observe through the broker, and preserve identity ambiguity                                      | acquire from durable lease lineage; reconcile receipts                      |
+| Fan-in/delivery authority           | Depends on accepted verification and canonical Attempt/lease/envelope evidence; it must not synthesize paths from adapter input                   | consume the already verified backend/mapping lineage                        |
 
-No production caller is moved in #887. #889 moves the existing Linux primitives behind the
-interface without changing behavior. #891 migrates mapping consumers and runtime routing.
+#889 routes the ordinary Git worktree broker through the boundary and binds every operation lease
+to the durable workspace lease ID/revision, controller owner, and mutation ID. The broker retains
+one construction-time Linux identity snapshot as non-authoritative evidence; every later effect
+requires newly acquired live capabilities whose identities match that snapshot. Direct broker
+tests must explicitly opt into synthetic test-only lineage.
+
+The explicit native-WSL projection engine remains a Linux-primitive consumer under #863, although
+the worktree broker it returns now uses `WorkspaceBoundary`. Execution-mapping identity recapture
+remains assigned to #891. Those are documented migrations, not native Windows fallbacks, and
+neither is consulted by `{ mode: "native" }` Windows resolution.
 
 ## Backend invariants
 

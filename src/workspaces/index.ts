@@ -9,6 +9,7 @@ export type {
 export { ExecaCommandRunner } from "./command-runner.js";
 
 export type {
+  BrokerBoundaryAuthority,
   BrokerCommandEvidence,
   BrokerFailure,
   BrokerFailureReason,
@@ -51,6 +52,15 @@ export type {
 } from "./native-wsl-projection-engine.js";
 export { NativeWslProjectionEngine } from "./native-wsl-projection-engine.js";
 
+export {
+  NativeWorkspaceBoundaryResolver,
+  resolveWorkspaceBoundary,
+} from "./workspace-boundary-resolver.js";
+export type {
+  WorkspaceBoundaryResolution,
+  WorkspaceBoundaryResolverOptions,
+} from "./workspace-boundary-resolver.js";
+
 export type {
   AllocateWorkspaceInput,
   HeartbeatCoordinatedWorkspaceInput,
@@ -90,6 +100,8 @@ export type {
   WorkspaceBoundaryLease,
   WorkspaceBoundaryProcessArgument,
   WorkspaceBoundaryProcessRequest,
+  WorkspaceBoundaryReadFileRequest,
   WorkspaceBoundaryResolver,
   WorkspaceBoundaryResult,
+  WorkspaceBoundaryWriteFileRequest,
 } from "./workspace-boundary.js";

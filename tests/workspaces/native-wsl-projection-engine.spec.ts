@@ -135,7 +135,7 @@ describe("NativeWslProjectionEngine real Git integration", () => {
       attemptId: "attempt-projection-integration",
       baseSha,
     };
-    const allocation = await result.broker.create(target);
+    const allocation = await result.broker.create(target, testBoundaryAuthority("allocate"));
     expect(allocation).toMatchObject({
       ok: true,
       outcome: "created",
@@ -170,7 +170,9 @@ describe("NativeWslProjectionEngine real Git integration", () => {
       attemptId: "attempt-projection-reuse",
       baseSha,
     };
-    await expect(first.broker.create(target)).resolves.toMatchObject({
+    await expect(
+      first.broker.create(target, testBoundaryAuthority("first-create"))
+    ).resolves.toMatchObject({
       ok: true,
       outcome: "created",
     });
@@ -197,7 +199,9 @@ describe("NativeWslProjectionEngine real Git integration", () => {
     expect(second.receipt.source_observation_digest).not.toBe(
       first.manifest.source_observation.observation_digest
     );
-    await expect(second.broker.create(target)).resolves.toMatchObject({
+    await expect(
+      second.broker.create(target, testBoundaryAuthority("second-create"))
+    ).resolves.toMatchObject({
       ok: true,
       outcome: "reused",
     });
@@ -226,7 +230,9 @@ describe("NativeWslProjectionEngine real Git integration", () => {
       attemptId: "attempt-projection-failed-relabel",
       baseSha,
     };
-    await expect(prepared.broker.create(target)).resolves.toMatchObject({
+    await expect(
+      prepared.broker.create(target, testBoundaryAuthority("prepared-create"))
+    ).resolves.toMatchObject({
       ok: true,
       outcome: "created",
     });
@@ -494,7 +500,9 @@ describe("NativeWslProjectionEngine real Git integration", () => {
       attemptId: "attempt-projection-cleanup",
       baseSha,
     };
-    await expect(prepared.broker.create(target)).resolves.toMatchObject({
+    await expect(
+      prepared.broker.create(target, testBoundaryAuthority("cleanup-create"))
+    ).resolves.toMatchObject({
       ok: true,
       outcome: "created",
     });
@@ -508,7 +516,9 @@ describe("NativeWslProjectionEngine real Git integration", () => {
       activeWorktreeCount: 1,
     });
 
-    await expect(prepared.broker.remove(target)).resolves.toMatchObject({
+    await expect(
+      prepared.broker.remove(target, testBoundaryAuthority("cleanup-remove"))
+    ).resolves.toMatchObject({
       ok: true,
       outcome: "removed",
     });
@@ -1034,6 +1044,17 @@ async function writeOwner(
     })}\n`,
     "utf8"
   );
+}
+
+function testBoundaryAuthority(operationId: string) {
+  return {
+    boundaryAuthority: {
+      operationId: `test-${operationId}`,
+      orchestrationLeaseId: "test-native-wsl-lease",
+      orchestrationLeaseRevision: 0,
+      ownerId: "test-native-wsl-owner",
+    },
+  };
 }
 
 function commandFailure(message: string): CommandResult {

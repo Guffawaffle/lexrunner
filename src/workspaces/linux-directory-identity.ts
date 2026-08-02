@@ -20,7 +20,7 @@ export type DirectoryBoundaryErrorCode =
 
 export type DirectoryBoundaryReasonCode =
   | "native_linux_ready"
-  | "windows_requires_native_wsl_broker"
+  | "windows_native_boundary_unavailable"
   | "macos_unsupported"
   | "unsupported_platform"
   | "case_insensitive_runtime"
@@ -67,7 +67,7 @@ export type DirectoryIdentityBoundarySupport =
       readonly platform: NodeJS.Platform;
       readonly pathComparison: "case-sensitive" | "case-insensitive";
       readonly reasonCode:
-        | "windows_requires_native_wsl_broker"
+        | "windows_native_boundary_unavailable"
         | "macos_unsupported"
         | "unsupported_platform"
         | "case_insensitive_runtime"
@@ -100,7 +100,7 @@ export function evaluateDirectoryIdentityBoundarySupport(
       supported: false,
       platform: facts.platform,
       pathComparison: facts.pathComparison,
-      reasonCode: "windows_requires_native_wsl_broker",
+      reasonCode: "windows_native_boundary_unavailable",
     };
   }
   if (facts.platform === "darwin") {
@@ -464,6 +464,8 @@ function boundarySupportMessage(
   reasonCode: DirectoryIdentityBoundarySupport["reasonCode"]
 ): string {
   switch (reasonCode) {
+    case "windows_native_boundary_unavailable":
+      return "Physical worktree containment requires the native Windows workspace boundary";
     case "case_insensitive_runtime":
       return "Physical worktree containment currently requires a case-sensitive Linux Git runtime";
     case "procfs_unavailable":

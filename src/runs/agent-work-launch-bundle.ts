@@ -10,6 +10,7 @@ import {
   type ExecutionEnvelope_v1 as ExecutionEnvelope,
   type WorkItem_v1,
 } from "../schemas/agent-work.js";
+import { withBrokerBoundaryAuthority } from "../workspaces/git-worktree-broker.js";
 import type {
   AgentWorkLifecycleFailure,
   AgentWorkLifecycleService,
@@ -231,7 +232,12 @@ async function assertCurrentWorkspace(
       attemptId: lifecycle.attempt.attemptId,
       baseSha: lifecycle.attempt.baseSha,
     },
-    input.attempt.broker
+    withBrokerBoundaryAuthority(input.attempt.broker, {
+      operationId: input.attempt.mutations.authorizeLaunch.mutationId,
+      orchestrationLeaseId: lifecycle.workspace.leaseId,
+      orchestrationLeaseRevision: lifecycle.workspace.revision,
+      ownerId: lifecycle.controllerLease.controllerId,
+    })
   );
   if (!observation.ok) {
     throw new Error(`Launch workspace observation failed: ${observation.reason}`);

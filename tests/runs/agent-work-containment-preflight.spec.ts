@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,7 +37,7 @@ describe("directory-identity boundary capability policy", () => {
       pathComparison: "case-insensitive",
       procfsAvailable: false,
       supported: false,
-      reasonCode: "windows_requires_native_wsl_broker",
+      reasonCode: "windows_native_boundary_unavailable",
     },
     {
       platform: "darwin",
@@ -103,7 +103,7 @@ describe("AgentWorkContainmentCapabilityService", () => {
     expect(pathProbe).toHaveBeenCalledTimes(3);
   });
 
-  it("returns a Windows broker requirement before touching either path", () => {
+  it("returns a native Windows boundary requirement before touching either path", () => {
     const pathProbe = vi.fn(() => verifiedPath());
     const service = serviceFor(runtimeSupport("win32", "case-insensitive"), pathProbe);
 
@@ -117,16 +117,16 @@ describe("AgentWorkContainmentCapabilityService", () => {
 
     expect(result).toMatchObject({
       state: "broker_required",
-      reasonCode: "windows_requires_native_wsl_broker",
+      reasonCode: "windows_native_boundary_unavailable",
       physicalContainmentAvailable: false,
-      projectionRequired: true,
+      projectionRequired: false,
       runtime: { platform: "windows", pathComparison: "case-insensitive" },
       paths: {
         repositoryRoot: { inspection: "syntactic_only", filesystem: "unknown" },
         repositoryGitDirectory: { inspection: "not_checked", filesystem: "unknown" },
         worktreeRoot: { inspection: "syntactic_only", filesystem: "unknown" },
       },
-      nextActions: ["provision_native_wsl_projection", "rerun_containment_preflight"],
+      nextActions: ["install_native_windows_boundary", "rerun_containment_preflight"],
     });
     expect(pathProbe).not.toHaveBeenCalled();
     expect(JSON.stringify(result)).not.toContain("stfc-mod");
@@ -146,7 +146,7 @@ describe("AgentWorkContainmentCapabilityService", () => {
 
     expect(result).toMatchObject({
       state: "broker_required",
-      reasonCode: "windows_requires_native_wsl_broker",
+      reasonCode: "windows_native_boundary_unavailable",
     });
     expect(pathProbe).not.toHaveBeenCalled();
   });
@@ -307,10 +307,22 @@ describe("containment preflight handler", () => {
     );
     const after = await recursiveEntries(root);
 
-    expect(output).toMatchObject({
-      ok: true,
-      result: { state: "native_ready", physicalContainmentAvailable: true },
-    });
+    expect(output).toMatchObject(
+      platform() === "linux"
+        ? {
+            ok: true,
+            result: { state: "native_ready", physicalContainmentAvailable: true },
+          }
+        : platform() === "win32"
+          ? {
+              ok: true,
+              result: { state: "broker_required", physicalContainmentAvailable: false },
+            }
+          : {
+              ok: true,
+              result: { state: "unsupported", physicalContainmentAvailable: false },
+            }
+    );
     expect(after).toEqual(before);
     expect(after.some((entry) => /(?:\.db|lexrunner-attempt\.json)$/u.test(entry))).toBe(false);
   });

@@ -213,7 +213,10 @@ jobs:
           tests/unit/verification/engine-verifier.spec.ts
           tests/dogfood-ecosystem.spec.ts
           tests/release-readiness.spec.ts
+          tests/runs/agent-work-containment-preflight.spec.ts
           tests/runs/agent-work-preparation-service.spec.ts
+          tests/workspaces/workspace-boundary-resolver.spec.ts
+          tests/workspaces/workspace-boundary.spec.ts
 
   # Full manual-only determinism and license gate.
   determinism-and-license:
