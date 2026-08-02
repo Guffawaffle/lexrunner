@@ -294,7 +294,11 @@ export type WorkspaceBoundaryLeaseReceipt_v1 = z.infer<typeof WorkspaceBoundaryL
 export function createWorkspaceBoundaryLeaseReceipt(
   input: z.input<z.ZodObject<typeof LeaseReceiptShape>>
 ): WorkspaceBoundaryLeaseReceipt_v1 {
-  const body = LeaseReceiptBody.parse(input);
+  const parsed = LeaseReceiptBody.parse(input);
+  const body = LeaseReceiptBody.parse({
+    ...parsed,
+    root_identity_digests: canonicalDigestSet(parsed.root_identity_digests),
+  });
   return WorkspaceBoundaryLeaseReceipt_v1.parse({
     ...body,
     receipt_digest: boundaryHash("lease-receipt", body),
@@ -354,11 +358,19 @@ export type WorkspaceBoundaryOperationReceipt_v1 = z.infer<
 export function createWorkspaceBoundaryOperationReceipt(
   input: z.input<z.ZodObject<typeof OperationReceiptShape>>
 ): WorkspaceBoundaryOperationReceipt_v1 {
-  const body = OperationReceiptBody.parse(input);
+  const parsed = OperationReceiptBody.parse(input);
+  const body = OperationReceiptBody.parse({
+    ...parsed,
+    identity_digests: canonicalDigestSet(parsed.identity_digests),
+  });
   return WorkspaceBoundaryOperationReceipt_v1.parse({
     ...body,
     receipt_digest: boundaryHash("operation-receipt", body),
   });
+}
+
+function canonicalDigestSet(digests: readonly string[]): string[] {
+  return [...new Set(digests)].sort();
 }
 
 declare const directoryCapabilityBrand: unique symbol;
