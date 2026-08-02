@@ -104,12 +104,31 @@ try {
         tamper_control = "hash_mismatch"
         production_signer_required = $true
         observed_at = [DateTimeOffset]::UtcNow.ToString("O")
+        receipt_digest_scope = "compact-json-without-receipt-digest"
     }
     $signingBody = $signingReceipt | ConvertTo-Json -Compress
-    $signingReceipt["receipt_digest"] = [Convert]::ToHexString(
+    $signingDigest = [Convert]::ToHexString(
         [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($signingBody))
     ).ToLowerInvariant()
-    $signingReceipt | ConvertTo-Json | Set-Content -LiteralPath $signingReceiptPath -Encoding utf8NoBOM
+    $signingJson = $signingBody.Insert(
+        $signingBody.Length - 1,
+        ",`"receipt_digest`":`"$signingDigest`"")
+    [IO.File]::WriteAllText(
+        $signingReceiptPath,
+        $signingJson,
+        [Text.UTF8Encoding]::new($false))
+
+    $writtenSigningJson = [IO.File]::ReadAllText($signingReceiptPath)
+    $digestProperty = ',"receipt_digest":"'
+    $digestOffset = $writtenSigningJson.LastIndexOf($digestProperty, [StringComparison]::Ordinal)
+    if ($digestOffset -lt 0) { throw "Signing receipt digest field was not written" }
+    $writtenSigningBody = $writtenSigningJson.Substring(0, $digestOffset) + "}"
+    $writtenSigningDigest = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($writtenSigningBody))
+    ).ToLowerInvariant()
+    if ($writtenSigningDigest -ne $signingDigest) {
+        throw "Signing receipt digest does not bind the written compact body"
+    }
 } finally {
     if ($certificate) { $certificate.Dispose() }
     if ($rsa) { $rsa.Dispose() }

@@ -163,7 +163,14 @@ internal static class ProofBroker
       return new byte[32];
     }
 
-    return Convert.FromHexString(capability);
+    try
+    {
+      return Convert.FromHexString(capability);
+    }
+    catch (FormatException)
+    {
+      return new byte[32];
+    }
   }
 
   private static string RequireString(JsonElement root, string name)

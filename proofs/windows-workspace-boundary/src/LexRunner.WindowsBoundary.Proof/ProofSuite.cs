@@ -19,6 +19,7 @@ internal static class ProofSuite
     Directory.CreateDirectory(fixtureRoot);
     var results = new List<ProofCaseResult>();
     string? ntfsIdentityDigest = null;
+    var fixtureFileSystem = "unknown";
     var cleanup = "indeterminate";
 
     try
@@ -26,6 +27,7 @@ internal static class ProofSuite
       results.Add(RunCase("ntfs-handle-identity-and-aliases", "protection", () =>
       {
         var root = NewDirectory(fixtureRoot, "identity-root");
+        fixtureFileSystem = NativeDirectoryAuthority.GetFileSystem(root);
         Directory.CreateDirectory(Path.Combine(root, "child"));
         using var authority = NativeDirectoryAuthority.Acquire(root);
         using var caseAlias = NativeDirectoryAuthority.Acquire(root.ToUpperInvariant());
@@ -341,6 +343,10 @@ internal static class ProofSuite
               second,
               $"{{\"operation\":\"hold\",\"capability\":\"{second.Capability}\"}}");
           RequireOutcome(missingField, "rejected", "invalid_request");
+          var malformedCapability = await SendBrokerRequestAsync(
+              second,
+              $"{{\"operation\":\"assert\",\"capability\":\"{new string('g', 64)}\"}}");
+          RequireOutcome(malformedCapability, "rejected", "lease_stale");
           var oversized = await SendBrokerRequestAsync(
               second,
               $"{{\"operation\":\"assert\",\"capability\":\"{new string('a', 4_096)}\"}}");
@@ -386,7 +392,13 @@ internal static class ProofSuite
     var passed = results.All(result => result.Passed) && cleanup == "completed";
     var unsupportedFileSystemObserved = results.Any(result =>
         result.Name == "unsupported-filesystem-fails-before-mutation" && result.Passed);
-    WriteReceipt(results, passed, cleanup, ntfsIdentityDigest, unsupportedFileSystemObserved);
+    WriteReceipt(
+        results,
+        passed,
+        cleanup,
+        fixtureFileSystem,
+        ntfsIdentityDigest,
+        unsupportedFileSystemObserved);
     return passed ? 0 : 1;
   }
 
@@ -663,6 +675,7 @@ internal static class ProofSuite
       IReadOnlyList<ProofCaseResult> results,
       bool passed,
       string cleanup,
+      string fileSystem,
       string? identityDigest,
       bool unsupportedFileSystemObserved)
   {
@@ -677,7 +690,7 @@ internal static class ProofSuite
       writer.WriteString("effect_state", "no_effect");
       writer.WriteString("cleanup", cleanup);
       writer.WriteString("observed_at", observedAt);
-      writer.WriteString("filesystem", "NTFS");
+      writer.WriteString("filesystem", fileSystem);
       writer.WriteString("architecture", System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant());
       writer.WriteBoolean("unsupported_filesystem_observed", unsupportedFileSystemObserved);
       if (identityDigest is not null)
