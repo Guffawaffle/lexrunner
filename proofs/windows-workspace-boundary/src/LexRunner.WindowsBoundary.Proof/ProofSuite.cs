@@ -67,9 +67,18 @@ internal static class ProofSuite
         ExpectBoundaryCode(
             "invalid_path",
             () => NativeDirectoryAuthority.Acquire($@"\\.\{driveRoot}").Dispose());
+        ExpectBoundaryCode(
+            "invalid_path",
+            () => NativeDirectoryAuthority.Acquire(Path.Combine("relative", "root")).Dispose());
+        ExpectBoundaryCode(
+            "invalid_path",
+            () => NativeDirectoryAuthority.Acquire($@"\relative\root").Dispose());
+        ExpectBoundaryCode(
+            "invalid_path",
+            () => NativeDirectoryAuthority.Acquire($"{driveRoot[0]}:relative\\root").Dispose());
 
         ntfsIdentityDigest = authority.RootIdentity.IdentityDigest;
-        return "case, dot-dot, and extended aliases converged; UNC, volume, and device namespaces failed closed";
+        return "case, dot-dot, and extended aliases converged; UNC, volume, device, and relative paths failed closed";
       }));
 
       results.Add(RunCase("pre-acquire-directory-replacement-is-rejected", "protection", () =>

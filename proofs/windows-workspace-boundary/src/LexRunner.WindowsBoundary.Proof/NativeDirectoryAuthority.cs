@@ -240,12 +240,12 @@ internal sealed class NativeDirectoryAuthority : IDisposable
     var localPath = path.StartsWith(@"\\?\", StringComparison.Ordinal)
         ? path[4..]
         : path;
-    var fullPath = Path.GetFullPath(localPath);
-    if (!Path.IsPathFullyQualified(fullPath))
+    if (!Path.IsPathFullyQualified(localPath))
     {
       throw new BoundaryProofException("invalid_path", "Path must be fully qualified");
     }
 
+    var fullPath = Path.GetFullPath(localPath);
     return Path.TrimEndingDirectorySeparator(fullPath);
   }
 
