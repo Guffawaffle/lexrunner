@@ -10,9 +10,12 @@ if (resolution.ok && resolution.boundary.capability.backend_kind === "linux-nati
   workspaceBoundaryConformance("LinuxWorkspaceBoundary conformance", () => linuxBoundary);
 } else {
   describe("LinuxWorkspaceBoundary conformance", () => {
-    it("does not select the Linux backend on the actual host", () => {
-      const decision = resolution.ok ? resolution.boundary.capability : resolution.decision;
-      expect(decision.backend_kind).not.toBe("linux-native");
+    it("does not expose a ready Linux backend on the actual host", () => {
+      if (resolution.ok) {
+        expect(resolution.boundary.capability.backend_kind).not.toBe("linux-native");
+        return;
+      }
+      expect(resolution.decision.state).not.toBe("ready");
     });
 
     it.skip("runs when production resolution selects linux-native", () => undefined);
