@@ -144,7 +144,7 @@ export function workspaceBoundaryConformance(
       });
       expect(mismatchedCwdRelativeResult).toMatchObject({
         ok: false,
-        error: { reason_code: "invalid_path" },
+        error: { code: "invalid_path" },
         receipt: { operation_id: "process-cwd-relative-mismatch", mutation: false },
       });
 
