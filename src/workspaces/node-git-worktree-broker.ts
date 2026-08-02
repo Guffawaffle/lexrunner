@@ -1210,7 +1210,16 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
 }
 
 function isAttemptMarker(value: unknown): value is AttemptMarker {

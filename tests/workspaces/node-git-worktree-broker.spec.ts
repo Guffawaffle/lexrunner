@@ -446,10 +446,15 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       worktreePath: join(linkedParent, "attempt"),
     });
 
-    await expect(broker.create(target)).resolves.toMatchObject({
+    const result = await broker.create(target);
+    expect(result).toMatchObject({
       ok: false,
       reason: "containment_violation",
     });
+    if (!result.ok) {
+      expect(result.message).toMatch(/symlink|identity|directory/iu);
+      expect(result.message).not.toContain("[object Object]");
+    }
     expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
     expect(await pathExists(join(outside, "attempt"))).toBe(false);
   });
@@ -512,10 +517,15 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
     await symlink(outside, worktreeRoot, "dir");
     const target = makeTarget("replaced-root");
 
-    await expect(broker.create(target)).resolves.toMatchObject({
+    const result = await broker.create(target);
+    expect(result).toMatchObject({
       ok: false,
       reason: "containment_violation",
     });
+    if (!result.ok) {
+      expect(result.message).toMatch(/symlink|identity|directory/iu);
+      expect(result.message).not.toContain("[object Object]");
+    }
     expect(await localBranchExists(repositoryRoot, target.branch)).toBe(false);
     expect(await pathExists(join(outside, "replaced-root"))).toBe(false);
     expect(await pathExists(join(originalRoot, "replaced-root"))).toBe(false);
