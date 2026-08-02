@@ -153,22 +153,22 @@ internal static class ProofSuite
       {
         var root = NewDirectory(fixtureRoot, "unprotected-root");
         var moved = root + "-original";
-        using var authority = NativeDirectoryAuthority.Acquire(
-                  root,
-                  new AuthorityOptions(ExcludeRenameDelete: false));
-        var originalIdentity = authority.RootIdentity;
-
-        Directory.Move(root, moved);
-        Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "canary.txt"), Canary);
-        var recaptured = authority.RecaptureRoot();
-        if (recaptured.FileId != originalIdentity.FileId ||
-                  !File.ReadAllText(Path.Combine(root, "canary.txt")).Equals(Canary, StringComparison.Ordinal))
+        using (var authority = NativeDirectoryAuthority.Acquire(
+                   root,
+                   new AuthorityOptions(ExcludeRenameDelete: false)))
         {
-          throw new InvalidOperationException("Share-delete negative control did not expose redirection");
+          var originalIdentity = authority.RootIdentity;
+          Directory.Move(root, moved);
+          Directory.CreateDirectory(root);
+          File.WriteAllText(Path.Combine(root, "canary.txt"), Canary);
+          var recaptured = authority.RecaptureRoot();
+          if (recaptured.FileId != originalIdentity.FileId ||
+              !File.ReadAllText(Path.Combine(root, "canary.txt")).Equals(Canary, StringComparison.Ordinal))
+          {
+            throw new InvalidOperationException("Share-delete negative control did not expose redirection");
+          }
         }
 
-        authority.Dispose();
         Directory.Delete(root, recursive: true);
         Directory.Move(moved, root);
         return "allowing FILE_SHARE_DELETE let the caller path name a replacement while the handle retained the original identity";

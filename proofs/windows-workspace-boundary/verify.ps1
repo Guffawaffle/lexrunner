@@ -20,9 +20,6 @@ $pfxPath = Join-Path $artifacts "ephemeral-signing.pfx"
 New-Item -ItemType Directory -Force -Path $artifacts, $publish, (Split-Path $signedCopy) | Out-Null
 
 try {
-    dotnet build $project -c Release
-    if ($LASTEXITCODE -ne 0) { throw "Managed proof build failed" }
-
     dotnet publish $project -c Release -r win-x64 --self-contained true -o $publish
     if ($LASTEXITCODE -ne 0) { throw "NativeAOT publish failed" }
 
@@ -65,10 +62,18 @@ try {
 
     $windowsKitsBin = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
     $signTool = Get-ChildItem -LiteralPath $windowsKitsBin `
-        -Recurse -Filter signtool.exe -ErrorAction Stop |
-        Where-Object FullName -Match "\\x64\\signtool\.exe$" |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1 -ExpandProperty FullName
+        -Directory -ErrorAction Stop |
+        Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' |
+        Sort-Object { [version]$_.Name } -Descending |
+        ForEach-Object { Join-Path $_.FullName "x64\signtool.exe" } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+    if (-not $signTool) {
+        $directSignTool = Join-Path $windowsKitsBin "x64\signtool.exe"
+        if (Test-Path -LiteralPath $directSignTool -PathType Leaf) {
+            $signTool = $directSignTool
+        }
+    }
     if (-not $signTool) { throw "Windows SDK signtool.exe was not found" }
 
     & $signTool sign /fd SHA256 /f $pfxPath /p $password $signedCopy
