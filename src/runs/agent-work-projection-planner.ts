@@ -9,33 +9,11 @@ import {
   NativeWslProjectionRequest_v1,
   nativeWslProjectionId,
 } from "../schemas/agent-work-projection.js";
+import { boundedStrictObject } from "../schemas/bounded-strict-object.js";
 import { SHA256Hash } from "../schemas/task-contract.js";
 
 const ProjectionId = z.string().min(1).max(4_096);
 const Timestamp = z.string().max(64).datetime({ offset: true });
-
-function boundedStrictObject<const Shape extends z.ZodRawShape>(shape: Shape) {
-  const allowedKeys = new Set(Object.keys(shape));
-  return z.preprocess((input) => {
-    if (input === null || typeof input !== "object" || Array.isArray(input)) {
-      return input;
-    }
-    try {
-      const prototype = Object.getPrototypeOf(input);
-      if (prototype !== Object.prototype && prototype !== null) {
-        return null;
-      }
-      for (const key of Reflect.ownKeys(input)) {
-        if (typeof key !== "string" || !allowedKeys.has(key)) {
-          return null;
-        }
-      }
-    } catch {
-      return null;
-    }
-    return input;
-  }, z.object(shape));
-}
 
 export const NativeWslProjectionInventoryObservation_v1 = z.union([
   boundedStrictObject({ state: z.literal("absent") }),

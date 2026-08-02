@@ -204,7 +204,10 @@ describe("WorkspaceBoundary v1 contract", () => {
       operation_id: "operation-rejected",
       outcome: "rejected",
       durability: "not_applicable",
-      error: boundaryError({ effect_state: "no_effect" }),
+      error: boundaryError({
+        effect_state: "no_effect",
+        operation_id: "operation-rejected",
+      }),
     });
     const indeterminate = operationReceipt({
       operation_id: "operation-indeterminate",
@@ -215,6 +218,7 @@ describe("WorkspaceBoundary v1 contract", () => {
       error: boundaryError({
         code: "durability_indeterminate",
         effect_state: "effect_unknown",
+        operation_id: "operation-indeterminate",
       }),
     });
 
@@ -226,9 +230,19 @@ describe("WorkspaceBoundary v1 contract", () => {
         operation_id: "operation-invalid",
         outcome: "indeterminate",
         durability: "not_applicable",
-        error: boundaryError({ effect_state: "effect_unknown" }),
+        error: boundaryError({
+          effect_state: "effect_unknown",
+          operation_id: "operation-invalid",
+        }),
       })
     ).toThrow(/indeterminate operations require indeterminate durability/u);
+    expect(() =>
+      operationReceipt({
+        operation_id: "operation-mismatch",
+        outcome: "rejected",
+        error: boundaryError({ operation_id: "another-operation" }),
+      })
+    ).toThrow(/error operation_id must match receipt operation_id/u);
     expect(
       WorkspaceBoundaryOperationReceipt_v1.safeParse({
         ...completed,

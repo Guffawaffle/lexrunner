@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { boundedStrictObject } from "../schemas/bounded-strict-object.js";
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import type { CommandResult } from "./command-runner.js";
 
@@ -29,23 +30,6 @@ const HexIdentity = z
   .min(1)
   .max(64)
   .regex(/^[a-f0-9]+$/u, "must be lowercase hexadecimal");
-
-function boundedStrictObject<const Shape extends z.ZodRawShape>(shape: Shape) {
-  const allowedKeys = new Set(Object.keys(shape));
-  return z.preprocess((input) => {
-    if (input === null || typeof input !== "object" || Array.isArray(input)) return input;
-    try {
-      const prototype = Object.getPrototypeOf(input);
-      if (prototype !== Object.prototype && prototype !== null) return null;
-      for (const key of Reflect.ownKeys(input)) {
-        if (typeof key !== "string" || !allowedKeys.has(key)) return null;
-      }
-    } catch {
-      return null;
-    }
-    return input;
-  }, z.object(shape));
-}
 
 export const WorkspaceBoundaryBackendKind = z.enum([
   "linux-native",
@@ -558,6 +542,16 @@ function requireValidOperationReceipt(
   if ((receipt.outcome === "completed") === Boolean(receipt.error)) {
     addIssue(context, ["error"], "completed operations omit errors; other outcomes require one");
   }
+  if (
+    receipt.error?.operation_id !== undefined &&
+    receipt.error.operation_id !== receipt.operation_id
+  ) {
+    addIssue(
+      context,
+      ["error", "operation_id"],
+      "error operation_id must match receipt operation_id"
+    );
+  }
   if (!receipt.mutation && receipt.durability !== "not_applicable") {
     addIssue(context, ["durability"], "read-only operations use not_applicable durability");
   }
@@ -573,16 +567,19 @@ function requireValidOperationReceipt(
   if (Date.parse(receipt.completed_at) < Date.parse(receipt.started_at)) {
     addIssue(context, ["completed_at"], "completed_at must not precede started_at");
   }
-  const mutationOperations = new Set<WorkspaceBoundaryOperationKind>([
-    "create-child",
-    "write-owned-file",
-    "rename-owned",
-    "remove-owned",
-    "sync-directory",
-  ]);
-  if (receipt.mutation !== mutationOperations.has(receipt.operation)) {
+  if (receipt.mutation !== isMutationOperation(receipt.operation)) {
     addIssue(context, ["mutation"], "mutation must match the operation kind");
   }
+}
+
+function isMutationOperation(operation: WorkspaceBoundaryOperationKind): boolean {
+  return (
+    operation === "create-child" ||
+    operation === "write-owned-file" ||
+    operation === "rename-owned" ||
+    operation === "remove-owned" ||
+    operation === "sync-directory"
+  );
 }
 
 function isWindowsAbsolutePath(value: string): boolean {

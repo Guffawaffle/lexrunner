@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { boundedStrictObject } from "./bounded-strict-object.js";
 import { computeCanonicalHash, SHA256Hash } from "./task-contract.js";
 
 export const NATIVE_WSL_PROJECTION_CONTRACT_VERSION = "1.0.0" as const;
@@ -59,29 +60,6 @@ const DecimalIdentity = z
   .string()
   .max(MAX_DECIMAL_IDENTITY_LENGTH)
   .regex(/^(?:0|[1-9][0-9]*)$/, "must be a decimal integer");
-
-function boundedStrictObject<const Shape extends z.ZodRawShape>(shape: Shape) {
-  const allowedKeys = new Set(Object.keys(shape));
-  return z.preprocess((input) => {
-    if (input === null || typeof input !== "object" || Array.isArray(input)) {
-      return input;
-    }
-    try {
-      const prototype = Object.getPrototypeOf(input);
-      if (prototype !== Object.prototype && prototype !== null) {
-        return null;
-      }
-      for (const key of Reflect.ownKeys(input)) {
-        if (typeof key !== "string" || !allowedKeys.has(key)) {
-          return null;
-        }
-      }
-    } catch {
-      return null;
-    }
-    return input;
-  }, z.object(shape));
-}
 
 export const NativeDirectoryIdentityClaim_v1 = boundedStrictObject({
   device: DecimalIdentity,
