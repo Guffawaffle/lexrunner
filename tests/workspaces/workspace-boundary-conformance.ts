@@ -43,7 +43,8 @@ export function workspaceBoundaryConformance(
         identity_kind: "linux-device-inode",
         canonical_path: repositoryRoot,
       });
-      expect(JSON.stringify(repository)).not.toMatch(/(?:procPath|\/proc\/|"fd"|directory)/u);
+      expect(Object.keys(repository).sort()).toEqual(["identity", "leaseId"]);
+      expect(JSON.stringify(repository)).not.toMatch(/procPath|\/proc\/\d+\/fd\/\d+/u);
 
       const git = await lease.openChild(repository, ".git", "open-git");
       expect(git.ok).toBe(true);
