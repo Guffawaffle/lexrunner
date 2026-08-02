@@ -9,14 +9,15 @@ import type {
   WorkspaceMutationResult,
   WorkspaceObservation,
 } from "../store/workspace-lifecycle-store.js";
-import type {
-  BrokerFailure,
-  BrokerOperationOptions,
-  CreateWorktreeResult,
-  GitWorktreeBroker,
-  ObserveWorktreeResult,
-  RemoveWorktreeResult,
-  WorktreeTarget,
+import {
+  withBrokerBoundaryAuthority,
+  type BrokerFailure,
+  type BrokerOperationOptions,
+  type CreateWorktreeResult,
+  type GitWorktreeBroker,
+  type ObserveWorktreeResult,
+  type RemoveWorktreeResult,
+  type WorktreeTarget,
 } from "./git-worktree-broker.js";
 
 const MAX_REASON_LENGTH = 1_024;
@@ -805,15 +806,12 @@ function boundaryBrokerOptions(
   operationId: string,
   ownerId: string
 ): BrokerOperationOptions {
-  return {
-    ...options,
-    boundaryAuthority: {
-      operationId,
-      orchestrationLeaseId: lease.leaseId,
-      orchestrationLeaseRevision: lease.revision,
-      ownerId,
-    },
-  };
+  return withBrokerBoundaryAuthority(options, {
+    operationId,
+    orchestrationLeaseId: lease.leaseId,
+    orchestrationLeaseRevision: lease.revision,
+    ownerId,
+  });
 }
 
 function boundPair(attempt: AttemptRecord, lease: WorkspaceLifecycleLeaseRecord) {

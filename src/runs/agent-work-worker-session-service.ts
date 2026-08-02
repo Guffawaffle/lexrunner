@@ -5,6 +5,7 @@ import type { ExecutionEnvelope_v1 } from "../schemas/agent-work.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
 import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { withBrokerBoundaryAuthority } from "../workspaces/git-worktree-broker.js";
 import type {
   AttachWorkerSessionInput,
   BindLaunchEnvelopeInput,
@@ -143,16 +144,24 @@ export class AgentWorkWorkerSessionService {
       envelope.paths.project_root,
       "execution_root"
     );
-    const observation = await this.runtime.observeWorkspace({
-      repositoryId: lease.repositoryId,
-      hostId: lease.hostId,
-      gitRuntime: lease.gitRuntime,
-      projectRoot: lease.projectRoot,
-      branch: lease.branch,
-      worktreePath: lease.worktreePath,
-      attemptId: attempt.attemptId,
-      baseSha: attempt.baseSha,
-    });
+    const observation = await this.runtime.observeWorkspace(
+      {
+        repositoryId: lease.repositoryId,
+        hostId: lease.hostId,
+        gitRuntime: lease.gitRuntime,
+        projectRoot: lease.projectRoot,
+        branch: lease.branch,
+        worktreePath: lease.worktreePath,
+        attemptId: attempt.attemptId,
+        baseSha: attempt.baseSha,
+      },
+      withBrokerBoundaryAuthority(undefined, {
+        operationId: input.mutationId,
+        orchestrationLeaseId: lease.leaseId,
+        orchestrationLeaseRevision: lease.revision,
+        ownerId: input.controller.controllerId,
+      })
+    );
     if (
       !observation.ok ||
       !observation.observation.exists ||

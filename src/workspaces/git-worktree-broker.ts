@@ -21,6 +21,16 @@ export interface BrokerBoundaryAuthority {
   ownerId: string;
 }
 
+export function withBrokerBoundaryAuthority(
+  options: BrokerOperationOptions | undefined,
+  authority: BrokerBoundaryAuthority
+): BrokerOperationOptions {
+  return {
+    ...options,
+    boundaryAuthority: { ...authority },
+  };
+}
+
 export type BrokerOperation = "create" | "observe" | "remove";
 
 export interface BrokerCommandEvidence {
