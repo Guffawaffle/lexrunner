@@ -15,6 +15,8 @@ const cliPath = path.join(repositoryRoot, "dist", "cli.js");
 const roots: string[] = [];
 const SECRET_VALUE = "dogfood-secret-value-that-must-not-be-reported";
 const SECRET_KEY = "dogfood-secret-key-that-must-not-be-reported";
+const CLI_INVOCATION_TIMEOUT_MS = 5_000;
+const CLI_SCENARIO_TIMEOUT_MS = 12_000;
 
 afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
@@ -89,38 +91,57 @@ describe("bounded plan validation diagnostics", () => {
     expect(JSON.stringify(dynamicKeyFailure)).not.toContain(SECRET_KEY);
   });
 
-  it("keeps schema CLI JSON and human output actionable", async () => {
-    const root = fixtureRoot();
-    const planPath = writePlan(root, invalidPlan(5));
+  it(
+    "keeps schema CLI JSON and human output actionable",
+    async () => {
+      const root = fixtureRoot();
+      const planPath = writePlan(root, invalidPlan(5));
 
-    const jsonResult = await runCli(["schema", "validate", planPath, "--json"]);
-    expect(jsonResult.exitCode).toBe(1);
-    const json = JSON.parse(jsonResult.stdout);
-    expect(json.errorCount).toBe(5);
-    expect(json.errors.map((entry: { path: string }) => entry.path)).toEqual([
-      "items.0.gates.0.run",
-      "items.1.gates.0.run",
-      "items.2.gates.0.run",
-      "items.3.gates.0.run",
-      "items.4.gates.0.run",
-    ]);
-    expect(jsonResult.stdout).not.toContain(SECRET_VALUE);
+      const jsonResult = await runCli(["schema", "validate", planPath, "--json"]);
+      expect(jsonResult.exitCode).toBe(1);
+      const json = JSON.parse(jsonResult.stdout);
+      expect(json.errorCount).toBe(5);
+      expect(json.errors.map((entry: { path: string }) => entry.path)).toEqual([
+        "items.0.gates.0.run",
+        "items.1.gates.0.run",
+        "items.2.gates.0.run",
+        "items.3.gates.0.run",
+        "items.4.gates.0.run",
+      ]);
+      expect(jsonResult.stdout).not.toContain(SECRET_VALUE);
 
-    const humanResult = await runCli(["schema", "validate", planPath]);
-    expect(humanResult.exitCode).toBe(1);
-    expect(humanResult.stderr).toContain("Plan validation failed with 5 error(s)");
-    expect(humanResult.stderr).toContain("items.0.gates.0.run [invalid_type]");
-    expect(humanResult.stderr).toContain("items.4.gates.0.run [invalid_type]");
-    expect(humanResult.stderr).not.toContain(SECRET_VALUE);
+      const humanResult = await runCli(["schema", "validate", planPath]);
+      expect(humanResult.exitCode).toBe(1);
+      expect(humanResult.stderr).toContain("Plan validation failed with 5 error(s)");
+      expect(humanResult.stderr).toContain("items.0.gates.0.run [invalid_type]");
+      expect(humanResult.stderr).toContain("items.4.gates.0.run [invalid_type]");
+      expect(humanResult.stderr).not.toContain(SECRET_VALUE);
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
 
-    writePlan(root, planWithSecretUnknownKey());
-    const hostileResult = await runCli(["schema", "validate", planPath, "--json"]);
-    expect(hostileResult.exitCode).toBe(1);
-    expect(hostileResult.stdout).toContain("Object contains one or more unrecognized keys");
-    expect(hostileResult.stdout).not.toContain(SECRET_KEY);
+  it(
+    "redacts hostile unknown keys from schema CLI JSON",
+    async () => {
+      const root = fixtureRoot();
+      const planPath = writePlan(root, planWithSecretUnknownKey());
+      const hostileResult = await runCli(["schema", "validate", planPath, "--json"]);
+      expect(hostileResult.exitCode).toBe(1);
+      expect(hostileResult.stdout).toContain("Object contains one or more unrecognized keys");
+      expect(hostileResult.stdout).not.toContain(SECRET_KEY);
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
 
-    for (const malformed of malformedSecretPlans()) {
+  it.each([0, 1])(
+    "redacts malformed schema CLI input case %# in JSON and human output",
+    async (caseIndex) => {
+      const root = fixtureRoot();
+      const planPath = path.join(root, "plan.json");
+      const malformed = malformedSecretPlans()[caseIndex];
+      if (!malformed) throw new Error(`Missing malformed-plan fixture ${caseIndex}`);
       fs.writeFileSync(planPath, malformed.content);
+
       const malformedResult = await runCli(["schema", "validate", planPath, "--json"]);
       expect(malformedResult.exitCode).toBe(1);
       expect(malformedResult.stdout).toContain("Invalid JSON: plan content could not be parsed");
@@ -144,49 +165,79 @@ describe("bounded plan validation diagnostics", () => {
       expect(malformedHumanResult.stderr).not.toContain(malformed.secret);
       expect(malformedHumanResult.stderr).not.toContain(SECRET_VALUE);
       expect(malformedHumanResult.stderr).not.toContain("TOPSECRET");
-    }
-  });
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
 
-  it("keeps status CLI JSON and human output actionable", async () => {
-    const root = fixtureRoot();
-    const planPath = writePlan(root, invalidPlan(5));
+  it(
+    "keeps status CLI JSON and human output actionable",
+    async () => {
+      const root = fixtureRoot();
+      const planPath = writePlan(root, invalidPlan(5));
 
-    const jsonResult = await runCli(["status", "--plan", planPath, "--json"]);
-    expect(jsonResult.exitCode).toBe(2);
-    const json = JSON.parse(jsonResult.stdout);
-    expect(json).toMatchObject({
-      contract: "bounded-ax-v1",
-      valid: false,
-      errorCount: 5,
-      errorsTruncated: false,
-    });
-    expect(json.errors).toHaveLength(5);
-    expect(jsonResult.stdout).not.toContain(SECRET_VALUE);
+      const jsonResult = await runCli(["status", "--plan", planPath, "--json"]);
+      expect(jsonResult.exitCode).toBe(2);
+      const json = JSON.parse(jsonResult.stdout);
+      expect(json).toMatchObject({
+        contract: "bounded-ax-v1",
+        valid: false,
+        errorCount: 5,
+        errorsTruncated: false,
+      });
+      expect(json.errors).toHaveLength(5);
+      expect(jsonResult.stdout).not.toContain(SECRET_VALUE);
 
-    const humanResult = await runCli(["status", "--plan", planPath]);
-    expect(humanResult.exitCode).toBe(2);
-    expect(humanResult.stderr).toContain("Plan validation failed with 5 error(s)");
-    expect(humanResult.stderr).toContain("items.0.gates.0.run [invalid_type]");
-    expect(humanResult.stderr).toContain("items.4.gates.0.run [invalid_type]");
-    expect(humanResult.stderr).not.toContain(SECRET_VALUE);
+      const humanResult = await runCli(["status", "--plan", planPath]);
+      expect(humanResult.exitCode).toBe(2);
+      expect(humanResult.stderr).toContain("Plan validation failed with 5 error(s)");
+      expect(humanResult.stderr).toContain("items.0.gates.0.run [invalid_type]");
+      expect(humanResult.stderr).toContain("items.4.gates.0.run [invalid_type]");
+      expect(humanResult.stderr).not.toContain(SECRET_VALUE);
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
 
-    fs.writeFileSync(planPath, "TOPSECRET");
-    const malformedJsonResult = await runCli(["status", "--plan", planPath, "--json"]);
-    expect(malformedJsonResult.exitCode).toBe(2);
-    expect(JSON.parse(malformedJsonResult.stdout)).toMatchObject({
-      contract: "bounded-ax-v1",
-      valid: false,
-      code: "CONFIG_INVALID",
-      errorCount: 1,
-      errorsTruncated: false,
-    });
-    expect(`${malformedJsonResult.stdout}${malformedJsonResult.stderr}`).not.toContain("TOPSECRET");
+  it(
+    "redacts malformed status CLI input in JSON and human output",
+    async () => {
+      const root = fixtureRoot();
+      const planPath = path.join(root, "plan.json");
+      fs.writeFileSync(planPath, "TOPSECRET");
 
-    const malformedHumanResult = await runCli(["status", "--plan", planPath]);
-    expect(malformedHumanResult.exitCode).toBe(2);
-    expect(malformedHumanResult.stderr).toContain("Invalid JSON: plan content could not be parsed");
-    expect(malformedHumanResult.stderr).not.toContain("TOPSECRET");
-  });
+      const malformedJsonResult = await runCli(["status", "--plan", planPath, "--json"]);
+      expect(malformedJsonResult.exitCode).toBe(2);
+      expect(JSON.parse(malformedJsonResult.stdout)).toMatchObject({
+        contract: "bounded-ax-v1",
+        valid: false,
+        code: "CONFIG_INVALID",
+        errorCount: 1,
+        errorsTruncated: false,
+      });
+      expect(`${malformedJsonResult.stdout}${malformedJsonResult.stderr}`).not.toContain(
+        "TOPSECRET"
+      );
+
+      const malformedHumanResult = await runCli(["status", "--plan", planPath]);
+      expect(malformedHumanResult.exitCode).toBe(2);
+      expect(malformedHumanResult.stderr).toContain(
+        "Invalid JSON: plan content could not be parsed"
+      );
+      expect(malformedHumanResult.stderr).not.toContain("TOPSECRET");
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
+
+  it(
+    "bounds each CLI subprocess with command-level diagnostics",
+    async () => {
+      const root = fixtureRoot();
+      const planPath = writePlan(root, invalidPlan(5));
+      await expect(runCli(["schema", "validate", planPath, "--json"], 1)).rejects.toThrow(
+        /CLI invocation timed out after 1ms \(schema validate --json; observed \d+ms\)/u
+      );
+    },
+    CLI_SCENARIO_TIMEOUT_MS
+  );
 
   it("returns detailed SDK MCP plan_validate errors and separates malformed JSON", async () => {
     const runStore = new InMemoryRunStore();
@@ -483,11 +534,20 @@ function writePlan(root: string, plan: object): string {
   return planPath;
 }
 
-async function runCli(args: string[]) {
-  return execa("node", [cliPath, ...args], {
+async function runCli(args: string[], timeoutMs = CLI_INVOCATION_TIMEOUT_MS) {
+  const result = await execa("node", [cliPath, ...args], {
     cwd: repositoryRoot,
+    timeout: timeoutMs,
+    forceKillAfterDelay: 500,
     reject: false,
   });
+  if (result.timedOut) {
+    const invocation = args.filter((argument) => !path.isAbsolute(argument)).join(" ");
+    throw new Error(
+      `CLI invocation timed out after ${timeoutMs}ms (${invocation || "unknown"}; observed ${Math.ceil(result.durationMs)}ms)`
+    );
+  }
+  return result;
 }
 
 function parseToolText(result: {
