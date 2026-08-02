@@ -1,6 +1,6 @@
 # ADR-011: Native-host WorkspaceBoundary
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-08-01
 **Authors:** lexrunner team
 
@@ -60,6 +60,19 @@ manifest. The resolver verifies presence, digest, signature, architecture, proto
 self-probe before returning `ready`. Development-unverified helpers can be inspected but cannot
 advertise a ready production capability. Distribution must not depend on an install-time download
 or on WSL.
+
+The #888 proof confirmed this selection on native Windows. A self-contained `win-x64` NativeAOT
+executable builds and runs without an installed application runtime. A disposable copy can be
+Authenticode-signed and its embedded signature and hash enforcement validated without trusting
+the ephemeral development signer. Production capability detection must still verify the release
+signer and manifest digest; the proof signature is never production authority.
+
+The proof also revised one handle detail: a metadata-only `FILE_READ_ATTRIBUTES` directory handle
+did not exclude rename of the exact directory on the tested Windows/NTFS kernel. Authority handles
+therefore request `FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES`, use
+`FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT`, and omit `FILE_SHARE_DELETE`.
+Negative controls demonstrated caller-path redirection when that operational access/share
+combination, held ancestors, or no-follow validation was removed.
 
 ### Exact claim
 
@@ -124,3 +137,11 @@ is rejected rather than used to narrow the Linux guarantee.
 - Unsupported filesystems and unavailable/unverified helpers remain hard failures.
 - Durability and broader containment claims stay visibly false until their separate conformance
   work passes.
+
+## Proof evidence
+
+The reproducible proof, hostile cases, machine-readable receipt format, and production protocol
+recommendations are documented in
+[Native Windows handle-authority proof](../security/windows-handle-authority-proof.md). The proof
+is intentionally separate from production routing: passing it does not make the development
+helper eligible for a `ready` capability decision.

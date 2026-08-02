@@ -12,6 +12,7 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "proofs/windows-workspace-boundary/**"
       - "package*.json"
       - "tsconfig*.json"
       - ".github/workflows/**"
@@ -195,6 +196,9 @@ jobs:
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: "proofs/windows-workspace-boundary/global.json"
       - name: Activate pinned npm
         run: npm install --global npm@11.16.0
       - name: Install dependencies
@@ -217,6 +221,18 @@ jobs:
           tests/runs/agent-work-preparation-service.spec.ts
           tests/workspaces/workspace-boundary-resolver.spec.ts
           tests/workspaces/workspace-boundary.spec.ts
+      - name: Run native Windows handle-authority proof
+        shell: pwsh
+        run: ./proofs/windows-workspace-boundary/verify.ps1
+      - name: Upload native Windows proof receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-handle-authority-proof
+          path: |
+            proofs/windows-workspace-boundary/artifacts/proof-receipt.json
+            proofs/windows-workspace-boundary/artifacts/signing-receipt.json
+          if-no-files-found: warn
 
   # Full manual-only determinism and license gate.
   determinism-and-license:
