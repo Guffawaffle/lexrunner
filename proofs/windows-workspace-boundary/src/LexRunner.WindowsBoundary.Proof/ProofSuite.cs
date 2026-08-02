@@ -527,15 +527,19 @@ internal static class ProofSuite
 
     using var process = Process.Start(startInfo)
         ?? throw new InvalidOperationException($"Could not start {executable}");
-    var stdout = process.StandardOutput.ReadToEnd();
-    var stderr = process.StandardError.ReadToEnd();
+    var stdoutTask = process.StandardOutput.ReadToEndAsync();
+    var stderrTask = process.StandardError.ReadToEndAsync();
     if (!process.WaitForExit(15_000))
     {
       process.Kill(entireProcessTree: true);
       process.WaitForExit(10_000);
+      Task.WhenAll(stdoutTask, stderrTask).GetAwaiter().GetResult();
       throw new InvalidOperationException($"{executable} timed out");
     }
 
+    Task.WhenAll(stdoutTask, stderrTask).GetAwaiter().GetResult();
+    var stdout = stdoutTask.Result;
+    var stderr = stderrTask.Result;
     if (process.ExitCode != 0)
     {
       throw new InvalidOperationException(
@@ -702,7 +706,7 @@ internal static class ProofSuite
     });
     var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)))
         .ToLowerInvariant();
-    using var bodyDocument = ProtocolJson.ParseBounded(body);
+    using var bodyDocument = JsonDocument.Parse(body);
     ProtocolJson.WriteLine(writer =>
     {
       foreach (var property in bodyDocument.RootElement.EnumerateObject())
