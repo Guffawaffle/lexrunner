@@ -337,7 +337,7 @@ class LinuxWorkspaceBoundaryLease {
       this.assertOpen();
       const cwd = this.requireCapability(request.cwd);
       const rendered = request.args.map((argument) =>
-        this.renderArgument(argument, temporaryDirectories)
+        this.renderArgument(argument, request.cwd, temporaryDirectories)
       );
       const asserted = [
         ...this.roots.values(),
@@ -440,9 +440,20 @@ class LinuxWorkspaceBoundaryLease {
 
   private renderArgument(
     argument: WorkspaceBoundaryProcessArgument,
+    cwd: WorkspaceBoundaryDirectoryCapability,
     temporaryDirectories: AnchoredDirectory[]
   ): string {
     if (argument.kind === "literal") return argument.value;
+    if (argument.relativeToCwd) {
+      if (argument.directory !== cwd || (argument.components?.length ?? 0) > 0) {
+        throw new DirectoryBoundaryError(
+          "invalid_path",
+          "A cwd-relative process argument must reference the exact cwd capability without components"
+        );
+      }
+      this.requireCapability(argument.directory);
+      return `${argument.prefix ?? ""}.${argument.suffix ?? ""}`;
+    }
     let directory = this.requireCapability(argument.directory);
     for (const component of argument.components ?? []) {
       directory = openChildDirectory(directory, component, "process directory component");

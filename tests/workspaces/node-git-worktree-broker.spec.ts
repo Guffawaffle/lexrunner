@@ -91,6 +91,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
     }
 
     const gitAdminDir = await gitStdout(target.worktreePath, "rev-parse", "--absolute-git-dir");
+    expect(await readFile(join(target.worktreePath, ".git"), "utf8")).not.toContain("/proc/");
     const marker = JSON.parse(
       await readFile(join(gitAdminDir, "lexrunner-attempt.json"), "utf8")
     ) as Record<string, unknown>;
@@ -188,6 +189,37 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       message: "Workspace boundary authority lineage is required",
     });
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("binds main Git authority to held directory capabilities", async () => {
+    let inspected = false;
+    const guarded = brokerWithRunner(
+      new HookedRunner(async (request, phase) => {
+        if (inspected || phase !== "before" || !hasArgSequence(request, ["check-ref-format"])) {
+          return;
+        }
+        inspected = true;
+        expect(request.args[0]).toBe("--git-dir=.");
+        expect(request.args[1]).toMatch(/^--work-tree=\/proc\/[0-9]+\/fd\/[0-9]+$/u);
+
+        const gitDirectory = await stat(request.cwd);
+        const expectedGitDirectory = await stat(join(repositoryRoot, ".git"));
+        expect([gitDirectory.dev, gitDirectory.ino]).toEqual([
+          expectedGitDirectory.dev,
+          expectedGitDirectory.ino,
+        ]);
+
+        const workTree = await stat(request.args[1].slice("--work-tree=".length));
+        const expectedWorkTree = await stat(repositoryRoot);
+        expect([workTree.dev, workTree.ino]).toEqual([expectedWorkTree.dev, expectedWorkTree.ino]);
+      })
+    );
+
+    await expect(guarded.create(makeTarget("held-main-authority"))).resolves.toMatchObject({
+      ok: true,
+      outcome: "created",
+    });
+    expect(inspected).toBe(true);
   });
 
   it("reports existing branch and occupied path conflicts without changing either", async () => {

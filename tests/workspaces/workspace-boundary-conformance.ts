@@ -111,6 +111,43 @@ export function workspaceBoundaryConformance(
         });
       }
 
+      const cwdRelativeResult = await lease.runProcess({
+        operationId: "process-cwd-relative",
+        executable: process.execPath,
+        args: [
+          { kind: "literal", value: "-e" },
+          { kind: "literal", value: "process.stdout.write(process.argv[1])" },
+          {
+            kind: "directory",
+            directory: repository,
+            prefix: "cwd=",
+            relativeToCwd: true,
+          },
+        ],
+        cwd: repository,
+        timeoutMs: 10_000,
+      });
+      expect(cwdRelativeResult.ok && cwdRelativeResult.value).toMatchObject({
+        ok: true,
+        stdout: "cwd=.",
+      });
+      const mismatchedCwdRelativeResult = await lease.runProcess({
+        operationId: "process-cwd-relative-mismatch",
+        executable: process.execPath,
+        args: [
+          { kind: "literal", value: "-e" },
+          { kind: "literal", value: "process.exit(99)" },
+          { kind: "directory", directory: created.value, relativeToCwd: true },
+        ],
+        cwd: repository,
+        timeoutMs: 10_000,
+      });
+      expect(mismatchedCwdRelativeResult).toMatchObject({
+        ok: false,
+        error: { reason_code: "invalid_path" },
+        receipt: { operation_id: "process-cwd-relative-mismatch", mutation: false },
+      });
+
       const asserted = await lease.assertCurrent(
         [repository, allocation, created.value],
         "assert-current"

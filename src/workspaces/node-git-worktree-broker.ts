@@ -747,11 +747,17 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
     options: BrokerOperationOptions,
     allowedNonzeroExitCodes: readonly number[] = []
   ): Promise<GitExecutionResult> {
-    // Relative repository paths resolve from the descriptor-backed cwd without
-    // leaking ephemeral procfs capability paths into Git worktree metadata.
+    // Git persists its resolved Git directory in linked-worktree metadata. Bind
+    // that directory as cwd so `.` is replacement-resistant without persisting
+    // an ephemeral procfs capability path.
     const boundaryArgs: WorkspaceBoundaryProcessArgument[] = [
-      { kind: "literal", value: "--git-dir=.git" },
-      { kind: "literal", value: "--work-tree=." },
+      {
+        kind: "directory",
+        directory: boundary.repositoryGit,
+        prefix: "--git-dir=",
+        relativeToCwd: true,
+      },
+      { kind: "directory", directory: boundary.repository, prefix: "--work-tree=" },
       ...args.map(boundaryArgument),
     ];
     const evidenceArgs = [
@@ -763,7 +769,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
       boundary,
       operation,
       boundaryArgs,
-      boundary.repository,
+      boundary.repositoryGit,
       options,
       allowedNonzeroExitCodes,
       { args: evidenceArgs, cwd: this.repositoryRoot }

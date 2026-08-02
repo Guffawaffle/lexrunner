@@ -378,6 +378,8 @@ export type WorkspaceBoundaryProcessArgument =
       readonly directory: WorkspaceBoundaryDirectoryCapability;
       readonly components?: readonly string[];
       readonly prefix?: string;
+      /** Render `.` only when this exact capability is also the process cwd. */
+      readonly relativeToCwd?: boolean;
       readonly suffix?: string;
     };
 
