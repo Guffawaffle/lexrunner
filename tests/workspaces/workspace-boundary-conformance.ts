@@ -91,13 +91,18 @@ export function workspaceBoundaryConformance(
       });
       expect(missing).toMatchObject({
         ok: false,
-        error: { code: "invalid_path", effect_state: "no_effect" },
+        error: {
+          code: "invalid_path",
+          effect_state: "no_effect",
+          message: "Boundary path does not exist",
+        },
         receipt: {
           operation_id: "read-missing-marker",
           operation: "read-owned-file",
           outcome: "rejected",
         },
       });
+      if (!missing.ok) expect(missing.error.message).not.toMatch(/ENOENT|\/proc\/\d+\/fd\/\d+/u);
 
       const processResult = await lease.runProcess({
         operationId: "process-path",

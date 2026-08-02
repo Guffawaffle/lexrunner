@@ -26,6 +26,7 @@ import {
   createWorkspaceBoundaryDirectoryIdentity,
   createWorkspaceBoundaryLeaseReceipt,
   createWorkspaceBoundaryOperationReceipt,
+  workspaceBoundaryLeaseBrand,
   type WorkspaceBoundary,
   type WorkspaceBoundaryAcquireRequest,
   type WorkspaceBoundaryDirectoryCapability,
@@ -123,7 +124,7 @@ export class LinuxWorkspaceBoundary implements WorkspaceBoundary {
           directories,
           runner: this.runner,
           clock: this.clock,
-        }) as unknown as WorkspaceBoundaryLease,
+        }),
       });
     } catch (error) {
       for (const directory of opened.reverse()) directory.close();
@@ -143,7 +144,8 @@ interface LinuxWorkspaceBoundaryLeaseOptions {
   readonly clock: () => Date;
 }
 
-class LinuxWorkspaceBoundaryLease {
+class LinuxWorkspaceBoundaryLease implements WorkspaceBoundaryLease {
+  readonly [workspaceBoundaryLeaseBrand] = true as const;
   readonly acquired: WorkspaceBoundaryLeaseReceipt_v1;
   private readonly roots: ReadonlyMap<string, LinuxDirectoryCapability>;
   private readonly runner: CommandRunner;
@@ -627,7 +629,15 @@ function knownNoEffect(error: unknown): boolean {
 }
 
 function boundedMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    isNodeError(error) && error.code === "ENOENT"
+      ? "Boundary path does not exist"
+      : isNodeError(error) && (error.code === "EACCES" || error.code === "EPERM")
+        ? "Boundary operation was denied by the host"
+        : (error instanceof Error ? error.message : String(error)).replace(
+            /\/proc\/\d+\/fd\/\d+/gu,
+            "<held-directory>"
+          );
   return message.length <= 4_096 ? message : message.slice(0, 4_096);
 }
 

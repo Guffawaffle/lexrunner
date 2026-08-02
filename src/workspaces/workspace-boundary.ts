@@ -362,7 +362,7 @@ export function createWorkspaceBoundaryOperationReceipt(
 }
 
 declare const directoryCapabilityBrand: unique symbol;
-declare const leaseCapabilityBrand: unique symbol;
+export const workspaceBoundaryLeaseBrand: unique symbol = Symbol("WorkspaceBoundaryLease");
 
 /** Live authority is intentionally opaque and is never reconstructed from a receipt or path. */
 export interface WorkspaceBoundaryDirectoryCapability {
@@ -420,7 +420,7 @@ export type WorkspaceBoundaryResult<T> =
     };
 
 export interface WorkspaceBoundaryLease {
-  readonly [leaseCapabilityBrand]: true;
+  readonly [workspaceBoundaryLeaseBrand]: true;
   readonly acquired: WorkspaceBoundaryLeaseReceipt_v1;
   root(role: string): WorkspaceBoundaryDirectoryCapability;
   openChild(
