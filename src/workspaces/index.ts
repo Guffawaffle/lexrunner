@@ -67,3 +67,29 @@ export type {
   WorkspaceMutationStep,
 } from "./workspace-coordinator.js";
 export { WorkspaceCoordinator } from "./workspace-coordinator.js";
+
+export {
+  WORKSPACE_BOUNDARY_CONTRACT_VERSION,
+  WorkspaceBoundaryBackendKind,
+  WorkspaceBoundaryCapabilityDecision_v1,
+  WorkspaceBoundaryDirectoryIdentity_v1,
+  WorkspaceBoundaryError_v1,
+  WorkspaceBoundaryLeaseReceipt_v1,
+  WorkspaceBoundaryOperationKind,
+  WorkspaceBoundaryOperationReceipt_v1,
+  WorkspaceBoundarySelectionRequest_v1,
+  createWorkspaceBoundaryCapabilityDecision,
+  createWorkspaceBoundaryDirectoryIdentity,
+  createWorkspaceBoundaryLeaseReceipt,
+  createWorkspaceBoundaryOperationReceipt,
+} from "./workspace-boundary.js";
+export type {
+  WorkspaceBoundary,
+  WorkspaceBoundaryAcquireRequest,
+  WorkspaceBoundaryDirectoryCapability,
+  WorkspaceBoundaryLease,
+  WorkspaceBoundaryProcessArgument,
+  WorkspaceBoundaryProcessRequest,
+  WorkspaceBoundaryResolver,
+  WorkspaceBoundaryResult,
+} from "./workspace-boundary.js";
