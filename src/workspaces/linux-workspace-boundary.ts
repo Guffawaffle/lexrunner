@@ -340,6 +340,7 @@ class LinuxWorkspaceBoundaryLease {
         this.renderArgument(argument, temporaryDirectories)
       );
       const asserted = [
+        ...this.roots.values(),
         request.cwd,
         ...request.args
           .filter(
