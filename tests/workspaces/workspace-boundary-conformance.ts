@@ -83,6 +83,21 @@ export function workspaceBoundaryConformance(
         maxBytes: 1_024,
       });
       expect(read.ok && Buffer.from(read.value).toString("utf8")).toBe('{"owned":true}\n');
+      const missing = await lease.readFile({
+        operationId: "read-missing-marker",
+        directory: git.value,
+        component: "missing-marker.json",
+        maxBytes: 1_024,
+      });
+      expect(missing).toMatchObject({
+        ok: false,
+        error: { code: "invalid_path", effect_state: "no_effect" },
+        receipt: {
+          operation_id: "read-missing-marker",
+          operation: "read-owned-file",
+          outcome: "rejected",
+        },
+      });
 
       const processResult = await lease.runProcess({
         operationId: "process-path",

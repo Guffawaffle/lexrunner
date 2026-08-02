@@ -595,6 +595,7 @@ function boundaryError(
   operationId: string,
   effectState: WorkspaceBoundaryError_v1["effect_state"]
 ): WorkspaceBoundaryError_v1 {
+  const nodeCode = isNodeError(error) ? error.code : undefined;
   const code =
     error instanceof DirectoryBoundaryError
       ? error.code === "identity_changed"
@@ -602,7 +603,11 @@ function boundaryError(
         : error.code === "unsupported_platform"
           ? "unsupported_filesystem"
           : "invalid_path"
-      : "operation_failed";
+      : nodeCode === "ENOENT"
+        ? "invalid_path"
+        : nodeCode === "EACCES" || nodeCode === "EPERM"
+          ? "sharing_violation"
+          : "operation_failed";
   return {
     schema_version: WORKSPACE_BOUNDARY_CONTRACT_VERSION,
     code,

@@ -863,7 +863,7 @@ export class NodeGitWorktreeBroker implements GitWorktreeBroker {
         maxBytes: MAX_ATTEMPT_MARKER_BYTES,
       });
       if (!read.ok) {
-        if (read.error.message.includes("ENOENT")) {
+        if (read.error.code === "invalid_path") {
           return { matches: false, reason: "worktree Attempt marker is missing" };
         }
         return {
