@@ -377,7 +377,25 @@ export type WorkspaceBoundaryProcessArgument =
       readonly kind: "directory";
       readonly directory: WorkspaceBoundaryDirectoryCapability;
       readonly components?: readonly string[];
+      readonly prefix?: string;
+      readonly suffix?: string;
     };
+
+export interface WorkspaceBoundaryReadFileRequest {
+  readonly operationId: string;
+  readonly directory: WorkspaceBoundaryDirectoryCapability;
+  readonly component: string;
+  readonly maxBytes: number;
+}
+
+export interface WorkspaceBoundaryWriteFileRequest {
+  readonly operationId: string;
+  readonly directory: WorkspaceBoundaryDirectoryCapability;
+  readonly component: string;
+  readonly content: Uint8Array;
+  readonly mode?: number;
+  readonly exclusive?: boolean;
+}
 
 export interface WorkspaceBoundaryProcessRequest {
   readonly operationId: string;
@@ -393,16 +411,26 @@ export interface WorkspaceBoundaryProcessRequest {
 
 export type WorkspaceBoundaryResult<T> =
   | { readonly ok: true; readonly value: T; readonly receipt: WorkspaceBoundaryOperationReceipt_v1 }
-  | { readonly ok: false; readonly error: WorkspaceBoundaryError_v1 };
+  | {
+      readonly ok: false;
+      readonly error: WorkspaceBoundaryError_v1;
+      readonly receipt: WorkspaceBoundaryOperationReceipt_v1;
+    };
 
 export interface WorkspaceBoundaryLease {
   readonly [leaseCapabilityBrand]: true;
   readonly acquired: WorkspaceBoundaryLeaseReceipt_v1;
+  root(role: string): WorkspaceBoundaryDirectoryCapability;
   openChild(
     parent: WorkspaceBoundaryDirectoryCapability,
     component: string,
     operationId: string
   ): Promise<WorkspaceBoundaryResult<WorkspaceBoundaryDirectoryCapability>>;
+  tryOpenChild(
+    parent: WorkspaceBoundaryDirectoryCapability,
+    component: string,
+    operationId: string
+  ): Promise<WorkspaceBoundaryResult<WorkspaceBoundaryDirectoryCapability | null>>;
   createChild(
     parent: WorkspaceBoundaryDirectoryCapability,
     component: string,
@@ -412,6 +440,8 @@ export interface WorkspaceBoundaryLease {
     directories: readonly WorkspaceBoundaryDirectoryCapability[],
     operationId: string
   ): Promise<WorkspaceBoundaryResult<readonly WorkspaceBoundaryDirectoryIdentity_v1[]>>;
+  readFile(request: WorkspaceBoundaryReadFileRequest): Promise<WorkspaceBoundaryResult<Uint8Array>>;
+  writeFile(request: WorkspaceBoundaryWriteFileRequest): Promise<WorkspaceBoundaryResult<void>>;
   runProcess(
     request: WorkspaceBoundaryProcessRequest
   ): Promise<WorkspaceBoundaryResult<CommandResult>>;

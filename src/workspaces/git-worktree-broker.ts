@@ -11,6 +11,14 @@ export interface WorktreeTarget extends WorkspaceIdentity {
 export interface BrokerOperationOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
+  boundaryAuthority?: BrokerBoundaryAuthority;
+}
+
+export interface BrokerBoundaryAuthority {
+  operationId: string;
+  orchestrationLeaseId: string;
+  orchestrationLeaseRevision: number;
+  ownerId: string;
 }
 
 export type BrokerOperation = "create" | "observe" | "remove";

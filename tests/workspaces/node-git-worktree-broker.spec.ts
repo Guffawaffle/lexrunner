@@ -49,6 +49,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       hostId: HOST_ID,
       gitRuntime: GIT_RUNTIME,
       pathComparison: "case-sensitive",
+      testOnlyAllowUnboundBoundaryAuthority: true,
     });
   });
 
@@ -118,6 +119,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       gitRuntime: GIT_RUNTIME,
       pathComparison: "case-sensitive",
       runner: { run },
+      testOnlyAllowUnboundBoundaryAuthority: true,
     });
     const target = makeTarget("wrong-root", { projectRoot: join(sandbox, "other repository") });
 
@@ -149,6 +151,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
           hostId: HOST_ID,
           gitRuntime: GIT_RUNTIME,
           pathComparison: "case-sensitive",
+          testOnlyAllowUnboundBoundaryAuthority: true,
         })
     ).toThrow(/must not overlap/);
   });
@@ -163,6 +166,28 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
 
     expect(invalidSha).toMatchObject({ ok: false, reason: "invalid_base_sha" });
     expect(invalidBranch).toMatchObject({ ok: false, reason: "invalid_branch" });
+  });
+
+  it("requires coordinator authority lineage outside explicit test fixtures", async () => {
+    const run = vi.fn(async () => {
+      throw new Error("Git must not run without boundary authority lineage");
+    });
+    const guarded = new NodeGitWorktreeBroker({
+      repositoryId: REPOSITORY_ID,
+      repositoryRoot,
+      worktreeRoot,
+      hostId: HOST_ID,
+      gitRuntime: GIT_RUNTIME,
+      pathComparison: "case-sensitive",
+      runner: { run },
+    });
+
+    await expect(guarded.create(makeTarget("missing-authority"))).resolves.toMatchObject({
+      ok: false,
+      reason: "containment_violation",
+      message: "Workspace boundary authority lineage is required",
+    });
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("reports existing branch and occupied path conflicts without changing either", async () => {
@@ -412,6 +437,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
           hostId: HOST_ID,
           gitRuntime: GIT_RUNTIME,
           pathComparison: "case-sensitive",
+          testOnlyAllowUnboundBoundaryAuthority: true,
         })
     ).toThrow(/symlink-free/);
     expect(
@@ -423,6 +449,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
           hostId: HOST_ID,
           gitRuntime: GIT_RUNTIME,
           pathComparison: "case-insensitive",
+          testOnlyAllowUnboundBoundaryAuthority: true,
         })
     ).toThrow(/case-sensitive Linux Git runtime/);
   });
@@ -440,6 +467,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
           hostId: HOST_ID,
           gitRuntime: GIT_RUNTIME,
           pathComparison: "case-sensitive",
+          testOnlyAllowUnboundBoundaryAuthority: true,
         })
     ).toThrow(/symlink-free directory/);
   });
@@ -707,6 +735,7 @@ describe("NodeGitWorktreeBroker real Git integration", () => {
       gitRuntime: GIT_RUNTIME,
       pathComparison: "case-sensitive",
       runner,
+      testOnlyAllowUnboundBoundaryAuthority: true,
     });
   }
 });

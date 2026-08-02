@@ -161,6 +161,7 @@ function makeBroker(runner: CommandRunner): NodeGitWorktreeBroker {
     gitRuntime: "git-test",
     pathComparison: "case-sensitive",
     runner,
+    testOnlyAllowUnboundBoundaryAuthority: true,
   });
 }
 

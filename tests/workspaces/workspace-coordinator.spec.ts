@@ -33,8 +33,14 @@ describe("WorkspaceCoordinator", () => {
       ports.durable.lease = lease(0, "reserved");
       return success(ports.durable.attempt, ports.durable.lease, "workspace_acquired", "reserve");
     });
-    ports.broker.create.mockImplementation(async () => {
+    ports.broker.create.mockImplementation(async (_target, options) => {
       sequence.push("create");
+      expect(options?.boundaryAuthority).toEqual({
+        operationId: "allocate-reserve",
+        orchestrationLeaseId: "workspace-1",
+        orchestrationLeaseRevision: 0,
+        ownerId: "controller-1",
+      });
       return { ok: true, outcome: "created", observation: observation() };
     });
     ports.store.heartbeatWorkspace.mockImplementation(async (input) => {

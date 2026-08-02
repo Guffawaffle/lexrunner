@@ -54,6 +54,8 @@ export type AgentWorkContainmentCapabilityState =
 
 export type AgentWorkContainmentReasonCode =
   | "native_linux_ready"
+  | "windows_native_boundary_unavailable"
+  /** Legacy v1 reason retained for persisted result compatibility. */
   | "windows_requires_native_wsl_broker"
   | "macos_unsupported"
   | "unsupported_platform"
@@ -74,6 +76,7 @@ export type AgentWorkContainmentReasonCode =
 
 export type AgentWorkContainmentNextAction =
   | "construct_attempt_packet"
+  | "install_native_windows_boundary"
   | "provision_native_wsl_projection"
   | "select_native_case_sensitive_linux_runtime"
   | "correct_declared_paths"
@@ -193,7 +196,7 @@ export class AgentWorkContainmentCapabilityService {
     }
 
     if (!support.supported) {
-      const brokerRequired = support.reasonCode === "windows_requires_native_wsl_broker";
+      const brokerRequired = support.reasonCode === "windows_native_boundary_unavailable";
       return capabilityResult({
         bindingDigest,
         support,
@@ -201,7 +204,7 @@ export class AgentWorkContainmentCapabilityService {
         state: brokerRequired ? "broker_required" : "unsupported",
         reasonCode: support.reasonCode,
         nextActions: brokerRequired
-          ? ["provision_native_wsl_projection", "rerun_containment_preflight"]
+          ? ["install_native_windows_boundary", "rerun_containment_preflight"]
           : ["select_native_case_sensitive_linux_runtime", "rerun_containment_preflight"],
       });
     }
@@ -232,6 +235,7 @@ export class AgentWorkContainmentCapabilityService {
         state: "broker_required",
         reasonCode: wslReason,
         nextActions: ["provision_native_wsl_projection", "rerun_containment_preflight"],
+        projectionRequired: true,
       });
     }
 
@@ -281,6 +285,7 @@ function capabilityResult(input: {
   state: Exclude<AgentWorkContainmentCapabilityState, "native_ready">;
   reasonCode: Exclude<AgentWorkContainmentReasonCode, "native_linux_ready">;
   nextActions: AgentWorkContainmentNextAction[];
+  projectionRequired?: boolean;
 }): AgentWorkContainmentPreflightResult {
   return {
     schemaVersion: "1.0.0",
@@ -289,7 +294,7 @@ function capabilityResult(input: {
     state: input.state,
     reasonCode: input.reasonCode,
     physicalContainmentAvailable: false,
-    projectionRequired: input.state === "broker_required",
+    projectionRequired: input.projectionRequired ?? false,
     runtime: {
       platform: publicPlatform(input.support.platform),
       pathComparison: input.support.pathComparison,
@@ -347,6 +352,7 @@ function firstPathFailure(
   | Exclude<
       AgentWorkContainmentReasonCode,
       | "native_linux_ready"
+      | "windows_native_boundary_unavailable"
       | "windows_requires_native_wsl_broker"
       | "macos_unsupported"
       | "unsupported_platform"
