@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - **Native-host workspace boundary** - Add the versioned `WorkspaceBoundary` contract, production
   Linux backend, runtime resolver, lease-bound authority lineage, and shared hostile-race
-  conformance coverage that preserve the existing Linux containment guarantee while defining the
+  conformance coverage that preserves the existing Linux containment guarantee while defining the
   fail-closed path to a native Windows backend.
 
 ### Changed
