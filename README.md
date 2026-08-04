@@ -111,11 +111,12 @@ The checked-in package version is the single source for `lex-pr --version`.
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **1.3.0**. npm availability and dist-tags are separate
+Current repository package version: **1.4.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [1.3.0 release notes](docs/releases/1.3.0.md), the
+See the [1.4.0 release notes](docs/releases/1.4.0.md), the
+[1.3.0 dogfood release](docs/releases/1.3.0.md), the
 [1.2.1 publication repair](docs/releases/1.2.1.md), and the underlying
 [1.2.0 compatibility decision](docs/releases/1.2.0.md) for package disposition, semver rationale,
 supported assisted behavior, and deferred guarantees.

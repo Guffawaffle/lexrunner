@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-04
+
+### Added
+
+- **Native-host workspace boundary** - Add the versioned `WorkspaceBoundary` contract, production
+  Linux backend, runtime resolver, lease-bound authority lineage, and shared hostile-race
+  conformance coverage that preserve the existing Linux containment guarantee while defining the
+  fail-closed path to a native Windows backend.
+
 ### Changed
 
 - **Lex 4 compatibility** - Upgrade `@smartergpt/lex` to the audited 4.x line while preserving all
@@ -19,7 +28,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   portable regressions in Windows CI without claiming runtime parity through skipped tests.
 - **Cross-platform patch application** - Apply unified diffs through argument-safe `git apply`
   instead of requiring a separately installed GNU `patch` executable.
-- **Dependency audit** - Remove the high-severity Sharp/libvips advisory path by adopting Lex 4.
+- **Boundary integrity** - Canonicalize receipt identity sets, preserve path-private diagnostics,
+  bind observations to live leases, and route Linux Git operations through boundary capabilities.
+- **Plan validation stability** - Bound CLI validation subprocesses and retain actionable timeout
+  diagnostics under hosted-runner load.
+- **Dependency audit** - Remove all currently reported production and development advisories,
+  including the Sharp/libvips path and newly disclosed URI, address, middleware, PostCSS, and brace
+  expansion findings.
 
 ## [1.3.0] - 2026-07-30
 
