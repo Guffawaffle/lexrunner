@@ -33,9 +33,9 @@ describe("CLI UX Enhancements E2E", () => {
       });
 
       expect(output).toContain("Examples:");
-      expect(output).toContain("$ lex-pr execute plan.json");
-      expect(output).toContain("$ lex-pr execute --dry-run");
-      expect(output).toContain("$ lex-pr execute --json > results.json");
+      expect(output).toContain("$ lexrunner execute plan.json");
+      expect(output).toContain("$ lexrunner execute --dry-run");
+      expect(output).toContain("$ lexrunner execute --json > results.json");
       expect(output).toContain("Common Issues:");
       expect(output).toContain("Gates timing out");
     });
@@ -58,8 +58,8 @@ describe("CLI UX Enhancements E2E", () => {
       });
 
       expect(output).toContain("Examples:");
-      expect(output).toContain("$ lex-pr discover --suggest");
-      expect(output).toContain("$ lex-pr discover --json > prs.json");
+      expect(output).toContain("$ lexrunner discover --suggest");
+      expect(output).toContain("$ lexrunner discover --json > prs.json");
       expect(output).toContain("Common Issues:");
       expect(output).toContain("Could not detect repository");
     });
@@ -70,8 +70,8 @@ describe("CLI UX Enhancements E2E", () => {
       });
 
       expect(output).toContain("Examples:");
-      expect(output).toContain("$ lex-pr plan --from-github --json > plan.json");
-      expect(output).toContain("$ lex-pr plan --dry-run");
+      expect(output).toContain("$ lexrunner plan --from-github --json > plan.json");
+      expect(output).toContain("$ lexrunner plan --dry-run");
       expect(output).toContain("Common Issues:");
       expect(output).toContain("GitHub API errors");
     });
@@ -82,8 +82,8 @@ describe("CLI UX Enhancements E2E", () => {
       });
 
       expect(output).toContain("Examples:");
-      expect(output).toContain("$ lex-pr status plan.json");
-      expect(output).toContain("$ lex-pr status --json");
+      expect(output).toContain("$ lexrunner status plan.json");
+      expect(output).toContain("$ lexrunner status --json");
       expect(output).toContain("Common Issues:");
       expect(output).toContain("Plan file not found");
     });

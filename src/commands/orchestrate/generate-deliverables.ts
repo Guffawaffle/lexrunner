@@ -22,7 +22,7 @@ export function registerGenerateDeliverablesCommand(program: Command): void {
         if (!options.batch) {
           console.error("❌ Error: --batch is required");
           console.error(
-            "Example: lex-pr orchestrate:generate-deliverables --batch batch3 --plan plan.json"
+            "Example: lexrunner orchestrate:generate-deliverables --batch batch3 --plan plan.json"
           );
           process.exit(1);
         }
