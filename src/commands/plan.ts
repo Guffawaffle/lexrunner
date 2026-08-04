@@ -295,11 +295,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
       }
     } catch (error) {
       if (error instanceof CycleError) {
-        const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
+        const prefix = deps.jsonModeActive() ? "[lexrunner]" : "❌";
         console.error(`\n${prefix} Plan validation failed: ${error.message}`);
         throwExit(1);
       } else if (error instanceof UnknownDependencyError) {
-        const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
+        const prefix = deps.jsonModeActive() ? "[lexrunner]" : "❌";
         console.error(`\n${prefix} Plan validation failed: ${error.message}`);
         throwExit(1);
       }

@@ -125,13 +125,13 @@ export function readGovernanceLogs(): GovernanceComparisonLog[] {
         const [major] = rawLog.schemaVersion.split(".").map(Number);
         if (major > CURRENT_MAJOR_VERSION) {
           console.warn(
-            `[lex-pr] Skipping log ${file}: schema v${rawLog.schemaVersion} not supported (current: v${CURRENT_MAJOR_VERSION}.x.x)`
+            `[lexrunner] Skipping log ${file}: schema v${rawLog.schemaVersion} not supported (current: v${CURRENT_MAJOR_VERSION}.x.x)`
           );
           continue;
         }
       } else {
         // Legacy logs without schemaVersion (treat as v0.x.x)
-        console.warn(`[lex-pr] Skipping log ${file}: missing schemaVersion (legacy format)`);
+        console.warn(`[lexrunner] Skipping log ${file}: missing schemaVersion (legacy format)`);
         continue;
       }
 
@@ -139,7 +139,7 @@ export function readGovernanceLogs(): GovernanceComparisonLog[] {
       logs.push(parsed);
     } catch (error) {
       // Skip invalid logs
-      console.warn(`[lex-pr] Skipping invalid log ${file}:`, error);
+      console.warn(`[lexrunner] Skipping invalid log ${file}:`, error);
     }
   }
 
@@ -189,7 +189,7 @@ export function readGovernanceLogsWithLegacy(): LegacyLogResult[] {
         const [major] = rawLog.schemaVersion.split(".").map(Number);
         if (major > CURRENT_MAJOR_VERSION) {
           console.warn(
-            `[lex-pr] Skipping log ${file}: schema v${rawLog.schemaVersion} not supported (current: v${CURRENT_MAJOR_VERSION}.x.x)`
+            `[lexrunner] Skipping log ${file}: schema v${rawLog.schemaVersion} not supported (current: v${CURRENT_MAJOR_VERSION}.x.x)`
           );
           continue;
         }
@@ -241,7 +241,7 @@ export function readGovernanceLogsWithLegacy(): LegacyLogResult[] {
       });
     } catch (error) {
       // Skip invalid logs (even with normalization)
-      console.warn(`[lex-pr] Skipping invalid log ${file} (even with normalization):`, error);
+      console.warn(`[lexrunner] Skipping invalid log ${file} (even with normalization):`, error);
     }
   }
 

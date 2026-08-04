@@ -169,7 +169,7 @@ Unconditionally disables ANSI escape codes in output, regardless of TTY detectio
 **Example:**
 
 ```bash
-lex-pr --no-color config:inspect
+lexrunner --no-color config:inspect
 ```
 
 #### `--json`
@@ -179,7 +179,7 @@ Enables JSON output mode and automatically disables colors. This flag:
 - Forces JSON output to stdout for supported commands
 - Disables ANSI color codes (implies `--no-color`)
 - Suppresses human-friendly decorations (emojis, tips, progress indicators)
-- Uses plain text prefixes in error messages (e.g., `[lex-pr]` instead of ❌)
+- Uses plain text prefixes in error messages (e.g., `[lexrunner]` instead of ❌)
 
 **Use cases:**
 
@@ -190,7 +190,7 @@ Enables JSON output mode and automatically disables colors. This flag:
 **Example:**
 
 ```bash
-lex-pr --json plan > plan.json
+lexrunner --json plan > plan.json
 ```
 
 **Note:** The `--json` flag can be used either globally or at the command level:

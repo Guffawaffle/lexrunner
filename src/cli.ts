@@ -138,7 +138,7 @@ async function finalizeAuditGuard(emitter: AuditEmitter, status?: string): Promi
     if (e instanceof Error && typeof e.message === "string" && e.message.startsWith("HIPAA:")) {
       throw e; // let top-level handler map to exit code 2
     }
-    console.warn("[lex-pr] audit: finalize failed (ignored)", String(e));
+    console.warn("[lexrunner] audit: finalize failed (ignored)", String(e));
   }
 }
 
@@ -167,7 +167,7 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
     e instanceof WriteProtectionError ||
     e instanceof AutopilotConfigError
   ) {
-    const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+    const prefix = jsonModeActive ? "[lexrunner]" : "❌";
     if (e instanceof SchemaValidationError && !jsonModeActive) {
       console.error(
         `\n${prefix} Error:\n${formatPlanValidationFailureText(formatPlanValidationFailure(e))}\n`
@@ -198,12 +198,12 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   }
   // HIPAA fail-closed errors are surfaced as Error messages prefixed with 'HIPAA:'
   if (e instanceof Error && typeof e.message === "string" && e.message.startsWith("HIPAA:")) {
-    const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+    const prefix = jsonModeActive ? "[lexrunner]" : "❌";
     console.error(`\n${prefix} ${e.message.replace(/^HIPAA:\s*/, "")}\n`);
     process.exitCode = 2;
     throwExit(2);
   }
-  const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+  const prefix = jsonModeActive ? "[lexrunner]" : "❌";
   console.error(`\n${prefix} Unexpected error: ${String(err?.message ?? e)}\n`);
   if (!jsonModeActive) {
     console.error("💡 Tip: Run 'lexrunner doctor' to check your environment\n");
@@ -1200,7 +1200,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    const prefix = jsonModeActive ? "[lex-pr]" : "❌";
+    const prefix = jsonModeActive ? "[lexrunner]" : "❌";
     process.stderr.write(`${prefix} ${message}\n`);
     process.exitCode = 1;
   }
@@ -1246,7 +1246,7 @@ if (isDirectExec) {
 
   void main().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[lex-pr] fatal: ${message}\n`);
+    process.stderr.write(`[lexrunner] fatal: ${message}\n`);
     process.exitCode = process.exitCode ?? 1;
   });
 }

@@ -55,7 +55,7 @@ async function finalizeAuditGuard(emitter: AuditEmitter, status?: string): Promi
     if (e instanceof Error && typeof e.message === "string" && e.message.startsWith("HIPAA:")) {
       throw e; // let top-level handler map to exit code 2
     }
-    console.warn("[lex-pr] audit: finalize failed (ignored)", String(e));
+    console.warn("[lexrunner] audit: finalize failed (ignored)", String(e));
   }
 }
 
@@ -388,7 +388,7 @@ Common Issues:
                 // Surface HIPAA failures as fatal
                 deps.exitWith(e as Error);
               }
-              console.warn("[lex-pr] audit: finalize on dry-run failed (ignored)", String(e));
+              console.warn("[lexrunner] audit: finalize on dry-run failed (ignored)", String(e));
             }
           }
 

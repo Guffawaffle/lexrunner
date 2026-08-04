@@ -15,8 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
-- **Consistent CLI identity** - Use `lexrunner` in root help, completions, installation guidance,
-  current release documentation, and generated CLI/MCP surface guidance.
+- **Consistent CLI identity** - Use `lexrunner` in root help, completions, diagnostic prefixes,
+  installation guidance, current release documentation, and generated CLI/MCP surface guidance.
 
 ### Fixed
 

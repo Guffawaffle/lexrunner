@@ -54,14 +54,14 @@ describe("CLI alias policy", () => {
 
   it("gives deprecated aliases stable replacement and removal guidance", () => {
     expect(aliasWarning("status")).toBe(
-      '[lex-pr] deprecated alias "status"; use "weave status"; removal: 2.0.0.'
+      '[lexrunner] deprecated alias "status"; use "weave status"; removal: 2.0.0.'
     );
     expect(aliasWarning("weave status")).toBeNull();
   });
 
   it("keeps merge as a tested compatibility alias for weave apply", () => {
     expect(aliasWarning("merge")).toBe(
-      '[lex-pr] compatibility alias "merge"; use "weave apply"; supported through 1.x and reviewed at 2.0.0.'
+      '[lexrunner] compatibility alias "merge"; use "weave apply"; supported through 1.x and reviewed at 2.0.0.'
     );
   });
 });
