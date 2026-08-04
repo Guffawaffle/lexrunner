@@ -11,7 +11,7 @@ export function registerGenerateDeliverablesCommand(program: Command): void {
   program
     .command("orchestrate:generate-deliverables")
     .description(
-      "Generate merge-weave deliverables with plan hash and toolchain manifest (canonical: lex-pr weave report)"
+      "Generate merge-weave deliverables with plan hash and toolchain manifest (canonical: lexrunner weave report)"
     )
     .option("--batch <batchId>", "Batch identifier (e.g., batch3)")
     .option("--plan <path>", "Path to plan.json file", "plan.json")
@@ -22,7 +22,7 @@ export function registerGenerateDeliverablesCommand(program: Command): void {
         if (!options.batch) {
           console.error("❌ Error: --batch is required");
           console.error(
-            "Example: lex-pr orchestrate:generate-deliverables --batch batch3 --plan plan.json"
+            "Example: lexrunner orchestrate:generate-deliverables --batch batch3 --plan plan.json"
           );
           process.exit(1);
         }

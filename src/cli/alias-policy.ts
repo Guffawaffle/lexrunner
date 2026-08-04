@@ -110,8 +110,8 @@ export function aliasWarning(path: string): string | null {
   const policy = POLICY_BY_PATH.get(path);
   if (!policy) return null;
   return policy.disposition === "deprecated"
-    ? `[lex-pr] deprecated alias "${path}"; use "${policy.replacement}"; removal: ${policy.removeIn}.`
-    : `[lex-pr] compatibility alias "${path}"; use "${policy.replacement}"; supported through 1.x and reviewed at 2.0.0.`;
+    ? `[lexrunner] deprecated alias "${path}"; use "${policy.replacement}"; removal: ${policy.removeIn}.`
+    : `[lexrunner] compatibility alias "${path}"; use "${policy.replacement}"; supported through 1.x and reviewed at 2.0.0.`;
 }
 
 export function emitAliasWarning(

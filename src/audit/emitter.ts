@@ -118,7 +118,7 @@ export class AuditEmitter {
           this.context = auditContext as Context;
         } catch (err) {
           // Context collection failed, log warning and continue with empty context
-          console.warn("[lex-pr] audit: context collection failed", err);
+          console.warn("[lexrunner] audit: context collection failed", err);
           this.context = {};
         }
       } else {
@@ -149,7 +149,7 @@ export class AuditEmitter {
     this.ndjsonStream = fs.createWriteStream(this.ndjsonPath, { flags: "a", autoClose: true });
     // Guard against stream errors (e.g., directory removed concurrently in tests)
     this.ndjsonStream.on("error", (err) => {
-      console.warn("[lex-pr] audit: ndjson stream error (ignored)", String(err));
+      console.warn("[lexrunner] audit: ndjson stream error (ignored)", String(err));
     });
 
     // Write schema file
@@ -259,7 +259,7 @@ export class AuditEmitter {
         this.ndjsonStream.write(line);
       }
     } catch (e) {
-      console.warn("[lex-pr] audit: ndjson write failed (ignored)", String(e));
+      console.warn("[lexrunner] audit: ndjson write failed (ignored)", String(e));
     }
 
     // Track event
@@ -290,7 +290,7 @@ export class AuditEmitter {
         await this.ingestSidecar();
       } catch (e) {
         // Don't let sidecar ingestion errors bubble and kill the test runner
-        console.warn("[lex-pr] audit: sidecar ingestion error (ignored)", String(e));
+        console.warn("[lexrunner] audit: sidecar ingestion error (ignored)", String(e));
       }
     }, 5000); // Every 5 seconds
 
@@ -340,12 +340,15 @@ export class AuditEmitter {
             this.eventsByType[event.event] = (this.eventsByType[event.event] || 0) + 1;
           }
         } catch (innerErr) {
-          console.warn("[lex-pr] audit: error ingesting sidecar event (ignored)", String(innerErr));
+          console.warn(
+            "[lexrunner] audit: error ingesting sidecar event (ignored)",
+            String(innerErr)
+          );
         }
       });
     } catch (err) {
       // If dropDir doesn't exist or files raced away, ignore the ingestion error
-      console.warn("[lex-pr] audit: ingestSidecarFiles failed (ignored)", String(err));
+      console.warn("[lexrunner] audit: ingestSidecarFiles failed (ignored)", String(err));
     }
   }
 
@@ -557,11 +560,11 @@ export class AuditEmitter {
           }
         } catch (parseError) {
           // Skip malformed lines
-          console.warn("[lex-pr] audit: skipping malformed line in audit.ndjson");
+          console.warn("[lexrunner] audit: skipping malformed line in audit.ndjson");
         }
       }
     } catch (e) {
-      console.warn("[lex-pr] audit: failed to read audit.ndjson (ignored)", String(e));
+      console.warn("[lexrunner] audit: failed to read audit.ndjson (ignored)", String(e));
       return;
     }
 
@@ -614,11 +617,11 @@ export class AuditEmitter {
           }
         } catch (parseError) {
           // Skip malformed lines
-          console.warn("[lex-pr] audit: skipping malformed line in audit.ndjson");
+          console.warn("[lexrunner] audit: skipping malformed line in audit.ndjson");
         }
       }
     } catch (e) {
-      console.warn("[lex-pr] audit: failed to read audit.ndjson for SARIF (ignored)", String(e));
+      console.warn("[lexrunner] audit: failed to read audit.ndjson for SARIF (ignored)", String(e));
       return;
     }
 

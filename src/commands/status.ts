@@ -18,7 +18,7 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
   program
     .command("status")
     .description(
-      "Show current execution status and merge eligibility (canonical: lex-pr weave status)"
+      "Show current execution status and merge eligibility (canonical: lexrunner weave status)"
     )
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .argument("[file]", "Path to plan.json file (alternative to --plan)")
@@ -27,13 +27,13 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
       "after",
       `
 Examples:
-  $ lex-pr status plan.json                     # Show plan status
-  $ lex-pr status --json                        # JSON output for dashboards
-  $ lex-pr status --json | jq '.mergeSummary'   # Extract merge summary
+  $ lexrunner status plan.json                     # Show plan status
+  $ lexrunner status --json                        # JSON output for dashboards
+  $ lexrunner status --json | jq '.mergeSummary'   # Extract merge summary
 
 Common Issues:
   • "Plan file not found": Verify path to plan.json
-  • Missing execution state: Run 'lex-pr execute' first to populate status`
+  • Missing execution state: Run 'lexrunner execute' first to populate status`
     )
     .action((file: string | undefined, opts) => {
       const planFile = opts.plan || file || "plan.json";

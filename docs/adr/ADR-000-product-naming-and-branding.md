@@ -1,7 +1,7 @@
 # ADR-000: Product Naming and Branding (LexRunner + Lex)
 
 **Date:** November 6, 2025
-**Status:** Accepted
+**Status:** Accepted; amended August 4, 2026
 **Author:** Go-to-Market Initiative
 
 ---
@@ -28,9 +28,14 @@ The current naming conflates both, making it unclear which product is which and 
 
 ### CLI Name
 
-- **CLI binary/command:** `lex-pr` remains unchanged (backward compatible).
-- **Tagline:** `lex-pr` (powered by LexRunner).
+- **Canonical CLI binary/command:** `lexrunner`.
+- **Compatibility alias:** `lex-pr` invokes the same CLI and remains supported throughout 1.x.
+- **Tagline:** `lexrunner` (powered by LexRunner).
 - **Package name (npm, future):** `@guffawaffle/lexrunner` (for the LexRunner product).
+
+The August 2026 amendment makes the package, product, and primary executable names consistent
+without removing the original executable. It supersedes only the earlier decision that `lex-pr`
+must remain the canonical spelling; the backward-compatibility requirement remains in force.
 
 ### Repository Names
 
@@ -51,7 +56,8 @@ The current naming conflates both, making it unclear which product is which and 
 2. **Portability:** Lex can be adopted independently; LexRunner is built on top of Lex.
 3. **Legal/Licensing:** Clear separation eases compliance and customer communication.
 4. **Brand Consistency:** "LexRunner" projects a premium, purpose-built identity; "Lex" projects open-source accessibility.
-5. **Backward Compatibility:** CLI name (`lex-pr`) does not change; existing scripts continue to work.
+5. **Backward Compatibility:** Existing `lex-pr` scripts continue to work through the additive
+   alias while new documentation uses `lexrunner`.
 
 ---
 
@@ -94,7 +100,9 @@ The current naming conflates both, making it unclear which product is which and 
 
 ## Alternatives Considered
 
-1. **Rename the CLI to `lexrunner-pr`:** Rejected; breaks backward compatibility and adds verbosity.
+1. **Replace `lex-pr` with `lexrunner-pr`:** Rejected; removing the existing binary would break
+   backward compatibility and the longer name adds verbosity. The later additive `lexrunner`
+   alias avoids both problems.
 2. **Rename repos to `lexrunner` and `lex-core`:** Rejected; GitHub repos stable; branding works via docs.
 3. **Merge Lex into lexrunner:** Rejected; compromises MIT license and OSS adoption story.
 

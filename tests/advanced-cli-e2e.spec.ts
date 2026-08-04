@@ -116,7 +116,7 @@ describe("Advanced CLI Features E2E", () => {
         encoding: "utf8",
       });
 
-      expect(output).toContain("_lex_pr_completions");
+      expect(output).toContain("_lexrunner_completions");
       expect(output).toContain("COMPREPLY");
       expect(output).toContain("complete -F");
     });
@@ -126,7 +126,7 @@ describe("Advanced CLI Features E2E", () => {
         encoding: "utf8",
       });
 
-      expect(output).toContain("#compdef lex-pr");
+      expect(output).toContain("#compdef lexrunner");
       expect(output).toContain("_arguments");
     });
 
@@ -137,7 +137,7 @@ describe("Advanced CLI Features E2E", () => {
 
       expect(output).toContain("bash completion");
       expect(output).toContain("~/.bashrc");
-      expect(output).toContain('eval "$(lex-pr completion bash)"');
+      expect(output).toContain('eval "$(lexrunner completion bash)"');
     });
   });
 
@@ -201,10 +201,10 @@ describe("Advanced CLI Features E2E", () => {
       const output = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
 
       expect(output).toContain("Power User Commands");
-      expect(output).toContain("lex-pr view");
-      expect(output).toContain("lex-pr query");
-      expect(output).toContain("lex-pr retry");
-      expect(output).toContain("lex-pr completion");
+      expect(output).toContain("lexrunner view");
+      expect(output).toContain("lexrunner query");
+      expect(output).toContain("lexrunner retry");
+      expect(output).toContain("lexrunner completion");
     });
 
     it("should list all commands including new ones", () => {

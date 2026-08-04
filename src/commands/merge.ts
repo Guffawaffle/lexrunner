@@ -33,13 +33,13 @@ export function registerMergeCommand(
       `
 Compatibility:
   "merge" is supported through the LexRunner 1.x line and reviewed at 2.0.0.
-  Use "lex-pr weave apply" for new automation.
+  Use "lexrunner weave apply" for new automation.
 
 Examples:
-  $ lex-pr merge --plan plan.json
-  $ lex-pr merge --plan plan.json --execute
-  $ lex-pr weave apply --plan plan.json --dry-run
-  $ lex-pr weave apply --plan plan.json --execute
+  $ lexrunner merge --plan plan.json
+  $ lexrunner merge --plan plan.json --execute
+  $ lexrunner weave apply --plan plan.json --dry-run
+  $ lexrunner weave apply --plan plan.json --execute
 `
     )
     .action(async (opts: WeaveApplyOptions) => {

@@ -97,7 +97,7 @@ export function registerAssignBatchCommand(program: Command): void {
   const assignBatch = program
     .command("orchestrate:assign-batch")
     .description(
-      "Bulk-assign GitHub Copilot agents to batched issues [DEPRECATED: Use 'lex-pr fanout assign']"
+      "Bulk-assign GitHub Copilot agents to batched issues [DEPRECATED: Use 'lexrunner fanout assign']"
     )
     .option("--batch <file>", "Batch plan JSON file")
     .option("--issues <numbers>", "Comma-separated issue numbers (e.g., 156,157,160)")

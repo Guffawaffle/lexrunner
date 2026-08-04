@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-04
+
+### Added
+
+- **Canonical CLI executable** - Publish `lexrunner` as the primary npm binary alongside
+  `lexrunner-mcp` and the retained `lex-pr` compatibility alias.
+
+### Changed
+
+- **Consistent CLI identity** - Use `lexrunner` in root and subcommand help, completions, diagnostic
+  prefixes, installation guidance, current release documentation, and generated CLI/MCP surface
+  guidance.
+
+### Fixed
+
+- **Package/executable mismatch** - Ensure installing `@smartergpt/lexrunner` exposes an executable
+  matching the package and product name without breaking existing `lex-pr` automation.
+
 ## [1.4.0] - 2026-08-04
 
 ### Added

@@ -160,9 +160,9 @@ items:
 
       const stderr = result.stderr;
 
-      // Should use plain prefix [lex-pr] instead of emoji (only if error occurs)
+      // Should use plain prefix [lexrunner] instead of emoji (only if error occurs)
       if (stderr && stderr.trim()) {
-        expect(stderr).toMatch(/\[lex-pr\]/);
+        expect(stderr).toMatch(/\[lexrunner\]/);
         // Should not contain emoji
         expect(stderr).not.toMatch(/[❌✓💡]/);
       }

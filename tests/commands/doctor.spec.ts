@@ -21,7 +21,7 @@ describe("Doctor Command", () => {
     expect(doctorCommand).toBeDefined();
     expect(doctorCommand?.name()).toBe("doctor");
     expect(doctorCommand?.description()).toBe(
-      "Environment and config sanity checks (canonical: lex-pr workspace doctor)"
+      "Environment and config sanity checks (canonical: lexrunner workspace doctor)"
     );
 
     // Check options

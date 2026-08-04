@@ -35,7 +35,7 @@ describe("Report Command", () => {
     expect(reportCommand).toBeDefined();
     expect(reportCommand?.name()).toBe("report");
     expect(reportCommand?.description()).toBe(
-      "Aggregate gate reports from directory (canonical: lex-pr weave report)"
+      "Aggregate gate reports from directory (canonical: lexrunner weave report)"
     );
 
     // Check required argument

@@ -55,7 +55,7 @@ async function finalizeAuditGuard(emitter: AuditEmitter, status?: string): Promi
     if (e instanceof Error && typeof e.message === "string" && e.message.startsWith("HIPAA:")) {
       throw e; // let top-level handler map to exit code 2
     }
-    console.warn("[lex-pr] audit: finalize failed (ignored)", String(e));
+    console.warn("[lexrunner] audit: finalize failed (ignored)", String(e));
   }
 }
 
@@ -119,16 +119,16 @@ export function registerExecuteCommand(
       "after",
       `
 Examples:
-  $ lex-pr execute plan.json                    # Run all gates in plan
-  $ lex-pr execute --dry-run                    # Validate plan without running gates
-  $ lex-pr execute --json > results.json        # JSON output for CI/CD integration
-  $ lex-pr execute --status-table               # Generate PR comment-ready status table
-  $ lex-pr execute --timeout 60000              # Increase timeout to 60 seconds
-  $ lex-pr execute --artifact-dir ./build       # Custom artifact location
+  $ lexrunner execute plan.json                    # Run all gates in plan
+  $ lexrunner execute --dry-run                    # Validate plan without running gates
+  $ lexrunner execute --json > results.json        # JSON output for CI/CD integration
+  $ lexrunner execute --status-table               # Generate PR comment-ready status table
+  $ lexrunner execute --timeout 60000              # Increase timeout to 60 seconds
+  $ lexrunner execute --artifact-dir ./build       # Custom artifact location
 
 Common Issues:
   • Gates timing out: Increase --timeout or check gate commands
-  • Missing dependencies: Run 'lex-pr merge-order' to verify plan structure
+  • Missing dependencies: Run 'lexrunner merge-order' to verify plan structure
   • Permission errors: Ensure artifact directory is writable`
     )
     .action(async (file: string | undefined, opts) => {
@@ -388,7 +388,7 @@ Common Issues:
                 // Surface HIPAA failures as fatal
                 deps.exitWith(e as Error);
               }
-              console.warn("[lex-pr] audit: finalize on dry-run failed (ignored)", String(e));
+              console.warn("[lexrunner] audit: finalize on dry-run failed (ignored)", String(e));
             }
           }
 

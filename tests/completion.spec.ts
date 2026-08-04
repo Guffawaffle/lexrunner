@@ -3,6 +3,13 @@ import { CompletionGenerator, registerCompletionCommand } from "../src/commands/
 import { Command } from "commander";
 
 describe("CompletionGenerator", () => {
+  it("uses the canonical executable name by default", () => {
+    const generator = new CompletionGenerator();
+
+    expect(generator.generateBash()).toContain("complete -F _lexrunner_completions lexrunner");
+    expect(generator.generateZsh()).toContain("#compdef lexrunner");
+  });
+
   describe("generateBash", () => {
     it("should generate valid bash completion script", () => {
       const generator = new CompletionGenerator("lex-pr");

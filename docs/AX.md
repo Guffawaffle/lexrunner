@@ -54,43 +54,43 @@ Matrix schema: **1.0.0**. Live inventory: **131 CLI registrations** and **33 MCP
 
 ### Canonical CLI/MCP semantic pairs
 
-| MCP tool                                   | CLI operation                          | Owning application service              |
-| ------------------------------------------ | -------------------------------------- | --------------------------------------- |
-| `accept_attempt`                           | `lex-pr attempt acceptance apply`      | `AgentWorkAttemptAcceptanceService`     |
-| `attach_attempt_worker`                    | `lex-pr attempt worker attach`         | `AgentWorkWorkerSessionService`         |
-| `cleanup_native_wsl_projection`            | `lex-pr attempt projection cleanup`    | `NativeWslProjectionLifecycleHandlers`  |
-| `config.show`                              | `lex-pr config show`                   | `ConfigurationQueryService`             |
-| `discover`                                 | `lex-pr weave discover`                | `DiscoveryQueryService`                 |
-| `doctor`                                   | `lex-pr workspace doctor`              | `WorkspaceDiagnosticsService`           |
-| `end_attempt_worker`                       | `lex-pr attempt worker end`            | `AgentWorkWorkerSessionService`         |
-| `gates.run`                                | `lex-pr gate run`                      | `GateExecutionService`                  |
-| `get_attempt_acceptance`                   | `lex-pr attempt acceptance status`     | `AgentWorkAttemptAcceptanceService`     |
-| `get_attempt_receipt`                      | `lex-pr attempt receipt status`        | `AgentWorkAttemptReceiptService`        |
-| `get_attempt_status`                       | `lex-pr attempt status`                | `AgentWorkLifecycleService`             |
-| `get_attempt_verification`                 | `lex-pr attempt verification status`   | `AgentWorkAttemptVerificationService`   |
-| `get_attempt_worker`                       | `lex-pr attempt worker status`         | `AgentWorkWorkerSessionService`         |
-| `get_native_wsl_projection_status`         | `lex-pr attempt projection status`     | `NativeWslProjectionLifecycleHandlers`  |
-| `heartbeat_attempt_worker`                 | `lex-pr attempt worker heartbeat`      | `AgentWorkWorkerSessionService`         |
-| `local.init`                               | `lex-pr workspace init`                | `WorkspaceInitializationService`        |
-| `merge-order`                              | `lex-pr weave merge-order`             | `MergeOrderQueryService`                |
-| `merge.apply`                              | `lex-pr weave apply`                   | `MergeApplicationService`               |
-| `plan.create`                              | `lex-pr weave plan`                    | `PlanCreationService`                   |
-| `preflight_attempt_containment`            | `lex-pr attempt preflight`             | `AgentWorkContainmentCapabilityService` |
-| `prepare_native_wsl_projection`            | `lex-pr attempt projection prepare`    | `NativeWslProjectionLifecycleHandlers`  |
-| `prepare_attempt`                          | `lex-pr attempt prepare`               | `AgentWorkLifecycleService`             |
-| `profile.resolve`                          | `lex-pr config show`                   | `ConfigurationQueryService`             |
-| `start_attempt`                            | `lex-pr attempt start`                 | `AgentWorkLifecycleService`             |
-| `status`                                   | `lex-pr weave status`                  | `IntegrationStatusQueryService`         |
-| `submit_attempt_receipt`                   | `lex-pr attempt receipt submit`        | `AgentWorkAttemptReceiptService`        |
-| `inspect_native_wsl_projection_quarantine` | `lex-pr attempt projection quarantine` | `NativeWslProjectionLifecycleHandlers`  |
-| `verify_attempt`                           | `lex-pr attempt verification run`      | `AgentWorkAttemptVerificationService`   |
+| MCP tool                                   | CLI operation                             | Owning application service              |
+| ------------------------------------------ | ----------------------------------------- | --------------------------------------- |
+| `accept_attempt`                           | `lexrunner attempt acceptance apply`      | `AgentWorkAttemptAcceptanceService`     |
+| `attach_attempt_worker`                    | `lexrunner attempt worker attach`         | `AgentWorkWorkerSessionService`         |
+| `cleanup_native_wsl_projection`            | `lexrunner attempt projection cleanup`    | `NativeWslProjectionLifecycleHandlers`  |
+| `config.show`                              | `lexrunner config show`                   | `ConfigurationQueryService`             |
+| `discover`                                 | `lexrunner weave discover`                | `DiscoveryQueryService`                 |
+| `doctor`                                   | `lexrunner workspace doctor`              | `WorkspaceDiagnosticsService`           |
+| `end_attempt_worker`                       | `lexrunner attempt worker end`            | `AgentWorkWorkerSessionService`         |
+| `gates.run`                                | `lexrunner gate run`                      | `GateExecutionService`                  |
+| `get_attempt_acceptance`                   | `lexrunner attempt acceptance status`     | `AgentWorkAttemptAcceptanceService`     |
+| `get_attempt_receipt`                      | `lexrunner attempt receipt status`        | `AgentWorkAttemptReceiptService`        |
+| `get_attempt_status`                       | `lexrunner attempt status`                | `AgentWorkLifecycleService`             |
+| `get_attempt_verification`                 | `lexrunner attempt verification status`   | `AgentWorkAttemptVerificationService`   |
+| `get_attempt_worker`                       | `lexrunner attempt worker status`         | `AgentWorkWorkerSessionService`         |
+| `get_native_wsl_projection_status`         | `lexrunner attempt projection status`     | `NativeWslProjectionLifecycleHandlers`  |
+| `heartbeat_attempt_worker`                 | `lexrunner attempt worker heartbeat`      | `AgentWorkWorkerSessionService`         |
+| `local.init`                               | `lexrunner workspace init`                | `WorkspaceInitializationService`        |
+| `merge-order`                              | `lexrunner weave merge-order`             | `MergeOrderQueryService`                |
+| `merge.apply`                              | `lexrunner weave apply`                   | `MergeApplicationService`               |
+| `plan.create`                              | `lexrunner weave plan`                    | `PlanCreationService`                   |
+| `preflight_attempt_containment`            | `lexrunner attempt preflight`             | `AgentWorkContainmentCapabilityService` |
+| `prepare_native_wsl_projection`            | `lexrunner attempt projection prepare`    | `NativeWslProjectionLifecycleHandlers`  |
+| `prepare_attempt`                          | `lexrunner attempt prepare`               | `AgentWorkLifecycleService`             |
+| `profile.resolve`                          | `lexrunner config show`                   | `ConfigurationQueryService`             |
+| `start_attempt`                            | `lexrunner attempt start`                 | `AgentWorkLifecycleService`             |
+| `status`                                   | `lexrunner weave status`                  | `IntegrationStatusQueryService`         |
+| `submit_attempt_receipt`                   | `lexrunner attempt receipt submit`        | `AgentWorkAttemptReceiptService`        |
+| `inspect_native_wsl_projection_quarantine` | `lexrunner attempt projection quarantine` | `NativeWslProjectionLifecycleHandlers`  |
+| `verify_attempt`                           | `lexrunner attempt verification run`      | `AgentWorkAttemptVerificationService`   |
 
 ### Intentional parity exceptions
 
 - MCP `workflow.guide`: agent-only workflow guidance; humans use CLI help and checked-in documentation
-- CLI `lex-pr plan-review`: interactive human approval is intentionally not exposed as an MCP mutation
-- CLI `lex-pr idea`: human ideation and GitHub issue creation remain an explicit local workflow
-- CLI `lex-pr view`: terminal-interactive plan navigation has no machine-facing semantics
+- CLI `lexrunner plan-review`: interactive human approval is intentionally not exposed as an MCP mutation
+- CLI `lexrunner idea`: human ideation and GitHub issue creation remain an explicit local workflow
+- CLI `lexrunner view`: terminal-interactive plan navigation has no machine-facing semantics
 
 ### Published deprecated MCP tools
 

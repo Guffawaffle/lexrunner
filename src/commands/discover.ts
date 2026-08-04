@@ -18,7 +18,7 @@ interface DiscoverCommandDeps {
 export function registerDiscoverCommand(program: Command, deps: DiscoverCommandDeps): void {
   program
     .command("discover")
-    .description("Discover open pull requests from GitHub (canonical: lex-pr weave discover)")
+    .description("Discover open pull requests from GitHub (canonical: lexrunner weave discover)")
     .option("--owner <owner>", "GitHub repository owner")
     .option("--repo <repo>", "GitHub repository name")
     .option("--state <state>", "PR state filter", "open")
@@ -28,11 +28,11 @@ export function registerDiscoverCommand(program: Command, deps: DiscoverCommandD
       "after",
       `
 Examples:
-  $ lex-pr discover                             # Discover PRs from current repo
-  $ lex-pr discover --suggest                   # Discover with dependency suggestions
-  $ lex-pr discover --json > prs.json           # JSON output for processing
-  $ lex-pr discover --owner org --repo project  # Specify repository explicitly
-  $ lex-pr discover --state all                 # Include closed PRs
+  $ lexrunner discover                             # Discover PRs from current repo
+  $ lexrunner discover --suggest                   # Discover with dependency suggestions
+  $ lexrunner discover --json > prs.json           # JSON output for processing
+  $ lexrunner discover --owner org --repo project  # Specify repository explicitly
+  $ lexrunner discover --state all                 # Include closed PRs
 
 Common Issues:
   • "Could not detect repository": Set GITHUB_TOKEN or run from git repository
@@ -58,9 +58,9 @@ Common Issues:
           console.error("  1. Run from a Git repository with GitHub remote:");
           console.error("     git remote -v");
           console.error("\n  2. Specify repository explicitly:");
-          console.error("     lex-pr discover --owner <owner> --repo <repo>\n");
+          console.error("     lexrunner discover --owner <owner> --repo <repo>\n");
           console.error("💡 Tip: Initialize your workspace first:");
-          console.error("   lex-pr init\n");
+          console.error("   lexrunner init\n");
           throwExit(1);
         }
         const resolvedAPI = githubAPI!;

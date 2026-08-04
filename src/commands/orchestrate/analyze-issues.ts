@@ -117,7 +117,7 @@ export function registerAnalyzeIssuesCommand(
 ): void {
   program
     .command("orchestrate:analyze-issues")
-    .description("Analyze GitHub issues for fanout [DEPRECATED: Use 'lex-pr fanout analyze']")
+    .description("Analyze GitHub issues for fanout [DEPRECATED: Use 'lexrunner fanout analyze']")
     .option("--repo <owner/repo>", "Repository (format: owner/repo)")
     .option("--labels <labels>", "Filter by labels (comma-separated)")
     .option("--json", "Output JSON format")

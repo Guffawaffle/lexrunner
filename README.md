@@ -1,4 +1,4 @@
-# LexRunner (`lex-pr`)
+# LexRunner (`lexrunner`)
 
 LexRunner turns a changing set of pull requests into a reviewable integration program: discover
 the work, freeze a dependency plan, run bounded gates, preserve evidence, and merge only with
@@ -19,13 +19,13 @@ branch, pushing, opening a PR, or merging requires separate approval.
 
 LexRunner’s supported workflow has grown in layers. A normal user can stop at any layer.
 
-| Layer               | Current capability                                                                                           | First surface                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| Deterministic plan  | Freeze PRs and declared dependencies into schema-versioned `plan.json`                                       | `lex-pr weave plan`                 |
-| Merge-weave         | Compute merge order, preview integration, run gates, and apply authorized merges                             | `lex-pr weave *`, `lex-pr gate run` |
-| Run and evidence    | Persist bounded receipts, independent verification, acceptance, and artifacts                                | `lex-pr attempt *`                  |
-| Fanout              | Harvest and analyze issue/PR evidence for parallel work planning                                             | `lex-pr fanout *`                   |
-| Assisted agent work | Prepare an immutable packet and workspace envelope, attach a foreground-owned worker, then verify its claims | CLI/MCP Attempt lifecycle           |
+| Layer               | Current capability                                                                                           | First surface                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Deterministic plan  | Freeze PRs and declared dependencies into schema-versioned `plan.json`                                       | `lexrunner weave plan`                    |
+| Merge-weave         | Compute merge order, preview integration, run gates, and apply authorized merges                             | `lexrunner weave *`, `lexrunner gate run` |
+| Run and evidence    | Persist bounded receipts, independent verification, acceptance, and artifacts                                | `lexrunner attempt *`                     |
+| Fanout              | Harvest and analyze issue/PR evidence for parallel work planning                                             | `lexrunner fanout *`                      |
+| Assisted agent work | Prepare an immutable packet and workspace envelope, attach a foreground-owned worker, then verify its claims | CLI/MCP Attempt lifecycle                 |
 
 The ADR-010 coordination model is accepted and its assisted Attempt lifecycle is implemented.
 LexRunner also has a tested headless reconciliation **application boundary**, but it is not a
@@ -39,21 +39,21 @@ remain unproven. See [ADR-010](docs/adr/ADR-010-agent-work-orchestration-protoco
 First inspect without mutation:
 
 ```bash
-lex-pr --version
-lex-pr workspace doctor --json
-lex-pr weave discover --json
+lexrunner --version
+lexrunner workspace doctor --json
+lexrunner weave discover --json
 ```
 
 After approving a local, reversible artifact, freeze and inspect a plan:
 
 ```bash
-lex-pr weave plan --from-github --output plan.json --json
-lex-pr schema validate plan.json --json
-lex-pr weave merge-order plan.json --json
-lex-pr gate run plan.json --dry-run --json
+lexrunner weave plan --from-github --output plan.json --json
+lexrunner schema validate plan.json --json
+lexrunner weave merge-order plan.json --json
+lexrunner gate run plan.json --dry-run --json
 ```
 
-These commands do not merge. `lex-pr weave apply --execute` is a separate mutation and should be
+These commands do not merge. `lexrunner weave apply --execute` is a separate mutation and should be
 run only after reviewing the frozen plan, authority, gates, and target branch.
 
 For a guided merge-weave walkthrough, use
@@ -94,28 +94,33 @@ organization, so a human with organization access must authenticate the npm CLI 
 ```bash
 npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
 npm install --save-dev @smartergpt/lexrunner
-npx lex-pr --version
+npx lexrunner --version
 ```
 
 Global installation is also supported:
 
 ```bash
 npm install --global @smartergpt/lexrunner
-lex-pr --version
+lexrunner --version
 ```
 
 Do not place npm tokens in the repository or a chat transcript. Windows/private-package validation
 is documented in the [Node 24 migration guide](docs/node-24-migration.md).
 
-The checked-in package version is the single source for `lex-pr --version`.
+`lexrunner` is the canonical CLI name. The existing `lex-pr` executable remains an additive
+compatibility alias and invokes the same program, so existing automation does not need to change.
+
+The checked-in package version is the single source for `lexrunner --version` and
+`lex-pr --version`.
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **1.4.0**. npm availability and dist-tags are separate
+Current repository package version: **1.4.1**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [1.4.0 release notes](docs/releases/1.4.0.md), the
+See the [1.4.1 release notes](docs/releases/1.4.1.md), the
+[1.4.0 native-host boundary release](docs/releases/1.4.0.md), the
 [1.3.0 dogfood release](docs/releases/1.3.0.md), the
 [1.2.1 publication repair](docs/releases/1.2.1.md), and the underlying
 [1.2.0 compatibility decision](docs/releases/1.2.0.md) for package disposition, semver rationale,
@@ -172,7 +177,7 @@ For implementation work, use the touched/adjacent gate selector and let CI prove
 high-risk changes:
 
 ```bash
-lex-pr gate select --base <base-sha> --head <head-sha> --json
+lexrunner gate select --base <base-sha> --head <head-sha> --json
 ```
 
 Release validation remains exhaustive. See [`AGENTS.md`](AGENTS.md),
@@ -182,7 +187,7 @@ Release validation remains exhaustive. See [`AGENTS.md`](AGENTS.md),
 ## Package and licensing
 
 - Package: `@smartergpt/lexrunner`
-- CLI: `lex-pr`
+- CLI: `lexrunner` (`lex-pr` compatibility alias)
 - MCP bin: `lexrunner-mcp`
 - Runtime dependency: `@smartergpt/lex` (MIT)
 - LexRunner license: SmarterGPT Source-Available Personal Use License

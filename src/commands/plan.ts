@@ -32,7 +32,7 @@ export function registerPlanCommand(program: Command, deps: PlanCommandDeps): vo
   program
     .command("plan")
     .description(
-      "Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)"
+      "Generate plan from configuration sources or GitHub PRs (canonical: lexrunner weave plan)"
     )
     .option("--out <dir>", "Output directory for artifacts (default: <profile>/runner)")
     .option("--json", "Output canonical plan JSON to stdout only")
@@ -73,20 +73,20 @@ export function registerPlanCommand(program: Command, deps: PlanCommandDeps): vo
       "after",
       `
 Examples:
-  $ lex-pr plan --from-github --json > plan.json    # Generate plan from GitHub PRs
-  $ lex-pr plan --dry-run                           # Preview plan without writing
-  $ lex-pr plan --labels "feature,bugfix"           # Filter by labels
-  $ lex-pr plan --exclude-prs 123,456               # Exclude specific PRs
-  $ lex-pr plan --target staging                    # Target different branch
-  $ lex-pr plan --required-gates lint,test,e2e      # Custom gate requirements
-  $ lex-pr plan --from-github --suggest-deps        # Review dependency suggestions
-  $ lex-pr plan --from-github --suggest-deps --format=json  # JSON suggestions for tooling
-  $ lex-pr plan --from-github --suggest-deps --threshold=0.7  # High-confidence only
+  $ lexrunner plan --from-github --json > plan.json    # Generate plan from GitHub PRs
+  $ lexrunner plan --dry-run                           # Preview plan without writing
+  $ lexrunner plan --labels "feature,bugfix"           # Filter by labels
+  $ lexrunner plan --exclude-prs 123,456               # Exclude specific PRs
+  $ lexrunner plan --target staging                    # Target different branch
+  $ lexrunner plan --required-gates lint,test,e2e      # Custom gate requirements
+  $ lexrunner plan --from-github --suggest-deps        # Review dependency suggestions
+  $ lexrunner plan --from-github --suggest-deps --format=json  # JSON suggestions for tooling
+  $ lexrunner plan --from-github --suggest-deps --threshold=0.7  # High-confidence only
 
 Common Issues:
   • GitHub API errors: Set GITHUB_TOKEN environment variable
   • Cycle detection failures: Review dependencies in scope.yml or PR descriptions
-  • Missing configuration: Run 'lex-pr init' to set up workspace`
+  • Missing configuration: Run 'lexrunner init' to set up workspace`
     )
     .action(async (opts) => {
       const previousJsonMode = deps.jsonModeActive();
@@ -295,11 +295,11 @@ async function executePlan(opts: any, deps: PlanCommandDeps): Promise<void> {
       }
     } catch (error) {
       if (error instanceof CycleError) {
-        const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
+        const prefix = deps.jsonModeActive() ? "[lexrunner]" : "❌";
         console.error(`\n${prefix} Plan validation failed: ${error.message}`);
         throwExit(1);
       } else if (error instanceof UnknownDependencyError) {
-        const prefix = deps.jsonModeActive() ? "[lex-pr]" : "❌";
+        const prefix = deps.jsonModeActive() ? "[lexrunner]" : "❌";
         console.error(`\n${prefix} Plan validation failed: ${error.message}`);
         throwExit(1);
       }
