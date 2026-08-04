@@ -36,7 +36,7 @@ describe("Plan Command Module", () => {
       const planCommand = program.commands.find((cmd) => cmd.name() === "plan");
       expect(planCommand).toBeDefined();
       expect(planCommand?.description()).toBe(
-        "Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)"
+        "Generate plan from configuration sources or GitHub PRs (canonical: lexrunner weave plan)"
       );
     });
     it("should register all expected options", () => {

@@ -17,7 +17,7 @@ interface ReportCommandDeps {
 export function registerReportCommand(program: Command, deps: ReportCommandDeps): void {
   program
     .command("report")
-    .description("Aggregate gate reports from directory (canonical: lex-pr weave report)")
+    .description("Aggregate gate reports from directory (canonical: lexrunner weave report)")
     .argument("<dir>", "Directory containing *.json gate result files")
     .option("--json", "Output JSON format (alias for --out json)")
     .option("--out <format>", "Output format: 'json' or 'md'", "json")

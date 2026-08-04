@@ -18,7 +18,7 @@ interface DiscoverCommandDeps {
 export function registerDiscoverCommand(program: Command, deps: DiscoverCommandDeps): void {
   program
     .command("discover")
-    .description("Discover open pull requests from GitHub (canonical: lex-pr weave discover)")
+    .description("Discover open pull requests from GitHub (canonical: lexrunner weave discover)")
     .option("--owner <owner>", "GitHub repository owner")
     .option("--repo <repo>", "GitHub repository name")
     .option("--state <state>", "PR state filter", "open")

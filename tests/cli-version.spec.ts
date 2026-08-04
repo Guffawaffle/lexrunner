@@ -16,6 +16,6 @@ describe("CLI package version", () => {
     });
 
     expect(result.stderr).toBe("");
-    expect(result.stdout).toBe(`LexRunner ${packageJson.version} (lex-pr)`);
+    expect(result.stdout).toBe(`LexRunner ${packageJson.version} (lexrunner)`);
   });
 });

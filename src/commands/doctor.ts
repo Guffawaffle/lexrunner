@@ -13,7 +13,7 @@ import { initColorControl } from "../util/colorControl.js";
 export function registerDoctorCommand(program: Command, jsonModeActive?: () => boolean): void {
   program
     .command("doctor")
-    .description("Environment and config sanity checks (canonical: lex-pr workspace doctor)")
+    .description("Environment and config sanity checks (canonical: lexrunner workspace doctor)")
     .option("--bootstrap", "Create minimal workspace configuration if missing")
     .option("--json", "Output JSON format")
     .option("--environment-quality", "Run environmental hostility scoring")

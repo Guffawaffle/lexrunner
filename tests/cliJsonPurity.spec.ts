@@ -431,7 +431,7 @@ describe("CLI JSON purity", () => {
     // stdout should have version info
     const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"))
       .version as string;
-    expect(stdout.trim()).toBe(`LexRunner ${packageVersion} (lex-pr)`);
+    expect(stdout.trim()).toBe(`LexRunner ${packageVersion} (lexrunner)`);
 
     // The key point: handlers are installed at CLI startup (tested in exitHandler.spec.ts)
     // If an unhandled rejection occurs, it will be caught and logged to stderr

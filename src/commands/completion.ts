@@ -16,7 +16,7 @@ export class CompletionGenerator {
   private programName: string;
   private commands: string[];
 
-  constructor(programName: string = "lex-pr") {
+  constructor(programName: string = "lexrunner") {
     this.programName = programName;
     this.commands = [
       "init",

@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/lexrunner",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -28,6 +28,7 @@
     "LICENSE.md"
   ],
   "bin": {
+    "lexrunner": "dist/cli.js",
     "lex-pr": "dist/cli.js",
     "lexrunner-mcp": "mcp-server.mjs"
   },
@@ -77,7 +78,7 @@
     }
   },
   "scripts": {
-    "postinstall": "node -e \"console.log('\\n📦 lexrunner installed! Run \\\"npx lex-pr init\\\" to set up your workspace.\\n')\"",
+    "postinstall": "node -e \"console.log('\\n📦 lexrunner installed! Run \\\"npx lexrunner init\\\" to set up your workspace. The \\\"lex-pr\\\" compatibility alias remains supported.\\n')\"",
     "dev": "tsx watch src/cli.ts",
     "cli": "tsx src/cli.ts",
     "cli:built": "node dist/cli.js",

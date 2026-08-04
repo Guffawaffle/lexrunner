@@ -4,6 +4,9 @@ import os from "node:os";
 import path from "node:path";
 
 const projectRoot = process.cwd();
+const packageVersion = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")
+).version;
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexrunner-packed-smoke-"));
 const consumerRoot = path.join(temporaryRoot, "consumer");
 const requiredAttemptTools = [
@@ -127,22 +130,50 @@ try {
   );
 
   const binRoot = path.join(consumerRoot, "node_modules", ".bin");
-  const cliHelp = execFileSync(path.join(binRoot, "lex-pr"), ["--help"], {
+  const canonicalCli = resolveBin(binRoot, "lexrunner");
+  const compatibilityCli = resolveBin(binRoot, "lex-pr");
+  const expectedVersion = `LexRunner ${packageVersion} (lexrunner)`;
+  const canonicalVersion = execFileSync(canonicalCli, ["--version"], {
+    cwd: consumerRoot,
+    encoding: "utf8",
+  }).trim();
+  const compatibilityVersion = execFileSync(compatibilityCli, ["--version"], {
+    cwd: consumerRoot,
+    encoding: "utf8",
+  }).trim();
+  if (canonicalVersion !== expectedVersion) {
+    throw new Error(`Packed canonical CLI reported unexpected version: ${canonicalVersion}`);
+  }
+  if (compatibilityVersion !== canonicalVersion) {
+    throw new Error("Packed lex-pr compatibility alias did not execute the canonical CLI");
+  }
+
+  const cliHelp = execFileSync(canonicalCli, ["--help"], {
     cwd: consumerRoot,
     encoding: "utf8",
   });
-  if (!cliHelp.includes("Usage: lex-pr")) throw new Error("Packed CLI bin did not render help");
+  if (!cliHelp.includes("Usage: lexrunner")) {
+    throw new Error("Packed canonical CLI bin did not render canonical help");
+  }
+  const compatibilityHelp = execFileSync(compatibilityCli, ["--help"], {
+    cwd: consumerRoot,
+    encoding: "utf8",
+  });
+  if (!compatibilityHelp.includes("Usage: lexrunner")) {
+    throw new Error("Packed lex-pr compatibility alias did not render canonical help");
+  }
 
-  smokeBoundedAttemptStatus(path.join(binRoot, "lex-pr"), consumerRoot);
-  smokeProjectionCliSurface(path.join(binRoot, "lex-pr"), consumerRoot);
+  smokeBoundedAttemptStatus(canonicalCli, consumerRoot);
+  smokeProjectionCliSurface(canonicalCli, consumerRoot);
 
-  const toolCount = await smokeMcp(path.join(binRoot, "lexrunner-mcp"), consumerRoot);
+  const toolCount = await smokeMcp(resolveBin(binRoot, "lexrunner-mcp"), consumerRoot);
   process.stdout.write(
     `${JSON.stringify({
       installed: "@smartergpt/lexrunner",
       import: "passed",
       require: "passed",
       cli: "passed",
+      cliAliases: ["lexrunner", "lex-pr"],
       assistedLifecycle: "bounded_read_only_status_passed",
       mcpTools: toolCount,
       mcpAttemptTools: requiredAttemptTools.length,
@@ -150,6 +181,16 @@ try {
   );
 } finally {
   fs.rmSync(temporaryRoot, { recursive: true, force: true });
+}
+
+function resolveBin(binRoot, name) {
+  const candidates =
+    process.platform === "win32"
+      ? [path.join(binRoot, `${name}.cmd`), path.join(binRoot, name)]
+      : [path.join(binRoot, name), path.join(binRoot, `${name}.cmd`)];
+  const resolved = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!resolved) throw new Error(`Packed package omitted the ${name} executable`);
+  return resolved;
 }
 
 function smokeBoundedAttemptStatus(cliPath, cwd) {

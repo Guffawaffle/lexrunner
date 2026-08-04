@@ -18,7 +18,7 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
   program
     .command("status")
     .description(
-      "Show current execution status and merge eligibility (canonical: lex-pr weave status)"
+      "Show current execution status and merge eligibility (canonical: lexrunner weave status)"
     )
     .option("--plan <file>", "Path to plan.json file", "plan.json")
     .argument("[file]", "Path to plan.json file (alternative to --plan)")

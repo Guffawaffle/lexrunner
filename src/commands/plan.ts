@@ -32,7 +32,7 @@ export function registerPlanCommand(program: Command, deps: PlanCommandDeps): vo
   program
     .command("plan")
     .description(
-      "Generate plan from configuration sources or GitHub PRs (canonical: lex-pr weave plan)"
+      "Generate plan from configuration sources or GitHub PRs (canonical: lexrunner weave plan)"
     )
     .option("--out <dir>", "Output directory for artifacts (default: <profile>/runner)")
     .option("--json", "Output canonical plan JSON to stdout only")

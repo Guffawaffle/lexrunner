@@ -12,6 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const check = process.argv.includes("--check");
 const matrix = JSON.parse(read("docs/architecture/cli-mcp-surface.json"));
 const packageJson = JSON.parse(read("package.json"));
+const canonicalCli = "lexrunner";
 const prettierOptions = (await resolveConfig(join(root, "README.md"))) ?? {};
 
 const classifications = ["canonical", "compatibility", "deprecated", "internal-only", "remove"];
@@ -37,14 +38,14 @@ const surface = await formatMarkdown(
     "| MCP tool | CLI operation | Owning application service |",
     "| --- | --- | --- |",
     ...matrix.mcp.parity.map(
-      ({ tool, cli, owner }) => `| \`${tool}\` | \`lex-pr ${cli}\` | \`${owner}\` |`
+      ({ tool, cli, owner }) => `| \`${tool}\` | \`${canonicalCli} ${cli}\` | \`${owner}\` |`
     ),
     "",
     "### Intentional parity exceptions",
     "",
     ...matrix.mcp.intentionalParityExceptions.map(
       ({ tool, cli, reason }) =>
-        `- ${tool ? `MCP \`${tool}\`` : `CLI \`lex-pr ${cli}\``}: ${reason}`
+        `- ${tool ? `MCP \`${tool}\`` : `CLI \`${canonicalCli} ${cli}\``}: ${reason}`
     ),
     "",
     "### Published deprecated MCP tools",

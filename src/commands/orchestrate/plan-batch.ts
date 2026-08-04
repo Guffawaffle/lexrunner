@@ -17,7 +17,7 @@ import * as fs from "fs";
 export function registerPlanBatchCommand(program: Command, jsonModeActive?: () => boolean): void {
   program
     .command("orchestrate:plan-batch")
-    .description("Generate batch plan using Kahn's algorithm (canonical: lex-pr weave plan)")
+    .description("Generate batch plan using Kahn's algorithm (canonical: lexrunner weave plan)")
     .option("--issues <numbers>", "Comma-separated issue/PR numbers (e.g., 156,157,160)")
     .option("--input <file>", "Input JSON file with analyzed issues")
     .option("--json", "Output JSON format instead of human-readable")

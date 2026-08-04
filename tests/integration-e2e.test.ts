@@ -34,7 +34,7 @@ describe("End-to-End Integration Tests", () => {
     it("should show help for main CLI", async () => {
       const { stdout, stderr } = await runCLI("--help");
 
-      expect(stdout).toContain("Lex-PR Runner");
+      expect(stdout).toContain("LexRunner");
       expect(stdout).toContain("discover");
       expect(stdout).toContain("merge");
       expect(stdout).toContain("bootstrap");
@@ -59,7 +59,7 @@ describe("End-to-End Integration Tests", () => {
       expect(stdout).toContain("--plan");
       expect(stdout).toContain("--dry-run");
       expect(stdout).toContain("--execute");
-      expect(stdout).toContain('Use "lex-pr weave apply" for new automation');
+      expect(stdout).toContain('Use "lexrunner weave apply" for new automation');
     });
 
     it("should show help for bootstrap command", async () => {

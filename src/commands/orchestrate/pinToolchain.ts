@@ -43,7 +43,7 @@ export function registerPinToolchainCommand(program: Command): void {
   orchestrateCmd
     .command("pin-toolchain")
     .description(
-      "Verify toolchain versions match pinned versions (canonical: lex-pr workspace doctor)"
+      "Verify toolchain versions match pinned versions (canonical: lexrunner workspace doctor)"
     )
     .option("--verify", "Check if current versions match pinned versions (default: true)", true)
     .action(async (opts: PinToolchainOptions, command: Command) => {

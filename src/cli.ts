@@ -180,16 +180,16 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
     if (!jsonModeActive) {
       if (e instanceof WriteProtectionError) {
         console.error("💡 Tip: Use a local profile directory for development:");
-        console.error("   lex-pr init --profile-dir .smartergpt.local\n");
+        console.error("   lexrunner init --profile-dir .smartergpt.local\n");
       } else if (e instanceof CycleError) {
         console.error("💡 Tip: Check your dependency declarations in PR descriptions");
         console.error("   Look for circular dependencies like: A→B→C→A\n");
       } else if (e instanceof UnknownDependencyError) {
         console.error("💡 Tip: Ensure all referenced PRs exist and are included in your plan");
-        console.error("   Run 'lex-pr discover' to find available PRs\n");
+        console.error("   Run 'lexrunner discover' to find available PRs\n");
       } else if (e instanceof SchemaValidationError) {
         console.error("💡 Tip: Validate your configuration files:");
-        console.error("   lex-pr schema validate plan.json\n");
+        console.error("   lexrunner schema validate plan.json\n");
       }
     }
 
@@ -206,7 +206,7 @@ function exitWith(e: unknown, schemaCode = "ESCHEMA") {
   const prefix = jsonModeActive ? "[lex-pr]" : "❌";
   console.error(`\n${prefix} Unexpected error: ${String(err?.message ?? e)}\n`);
   if (!jsonModeActive) {
-    console.error("💡 Tip: Run 'lex-pr doctor' to check your environment\n");
+    console.error("💡 Tip: Run 'lexrunner doctor' to check your environment\n");
   }
   throwExit(1); // Unexpected failures
 }
@@ -229,11 +229,11 @@ program.configureOutput({
 });
 
 program
-  .name("lex-pr")
+  .name("lexrunner")
   .description(
-    "Lex-PR Runner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly"
+    "LexRunner - Fan-out PRs, compute merge pyramid, run gates, and weave merges cleanly"
   )
-  .version(`LexRunner ${packageMetadata.version} (lex-pr)`)
+  .version(`LexRunner ${packageMetadata.version} (lexrunner)`)
   .option("--no-color", "Disable ANSI color codes in output")
   .option("--audit-profile <profile>", "Audit logging profile: off|basic|soc2|hipaa-strict", "off")
   .option("--audit-key <hex>", "Audit encryption key (64 hex chars) - overrides LEX_AUDIT_KEY_HEX")
@@ -273,57 +273,57 @@ program
     "after",
     `
 Examples (Canonical Category-Action Pattern):
-	$ lex-pr workspace init                 Initialize workspace with interactive setup
-	$ lex-pr workspace doctor               Validate environment and configuration
-	$ lex-pr idea                           Capture feature idea interactively
-	$ lex-pr idea --title "..." --description "..." --dry-run
-	$ lex-pr config show                    Display configuration with precedence chain
-	$ lex-pr config show --key scope.target Show specific configuration value
-	$ lex-pr config show --json             Output configuration in JSON format
-	$ lex-pr config:inspect                 Display merged configuration with provenance map
-	$ lex-pr weave discover                 Find open PRs matching scope
-	$ lex-pr weave discover --suggest       Generate dependency suggestions with heuristics
-	$ lex-pr weave plan --from-github       Generate merge plan from GitHub PRs
-	$ lex-pr plan-review plan.json          Interactively review and edit plan
-	$ lex-pr plan-diff plan1.json plan2.json  Compare two plans
-	$ lex-pr gate run plan.json             Run quality gates on plan
-	$ lex-pr orchestrate:analyze-issues     Analyze issues for parallel work planning (fanout commands coming soon)
-	$ lex-pr orchestrate:analyze-issues --labels priority:P1 --json
-	$ lex-pr security check-rotation        Check token rotation status
-	$ lex-pr security scan-plan             Scan a plan file for secrets
-	$ lex-pr security validate-secrets GITHUB_TOKEN OTHER_SECRET
+	$ lexrunner workspace init                 Initialize workspace with interactive setup
+	$ lexrunner workspace doctor               Validate environment and configuration
+	$ lexrunner idea                           Capture feature idea interactively
+	$ lexrunner idea --title "..." --description "..." --dry-run
+	$ lexrunner config show                    Display configuration with precedence chain
+	$ lexrunner config show --key scope.target Show specific configuration value
+	$ lexrunner config show --json             Output configuration in JSON format
+	$ lexrunner config:inspect                 Display merged configuration with provenance map
+	$ lexrunner weave discover                 Find open PRs matching scope
+	$ lexrunner weave discover --suggest       Generate dependency suggestions with heuristics
+	$ lexrunner weave plan --from-github       Generate merge plan from GitHub PRs
+	$ lexrunner plan-review plan.json          Interactively review and edit plan
+	$ lexrunner plan-diff plan1.json plan2.json  Compare two plans
+	$ lexrunner gate run plan.json             Run quality gates on plan
+	$ lexrunner orchestrate:analyze-issues     Analyze issues for parallel work planning (fanout commands coming soon)
+	$ lexrunner orchestrate:analyze-issues --labels priority:P1 --json
+	$ lexrunner security check-rotation        Check token rotation status
+	$ lexrunner security scan-plan             Scan a plan file for secrets
+	$ lexrunner security validate-secrets GITHUB_TOKEN OTHER_SECRET
 
 Governance (LexSona Shadow Mode):
-	$ lex-pr governance:report              Analyze shadow governance logs
-	$ lex-pr governance:report --format markdown --disagreements-only
-	$ lex-pr governance:report --since 2025-12-01 --persona quality-first_engineering
-	$ lex-pr governance:cleanup             Clean up old governance logs
+	$ lexrunner governance:report              Analyze shadow governance logs
+	$ lexrunner governance:report --format markdown --disagreements-only
+	$ lexrunner governance:report --since 2025-12-01 --persona quality-first_engineering
+	$ lexrunner governance:cleanup             Clean up old governance logs
 
 Power User Commands:
-	$ lex-pr view plan.json                 Interactive plan viewer
-	$ lex-pr query plan.json --stats        Plan statistics and analysis
-	$ lex-pr query plan.json "level eq 1"   Query items by criteria
-	$ lex-pr retry --filter failed          Retry failed gates
-	$ lex-pr completion bash                Generate bash completion script
+	$ lexrunner view plan.json                 Interactive plan viewer
+	$ lexrunner query plan.json --stats        Plan statistics and analysis
+	$ lexrunner query plan.json "level eq 1"   Query items by criteria
+	$ lexrunner retry --filter failed          Retry failed gates
+	$ lexrunner completion bash                Generate bash completion script
 
 Canonical Workflow:
-	1. Ideate:      lex-pr idea (capture feature ideas as GitHub Issues)
-	2. Discover:    lex-pr weave discover (optionally add --suggest for dependencies)
-	3. Plan:        lex-pr weave plan --from-github --json > plan.json
-	4. Review:      lex-pr plan-review plan.json
-	5. Execute:     lex-pr gate run plan.json
-	6. Report:      lex-pr weave report artifacts --out md
+	1. Ideate:      lexrunner idea (capture feature ideas as GitHub Issues)
+	2. Discover:    lexrunner weave discover (optionally add --suggest for dependencies)
+	3. Plan:        lexrunner weave plan --from-github --json > plan.json
+	4. Review:      lexrunner plan-review plan.json
+	5. Execute:     lexrunner gate run plan.json
+	6. Report:      lexrunner weave report artifacts --out md
 
 Legacy Commands (Deprecated, use canonical forms above):
-	$ lex-pr init       → lex-pr workspace init
-	$ lex-pr doctor     → lex-pr workspace doctor
-	$ lex-pr discover   → lex-pr weave discover
-	$ lex-pr plan       → lex-pr weave plan
-	$ lex-pr status     → lex-pr weave status
-	$ lex-pr report     → lex-pr weave report
-	$ lex-pr execute    → lex-pr gate run
-	$ lex-pr orchestrate:analyze-issues → lex-pr fanout analyze
-	$ lex-pr orchestrate:assign-batch   → lex-pr fanout assign
+	$ lexrunner init       → lexrunner workspace init
+	$ lexrunner doctor     → lexrunner workspace doctor
+	$ lexrunner discover   → lexrunner weave discover
+	$ lexrunner plan       → lexrunner weave plan
+	$ lexrunner status     → lexrunner weave status
+	$ lexrunner report     → lexrunner weave report
+	$ lexrunner execute    → lexrunner gate run
+	$ lexrunner orchestrate:analyze-issues → lexrunner fanout analyze
+	$ lexrunner orchestrate:assign-batch   → lexrunner fanout assign
 `
   );
 
@@ -595,7 +595,7 @@ registerGateSelectCommand(gateCmd, () => jsonModeActive);
 // These commands are maintained for backward compatibility but show
 // deprecation warnings directing users to the canonical category-action forms.
 // The deprecation warnings are built into the command implementations themselves
-// by checking if program.name() === "lex-pr" (top-level) vs a category name.
+// by checking the parent program name (top-level) vs a category name.
 
 // Note: We DON'T re-register weave subcommands (discover, plan, status, report, merge-order)
 // as top-level commands because that would create duplicate command errors.
@@ -791,7 +791,7 @@ program
           console.log("1. Edit .smartergpt/intent.md to describe your project goals");
           console.log("2. Update .smartergpt/scope.yml for PR discovery rules");
           console.log("3. Configure .smartergpt/gates.yml for quality gates");
-          console.log("4. Run 'lex-pr doctor' to verify configuration");
+          console.log("4. Run 'lexrunner doctor' to verify configuration");
         }
       }
     } catch (error) {
@@ -868,7 +868,7 @@ program
 // Migrate profile command
 program
   .command("migrate-profile")
-  .description("Migrate profile configuration structure (canonical: lex-pr workspace migrate)")
+  .description("Migrate profile configuration structure (canonical: lexrunner workspace migrate)")
   .option("--from-flat", "Migrate from flat structure to runner/ subdirectory")
   .option("--dry-run", "Show what would be migrated without making changes")
   .option("--profile-dir <path>", "Profile directory to migrate (default: auto-detect)")

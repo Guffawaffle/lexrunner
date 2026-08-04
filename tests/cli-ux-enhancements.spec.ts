@@ -46,8 +46,8 @@ describe("CLI UX Enhancements E2E", () => {
       });
 
       expect(output).toContain("Examples:");
-      expect(output).toContain("$ lex-pr merge --plan plan.json --execute");
-      expect(output).toContain("$ lex-pr weave apply --plan plan.json --execute");
+      expect(output).toContain("$ lexrunner merge --plan plan.json --execute");
+      expect(output).toContain("$ lexrunner weave apply --plan plan.json --execute");
       expect(output).toContain("supported through the LexRunner 1.x line");
       expect(output).not.toContain("--cleanup");
     });

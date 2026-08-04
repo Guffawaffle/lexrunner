@@ -28,7 +28,7 @@ export function registerPredictConflictsCommand(
   program
     .command("orchestrate:predict-conflicts")
     .description(
-      "Predict merge conflicts using conflict graphs and MIS computation (canonical: lex-pr weave analyze)"
+      "Predict merge conflicts using conflict graphs and MIS computation (canonical: lexrunner weave analyze)"
     )
     .option("--prs <numbers>", "Comma-separated list of PR numbers (e.g., 166,167,168)")
     .option("--base <branch>", "Base branch for conflict analysis", "main")
