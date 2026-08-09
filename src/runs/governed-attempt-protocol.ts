@@ -358,7 +358,7 @@ export const DelegationInvocationRequest_v1 = z
     provider_attestation_hash: SHA256Hash,
     environment_attestation_hash: SHA256Hash,
     workspace_attestation_hash: SHA256Hash,
-    phase: z.enum(["authorized_work", "resume"]),
+    phase: z.enum(["offer", "authorized_work", "resume"]),
   })
   .strict();
 export type DelegationInvocationRequest_v1 = z.infer<typeof DelegationInvocationRequest_v1>;
@@ -387,9 +387,6 @@ export function authorizeDelegationInvocationBinding(
   if (state.status === "declined") {
     return { authorized: false, reason: "delegation_declined" };
   }
-  if (state.status !== "accepted" || state.acceptanceReceiptHash === undefined) {
-    return { authorized: false, reason: "not_accepted" };
-  }
   if (
     request.delegation_id !== offer.delegation_id ||
     request.attempt_id !== offer.attempt_id ||
@@ -399,6 +396,16 @@ export function authorizeDelegationInvocationBinding(
     request.transcript_start_hash !== offer.transcript_start_hash
   ) {
     return { authorized: false, reason: "binding_mismatch" };
+  }
+  if (request.phase === "offer") {
+    if (state.status !== "offered") return { authorized: false, reason: "binding_mismatch" };
+    return {
+      authorized: true,
+      authorizationBindingHash: computeCanonicalHash({ request, offer_status: "offered" }),
+    };
+  }
+  if (state.status !== "accepted" || state.acceptanceReceiptHash === undefined) {
+    return { authorized: false, reason: "not_accepted" };
   }
   return {
     authorized: true,

@@ -5,6 +5,16 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createDelegationDecisionReceipt } from "../../src/runs/governed-attempt-protocol.js";
+import {
+  GovernedCapabilityGrant_v1,
+  GovernedControlId,
+  GovernedReviewRequirements_v1,
+  authorizeGovernedReview,
+} from "../../src/runs/governed-attempt-executor.js";
+import {
+  createGovernedAttemptVerificationContext,
+  createGovernedAttemptVerificationReceipt,
+} from "../../src/runs/governed-attempt-verification.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import type { GovernedAttemptOperationStore } from "../../src/store/governed-attempt-operation-store.js";
 import type { GovernedDelegationStore } from "../../src/store/governed-delegation-store.js";
@@ -185,6 +195,77 @@ describe.each([
     const encoded = JSON.stringify(await store.getAttemptOperation("operation-1"));
     expect(encoded).not.toContain("reservationToken");
     expect(encoded).not.toContain("raw evidence");
+  });
+
+  it("persists an independently bound verification receipt without rewriting the provider claim", async () => {
+    const fixture = verificationBoundFixture();
+    const created = await store.createAttemptOperation({
+      mutationId: "operation-create",
+      handle: fixture.handle,
+      authorization: fixture.authorization,
+      evidenceReservation: fixture.reservation,
+      evidenceDeclaration: fixture.declaration,
+      verificationContext: fixture.context,
+      now: at(2),
+    });
+    expect(created).toMatchObject({ created: true });
+    await append(store, 0, event("completed", 1), "event-completed");
+    const providerResult = {
+      ...attemptResult(),
+      authorization_binding_digest: fixture.authorization.binding_digest,
+      admissibility: "inadmissible" as const,
+    };
+    const result = await store.recordAttemptOperationResult({
+      mutationId: "result-final",
+      operationId: "operation-1",
+      expectedRevision: 1,
+      result: providerResult,
+      now: at(4),
+    });
+    if (!result.recorded) throw new Error(`result fixture failed: ${result.reason}`);
+    const receipt = createGovernedAttemptVerificationReceipt({
+      verification_id: "verification-1",
+      verifier_id: "lexrunner-host-verifier",
+      operation_id: "operation-1",
+      attempt_id: "attempt-1",
+      delegation_id: "delegation-1",
+      capture_id: "capture-1",
+      authorization_binding_digest: fixture.authorization.binding_digest,
+      verification_context_hash: fixture.context.context_hash,
+      operation_result_hash: result.record.result_hash!,
+      capture_root: hash("capture-root"),
+      capture_verification_hash: hash("capture-verification"),
+      decision: "accepted",
+      task_outcome: "pass",
+      admissibility: "admissible",
+      failure_codes: [],
+      verified_at: at(5),
+    });
+    const recorded = await store.recordAttemptOperationVerification({
+      mutationId: "verification-final",
+      operationId: "operation-1",
+      expectedRevision: result.record.revision,
+      verification: receipt,
+      now: at(5),
+    });
+    expect(recorded).toMatchObject({
+      recorded: true,
+      idempotentReplay: false,
+      record: {
+        revision: 3,
+        result: { admissibility: "inadmissible" },
+        verification: { decision: "accepted", admissibility: "admissible" },
+      },
+    });
+    await expect(
+      store.recordAttemptOperationVerification({
+        mutationId: "verification-final",
+        operationId: "operation-1",
+        expectedRevision: result.record.revision,
+        verification: receipt,
+        now: at(5),
+      })
+    ).resolves.toMatchObject({ recorded: true, idempotentReplay: true });
   });
 });
 
@@ -374,5 +455,104 @@ function evidenceDeclaration(boundAuthorization: ReturnType<typeof authorization
     declared_at: at(0),
     opened_at: at(1),
     retention_expires_at: "2026-08-12T10:00:00.000Z",
+  };
+}
+
+function verificationBoundFixture() {
+  const controls = GovernedControlId.options.map((control) => ({
+    control,
+    minimum_strength: "host_enforced_indirect" as const,
+  }));
+  const requirements = GovernedReviewRequirements_v1.parse({
+    schema_version: "1.0.0",
+    attempt_id: "attempt-1",
+    delegation_id: "delegation-1",
+    repository_id: "synthetic-repository",
+    base_object_id: "1".repeat(40),
+    candidate_object_id: "2".repeat(40),
+    objective_hash: hash("objective"),
+    authorized_model_provider: "openai",
+    source_disclosure_allowed: true,
+    controls,
+    max_duration_ms: 60_000,
+    max_output_bytes: 1_000_000,
+  });
+  const grant = GovernedCapabilityGrant_v1.parse({
+    schema_version: "1.0.0",
+    attempt_id: "attempt-1",
+    delegation_id: "delegation-1",
+    repository_id: requirements.repository_id,
+    base_object_id: requirements.base_object_id,
+    candidate_object_id: requirements.candidate_object_id,
+    authorized_model_provider: requirements.authorized_model_provider,
+    source_disclosure_allowed: true,
+    controls,
+    tools: ["read_only_shell"],
+    max_duration_ms: requirements.max_duration_ms,
+    max_output_bytes: requirements.max_output_bytes,
+  });
+  const observed = { observed_at: at(0), expires_at: at(59) };
+  const executor = {
+    schema_version: "1.0.0" as const,
+    executor_id: "synthetic-executor",
+    executor_version: "1.0.0",
+    executable_hash: hash("executable"),
+    protocol: "jsonl-stdin" as const,
+    configuration_hash: hash("configuration"),
+    tool_surface_hash: hash("tools"),
+    ...observed,
+  };
+  const environment = {
+    schema_version: "1.0.0" as const,
+    provider_id: "synthetic-provider",
+    environment_id: "environment-1",
+    topology_hash: hash("topology"),
+    controls: GovernedControlId.options.map((control) => ({
+      control,
+      status: "enforced" as const,
+      strength: "independently_enforced_verified" as const,
+      evidence_refs: [hash(`control:${control}`)],
+      enforcement_owner: "host-verifier",
+    })),
+    ...observed,
+  };
+  const workspace = {
+    schema_version: "1.0.0" as const,
+    workspace_id: "workspace-1",
+    repository_id: requirements.repository_id,
+    base_object_id: requirements.base_object_id,
+    candidate_object_id: requirements.candidate_object_id,
+    corpus_hash: hash("corpus"),
+    selection_hash: hash("selection"),
+    corpus_kind: "synthetic" as const,
+    ...observed,
+  };
+  const decision = authorizeGovernedReview({
+    authorizationId: "authorization-1",
+    requirements,
+    grant,
+    executor,
+    environment,
+    workspace,
+    authorizedAt: at(1),
+    expiresAt: at(58),
+  });
+  if (!decision.authorized) throw new Error(`verification fixture failed: ${decision.reason}`);
+  const context = createGovernedAttemptVerificationContext({
+    requirements,
+    executor,
+    environment,
+    workspace,
+    output_schema: { type: "object" },
+  });
+  return {
+    authorization: decision.authorization,
+    context,
+    handle: {
+      ...handle(),
+      authorization_binding_digest: decision.authorization.binding_digest,
+    },
+    reservation: evidenceReservation(decision.authorization),
+    declaration: evidenceDeclaration(decision.authorization),
   };
 }

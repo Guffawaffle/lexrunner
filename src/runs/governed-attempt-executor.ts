@@ -333,6 +333,15 @@ export const AttemptExecutorEvent_v1 = z.discriminatedUnion("type", [
   z
     .object({
       schema_version: z.literal(GOVERNED_ATTEMPT_EXECUTOR_VERSION),
+      type: z.literal("accepted"),
+      sequence: z.number().int().positive(),
+      observed_at: instant,
+      evidence_ref: SHA256Hash,
+    })
+    .strict(),
+  z
+    .object({
+      schema_version: z.literal(GOVERNED_ATTEMPT_EXECUTOR_VERSION),
       type: z.literal("executor_event"),
       sequence: z.number().int().positive(),
       observed_at: instant,
@@ -409,6 +418,8 @@ export interface AttemptExecutor {
     handle: AttemptExecutorHandle_v1,
     options?: { afterSequence?: number; signal?: AbortSignal }
   ): AsyncIterable<AttemptExecutorEvent_v1>;
+  /** Releases authorized work only after the Delegation ACCEPT is durably latched. */
+  continueAfterAcceptance?(handle: AttemptExecutorHandle_v1): Promise<void>;
   cancel(handle: AttemptExecutorHandle_v1): Promise<void>;
   collect(handle: AttemptExecutorHandle_v1): Promise<GovernedAttemptResult_v1>;
   release(handle: AttemptExecutorHandle_v1): Promise<void>;

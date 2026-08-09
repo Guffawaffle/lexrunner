@@ -753,15 +753,19 @@ def provider_offer(authorization: dict[str, Any]) -> bytes:
     return text.encode("utf-8")
 
 
-def phase_two_prompt(prompt: bytes) -> bytes:
+def phase_two_prompt(prompt: bytes, output_schema: dict[str, Any]) -> bytes:
+    schema = json.dumps(output_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
     prefix = (
         "This is the authorized synthetic read-only review you accepted.\n"
         "You retain the right to stop: a final response exactly equal to NO is a terminal refusal.\n"
-        "Otherwise return only JSON conforming to the requested result schema.\n\n"
+        "Otherwise your final response must be only one JSON value conforming exactly to the "
+        "schema below. Do not wrap it in markdown.\n\n"
+        "Authorized result schema:\n"
     ).encode("utf-8")
-    if len(prefix) + len(prompt) > MAX_PROMPT_BYTES:
+    separator = b"\n\nAuthorized task:\n"
+    if len(prefix) + len(schema) + len(separator) + len(prompt) > MAX_PROMPT_BYTES:
         fail("authorized prompt exceeds its bound after the autonomy prelude")
-    return prefix + prompt
+    return prefix + schema + separator + prompt
 
 
 def initialize_codex_home(directory: Path) -> None:
@@ -954,14 +958,6 @@ def bwrap_command(handle: str, *, phase: str, thread_id: str | None = None) -> l
         "LANG",
         "C.UTF-8",
     ]
-    if phase == "review":
-        command.extend(
-            [
-                "--ro-bind",
-                str(directory / "schema.json"),
-                "/run/lexrunner-output-schema.json",
-            ]
-        )
     command.extend([str(CODEX_EXECUTABLE), "exec"])
     if phase == "review":
         if thread_id is None or not re.fullmatch(r"[0-9a-fA-F-]{16,64}", thread_id):
@@ -986,8 +982,6 @@ def bwrap_command(handle: str, *, phase: str, thread_id: str | None = None) -> l
     )
     for feature in PHASE_ONE_DISABLED_FEATURES:
         command.extend(["--disable", feature])
-    if phase == "review":
-        command.extend(["--output-schema", "/run/lexrunner-output-schema.json"])
     command.extend(
         [
             "--enable" if record["authorization"]["grant"].get("tools") else "--disable",
@@ -1161,13 +1155,67 @@ def task_outcome(value: Any) -> str:
 
 def cleanup_operation_secrets(handle: str) -> None:
     directory = operation_directory(handle)
-    prompt = directory / "prompt.bin"
-    if prompt.exists():
-        prompt.unlink()
+    for name in ("prompt.bin", "accepted-state.json", "continue.json"):
+        sensitive = directory / name
+        if sensitive.exists():
+            sensitive.unlink()
     codex_home = directory / "codex-home"
     if codex_home.exists():
         shutil.rmtree(codex_home)
     fsync_directory(directory)
+
+
+def wait_for_authorized_continuation(handle: str) -> bool:
+    directory = operation_directory(handle)
+    libc = ctypes.CDLL(None, use_errno=True)
+    init = libc.inotify_init1
+    init.argtypes = [ctypes.c_int]
+    init.restype = ctypes.c_int
+    add = libc.inotify_add_watch
+    add.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32]
+    add.restype = ctypes.c_int
+    descriptor = init(os.O_CLOEXEC)
+    if descriptor < 0:
+        fail("continuation watch initialization failed")
+    try:
+        mask = 0x00000002 | 0x00000008 | 0x00000100 | 0x00000080
+        if add(descriptor, os.fsencode(directory), mask) < 0:
+            fail("continuation watch failed")
+        while True:
+            if (directory / "continue.json").exists():
+                return True
+            if (directory / "cancel-requested.json").exists():
+                return False
+            os.read(descriptor, 4096)
+    finally:
+        os.close(descriptor)
+
+
+def continue_operation(handle: str, authorization: dict[str, Any]) -> None:
+    record = operation(handle)
+    authorization = validate_authorization(authorization)
+    if canonical_hash(authorization) != canonical_hash(record["authorization"]):
+        fail("continuation authorization does not match the launched operation")
+    exact_attestation_bundle(authorization, require_live=True)
+    if terminal_event(handle) is not None:
+        fail("terminal provider operation cannot continue")
+    accepted = operation_directory(handle) / "accepted-state.json"
+    if not accepted.exists():
+        fail("provider operation has not accepted its Delegation")
+    ensure_trusted_file(accepted, root_owned=False, max_bytes=MAX_CONTROL_BYTES)
+    if not any(event.get("type") == "accepted" for event in existing_events(handle)):
+        fail("provider operation has not accepted its Delegation")
+    continuation = operation_directory(handle) / "continue.json"
+    value = {
+        "authorization_binding_digest": authorization["binding_digest"],
+        "continued_at": instant(now_utc()),
+    }
+    if continuation.exists():
+        existing = read_json_file(continuation)
+        if existing.get("authorization_binding_digest") != authorization["binding_digest"]:
+            fail("provider continuation conflicts with the existing authorization")
+        return
+    write_atomic(continuation, canonical_bytes(value) + b"\n")
 
 
 def run_worker(handle: str) -> None:
@@ -1199,14 +1247,40 @@ def run_worker(handle: str) -> None:
         append_terminal(handle, "failed", {"phase": "offer", "reason": "invalid_decision"})
         cleanup_operation_secrets(handle)
         return
+    write_atomic(
+        operation_directory(handle) / "accepted-state.json",
+        canonical_bytes(
+            {
+                "thread_id": thread_id,
+                "authorization_binding_digest": authorization["binding_digest"],
+            }
+        )
+        + b"\n",
+    )
+    append_event(
+        handle,
+        "accepted",
+        canonical_bytes(
+            {
+                "decision": "ACCEPT",
+                "thread_binding_hash": content_hash(thread_id.encode("utf-8")),
+            }
+        ),
+        "provider_receipt",
+    )
+    if not wait_for_authorized_continuation(handle):
+        append_terminal(handle, "cancelled", {"cancel_requested": True})
+        cleanup_operation_secrets(handle)
+        return
     exact_attestation_bundle(authorization, require_live=True)
     prompt = ensure_trusted_file(
         operation_directory(handle) / "prompt.bin", root_owned=False, max_bytes=MAX_PROMPT_BYTES
     )
+    schema = read_json_file(operation_directory(handle) / "schema.json")
     return_code, _thread, messages, declined = stream_codex(
         handle,
         bwrap_command(handle, phase="review", thread_id=thread_id),
-        phase_two_prompt(prompt),
+        phase_two_prompt(prompt, schema),
         maximum,
     )
     if declined:
@@ -1219,7 +1293,6 @@ def run_worker(handle: str) -> None:
         return
     try:
         result = json.loads(messages[-1])
-        schema = read_json_file(operation_directory(handle) / "schema.json")
         validate_result_schema(result, schema)
         outcome = task_outcome(result)
     except (json.JSONDecodeError, ProviderError):
@@ -1369,6 +1442,9 @@ def build_parser() -> argparse.ArgumentParser:
     observe = subparsers.add_parser("observe")
     observe.add_argument("--provider-handle", required=True)
     observe.add_argument("--after-sequence", type=int, required=True)
+    continuation = subparsers.add_parser("continue")
+    continuation.add_argument("--provider-handle", required=True)
+    continuation.add_argument("--stdin-format", choices=("canonical-json-v1",), required=True)
     for command in ("cancel", "collect", "release", "worker", "finalize"):
         child = subparsers.add_parser(command)
         child.add_argument("--provider-handle", required=True)
@@ -1396,6 +1472,9 @@ def dispatch(arguments: argparse.Namespace) -> None:
         if arguments.after_sequence < 0:
             fail("after-sequence must be non-negative")
         observe_operation(arguments.provider_handle, arguments.after_sequence)
+    elif arguments.command == "continue":
+        continue_operation(arguments.provider_handle, read_json_stdin())
+        emit_json({"continued": True})
     elif arguments.command == "cancel":
         cancel_operation(arguments.provider_handle)
         emit_json({"cancelled": True})

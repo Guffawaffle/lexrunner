@@ -130,6 +130,38 @@ describe("GovernedAttemptAsyncSupervisor", () => {
     expect((await store.getAttemptOperation("operation-1"))?.result).toBeDefined();
     await store.close();
   });
+
+  it("recovers verifier-pending completion without resolving or reattaching an executor", async () => {
+    let executorResolutions = 0;
+    let verifications = 0;
+    const verifierPending = {
+      operation_id: "operation-1",
+      status: "completed",
+      result: { task_outcome: "block" },
+      verification_context: { context_hash: hash("context") },
+    };
+    const store = {
+      getAttemptOperation: async () => verifierPending,
+    };
+    const supervisor = new GovernedAttemptAsyncSupervisor(
+      store as never,
+      async () => {
+        executorResolutions += 1;
+        return null;
+      },
+      {
+        verifyCompleted: async (operationId) => {
+          expect(operationId).toBe("operation-1");
+          verifications += 1;
+        },
+      }
+    );
+
+    await expect(supervisor.attach("operation-1")).resolves.toBe("attached");
+    await supervisor.wait("operation-1");
+    expect(executorResolutions).toBe(0);
+    expect(verifications).toBe(1);
+  });
 });
 
 class DeferredExecutor implements AttemptExecutor {

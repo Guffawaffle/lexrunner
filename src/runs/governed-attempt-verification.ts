@@ -1,0 +1,197 @@
+import { z } from "zod";
+
+import {
+  EnvironmentAttestation_v1,
+  ExecutorAttestation_v1,
+  GovernedReviewRequirements_v1,
+  WorkspaceAttestation_v1,
+} from "./governed-attempt-executor.js";
+import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
+import {
+  ProtectedEvidenceFrameClass,
+  ProtectedEvidenceReference_v1,
+} from "../store/protected-evidence-store.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
+
+export const GOVERNED_ATTEMPT_VERIFICATION_VERSION = "1.0.0" as const;
+
+const opaqueId = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "Must be an opaque identifier");
+const instant = z.string().datetime({ offset: true });
+
+const BoundedOutputSchema = z.record(z.string(), z.unknown()).refine(
+  (value) => {
+    try {
+      return Buffer.byteLength(canonicalJSONStringify(value), "utf8") <= 256 * 1_024;
+    } catch {
+      return false;
+    }
+  },
+  { message: "output schema must be bounded canonical JSON" }
+);
+
+const verificationContextBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_ATTEMPT_VERIFICATION_VERSION),
+    requirements: GovernedReviewRequirements_v1,
+    executor: ExecutorAttestation_v1,
+    environment: EnvironmentAttestation_v1,
+    workspace: WorkspaceAttestation_v1,
+    output_schema: BoundedOutputSchema,
+    output_schema_hash: SHA256Hash,
+  })
+  .strict();
+
+/**
+ * Safe, durable verifier input. It contains no prompt or raw evidence. Every
+ * attestation and requirement is hash-bound to the operation authorization.
+ */
+export const GovernedAttemptVerificationContext_v1 = verificationContextBody
+  .extend({ context_hash: SHA256Hash })
+  .strict()
+  .superRefine((value, context) => {
+    if (computeCanonicalHash(value.output_schema) !== value.output_schema_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["output_schema_hash"],
+        message: "output schema hash does not match the canonical schema",
+      });
+    }
+    const { context_hash: _contextHash, ...body } = value;
+    if (computeCanonicalHash(body) !== value.context_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["context_hash"],
+        message: "verification context hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedAttemptVerificationContext_v1 = z.infer<
+  typeof GovernedAttemptVerificationContext_v1
+>;
+
+export function createGovernedAttemptVerificationContext(
+  input: Omit<z.input<typeof verificationContextBody>, "schema_version" | "output_schema_hash"> & {
+    output_schema: Record<string, unknown>;
+  }
+): GovernedAttemptVerificationContext_v1 {
+  const body = verificationContextBody.parse({
+    schema_version: GOVERNED_ATTEMPT_VERIFICATION_VERSION,
+    ...input,
+    output_schema_hash: computeCanonicalHash(input.output_schema),
+  });
+  return GovernedAttemptVerificationContext_v1.parse({
+    ...body,
+    context_hash: computeCanonicalHash(body),
+  });
+}
+
+export const GovernedAttemptVerificationFailureCode = z.enum([
+  "operation_not_completed",
+  "result_missing",
+  "provider_claim_elevated",
+  "authorization_invalid",
+  "authorization_expired",
+  "context_binding_mismatch",
+  "control_unverifiable",
+  "evidence_incomplete",
+  "evidence_binding_mismatch",
+  "evidence_integrity_failure",
+  "event_mismatch",
+  "protocol_violation",
+  "output_schema_invalid",
+  "output_invalid",
+  "outcome_mismatch",
+]);
+export type GovernedAttemptVerificationFailureCode = z.infer<
+  typeof GovernedAttemptVerificationFailureCode
+>;
+
+const verificationReceiptBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_ATTEMPT_VERIFICATION_VERSION),
+    verification_id: opaqueId,
+    verifier_id: opaqueId,
+    operation_id: opaqueId,
+    attempt_id: opaqueId,
+    delegation_id: opaqueId,
+    capture_id: opaqueId,
+    authorization_binding_digest: SHA256Hash,
+    verification_context_hash: SHA256Hash,
+    operation_result_hash: SHA256Hash,
+    capture_root: SHA256Hash,
+    capture_verification_hash: SHA256Hash,
+    decision: z.enum(["accepted", "rejected"]),
+    task_outcome: z.enum(["pass", "block", "not_produced", "invalid"]),
+    admissibility: z.enum(["admissible", "inadmissible"]),
+    failure_codes: z.array(GovernedAttemptVerificationFailureCode).max(16),
+    verified_at: instant,
+  })
+  .strict();
+
+/** Coordination-safe independent-verifier receipt. Raw bytes never enter it. */
+export const GovernedAttemptVerificationReceipt_v1 = verificationReceiptBody
+  .extend({ receipt_hash: SHA256Hash })
+  .strict()
+  .superRefine((value, context) => {
+    const accepted = value.decision === "accepted";
+    if (
+      accepted !== (value.admissibility === "admissible") ||
+      accepted !== (value.failure_codes.length === 0) ||
+      (accepted && !["pass", "block"].includes(value.task_outcome))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["decision"],
+        message: "accepted verification requires an admissible PASS/BLOCK and no failures",
+      });
+    }
+    const { receipt_hash: _receiptHash, ...body } = value;
+    if (computeCanonicalHash(body) !== value.receipt_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["receipt_hash"],
+        message: "verification receipt hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedAttemptVerificationReceipt_v1 = z.infer<
+  typeof GovernedAttemptVerificationReceipt_v1
+>;
+
+export function createGovernedAttemptVerificationReceipt(
+  input: Omit<z.input<typeof verificationReceiptBody>, "schema_version">
+): GovernedAttemptVerificationReceipt_v1 {
+  const body = verificationReceiptBody.parse({
+    schema_version: GOVERNED_ATTEMPT_VERIFICATION_VERSION,
+    ...input,
+  });
+  return GovernedAttemptVerificationReceipt_v1.parse({
+    ...body,
+    receipt_hash: computeCanonicalHash(body),
+  });
+}
+
+export interface IndependentlyReadEvidenceFrame {
+  sequence: number;
+  frameClass: z.infer<typeof ProtectedEvidenceFrameClass>;
+  observedAt: string;
+  evidenceRef: string;
+  bytes: Uint8Array;
+}
+
+/**
+ * Result of a fresh, verifier-owned read of the sealed container. This port is
+ * intentionally separate from the write-only execution evidence port.
+ */
+export interface IndependentlyVerifiedEvidenceCapture {
+  reference: z.infer<typeof ProtectedEvidenceReference_v1>;
+  frames: readonly IndependentlyReadEvidenceFrame[];
+}
+
+export interface ProtectedEvidenceIndependentReader {
+  readVerifiedCapture(captureId: string): Promise<IndependentlyVerifiedEvidenceCapture>;
+}

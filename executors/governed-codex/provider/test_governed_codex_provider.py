@@ -77,7 +77,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         QUALIFICATION.write_text(json.dumps(qualification), encoding="utf-8")
         QUALIFICATION.chmod(0o600)
 
-    def test_prepares_and_reloads_the_exact_pre_authorization_bundle(self) -> None:
+    def authorization(self) -> tuple[dict, dict]:
         bundle = provider.prepare_bundle(
             {
                 "environment_id": "disposable-environment-1",
@@ -117,7 +117,10 @@ class GovernedCodexProviderTest(unittest.TestCase):
             "authorized_at": when(0),
             "expires_at": when(60),
         }
-        authorization = {**body, "binding_digest": provider.canonical_hash(body)}
+        return bundle, {**body, "binding_digest": provider.canonical_hash(body)}
+
+    def test_prepares_and_reloads_the_exact_pre_authorization_bundle(self) -> None:
+        bundle, authorization = self.authorization()
         self.assertEqual(
             provider.exact_attestation_bundle(authorization, require_live=True), bundle
         )
@@ -127,6 +130,50 @@ class GovernedCodexProviderTest(unittest.TestCase):
         with self.assertRaisesRegex(provider.ProviderError, "workspace changed"):
             provider.exact_attestation_bundle(authorization, require_live=True)
         corpus.write_text("Synthetic review corpus.\n", encoding="utf-8")
+
+    def test_continuation_requires_durable_accept_and_exact_authorization(self) -> None:
+        handle = "provider-" + "d" * 32
+        directory = provider.operation_directory(handle)
+        directory.mkdir(mode=0o700, parents=True)
+        _, authorization = self.authorization()
+        provider.write_atomic(
+            directory / "operation.json",
+            provider.canonical_bytes(
+                {
+                    "provider_handle": handle,
+                    "operation_id": "operation-1",
+                    "authorization": authorization,
+                }
+            )
+            + b"\n",
+        )
+
+        with self.assertRaises(provider.ProviderError):
+            provider.continue_operation(handle, authorization)
+        self.assertFalse((directory / "continue.json").exists())
+
+        provider.write_atomic(directory / "accepted-state.json", b"{}\n")
+        provider.append_event(
+            handle,
+            "accepted",
+            provider.canonical_bytes({"decision": "ACCEPT"}),
+            "provider_receipt",
+        )
+        conflicting = dict(authorization)
+        conflicting["authorization_id"] = "authorization-2"
+        conflicting_body = {
+            key: value for key, value in conflicting.items() if key != "binding_digest"
+        }
+        conflicting["binding_digest"] = provider.canonical_hash(conflicting_body)
+        with self.assertRaisesRegex(provider.ProviderError, "does not match"):
+            provider.continue_operation(handle, conflicting)
+
+        provider.continue_operation(handle, authorization)
+        provider.continue_operation(handle, authorization)
+        continuation = provider.read_json_file(directory / "continue.json")
+        self.assertEqual(
+            continuation["authorization_binding_digest"], authorization["binding_digest"]
+        )
 
     def test_terminal_event_closes_the_provider_stream(self) -> None:
         handle = "provider-" + "a" * 32
@@ -144,7 +191,9 @@ class GovernedCodexProviderTest(unittest.TestCase):
             )
         self.assertEqual(provider.terminal_event(handle)["type"], "declined")
 
-    def test_review_mounts_and_applies_the_authorized_output_schema(self) -> None:
+    def test_review_keeps_exact_no_reachable_and_leaves_schema_validation_to_verifiers(
+        self,
+    ) -> None:
         handle = "provider-" + "b" * 32
         directory = provider.operation_directory(handle)
         directory.mkdir(mode=0o700, parents=True)
@@ -168,14 +217,17 @@ class GovernedCodexProviderTest(unittest.TestCase):
 
         self.assertNotIn("--output-schema", offer)
         self.assertNotIn("/run/lexrunner-output-schema.json", offer)
-        self.assertIn("--output-schema", review)
-        self.assertEqual(
-            review[review.index("--output-schema") + 1],
-            "/run/lexrunner-output-schema.json",
+        self.assertNotIn("--output-schema", review)
+        self.assertNotIn("/run/lexrunner-output-schema.json", review)
+        self.assertNotIn(str(directory / "schema.json"), review)
+        resumed_prompt = provider.phase_two_prompt(
+            b"Review the bounded candidate.",
+            {"type": "object", "required": ["verdict"]},
+        ).decode("utf-8")
+        self.assertIn("final response exactly equal to NO", resumed_prompt)
+        self.assertIn(
+            '{"required":["verdict"],"type":"object"}', resumed_prompt
         )
-        schema_mount = review.index(str(directory / "schema.json"))
-        self.assertEqual(review[schema_mount - 1], "--ro-bind")
-        self.assertEqual(review[schema_mount + 1], "/run/lexrunner-output-schema.json")
 
     def test_release_requires_terminal_state_and_removes_the_transient_spool(self) -> None:
         handle = "provider-" + "c" * 32

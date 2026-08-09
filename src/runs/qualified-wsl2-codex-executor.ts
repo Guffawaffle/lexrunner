@@ -37,6 +37,7 @@ const emissionCommon = {
 
 export const QualifiedCodexProviderEmission_v1 = z.discriminatedUnion("type", [
   z.object({ ...emissionCommon, type: z.literal("started") }).strict(),
+  z.object({ ...emissionCommon, type: z.literal("accepted") }).strict(),
   z
     .object({
       ...emissionCommon,
@@ -118,6 +119,10 @@ export interface QualifiedCodexProviderBridge {
     providerHandle: string,
     options: { afterSequence: number; signal?: AbortSignal }
   ): AsyncIterable<QualifiedCodexProviderEmission_v1>;
+  continueAfterAcceptance(
+    providerHandle: string,
+    authorization: AttemptAuthorization
+  ): Promise<void>;
   cancel(providerHandle: string): Promise<void>;
   collect(providerHandle: string): Promise<QualifiedCodexProviderClaim>;
   release(providerHandle: string): Promise<void>;
@@ -278,6 +283,12 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
         await active.evidence.markIncomplete({ reasonCode: "cancelled", terminalAt: this.now() });
       }
     }
+  }
+
+  async continueAfterAcceptance(handleCandidate: AttemptExecutorHandle): Promise<void> {
+    const handle = AttemptExecutorHandle_v1.parse(handleCandidate);
+    const active = this.requireActive(handle);
+    await this.bridge.continueAfterAcceptance(handle.provider_handle, active.authorization);
   }
 
   async collect(handleCandidate: AttemptExecutorHandle): Promise<GovernedAttemptResult> {

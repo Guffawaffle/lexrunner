@@ -21,6 +21,10 @@ import {
   ProtectedEvidenceReservationRequest_v1,
   type ProtectedEvidenceReservationRequest_v1 as ProtectedEvidenceReservationRequest,
 } from "../store/protected-evidence-store.js";
+import {
+  GovernedAttemptVerificationContext_v1,
+  type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
+} from "./governed-attempt-verification.js";
 
 type GovernedOperationStore = GovernedAttemptOperationStore & GovernedDelegationStore;
 
@@ -33,6 +37,7 @@ export interface StartGovernedAttemptOperationInput {
   outputSchema: unknown;
   evidence?: GovernedAttemptEvidenceCapture;
   evidenceReservation?: ProtectedEvidenceReservationRequest;
+  verificationContext?: GovernedAttemptVerificationContext;
   now: string;
 }
 
@@ -63,7 +68,14 @@ export type ObserveGovernedAttemptOperationResult =
   | {
       terminal: false;
       operationId: string;
-      reason: "not_found" | "store_rejected" | "decline_latch_failed" | "observation_aborted";
+      reason:
+        | "not_found"
+        | "store_rejected"
+        | "acceptance_latch_failed"
+        | "work_authorization_failed"
+        | "continuation_failed"
+        | "decline_latch_failed"
+        | "observation_aborted";
     };
 
 /**
@@ -84,7 +96,11 @@ export class GovernedAttemptOperationService {
     const invocation = DelegationInvocationRequest_v1.parse(input.invocation);
     const delegation = await this.store.getDelegation(authorization.delegation_id);
     if (!delegation) return { started: false, reason: "delegation_not_found" };
-    if (delegation.status !== "accepted" || !delegation.acceptance_receipt_hash) {
+    const offerLaunch = invocation.phase === "offer";
+    if (
+      (offerLaunch && delegation.status !== "offered") ||
+      (!offerLaunch && (delegation.status !== "accepted" || !delegation.acceptance_receipt_hash))
+    ) {
       return { started: false, reason: "delegation_not_accepted" };
     }
     if (
@@ -98,12 +114,17 @@ export class GovernedAttemptOperationService {
     ) {
       return { started: false, reason: "binding_mismatch" };
     }
-    if ((input.evidence === undefined) !== (input.evidenceReservation === undefined)) {
+    if (
+      (input.evidence === undefined) !== (input.evidenceReservation === undefined) ||
+      (input.evidence === undefined) !== (input.verificationContext === undefined)
+    ) {
       return { started: false, reason: "binding_mismatch" };
     }
     let evidenceReservation: ProtectedEvidenceReservationRequest | undefined;
+    let verificationContext: GovernedAttemptVerificationContext | undefined;
     if (input.evidence && input.evidenceReservation) {
       evidenceReservation = ProtectedEvidenceReservationRequest_v1.parse(input.evidenceReservation);
+      verificationContext = GovernedAttemptVerificationContext_v1.parse(input.verificationContext);
       const reference = input.evidence.getReference();
       if (
         reference.status !== "open" ||
@@ -120,7 +141,15 @@ export class GovernedAttemptOperationService {
         reference.authorization_binding_digest !== authorization.binding_digest ||
         reference.executor_binding_digest !== authorization.executor_attestation_hash ||
         reference.environment_binding_digest !== authorization.environment_attestation_hash ||
-        reference.workspace_binding_digest !== authorization.workspace_attestation_hash
+        reference.workspace_binding_digest !== authorization.workspace_attestation_hash ||
+        computeCanonicalHash(verificationContext.requirements) !==
+          authorization.requirements_hash ||
+        computeCanonicalHash(verificationContext.executor) !==
+          authorization.executor_attestation_hash ||
+        computeCanonicalHash(verificationContext.environment) !==
+          authorization.environment_attestation_hash ||
+        computeCanonicalHash(verificationContext.workspace) !==
+          authorization.workspace_attestation_hash
       ) {
         return { started: false, reason: "binding_mismatch" };
       }
@@ -158,6 +187,7 @@ export class GovernedAttemptOperationService {
         ? {
             evidenceReservation,
             evidenceDeclaration: input.evidence!.getReference(),
+            verificationContext: verificationContext!,
           }
         : {}),
       now: input.now,
@@ -182,11 +212,25 @@ export class GovernedAttemptOperationService {
     if (!record) return { terminal: false, operationId, reason: "not_found" };
     if (record.status !== "running") return this.terminalResult(record);
 
+    const acceptedEvent = (await this.store.listAttemptOperationEvents(operationId))
+      .map((entry) => entry.event)
+      .find((event) => event.type === "accepted");
+    if (acceptedEvent) {
+      const continued = await this.continueAcceptedWork(executor, record, acceptedEvent);
+      if (!continued) return this.cancel(executor, operationId);
+    }
+
     for await (const candidate of executor.observe(record.handle, {
       afterSequence: record.last_event_sequence,
       ...(signal ? { signal } : {}),
     })) {
       const event = AttemptExecutorEvent_v1.parse(candidate);
+      if (event.type === "accepted") {
+        const latched = await this.latchAcceptance(record, event);
+        if (!latched) {
+          return this.cancel(executor, operationId);
+        }
+      }
       if (event.type === "declined") {
         const latched = await this.latchDecline(record, event);
         if (!latched) {
@@ -206,6 +250,10 @@ export class GovernedAttemptOperationService {
         return { terminal: false, operationId, reason: "store_rejected" };
       }
       record = appended.record;
+      if (event.type === "accepted") {
+        const continued = await this.continueAcceptedWork(executor, record, event);
+        if (!continued) return this.cancel(executor, operationId);
+      }
       if (event.type === "declined") {
         await executor.cancel(record.handle).catch(() => undefined);
         await executor.release(record.handle).catch(() => undefined);
@@ -335,6 +383,78 @@ export class GovernedAttemptOperationService {
       now: event.observed_at,
     });
     return decided.recorded || decided.reason === "delegation_declined";
+  }
+
+  private async latchAcceptance(
+    record: Awaited<ReturnType<GovernedAttemptOperationStore["getAttemptOperation"]>> & {},
+    event: AttemptExecutorEvent
+  ): Promise<boolean> {
+    const delegation = await this.store.getDelegation(record.delegation_id);
+    if (!delegation) return false;
+    if (delegation.status === "accepted") return true;
+    if (delegation.status !== "offered") return false;
+    const receipt = createDelegationDecisionReceipt({
+      offer: delegation.state.offer,
+      decision: "ACCEPT",
+      decisionReceiptId: `${record.operation_id}:accept:${event.sequence}`,
+      decidedAt: event.observed_at,
+    });
+    const decided = await this.store.recordDelegationDecision({
+      mutationId: `${record.operation_id}:accept:${event.sequence}`,
+      delegationId: record.delegation_id,
+      expectedRevision: delegation.revision,
+      receipt,
+      now: event.observed_at,
+    });
+    if (decided.recorded) return true;
+    return (await this.store.getDelegation(record.delegation_id))?.status === "accepted";
+  }
+
+  private async authorizeAcceptedWork(
+    record: Awaited<ReturnType<GovernedAttemptOperationStore["getAttemptOperation"]>> & {},
+    event: AttemptExecutorEvent
+  ): Promise<boolean> {
+    const delegation = await this.store.getDelegation(record.delegation_id);
+    if (!delegation || delegation.status !== "accepted") return false;
+    const offer = delegation.state.offer;
+    const request = DelegationInvocationRequest_v1.parse({
+      schema_version: "1.0.0",
+      delegation_id: record.delegation_id,
+      attempt_id: record.attempt_id,
+      offer_hash: delegation.offer_hash,
+      authority_grant_hash: offer.authority_grant_hash,
+      worker_thread_id: offer.worker.thread_id,
+      transcript_start_hash: offer.transcript_start_hash,
+      provider_attestation_hash: record.authorization.executor_attestation_hash,
+      environment_attestation_hash: record.authorization.environment_attestation_hash,
+      workspace_attestation_hash: record.authorization.workspace_attestation_hash,
+      phase: "authorized_work",
+    });
+    const authorized = await this.store.authorizeDelegationInvocation({
+      mutationId: `${record.operation_id}:authorize-work:${event.sequence}`,
+      delegationId: record.delegation_id,
+      expectedRevision: delegation.revision,
+      request,
+      now: event.observed_at,
+    });
+    return authorized.authorized;
+  }
+
+  private async continueAcceptedWork(
+    executor: AttemptExecutor,
+    record: Awaited<ReturnType<GovernedAttemptOperationStore["getAttemptOperation"]>> & {},
+    event: AttemptExecutorEvent
+  ): Promise<boolean> {
+    if (event.type !== "accepted") return false;
+    if (!(await this.latchAcceptance(record, event))) return false;
+    if (!(await this.authorizeAcceptedWork(record, event))) return false;
+    if (!executor.continueAfterAcceptance) return false;
+    try {
+      await executor.continueAfterAcceptance(record.handle);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private terminalResult(

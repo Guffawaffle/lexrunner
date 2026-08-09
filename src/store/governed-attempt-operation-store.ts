@@ -17,6 +17,12 @@ import {
   type ProtectedEvidenceReference_v1 as ProtectedEvidenceReference,
   type ProtectedEvidenceReservationRequest_v1 as ProtectedEvidenceReservationRequest,
 } from "./protected-evidence-store.js";
+import {
+  GovernedAttemptVerificationContext_v1,
+  GovernedAttemptVerificationReceipt_v1,
+  type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
+  type GovernedAttemptVerificationReceipt_v1 as GovernedAttemptVerificationReceipt,
+} from "../runs/governed-attempt-verification.js";
 
 export const GOVERNED_ATTEMPT_OPERATION_STORE_VERSION = "1.0.0" as const;
 
@@ -49,9 +55,11 @@ export const GovernedAttemptOperationRecord_v1 = z
     authorization: AttemptAuthorization_v1,
     evidence_reservation: ProtectedEvidenceReservationRequest_v1.optional(),
     evidence_declaration: ProtectedEvidenceReference_v1.optional(),
+    verification_context: GovernedAttemptVerificationContext_v1.optional(),
     last_event_sequence: z.number().int().nonnegative(),
     result: GovernedAttemptResult_v1.optional(),
     result_hash: SHA256Hash.optional(),
+    verification: GovernedAttemptVerificationReceipt_v1.optional(),
     created_at: instant,
     updated_at: instant,
     terminal_at: instant.optional(),
@@ -104,6 +112,24 @@ export const GovernedAttemptOperationRecord_v1 = z
         });
       }
     }
+    if (value.verification_context) {
+      const verifier = value.verification_context;
+      if (
+        verifier.requirements.attempt_id !== value.attempt_id ||
+        verifier.requirements.delegation_id !== value.delegation_id ||
+        computeCanonicalHash(verifier.requirements) !== value.authorization.requirements_hash ||
+        computeCanonicalHash(verifier.executor) !== value.authorization.executor_attestation_hash ||
+        computeCanonicalHash(verifier.environment) !==
+          value.authorization.environment_attestation_hash ||
+        computeCanonicalHash(verifier.workspace) !== value.authorization.workspace_attestation_hash
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["verification_context"],
+          message: "verification context must exactly bind the operation authorization",
+        });
+      }
+    }
     const terminal = value.status !== "running";
     if (terminal !== (value.terminal_at !== undefined)) {
       context.addIssue({
@@ -137,6 +163,26 @@ export const GovernedAttemptOperationRecord_v1 = z
         message: "operation result identity does not match the operation",
       });
     }
+    if (value.verification) {
+      if (
+        !value.result_hash ||
+        !value.verification_context ||
+        !value.evidence_declaration ||
+        value.verification.operation_id !== value.operation_id ||
+        value.verification.attempt_id !== value.attempt_id ||
+        value.verification.delegation_id !== value.delegation_id ||
+        value.verification.authorization_binding_digest !== value.authorization.binding_digest ||
+        value.verification.verification_context_hash !== value.verification_context.context_hash ||
+        value.verification.operation_result_hash !== value.result_hash ||
+        value.verification.capture_id !== value.evidence_declaration.capture_id
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["verification"],
+          message: "independent verification receipt must exactly bind the operation result",
+        });
+      }
+    }
   });
 export type GovernedAttemptOperationRecord_v1 = z.infer<typeof GovernedAttemptOperationRecord_v1>;
 
@@ -161,6 +207,7 @@ export interface CreateGovernedAttemptOperationInput {
   authorization: AttemptAuthorization;
   evidenceReservation?: ProtectedEvidenceReservationRequest;
   evidenceDeclaration?: ProtectedEvidenceReference;
+  verificationContext?: GovernedAttemptVerificationContext;
   now: string;
 }
 
@@ -180,6 +227,14 @@ export interface RecordGovernedAttemptOperationResultInput {
   now: string;
 }
 
+export interface RecordGovernedAttemptOperationVerificationInput {
+  mutationId: string;
+  operationId: string;
+  expectedRevision: number;
+  verification: GovernedAttemptVerificationReceipt;
+  now: string;
+}
+
 export type GovernedAttemptOperationFailureReason =
   | "not_found"
   | "operation_conflict"
@@ -188,7 +243,8 @@ export type GovernedAttemptOperationFailureReason =
   | "sequence_mismatch"
   | "terminal_latched"
   | "binding_mismatch"
-  | "result_conflict";
+  | "result_conflict"
+  | "verification_conflict";
 
 export type CreateGovernedAttemptOperationResult =
   | {
@@ -215,6 +271,14 @@ export type RecordGovernedAttemptOperationResultResult =
     }
   | { recorded: false; reason: GovernedAttemptOperationFailureReason };
 
+export type RecordGovernedAttemptOperationVerificationResult =
+  | {
+      recorded: true;
+      record: GovernedAttemptOperationRecord_v1;
+      idempotentReplay: boolean;
+    }
+  | { recorded: false; reason: GovernedAttemptOperationFailureReason };
+
 export interface GovernedAttemptOperationStore {
   createAttemptOperation(
     input: CreateGovernedAttemptOperationInput
@@ -225,6 +289,9 @@ export interface GovernedAttemptOperationStore {
   recordAttemptOperationResult(
     input: RecordGovernedAttemptOperationResultInput
   ): Promise<RecordGovernedAttemptOperationResultResult>;
+  recordAttemptOperationVerification(
+    input: RecordGovernedAttemptOperationVerificationInput
+  ): Promise<RecordGovernedAttemptOperationVerificationResult>;
   getAttemptOperation(operationId: string): Promise<GovernedAttemptOperationRecord_v1 | null>;
   listRecoverableAttemptOperations(): Promise<GovernedAttemptOperationRecord_v1[]>;
   listAttemptOperationEvents(operationId: string): Promise<GovernedAttemptOperationEvent_v1[]>;

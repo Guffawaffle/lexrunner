@@ -7,6 +7,10 @@ import {
   AttemptExecutorHandle_v1,
   GovernedAttemptResult_v1,
 } from "../../runs/governed-attempt-executor.js";
+import {
+  GovernedAttemptVerificationContext_v1,
+  GovernedAttemptVerificationReceipt_v1,
+} from "../../runs/governed-attempt-verification.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import { canonicalJSONStringify } from "../../util/canonicalJson.js";
 import {
@@ -23,6 +27,8 @@ import {
   type GovernedAttemptOperationStore,
   type RecordGovernedAttemptOperationResultInput,
   type RecordGovernedAttemptOperationResultResult,
+  type RecordGovernedAttemptOperationVerificationInput,
+  type RecordGovernedAttemptOperationVerificationResult,
 } from "../governed-attempt-operation-store.js";
 import type { SqliteCoordinationStoreOptions } from "./coordination-store.js";
 import { SqliteGovernedDelegationStore } from "./governed-delegation-store.js";
@@ -37,8 +43,10 @@ CREATE TABLE IF NOT EXISTS governed_attempt_operations (
  authorizationJson TEXT NOT NULL CHECK(length(authorizationJson)<=262144),
  evidenceReservationJson TEXT CHECK(evidenceReservationJson IS NULL OR length(evidenceReservationJson)<=262144),
  evidenceDeclarationJson TEXT CHECK(evidenceDeclarationJson IS NULL OR length(evidenceDeclarationJson)<=262144),
+ verificationContextJson TEXT CHECK(verificationContextJson IS NULL OR length(verificationContextJson)<=262144),
  lastEventSequence INTEGER NOT NULL CHECK(lastEventSequence>=0),
  resultJson TEXT CHECK(resultJson IS NULL OR length(resultJson)<=262144), resultHash TEXT,
+ verificationJson TEXT CHECK(verificationJson IS NULL OR length(verificationJson)<=262144),
  createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, terminalAt TEXT,
  FOREIGN KEY(delegationId) REFERENCES governed_delegations(delegationId) ON DELETE RESTRICT);
 CREATE INDEX IF NOT EXISTS idx_governed_attempt_operations_delegation
@@ -51,6 +59,9 @@ CREATE TABLE IF NOT EXISTS governed_attempt_operation_events (
  PRIMARY KEY(operationId,executorSequence), UNIQUE(mutationId),
  FOREIGN KEY(operationId) REFERENCES governed_attempt_operations(operationId) ON DELETE RESTRICT);
 CREATE TABLE IF NOT EXISTS governed_attempt_operation_result_mutations (
+ mutationId TEXT PRIMARY KEY, operationId TEXT NOT NULL, mutationFingerprint TEXT NOT NULL,
+ FOREIGN KEY(operationId) REFERENCES governed_attempt_operations(operationId) ON DELETE RESTRICT);
+CREATE TABLE IF NOT EXISTS governed_attempt_operation_verification_mutations (
  mutationId TEXT PRIMARY KEY, operationId TEXT NOT NULL, mutationFingerprint TEXT NOT NULL,
  FOREIGN KEY(operationId) REFERENCES governed_attempt_operations(operationId) ON DELETE RESTRICT);
 INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
@@ -69,9 +80,11 @@ interface OperationRow {
   authorizationJson: string | null;
   evidenceReservationJson: string | null;
   evidenceDeclarationJson: string | null;
+  verificationContextJson: string | null;
   lastEventSequence: number;
   resultJson: string | null;
   resultHash: string | null;
+  verificationJson: string | null;
   createdAt: string;
   updatedAt: string;
   terminalAt: string | null;
@@ -95,6 +108,12 @@ interface ResultMutationRow {
   mutationFingerprint: string;
 }
 
+interface VerificationMutationRow {
+  mutationId: string;
+  operationId: string;
+  mutationFingerprint: string;
+}
+
 export class SqliteGovernedAttemptOperationStore
   extends SqliteGovernedDelegationStore
   implements GovernedAttemptOperationStore
@@ -105,6 +124,7 @@ export class SqliteGovernedAttemptOperationStore
       try {
         this.applyOperationMigration();
         this.applyOperationBindingMigration();
+        this.applyOperationVerificationMigration();
       } catch (error) {
         this.db.close();
         throw error;
@@ -117,6 +137,9 @@ export class SqliteGovernedAttemptOperationStore
   ): Promise<CreateGovernedAttemptOperationResult> {
     const handle = AttemptExecutorHandle_v1.parse(input.handle);
     const authorization = AttemptAuthorization_v1.parse(input.authorization);
+    const verificationContext = input.verificationContext
+      ? GovernedAttemptVerificationContext_v1.parse(input.verificationContext)
+      : undefined;
     const now = normalizeInstant(input.now);
     const fingerprint = computeCanonicalHash({
       kind: "operation_create",
@@ -124,6 +147,7 @@ export class SqliteGovernedAttemptOperationStore
       authorization,
       ...(input.evidenceReservation ? { evidence_reservation: input.evidenceReservation } : {}),
       ...(input.evidenceDeclaration ? { evidence_declaration: input.evidenceDeclaration } : {}),
+      ...(verificationContext ? { verification_context: verificationContext } : {}),
     });
     return this.db.transaction(() => {
       const replay = this.db
@@ -151,6 +175,9 @@ export class SqliteGovernedAttemptOperationStore
             ...(existing.evidence_declaration
               ? { evidence_declaration: existing.evidence_declaration }
               : {}),
+            ...(existing.verification_context
+              ? { verification_context: existing.verification_context }
+              : {}),
           }) !== fingerprint
         ) {
           return { created: false, reason: "operation_conflict" } as const;
@@ -166,6 +193,11 @@ export class SqliteGovernedAttemptOperationStore
           .get(input.mutationId) ??
         this.db
           .prepare("SELECT 1 FROM governed_attempt_operation_result_mutations WHERE mutationId=?")
+          .get(input.mutationId) ??
+        this.db
+          .prepare(
+            "SELECT 1 FROM governed_attempt_operation_verification_mutations WHERE mutationId=?"
+          )
           .get(input.mutationId);
       if (mutation) return { created: false, reason: "mutation_conflict" } as const;
       const record = GovernedAttemptOperationRecord_v1.parse({
@@ -179,6 +211,7 @@ export class SqliteGovernedAttemptOperationStore
         authorization,
         ...(input.evidenceReservation ? { evidence_reservation: input.evidenceReservation } : {}),
         ...(input.evidenceDeclaration ? { evidence_declaration: input.evidenceDeclaration } : {}),
+        ...(verificationContext ? { verification_context: verificationContext } : {}),
         last_event_sequence: 0,
         created_at: now,
         updated_at: now,
@@ -188,9 +221,9 @@ export class SqliteGovernedAttemptOperationStore
           `INSERT INTO governed_attempt_operations(
             operationId,attemptId,delegationId,revision,status,createMutationId,
             createMutationFingerprint,handleJson,authorizationJson,evidenceReservationJson,
-            evidenceDeclarationJson,lastEventSequence,resultJson,resultHash,
-            createdAt,updatedAt,terminalAt
-          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+            evidenceDeclarationJson,verificationContextJson,lastEventSequence,resultJson,resultHash,
+            verificationJson,createdAt,updatedAt,terminalAt
+          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           record.operation_id,
@@ -204,7 +237,9 @@ export class SqliteGovernedAttemptOperationStore
           canonicalJSONStringify(record.authorization),
           record.evidence_reservation ? canonicalJSONStringify(record.evidence_reservation) : null,
           record.evidence_declaration ? canonicalJSONStringify(record.evidence_declaration) : null,
+          record.verification_context ? canonicalJSONStringify(record.verification_context) : null,
           0,
+          null,
           null,
           null,
           record.created_at,
@@ -385,6 +420,83 @@ export class SqliteGovernedAttemptOperationStore
     })();
   }
 
+  async recordAttemptOperationVerification(
+    input: RecordGovernedAttemptOperationVerificationInput
+  ): Promise<RecordGovernedAttemptOperationVerificationResult> {
+    const verification = GovernedAttemptVerificationReceipt_v1.parse(input.verification);
+    const now = normalizeInstant(input.now);
+    const fingerprint = computeCanonicalHash({
+      kind: "operation_verification",
+      operation_id: input.operationId,
+      expected_revision: input.expectedRevision,
+      receipt_hash: verification.receipt_hash,
+    });
+    return this.db.transaction(() => {
+      const replay = this.db
+        .prepare(
+          "SELECT * FROM governed_attempt_operation_verification_mutations WHERE mutationId=?"
+        )
+        .get(input.mutationId) as VerificationMutationRow | undefined;
+      if (replay) {
+        if (
+          replay.operationId !== input.operationId ||
+          replay.mutationFingerprint !== fingerprint
+        ) {
+          return { recorded: false, reason: "mutation_conflict" } as const;
+        }
+        return {
+          recorded: true,
+          record: this.requireOperation(input.operationId),
+          idempotentReplay: true,
+        } as const;
+      }
+      const current = this.operation(input.operationId);
+      if (!current) return { recorded: false, reason: "not_found" } as const;
+      if (current.revision !== input.expectedRevision) {
+        return { recorded: false, reason: "stale_revision" } as const;
+      }
+      if (!current.result || !current.result_hash) {
+        return { recorded: false, reason: "verification_conflict" } as const;
+      }
+      if (
+        verification.operation_id !== current.operation_id ||
+        verification.operation_result_hash !== current.result_hash ||
+        verification.authorization_binding_digest !== current.authorization.binding_digest ||
+        verification.verification_context_hash !== current.verification_context?.context_hash ||
+        verification.capture_id !== current.evidence_declaration?.capture_id
+      ) {
+        return { recorded: false, reason: "binding_mismatch" } as const;
+      }
+      if (current.verification && current.verification.receipt_hash !== verification.receipt_hash) {
+        return { recorded: false, reason: "verification_conflict" } as const;
+      }
+      this.db
+        .prepare(
+          `UPDATE governed_attempt_operations SET revision=?,verificationJson=?,updatedAt=?
+           WHERE operationId=? AND revision=?`
+        )
+        .run(
+          current.revision + 1,
+          canonicalJSONStringify(verification),
+          now,
+          current.operation_id,
+          current.revision
+        );
+      this.db
+        .prepare(
+          `INSERT INTO governed_attempt_operation_verification_mutations(
+            mutationId,operationId,mutationFingerprint
+          ) VALUES(?,?,?)`
+        )
+        .run(input.mutationId, input.operationId, fingerprint);
+      return {
+        recorded: true,
+        record: this.requireOperation(input.operationId),
+        idempotentReplay: false,
+      } as const;
+    })();
+  }
+
   async getAttemptOperation(operationId: string): Promise<GovernedAttemptOperationRecord | null> {
     return this.operation(operationId);
   }
@@ -393,7 +505,11 @@ export class SqliteGovernedAttemptOperationStore
     const rows = this.db
       .prepare(
         `SELECT * FROM governed_attempt_operations
-         WHERE status='running' OR (status='completed' AND resultJson IS NULL)
+         WHERE status='running' OR (
+           status='completed' AND (
+             resultJson IS NULL OR (verificationContextJson IS NOT NULL AND verificationJson IS NULL)
+           )
+         )
          ORDER BY createdAt,operationId`
       )
       .all() as OperationRow[];
@@ -471,6 +587,34 @@ export class SqliteGovernedAttemptOperationStore
       )
       .run();
   }
+
+  private applyOperationVerificationMigration(): void {
+    const columns = this.db.prepare("PRAGMA table_info(governed_attempt_operations)").all() as {
+      name: string;
+    }[];
+    if (!columns.some((column) => column.name === "verificationContextJson")) {
+      this.db.exec(
+        "ALTER TABLE governed_attempt_operations ADD COLUMN verificationContextJson TEXT"
+      );
+    }
+    if (!columns.some((column) => column.name === "verificationJson")) {
+      this.db.exec("ALTER TABLE governed_attempt_operations ADD COLUMN verificationJson TEXT");
+    }
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS governed_attempt_operation_verification_mutations (
+        mutationId TEXT PRIMARY KEY,
+        operationId TEXT NOT NULL,
+        mutationFingerprint TEXT NOT NULL,
+        FOREIGN KEY (operationId) REFERENCES governed_attempt_operations(operationId) ON DELETE RESTRICT
+      )
+    `);
+    this.db
+      .prepare(
+        `INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+         VALUES(15,'governed-attempt-independent-verification',datetime('now'))`
+      )
+      .run();
+  }
 }
 
 function recordFromRow(row: OperationRow): GovernedAttemptOperationRecord {
@@ -478,7 +622,9 @@ function recordFromRow(row: OperationRow): GovernedAttemptOperationRecord {
   let authorization: unknown;
   let evidenceReservation: unknown;
   let evidenceDeclaration: unknown;
+  let verificationContext: unknown;
   let result: unknown;
+  let verification: unknown;
   try {
     handle = JSON.parse(row.handleJson) as unknown;
     if (!row.authorizationJson) {
@@ -491,7 +637,11 @@ function recordFromRow(row: OperationRow): GovernedAttemptOperationRecord {
     evidenceDeclaration = row.evidenceDeclarationJson
       ? (JSON.parse(row.evidenceDeclarationJson) as unknown)
       : undefined;
+    verificationContext = row.verificationContextJson
+      ? (JSON.parse(row.verificationContextJson) as unknown)
+      : undefined;
     result = row.resultJson ? (JSON.parse(row.resultJson) as unknown) : undefined;
+    verification = row.verificationJson ? (JSON.parse(row.verificationJson) as unknown) : undefined;
   } catch {
     throw new Error("Corrupt governed Attempt operation JSON");
   }
@@ -506,8 +656,10 @@ function recordFromRow(row: OperationRow): GovernedAttemptOperationRecord {
     authorization,
     ...(evidenceReservation ? { evidence_reservation: evidenceReservation } : {}),
     ...(evidenceDeclaration ? { evidence_declaration: evidenceDeclaration } : {}),
+    ...(verificationContext ? { verification_context: verificationContext } : {}),
     last_event_sequence: row.lastEventSequence,
     ...(result ? { result, result_hash: row.resultHash } : {}),
+    ...(verification ? { verification } : {}),
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     ...(row.terminalAt ? { terminal_at: row.terminalAt } : {}),

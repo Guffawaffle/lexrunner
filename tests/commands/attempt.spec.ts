@@ -17,6 +17,8 @@ import type { AttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-r
 import type { AttemptVerificationHandlers } from "../../src/runs/agent-work-attempt-verification-adapters.js";
 import type { GovernedDelegationHandlers } from "../../src/runs/governed-delegation-adapters.js";
 import type { GovernedAttemptOperationHandlers } from "../../src/runs/governed-attempt-operation-adapters.js";
+import type { GovernedAttemptVerificationHandlers } from "../../src/runs/governed-attempt-verification-adapters.js";
+import type { GovernedReviewRuntimeHandlers } from "../../src/runs/governed-review-runtime-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
@@ -30,6 +32,8 @@ describe("attempt commands", () => {
   let verificationHandlers: AttemptVerificationHandlers;
   let delegationHandlers: GovernedDelegationHandlers;
   let governedReviewHandlers: GovernedAttemptOperationHandlers;
+  let governedReviewVerificationHandlers: GovernedAttemptVerificationHandlers;
+  let governedReviewRuntimeHandlers: GovernedReviewRuntimeHandlers;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -161,6 +165,45 @@ describe("attempt commands", () => {
         },
       })),
     };
+    governedReviewVerificationHandlers = {
+      verify: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.review.verify",
+          operationId: "operation-1",
+          verificationId: "verification-1",
+          verified: true,
+          decision: "accepted",
+          taskOutcome: "block",
+          admissibility: "admissible",
+          failureCodes: [],
+          receiptHash: `sha256:${"e".repeat(64)}`,
+        },
+      })),
+    };
+    governedReviewRuntimeHandlers = {
+      start: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.review.start",
+          started: true,
+          operationId: "operation-1",
+          delegationId: "delegation-1",
+          captureId: "capture-1",
+          supervisionStarted: true,
+        },
+      })),
+      supervise: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.review.supervise",
+          operationId: "operation-1",
+          supervised: true,
+          status: "completed",
+          verificationDecision: "accepted",
+        },
+      })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       containmentHandler,
@@ -172,6 +215,8 @@ describe("attempt commands", () => {
       verificationHandlers,
       delegationHandlers,
       governedReviewHandlers,
+      governedReviewVerificationHandlers,
+      governedReviewRuntimeHandlers,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
@@ -325,7 +370,12 @@ describe("attempt commands", () => {
       "synthetic",
       "status",
     ]);
-    expect(attempt?.commands[10].commands.map((command) => command.name())).toEqual(["status"]);
+    expect(attempt?.commands[10].commands.map((command) => command.name())).toEqual([
+      "status",
+      "verify",
+      "start",
+      "supervise",
+    ]);
   });
 
   it("reads asynchronous governed review status without raw evidence access", async () => {
@@ -349,6 +399,101 @@ describe("attempt commands", () => {
     expect(outputs.at(-1)).toMatchObject({
       ok: true,
       result: { operation: "agent-work.review.status", status: "running" },
+    });
+  });
+
+  it("forwards independent governed review verification without exposing an evidence path", async () => {
+    const databasePath = join(directory, "operations.db");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "review",
+      "verify",
+      "--database-path",
+      databasePath,
+      "--operation-id",
+      "operation-1",
+      "--verification-id",
+      "verification-1",
+      "--json",
+    ]);
+    expect(governedReviewVerificationHandlers.verify).toHaveBeenCalledWith({
+      databasePath,
+      operationId: "operation-1",
+      verificationId: "verification-1",
+    });
+    expect(outputs.at(-1)).toMatchObject({
+      ok: true,
+      result: { operation: "agent-work.review.verify", admissibility: "admissible" },
+    });
+  });
+
+  it("forwards a bounded prompt into the durable governed review start path", async () => {
+    const databasePath = join(directory, "operations.db");
+    const promptPath = join(directory, "review-prompt.txt");
+    await fs.writeFile(promptPath, "You may answer ACCEPT or NO.", "utf8");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "review",
+      "start",
+      "--database-path",
+      databasePath,
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--distribution",
+      "lexrunner-attempt-01234567",
+      "--environment-id",
+      "environment-1",
+      "--objective",
+      "Review the synthetic retry-window corpus",
+      "--prompt",
+      promptPath,
+      "--json",
+    ]);
+    expect(governedReviewRuntimeHandlers.start).toHaveBeenCalledWith({
+      databasePath,
+      runId: "run-1",
+      attemptId: "attempt-1",
+      distribution: "lexrunner-attempt-01234567",
+      environmentId: "environment-1",
+      objective: "Review the synthetic retry-window corpus",
+      prompt: Buffer.from("You may answer ACCEPT or NO."),
+    });
+    expect(outputs.at(-1)).toMatchObject({
+      ok: true,
+      result: { operation: "agent-work.review.start", supervisionStarted: true },
+    });
+  });
+
+  it("forwards detached governed review supervision without prompt or evidence access", async () => {
+    const databasePath = join(directory, "operations.db");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "review",
+      "supervise",
+      "--database-path",
+      databasePath,
+      "--operation-id",
+      "operation-1",
+      "--distribution",
+      "lexrunner-attempt-01234567",
+      "--json",
+    ]);
+    expect(governedReviewRuntimeHandlers.supervise).toHaveBeenCalledWith({
+      databasePath,
+      operationId: "operation-1",
+      distribution: "lexrunner-attempt-01234567",
+    });
+    expect(outputs.at(-1)).toMatchObject({
+      ok: true,
+      result: { operation: "agent-work.review.supervise", verificationDecision: "accepted" },
     });
   });
 

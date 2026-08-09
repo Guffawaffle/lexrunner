@@ -16,9 +16,15 @@ CREATE TABLE IF NOT EXISTS governed_attempt_operations (
   evidenceDeclarationJson TEXT CHECK (
     evidenceDeclarationJson IS NULL OR length(evidenceDeclarationJson) <= 262144
   ),
+  verificationContextJson TEXT CHECK (
+    verificationContextJson IS NULL OR length(verificationContextJson) <= 262144
+  ),
   lastEventSequence INTEGER NOT NULL CHECK (lastEventSequence >= 0),
   resultJson TEXT CHECK (resultJson IS NULL OR length(resultJson) <= 262144),
   resultHash TEXT,
+  verificationJson TEXT CHECK (
+    verificationJson IS NULL OR length(verificationJson) <= 262144
+  ),
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   terminalAt TEXT,
@@ -44,6 +50,13 @@ CREATE TABLE IF NOT EXISTS governed_attempt_operation_events (
 );
 
 CREATE TABLE IF NOT EXISTS governed_attempt_operation_result_mutations (
+  mutationId TEXT PRIMARY KEY,
+  operationId TEXT NOT NULL,
+  mutationFingerprint TEXT NOT NULL,
+  FOREIGN KEY (operationId) REFERENCES governed_attempt_operations(operationId) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS governed_attempt_operation_verification_mutations (
   mutationId TEXT PRIMARY KEY,
   operationId TEXT NOT NULL,
   mutationFingerprint TEXT NOT NULL,
