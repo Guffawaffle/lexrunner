@@ -2,6 +2,8 @@
 node_modules/
 dist/
 coverage/
+proofs/windows-workspace-boundary/**/bin/
+proofs/windows-workspace-boundary/**/obj/
 
 # Project workspaces (local-only R&D playground, never tracked except README)
 project/*

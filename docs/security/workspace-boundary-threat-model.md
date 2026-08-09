@@ -115,6 +115,9 @@ The helper opens directories with `CreateFileW`, `FILE_FLAG_BACKUP_SEMANTICS`, a
 `FILE_FLAG_OPEN_REPARSE_POINT`. It derives volume/file identity and the normalized final path from
 the held handle, inspects every reparse tag against an allowlist, and holds the complete ancestor
 chain. Authority handles omit `FILE_SHARE_DELETE` whenever replacement exclusion is required.
+The #888 kernel proof additionally requires `FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES` access:
+a metadata-only attributes handle did not exclude exact-root rename on the tested Windows/NTFS
+kernel, while the operational directory handle plus omitted delete sharing did.
 
 Windows path comparison is case-insensitive, but identity is never lowercased path text. Drive,
 UNC, and extended-length inputs normalize to the handle-derived final path and volume/file ID.

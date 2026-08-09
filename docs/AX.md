@@ -45,11 +45,11 @@ itself is tested against `inspectRegisteredCliSurface()` and the published MCP `
 
 <!-- BEGIN GENERATED AX SURFACE -->
 
-Matrix schema: **1.0.0**. Live inventory: **131 CLI registrations** and **33 MCP tools**.
+Matrix schema: **1.0.0**. Live inventory: **136 CLI registrations** and **33 MCP tools**.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |        92 |             9 |         15 |            15 |      0 |
+| CLI     |        97 |             9 |         15 |            15 |      0 |
 | MCP     |        29 |             0 |          4 |             0 |      0 |
 
 ### Canonical CLI/MCP semantic pairs

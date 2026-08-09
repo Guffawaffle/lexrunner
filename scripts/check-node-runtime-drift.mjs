@@ -42,6 +42,7 @@ requireMatch(
 
 const expectedActions = new Map([
   ["checkout", "7"],
+  ["setup-dotnet", "5"],
   ["setup-node", "7"],
   ["cache", "6"],
   ["cache/save", "6"],

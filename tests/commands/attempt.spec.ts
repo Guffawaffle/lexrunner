@@ -15,6 +15,8 @@ import type {
 import type { AttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 import type { AttemptReceiptHandlers } from "../../src/runs/agent-work-attempt-receipt-adapters.js";
 import type { AttemptVerificationHandlers } from "../../src/runs/agent-work-attempt-verification-adapters.js";
+import type { GovernedDelegationHandlers } from "../../src/runs/governed-delegation-adapters.js";
+import type { GovernedAttemptOperationHandlers } from "../../src/runs/governed-attempt-operation-adapters.js";
 
 describe("attempt commands", () => {
   let directory: string;
@@ -26,6 +28,8 @@ describe("attempt commands", () => {
   let workerHandlers: AttemptWorkerHandlers;
   let receiptHandlers: AttemptReceiptHandlers;
   let verificationHandlers: AttemptVerificationHandlers;
+  let delegationHandlers: GovernedDelegationHandlers;
+  let governedReviewHandlers: GovernedAttemptOperationHandlers;
   let outputs: unknown[];
 
   beforeEach(async () => {
@@ -119,6 +123,44 @@ describe("attempt commands", () => {
       applyAcceptance: vi.fn(async () => ({ ok: true, result: { applied: true } as never })),
       acceptanceStatus: vi.fn(async () => ({ ok: true, result: { acceptance: null } })),
     };
+    delegationHandlers = {
+      synthetic: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.delegation.synthetic",
+          syntheticOnly: true,
+          completed: true,
+          delegationId: "delegation-1",
+          attemptId: "attempt-1",
+          status: "declined",
+          decision: "decline",
+          terminal: true,
+          reasonVolunteered: false,
+          executorInvocation: {
+            attempted: false,
+            authorized: false,
+            denialReason: "delegation_declined",
+          },
+          evidence: {
+            offerHash: `sha256:${"c".repeat(64)}`,
+            decisionReceiptHash: `sha256:${"d".repeat(64)}`,
+          },
+          eventCount: 3,
+        },
+      })),
+      status: vi.fn(async () => ({ ok: true, result: { record: null, events: [] } })),
+    };
+    governedReviewHandlers = {
+      status: vi.fn(async () => ({
+        ok: true,
+        result: {
+          operation: "agent-work.review.status",
+          found: true,
+          operationId: "operation-1",
+          status: "running",
+        },
+      })),
+    };
     process.exitCode = undefined;
     registerAttemptCommand(program, {
       containmentHandler,
@@ -128,6 +170,8 @@ describe("attempt commands", () => {
       workerHandlers,
       receiptHandlers,
       verificationHandlers,
+      delegationHandlers,
+      governedReviewHandlers,
       jsonModeActive: () => Boolean(program.opts().json),
       writeJson: (value) => outputs.push(value),
     });
@@ -229,6 +273,8 @@ describe("attempt commands", () => {
       "prepare",
       "start",
       "status",
+      "delegation",
+      "review",
     ]);
     expect(attempt?.commands[0].options.map((option) => option.long)).toEqual([
       "--input",
@@ -275,6 +321,97 @@ describe("attempt commands", () => {
       "--attempt-id",
       "--json",
     ]);
+    expect(attempt?.commands[9].commands.map((command) => command.name())).toEqual([
+      "synthetic",
+      "status",
+    ]);
+    expect(attempt?.commands[10].commands.map((command) => command.name())).toEqual(["status"]);
+  });
+
+  it("reads asynchronous governed review status without raw evidence access", async () => {
+    const databasePath = join(directory, "operations.db");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "review",
+      "status",
+      "--database-path",
+      databasePath,
+      "--operation-id",
+      "operation-1",
+      "--json",
+    ]);
+    expect(governedReviewHandlers.status).toHaveBeenCalledWith({
+      databasePath,
+      operationId: "operation-1",
+    });
+    expect(outputs.at(-1)).toMatchObject({
+      ok: true,
+      result: { operation: "agent-work.review.status", status: "running" },
+    });
+  });
+
+  it("treats synthetic NO as a successful terminal protocol result", async () => {
+    const databasePath = join(directory, "delegations.db");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "delegation",
+      "synthetic",
+      "--database-path",
+      databasePath,
+      "--delegation-id",
+      "delegation-1",
+      "--decision",
+      "NO",
+      "--json",
+    ]);
+
+    expect(delegationHandlers.synthetic).toHaveBeenCalledWith({
+      databasePath,
+      delegationId: "delegation-1",
+      decision: "NO",
+    });
+    expect(process.exitCode).toBeUndefined();
+    expect(outputs.at(-1)).toMatchObject({
+      ok: true,
+      result: {
+        completed: true,
+        status: "declined",
+        executorInvocation: { attempted: false, authorized: false },
+      },
+    });
+  });
+
+  it("maps an incomplete synthetic protocol operation to exit one", async () => {
+    vi.mocked(delegationHandlers.synthetic).mockResolvedValueOnce({
+      ok: true,
+      result: {
+        operation: "agent-work.delegation.synthetic",
+        syntheticOnly: true,
+        completed: false,
+        delegationId: "delegation-1",
+        attemptId: "attempt-1",
+        reason: "mutation_conflict",
+      },
+    });
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "delegation",
+      "synthetic",
+      "--database-path",
+      join(directory, "delegations.db"),
+      "--delegation-id",
+      "delegation-1",
+      "--decision",
+      "NO",
+      "--json",
+    ]);
+    expect(process.exitCode).toBe(1);
   });
 
   it("forwards every projection operation through the shared lifecycle handler", async () => {
