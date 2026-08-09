@@ -149,6 +149,15 @@ export {
 } from "./workspace-lifecycle-store.js";
 export { InMemoryWorkspaceLifecycleStore } from "./inmemory/index.js";
 export { toAttemptContract } from "./workspace-lifecycle-store.js";
+export * from "./protected-evidence-store.js";
+export * from "./local-protected-evidence-store.js";
+export * from "./windows-protected-evidence-authority.js";
+export * from "./governed-delegation-store.js";
+export { InMemoryGovernedDelegationStore } from "./inmemory/governed-delegation-store.js";
+export { SqliteGovernedDelegationStore } from "./sqlite/governed-delegation-store.js";
+export * from "./governed-attempt-operation-store.js";
+export { InMemoryGovernedAttemptOperationStore } from "./inmemory/governed-attempt-operation-store.js";
+export { SqliteGovernedAttemptOperationStore } from "./sqlite/governed-attempt-operation-store.js";
 
 /**
  * Default database path relative to baseDir.

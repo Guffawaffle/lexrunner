@@ -235,6 +235,16 @@ export type {
   WorkerRuntimePort,
   WorkerRuntimeSignal,
 } from "./agent-work-worker-runtime.js";
+export * from "./governed-attempt-protocol.js";
+export * from "./governed-attempt-executor.js";
+export * from "./governed-attempt-evidence.js";
+export * from "./governed-attempt-async-supervisor.js";
+export * from "./qualified-wsl2-codex-executor.js";
+export * from "./external-wsl2-codex-provider-bridge.js";
+export * from "./governed-attempt-operation-adapters.js";
+export * from "./governed-attempt-operation-service.js";
+export * from "./governed-delegation-service.js";
+export * from "./governed-delegation-adapters.js";
 export {
   AttemptReceiptStatusRequestJsonSchema,
   AttemptReceiptStatusRequestSchema,

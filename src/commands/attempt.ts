@@ -29,6 +29,14 @@ import {
   createAttemptVerificationHandlers,
   type AttemptVerificationHandlers,
 } from "../runs/agent-work-attempt-verification-adapters.js";
+import {
+  createGovernedDelegationHandlers,
+  type GovernedDelegationHandlers,
+} from "../runs/governed-delegation-adapters.js";
+import {
+  createGovernedAttemptOperationHandlers,
+  type GovernedAttemptOperationHandlers,
+} from "../runs/governed-attempt-operation-adapters.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
@@ -40,6 +48,8 @@ export interface AttemptCommandDependencies {
   workerHandlers?: AttemptWorkerHandlers;
   receiptHandlers?: AttemptReceiptHandlers;
   verificationHandlers?: AttemptVerificationHandlers;
+  delegationHandlers?: GovernedDelegationHandlers;
+  governedReviewHandlers?: GovernedAttemptOperationHandlers;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -61,6 +71,9 @@ export function registerAttemptCommand(
   const receiptHandlers = dependencies.receiptHandlers ?? createAttemptReceiptHandlers();
   const verificationHandlers =
     dependencies.verificationHandlers ?? createAttemptVerificationHandlers();
+  const delegationHandlers = dependencies.delegationHandlers ?? createGovernedDelegationHandlers();
+  const governedReviewHandlers =
+    dependencies.governedReviewHandlers ?? createGovernedAttemptOperationHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
 
   attempt
@@ -327,6 +340,74 @@ export function registerAttemptCommand(
         setFailureExitCode(output);
       }
     );
+
+  const delegation = attempt
+    .command("delegation")
+    .description("Exercise governed worker acceptance and refusal without launching an executor");
+  delegation
+    .command("synthetic")
+    .description("Persist a synthetic ACCEPT or NO and prove the invocation latch")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--delegation-id <id>", "Opaque synthetic Delegation identifier")
+    .requiredOption("--decision <ACCEPT|NO>", "Exact worker decision")
+    .option("--attempt-id <id>", "Opaque synthetic Attempt identifier")
+    .option("--reason <text>", "Optional volunteered refusal reason; never persisted as raw text")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        delegationId: string;
+        decision: string;
+        attemptId?: string;
+        reason?: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await delegationHandlers.synthetic({
+          databasePath: options.databasePath,
+          delegationId: options.delegationId,
+          decision: options.decision,
+          ...(options.attemptId ? { attemptId: options.attemptId } : {}),
+          ...(options.reason ? { reason: options.reason } : {}),
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+  delegation
+    .command("status")
+    .description("Read coordination-safe synthetic Delegation state and events")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--delegation-id <id>", "Delegation identifier")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { databasePath: string; delegationId: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const output = await delegationHandlers.status({
+        databasePath: options.databasePath,
+        delegationId: options.delegationId,
+      });
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
+
+  const review = attempt
+    .command("review")
+    .description("Inspect durable governed-review operations without reading raw evidence");
+  review
+    .command("status")
+    .description("Read coordination-safe asynchronous review status")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--operation-id <id>", "Governed review operation identifier")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { databasePath: string; operationId: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const output = await governedReviewHandlers.status({
+        databasePath: options.databasePath,
+        operationId: options.operationId,
+      });
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
 }
 
 function registerProjectionInputCommand(
@@ -473,6 +554,9 @@ function setFailureExitCode(output: unknown): void {
     process.exitCode = 1;
   }
   if (output.ok === true && isRecord(output.result) && output.result.applied === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.completed === false) {
     process.exitCode = 1;
   }
 }
