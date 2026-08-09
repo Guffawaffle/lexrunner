@@ -1,16 +1,20 @@
 # Disposable WSL2 governed Codex provider
 
 This provider is intentionally limited to the checked-in synthetic corpus. Its public protocol is
-`inspect`, `prepare`, `attest`, `launch`, `observe`, `cancel`, `collect`, and `release`; `worker` and
-`finalize` are internal systemd entry points.
+`inspect`, `prepare`, `attest`, `launch`, `observe`, `continue`, `cancel`, `collect`, and `release`;
+`worker` and `finalize` are internal systemd entry points.
 
 Codex 0.145 freezes a thread's tool inventory, so the phase-one offer and resumed phase expose the
 same read-only shell capability. Phase one has an empty corpus and qualification fails if any tool
 event occurs before the decision. `NO` immediately emits a terminal decline. `ACCEPT` permits a
-second, freshly attested process to resume the exact Codex thread with the synthetic corpus mounted
-read-only. The authorized JSON Schema is mounted as a separate read-only file and passed to the
-exact resumed turn with `--output-schema`; the provider also validates the final response
-independently. The outer bubblewrap view hides Windows mounts, provider state, credential seeds, homes,
+durable accepted receipt, but the provider remains paused until the host has latched that receipt,
+authorized the exact work invocation, and calls `continue` with the original authorization on stdin.
+Only then can a second, freshly attested process resume the exact Codex thread with the synthetic
+corpus mounted read-only. The resumed agent may still answer exactly `NO`; otherwise the provider and
+the independent Windows verifier both validate the final response against the authorized JSON
+Schema included in the resumed prompt. The schema is not imposed as a Codex process-level output
+constraint because that would make bare `NO` unreachable. The outer bubblewrap view hides Windows
+mounts, provider state, credential seeds, homes,
 `/run`, and local IPC. The image replaces WSL's `/mnt/wsl` resolver symlink with a root-owned regular
 `/etc/resolv.conf` before `/mnt` is hidden. A transient user service owns the process cgroup with
 `KillMode=control-group`; its

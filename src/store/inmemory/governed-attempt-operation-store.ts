@@ -13,6 +13,8 @@ import {
   type GovernedAttemptOperationStore,
   type RecordGovernedAttemptOperationResultInput,
   type RecordGovernedAttemptOperationResultResult,
+  type RecordGovernedAttemptOperationVerificationInput,
+  type RecordGovernedAttemptOperationVerificationResult,
 } from "../governed-attempt-operation-store.js";
 import { InMemoryGovernedDelegationStore } from "./governed-delegation-store.js";
 
@@ -30,6 +32,10 @@ export class InMemoryGovernedAttemptOperationStore
     string,
     { fingerprint: string; operationId: string }
   >();
+  private readonly operationVerificationMutations = new Map<
+    string,
+    { fingerprint: string; operationId: string }
+  >();
 
   async createAttemptOperation(
     input: CreateGovernedAttemptOperationInput
@@ -41,6 +47,7 @@ export class InMemoryGovernedAttemptOperationStore
       authorization: input.authorization,
       ...(input.evidenceReservation ? { evidence_reservation: input.evidenceReservation } : {}),
       ...(input.evidenceDeclaration ? { evidence_declaration: input.evidenceDeclaration } : {}),
+      ...(input.verificationContext ? { verification_context: input.verificationContext } : {}),
     });
     const replay = this.createMutations.get(input.mutationId);
     if (replay) {
@@ -64,13 +71,20 @@ export class InMemoryGovernedAttemptOperationStore
           ...(existing.evidence_declaration
             ? { evidence_declaration: existing.evidence_declaration }
             : {}),
+          ...(existing.verification_context
+            ? { verification_context: existing.verification_context }
+            : {}),
         }) !== fingerprint
       ) {
         return { created: false, reason: "operation_conflict" };
       }
       return { created: true, record: clone(existing), idempotentReplay: true };
     }
-    if (this.findEventMutation(input.mutationId) || this.resultMutations.has(input.mutationId)) {
+    if (
+      this.findEventMutation(input.mutationId) ||
+      this.resultMutations.has(input.mutationId) ||
+      this.operationVerificationMutations.has(input.mutationId)
+    ) {
       return { created: false, reason: "mutation_conflict" };
     }
     const record = GovernedAttemptOperationRecord_v1.parse({
@@ -84,6 +98,7 @@ export class InMemoryGovernedAttemptOperationStore
       authorization: input.authorization,
       ...(input.evidenceReservation ? { evidence_reservation: input.evidenceReservation } : {}),
       ...(input.evidenceDeclaration ? { evidence_declaration: input.evidenceDeclaration } : {}),
+      ...(input.verificationContext ? { verification_context: input.verificationContext } : {}),
       last_event_sequence: 0,
       created_at: now,
       updated_at: now,
@@ -208,6 +223,62 @@ export class InMemoryGovernedAttemptOperationStore
     return { recorded: true, record: clone(record), idempotentReplay: false };
   }
 
+  async recordAttemptOperationVerification(
+    input: RecordGovernedAttemptOperationVerificationInput
+  ): Promise<RecordGovernedAttemptOperationVerificationResult> {
+    const now = normalizeInstant(input.now);
+    const fingerprint = computeCanonicalHash({
+      kind: "operation_verification",
+      operation_id: input.operationId,
+      expected_revision: input.expectedRevision,
+      receipt_hash: input.verification.receipt_hash,
+    });
+    const replay = this.operationVerificationMutations.get(input.mutationId);
+    if (replay) {
+      if (replay.operationId !== input.operationId || replay.fingerprint !== fingerprint) {
+        return { recorded: false, reason: "mutation_conflict" };
+      }
+      const replayRecord = this.operations.get(input.operationId);
+      if (!replayRecord) return { recorded: false, reason: "not_found" };
+      return { recorded: true, record: clone(replayRecord), idempotentReplay: true };
+    }
+    const current = this.operations.get(input.operationId);
+    if (!current) return { recorded: false, reason: "not_found" };
+    if (current.revision !== input.expectedRevision) {
+      return { recorded: false, reason: "stale_revision" };
+    }
+    if (!current.result || !current.result_hash) {
+      return { recorded: false, reason: "verification_conflict" };
+    }
+    if (
+      input.verification.operation_id !== current.operation_id ||
+      input.verification.operation_result_hash !== current.result_hash ||
+      input.verification.authorization_binding_digest !== current.authorization.binding_digest ||
+      input.verification.verification_context_hash !== current.verification_context?.context_hash ||
+      input.verification.capture_id !== current.evidence_declaration?.capture_id
+    ) {
+      return { recorded: false, reason: "binding_mismatch" };
+    }
+    if (
+      current.verification &&
+      current.verification.receipt_hash !== input.verification.receipt_hash
+    ) {
+      return { recorded: false, reason: "verification_conflict" };
+    }
+    const record = GovernedAttemptOperationRecord_v1.parse({
+      ...current,
+      revision: current.revision + 1,
+      verification: input.verification,
+      updated_at: now,
+    });
+    this.operations.set(record.operation_id, record);
+    this.operationVerificationMutations.set(input.mutationId, {
+      fingerprint,
+      operationId: input.operationId,
+    });
+    return { recorded: true, record: clone(record), idempotentReplay: false };
+  }
+
   async getAttemptOperation(operationId: string): Promise<GovernedAttemptOperationRecord | null> {
     const record = this.operations.get(operationId);
     return record ? clone(record) : null;
@@ -216,7 +287,10 @@ export class InMemoryGovernedAttemptOperationStore
   async listRecoverableAttemptOperations(): Promise<GovernedAttemptOperationRecord[]> {
     return [...this.operations.values()]
       .filter(
-        (record) => record.status === "running" || (record.status === "completed" && !record.result)
+        (record) =>
+          record.status === "running" ||
+          (record.status === "completed" &&
+            (!record.result || (Boolean(record.verification_context) && !record.verification)))
       )
       .sort((left, right) =>
         left.created_at === right.created_at

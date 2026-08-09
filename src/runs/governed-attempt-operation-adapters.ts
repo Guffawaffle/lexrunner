@@ -42,7 +42,7 @@ export interface GovernedAttemptOperationStatusProjection {
   executor?: { executorId: string; providerHandle: string };
   evidence?: {
     captureId: string;
-    declarationStatus: "open";
+    launchDeclarationStatus: "open";
     reservedBytes: number;
     reservedFrames: number;
   };
@@ -52,6 +52,13 @@ export interface GovernedAttemptOperationStatusProjection {
     authorizationOutcome: string;
     evidenceOutcome: string;
     admissibility: string;
+  };
+  verification?: {
+    decision: "accepted" | "rejected";
+    verifierId: string;
+    verifiedAt: string;
+    failureCodes: string[];
+    receiptHash: string;
   };
 }
 
@@ -131,7 +138,7 @@ export function createGovernedAttemptOperationHandlers(
               ? {
                   evidence: {
                     captureId: record.evidence_declaration.capture_id,
-                    declarationStatus: "open" as const,
+                    launchDeclarationStatus: "open" as const,
                     reservedBytes: record.evidence_reservation.reserved_bytes,
                     reservedFrames: record.evidence_reservation.reserved_frames,
                   },
@@ -144,7 +151,19 @@ export function createGovernedAttemptOperationHandlers(
                     taskOutcome: record.result.task_outcome,
                     authorizationOutcome: record.result.authorization_outcome,
                     evidenceOutcome: record.result.evidence_outcome,
-                    admissibility: record.result.admissibility,
+                    admissibility:
+                      record.verification?.admissibility ?? record.result.admissibility,
+                  },
+                }
+              : {}),
+            ...(record.verification
+              ? {
+                  verification: {
+                    decision: record.verification.decision,
+                    verifierId: record.verification.verifier_id,
+                    verifiedAt: record.verification.verified_at,
+                    failureCodes: [...record.verification.failure_codes],
+                    receiptHash: record.verification.receipt_hash,
                   },
                 }
               : {}),

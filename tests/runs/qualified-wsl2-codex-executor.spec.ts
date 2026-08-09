@@ -52,13 +52,21 @@ describe("QualifiedWsl2CodexExecutor", () => {
     const observed = collectEvents(executor.observe(handle));
     bridge.emit([
       emission("started", 1, '{"type":"thread.started"}'),
-      emission("executor_event", 2, '{"type":"item.completed"}'),
-      emission("completed", 3, '{"type":"turn.completed"}'),
+      emission("accepted", 2, '{"decision":"ACCEPT"}'),
+      emission("executor_event", 3, '{"type":"item.completed"}'),
+      emission("completed", 4, '{"type":"turn.completed"}'),
     ]);
     const events = await observed;
-    expect(events.map((event) => event.type)).toEqual(["started", "executor_event", "completed"]);
+    expect(events.map((event) => event.type)).toEqual([
+      "started",
+      "accepted",
+      "executor_event",
+      "completed",
+    ]);
     expect(JSON.stringify(events)).not.toContain("thread.started");
     expect(events.every((event) => event.evidence_ref.startsWith("sha256:"))).toBe(true);
+    await executor.continueAfterAcceptance(handle);
+    expect(bridge.continueCount).toBe(1);
 
     const restarted = new QualifiedWsl2CodexExecutor(bridge, () => at(10));
     await restarted.attach({
@@ -133,6 +141,7 @@ describe("QualifiedWsl2CodexExecutor", () => {
 class DeferredBridge implements QualifiedCodexProviderBridge {
   launchInput?: Parameters<QualifiedCodexProviderBridge["launch"]>[0];
   cancelCount = 0;
+  continueCount = 0;
   releaseCount = 0;
   private releaseEmissions!: (events: QualifiedCodexProviderEmission_v1[]) => void;
   private readonly emissions = new Promise<QualifiedCodexProviderEmission_v1[]>((resolve) => {
@@ -172,6 +181,10 @@ class DeferredBridge implements QualifiedCodexProviderBridge {
     this.cancelCount += 1;
   }
 
+  async continueAfterAcceptance(): Promise<void> {
+    this.continueCount += 1;
+  }
+
   async collect(): Promise<QualifiedCodexProviderClaim> {
     return { taskOutcome: "pass" };
   }
@@ -192,7 +205,7 @@ async function collectEvents<T>(values: AsyncIterable<T>): Promise<T[]> {
 }
 
 function emission(
-  type: "started" | "executor_event" | "declined" | "completed",
+  type: "started" | "accepted" | "executor_event" | "declined" | "completed",
   sequence: number,
   raw: string
 ): QualifiedCodexProviderEmission_v1 {

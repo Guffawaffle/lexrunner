@@ -12,6 +12,7 @@ import {
   type GovernedAttemptResult_v1,
 } from "../../src/runs/governed-attempt-executor.js";
 import { GovernedAttemptOperationService } from "../../src/runs/governed-attempt-operation-service.js";
+import { createGovernedAttemptVerificationContext } from "../../src/runs/governed-attempt-verification.js";
 import {
   DelegationInvocationRequest_v1,
   createDelegationDecisionReceipt,
@@ -55,7 +56,7 @@ describe("GovernedAttemptOperationService", () => {
       settled = true;
       return value;
     });
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(settled).toBe(false);
     expect(executor.observeCount).toBe(1);
 
@@ -69,6 +70,93 @@ describe("GovernedAttemptOperationService", () => {
     expect(executor.collectCount).toBe(1);
     expect(executor.releaseCount).toBe(1);
     expect((await store.getAttemptOperation("operation-1"))?.result_hash).toMatch(/^sha256:/u);
+    await store.close();
+  });
+
+  it("latches worker ACCEPT before releasing authorized work", async () => {
+    const store = new InMemoryGovernedAttemptOperationStore();
+    const fixture = authorizationFixture();
+    await createOfferedDelegation(store, fixture.authorization.grant);
+    const executor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
+    const service = new GovernedAttemptOperationService(store, () => at(9));
+    const started = await service.start(executor, {
+      operationMutationId: "operation-create",
+      authorizationMutationId: "delegation-offer-authorize",
+      authorization: fixture.authorization,
+      invocation: invocation(fixture.authorization, "offer"),
+      prompt: Buffer.from("synthetic prompt"),
+      outputSchema: { type: "object" },
+      now: at(3),
+    });
+    expect(started).toMatchObject({ started: true });
+
+    const observation = service.observeToTerminal(executor, "operation-1");
+    executor.emit([
+      event("started", 1),
+      event("accepted", 2),
+      event("executor_event", 3),
+      event("completed", 4),
+    ]);
+    await expect(observation).resolves.toMatchObject({ terminal: true, status: "completed" });
+    expect(executor.continueCount).toBe(1);
+    expect((await store.getDelegation("delegation-1"))?.status).toBe("accepted");
+    expect(
+      (await store.listAttemptOperationEvents("operation-1")).map((entry) => entry.event.type)
+    ).toEqual(["started", "accepted", "executor_event", "completed"]);
+    await store.close();
+  });
+
+  it("replays an authorized continuation after a crash following durable ACCEPT", async () => {
+    const store = new InMemoryGovernedAttemptOperationStore();
+    const fixture = authorizationFixture();
+    await createOfferedDelegation(store, fixture.authorization.grant);
+    const firstExecutor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
+    const service = new GovernedAttemptOperationService(store, () => at(9));
+    const started = await service.start(firstExecutor, {
+      operationMutationId: "operation-create",
+      authorizationMutationId: "delegation-offer-authorize",
+      authorization: fixture.authorization,
+      invocation: invocation(fixture.authorization, "offer"),
+      prompt: Buffer.from("synthetic prompt"),
+      outputSchema: { type: "object" },
+      now: at(3),
+    });
+    expect(started).toMatchObject({ started: true });
+
+    const offer = (await store.getDelegation("delegation-1"))!.state.offer;
+    await store.recordDelegationDecision({
+      mutationId: "operation-1:accept:2",
+      delegationId: "delegation-1",
+      expectedRevision: 1,
+      receipt: createDelegationDecisionReceipt({
+        offer,
+        decision: "ACCEPT",
+        decisionReceiptId: "operation-1:accept:2",
+        decidedAt: at(5),
+      }),
+      now: at(5),
+    });
+    await store.appendAttemptOperationEvent({
+      mutationId: "operation-1:event:1",
+      operationId: "operation-1",
+      expectedRevision: 0,
+      event: event("started", 1),
+      now: at(4),
+    });
+    await store.appendAttemptOperationEvent({
+      mutationId: "operation-1:event:2",
+      operationId: "operation-1",
+      expectedRevision: 1,
+      event: event("accepted", 2),
+      now: at(5),
+    });
+
+    const recoveredExecutor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
+    const observation = service.observeToTerminal(recoveredExecutor, "operation-1");
+    recoveredExecutor.emit([event("executor_event", 3), event("completed", 4)]);
+    await expect(observation).resolves.toMatchObject({ terminal: true, status: "completed" });
+    expect(recoveredExecutor.continueCount).toBe(1);
+    expect(recoveredExecutor.observeCount).toBe(1);
     await store.close();
   });
 
@@ -120,6 +208,7 @@ describe("GovernedAttemptOperationService", () => {
       outputSchema: { type: "object" },
       evidence: binding.capture,
       evidenceReservation: binding.reservation,
+      verificationContext: fixture.verificationContext,
       now: at(3),
     });
     expect(started).toMatchObject({ started: true });
@@ -203,6 +292,7 @@ class DeferredExecutor implements AttemptExecutor {
   cancelCount = 0;
   collectCount = 0;
   releaseCount = 0;
+  continueCount = 0;
   startEvidence?: GovernedAttemptEvidenceCapture;
   private resolveEvents!: (events: AttemptExecutorEvent_v1[]) => void;
   private readonly events = new Promise<AttemptExecutorEvent_v1[]>((resolve) => {
@@ -228,6 +318,10 @@ class DeferredExecutor implements AttemptExecutor {
 
   async cancel(): Promise<void> {
     this.cancelCount += 1;
+  }
+
+  async continueAfterAcceptance(): Promise<void> {
+    this.continueCount += 1;
   }
 
   async collect(): Promise<GovernedAttemptResult_v1> {
@@ -343,7 +437,48 @@ function authorizationFixture() {
     expiresAt: at(10),
   });
   if (!decision.authorized) throw new Error(`authorization fixture failed: ${decision.reason}`);
-  return decision;
+  return {
+    ...decision,
+    verificationContext: createGovernedAttemptVerificationContext({
+      requirements,
+      executor: {
+        schema_version: "1.0.0",
+        executor_id: "synthetic-executor",
+        executor_version: "1.0.0",
+        executable_hash: hash("executor"),
+        protocol: "synthetic",
+        configuration_hash: hash("config"),
+        tool_surface_hash: hash("tools"),
+        ...observed,
+      },
+      environment: {
+        schema_version: "1.0.0",
+        provider_id: "synthetic-provider",
+        environment_id: "environment-1",
+        topology_hash: hash("topology"),
+        controls: GovernedControlId.options.map((control) => ({
+          control,
+          status: "enforced" as const,
+          strength: "independently_enforced_verified" as const,
+          evidence_refs: [hash(`control:${control}`)],
+          enforcement_owner: "synthetic-provider",
+        })),
+        ...observed,
+      },
+      workspace: {
+        schema_version: "1.0.0",
+        workspace_id: "workspace-1",
+        repository_id: requirements.repository_id,
+        base_object_id: requirements.base_object_id,
+        candidate_object_id: requirements.candidate_object_id,
+        corpus_hash: hash("corpus"),
+        selection_hash: hash("selection"),
+        corpus_kind: "synthetic",
+        ...observed,
+      },
+      output_schema: { type: "object" },
+    }),
+  };
 }
 
 async function acceptDelegation(
@@ -380,7 +515,37 @@ async function acceptDelegation(
   });
 }
 
-function invocation(authorization: ReturnType<typeof authorizationFixture>["authorization"]) {
+async function createOfferedDelegation(
+  store: InMemoryGovernedAttemptOperationStore,
+  grant: GovernedCapabilityGrant_v1
+): Promise<void> {
+  const offer = {
+    schema_version: "1.0.0" as const,
+    delegation_id: "delegation-1",
+    attempt_id: "attempt-1",
+    worker: {
+      provider_id: "synthetic-provider",
+      worker_id: "worker-1",
+      thread_id: "thread-1",
+    },
+    task_offer_hash: hash("task"),
+    requirements_hash: hash("requirements"),
+    authority_grant_hash: computeCanonicalHash(grant),
+    transcript_start_hash: hash("transcript"),
+    offered_at: at(0),
+  };
+  const created = await store.createDelegation({
+    mutationId: "delegation-create",
+    offer,
+    now: at(0),
+  });
+  if (!created.created) throw new Error(`failed to create offered Delegation: ${created.reason}`);
+}
+
+function invocation(
+  authorization: ReturnType<typeof authorizationFixture>["authorization"],
+  phase: "offer" | "authorized_work" = "authorized_work"
+) {
   return DelegationInvocationRequest_v1.parse({
     schema_version: "1.0.0",
     delegation_id: authorization.delegation_id,
@@ -406,7 +571,7 @@ function invocation(authorization: ReturnType<typeof authorizationFixture>["auth
     provider_attestation_hash: authorization.executor_attestation_hash,
     environment_attestation_hash: authorization.environment_attestation_hash,
     workspace_attestation_hash: authorization.workspace_attestation_hash,
-    phase: "authorized_work",
+    phase,
   });
 }
 
@@ -424,7 +589,7 @@ function handle(binding: string): AttemptExecutorHandle_v1 {
 }
 
 function event(
-  type: "started" | "executor_event" | "declined" | "completed",
+  type: "started" | "accepted" | "executor_event" | "declined" | "completed",
   sequence: number
 ): AttemptExecutorEvent_v1 {
   const common = {

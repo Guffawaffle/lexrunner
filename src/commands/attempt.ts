@@ -37,6 +37,14 @@ import {
   createGovernedAttemptOperationHandlers,
   type GovernedAttemptOperationHandlers,
 } from "../runs/governed-attempt-operation-adapters.js";
+import {
+  createGovernedAttemptVerificationHandlers,
+  type GovernedAttemptVerificationHandlers,
+} from "../runs/governed-attempt-verification-adapters.js";
+import {
+  createGovernedReviewRuntimeHandlers,
+  type GovernedReviewRuntimeHandlers,
+} from "../runs/governed-review-runtime-adapters.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 1024 * 1024;
 
@@ -50,6 +58,8 @@ export interface AttemptCommandDependencies {
   verificationHandlers?: AttemptVerificationHandlers;
   delegationHandlers?: GovernedDelegationHandlers;
   governedReviewHandlers?: GovernedAttemptOperationHandlers;
+  governedReviewVerificationHandlers?: GovernedAttemptVerificationHandlers;
+  governedReviewRuntimeHandlers?: GovernedReviewRuntimeHandlers;
   jsonModeActive: () => boolean;
   maxInputBytes?: number;
   writeJson?: (value: unknown) => void;
@@ -74,6 +84,10 @@ export function registerAttemptCommand(
   const delegationHandlers = dependencies.delegationHandlers ?? createGovernedDelegationHandlers();
   const governedReviewHandlers =
     dependencies.governedReviewHandlers ?? createGovernedAttemptOperationHandlers();
+  const governedReviewVerificationHandlers =
+    dependencies.governedReviewVerificationHandlers ?? createGovernedAttemptVerificationHandlers();
+  const governedReviewRuntimeHandlers =
+    dependencies.governedReviewRuntimeHandlers ?? createGovernedReviewRuntimeHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
 
   attempt
@@ -392,7 +406,7 @@ export function registerAttemptCommand(
 
   const review = attempt
     .command("review")
-    .description("Inspect durable governed-review operations without reading raw evidence");
+    .description("Inspect and independently verify durable governed-review operations");
   review
     .command("status")
     .description("Read coordination-safe asynchronous review status")
@@ -408,6 +422,98 @@ export function registerAttemptCommand(
       (dependencies.writeJson ?? writeJsonOutput)(output);
       setFailureExitCode(output);
     });
+  review
+    .command("verify")
+    .description("Independently verify protected evidence and persist an admissibility receipt")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--operation-id <id>", "Governed review operation identifier")
+    .requiredOption("--verification-id <id>", "Idempotent independent verification identifier")
+    .option("--verifier-id <id>", "Bounded verifier identity")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        operationId: string;
+        verificationId: string;
+        verifierId?: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await governedReviewVerificationHandlers.verify({
+          databasePath: options.databasePath,
+          operationId: options.operationId,
+          verificationId: options.verificationId,
+          ...(options.verifierId ? { verifierId: options.verifierId } : {}),
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+  review
+    .command("start")
+    .description("Launch a synthetic-only governed Codex offer and detached supervisor")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .requiredOption("--attempt-id <id>", "Attempt identifier")
+    .requiredOption("--distribution <name>", "Qualified disposable WSL2 distribution")
+    .requiredOption("--environment-id <id>", "Qualified environment identifier")
+    .requiredOption("--objective <text>", "Bounded review objective")
+    .requiredOption("--prompt <file|->", "Prompt file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        runId: string;
+        attemptId: string;
+        distribution: string;
+        environmentId: string;
+        objective: string;
+        prompt: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const prompt = await readBoundedInputBytes(
+          options.prompt,
+          dependencies.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES,
+          "governed review prompt"
+        );
+        const output = await governedReviewRuntimeHandlers.start({
+          databasePath: options.databasePath,
+          runId: options.runId,
+          attemptId: options.attemptId,
+          distribution: options.distribution,
+          environmentId: options.environmentId,
+          objective: options.objective,
+          prompt,
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
+  review
+    .command("supervise")
+    .description("Attach to one durable governed provider operation until terminal verification")
+    .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
+    .requiredOption("--operation-id <id>", "Governed review operation identifier")
+    .requiredOption("--distribution <name>", "Qualified disposable WSL2 distribution")
+    .option("--json", "Output canonical JSON")
+    .action(
+      async (options: {
+        databasePath: string;
+        operationId: string;
+        distribution: string;
+        json?: boolean;
+      }) => {
+        requireJsonMode(options.json, dependencies.jsonModeActive());
+        const output = await governedReviewRuntimeHandlers.supervise({
+          databasePath: options.databasePath,
+          operationId: options.operationId,
+          distribution: options.distribution,
+        });
+        (dependencies.writeJson ?? writeJsonOutput)(output);
+        setFailureExitCode(output);
+      }
+    );
 }
 
 function registerProjectionInputCommand(
@@ -510,13 +616,45 @@ async function readJsonInput(inputPath: string, maxBytes: number): Promise<unkno
 }
 
 async function readBoundedFile(inputPath: string, maxBytes: number): Promise<string> {
-  const stats = await fs.stat(inputPath);
-  if (!stats.isFile()) throw new Error("input path is not a file");
-  if (stats.size > maxBytes) throw new Error(`input exceeds ${maxBytes} bytes`);
-  return readBoundedStream(createReadStream(inputPath), maxBytes);
+  return (await readBoundedBytesFile(inputPath, maxBytes)).toString("utf8");
 }
 
 async function readBoundedStream(stream: NodeJS.ReadableStream, maxBytes: number): Promise<string> {
+  return (await readBoundedBytesStream(stream, maxBytes)).toString("utf8");
+}
+
+async function readBoundedInputBytes(
+  inputPath: string,
+  maxBytes: number,
+  label: string
+): Promise<Buffer> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
+    throw new TypeError("maxInputBytes must be a positive safe integer");
+  }
+  try {
+    const bytes =
+      inputPath === "-"
+        ? await readBoundedBytesStream(process.stdin, maxBytes)
+        : await readBoundedBytesFile(inputPath, maxBytes);
+    if (bytes.byteLength === 0) throw new Error("input must not be empty");
+    return bytes;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throwExit(2, `Failed to read ${label}: ${message}`);
+  }
+}
+
+async function readBoundedBytesFile(inputPath: string, maxBytes: number): Promise<Buffer> {
+  const stats = await fs.stat(inputPath);
+  if (!stats.isFile()) throw new Error("input path is not a file");
+  if (stats.size > maxBytes) throw new Error(`input exceeds ${maxBytes} bytes`);
+  return readBoundedBytesStream(createReadStream(inputPath), maxBytes);
+}
+
+async function readBoundedBytesStream(
+  stream: NodeJS.ReadableStream,
+  maxBytes: number
+): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const value of stream) {
@@ -525,7 +663,7 @@ async function readBoundedStream(stream: NodeJS.ReadableStream, maxBytes: number
     if (total > maxBytes) throw new Error(`input exceeds ${maxBytes} bytes`);
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
 }
 
 function requireJsonMode(local: boolean | undefined, global: boolean): void {
@@ -557,6 +695,15 @@ function setFailureExitCode(output: unknown): void {
     process.exitCode = 1;
   }
   if (output.ok === true && isRecord(output.result) && output.result.completed === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.started === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.supervisionStarted === false) {
+    process.exitCode = 1;
+  }
+  if (output.ok === true && isRecord(output.result) && output.result.supervised === false) {
     process.exitCode = 1;
   }
 }

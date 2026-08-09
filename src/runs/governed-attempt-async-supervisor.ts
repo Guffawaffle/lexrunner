@@ -18,11 +18,12 @@ export type GovernedAttemptExecutorResolver = (
 export interface GovernedAttemptObservationNotice {
   operationId: string;
   result?: ObserveGovernedAttemptOperationResult;
-  errorCode?: "executor_unavailable" | "observation_failed";
+  errorCode?: "executor_unavailable" | "observation_failed" | "verification_failed";
 }
 
 export interface GovernedAttemptAsyncSupervisorOptions {
   onNotice?: (notice: GovernedAttemptObservationNotice) => void | Promise<void>;
+  verifyCompleted?: (operationId: string) => Promise<void>;
 }
 
 /**
@@ -69,9 +70,30 @@ export class GovernedAttemptAsyncSupervisor {
     const record = await this.store.getAttemptOperation(operationId);
     if (
       !record ||
-      (record.status !== "running" && !(record.status === "completed" && !record.result))
+      (record.status !== "running" &&
+        !(record.status === "completed" && !record.result) &&
+        !(
+          record.status === "completed" &&
+          record.result &&
+          record.verification_context &&
+          !record.verification &&
+          this.options.verifyCompleted
+        ))
     ) {
       return "not_recoverable";
+    }
+    if (
+      record.status === "completed" &&
+      record.result &&
+      record.verification_context &&
+      !record.verification &&
+      this.options.verifyCompleted
+    ) {
+      const completion = this.verify(operationId).finally(() => {
+        this.observations.delete(operationId);
+      });
+      this.observations.set(operationId, { controller: new AbortController(), completion });
+      return "attached";
     }
     const executor = await this.resolveExecutor(record);
     if (!executor) {
@@ -111,6 +133,9 @@ export class GovernedAttemptAsyncSupervisor {
     try {
       const result = await this.service.observeToTerminal(executor, operationId, signal);
       await this.notice({ operationId, result });
+      if (result.terminal && result.status === "completed" && result.result) {
+        await this.verify(operationId);
+      }
     } catch {
       await this.notice({ operationId, errorCode: "observation_failed" });
     }
@@ -120,6 +145,9 @@ export class GovernedAttemptAsyncSupervisor {
     try {
       const result = await this.service.collectCompleted(executor, operationId);
       await this.notice({ operationId, result });
+      if (result.terminal && result.status === "completed" && result.result) {
+        await this.verify(operationId);
+      }
     } catch {
       await this.notice({ operationId, errorCode: "observation_failed" });
     }
@@ -127,5 +155,14 @@ export class GovernedAttemptAsyncSupervisor {
 
   private async notice(notice: GovernedAttemptObservationNotice): Promise<void> {
     await this.options.onNotice?.(notice);
+  }
+
+  private async verify(operationId: string): Promise<void> {
+    if (!this.options.verifyCompleted) return;
+    try {
+      await this.options.verifyCompleted(operationId);
+    } catch {
+      await this.notice({ operationId, errorCode: "verification_failed" });
+    }
   }
 }

@@ -1,0 +1,398 @@
+import { createHash } from "node:crypto";
+
+import { Ajv2020 } from "ajv/dist/2020.js";
+
+import {
+  type GovernedAttemptOperationEvent_v1 as GovernedAttemptOperationEvent,
+  type GovernedAttemptOperationRecord_v1 as GovernedAttemptOperationRecord,
+} from "../store/governed-attempt-operation-store.js";
+import { computeCanonicalHash } from "../schemas/task-contract.js";
+import {
+  createGovernedAttemptVerificationReceipt,
+  type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
+  type GovernedAttemptVerificationFailureCode,
+  type GovernedAttemptVerificationReceipt_v1 as GovernedAttemptVerificationReceipt,
+  type IndependentlyReadEvidenceFrame,
+  type IndependentlyVerifiedEvidenceCapture,
+} from "./governed-attempt-verification.js";
+
+const TOOL_ITEM_TYPES = new Set([
+  "command_execution",
+  "file_change",
+  "mcp_tool_call",
+  "web_search",
+]);
+const STRENGTH_RANK = {
+  executor_reported: 0,
+  inferred: 1,
+  host_enforced_indirect: 2,
+  independently_enforced_verified: 3,
+} as const;
+
+export interface GovernedAttemptIndependentVerificationInput {
+  verificationId: string;
+  verifierId: string;
+  operation: GovernedAttemptOperationRecord;
+  events: readonly GovernedAttemptOperationEvent[];
+  context: GovernedAttemptVerificationContext;
+  evidence: IndependentlyVerifiedEvidenceCapture;
+  verifiedAt: string;
+}
+
+/**
+ * Independent semantic verifier for one completed governed review. It trusts
+ * neither the provider's terminal classification nor its collected verdict.
+ */
+export class GovernedAttemptIndependentVerifier {
+  verify(input: GovernedAttemptIndependentVerificationInput): GovernedAttemptVerificationReceipt {
+    const failures = new Set<GovernedAttemptVerificationFailureCode>();
+    const { operation, context, evidence } = input;
+
+    if (operation.status !== "completed") failures.add("operation_not_completed");
+    if (!operation.result || !operation.result_hash) failures.add("result_missing");
+    if (operation.result?.admissibility === "admissible") failures.add("provider_claim_elevated");
+
+    this.verifyContext(input, failures);
+    this.verifyEvidenceBinding(input, failures);
+    this.verifyEvents(input, failures);
+
+    const protocol = analyzeProtocol(evidence.frames, operation, failures);
+    let taskOutcome: "pass" | "block" | "not_produced" | "invalid" = "not_produced";
+    if (protocol.finalMessage !== undefined) {
+      let output: unknown;
+      try {
+        output = JSON.parse(protocol.finalMessage) as unknown;
+      } catch {
+        failures.add("output_invalid");
+      }
+      if (output !== undefined) {
+        try {
+          const validator = new Ajv2020({ allErrors: true, strict: true }).compile(
+            context.output_schema
+          );
+          if (!validator(output)) failures.add("output_invalid");
+        } catch {
+          failures.add("output_schema_invalid");
+        }
+        taskOutcome = extractTaskOutcome(output);
+        if (taskOutcome === "invalid") failures.add("output_invalid");
+      }
+    } else {
+      failures.add("protocol_violation");
+    }
+
+    if (
+      !operation.result ||
+      operation.result.task_outcome !== taskOutcome ||
+      protocol.terminalTaskOutcome !== taskOutcome
+    ) {
+      failures.add("outcome_mismatch");
+    }
+
+    const failureCodes = [...failures].sort();
+    const accepted = failureCodes.length === 0;
+    return createGovernedAttemptVerificationReceipt({
+      verification_id: input.verificationId,
+      verifier_id: input.verifierId,
+      operation_id: operation.operation_id,
+      attempt_id: operation.attempt_id,
+      delegation_id: operation.delegation_id,
+      capture_id: evidence.reference.capture_id,
+      authorization_binding_digest: operation.authorization.binding_digest,
+      verification_context_hash: context.context_hash,
+      operation_result_hash:
+        operation.result_hash ??
+        computeCanonicalHash({
+          kind: "missing_governed_attempt_result",
+          operation: operation.operation_id,
+        }),
+      capture_root:
+        evidence.reference.capture_root ??
+        computeCanonicalHash({
+          kind: "missing_capture_root",
+          capture: evidence.reference.capture_id,
+        }),
+      capture_verification_hash:
+        evidence.reference.verification_hash ??
+        computeCanonicalHash({
+          kind: "missing_capture_verification",
+          capture: evidence.reference.capture_id,
+        }),
+      decision: accepted ? "accepted" : "rejected",
+      task_outcome: taskOutcome,
+      admissibility: accepted ? "admissible" : "inadmissible",
+      failure_codes: failureCodes,
+      verified_at: input.verifiedAt,
+    });
+  }
+
+  private verifyContext(
+    input: GovernedAttemptIndependentVerificationInput,
+    failures: Set<GovernedAttemptVerificationFailureCode>
+  ): void {
+    const { operation, context } = input;
+    const authorization = operation.authorization;
+    if (
+      context.requirements.attempt_id !== operation.attempt_id ||
+      context.requirements.delegation_id !== operation.delegation_id ||
+      computeCanonicalHash(context.requirements) !== authorization.requirements_hash ||
+      computeCanonicalHash(context.executor) !== authorization.executor_attestation_hash ||
+      computeCanonicalHash(context.environment) !== authorization.environment_attestation_hash ||
+      computeCanonicalHash(context.workspace) !== authorization.workspace_attestation_hash ||
+      context.executor.executor_id !== operation.handle.executor_id ||
+      context.workspace.repository_id !== authorization.grant.repository_id ||
+      context.workspace.base_object_id !== authorization.grant.base_object_id ||
+      context.workspace.candidate_object_id !== authorization.grant.candidate_object_id ||
+      context.workspace.corpus_kind !== "synthetic"
+    ) {
+      failures.add("context_binding_mismatch");
+    }
+    if (operation.result?.authorization_outcome !== "valid") {
+      failures.add("authorization_invalid");
+    }
+    const observed = input.evidence.frames.map((frame) => Date.parse(frame.observedAt));
+    if (
+      observed.some(
+        (timestamp) =>
+          !Number.isFinite(timestamp) ||
+          timestamp < Date.parse(authorization.authorized_at) ||
+          timestamp > Date.parse(authorization.expires_at)
+      )
+    ) {
+      failures.add("authorization_expired");
+    }
+    const attested = new Map(
+      context.environment.controls.map((control) => [control.control, control] as const)
+    );
+    for (const required of context.requirements.controls) {
+      const actual = attested.get(required.control);
+      if (
+        !actual ||
+        actual.status !== "enforced" ||
+        STRENGTH_RANK[actual.strength] < STRENGTH_RANK[required.minimum_strength]
+      ) {
+        failures.add("control_unverifiable");
+      }
+    }
+  }
+
+  private verifyEvidenceBinding(
+    input: GovernedAttemptIndependentVerificationInput,
+    failures: Set<GovernedAttemptVerificationFailureCode>
+  ): void {
+    const { operation, evidence } = input;
+    const reference = evidence.reference;
+    if (
+      reference.status !== "complete" ||
+      !reference.capture_root ||
+      !reference.verification_hash
+    ) {
+      failures.add("evidence_incomplete");
+    }
+    if (
+      !operation.evidence_reservation ||
+      !operation.evidence_declaration ||
+      reference.capture_id !== operation.evidence_declaration?.capture_id ||
+      reference.attempt_id !== operation.attempt_id ||
+      reference.delegation_id !== operation.delegation_id ||
+      reference.authorization_binding_digest !== operation.authorization.binding_digest ||
+      reference.executor_binding_digest !== operation.authorization.executor_attestation_hash ||
+      reference.environment_binding_digest !==
+        operation.authorization.environment_attestation_hash ||
+      reference.workspace_binding_digest !== operation.authorization.workspace_attestation_hash
+    ) {
+      failures.add("evidence_binding_mismatch");
+    }
+    if (
+      reference.frame_count !== evidence.frames.length ||
+      evidence.frames.some((frame, index) => frame.sequence !== index + 1)
+    ) {
+      failures.add("evidence_integrity_failure");
+    }
+  }
+
+  private verifyEvents(
+    input: GovernedAttemptIndependentVerificationInput,
+    failures: Set<GovernedAttemptVerificationFailureCode>
+  ): void {
+    const { operation, events, evidence } = input;
+    if (
+      events.length !== evidence.frames.length ||
+      events.length !== operation.last_event_sequence ||
+      events.some((entry, index) => {
+        const frame = evidence.frames[index];
+        const expectedType =
+          index === 0
+            ? "started"
+            : index === evidence.frames.length - 1
+              ? "completed"
+              : frame?.frameClass === "provider_receipt" &&
+                  parseObject(frame.bytes)?.decision === "ACCEPT"
+                ? "accepted"
+                : "executor_event";
+        const expectedExecutorEventType =
+          expectedType === "executor_event" ? executorEventType(frame) : undefined;
+        return (
+          entry.operation_id !== operation.operation_id ||
+          entry.event.sequence !== index + 1 ||
+          entry.event.sequence !== frame?.sequence ||
+          entry.event.observed_at !== frame?.observedAt ||
+          entry.event.evidence_ref !== frame?.evidenceRef ||
+          entry.event.type !== expectedType ||
+          (entry.event.type === "executor_event" &&
+            entry.event.executor_event_type !== expectedExecutorEventType)
+        );
+      })
+    ) {
+      failures.add("event_mismatch");
+    }
+  }
+}
+
+function analyzeProtocol(
+  frames: readonly IndependentlyReadEvidenceFrame[],
+  operation: GovernedAttemptOperationRecord,
+  failures: Set<GovernedAttemptVerificationFailureCode>
+): { finalMessage?: string; terminalTaskOutcome?: "pass" | "block" | "not_produced" | "invalid" } {
+  if (frames.length < 3) {
+    failures.add("protocol_violation");
+    return {};
+  }
+  const first = parseObject(frames[0]!.bytes);
+  if (
+    frames[0]!.frameClass !== "provider_receipt" ||
+    first?.operation_id !== operation.operation_id ||
+    first?.provider_handle !== operation.handle.provider_handle ||
+    first?.authorization_binding_digest !== operation.authorization.binding_digest
+  ) {
+    failures.add("protocol_violation");
+  }
+
+  let accepted = false;
+  let acceptedReceipt = false;
+  const threadIds: string[] = [];
+  const reviewMessages: string[] = [];
+  for (const frame of frames.slice(1, -1)) {
+    if (frame.frameClass === "executor_stderr") continue;
+    if (frame.frameClass === "provider_receipt") {
+      const receipt = parseObject(frame.bytes);
+      const acceptedThread = threadIds[threadIds.length - 1];
+      if (
+        !accepted ||
+        acceptedReceipt ||
+        receipt?.decision !== "ACCEPT" ||
+        !acceptedThread ||
+        receipt.thread_binding_hash !== contentHash(acceptedThread)
+      ) {
+        failures.add("protocol_violation");
+      } else {
+        acceptedReceipt = true;
+      }
+      continue;
+    }
+    if (frame.frameClass !== "executor_stdout") {
+      failures.add("protocol_violation");
+      continue;
+    }
+    const event = parseObject(frame.bytes);
+    if (!event) {
+      failures.add("protocol_violation");
+      continue;
+    }
+    if (event.type === "thread.started" && typeof event.thread_id === "string") {
+      if (threadIds.length > 0 && !acceptedReceipt) failures.add("protocol_violation");
+      threadIds.push(event.thread_id);
+    }
+    const item = isObject(event.item) ? event.item : undefined;
+    if (
+      !acceptedReceipt &&
+      item &&
+      typeof item.type === "string" &&
+      TOOL_ITEM_TYPES.has(item.type)
+    ) {
+      failures.add("protocol_violation");
+    }
+    if (
+      acceptedReceipt &&
+      item &&
+      typeof item.type === "string" &&
+      item.type !== "command_execution" &&
+      TOOL_ITEM_TYPES.has(item.type)
+    ) {
+      failures.add("protocol_violation");
+    }
+    if (event.type === "item.completed" && item?.type === "agent_message") {
+      const message = item.text;
+      if (typeof message !== "string") {
+        failures.add("protocol_violation");
+      } else if (!accepted) {
+        if (message.trim() !== "ACCEPT") failures.add("protocol_violation");
+        else accepted = true;
+      } else if (!acceptedReceipt) {
+        failures.add("protocol_violation");
+      } else {
+        reviewMessages.push(message);
+      }
+    }
+  }
+  if (!accepted || !acceptedReceipt || threadIds.length < 2 || new Set(threadIds).size !== 1) {
+    failures.add("protocol_violation");
+  }
+
+  const terminalFrame = frames[frames.length - 1]!;
+  const terminal = parseObject(terminalFrame.bytes);
+  const terminalTaskOutcome = normalizeTaskOutcome(terminal?.task_outcome);
+  if (
+    terminalFrame.frameClass !== "provider_receipt" ||
+    terminal?.structured_result_present !== true ||
+    !terminalTaskOutcome
+  ) {
+    failures.add("protocol_violation");
+  }
+  return {
+    ...(reviewMessages.length > 0
+      ? { finalMessage: reviewMessages[reviewMessages.length - 1]! }
+      : {}),
+    ...(terminalTaskOutcome ? { terminalTaskOutcome } : {}),
+  };
+}
+
+function contentHash(value: string): string {
+  return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
+}
+
+function extractTaskOutcome(value: unknown): "pass" | "block" | "invalid" {
+  if (!isObject(value)) return "invalid";
+  const outcome = normalizeTaskOutcome(value.verdict ?? value.taskOutcome ?? value.task_outcome);
+  return outcome === "pass" || outcome === "block" ? outcome : "invalid";
+}
+
+function normalizeTaskOutcome(
+  value: unknown
+): "pass" | "block" | "not_produced" | "invalid" | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return ["pass", "block", "not_produced", "invalid"].includes(normalized)
+    ? (normalized as "pass" | "block" | "not_produced" | "invalid")
+    : undefined;
+}
+
+function parseObject(bytes: Uint8Array): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(Buffer.from(bytes).toString("utf8")) as unknown;
+    return isObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function executorEventType(frame: IndependentlyReadEvidenceFrame | undefined): string | undefined {
+  if (!frame) return undefined;
+  if (frame.frameClass === "executor_stderr") return "codex.stderr";
+  if (frame.frameClass !== "executor_stdout") return undefined;
+  return String(parseObject(frame.bytes)?.type ?? "codex.invalid_json").slice(0, 128);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

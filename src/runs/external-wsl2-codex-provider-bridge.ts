@@ -162,6 +162,7 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
         .object({
           type: z.enum([
             "started",
+            "accepted",
             "executor_event",
             "declined",
             "completed",
@@ -199,6 +200,23 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
   async cancel(providerHandle: string): Promise<void> {
     await this.transport.request({
       args: ["cancel", "--provider-handle", opaqueId.parse(providerHandle)],
+      maxOutputBytes: MAX_CONTROL_BYTES,
+    });
+  }
+
+  async continueAfterAcceptance(
+    providerHandle: string,
+    authorization: AttemptAuthorization_v1
+  ): Promise<void> {
+    await this.transport.request({
+      args: [
+        "continue",
+        "--provider-handle",
+        opaqueId.parse(providerHandle),
+        "--stdin-format",
+        "canonical-json-v1",
+      ],
+      stdin: encodeCanonical(authorization),
       maxOutputBytes: MAX_CONTROL_BYTES,
     });
   }

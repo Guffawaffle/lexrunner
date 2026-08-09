@@ -86,6 +86,28 @@ describe("ExternalWsl2CodexProviderBridge", () => {
     expect(transport.streams[0]!.args.join(" ")).not.toContain("turn.completed");
   });
 
+  it("sends the exact continuation authorization on stdin and never argv", async () => {
+    const transport = new FakeTransport();
+    const bridge = new ExternalWsl2CodexProviderBridge({
+      distribution: "lexrunner-attempt-01234567",
+      transport,
+    });
+    const exactAuthorization = authorization();
+    await bridge.continueAfterAcceptance("provider-handle-1", exactAuthorization);
+    const continuation = transport.requests.at(-1)!;
+    expect(continuation.args).toEqual([
+      "continue",
+      "--provider-handle",
+      "provider-handle-1",
+      "--stdin-format",
+      "canonical-json-v1",
+    ]);
+    expect(continuation.args.join(" ")).not.toContain(exactAuthorization.binding_digest);
+    expect(JSON.parse(Buffer.from(continuation.stdin!).toString("utf8"))).toEqual(
+      exactAuthorization
+    );
+  });
+
   it("releases the transient provider spool only through the opaque handle", async () => {
     const transport = new FakeTransport();
     const bridge = new ExternalWsl2CodexProviderBridge({
@@ -142,6 +164,8 @@ class FakeTransport implements Wsl2CodexProviderTransport {
         return json({ taskOutcome: "pass" });
       case "cancel":
         return json({ cancelled: true });
+      case "continue":
+        return json({ continued: true });
       case "release":
         return json({ released: true });
       default:
