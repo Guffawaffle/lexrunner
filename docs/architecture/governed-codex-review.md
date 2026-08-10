@@ -2,8 +2,9 @@
 
 This runtime is a deliberately read-only code-review profile, not the universal governed-agent
 contract. Review-neutral task/profile and positive capability semantics—including recoverable
-writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The current v1
-review authorization remains specialized until it is migrated through that profile boundary.
+writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The runtime now
+expresses its task semantics through the generic `code-review` profile. Its existing executor grant
+remains a compatibility adapter until the protected generic-grant store migration is complete.
 
 Status: governed synthetic and exact committed repository-corpus review are available through the
 persistent asynchronous CLI.
@@ -117,12 +118,15 @@ thread-binding receipt, rejects work before the host's durable ACCEPT receipt, a
 final JSON again. Only its immutable receipt can elevate the status projection to `admissible`; the
 provider result is persisted as `inadmissible`.
 
-The verifier does not receive or reconstruct raw prompt bytes. It independently binds the durable
-task offer to the prompt hash and output-schema hash recorded by both the host and the protected
-provider receipt. Prompt transport and hashing therefore remain inside the attested host/provider
-launch trusted base; independent raw-prompt reconstruction is not claimed. For repository review,
-the verifier also reopens the Attempt, lease, packet, envelope, and path mapping and requires their
-hashes and identities to match the protected corpus receipt.
+The verifier does not receive or reconstruct raw prompt bytes. The durable task offer names the
+exact generic `GovernedTaskSpec` hash. That protected task binds the `code-review` input/output
+contracts, objective, model provider, sealed-corpus read scope, budgets, and independent verifier.
+The verifier reconstructs the expected profile from the prompt hash, output-schema hash, and
+independently attested corpus identity, then requires an exact task hash and offer-provider match.
+Prompt transport and hashing therefore remain inside the attested host/provider launch trusted base;
+independent raw-prompt reconstruction is not claimed. For repository review, the verifier also
+reopens the Attempt, lease, packet, envelope, and path mapping and requires their hashes and
+identities to match the protected corpus receipt.
 
 The qualified executor currently requires all of the following:
 

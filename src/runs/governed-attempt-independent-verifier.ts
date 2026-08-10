@@ -24,6 +24,11 @@ import {
   type IndependentlyReadEvidenceFrame,
   type IndependentlyVerifiedEvidenceCapture,
 } from "./governed-attempt-verification.js";
+import {
+  GOVERNED_CODE_REVIEW_VERIFIER_ID,
+  computeGovernedCodeReviewCorpusScopeHash,
+  governedCodeReviewTaskMatches,
+} from "./governed-review-task-profile.js";
 
 const TOOL_ITEM_TYPES = new Set([
   "command_execution",
@@ -171,6 +176,31 @@ export class GovernedAttemptIndependentVerifier {
         input.delegation.offer_hash !== context.input_binding.delegation_offer_hash ||
         input.delegation.state.offer.task_offer_hash !== context.input_binding.task_offer_hash ||
         context.input_binding.output_schema_hash !== context.output_schema_hash
+      ) {
+        failures.add("task_input_binding_mismatch");
+      }
+      if (
+        context.governed_task &&
+        (!input.delegation ||
+          input.verifierId !== GOVERNED_CODE_REVIEW_VERIFIER_ID ||
+          input.delegation.state.offer.worker.provider_id !==
+            context.governed_task.authorized_model_provider ||
+          !governedCodeReviewTaskMatches(context.governed_task, {
+            attemptId: operation.attempt_id,
+            delegationId: operation.delegation_id,
+            objectiveHash: context.requirements.objective_hash,
+            authorizedModelProvider: context.requirements.authorized_model_provider,
+            promptHash: context.input_binding.prompt_hash,
+            corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+              repositoryId: context.workspace.repository_id,
+              baseObjectId: context.workspace.base_object_id,
+              candidateObjectId: context.workspace.candidate_object_id,
+              corpusHash: context.workspace.corpus_hash,
+              selectionHash: context.workspace.selection_hash,
+            }),
+            maxDurationMs: context.requirements.max_duration_ms,
+            maxOutputBytes: context.requirements.max_output_bytes,
+          }))
       ) {
         failures.add("task_input_binding_mismatch");
       }

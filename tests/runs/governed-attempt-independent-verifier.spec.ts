@@ -28,6 +28,11 @@ import {
   initialProtectedEvidenceChainHead,
 } from "../../src/store/local-protected-evidence-store.js";
 import { ProtectedEvidenceReference_v1 } from "../../src/store/protected-evidence-store.js";
+import {
+  GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskSpec,
+} from "../../src/runs/governed-review-task-profile.js";
 
 const hash = (value: string) => computeCanonicalHash({ value });
 const at = (seconds: number) => `2026-08-09T11:00:${String(seconds).padStart(2, "0")}.000Z`;
@@ -144,6 +149,27 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
   });
 
+  it("independently verifies the protected generic code-review task profile", () => {
+    const fixture = verificationFixture({ governedTask: true });
+    const admitted = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-governed-task",
+      verifierId: "lexrunner.windows-host-verifier",
+      ...fixture,
+      verifiedAt: at(15),
+    });
+    expect(admitted).toMatchObject({ decision: "accepted", failure_codes: [] });
+
+    fixture.context.governed_task!.input_binding_hash = hash("tampered-task-input");
+    const rejected = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-governed-task-tampered",
+      verifierId: "lexrunner.windows-host-verifier",
+      ...fixture,
+      verifiedAt: at(15),
+    });
+    expect(rejected.decision).toBe("rejected");
+    expect(rejected.failure_codes).toContain("task_input_binding_mismatch");
+  });
+
   it("independently admits a repository corpus only with the exact durable lifecycle", () => {
     const fixture = verificationFixture({ repository: true });
     const receipt = new GovernedAttemptIndependentVerifier().verify({
@@ -189,7 +215,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
   });
 });
 
-function verificationFixture(options: { repository?: boolean } = {}) {
+function verificationFixture(options: { repository?: boolean; governedTask?: boolean } = {}) {
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -277,27 +303,48 @@ function verificationFixture(options: { repository?: boolean } = {}) {
   });
   if (!decision.authorized) throw new Error(`authorization fixture failed: ${decision.reason}`);
 
-  const outputSchema = {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    additionalProperties: false,
-    required: ["verdict", "findings"],
-    properties: {
-      verdict: { type: "string", enum: ["PASS", "BLOCK"] },
-      findings: { type: "array", maxItems: 16 },
-    },
-  };
+  const outputSchema = options.governedTask
+    ? GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA
+    : {
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        additionalProperties: false,
+        required: ["verdict", "findings"],
+        properties: {
+          verdict: { type: "string", enum: ["PASS", "BLOCK"] },
+          findings: { type: "array", maxItems: 16 },
+        },
+      };
+  const promptHash = hash("prompt");
+  const governedTask = options.governedTask
+    ? createGovernedCodeReviewTaskSpec({
+        attemptId: requirements.attempt_id,
+        delegationId: requirements.delegation_id,
+        objectiveHash: requirements.objective_hash,
+        authorizedModelProvider: requirements.authorized_model_provider,
+        promptHash,
+        corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+          repositoryId: workspace.repository_id,
+          baseObjectId: workspace.base_object_id,
+          candidateObjectId: workspace.candidate_object_id,
+          corpusHash: workspace.corpus_hash,
+          selectionHash: workspace.selection_hash,
+        }),
+        maxDurationMs: requirements.max_duration_ms,
+        maxOutputBytes: requirements.max_output_bytes,
+      })
+    : undefined;
   const inputBindingBase = {
-    prompt_hash: hash("prompt"),
+    prompt_hash: promptHash,
     output_schema_hash: computeCanonicalHash(outputSchema),
-    task_offer_hash: hash("task-offer"),
+    task_offer_hash: governedTask?.task_spec_hash ?? hash("task-offer"),
   };
   const offer = {
     schema_version: "1.0.0" as const,
     delegation_id: requirements.delegation_id,
     attempt_id: requirements.attempt_id,
     worker: {
-      provider_id: "openai-codex",
+      provider_id: governedTask?.authorized_model_provider ?? "openai-codex",
       worker_id: executor.executor_id,
       thread_id: "logical-thread-1",
     },
@@ -316,6 +363,7 @@ function verificationFixture(options: { repository?: boolean } = {}) {
     workspace,
     output_schema: outputSchema,
     input_binding: inputBinding,
+    ...(governedTask ? { governed_task: governedTask } : {}),
     ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
   });
   const raw = [

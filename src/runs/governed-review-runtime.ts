@@ -42,6 +42,12 @@ import {
 } from "./governed-review-repository-corpus.js";
 import type { GovernedRepositoryCorpusSource } from "./external-wsl2-repository-corpus-source.js";
 import type { QualifiedCodexProviderAttestations } from "./qualified-wsl2-codex-executor.js";
+import {
+  GOVERNED_CODE_REVIEW_MAX_EVIDENCE_BYTES,
+  GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskSpec,
+} from "./governed-review-task-profile.js";
 
 type GovernedReviewStore = GovernedAttemptOperationStore & GovernedDelegationStore;
 
@@ -53,30 +59,7 @@ export const SYNTHETIC_GOVERNED_REVIEW = Object.freeze({
   maxOutputBytes: 2 * 1_024 * 1_024,
 });
 
-export const SYNTHETIC_GOVERNED_REVIEW_OUTPUT_SCHEMA = Object.freeze({
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  type: "object",
-  additionalProperties: false,
-  required: ["verdict", "findings"],
-  properties: {
-    verdict: { type: "string", enum: ["PASS", "BLOCK"] },
-    findings: {
-      type: "array",
-      maxItems: 16,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["severity", "file", "line", "message"],
-        properties: {
-          severity: { type: "string", enum: ["blocking", "advisory"] },
-          file: { type: "string", minLength: 1, maxLength: 256 },
-          line: { type: "integer", minimum: 1 },
-          message: { type: "string", minLength: 1, maxLength: 2_048 },
-        },
-      },
-    },
-  },
-} satisfies Record<string, unknown>);
+export const SYNTHETIC_GOVERNED_REVIEW_OUTPUT_SCHEMA = GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA;
 
 export interface StartSyntheticGovernedReviewInput {
   runId: string;
@@ -498,17 +481,30 @@ export class GovernedReviewRuntime {
     }
     const promptHash = contentHash(input.prompt);
     const outputSchemaHash = computeCanonicalHash(SYNTHETIC_GOVERNED_REVIEW_OUTPUT_SCHEMA);
-    const taskOfferHash = computeCanonicalHash({
-      objective_hash: objectiveHash,
-      prompt_hash: promptHash,
-      output_schema_hash: outputSchemaHash,
+    const corpusScopeHash = computeGovernedCodeReviewCorpusScopeHash({
+      repositoryId: attestations.workspace.repository_id,
+      baseObjectId: attestations.workspace.base_object_id,
+      candidateObjectId: attestations.workspace.candidate_object_id,
+      corpusHash: attestations.workspace.corpus_hash,
+      selectionHash: attestations.workspace.selection_hash,
     });
+    const governedTask = createGovernedCodeReviewTaskSpec({
+      attemptId: input.attemptId,
+      delegationId,
+      objectiveHash,
+      authorizedModelProvider: requirements.authorized_model_provider,
+      promptHash,
+      corpusScopeHash,
+      maxDurationMs: requirements.max_duration_ms,
+      maxOutputBytes: requirements.max_output_bytes,
+    });
+    const taskOfferHash = governedTask.task_spec_hash;
     const offer = {
       schema_version: "1.0.0" as const,
       delegation_id: delegationId,
       attempt_id: input.attemptId,
       worker: {
-        provider_id: "openai-codex",
+        provider_id: governedTask.authorized_model_provider,
         worker_id: attestations.executor.executor_id,
         thread_id: logicalThreadId,
       },
@@ -525,6 +521,7 @@ export class GovernedReviewRuntime {
       environment: attestations.environment,
       workspace: attestations.workspace,
       output_schema: SYNTHETIC_GOVERNED_REVIEW_OUTPUT_SCHEMA,
+      governed_task: governedTask,
       input_binding: {
         prompt_hash: promptHash,
         output_schema_hash: outputSchemaHash,
@@ -563,7 +560,7 @@ export class GovernedReviewRuntime {
       executor_binding_digest: authorization.authorization.executor_attestation_hash,
       environment_binding_digest: authorization.authorization.environment_attestation_hash,
       workspace_binding_digest: authorization.authorization.workspace_attestation_hash,
-      reserved_bytes: 8 * 1_024 * 1_024,
+      reserved_bytes: GOVERNED_CODE_REVIEW_MAX_EVIDENCE_BYTES,
       reserved_frames: 4_096,
       reserved_events: 4_096,
       max_duration_ms: requirements.max_duration_ms,

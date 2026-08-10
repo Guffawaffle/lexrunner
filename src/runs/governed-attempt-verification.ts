@@ -12,6 +12,7 @@ import {
   ProtectedEvidenceReference_v1,
 } from "../store/protected-evidence-store.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { GovernedTaskSpec_v1 } from "./governed-task.js";
 
 export const GOVERNED_ATTEMPT_VERIFICATION_VERSION = "1.0.0" as const;
 
@@ -70,6 +71,7 @@ const verificationContextBody = z
     output_schema: BoundedOutputSchema,
     output_schema_hash: SHA256Hash,
     input_binding: GovernedAttemptInputBinding_v1.optional(),
+    governed_task: GovernedTaskSpec_v1.optional(),
     repository_corpus: GovernedRepositoryCorpusVerificationBinding_v1.optional(),
   })
   .strict();
@@ -97,6 +99,23 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
         code: "custom",
         path: ["input_binding", "output_schema_hash"],
         message: "input binding must name the exact output schema",
+      });
+    }
+    if (
+      value.governed_task &&
+      (!value.input_binding ||
+        value.governed_task.attempt_id !== value.requirements.attempt_id ||
+        value.governed_task.delegation_id !== value.requirements.delegation_id ||
+        value.governed_task.objective_hash !== value.requirements.objective_hash ||
+        value.governed_task.authorized_model_provider !==
+          value.requirements.authorized_model_provider ||
+        value.governed_task.profile.output_contract_hash !== value.output_schema_hash ||
+        value.input_binding.task_offer_hash !== value.governed_task.task_spec_hash)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task"],
+        message: "governed task must bind the requirements, output contract, and exact task offer",
       });
     }
     if (

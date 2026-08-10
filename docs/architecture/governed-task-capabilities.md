@@ -84,7 +84,8 @@ not treated as a conformant sandbox.
 
 ## Migration boundary
 
-The existing governed review path remains on its read-only v1 authorization contract. It should be
-migrated by introducing a `code-review` task profile over the generic task contract, not by adding
-write exceptions to review schemas. A second non-review profile must prove that the protocol,
-operation store, supervisor, refusal behavior, and evidence store require no task-specific changes.
+The governed review path now creates and durably verifies a `code-review` profile over the generic
+task contract; it does not add write exceptions to review schemas. Its legacy read-only executor
+grant remains as a compatibility adapter while protected generic grant resolution is wired into the
+operation store. A second non-review profile must then prove that the protocol, operation store,
+supervisor, refusal behavior, and evidence store require no task-specific changes.
