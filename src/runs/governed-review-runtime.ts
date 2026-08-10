@@ -46,6 +46,7 @@ import {
   GOVERNED_CODE_REVIEW_MAX_EVIDENCE_BYTES,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
   createGovernedCodeReviewTaskSpec,
 } from "./governed-review-task-profile.js";
 
@@ -498,6 +499,14 @@ export class GovernedReviewRuntime {
       maxDurationMs: requirements.max_duration_ms,
       maxOutputBytes: requirements.max_output_bytes,
     });
+    const taskExecution = createGovernedCodeReviewTaskExecutionBinding({
+      task: governedTask,
+      authorizedAt,
+      expiresAt,
+      executorAttestationHash: authorization.authorization.executor_attestation_hash,
+      environmentAttestationHash: authorization.authorization.environment_attestation_hash,
+      workspaceAttestationHash: authorization.authorization.workspace_attestation_hash,
+    });
     const taskOfferHash = governedTask.task_spec_hash;
     const offer = {
       schema_version: "1.0.0" as const,
@@ -510,7 +519,7 @@ export class GovernedReviewRuntime {
       },
       task_offer_hash: taskOfferHash,
       requirements_hash: computeCanonicalHash(requirements),
-      authority_grant_hash: computeCanonicalHash(grant),
+      authority_grant_hash: taskExecution.authority_grant_hash,
       transcript_start_hash: computeCanonicalHash({ kind: "new-governed-review-transcript" }),
       offered_at: authorizedAt,
     };
@@ -522,6 +531,7 @@ export class GovernedReviewRuntime {
       workspace: attestations.workspace,
       output_schema: SYNTHETIC_GOVERNED_REVIEW_OUTPUT_SCHEMA,
       governed_task: governedTask,
+      task_execution: taskExecution,
       input_binding: {
         prompt_hash: promptHash,
         output_schema_hash: outputSchemaHash,

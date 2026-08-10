@@ -4,7 +4,8 @@ This runtime is a deliberately read-only code-review profile, not the universal 
 contract. Review-neutral task/profile and positive capability semantics—including recoverable
 writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The runtime now
 expresses its task semantics through the generic `code-review` profile. Its existing executor grant
-remains a compatibility adapter until the protected generic-grant store migration is complete.
+remains a compatibility transport, but it cannot release work unless the protected generic grant
+and exact qualified adapter independently evaluate for the bound task.
 
 Status: governed synthetic and exact committed repository-corpus review are available through the
 persistent asynchronous CLI.
@@ -18,6 +19,9 @@ running ADR-010 Attempt -> offered Delegation -> provider offer turn
                                                    |             |
                                                    v             v
                                             terminal decline   durable host latch
+                                                                  |
+                                                                  v
+                                                  generic task/grant/adapter evaluation
                                                                   |
                                                                   v
                                                         exact work authorization
@@ -40,8 +44,11 @@ Stopping the supervisor aborts only the observation client; it does not cancel o
 provider operation lost.
 
 The provider pauses after its ACCEPT receipt. The host persists the Delegation acceptance and the
-safe operation event, authorizes the exact `authorized_work` invocation, and only then sends the
-original authorization on stdin to `continue`. That gate is idempotent. Restart recovery replays it
+safe operation event, resolves the protected generic task and attenuated grant, evaluates the exact
+qualified adapter and per-capability enforcement receipts, authorizes the exact `authorized_work`
+invocation, and only then sends the compatibility authorization on stdin to `continue`. The legacy
+read-only tool grant must describe exactly the same selected capability dimensions, so it cannot
+bypass or silently expand the generic grant. That gate is idempotent. Restart recovery replays it
 when a crash occurs after durable ACCEPT but before continuation; it cannot invent an acceptance.
 
 ## Refusal
@@ -123,6 +130,8 @@ exact generic `GovernedTaskSpec` hash. That protected task binds the `code-revie
 contracts, objective, model provider, sealed-corpus read scope, budgets, and independent verifier.
 The verifier reconstructs the expected profile from the prompt hash, output-schema hash, and
 independently attested corpus identity, then requires an exact task hash and offer-provider match.
+The generic verifier dispatches outcome interpretation through that exact profile/verifier binding;
+only the `code-review` profile maps its own `PASS`/`BLOCK` vocabulary to coordination outcomes.
 Prompt transport and hashing therefore remain inside the attested host/provider launch trusted base;
 independent raw-prompt reconstruction is not claimed. For repository review, the verifier also
 reopens the Attempt, lease, packet, envelope, and path mapping and requires their hashes and

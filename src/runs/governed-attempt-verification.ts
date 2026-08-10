@@ -12,7 +12,7 @@ import {
   ProtectedEvidenceReference_v1,
 } from "../store/protected-evidence-store.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
-import { GovernedTaskSpec_v1 } from "./governed-task.js";
+import { GovernedTaskExecutionBinding_v1, GovernedTaskSpec_v1 } from "./governed-task.js";
 
 export const GOVERNED_ATTEMPT_VERIFICATION_VERSION = "1.0.0" as const;
 
@@ -72,6 +72,7 @@ const verificationContextBody = z
     output_schema_hash: SHA256Hash,
     input_binding: GovernedAttemptInputBinding_v1.optional(),
     governed_task: GovernedTaskSpec_v1.optional(),
+    task_execution: GovernedTaskExecutionBinding_v1.optional(),
     repository_corpus: GovernedRepositoryCorpusVerificationBinding_v1.optional(),
   })
   .strict();
@@ -116,6 +117,26 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
         code: "custom",
         path: ["governed_task"],
         message: "governed task must bind the requirements, output contract, and exact task offer",
+      });
+    }
+    if ((value.governed_task !== undefined) !== (value.task_execution !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["task_execution"],
+        message: "governed task and task execution authority must appear together",
+      });
+    }
+    if (
+      value.governed_task &&
+      value.task_execution &&
+      (value.task_execution.task_spec_hash !== value.governed_task.task_spec_hash ||
+        value.task_execution.authority_grant.attempt_id !== value.governed_task.attempt_id ||
+        value.task_execution.authority_grant.delegation_id !== value.governed_task.delegation_id)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["task_execution"],
+        message: "task execution authority must bind the exact governed task and delegation",
       });
     }
     if (

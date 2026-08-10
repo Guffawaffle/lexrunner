@@ -263,7 +263,7 @@ export type GovernedTaskAdapterEvaluation =
     }
   | Extract<GovernedTaskGrantEvaluation, { permitted: true }>;
 
-const GovernedTaskAdapterSelection_v1 = z
+export const GovernedTaskAdapterSelection_v1 = z
   .object({
     adapter_id: opaqueId,
     adapter_version: z.string().min(1).max(256),
@@ -378,7 +378,7 @@ export function createGovernedTaskCapabilityEnforcementReceipt(
   });
 }
 
-const GovernedTaskQualifiedAdapterResolution_v1 = z
+export const GovernedTaskQualifiedAdapterResolution_v1 = z
   .object({
     manifest: WorkerAdapterManifest_v1,
     qualification: GovernedTaskAdapterQualification_v1,
@@ -397,6 +397,65 @@ const GovernedTaskQualifiedAdapterResolution_v1 = z
       });
     }
   });
+export type GovernedTaskQualifiedAdapterResolution_v1 = z.infer<
+  typeof GovernedTaskQualifiedAdapterResolution_v1
+>;
+
+const governedTaskExecutionBindingBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_TASK_CONTRACT_VERSION),
+    task_spec_hash: SHA256Hash,
+    authority_grant: DelegatedAuthorityGrant_v1,
+    authority_grant_hash: SHA256Hash,
+    adapter_selection: GovernedTaskAdapterSelection_v1,
+    adapter_resolution: GovernedTaskQualifiedAdapterResolution_v1,
+  })
+  .strict()
+  .superRefine((binding, context) => {
+    if (computeAuthorityGrantHash(binding.authority_grant) !== binding.authority_grant_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["authority_grant_hash"],
+        message: "task execution binding must name the exact authority grant",
+      });
+    }
+    if (
+      binding.adapter_resolution.manifest.adapter.id !== binding.adapter_selection.adapter_id ||
+      binding.adapter_resolution.manifest.adapter.version !==
+        binding.adapter_selection.adapter_version
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["adapter_selection"],
+        message: "task execution binding must select the exact qualified adapter",
+      });
+    }
+  });
+
+export const GovernedTaskExecutionBinding_v1 = governedTaskExecutionBindingBody
+  .extend({ execution_binding_hash: SHA256Hash })
+  .strict()
+  .superRefine((binding, context) => {
+    const { execution_binding_hash: _executionBindingHash, ...body } = binding;
+    if (computeCanonicalHash(body) !== binding.execution_binding_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["execution_binding_hash"],
+        message: "task execution binding hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedTaskExecutionBinding_v1 = z.infer<typeof GovernedTaskExecutionBinding_v1>;
+
+export function createGovernedTaskExecutionBinding(
+  candidate: z.input<typeof governedTaskExecutionBindingBody>
+): GovernedTaskExecutionBinding_v1 {
+  const body = governedTaskExecutionBindingBody.parse(candidate);
+  return GovernedTaskExecutionBinding_v1.parse({
+    ...body,
+    execution_binding_hash: computeCanonicalHash(body),
+  });
+}
 
 /** Trusted host port; implementations resolve only protected, independently qualified records. */
 export interface GovernedTaskAdapterQualificationAuthority {

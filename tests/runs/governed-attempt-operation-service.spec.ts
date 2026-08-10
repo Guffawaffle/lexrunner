@@ -15,8 +15,17 @@ import { GovernedAttemptOperationService } from "../../src/runs/governed-attempt
 import { createGovernedAttemptVerificationContext } from "../../src/runs/governed-attempt-verification.js";
 import {
   DelegationInvocationRequest_v1,
+  computeDelegationOfferHash,
   createDelegationDecisionReceipt,
 } from "../../src/runs/governed-attempt-protocol.js";
+import {
+  GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
+  createGovernedCodeReviewTaskSpec,
+} from "../../src/runs/governed-review-task-profile.js";
+import { createGovernedTaskExecutionBinding } from "../../src/runs/governed-task.js";
+import { contentHash } from "../../src/runs/governed-review-repository-corpus.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { InMemoryGovernedAttemptOperationStore } from "../../src/store/inmemory/governed-attempt-operation-store.js";
 import type { GovernedAttemptEvidenceCapture } from "../../src/runs/governed-attempt-evidence.js";
@@ -104,6 +113,52 @@ describe("GovernedAttemptOperationService", () => {
       (await store.listAttemptOperationEvents("operation-1")).map((entry) => entry.event.type)
     ).toEqual(["started", "accepted", "executor_event", "completed"]);
     await store.close();
+  });
+
+  it("releases accepted task work only after the generic grant and adapter evaluate", async () => {
+    const permitted = await governedTaskOfferFixture();
+    if (!permitted.started.started) throw new Error(permitted.started.reason);
+    const permittedObservation = permitted.service.observeToTerminal(
+      permitted.executor,
+      "operation-1"
+    );
+    permitted.executor.emit([
+      event("started", 1),
+      event("accepted", 2),
+      event("executor_event", 3),
+      event("completed", 4),
+    ]);
+    await expect(permittedObservation).resolves.toMatchObject({
+      terminal: true,
+      status: "completed",
+    });
+    expect(permitted.executor.continueCount).toBe(1);
+    await permitted.store.close();
+
+    const blocked = await governedTaskOfferFixture({ invalidateQualification: true });
+    if (!blocked.started.started) throw new Error(blocked.started.reason);
+    const blockedObservation = blocked.service.observeToTerminal(blocked.executor, "operation-1");
+    blocked.executor.emit([event("started", 1), event("accepted", 2), event("executor_event", 3)]);
+    await expect(blockedObservation).resolves.toMatchObject({
+      terminal: true,
+      status: "cancelled",
+    });
+    expect(blocked.executor.continueCount).toBe(0);
+    expect(blocked.executor.cancelCount).toBe(1);
+    await blocked.store.close();
+
+    const direct = await governedTaskOfferFixture({
+      invalidateQualification: true,
+      acceptedBeforeStart: true,
+    });
+    expect(direct.started).toEqual({ started: false, reason: "authorization_denied" });
+    expect(direct.executor.startCount).toBe(0);
+    await direct.store.close();
+
+    const legacyExpansion = await governedTaskOfferFixture({ omitGrantCapabilities: true });
+    expect(legacyExpansion.started).toEqual({ started: false, reason: "binding_mismatch" });
+    expect(legacyExpansion.executor.startCount).toBe(0);
+    await legacyExpansion.store.close();
   });
 
   it("replays an authorized continuation after a crash following durable ACCEPT", async () => {
@@ -355,6 +410,149 @@ async function runningFixture() {
   });
   if (!started.started) throw new Error(`failed to start fixture: ${started.reason}`);
   return { store, service, executor };
+}
+
+async function governedTaskOfferFixture(
+  options: {
+    invalidateQualification?: boolean;
+    acceptedBeforeStart?: boolean;
+    omitGrantCapabilities?: boolean;
+  } = {}
+) {
+  const store = new InMemoryGovernedAttemptOperationStore();
+  const fixture = authorizationFixture();
+  const prompt = Buffer.from("synthetic prompt");
+  const context = fixture.verificationContext;
+  const task = createGovernedCodeReviewTaskSpec({
+    attemptId: fixture.authorization.attempt_id,
+    delegationId: fixture.authorization.delegation_id,
+    objectiveHash: context.requirements.objective_hash,
+    authorizedModelProvider: context.requirements.authorized_model_provider,
+    promptHash: contentHash(prompt),
+    corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+      repositoryId: context.workspace.repository_id,
+      baseObjectId: context.workspace.base_object_id,
+      candidateObjectId: context.workspace.candidate_object_id,
+      corpusHash: context.workspace.corpus_hash,
+      selectionHash: context.workspace.selection_hash,
+    }),
+    maxDurationMs: context.requirements.max_duration_ms,
+    maxOutputBytes: context.requirements.max_output_bytes,
+  });
+  let taskExecution = createGovernedCodeReviewTaskExecutionBinding({
+    task,
+    authorizedAt: at(1),
+    expiresAt: at(10),
+    executorAttestationHash: fixture.authorization.executor_attestation_hash,
+    environmentAttestationHash: fixture.authorization.environment_attestation_hash,
+    workspaceAttestationHash: fixture.authorization.workspace_attestation_hash,
+  });
+  if (options.invalidateQualification) {
+    const { execution_binding_hash: _executionBindingHash, ...body } = taskExecution;
+    taskExecution = createGovernedTaskExecutionBinding({
+      ...body,
+      adapter_resolution: {
+        ...body.adapter_resolution,
+        manifest: {
+          ...body.adapter_resolution.manifest,
+          authority: {
+            ...body.adapter_resolution.manifest.authority,
+            filesystem_read: "unsupported",
+          },
+        },
+      },
+    });
+  }
+  if (options.omitGrantCapabilities) {
+    const { execution_binding_hash: _executionBindingHash, ...body } = taskExecution;
+    const authorityGrant = { ...body.authority_grant, capabilities: [] };
+    taskExecution = createGovernedTaskExecutionBinding({
+      ...body,
+      authority_grant: authorityGrant,
+      authority_grant_hash: computeCanonicalHash(authorityGrant),
+    });
+  }
+  const offer = {
+    schema_version: "1.0.0" as const,
+    delegation_id: fixture.authorization.delegation_id,
+    attempt_id: fixture.authorization.attempt_id,
+    worker: {
+      provider_id: task.authorized_model_provider,
+      worker_id: "worker-1",
+      thread_id: "thread-1",
+    },
+    task_offer_hash: task.task_spec_hash,
+    requirements_hash: computeCanonicalHash(context.requirements),
+    authority_grant_hash: taskExecution.authority_grant_hash,
+    transcript_start_hash: hash("transcript"),
+    offered_at: at(0),
+  };
+  const created = await store.createDelegation({
+    mutationId: "delegation-create",
+    offer,
+    now: at(0),
+  });
+  if (!created.created) throw new Error(`failed to create task Delegation: ${created.reason}`);
+  if (options.acceptedBeforeStart) {
+    const accepted = await store.recordDelegationDecision({
+      mutationId: "delegation-accept",
+      delegationId: offer.delegation_id,
+      expectedRevision: created.record.revision,
+      receipt: createDelegationDecisionReceipt({
+        offer,
+        decision: "ACCEPT",
+        decisionReceiptId: "acceptance-1",
+        decidedAt: at(1),
+      }),
+      now: at(1),
+    });
+    if (!accepted.recorded) {
+      throw new Error(`failed to accept task Delegation: ${accepted.reason}`);
+    }
+  }
+  const verificationContext = createGovernedAttemptVerificationContext({
+    requirements: context.requirements,
+    executor: context.executor,
+    environment: context.environment,
+    workspace: context.workspace,
+    output_schema: GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+    input_binding: {
+      prompt_hash: contentHash(prompt),
+      output_schema_hash: computeCanonicalHash(GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA),
+      task_offer_hash: task.task_spec_hash,
+      delegation_offer_hash: computeDelegationOfferHash(offer),
+    },
+    governed_task: task,
+    task_execution: taskExecution,
+  });
+  const evidence = evidenceBinding(fixture.authorization);
+  const executor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
+  const service = new GovernedAttemptOperationService(store, () => at(9));
+  const started = await service.start(executor, {
+    operationMutationId: "operation-create",
+    authorizationMutationId: "delegation-offer-authorize",
+    authorization: fixture.authorization,
+    invocation: DelegationInvocationRequest_v1.parse({
+      schema_version: "1.0.0",
+      delegation_id: offer.delegation_id,
+      attempt_id: offer.attempt_id,
+      offer_hash: computeDelegationOfferHash(offer),
+      authority_grant_hash: offer.authority_grant_hash,
+      worker_thread_id: offer.worker.thread_id,
+      transcript_start_hash: offer.transcript_start_hash,
+      provider_attestation_hash: fixture.authorization.executor_attestation_hash,
+      environment_attestation_hash: fixture.authorization.environment_attestation_hash,
+      workspace_attestation_hash: fixture.authorization.workspace_attestation_hash,
+      phase: options.acceptedBeforeStart ? "authorized_work" : "offer",
+    }),
+    prompt,
+    outputSchema: GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+    evidence: evidence.capture,
+    evidenceReservation: evidence.reservation,
+    verificationContext,
+    now: at(3),
+  });
+  return { store, service, executor, started };
 }
 
 function authorizationFixture() {

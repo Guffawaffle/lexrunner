@@ -22,7 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - **Governed review task profile** - Express read-only review through a durable generic
   `GovernedTaskSpec`, bind the Delegation offer to its exact task and provider, and independently
-  reconstruct the profile from protected prompt, corpus, output-contract, and budget bindings.
+  reconstruct the profile from protected prompt, corpus, output-contract, and budget bindings;
+  release accepted work only after the generic grant and qualified adapter evaluate, and dispatch
+  `PASS`/`BLOCK` interpretation through the exact profile verifier.
 - **Qualified provider topology** - Bind the root-owned repository exporter and exact Git executable
   and version into live qualification evidence, and securely discard sealed corpora that never
   become operation-bound.

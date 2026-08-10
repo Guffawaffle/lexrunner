@@ -28,6 +28,7 @@ import {
   GOVERNED_CODE_REVIEW_VERIFIER_ID,
   computeGovernedCodeReviewCorpusScopeHash,
   governedCodeReviewTaskMatches,
+  interpretGovernedCodeReviewOutcome,
 } from "./governed-review-task-profile.js";
 
 const TOOL_ITEM_TYPES = new Set([
@@ -79,6 +80,7 @@ export class GovernedAttemptIndependentVerifier {
 
     const protocol = analyzeProtocol(evidence.frames, operation, failures);
     let taskOutcome: "pass" | "block" | "not_produced" | "invalid" = "not_produced";
+    let terminalTaskOutcome: "pass" | "block" | "invalid" | undefined;
     if (protocol.finalMessage !== undefined) {
       let output: unknown;
       try {
@@ -95,8 +97,21 @@ export class GovernedAttemptIndependentVerifier {
         } catch {
           failures.add("output_schema_invalid");
         }
-        taskOutcome = extractTaskOutcome(output);
-        if (taskOutcome === "invalid") failures.add("output_invalid");
+        const profile = interpretGovernedCodeReviewOutcome({
+          task: context.governed_task,
+          verifierId: input.verifierId,
+          output,
+          terminalTaskOutcome: protocol.terminalTaskOutcome,
+        });
+        if (!profile.matched) {
+          failures.add("task_input_binding_mismatch");
+          taskOutcome = "invalid";
+        } else {
+          taskOutcome = profile.outputOutcome;
+          terminalTaskOutcome = profile.terminalOutcome;
+          if (taskOutcome === "invalid") failures.add("output_invalid");
+          if (!terminalTaskOutcome) failures.add("protocol_violation");
+        }
       }
     } else {
       failures.add("protocol_violation");
@@ -105,7 +120,7 @@ export class GovernedAttemptIndependentVerifier {
     if (
       !operation.result ||
       operation.result.task_outcome !== taskOutcome ||
-      protocol.terminalTaskOutcome !== taskOutcome
+      terminalTaskOutcome !== taskOutcome
     ) {
       failures.add("outcome_mismatch");
     }
@@ -183,6 +198,9 @@ export class GovernedAttemptIndependentVerifier {
         context.governed_task &&
         (!input.delegation ||
           input.verifierId !== GOVERNED_CODE_REVIEW_VERIFIER_ID ||
+          !context.task_execution ||
+          input.delegation.state.offer.authority_grant_hash !==
+            context.task_execution.authority_grant_hash ||
           input.delegation.state.offer.worker.provider_id !==
             context.governed_task.authorized_model_provider ||
           !governedCodeReviewTaskMatches(context.governed_task, {
@@ -411,7 +429,7 @@ function analyzeProtocol(
   frames: readonly IndependentlyReadEvidenceFrame[],
   operation: GovernedAttemptOperationRecord,
   failures: Set<GovernedAttemptVerificationFailureCode>
-): { finalMessage?: string; terminalTaskOutcome?: "pass" | "block" | "not_produced" | "invalid" } {
+): { finalMessage?: string; terminalTaskOutcome?: unknown } {
   if (frames.length < 3) {
     failures.add("protocol_violation");
     return {};
@@ -513,11 +531,10 @@ function analyzeProtocol(
 
   const terminalFrame = frames[frames.length - 1]!;
   const terminal = parseObject(terminalFrame.bytes);
-  const terminalTaskOutcome = normalizeTaskOutcome(terminal?.task_outcome);
   if (
     terminalFrame.frameClass !== "provider_receipt" ||
     terminal?.structured_result_present !== true ||
-    !terminalTaskOutcome
+    !("task_outcome" in (terminal ?? {}))
   ) {
     failures.add("protocol_violation");
   }
@@ -525,7 +542,9 @@ function analyzeProtocol(
     ...(reviewMessages.length > 0
       ? { finalMessage: reviewMessages[reviewMessages.length - 1]! }
       : {}),
-    ...(terminalTaskOutcome ? { terminalTaskOutcome } : {}),
+    ...(terminal && "task_outcome" in terminal
+      ? { terminalTaskOutcome: terminal.task_outcome }
+      : {}),
   };
 }
 
@@ -538,22 +557,6 @@ function providerRepositoryCorpusBinding(
 
 function contentHash(value: string): string {
   return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
-}
-
-function extractTaskOutcome(value: unknown): "pass" | "block" | "invalid" {
-  if (!isObject(value)) return "invalid";
-  const outcome = normalizeTaskOutcome(value.verdict ?? value.taskOutcome ?? value.task_outcome);
-  return outcome === "pass" || outcome === "block" ? outcome : "invalid";
-}
-
-function normalizeTaskOutcome(
-  value: unknown
-): "pass" | "block" | "not_produced" | "invalid" | undefined {
-  if (typeof value !== "string") return undefined;
-  const normalized = value.trim().toLowerCase();
-  return ["pass", "block", "not_produced", "invalid"].includes(normalized)
-    ? (normalized as "pass" | "block" | "not_produced" | "invalid")
-    : undefined;
 }
 
 function parseObject(bytes: Uint8Array): Record<string, unknown> | undefined {

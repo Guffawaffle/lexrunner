@@ -32,6 +32,7 @@ import {
   GOVERNED_CODE_REVIEW_VERIFIER_ID,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
   createGovernedCodeReviewTaskSpec,
 } from "../../src/runs/governed-review-task-profile.js";
 
@@ -43,7 +44,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const fixture = verificationFixture();
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-1",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -67,7 +68,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-2",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -86,7 +87,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-pre-receipt-command",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -104,7 +105,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-thread-binding",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -124,7 +125,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-3",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -141,7 +142,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-task-input",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -154,7 +155,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const fixture = verificationFixture({ governedTask: true });
     const admitted = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-governed-task",
-      verifierId: "lexrunner.windows-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -163,7 +164,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     fixture.context.governed_task!.input_binding_hash = hash("tampered-task-input");
     const rejected = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-governed-task-tampered",
-      verifierId: "lexrunner.windows-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -232,7 +233,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 });
 
 function verificationFixture(options: { repository?: boolean; governedTask?: boolean } = {}) {
-  const usesGovernedTask = options.governedTask === true || options.repository === true;
+  const usesGovernedTask = options.governedTask !== false;
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -351,6 +352,16 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
         maxOutputBytes: requirements.max_output_bytes,
       })
     : undefined;
+  const taskExecution = governedTask
+    ? createGovernedCodeReviewTaskExecutionBinding({
+        task: governedTask,
+        authorizedAt: at(1),
+        expiresAt: at(18),
+        executorAttestationHash: computeCanonicalHash(executor),
+        environmentAttestationHash: computeCanonicalHash(environment),
+        workspaceAttestationHash: computeCanonicalHash(workspace),
+      })
+    : undefined;
   const inputBindingBase = {
     prompt_hash: promptHash,
     output_schema_hash: computeCanonicalHash(outputSchema),
@@ -367,7 +378,7 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
     },
     task_offer_hash: inputBindingBase.task_offer_hash,
     requirements_hash: computeCanonicalHash(requirements),
-    authority_grant_hash: computeCanonicalHash(grant),
+    authority_grant_hash: taskExecution?.authority_grant_hash ?? computeCanonicalHash(grant),
     transcript_start_hash: hash("transcript"),
     offered_at: at(1),
   };
@@ -381,6 +392,7 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
     output_schema: outputSchema,
     input_binding: inputBinding,
     ...(governedTask ? { governed_task: governedTask } : {}),
+    ...(taskExecution ? { task_execution: taskExecution } : {}),
     ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
   });
   const raw = [

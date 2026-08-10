@@ -4,8 +4,10 @@ import {
   GOVERNED_CODE_REVIEW_INPUT_CONTRACT_HASH,
   GOVERNED_CODE_REVIEW_OUTPUT_CONTRACT_HASH,
   computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
   createGovernedCodeReviewTaskSpec,
   governedCodeReviewTaskMatches,
+  interpretGovernedCodeReviewOutcome,
 } from "../../src/runs/governed-review-task-profile.js";
 
 const hash = (character: string): `sha256:${string}` => `sha256:${character.repeat(64)}`;
@@ -60,6 +62,49 @@ describe("governed code-review task profile", () => {
     expect(
       computeGovernedCodeReviewCorpusScopeHash({ ...identity, selectionHash: hash("f") })
     ).not.toBe(scope);
+  });
+
+  it("binds the exact read grant to a qualified adapter and keeps outcome semantics in-profile", () => {
+    const task = createGovernedCodeReviewTaskSpec(taskInput());
+    const execution = createGovernedCodeReviewTaskExecutionBinding({
+      task,
+      authorizedAt: "2026-08-10T06:00:00.000Z",
+      expiresAt: "2026-08-10T07:00:00.000Z",
+      executorAttestationHash: hash("4"),
+      environmentAttestationHash: hash("5"),
+      workspaceAttestationHash: hash("6"),
+    });
+
+    expect(execution).toMatchObject({
+      task_spec_hash: task.task_spec_hash,
+      authority_grant: {
+        capabilities: [{ capability_id: "read-sealed-review-corpus" }],
+      },
+      adapter_resolution: {
+        manifest: {
+          authority: {
+            filesystem_read: "enforced",
+            filesystem_write: "unsupported",
+          },
+        },
+      },
+    });
+    expect(
+      interpretGovernedCodeReviewOutcome({
+        task,
+        verifierId: task.profile.verifier_id,
+        output: { verdict: "PASS", findings: [] },
+        terminalTaskOutcome: "pass",
+      })
+    ).toEqual({ matched: true, outputOutcome: "pass", terminalOutcome: "pass" });
+    expect(
+      interpretGovernedCodeReviewOutcome({
+        task,
+        verifierId: "another-verifier",
+        output: { verdict: "PASS", findings: [] },
+        terminalTaskOutcome: "pass",
+      })
+    ).toEqual({ matched: false });
   });
 });
 

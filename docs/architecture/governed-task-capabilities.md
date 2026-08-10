@@ -85,7 +85,11 @@ not treated as a conformant sandbox.
 ## Migration boundary
 
 The governed review path now creates and durably verifies a `code-review` profile over the generic
-task contract; it does not add write exceptions to review schemas. Its legacy read-only executor
-grant remains as a compatibility adapter while protected generic grant resolution is wired into the
-operation store. A second non-review profile must then prove that the protocol, operation store,
-supervisor, refusal behavior, and evidence store require no task-specific changes.
+task contract; it does not add write exceptions to review schemas. After durable `ACCEPT` and before
+task continuation, the operation service resolves the protected task, operator-issued attenuated
+grant, accepted offer, adapter qualification, and per-capability enforcement receipts through the
+generic evaluators. The legacy read-only executor grant remains only a compatibility transport and
+must match the generic grant's selected dimensions. Review output interpretation likewise lives in
+the bound profile, not the generic independent verifier. A second non-review profile must now prove
+that the protocol, operation store, supervisor, refusal behavior, and evidence store require no
+task-specific changes.

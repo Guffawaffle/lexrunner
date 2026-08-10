@@ -88,6 +88,7 @@ describe("GovernedReviewRuntime", () => {
     expect(delegation?.state.offer).toMatchObject({
       worker: { provider_id: "openai" },
       task_offer_hash: result.verificationContext.governed_task?.task_spec_hash,
+      authority_grant_hash: result.verificationContext.task_execution?.authority_grant_hash,
     });
     expect(await store.getAttemptOperation(result.operationId)).toMatchObject({
       attempt_id: "attempt-1",
@@ -102,6 +103,10 @@ describe("GovernedReviewRuntime", () => {
               effect: { class: "observation" },
             },
           ],
+        },
+        task_execution: {
+          task_spec_hash: result.verificationContext.governed_task?.task_spec_hash,
+          adapter_selection: { adapter_id: "lexrunner.qualified-wsl2-codex" },
         },
       },
     });
