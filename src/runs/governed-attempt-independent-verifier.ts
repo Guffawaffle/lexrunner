@@ -204,6 +204,9 @@ export class GovernedAttemptIndependentVerifier {
       ) {
         failures.add("task_input_binding_mismatch");
       }
+      if (context.workspace.corpus_kind === "repository" && !context.governed_task) {
+        failures.add("task_input_binding_mismatch");
+      }
     } else if (context.workspace.corpus_kind === "repository") {
       failures.add("task_input_binding_mismatch");
     }

@@ -135,6 +135,13 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
         message: "repository workspace requires an exact task input binding",
       });
     }
+    if (value.workspace.corpus_kind === "repository" && !value.governed_task) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task"],
+        message: "repository workspace requires an exact governed task specification",
+      });
+    }
     const { context_hash: _contextHash, ...body } = value;
     if (computeCanonicalHash(body) !== value.context_hash) {
       context.addIssue({

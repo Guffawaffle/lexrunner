@@ -29,6 +29,7 @@ import {
 } from "../../src/store/local-protected-evidence-store.js";
 import { ProtectedEvidenceReference_v1 } from "../../src/store/protected-evidence-store.js";
 import {
+  GOVERNED_CODE_REVIEW_VERIFIER_ID,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskSpec,
@@ -174,7 +175,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const fixture = verificationFixture({ repository: true });
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -191,7 +192,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const { repositoryLifecycle: _repositoryLifecycle, ...withoutLifecycle } = fixture;
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository-missing-lifecycle",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...withoutLifecycle,
       verifiedAt: at(15),
     });
@@ -205,7 +206,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     fixture.repositoryLifecycle!.lease!.status = "released";
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository-released-lease",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -213,9 +214,25 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.decision).toBe("rejected");
     expect(receipt.failure_codes).toContain("lifecycle_binding_mismatch");
   });
+
+  it("rejects a repository result when its protected governed task is absent", () => {
+    const fixture = verificationFixture({ repository: true });
+    delete fixture.context.governed_task;
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-repository-missing-governed-task",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
+  });
 });
 
 function verificationFixture(options: { repository?: boolean; governedTask?: boolean } = {}) {
+  const usesGovernedTask = options.governedTask === true || options.repository === true;
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -303,7 +320,7 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
   });
   if (!decision.authorized) throw new Error(`authorization fixture failed: ${decision.reason}`);
 
-  const outputSchema = options.governedTask
+  const outputSchema = usesGovernedTask
     ? GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA
     : {
         $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -316,7 +333,7 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
         },
       };
   const promptHash = hash("prompt");
-  const governedTask = options.governedTask
+  const governedTask = usesGovernedTask
     ? createGovernedCodeReviewTaskSpec({
         attemptId: requirements.attempt_id,
         delegationId: requirements.delegation_id,
