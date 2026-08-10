@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import Database from "better-sqlite3-multiple-ciphers";
 
 import { createDelegationDecisionReceipt } from "../../src/runs/governed-attempt-protocol.js";
 import {
@@ -269,6 +270,33 @@ describe.each([
   });
 });
 
+describe("SQLite governed Attempt repository lifecycle guard", () => {
+  it("rejects operation creation after the bound workspace lease is released", async () => {
+    const directory = await fs.mkdtemp(join(tmpdir(), "lexrunner-governed-operation-guard-"));
+    const databasePath = join(directory, "coordination.db");
+    const store = new SqliteGovernedAttemptOperationStore(databasePath);
+    try {
+      await acceptedDelegation(store);
+      seedRepositoryLifecycle(databasePath, "released");
+      const fixture = verificationBoundFixture(true);
+      await expect(
+        store.createAttemptOperation({
+          mutationId: "operation-create-guarded",
+          handle: fixture.handle,
+          authorization: fixture.authorization,
+          evidenceReservation: fixture.reservation,
+          evidenceDeclaration: fixture.declaration,
+          verificationContext: fixture.context,
+          now: at(2),
+        })
+      ).resolves.toEqual({ created: false, reason: "binding_mismatch" });
+    } finally {
+      await store.close();
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 async function acceptedDelegation(store: GovernedDelegationStore): Promise<void> {
   const offer = {
     schema_version: "1.0.0" as const,
@@ -458,7 +486,7 @@ function evidenceDeclaration(boundAuthorization: ReturnType<typeof authorization
   };
 }
 
-function verificationBoundFixture() {
+function verificationBoundFixture(repository = false) {
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -524,7 +552,7 @@ function verificationBoundFixture() {
     candidate_object_id: requirements.candidate_object_id,
     corpus_hash: hash("corpus"),
     selection_hash: hash("selection"),
-    corpus_kind: "synthetic" as const,
+    corpus_kind: repository ? ("repository" as const) : ("synthetic" as const),
     ...observed,
   };
   const decision = authorizeGovernedReview({
@@ -538,12 +566,34 @@ function verificationBoundFixture() {
     expiresAt: at(58),
   });
   if (!decision.authorized) throw new Error(`verification fixture failed: ${decision.reason}`);
+  const outputSchema = { type: "object" };
   const context = createGovernedAttemptVerificationContext({
     requirements,
     executor,
     environment,
     workspace,
-    output_schema: { type: "object" },
+    output_schema: outputSchema,
+    ...(repository
+      ? {
+          input_binding: {
+            prompt_hash: hash("prompt"),
+            output_schema_hash: computeCanonicalHash(outputSchema),
+            task_offer_hash: hash("task-offer"),
+            delegation_offer_hash: hash("delegation-offer"),
+          },
+          repository_corpus: {
+            manifest_hash: hash("manifest"),
+            source_binding_hash: hash("source-binding"),
+            workspace_lease_id: "workspace-1",
+            workspace_lease_revision: 1,
+            task_packet_hash: hash("packet"),
+            launch_envelope_hash: hash("envelope"),
+            path_mapping_hash: hash("path-mapping"),
+            candidate_tree_hash: hash("candidate-tree"),
+            patch_hash: hash("patch"),
+          },
+        }
+      : {}),
   });
   return {
     authorization: decision.authorization,
@@ -555,4 +605,98 @@ function verificationBoundFixture() {
     reservation: evidenceReservation(decision.authorization),
     declaration: evidenceDeclaration(decision.authorization),
   };
+}
+
+function seedRepositoryLifecycle(databasePath: string, status: "active" | "released"): void {
+  const database = new Database(databasePath);
+  try {
+    database.pragma("foreign_keys = OFF");
+    database
+      .prepare(
+        `INSERT INTO attempts(
+          attemptId,runId,runRevision,workItemId,workItemRevision,packetId,packetHash,baseSha,
+          revision,status,workspaceLeaseId,createdAt,updatedAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "attempt-1",
+        "run-1",
+        0,
+        "work-1",
+        0,
+        "packet-1",
+        hash("packet"),
+        "1".repeat(40),
+        4,
+        "running",
+        "workspace-1",
+        at(0),
+        at(0)
+      );
+    database
+      .prepare(
+        `INSERT INTO workspace_leases(
+          leaseId,runId,runRevision,workItemId,workItemRevision,packetId,packetHash,attemptId,
+          revision,controllerId,controllerLeaseId,fencingToken,repositoryId,hostId,gitRuntime,
+          projectRoot,branch,worktreePath,baseSha,status,acquiredAt,heartbeatAt,expiresAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "workspace-1",
+        "run-1",
+        0,
+        "work-1",
+        0,
+        "packet-1",
+        hash("packet"),
+        "attempt-1",
+        status === "active" ? 1 : 2,
+        "controller-1",
+        "controller-lease-1",
+        1,
+        "synthetic-repository",
+        "host-1",
+        "git-1",
+        "/srv/repository",
+        "agent/attempt-1",
+        "/srv/worktrees/attempt-1",
+        "1".repeat(40),
+        status,
+        at(0),
+        at(1),
+        at(59)
+      );
+    database
+      .prepare(
+        `INSERT INTO launch_envelope_bindings(
+          attemptId,runId,workspaceLeaseId,attemptRevision,workspaceLeaseRevision,
+          authorizationMutationId,envelopeId,envelopeHash,envelopeJson,controllerId,
+          controllerLeaseId,fencingToken,createdAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "attempt-1",
+        "run-1",
+        "workspace-1",
+        3,
+        1,
+        "launch-authorization-1",
+        "envelope-1",
+        hash("envelope"),
+        "{}",
+        "controller-1",
+        "controller-lease-1",
+        1,
+        at(0)
+      );
+    database
+      .prepare(
+        `INSERT INTO task_packet_bindings(
+          attemptId,runId,workItemId,workItemRevision,packetId,packetHash,packetJson,createdAt
+        ) VALUES(?,?,?,?,?,?,?,?)`
+      )
+      .run("attempt-1", "run-1", "work-1", 0, "packet-1", hash("packet"), "{}", at(0));
+  } finally {
+    database.close();
+  }
 }

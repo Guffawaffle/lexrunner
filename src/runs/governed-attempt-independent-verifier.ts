@@ -259,6 +259,9 @@ export class GovernedAttemptIndependentVerifier {
         attempt.packetHash !== repository.task_packet_hash ||
         attempt.baseSha !== input.context.workspace.base_object_id ||
         lease.leaseId !== repository.workspace_lease_id ||
+        lease.status !== "active" ||
+        Date.parse(lease.expiresAt) <= Date.parse(input.verifiedAt) ||
+        lease.revision < repository.workspace_lease_revision ||
         lease.attemptId !== attempt.attemptId ||
         lease.runId !== attempt.runId ||
         lease.packetId !== attempt.packetId ||
@@ -268,6 +271,7 @@ export class GovernedAttemptIndependentVerifier {
         launchBinding.attemptId !== attempt.attemptId ||
         launchBinding.runId !== attempt.runId ||
         launchBinding.workspaceLeaseId !== lease.leaseId ||
+        launchBinding.workspaceLeaseRevision !== repository.workspace_lease_revision ||
         launchBinding.envelopeHash !== repository.launch_envelope_hash ||
         launchBinding.envelopeId !== envelope.envelope_id ||
         launchBinding.workspaceLeaseRevision !== envelope.workspace_lease_revision ||

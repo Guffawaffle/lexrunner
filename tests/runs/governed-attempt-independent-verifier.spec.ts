@@ -173,6 +173,20 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.decision).toBe("rejected");
     expect(receipt.failure_codes).toContain("lifecycle_binding_mismatch");
   });
+
+  it("rejects a repository result after its bound workspace lease is released", () => {
+    const fixture = verificationFixture({ repository: true });
+    fixture.repositoryLifecycle!.lease!.status = "released";
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-repository-released-lease",
+      verifierId: "lexrunner-host-verifier",
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("lifecycle_binding_mismatch");
+  });
 });
 
 function verificationFixture(options: { repository?: boolean } = {}) {
@@ -660,6 +674,7 @@ function repositoryVerificationLifecycle(input: {
       manifest_hash: hash("manifest"),
       source_binding_hash: computeCanonicalHash(source),
       workspace_lease_id: source.workspace_lease_id,
+      workspace_lease_revision: 1,
       task_packet_hash: source.task_packet_hash,
       launch_envelope_hash: source.launch_envelope_hash,
       path_mapping_hash: source.path_mapping_hash,

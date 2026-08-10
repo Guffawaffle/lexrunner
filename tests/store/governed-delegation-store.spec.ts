@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import Database from "better-sqlite3-multiple-ciphers";
 
 import {
   DelegationInvocationRequest_v1,
@@ -244,6 +245,164 @@ describe("SQLite governed Delegation privacy", () => {
     }
   });
 });
+
+describe("SQLite governed Delegation repository lifecycle guard", () => {
+  it("atomically denies work authorization after the bound lease is released", async () => {
+    const directory = await fs.mkdtemp(join(tmpdir(), "lexrunner-governed-lifecycle-guard-"));
+    const databasePath = join(directory, "coordination.db");
+    const store = new SqliteGovernedDelegationStore(databasePath);
+    const envelopeHash = `sha256:${"8".repeat(64)}`;
+    const guard = {
+      manifest_hash: `sha256:${"9".repeat(64)}`,
+      source_binding_hash: `sha256:${"a".repeat(64)}`,
+      workspace_lease_id: "workspace-1",
+      workspace_lease_revision: 1,
+      task_packet_hash: HASH.task,
+      launch_envelope_hash: envelopeHash,
+      path_mapping_hash: `sha256:${"b".repeat(64)}`,
+      candidate_tree_hash: `sha256:${"c".repeat(64)}`,
+      patch_hash: `sha256:${"d".repeat(64)}`,
+    } as const;
+    try {
+      seedRepositoryLifecycle(databasePath, envelopeHash);
+      await createOffer(store);
+      const accepted = await store.recordDelegationDecision({
+        mutationId: "mutation-guard-accept",
+        delegationId: "delegation-1",
+        expectedRevision: 0,
+        receipt: decisionReceipt("ACCEPT", "decision-guard-accept"),
+        now: "2026-08-09T08:00:01Z",
+      });
+      if (!accepted.recorded) throw new Error("expected guarded Delegation acceptance");
+      await expect(
+        store.authorizeDelegationInvocation({
+          mutationId: "mutation-guard-authorize-active",
+          delegationId: "delegation-1",
+          expectedRevision: 1,
+          request: invocation(),
+          repositoryLifecycleGuard: guard,
+          now: "2026-08-09T08:00:02Z",
+        })
+      ).resolves.toMatchObject({ authorized: true });
+
+      const database = new Database(databasePath);
+      try {
+        database
+          .prepare("UPDATE workspace_leases SET status='released',revision=2 WHERE leaseId=?")
+          .run("workspace-1");
+      } finally {
+        database.close();
+      }
+      await expect(
+        store.authorizeDelegationInvocation({
+          mutationId: "mutation-guard-authorize-released",
+          delegationId: "delegation-1",
+          expectedRevision: 1,
+          request: invocation(),
+          repositoryLifecycleGuard: guard,
+          now: "2026-08-09T08:00:03Z",
+        })
+      ).resolves.toMatchObject({ authorized: false, reason: "binding_mismatch" });
+    } finally {
+      await store.close();
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+function seedRepositoryLifecycle(databasePath: string, envelopeHash: string): void {
+  const database = new Database(databasePath);
+  try {
+    database.pragma("foreign_keys = OFF");
+    database
+      .prepare(
+        `INSERT INTO attempts(
+          attemptId,runId,runRevision,workItemId,workItemRevision,packetId,packetHash,baseSha,
+          revision,status,workspaceLeaseId,createdAt,updatedAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "attempt-1",
+        "run-1",
+        0,
+        "work-1",
+        0,
+        "packet-1",
+        HASH.task,
+        "1".repeat(40),
+        4,
+        "running",
+        "workspace-1",
+        "2026-08-09T08:00:00Z",
+        "2026-08-09T08:00:00Z"
+      );
+    database
+      .prepare(
+        `INSERT INTO workspace_leases(
+          leaseId,runId,runRevision,workItemId,workItemRevision,packetId,packetHash,attemptId,
+          revision,controllerId,controllerLeaseId,fencingToken,repositoryId,hostId,gitRuntime,
+          projectRoot,branch,worktreePath,baseSha,status,acquiredAt,heartbeatAt,expiresAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "workspace-1",
+        "run-1",
+        0,
+        "work-1",
+        0,
+        "packet-1",
+        HASH.task,
+        "attempt-1",
+        1,
+        "controller-1",
+        "controller-lease-1",
+        1,
+        "synthetic-repository",
+        "host-1",
+        "git-1",
+        "/srv/repository",
+        "agent/attempt-1",
+        "/srv/worktrees/attempt-1",
+        "1".repeat(40),
+        "active",
+        "2026-08-09T08:00:00Z",
+        "2026-08-09T08:00:01Z",
+        "2026-08-09T09:00:00Z"
+      );
+    database
+      .prepare(
+        `INSERT INTO launch_envelope_bindings(
+          attemptId,runId,workspaceLeaseId,attemptRevision,workspaceLeaseRevision,
+          authorizationMutationId,envelopeId,envelopeHash,envelopeJson,controllerId,
+          controllerLeaseId,fencingToken,createdAt
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        "attempt-1",
+        "run-1",
+        "workspace-1",
+        3,
+        1,
+        "launch-authorization-1",
+        "envelope-1",
+        envelopeHash,
+        "{}",
+        "controller-1",
+        "controller-lease-1",
+        1,
+        "2026-08-09T08:00:00Z"
+      );
+    database
+      .prepare(
+        `INSERT INTO task_packet_bindings(
+          attemptId,runId,workItemId,workItemRevision,packetId,packetHash,packetJson,createdAt
+        ) VALUES(?,?,?,?,?,?,?,?)`
+      )
+      .run("attempt-1", "run-1", "work-1", 0, "packet-1", HASH.task, "{}", "2026-08-09T08:00:00Z");
+  } finally {
+    database.close();
+  }
+}
 
 function offer(overrides: Record<string, unknown> = {}) {
   return DelegationOffer_v1.parse({

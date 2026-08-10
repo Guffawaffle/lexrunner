@@ -96,6 +96,14 @@ Repository review requires a current qualification manifest whose execution-prof
 installed provider, repository exporter, Git executable and version, Codex, bubblewrap, managed
 requirements, and two-phase feature set. Pre-profile manifests fail closed after upgrade.
 
+Repository invocation authorization and durable operation creation each query the Attempt, active
+workspace lease, immutable envelope, and task-packet bindings inside the same SQLite transaction as
+their authorization event or operation insert. The post-ACCEPT work authorization repeats that
+guard before the provider can resume with the sealed corpus. If a lease changes while the
+action-free offer process starts, operation creation fails and cancels/releases that process. The
+independent verifier separately requires the bound lease to remain active and at least as current
+as the launch-envelope revision.
+
 The resumed prompt includes the authorized result schema, but Codex is not process-constrained by
 `--output-schema`: a process-level object schema would make the agent's bare `NO` unreachable. If
 the agent proceeds, the provider validates its final JSON before classifying the claim. The

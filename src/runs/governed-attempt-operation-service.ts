@@ -168,6 +168,9 @@ export class GovernedAttemptOperationService {
       delegationId: authorization.delegation_id,
       expectedRevision: delegation.revision,
       request: invocation,
+      ...(verificationContext?.repository_corpus
+        ? { repositoryLifecycleGuard: verificationContext.repository_corpus }
+        : {}),
       now: input.now,
     });
     if (!permit.authorized) return { started: false, reason: "authorization_denied" };
@@ -203,7 +206,7 @@ export class GovernedAttemptOperationService {
             verificationContext: verificationContext!,
           }
         : {}),
-      now: input.now,
+      now: this.now(),
     });
     if (!created.created) {
       await executor.cancel(handle).catch(() => undefined);
@@ -449,7 +452,10 @@ export class GovernedAttemptOperationService {
       delegationId: record.delegation_id,
       expectedRevision: delegation.revision,
       request,
-      now: event.observed_at,
+      ...(record.verification_context?.repository_corpus
+        ? { repositoryLifecycleGuard: record.verification_context.repository_corpus }
+        : {}),
+      now: this.now(),
     });
     return authorized.authorized;
   }

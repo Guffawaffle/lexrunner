@@ -48,6 +48,7 @@ export const GovernedRepositoryCorpusVerificationBinding_v1 = z
     manifest_hash: SHA256Hash,
     source_binding_hash: SHA256Hash,
     workspace_lease_id: opaqueId,
+    workspace_lease_revision: z.number().int().nonnegative(),
     task_packet_hash: SHA256Hash,
     launch_envelope_hash: SHA256Hash,
     path_mapping_hash: SHA256Hash,

@@ -314,6 +314,7 @@ export class GovernedReviewRuntime {
         candidateObjectId: corpus.header.candidate_object_id,
         attestations,
         corpus,
+        workspaceLeaseRevision: launchBinding.workspaceLeaseRevision,
       });
       if (!started.started) {
         await this.dependencies.bridge.discardRepository(preparedWorkspaceId);
@@ -425,8 +426,12 @@ export class GovernedReviewRuntime {
       candidateObjectId: string;
       attestations: QualifiedCodexProviderAttestations;
       corpus?: GovernedRepositoryCorpusFrame;
+      workspaceLeaseRevision?: number;
     }
   ): Promise<StartSyntheticGovernedReviewResult> {
+    if (prepared.corpus && prepared.workspaceLeaseRevision === undefined) {
+      return { started: false, reason: "lifecycle_binding_mismatch" };
+    }
     const attempt = await this.dependencies.lifecycle.getAttempt(input.attemptId);
     if (!attempt) return { started: false, reason: "attempt_not_found" };
     if (attempt.runId !== input.runId) return { started: false, reason: "attempt_run_mismatch" };
@@ -532,6 +537,7 @@ export class GovernedReviewRuntime {
               manifest_hash: computeCanonicalHash(prepared.corpus.header),
               source_binding_hash: prepared.corpus.header.source_binding_hash,
               workspace_lease_id: prepared.corpus.header.source_binding.workspace_lease_id,
+              workspace_lease_revision: prepared.workspaceLeaseRevision!,
               task_packet_hash: prepared.corpus.header.source_binding.task_packet_hash,
               launch_envelope_hash: prepared.corpus.header.source_binding.launch_envelope_hash,
               path_mapping_hash: prepared.corpus.header.source_binding.path_mapping_hash,

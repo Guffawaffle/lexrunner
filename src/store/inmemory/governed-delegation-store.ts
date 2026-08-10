@@ -186,6 +186,9 @@ export class InMemoryGovernedDelegationStore
       delegation_id: input.delegationId,
       expected_revision: input.expectedRevision,
       request,
+      ...(input.repositoryLifecycleGuard
+        ? { repository_lifecycle_guard: input.repositoryLifecycleGuard }
+        : {}),
     });
     const replay = this.findMutation(input.delegationId, input.mutationId);
     if (replay) {
@@ -222,17 +225,26 @@ export class InMemoryGovernedDelegationStore
     if (current.revision !== input.expectedRevision) {
       return { authorized: false, reason: "stale_revision" };
     }
-    const authorization = authorizeDelegationInvocationBinding(
-      {
-        status: current.status,
-        offer: current.state.offer,
-        offerHash: current.offer_hash,
-        ...(current.acceptance_receipt_hash
-          ? { acceptanceReceiptHash: current.acceptance_receipt_hash }
-          : {}),
-      },
-      request
-    );
+    const lifecycleAuthorized =
+      !input.repositoryLifecycleGuard ||
+      (await this.repositoryLifecycleMatches(
+        current.attempt_id,
+        input.repositoryLifecycleGuard,
+        now
+      ));
+    const authorization = lifecycleAuthorized
+      ? authorizeDelegationInvocationBinding(
+          {
+            status: current.status,
+            offer: current.state.offer,
+            offerHash: current.offer_hash,
+            ...(current.acceptance_receipt_hash
+              ? { acceptanceReceiptHash: current.acceptance_receipt_hash }
+              : {}),
+          },
+          request
+        )
+      : ({ authorized: false, reason: "binding_mismatch" } as const);
     const event = this.appendEvent({
       schema_version: GOVERNED_DELEGATION_STORE_VERSION,
       delegation_id: current.delegation_id,
@@ -274,6 +286,36 @@ export class InMemoryGovernedDelegationStore
 
   async listDelegationEvents(delegationId: string): Promise<GovernedDelegationEvent[]> {
     return this.delegationEventsFor(delegationId).map(cloneEvent);
+  }
+
+  private async repositoryLifecycleMatches(
+    attemptId: string,
+    binding: AuthorizeGovernedDelegationInvocationInput["repositoryLifecycleGuard"] & {},
+    now: string
+  ): Promise<boolean> {
+    const attempt = await this.getAttempt(attemptId);
+    if (!attempt?.workspaceLeaseId) return false;
+    const [lease, envelope, packet] = await Promise.all([
+      this.getWorkspaceLease(attempt.workspaceLeaseId),
+      this.getLaunchEnvelopeBinding(attemptId),
+      this.getTaskPacketBinding(attemptId),
+    ]);
+    return Boolean(
+      lease &&
+      envelope &&
+      packet &&
+      attempt.status === "running" &&
+      attempt.workspaceLeaseId === binding.workspace_lease_id &&
+      attempt.packetHash === binding.task_packet_hash &&
+      lease.status === "active" &&
+      lease.revision >= binding.workspace_lease_revision &&
+      lease.packetHash === binding.task_packet_hash &&
+      Date.parse(lease.expiresAt) > Date.parse(now) &&
+      envelope.workspaceLeaseId === binding.workspace_lease_id &&
+      envelope.workspaceLeaseRevision === binding.workspace_lease_revision &&
+      envelope.envelopeHash === binding.launch_envelope_hash &&
+      packet.packetHash === binding.task_packet_hash
+    );
   }
 
   private appendEvent(candidate: GovernedDelegationEvent): GovernedDelegationEvent {

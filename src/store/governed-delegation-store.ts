@@ -12,6 +12,7 @@ import {
   type DelegationOffer_v1 as DelegationOffer,
   type DelegationProtocolState_v1 as DelegationProtocolState,
 } from "../runs/governed-attempt-protocol.js";
+import type { GovernedRepositoryCorpusVerificationBinding_v1 } from "../runs/governed-attempt-verification.js";
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 
 export const GOVERNED_DELEGATION_STORE_VERSION = "1.0.0" as const;
@@ -186,6 +187,7 @@ export interface AuthorizeGovernedDelegationInvocationInput {
   delegationId: string;
   expectedRevision: number;
   request: DelegationInvocationRequest;
+  repositoryLifecycleGuard?: GovernedRepositoryCorpusVerificationBinding_v1;
   now: string;
 }
 

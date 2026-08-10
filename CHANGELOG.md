@@ -28,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   both the Windows corpus parser and provider boundary.
 - **Qualification upgrade boundary** - Reject pre-profile qualification manifests so repository
   review cannot use a legacy attestation that omits the exporter and Git executable hashes.
+- **Repository launch lease race** - Atomically require the bound active workspace lease when
+  authorizing the offer, creating the durable operation, and authorizing post-acceptance work; the
+  independent verifier also rejects results after lease release.
 
 ## [1.4.1] - 2026-08-04
 

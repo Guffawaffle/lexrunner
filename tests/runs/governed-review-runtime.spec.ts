@@ -138,6 +138,10 @@ describe("GovernedReviewRuntime", () => {
   it("binds a clean committed repository corpus to the exact durable lifecycle and task input", async () => {
     const store = new InMemoryGovernedAttemptOperationStore();
     const lifecycle = repositoryLifecycleFixture();
+    vi.spyOn(store, "getAttempt").mockResolvedValue(lifecycle.attempt);
+    vi.spyOn(store, "getWorkspaceLease").mockResolvedValue(lifecycle.lease);
+    vi.spyOn(store, "getLaunchEnvelopeBinding").mockResolvedValue(lifecycle.launchBinding);
+    vi.spyOn(store, "getTaskPacketBinding").mockResolvedValue(lifecycle.packetBinding);
     const corpus = repositoryCorpusFixture(lifecycle.packet.packet_hash, lifecycle.envelopeHash);
     const bridge = repositoryProviderBridge(corpus);
     const source = { export: vi.fn(async () => corpus) };
