@@ -177,7 +177,56 @@ describe("generic governed task capabilities", () => {
         minimum_enforcement: "enforced",
         effect: { class: "observation" },
       })
-    ).toThrow(/owned, recoverable workspace mutation/u);
+    ).toThrow(/workspace_mutation/u);
+  });
+
+  it("applies an exhaustive effect policy to reads, network, and secrets", () => {
+    expect(() =>
+      GovernedTaskCapability_v1.parse({
+        dimension: "filesystem_read",
+        capability_id: "read-input",
+        scope_hash: hash("1"),
+        minimum_enforcement: "enforced",
+        effect: {
+          class: "runtime_execution",
+          containment_profile_hash: hash("2"),
+        },
+      })
+    ).toThrow(/filesystem_read must declare one of: observation/u);
+
+    expect(() =>
+      GovernedTaskCapability_v1.parse({
+        dimension: "network",
+        capability_id: "call-api",
+        scope_hash: hash("1"),
+        minimum_enforcement: "brokered",
+        effect: { class: "observation" },
+      })
+    ).toThrow(/network must declare one of: external_effect/u);
+
+    expect(() =>
+      GovernedTaskCapability_v1.parse({
+        dimension: "secrets",
+        capability_id: "read-token",
+        scope_hash: hash("1"),
+        minimum_enforcement: "brokered",
+        effect: { class: "observation" },
+      })
+    ).toThrow(/secrets must declare one of: sensitive_data_access/u);
+
+    expect(
+      GovernedTaskCapability_v1.parse({
+        dimension: "secrets",
+        capability_id: "read-token",
+        scope_hash: hash("1"),
+        minimum_enforcement: "brokered",
+        effect: {
+          class: "sensitive_data_access",
+          secret_scope_hash: hash("2"),
+          handling_policy_hash: hash("3"),
+        },
+      }).effect
+    ).toMatchObject({ class: "sensitive_data_access" });
   });
 
   it("permits irreversible external effects only with bound consequence acceptance", () => {

@@ -81,12 +81,37 @@ export const GovernedTaskCapabilityEffect_v1 = z.discriminatedUnion("class", [
     .strict(),
   z
     .object({
+      class: z.literal("sensitive_data_access"),
+      secret_scope_hash: SHA256Hash,
+      handling_policy_hash: SHA256Hash,
+    })
+    .strict(),
+  z
+    .object({
       class: z.literal("delegation"),
       child_authority_ceiling_hash: SHA256Hash,
     })
     .strict(),
 ]);
 export type GovernedTaskCapabilityEffect_v1 = z.infer<typeof GovernedTaskCapabilityEffect_v1>;
+
+type GovernedTaskCapabilityEffectClass = GovernedTaskCapabilityEffect_v1["class"];
+
+const allowedEffectClasses = {
+  filesystem_read: ["observation"],
+  filesystem_write: ["workspace_mutation"],
+  git_write: ["workspace_mutation", "external_effect"],
+  github_write: ["external_effect"],
+  external_runtime: ["runtime_execution"],
+  network: ["external_effect"],
+  secrets: ["sensitive_data_access"],
+  signing: ["external_effect"],
+  release: ["external_effect"],
+  nested_delegation: ["delegation"],
+} as const satisfies Record<
+  z.infer<typeof WorkerAdapterAuthorityDimension>,
+  readonly GovernedTaskCapabilityEffectClass[]
+>;
 
 export const GovernedTaskCapability_v1 = z
   .object({
@@ -98,56 +123,13 @@ export const GovernedTaskCapability_v1 = z
   })
   .strict()
   .superRefine((capability, context) => {
-    const effectClass = capability.effect.class;
-    if (capability.dimension === "filesystem_write" && effectClass !== "workspace_mutation") {
+    const allowed: readonly GovernedTaskCapabilityEffectClass[] =
+      allowedEffectClasses[capability.dimension];
+    if (!allowed.includes(capability.effect.class)) {
       context.addIssue({
         code: "custom",
         path: ["effect", "class"],
-        message: "filesystem_write must be an owned, recoverable workspace mutation",
-      });
-    }
-    if (
-      capability.dimension === "git_write" &&
-      !["workspace_mutation", "external_effect"].includes(effectClass)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["effect", "class"],
-        message: "git_write must declare either workspace recovery or an external effect",
-      });
-    }
-    if (
-      ["github_write", "signing", "release"].includes(capability.dimension) &&
-      effectClass !== "external_effect"
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["effect", "class"],
-        message: `${capability.dimension} must declare its durable external effect`,
-      });
-    }
-    if (capability.dimension === "external_runtime" && effectClass !== "runtime_execution") {
-      context.addIssue({
-        code: "custom",
-        path: ["effect", "class"],
-        message: "external_runtime must bind an enforced containment profile",
-      });
-    }
-    if (capability.dimension === "nested_delegation" && effectClass !== "delegation") {
-      context.addIssue({
-        code: "custom",
-        path: ["effect", "class"],
-        message: "nested_delegation must bind a child authority ceiling",
-      });
-    }
-    if (
-      effectClass === "workspace_mutation" &&
-      !["filesystem_write", "git_write"].includes(capability.dimension)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["effect", "class"],
-        message: "workspace mutation recovery is valid only for filesystem or Git writes",
+        message: `${capability.dimension} must declare one of: ${allowed.join(", ")}`,
       });
     }
   });

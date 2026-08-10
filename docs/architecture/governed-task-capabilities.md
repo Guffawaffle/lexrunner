@@ -42,11 +42,14 @@ Effect policies distinguish:
 - `external_effect`: the consequence scope is bound, together with either a compensating action or
   explicit acceptance that the effect is irreversible;
 - `runtime_execution`: an agent may freely use a runtime inside a bound containment profile;
+- `sensitive_data_access`: secret scope and the required handling policy are both bound;
 - `delegation`: child work is constrained by a bound child-authority ceiling.
 
-Filesystem writes cannot masquerade as observation. Git writes must identify whether they are
-recoverable workspace changes or durable external effects. GitHub writes, signing, and release
-authority always declare external-effect semantics.
+The dimension-to-effect mapping is total. Filesystem reads are observation only; filesystem writes
+are recoverable workspace mutations; Git writes distinguish workspace recovery from external
+effects; GitHub writes, network access, signing, and release are externally consequential; external
+runtimes bind containment; secrets bind sensitive-data handling; and nested Delegations bind their
+child ceiling. An unrelated effect class is rejected rather than interpreted optimistically.
 
 ## Write-capable executor qualification
 
