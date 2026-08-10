@@ -49,6 +49,7 @@ function fixture() {
     candidate_object_id: candidate,
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: "operator-1",
     source_disclosure_allowed: true,
     controls: controls(),
     max_duration_ms: 600_000,
@@ -194,6 +195,23 @@ describe("governed Attempt executor contracts", () => {
         authorization_outcome: "invalid",
         evidence_outcome: "sufficient",
         admissibility: "inadmissible",
+        evidence_refs: [hash("evidence")],
+      })
+    ).not.toThrow();
+  });
+
+  it("admits a produced outcome identifier owned by a non-review task profile", () => {
+    expect(() =>
+      GovernedAttemptResult_v1.parse({
+        schema_version: "1.0.0",
+        attempt_id: "attempt-1",
+        delegation_id: "delegation-1",
+        authorization_binding_digest: hash("authorization"),
+        worker_outcome: "completed",
+        task_outcome: "artifact_published",
+        authorization_outcome: "valid",
+        evidence_outcome: "sufficient",
+        admissibility: "admissible",
         evidence_refs: [hash("evidence")],
       })
     ).not.toThrow();

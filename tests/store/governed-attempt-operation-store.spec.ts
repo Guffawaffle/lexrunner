@@ -16,6 +16,13 @@ import {
   createGovernedAttemptVerificationContext,
   createGovernedAttemptVerificationReceipt,
 } from "../../src/runs/governed-attempt-verification.js";
+import {
+  GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
+  computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
+  createGovernedCodeReviewTaskSpec,
+} from "../../src/runs/governed-review-task-profile.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import type { GovernedAttemptOperationStore } from "../../src/store/governed-attempt-operation-store.js";
 import type { GovernedDelegationStore } from "../../src/store/governed-delegation-store.js";
@@ -27,6 +34,44 @@ const at = (seconds: number) => `2026-08-09T10:00:${String(seconds).padStart(2, 
 
 type OperationStore = GovernedAttemptOperationStore &
   GovernedDelegationStore & { close(): Promise<void> };
+
+describe("generic governed Attempt verification receipt", () => {
+  const receiptInput = {
+    verification_id: "verification-1",
+    verifier_id: "profile-verifier",
+    operation_id: "operation-1",
+    attempt_id: "attempt-1",
+    delegation_id: "delegation-1",
+    capture_id: "capture-1",
+    authorization_binding_digest: hash("authorization"),
+    verification_context_hash: hash("context"),
+    operation_result_hash: hash("result"),
+    capture_root: hash("capture-root"),
+    capture_verification_hash: hash("capture-verification"),
+    decision: "accepted" as const,
+    admissibility: "admissible" as const,
+    failure_codes: [],
+    verified_at: at(5),
+  };
+
+  it("accepts a profile-owned terminal outcome without knowing its vocabulary", () => {
+    expect(
+      createGovernedAttemptVerificationReceipt({
+        ...receiptInput,
+        task_outcome: "artifact_published",
+      })
+    ).toMatchObject({ decision: "accepted", task_outcome: "artifact_published" });
+  });
+
+  it("rejects an accepted receipt with a profile-neutral non-outcome sentinel", () => {
+    expect(() =>
+      createGovernedAttemptVerificationReceipt({
+        ...receiptInput,
+        task_outcome: "not_produced",
+      })
+    ).toThrow(/produced profile outcome/u);
+  });
+});
 
 describe.each([
   {
@@ -276,9 +321,14 @@ describe("SQLite governed Attempt repository lifecycle guard", () => {
     const databasePath = join(directory, "coordination.db");
     const store = new SqliteGovernedAttemptOperationStore(databasePath);
     try {
-      await acceptedDelegation(store);
-      seedRepositoryLifecycle(databasePath, "released");
       const fixture = verificationBoundFixture(true);
+      await acceptedDelegation(store, {
+        providerId: fixture.context.governed_task!.authorized_model_provider,
+        taskOfferHash: fixture.context.governed_task!.task_spec_hash,
+        authorityGrantHash: fixture.context.task_execution!.authority_grant_hash,
+        requirementsHash: computeCanonicalHash(fixture.context.requirements),
+      });
+      seedRepositoryLifecycle(databasePath, "released");
       await expect(
         store.createAttemptOperation({
           mutationId: "operation-create-guarded",
@@ -297,19 +347,32 @@ describe("SQLite governed Attempt repository lifecycle guard", () => {
   });
 });
 
-async function acceptedDelegation(store: GovernedDelegationStore): Promise<void> {
+async function acceptedDelegation(
+  store: GovernedDelegationStore,
+  binding: {
+    providerId: string;
+    taskOfferHash: string;
+    authorityGrantHash: string;
+    requirementsHash: string;
+  } = {
+    providerId: "synthetic-provider",
+    taskOfferHash: hash("task"),
+    authorityGrantHash: hash("grant"),
+    requirementsHash: hash("requirements"),
+  }
+): Promise<void> {
   const offer = {
     schema_version: "1.0.0" as const,
     delegation_id: "delegation-1",
     attempt_id: "attempt-1",
     worker: {
-      provider_id: "synthetic-provider",
+      provider_id: binding.providerId,
       worker_id: "worker-1",
       thread_id: "thread-1",
     },
-    task_offer_hash: hash("task"),
-    requirements_hash: hash("requirements"),
-    authority_grant_hash: hash("grant"),
+    task_offer_hash: binding.taskOfferHash,
+    requirements_hash: binding.requirementsHash,
+    authority_grant_hash: binding.authorityGrantHash,
     transcript_start_hash: hash("transcript"),
     offered_at: at(0),
   };
@@ -500,6 +563,7 @@ function verificationBoundFixture(repository = false) {
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 60_000,
@@ -566,7 +630,36 @@ function verificationBoundFixture(repository = false) {
     expiresAt: at(58),
   });
   if (!decision.authorized) throw new Error(`verification fixture failed: ${decision.reason}`);
-  const outputSchema = { type: "object" };
+  const outputSchema = repository ? GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA : { type: "object" };
+  const promptHash = hash("prompt");
+  const governedTask = repository
+    ? createGovernedCodeReviewTaskSpec({
+        attemptId: requirements.attempt_id,
+        delegationId: requirements.delegation_id,
+        objectiveHash: requirements.objective_hash,
+        authorizedModelProvider: requirements.authorized_model_provider,
+        promptHash,
+        corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+          repositoryId: workspace.repository_id,
+          baseObjectId: workspace.base_object_id,
+          candidateObjectId: workspace.candidate_object_id,
+          corpusHash: workspace.corpus_hash,
+          selectionHash: workspace.selection_hash,
+        }),
+        maxDurationMs: requirements.max_duration_ms,
+        maxOutputBytes: requirements.max_output_bytes,
+      })
+    : undefined;
+  const taskExecution = governedTask
+    ? createGovernedCodeReviewTaskExecutionBinding({
+        task: governedTask,
+        authorizedAt: at(1),
+        expiresAt: at(58),
+        executorAttestationHash: computeCanonicalHash(executor),
+        environmentAttestationHash: computeCanonicalHash(environment),
+        workspaceAttestationHash: computeCanonicalHash(workspace),
+      })
+    : undefined;
   const context = createGovernedAttemptVerificationContext({
     requirements,
     executor,
@@ -576,11 +669,13 @@ function verificationBoundFixture(repository = false) {
     ...(repository
       ? {
           input_binding: {
-            prompt_hash: hash("prompt"),
+            prompt_hash: promptHash,
             output_schema_hash: computeCanonicalHash(outputSchema),
-            task_offer_hash: hash("task-offer"),
+            task_offer_hash: governedTask!.task_spec_hash,
             delegation_offer_hash: hash("delegation-offer"),
           },
+          governed_task: governedTask,
+          task_execution: taskExecution,
           repository_corpus: {
             manifest_hash: hash("manifest"),
             source_binding_hash: hash("source-binding"),

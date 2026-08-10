@@ -4,7 +4,9 @@ import {
   EnvironmentAttestation_v1,
   ExecutorAttestation_v1,
   GovernedReviewRequirements_v1,
+  GovernedTaskOutcome_v1,
   WorkspaceAttestation_v1,
+  isProducedGovernedTaskOutcome,
 } from "./governed-attempt-executor.js";
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import {
@@ -12,6 +14,7 @@ import {
   ProtectedEvidenceReference_v1,
 } from "../store/protected-evidence-store.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { GovernedTaskExecutionBinding_v1, GovernedTaskSpec_v1 } from "./governed-task.js";
 
 export const GOVERNED_ATTEMPT_VERIFICATION_VERSION = "1.0.0" as const;
 
@@ -70,6 +73,8 @@ const verificationContextBody = z
     output_schema: BoundedOutputSchema,
     output_schema_hash: SHA256Hash,
     input_binding: GovernedAttemptInputBinding_v1.optional(),
+    governed_task: GovernedTaskSpec_v1.optional(),
+    task_execution: GovernedTaskExecutionBinding_v1.optional(),
     repository_corpus: GovernedRepositoryCorpusVerificationBinding_v1.optional(),
   })
   .strict();
@@ -100,6 +105,58 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
       });
     }
     if (
+      value.governed_task &&
+      (!value.input_binding ||
+        value.governed_task.attempt_id !== value.requirements.attempt_id ||
+        value.governed_task.delegation_id !== value.requirements.delegation_id ||
+        value.governed_task.objective_hash !== value.requirements.objective_hash ||
+        value.governed_task.authorized_model_provider !==
+          value.requirements.authorized_model_provider ||
+        value.governed_task.profile.output_contract_hash !== value.output_schema_hash ||
+        value.input_binding.task_offer_hash !== value.governed_task.task_spec_hash)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task"],
+        message: "governed task must bind the requirements, output contract, and exact task offer",
+      });
+    }
+    if ((value.governed_task !== undefined) !== (value.task_execution !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["task_execution"],
+        message: "governed task and task execution authority must appear together",
+      });
+    }
+    if (
+      value.governed_task &&
+      value.task_execution &&
+      (value.task_execution.task_spec_hash !== value.governed_task.task_spec_hash ||
+        value.task_execution.authority_grant.attempt_id !== value.governed_task.attempt_id ||
+        value.task_execution.authority_grant.delegation_id !== value.governed_task.delegation_id ||
+        value.task_execution.authority_grant.issuer.kind !== "operator" ||
+        value.task_execution.authority_grant.issuer.principal_id !==
+          value.requirements.authorized_operator_principal_id)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["task_execution"],
+        message:
+          "task execution authority must bind the exact governed task, delegation, and authorized root operator",
+      });
+    }
+    if (
+      value.governed_task &&
+      (value.governed_task.budget.max_duration_ms !== value.requirements.max_duration_ms ||
+        value.governed_task.budget.max_output_bytes !== value.requirements.max_output_bytes)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task", "budget"],
+        message: "governed task duration and output budgets must match execution requirements",
+      });
+    }
+    if (
       (value.workspace.corpus_kind === "repository") !==
       (value.repository_corpus !== undefined)
     ) {
@@ -114,6 +171,13 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
         code: "custom",
         path: ["input_binding"],
         message: "repository workspace requires an exact task input binding",
+      });
+    }
+    if (value.workspace.corpus_kind === "repository" && !value.governed_task) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task"],
+        message: "repository workspace requires an exact governed task specification",
       });
     }
     const { context_hash: _contextHash, ...body } = value;
@@ -163,6 +227,7 @@ export const GovernedAttemptVerificationFailureCode = z.enum([
   "output_schema_invalid",
   "output_invalid",
   "outcome_mismatch",
+  "budget_exceeded",
 ]);
 export type GovernedAttemptVerificationFailureCode = z.infer<
   typeof GovernedAttemptVerificationFailureCode
@@ -183,7 +248,7 @@ const verificationReceiptBody = z
     capture_root: SHA256Hash,
     capture_verification_hash: SHA256Hash,
     decision: z.enum(["accepted", "rejected"]),
-    task_outcome: z.enum(["pass", "block", "not_produced", "invalid"]),
+    task_outcome: GovernedTaskOutcome_v1,
     admissibility: z.enum(["admissible", "inadmissible"]),
     failure_codes: z.array(GovernedAttemptVerificationFailureCode).max(32),
     verified_at: instant,
@@ -199,12 +264,13 @@ export const GovernedAttemptVerificationReceipt_v1 = verificationReceiptBody
     if (
       accepted !== (value.admissibility === "admissible") ||
       accepted !== (value.failure_codes.length === 0) ||
-      (accepted && !["pass", "block"].includes(value.task_outcome))
+      (accepted && !isProducedGovernedTaskOutcome(value.task_outcome))
     ) {
       context.addIssue({
         code: "custom",
         path: ["decision"],
-        message: "accepted verification requires an admissible PASS/BLOCK and no failures",
+        message:
+          "accepted verification requires an admissible produced profile outcome and no failures",
       });
     }
     const { receipt_hash: _receiptHash, ...body } = value;

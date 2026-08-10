@@ -83,11 +83,32 @@ describe("GovernedReviewRuntime", () => {
       captureId: "capture-capture",
     });
     if (!result.started) throw new Error(result.reason);
-    expect((await store.getDelegation(result.delegationId))?.status).toBe("offered");
+    const delegation = await store.getDelegation(result.delegationId);
+    expect(delegation?.status).toBe("offered");
+    expect(delegation?.state.offer).toMatchObject({
+      worker: { provider_id: "openai" },
+      task_offer_hash: result.verificationContext.governed_task?.task_spec_hash,
+      authority_grant_hash: result.verificationContext.task_execution?.authority_grant_hash,
+    });
     expect(await store.getAttemptOperation(result.operationId)).toMatchObject({
       attempt_id: "attempt-1",
       status: "running",
-      verification_context: { workspace: { corpus_kind: "synthetic" } },
+      verification_context: {
+        workspace: { corpus_kind: "synthetic" },
+        governed_task: {
+          profile: { profile_id: "code-review" },
+          capability_ceiling: [
+            {
+              dimension: "filesystem_read",
+              effect: { class: "observation" },
+            },
+          ],
+        },
+        task_execution: {
+          task_spec_hash: result.verificationContext.governed_task?.task_spec_hash,
+          adapter_selection: { adapter_id: "lexrunner.qualified-wsl2-codex" },
+        },
+      },
     });
     expect(bridge.launch).toHaveBeenCalledOnce();
     await store.close();

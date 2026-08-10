@@ -272,6 +272,7 @@ function authorizationFixture(corpusKind: "synthetic" | "repository") {
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: "operator-1",
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 60_000,

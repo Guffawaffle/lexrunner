@@ -53,7 +53,7 @@ export interface GovernedAttemptVerificationProjection {
   verified: boolean;
   idempotentReplay?: boolean;
   decision?: "accepted" | "rejected";
-  taskOutcome?: "pass" | "block" | "not_produced" | "invalid";
+  taskOutcome?: string;
   admissibility?: "admissible" | "inadmissible";
   failureCodes?: string[];
   receiptHash?: string;

@@ -2,8 +2,10 @@
 
 This runtime is a deliberately read-only code-review profile, not the universal governed-agent
 contract. Review-neutral task/profile and positive capability semantics—including recoverable
-writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The current v1
-review authorization remains specialized until it is migrated through that profile boundary.
+writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The runtime now
+expresses its task semantics through the generic `code-review` profile. Its existing executor grant
+remains a compatibility transport, but it cannot release work unless the protected generic grant
+and exact qualified adapter independently evaluate for the bound task.
 
 Status: governed synthetic and exact committed repository-corpus review are available through the
 persistent asynchronous CLI.
@@ -17,6 +19,9 @@ running ADR-010 Attempt -> offered Delegation -> provider offer turn
                                                    |             |
                                                    v             v
                                             terminal decline   durable host latch
+                                                                  |
+                                                                  v
+                                                  generic task/grant/adapter evaluation
                                                                   |
                                                                   v
                                                         exact work authorization
@@ -39,15 +44,23 @@ Stopping the supervisor aborts only the observation client; it does not cancel o
 provider operation lost.
 
 The provider pauses after its ACCEPT receipt. The host persists the Delegation acceptance and the
-safe operation event, authorizes the exact `authorized_work` invocation, and only then sends the
-original authorization on stdin to `continue`. That gate is idempotent. Restart recovery replays it
-when a crash occurs after durable ACCEPT but before continuation; it cannot invent an acceptance.
+safe operation event, resolves the protected generic task and attenuated grant, evaluates the exact
+qualified adapter and per-capability enforcement receipts, authorizes the exact `authorized_work`
+invocation, and only then sends the compatibility authorization on stdin to `continue`. The legacy
+read-only tool grant must describe exactly the same selected capability dimensions, so it cannot
+bypass or silently expand the generic grant. If either the generic task or its execution binding is
+absent, a legacy offer remains refusal-only: direct work is denied and `ACCEPT` is durably recorded
+but cannot cross the continuation boundary. The root generic grant must also name the exact operator
+principal in the protected authorization requirements; merely claiming operator issuance is not
+sufficient. That gate is idempotent. Restart recovery replays it when a crash occurs after durable
+ACCEPT but before continuation; it cannot invent an acceptance.
 
 ## Refusal
 
-`NO` is terminal. A reason is optional and, when volunteered, is protected evidence rather than
-CoordinationStore content. The Delegation decline is latched before provider cancellation. No later
-provider event is accepted for that operation.
+`NO` is terminal from either the still-offered refusal turn or an accepted continuation. A reason is
+optional and, when volunteered, is protected evidence rather than CoordinationStore content. The
+Delegation decline is latched before provider cancellation. No later provider event is accepted for
+that operation.
 
 ## Evidence
 
@@ -117,12 +130,24 @@ thread-binding receipt, rejects work before the host's durable ACCEPT receipt, a
 final JSON again. Only its immutable receipt can elevate the status projection to `admissible`; the
 provider result is persisted as `inadmissible`.
 
-The verifier does not receive or reconstruct raw prompt bytes. It independently binds the durable
-task offer to the prompt hash and output-schema hash recorded by both the host and the protected
-provider receipt. Prompt transport and hashing therefore remain inside the attested host/provider
-launch trusted base; independent raw-prompt reconstruction is not claimed. For repository review,
-the verifier also reopens the Attempt, lease, packet, envelope, and path mapping and requires their
-hashes and identities to match the protected corpus receipt.
+The verifier does not receive or reconstruct raw prompt bytes. The durable task offer names the
+exact generic `GovernedTaskSpec` hash. That protected task binds the `code-review` input/output
+contracts, objective, model provider, sealed-corpus read scope, budgets, and independent verifier.
+The verifier reconstructs the expected profile from the prompt hash, output-schema hash, and
+independently attested corpus identity, then requires an exact task hash and offer-provider match.
+The generic verifier dispatches outcome interpretation through that exact profile/verifier binding;
+only the `code-review` profile maps its own `PASS`/`BLOCK` vocabulary to coordination outcomes, and
+it treats `PASS` with any blocking finding as invalid. Generic provider claims, results, status
+projections, and independent receipts carry a bounded profile-owned outcome identifier rather than
+enumerating review verdicts; the receipt accepts it only after the exact profile verifier succeeds.
+Duration and output limits are independently cross-checked against the authorization requirements;
+evidence bytes and tool-call limits are cross-checked against the durable evidence reservation. The
+verifier then measures the independently read capture lifetime, final output bytes, total protected
+evidence bytes, and completed tool events and rejects any exact task-budget overrun.
+Prompt transport and hashing therefore remain inside the attested host/provider launch trusted base;
+independent raw-prompt reconstruction is not claimed. For repository review, the verifier also
+reopens the Attempt, lease, packet, envelope, and path mapping and requires their hashes and
+identities to match the protected corpus receipt.
 
 The qualified executor currently requires all of the following:
 

@@ -11,6 +11,7 @@ import {
 import {
   DelegationInvocationRequest_v1,
   createDelegationDecisionReceipt,
+  type DelegationProtocolState_v1 as DelegationProtocolState,
   type DelegationInvocationRequest_v1 as DelegationInvocationRequest,
 } from "./governed-attempt-protocol.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
@@ -26,6 +27,7 @@ import {
   type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
 } from "./governed-attempt-verification.js";
 import { contentHash } from "./governed-review-repository-corpus.js";
+import { evaluateGovernedTaskGrantForAdapter } from "./governed-task.js";
 
 type GovernedOperationStore = GovernedAttemptOperationStore & GovernedDelegationStore;
 
@@ -110,8 +112,7 @@ export class GovernedAttemptOperationService {
       invocation.delegation_id !== authorization.delegation_id ||
       invocation.provider_attestation_hash !== authorization.executor_attestation_hash ||
       invocation.environment_attestation_hash !== authorization.environment_attestation_hash ||
-      invocation.workspace_attestation_hash !== authorization.workspace_attestation_hash ||
-      delegation.state.offer.authority_grant_hash !== computeCanonicalHash(authorization.grant)
+      invocation.workspace_attestation_hash !== authorization.workspace_attestation_hash
     ) {
       return { started: false, reason: "binding_mismatch" };
     }
@@ -151,6 +152,8 @@ export class GovernedAttemptOperationService {
           authorization.environment_attestation_hash ||
         computeCanonicalHash(verificationContext.workspace) !==
           authorization.workspace_attestation_hash ||
+        (verificationContext.governed_task !== undefined &&
+          !taskBudgetMatchesExecution(verificationContext, evidenceReservation, authorization)) ||
         (verificationContext.input_binding !== undefined &&
           (verificationContext.input_binding.prompt_hash !== contentHash(input.prompt) ||
             verificationContext.input_binding.output_schema_hash !==
@@ -161,6 +164,39 @@ export class GovernedAttemptOperationService {
             verificationContext.input_binding.delegation_offer_hash !== invocation.offer_hash))
       ) {
         return { started: false, reason: "binding_mismatch" };
+      }
+    }
+    const expectedAuthorityGrantHash =
+      verificationContext?.task_execution?.authority_grant_hash ??
+      computeCanonicalHash(authorization.grant);
+    if (
+      delegation.state.offer.authority_grant_hash !== expectedAuthorityGrantHash ||
+      invocation.authority_grant_hash !== expectedAuthorityGrantHash ||
+      (verificationContext?.task_execution !== undefined &&
+        !legacyExecutorGrantMatchesTaskExecution(authorization, verificationContext.task_execution))
+    ) {
+      return { started: false, reason: "binding_mismatch" };
+    }
+    if (!offerLaunch) {
+      const task = verificationContext?.governed_task;
+      const execution = verificationContext?.task_execution;
+      const authorizedOperatorPrincipalId =
+        verificationContext?.requirements.authorized_operator_principal_id;
+      if (
+        !task ||
+        !execution ||
+        !authorizedOperatorPrincipalId ||
+        !(await evaluateBoundTaskExecution({
+          attemptId: authorization.attempt_id,
+          delegationId: authorization.delegation_id,
+          task,
+          execution,
+          delegationState: delegation.state,
+          authorizedOperatorPrincipalId,
+          evaluatedAt: input.now,
+        }))
+      ) {
+        return { started: false, reason: "authorization_denied" };
       }
     }
     const permit = await this.store.authorizeDelegationInvocation({
@@ -385,7 +421,7 @@ export class GovernedAttemptOperationService {
     const delegation = await this.store.getDelegation(record.delegation_id);
     if (!delegation) return false;
     if (delegation.status === "declined") return true;
-    if (delegation.status !== "accepted") return false;
+    if (delegation.status !== "offered" && delegation.status !== "accepted") return false;
     const receipt = createDelegationDecisionReceipt({
       offer: delegation.state.offer,
       decision: "NO",
@@ -467,6 +503,7 @@ export class GovernedAttemptOperationService {
   ): Promise<boolean> {
     if (event.type !== "accepted") return false;
     if (!(await this.latchAcceptance(record, event))) return false;
+    if (!(await this.authorizeGovernedTaskExecution(record, event))) return false;
     if (!(await this.authorizeAcceptedWork(record, event))) return false;
     if (!executor.continueAfterAcceptance) return false;
     try {
@@ -475,6 +512,33 @@ export class GovernedAttemptOperationService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Resolve the durable task/grant/qualification records only after the worker
+   * accepts, and before the provider is allowed to begin task work. The first
+   * provider turn is therefore a refusal-only offer phase, not task authority.
+   */
+  private async authorizeGovernedTaskExecution(
+    record: Awaited<ReturnType<GovernedAttemptOperationStore["getAttemptOperation"]>> & {},
+    event: AttemptExecutorEvent
+  ): Promise<boolean> {
+    const context = record.verification_context;
+    const task = context?.governed_task;
+    if (!task) return false;
+    const execution = context.task_execution;
+    if (!execution) return false;
+    const delegation = await this.store.getDelegation(record.delegation_id);
+    if (!delegation || delegation.status !== "accepted") return false;
+    return evaluateBoundTaskExecution({
+      attemptId: record.attempt_id,
+      delegationId: record.delegation_id,
+      task,
+      execution,
+      delegationState: delegation.state,
+      authorizedOperatorPrincipalId: context.requirements.authorized_operator_principal_id,
+      evaluatedAt: event.observed_at,
+    });
   }
 
   private terminalResult(
@@ -490,4 +554,87 @@ export class GovernedAttemptOperationService {
       ...(record.result ? { result: record.result } : {}),
     };
   }
+}
+
+function legacyExecutorGrantMatchesTaskExecution(
+  authorization: AttemptAuthorization,
+  execution: NonNullable<GovernedAttemptVerificationContext["task_execution"]>
+): boolean {
+  const dimensions = new Set(
+    execution.authority_grant.capabilities.map(({ dimension }) => dimension)
+  );
+  const legacyRead = authorization.grant.tools.includes("read_only_shell");
+  return (
+    [...dimensions].every((dimension) => dimension === "filesystem_read") &&
+    dimensions.has("filesystem_read") === legacyRead
+  );
+}
+
+function taskBudgetMatchesExecution(
+  context: GovernedAttemptVerificationContext,
+  reservation: ProtectedEvidenceReservationRequest,
+  authorization: AttemptAuthorization
+): boolean {
+  const budget = context.governed_task?.budget;
+  return (
+    budget !== undefined &&
+    budget.max_duration_ms === context.requirements.max_duration_ms &&
+    budget.max_duration_ms === reservation.max_duration_ms &&
+    budget.max_duration_ms === authorization.grant.max_duration_ms &&
+    budget.max_output_bytes === context.requirements.max_output_bytes &&
+    budget.max_output_bytes === authorization.grant.max_output_bytes &&
+    budget.max_evidence_bytes === reservation.reserved_bytes &&
+    budget.max_tool_calls === reservation.max_tool_calls
+  );
+}
+
+async function evaluateBoundTaskExecution(input: {
+  attemptId: string;
+  delegationId: string;
+  task: NonNullable<GovernedAttemptVerificationContext["governed_task"]>;
+  execution: NonNullable<GovernedAttemptVerificationContext["task_execution"]>;
+  delegationState: DelegationProtocolState;
+  authorizedOperatorPrincipalId: string;
+  evaluatedAt: string;
+}): Promise<boolean> {
+  const evaluated = await evaluateGovernedTaskGrantForAdapter(
+    {
+      attempt_id: input.attemptId,
+      delegation_id: input.delegationId,
+      task_spec_hash: input.task.task_spec_hash,
+      authority_grant_hash: input.execution.authority_grant_hash,
+      authorized_operator_principal_id: input.authorizedOperatorPrincipalId,
+    },
+    {
+      resolveAuthorizedTaskGrant: async (selection) => {
+        if (
+          selection.attemptId !== input.attemptId ||
+          selection.delegationId !== input.delegationId ||
+          selection.taskSpecHash !== input.task.task_spec_hash ||
+          selection.authorityGrantHash !== input.execution.authority_grant_hash
+        ) {
+          return null;
+        }
+        return {
+          task_chain: [input.task],
+          grant_chain: [input.execution.authority_grant],
+          delegation: input.delegationState,
+        };
+      },
+    },
+    input.execution.adapter_selection,
+    {
+      resolveQualifiedAdapter: async (selection) => {
+        if (
+          selection.adapterId !== input.execution.adapter_selection.adapter_id ||
+          selection.adapterVersion !== input.execution.adapter_selection.adapter_version
+        ) {
+          return null;
+        }
+        return input.execution.adapter_resolution;
+      },
+    },
+    input.evaluatedAt
+  );
+  return evaluated.permitted && evaluated.taskSpecHash === input.task.task_spec_hash;
 }

@@ -24,6 +24,12 @@ import {
   type IndependentlyReadEvidenceFrame,
   type IndependentlyVerifiedEvidenceCapture,
 } from "./governed-attempt-verification.js";
+import {
+  GOVERNED_CODE_REVIEW_VERIFIER_ID,
+  computeGovernedCodeReviewCorpusScopeHash,
+  governedCodeReviewTaskMatches,
+  interpretGovernedCodeReviewOutcome,
+} from "./governed-review-task-profile.js";
 
 const TOOL_ITEM_TYPES = new Set([
   "command_execution",
@@ -73,7 +79,9 @@ export class GovernedAttemptIndependentVerifier {
     this.verifyEvents(input, failures);
 
     const protocol = analyzeProtocol(evidence.frames, operation, failures);
+    this.verifyTaskBudget(input, protocol.finalMessage, failures);
     let taskOutcome: "pass" | "block" | "not_produced" | "invalid" = "not_produced";
+    let terminalTaskOutcome: "pass" | "block" | "invalid" | undefined;
     if (protocol.finalMessage !== undefined) {
       let output: unknown;
       try {
@@ -90,8 +98,21 @@ export class GovernedAttemptIndependentVerifier {
         } catch {
           failures.add("output_schema_invalid");
         }
-        taskOutcome = extractTaskOutcome(output);
-        if (taskOutcome === "invalid") failures.add("output_invalid");
+        const profile = interpretGovernedCodeReviewOutcome({
+          task: context.governed_task,
+          verifierId: input.verifierId,
+          output,
+          terminalTaskOutcome: protocol.terminalTaskOutcome,
+        });
+        if (!profile.matched) {
+          failures.add("task_input_binding_mismatch");
+          taskOutcome = "invalid";
+        } else {
+          taskOutcome = profile.outputOutcome;
+          terminalTaskOutcome = profile.terminalOutcome;
+          if (taskOutcome === "invalid") failures.add("output_invalid");
+          if (!terminalTaskOutcome) failures.add("protocol_violation");
+        }
       }
     } else {
       failures.add("protocol_violation");
@@ -100,7 +121,7 @@ export class GovernedAttemptIndependentVerifier {
     if (
       !operation.result ||
       operation.result.task_outcome !== taskOutcome ||
-      protocol.terminalTaskOutcome !== taskOutcome
+      terminalTaskOutcome !== taskOutcome
     ) {
       failures.add("outcome_mismatch");
     }
@@ -172,6 +193,56 @@ export class GovernedAttemptIndependentVerifier {
         input.delegation.state.offer.task_offer_hash !== context.input_binding.task_offer_hash ||
         context.input_binding.output_schema_hash !== context.output_schema_hash
       ) {
+        failures.add("task_input_binding_mismatch");
+      }
+      if (
+        context.governed_task &&
+        (!input.delegation ||
+          !operation.evidence_reservation ||
+          operation.evidence_reservation.max_tool_calls === undefined ||
+          input.verifierId !== GOVERNED_CODE_REVIEW_VERIFIER_ID ||
+          !context.task_execution ||
+          input.delegation.state.offer.authority_grant_hash !==
+            context.task_execution.authority_grant_hash ||
+          input.delegation.state.offer.worker.provider_id !==
+            context.governed_task.authorized_model_provider ||
+          !governedCodeReviewTaskMatches(context.governed_task, {
+            attemptId: operation.attempt_id,
+            delegationId: operation.delegation_id,
+            objectiveHash: context.requirements.objective_hash,
+            authorizedModelProvider: context.requirements.authorized_model_provider,
+            promptHash: context.input_binding.prompt_hash,
+            corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+              repositoryId: context.workspace.repository_id,
+              baseObjectId: context.workspace.base_object_id,
+              candidateObjectId: context.workspace.candidate_object_id,
+              corpusHash: context.workspace.corpus_hash,
+              selectionHash: context.workspace.selection_hash,
+            }),
+            maxDurationMs: context.requirements.max_duration_ms,
+            maxOutputBytes: context.requirements.max_output_bytes,
+            maxEvidenceBytes: operation.evidence_reservation.reserved_bytes,
+            maxToolCalls: operation.evidence_reservation.max_tool_calls,
+          }))
+      ) {
+        failures.add("task_input_binding_mismatch");
+      }
+      const budget = context.governed_task?.budget;
+      const reservation = operation.evidence_reservation;
+      if (
+        budget &&
+        (!reservation ||
+          budget.max_duration_ms !== context.requirements.max_duration_ms ||
+          budget.max_duration_ms !== reservation.max_duration_ms ||
+          budget.max_duration_ms !== operation.authorization.grant.max_duration_ms ||
+          budget.max_output_bytes !== context.requirements.max_output_bytes ||
+          budget.max_output_bytes !== operation.authorization.grant.max_output_bytes ||
+          budget.max_evidence_bytes !== reservation.reserved_bytes ||
+          budget.max_tool_calls !== reservation.max_tool_calls)
+      ) {
+        failures.add("task_input_binding_mismatch");
+      }
+      if (context.workspace.corpus_kind === "repository" && !context.governed_task) {
         failures.add("task_input_binding_mismatch");
       }
     } else if (context.workspace.corpus_kind === "repository") {
@@ -336,6 +407,29 @@ export class GovernedAttemptIndependentVerifier {
     }
   }
 
+  private verifyTaskBudget(
+    input: GovernedAttemptIndependentVerificationInput,
+    finalMessage: string | undefined,
+    failures: Set<GovernedAttemptVerificationFailureCode>
+  ): void {
+    const budget = input.context.governed_task?.budget;
+    if (!budget) return;
+    const openedAt = Date.parse(input.evidence.reference.opened_at ?? "");
+    const sealedAt = Date.parse(input.evidence.reference.sealed_at ?? "");
+    const elapsedMs =
+      Number.isFinite(openedAt) && Number.isFinite(sealedAt)
+        ? sealedAt - openedAt
+        : Number.POSITIVE_INFINITY;
+    if (
+      elapsedMs > budget.max_duration_ms ||
+      Buffer.byteLength(finalMessage ?? "", "utf8") > budget.max_output_bytes ||
+      input.evidence.reference.total_bytes > budget.max_evidence_bytes ||
+      countObservedToolCalls(input.evidence.frames) > budget.max_tool_calls
+    ) {
+      failures.add("budget_exceeded");
+    }
+  }
+
   private verifyEvents(
     input: GovernedAttemptIndependentVerificationInput,
     failures: Set<GovernedAttemptVerificationFailureCode>
@@ -378,7 +472,7 @@ function analyzeProtocol(
   frames: readonly IndependentlyReadEvidenceFrame[],
   operation: GovernedAttemptOperationRecord,
   failures: Set<GovernedAttemptVerificationFailureCode>
-): { finalMessage?: string; terminalTaskOutcome?: "pass" | "block" | "not_produced" | "invalid" } {
+): { finalMessage?: string; terminalTaskOutcome?: unknown } {
   if (frames.length < 3) {
     failures.add("protocol_violation");
     return {};
@@ -480,11 +574,10 @@ function analyzeProtocol(
 
   const terminalFrame = frames[frames.length - 1]!;
   const terminal = parseObject(terminalFrame.bytes);
-  const terminalTaskOutcome = normalizeTaskOutcome(terminal?.task_outcome);
   if (
     terminalFrame.frameClass !== "provider_receipt" ||
     terminal?.structured_result_present !== true ||
-    !terminalTaskOutcome
+    !("task_outcome" in (terminal ?? {}))
   ) {
     failures.add("protocol_violation");
   }
@@ -492,7 +585,9 @@ function analyzeProtocol(
     ...(reviewMessages.length > 0
       ? { finalMessage: reviewMessages[reviewMessages.length - 1]! }
       : {}),
-    ...(terminalTaskOutcome ? { terminalTaskOutcome } : {}),
+    ...(terminal && "task_outcome" in terminal
+      ? { terminalTaskOutcome: terminal.task_outcome }
+      : {}),
   };
 }
 
@@ -507,22 +602,6 @@ function contentHash(value: string): string {
   return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
 }
 
-function extractTaskOutcome(value: unknown): "pass" | "block" | "invalid" {
-  if (!isObject(value)) return "invalid";
-  const outcome = normalizeTaskOutcome(value.verdict ?? value.taskOutcome ?? value.task_outcome);
-  return outcome === "pass" || outcome === "block" ? outcome : "invalid";
-}
-
-function normalizeTaskOutcome(
-  value: unknown
-): "pass" | "block" | "not_produced" | "invalid" | undefined {
-  if (typeof value !== "string") return undefined;
-  const normalized = value.trim().toLowerCase();
-  return ["pass", "block", "not_produced", "invalid"].includes(normalized)
-    ? (normalized as "pass" | "block" | "not_produced" | "invalid")
-    : undefined;
-}
-
 function parseObject(bytes: Uint8Array): Record<string, unknown> | undefined {
   try {
     const parsed = JSON.parse(Buffer.from(bytes).toString("utf8")) as unknown;
@@ -530,6 +609,19 @@ function parseObject(bytes: Uint8Array): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
+}
+
+function countObservedToolCalls(frames: readonly IndependentlyReadEvidenceFrame[]): number {
+  return frames.reduce((count, frame) => {
+    if (frame.frameClass !== "executor_stdout") return count;
+    const event = parseObject(frame.bytes);
+    const item = isObject(event?.item) ? event.item : undefined;
+    return event?.type === "item.completed" &&
+      typeof item?.type === "string" &&
+      TOOL_ITEM_TYPES.has(item.type)
+      ? count + 1
+      : count;
+  }, 0);
 }
 
 function executorEventType(frame: IndependentlyReadEvidenceFrame | undefined): string | undefined {

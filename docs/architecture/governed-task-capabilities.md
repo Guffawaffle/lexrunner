@@ -23,7 +23,9 @@ host grant authority resolves aligned protected task/grant chains, authorizes th
 issuer, and supplies the protected accepted offer. The evaluator rechecks every identity and hash,
 binds the selected task hash and grant hash to that offer, verifies its worker provider against the
 task-authorized provider, and requires the selected grant to be active at the explicit authorization
-instant. Caller-supplied task, grant, provider, or offer bodies are never authority.
+instant. The root grant's operator principal must equal the principal named by the protected,
+authorization-hashed execution requirements; an arbitrary `issuer.kind: operator` is not authority.
+Caller-supplied task, grant, provider, or offer bodies are never authority.
 
 Every delegated link passes the shared exact-subset attenuation evaluator. It must also carry a
 granted `nested_delegation` capability whose effect hash exactly binds the protected child task's
@@ -41,6 +43,11 @@ runtime containment, or sensitive-data policy.
 
 `NO` is universal Delegation behavior. A task profile cannot require a rationale or reinterpret
 refusal as a failed task result.
+
+All four generic budget dimensions are authorization, not suggestions. Duration and output limits
+must match the execution requirements; evidence bytes and tool calls must match the durable capture
+reservation. Independent verification measures the sealed capture and refuses admissibility after
+any overrun, even when the provider reports successful completion.
 
 ## Positive capability model
 
@@ -84,7 +91,15 @@ not treated as a conformant sandbox.
 
 ## Migration boundary
 
-The existing governed review path remains on its read-only v1 authorization contract. It should be
-migrated by introducing a `code-review` task profile over the generic task contract, not by adding
-write exceptions to review schemas. A second non-review profile must prove that the protocol,
-operation store, supervisor, refusal behavior, and evidence store require no task-specific changes.
+The governed review path now creates and durably verifies a `code-review` profile over the generic
+task contract; it does not add write exceptions to review schemas. After durable `ACCEPT` and before
+task continuation, the operation service resolves the protected task, operator-issued attenuated
+grant, accepted offer, adapter qualification, and per-capability enforcement receipts through the
+generic evaluators. The legacy read-only executor grant remains only a compatibility transport and
+must match the generic grant's selected dimensions. A legacy offer without both the generic task and
+execution binding may still reach the refusal turn, but `ACCEPT` cannot release work and a direct
+authorized-work launch fails closed. Generic results and verification receipts carry a bounded
+profile-owned outcome identifier; only `not_produced` and `invalid` are protocol sentinels. Review
+output interpretation likewise lives in the bound profile, not the generic independent verifier. A
+second non-review profile must now prove that the protocol, operation store, supervisor, refusal
+behavior, and evidence store require no task-specific changes.

@@ -7,6 +7,7 @@ import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import {
   EnvironmentAttestation_v1,
   ExecutorAttestation_v1,
+  GovernedTaskOutcome_v1,
   WorkspaceAttestation_v1,
   type AttemptAuthorization_v1,
   type ExecutorAttestation_v1 as ExecutorAttestation,
@@ -270,10 +271,7 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
       args: ["collect", "--provider-handle", opaqueId.parse(providerHandle)],
       maxOutputBytes: MAX_CONTROL_BYTES,
     });
-    return z
-      .object({ taskOutcome: z.enum(["pass", "block", "not_produced", "invalid"]) })
-      .strict()
-      .parse(parseJson(output));
+    return z.object({ taskOutcome: GovernedTaskOutcome_v1 }).strict().parse(parseJson(output));
   }
 
   async release(providerHandle: string): Promise<void> {

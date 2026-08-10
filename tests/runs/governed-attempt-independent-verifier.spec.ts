@@ -28,6 +28,14 @@ import {
   initialProtectedEvidenceChainHead,
 } from "../../src/store/local-protected-evidence-store.js";
 import { ProtectedEvidenceReference_v1 } from "../../src/store/protected-evidence-store.js";
+import {
+  GOVERNED_CODE_REVIEW_VERIFIER_ID,
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
+  GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  computeGovernedCodeReviewCorpusScopeHash,
+  createGovernedCodeReviewTaskExecutionBinding,
+  createGovernedCodeReviewTaskSpec,
+} from "../../src/runs/governed-review-task-profile.js";
 
 const hash = (value: string) => computeCanonicalHash({ value });
 const at = (seconds: number) => `2026-08-09T11:00:${String(seconds).padStart(2, "0")}.000Z`;
@@ -37,7 +45,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const fixture = verificationFixture();
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-1",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -61,7 +69,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-2",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -80,7 +88,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-pre-receipt-command",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -98,7 +106,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-thread-binding",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -118,7 +126,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-3",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -129,13 +137,48 @@ describe("GovernedAttemptIndependentVerifier", () => {
     );
   });
 
+  it("rejects PASS when the structured review contains a blocking finding", () => {
+    const fixture = verificationFixture();
+    fixture.evidence.frames[7]!.bytes = bytes({
+      type: "item.completed",
+      item: {
+        type: "agent_message",
+        text: JSON.stringify({
+          verdict: "PASS",
+          findings: [
+            { severity: "blocking", file: "src/example.ts", line: 1, message: "Must fix" },
+          ],
+        }),
+      },
+    });
+    fixture.evidence.frames[8]!.bytes = bytes({
+      task_outcome: "pass",
+      structured_result_present: true,
+    });
+    fixture.operation.result = { ...fixture.operation.result!, task_outcome: "pass" };
+    fixture.operation.result_hash = computeCanonicalHash(fixture.operation.result);
+    rebindEvidenceEvents(fixture);
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-pass-with-blocking-finding",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toEqual(
+      expect.arrayContaining(["outcome_mismatch", "output_invalid"])
+    );
+  });
+
   it("rejects a durable Delegation whose task offer differs from the protected launch binding", () => {
     const fixture = verificationFixture();
     fixture.delegation.state.offer.task_offer_hash = hash("different-task");
 
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-task-input",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -144,11 +187,32 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
   });
 
+  it("independently verifies the protected generic code-review task profile", () => {
+    const fixture = verificationFixture({ governedTask: true });
+    const admitted = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-governed-task",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+    expect(admitted).toMatchObject({ decision: "accepted", failure_codes: [] });
+
+    fixture.context.governed_task!.input_binding_hash = hash("tampered-task-input");
+    const rejected = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-governed-task-tampered",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+    expect(rejected.decision).toBe("rejected");
+    expect(rejected.failure_codes).toContain("task_input_binding_mismatch");
+  });
+
   it("independently admits a repository corpus only with the exact durable lifecycle", () => {
     const fixture = verificationFixture({ repository: true });
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -165,7 +229,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     const { repositoryLifecycle: _repositoryLifecycle, ...withoutLifecycle } = fixture;
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository-missing-lifecycle",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...withoutLifecycle,
       verifiedAt: at(15),
     });
@@ -179,7 +243,7 @@ describe("GovernedAttemptIndependentVerifier", () => {
     fixture.repositoryLifecycle!.lease!.status = "released";
     const receipt = new GovernedAttemptIndependentVerifier().verify({
       verificationId: "verification-repository-released-lease",
-      verifierId: "lexrunner-host-verifier",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
       ...fixture,
       verifiedAt: at(15),
     });
@@ -187,9 +251,69 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.decision).toBe("rejected");
     expect(receipt.failure_codes).toContain("lifecycle_binding_mismatch");
   });
+
+  it("rejects a repository result when its protected governed task is absent", () => {
+    const fixture = verificationFixture({ repository: true });
+    delete fixture.context.governed_task;
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-repository-missing-governed-task",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
+  });
+
+  it("rejects sealed evidence that exceeds the exact task tool budget", () => {
+    const fixture = verificationFixture({ maxToolCalls: 1 });
+    fixture.evidence.frames[5]!.bytes = bytes({
+      type: "item.completed",
+      item: { type: "command_execution", command: "second read" },
+    });
+    rebindEvidenceEvents(fixture);
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-tool-budget-exceeded",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("budget_exceeded");
+
+    const oversized = verificationFixture();
+    oversized.evidence.reference.total_bytes =
+      oversized.context.governed_task!.budget.max_evidence_bytes + 1;
+    const oversizedReceipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-evidence-budget-exceeded",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...oversized,
+      verifiedAt: at(15),
+    });
+    expect(oversizedReceipt.decision).toBe("rejected");
+    expect(oversizedReceipt.failure_codes).toContain("budget_exceeded");
+
+    const drifted = verificationFixture();
+    drifted.operation.evidence_reservation!.max_tool_calls = 101;
+    const driftedReceipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-tool-budget-binding-drift",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...drifted,
+      verifiedAt: at(15),
+    });
+    expect(driftedReceipt.decision).toBe("rejected");
+    expect(driftedReceipt.failure_codes).toContain("task_input_binding_mismatch");
+  });
 });
 
-function verificationFixture(options: { repository?: boolean } = {}) {
+function verificationFixture(
+  options: { repository?: boolean; governedTask?: boolean; maxToolCalls?: number } = {}
+) {
+  const usesGovernedTask = options.governedTask !== false;
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -203,6 +327,7 @@ function verificationFixture(options: { repository?: boolean } = {}) {
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 600_000,
@@ -277,33 +402,65 @@ function verificationFixture(options: { repository?: boolean } = {}) {
   });
   if (!decision.authorized) throw new Error(`authorization fixture failed: ${decision.reason}`);
 
-  const outputSchema = {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    additionalProperties: false,
-    required: ["verdict", "findings"],
-    properties: {
-      verdict: { type: "string", enum: ["PASS", "BLOCK"] },
-      findings: { type: "array", maxItems: 16 },
-    },
-  };
+  const outputSchema = usesGovernedTask
+    ? GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA
+    : {
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        additionalProperties: false,
+        required: ["verdict", "findings"],
+        properties: {
+          verdict: { type: "string", enum: ["PASS", "BLOCK"] },
+          findings: { type: "array", maxItems: 16 },
+        },
+      };
+  const promptHash = hash("prompt");
+  const governedTask = usesGovernedTask
+    ? createGovernedCodeReviewTaskSpec({
+        attemptId: requirements.attempt_id,
+        delegationId: requirements.delegation_id,
+        objectiveHash: requirements.objective_hash,
+        authorizedModelProvider: requirements.authorized_model_provider,
+        promptHash,
+        corpusScopeHash: computeGovernedCodeReviewCorpusScopeHash({
+          repositoryId: workspace.repository_id,
+          baseObjectId: workspace.base_object_id,
+          candidateObjectId: workspace.candidate_object_id,
+          corpusHash: workspace.corpus_hash,
+          selectionHash: workspace.selection_hash,
+        }),
+        maxDurationMs: requirements.max_duration_ms,
+        maxOutputBytes: requirements.max_output_bytes,
+        ...(options.maxToolCalls ? { maxToolCalls: options.maxToolCalls } : {}),
+      })
+    : undefined;
+  const taskExecution = governedTask
+    ? createGovernedCodeReviewTaskExecutionBinding({
+        task: governedTask,
+        authorizedAt: at(1),
+        expiresAt: at(18),
+        executorAttestationHash: computeCanonicalHash(executor),
+        environmentAttestationHash: computeCanonicalHash(environment),
+        workspaceAttestationHash: computeCanonicalHash(workspace),
+      })
+    : undefined;
   const inputBindingBase = {
-    prompt_hash: hash("prompt"),
+    prompt_hash: promptHash,
     output_schema_hash: computeCanonicalHash(outputSchema),
-    task_offer_hash: hash("task-offer"),
+    task_offer_hash: governedTask?.task_spec_hash ?? hash("task-offer"),
   };
   const offer = {
     schema_version: "1.0.0" as const,
     delegation_id: requirements.delegation_id,
     attempt_id: requirements.attempt_id,
     worker: {
-      provider_id: "openai-codex",
+      provider_id: governedTask?.authorized_model_provider ?? "openai-codex",
       worker_id: executor.executor_id,
       thread_id: "logical-thread-1",
     },
     task_offer_hash: inputBindingBase.task_offer_hash,
     requirements_hash: computeCanonicalHash(requirements),
-    authority_grant_hash: computeCanonicalHash(grant),
+    authority_grant_hash: taskExecution?.authority_grant_hash ?? computeCanonicalHash(grant),
     transcript_start_hash: hash("transcript"),
     offered_at: at(1),
   };
@@ -316,6 +473,8 @@ function verificationFixture(options: { repository?: boolean } = {}) {
     workspace,
     output_schema: outputSchema,
     input_binding: inputBinding,
+    ...(governedTask ? { governed_task: governedTask } : {}),
+    ...(taskExecution ? { task_execution: taskExecution } : {}),
     ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
   });
   const raw = [
@@ -444,10 +603,11 @@ function verificationFixture(options: { repository?: boolean } = {}) {
       executor_binding_digest: reference.executor_binding_digest,
       environment_binding_digest: reference.environment_binding_digest,
       workspace_binding_digest: reference.workspace_binding_digest,
-      reserved_bytes: 1_000_000,
+      reserved_bytes: 8 * 1_024 * 1_024,
       reserved_frames: 100,
       reserved_events: 100,
       max_duration_ms: 600_000,
+      max_tool_calls: governedTask?.budget.max_tool_calls ?? 100,
     },
     evidence_declaration: {
       ...reference,

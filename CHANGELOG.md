@@ -20,12 +20,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- **Governed review task profile** - Express read-only review through a durable generic
+  `GovernedTaskSpec`, bind the Delegation offer to its exact task and provider, and independently
+  reconstruct the profile from protected prompt, corpus, output-contract, and budget bindings;
+  release accepted work only after the generic grant and qualified adapter evaluate, and dispatch
+  `PASS`/`BLOCK` interpretation through the exact profile verifier.
 - **Qualified provider topology** - Bind the root-owned repository exporter and exact Git executable
   and version into live qualification evidence, and securely discard sealed corpora that never
   become operation-bound.
 
 ### Fixed
 
+- **Governed refusal and budget enforcement** - Persist an offer-phase `NO` directly from the
+  offered Delegation state, and independently reject duration, output, evidence-byte, or tool-call
+  usage beyond the exact task budget bound to execution requirements and the evidence reservation.
+- **Generic continuation and outcome isolation** - Deny both direct work and post-`ACCEPT`
+  continuation when the durable generic task/execution binding is absent, keep unbound legacy
+  offers refusal-only, reject contradictory `PASS` output with blocking findings, and make generic
+  results and verification receipts accept profile-owned outcome identifiers without embedding the
+  code-review vocabulary. Bind the root task grant issuer to the operator principal named by the
+  protected authorization requirements so a self-consistent caller grant cannot mint authority.
 - **Git object substitution defense** - Verify every exported file against the blob object ID in
   the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
   both the Windows corpus parser and provider boundary.
