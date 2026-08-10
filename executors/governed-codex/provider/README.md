@@ -39,7 +39,8 @@ patch, and metadata. `discard-repository` is idempotent only for an unreferenced
 operation-bound corpora remain until terminal `release`.
 Qualification also fails unless the provider's attested Git executable is exactly `/usr/bin/git`,
 the fixed executable used by the repository exporter; test-only path overrides cannot qualify a
-repository-review image.
+repository-review image. Legacy qualification manifests without the execution-profile binding are
+rejected and must be replaced by a fresh live qualification before the upgraded provider can run.
 
 `observe` replays a provider-only, mode-0600 event spool and then blocks on inotify. The Windows host
 must persist each raw frame to the operator-only protected evidence store before publishing its safe

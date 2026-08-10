@@ -182,6 +182,17 @@ class GovernedCodexProviderTest(unittest.TestCase):
         finally:
             provider.GIT_EXECUTABLE = original
 
+    def test_qualification_rejects_legacy_manifest_without_execution_profile(self) -> None:
+        original = QUALIFICATION.read_bytes()
+        try:
+            legacy = json.loads(original)
+            del legacy["execution_profile_hash"]
+            QUALIFICATION.write_text(json.dumps(legacy), encoding="utf-8")
+            with self.assertRaisesRegex(provider.ProviderError, "missing fields"):
+                provider.load_qualification()
+        finally:
+            QUALIFICATION.write_bytes(original)
+
     def test_runtime_rejects_a_changed_qualified_execution_profile(self) -> None:
         original = REQUIREMENTS.read_bytes()
         try:

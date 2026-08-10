@@ -92,6 +92,10 @@ the sealed candidate, patch, and bounded metadata enter `/workspace`, read-only,
 ACCEPT. A failed pre-launch path discards an unreferenced sealed corpus; a referenced corpus cannot
 be discarded and is removed only with its terminal operation spool.
 
+Repository review requires a current qualification manifest whose execution-profile hash binds the
+installed provider, repository exporter, Git executable and version, Codex, bubblewrap, managed
+requirements, and two-phase feature set. Pre-profile manifests fail closed after upgrade.
+
 The resumed prompt includes the authorized result schema, but Codex is not process-constrained by
 `--output-schema`: a process-level object schema would make the agent's bare `NO` unreachable. If
 the agent proceeds, the provider validates its final JSON before classifying the claim. The

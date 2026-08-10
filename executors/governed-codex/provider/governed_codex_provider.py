@@ -265,24 +265,24 @@ def load_qualification() -> dict[str, Any]:
         raise ProviderError("qualification manifest is invalid") from error
     if not isinstance(value, dict):
         fail("qualification manifest must be an object")
-    legacy_fields = {
+    required_fields = {
         "schema_version",
         "provider_id",
         "environment_id",
         "topology_hash",
+        "execution_profile_hash",
         "controls",
         "qualified_at",
         "expires_at",
     }
-    if set(value) not in (legacy_fields, legacy_fields | {"execution_profile_hash"}):
+    if set(value) != required_fields:
         fail("qualification has unexpected or missing fields")
     if value["schema_version"] != PROTOCOL_VERSION:
         fail("qualification schema version is unsupported")
     require_opaque(value["provider_id"], "provider_id")
     require_opaque(value["environment_id"], "environment_id")
     require_hash(value["topology_hash"], "topology_hash")
-    if "execution_profile_hash" in value:
-        require_hash(value["execution_profile_hash"], "execution_profile_hash")
+    require_hash(value["execution_profile_hash"], "execution_profile_hash")
     controls = value["controls"]
     if not isinstance(controls, list) or len(controls) != len(CONTROL_IDS):
         fail("qualification must contain every denial control")
@@ -313,12 +313,7 @@ def load_qualification() -> dict[str, Any]:
     expires_at = parse_instant(value["expires_at"], "expires_at")
     if expires_at <= qualified_at or expires_at <= now_utc():
         fail("qualification manifest is stale")
-    # Legacy manifests are accepted only for their existing short TTL so an
-    # already-qualified image can bootstrap this additive enforcement field.
-    if value.get("execution_profile_hash") not in (
-        None,
-        canonical_hash(fixed_execution_profile()),
-    ):
+    if value["execution_profile_hash"] != canonical_hash(fixed_execution_profile()):
         fail("qualified execution profile no longer matches the installed image")
     return value
 
