@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- **Provider stream failure terminality** - Convert bounded-line, invalid-event, sequence, and
+  transport failures into a durable `failed` executor event with a bounded protected failure frame;
+  cancel the provider, never retain raw failure output in lifecycle state, and reserve `lost` for
+  unexplained stream disappearance.
 - **Governed review task profile** - Express read-only review through a durable generic
   `GovernedTaskSpec`, bind the Delegation offer to its exact task and provider, and independently
   reconstruct the profile from protected prompt, corpus, output-contract, and budget bindings;

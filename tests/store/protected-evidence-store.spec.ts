@@ -111,6 +111,7 @@ describe("CoordinationStore-safe protected evidence references", () => {
     for (const reason_code of [
       "byte_limit_exceeded",
       "event_limit_exceeded",
+      "provider_failure",
       "prohibited_content",
     ] as const) {
       const reference = ProtectedEvidenceReference_v1.parse({

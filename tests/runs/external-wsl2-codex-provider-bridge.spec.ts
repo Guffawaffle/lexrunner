@@ -6,6 +6,7 @@ import {
 } from "../../src/runs/external-wsl2-codex-provider-bridge.js";
 import type { AttemptAuthorization_v1 } from "../../src/runs/governed-attempt-executor.js";
 import { GovernedControlId } from "../../src/runs/governed-attempt-executor.js";
+import { QualifiedCodexProviderStreamError } from "../../src/runs/qualified-wsl2-codex-executor.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 
 const hash = (value: string) => computeCanonicalHash({ value });
@@ -84,6 +85,19 @@ describe("ExternalWsl2CodexProviderBridge", () => {
       "4",
     ]);
     expect(transport.streams[0]!.args.join(" ")).not.toContain("turn.completed");
+  });
+
+  it("normalizes transport exceptions without exposing their raw text", async () => {
+    const transport = new FailingStreamTransport();
+    const bridge = new ExternalWsl2CodexProviderBridge({
+      distribution: "lexrunner-attempt-01234567",
+      transport,
+    });
+
+    const failure = await collectFailure(bridge.observe("provider-handle-1", { afterSequence: 0 }));
+    expect(failure).toBeInstanceOf(QualifiedCodexProviderStreamError);
+    expect(failure).toMatchObject({ code: "transport_failed" });
+    expect(String(failure)).not.toContain("provider-secret-output");
   });
 
   it("sends the exact continuation authorization on stdin and never argv", async () => {
@@ -203,6 +217,23 @@ class FakeTransport implements Wsl2CodexProviderTransport {
       raw_base64: Buffer.from('{"type":"turn.completed"}').toString("base64"),
     });
   }
+}
+
+class FailingStreamTransport extends FakeTransport {
+  override async *stream(): AsyncIterable<Uint8Array> {
+    throw new Error("provider-secret-output");
+  }
+}
+
+async function collectFailure(values: AsyncIterable<unknown>): Promise<unknown> {
+  try {
+    for await (const _value of values) {
+      // A failing stream must not yield semantic events.
+    }
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected provider stream failure");
 }
 
 function authorization(): AttemptAuthorization_v1 {

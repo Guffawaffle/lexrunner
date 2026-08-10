@@ -80,6 +80,13 @@ issues an opaque-handle `release`. The provider rejects release before terminali
 the transient WSL copy. A host crash before that acknowledgement leaves the spool available for
 restart attachment.
 
+Known provider-stream failures are not disappearance. An oversized line, malformed event,
+non-contiguous sequence, or transport error cancels the provider and produces a durable `failed`
+event backed by a bounded host-created capture-lifecycle frame. Raw failure bytes and exception
+text never enter lifecycle state. If that bounded frame cannot become complete evidence, the
+capture becomes incomplete with a bounded reason code. `lost` remains reserved for a stream that
+ends without a terminal event and without a classified failure.
+
 ## Provider boundary
 
 The host bridge accepts only disposable distribution names matching `lexrunner-attempt-<hex>`, invokes
