@@ -328,6 +328,17 @@ export class SqliteGovernedDelegationStore
             idempotentReplay: true,
           } as const;
         }
+        if (
+          input.repositoryLifecycleGuard &&
+          !this.repositoryLifecycleMatches(current.attempt_id, input.repositoryLifecycleGuard, now)
+        ) {
+          return {
+            authorized: false,
+            reason: "binding_mismatch",
+            record: current,
+            idempotentReplay: true,
+          } as const;
+        }
         return {
           authorized: true,
           record: current,

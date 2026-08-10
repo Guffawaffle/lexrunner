@@ -295,6 +295,20 @@ describe("SQLite governed Delegation repository lifecycle guard", () => {
       }
       await expect(
         store.authorizeDelegationInvocation({
+          mutationId: "mutation-guard-authorize-active",
+          delegationId: "delegation-1",
+          expectedRevision: 1,
+          request: invocation(),
+          repositoryLifecycleGuard: guard,
+          now: "2026-08-09T08:00:03Z",
+        })
+      ).resolves.toMatchObject({
+        authorized: false,
+        reason: "binding_mismatch",
+        idempotentReplay: true,
+      });
+      await expect(
+        store.authorizeDelegationInvocation({
           mutationId: "mutation-guard-authorize-released",
           delegationId: "delegation-1",
           expectedRevision: 1,

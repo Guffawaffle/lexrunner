@@ -211,6 +211,21 @@ export class InMemoryGovernedDelegationStore
           idempotentReplay: true,
         };
       }
+      if (
+        input.repositoryLifecycleGuard &&
+        !(await this.repositoryLifecycleMatches(
+          current.attempt_id,
+          input.repositoryLifecycleGuard,
+          now
+        ))
+      ) {
+        return {
+          authorized: false,
+          reason: "binding_mismatch",
+          record: cloneRecord(current),
+          idempotentReplay: true,
+        };
+      }
       return {
         authorized: true,
         record: cloneRecord(current),
