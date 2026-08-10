@@ -136,6 +136,41 @@ describe("GovernedAttemptIndependentVerifier", () => {
     );
   });
 
+  it("rejects PASS when the structured review contains a blocking finding", () => {
+    const fixture = verificationFixture();
+    fixture.evidence.frames[7]!.bytes = bytes({
+      type: "item.completed",
+      item: {
+        type: "agent_message",
+        text: JSON.stringify({
+          verdict: "PASS",
+          findings: [
+            { severity: "blocking", file: "src/example.ts", line: 1, message: "Must fix" },
+          ],
+        }),
+      },
+    });
+    fixture.evidence.frames[8]!.bytes = bytes({
+      task_outcome: "pass",
+      structured_result_present: true,
+    });
+    fixture.operation.result = { ...fixture.operation.result!, task_outcome: "pass" };
+    fixture.operation.result_hash = computeCanonicalHash(fixture.operation.result);
+    rebindEvidenceEvents(fixture);
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-pass-with-blocking-finding",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toEqual(
+      expect.arrayContaining(["outcome_mismatch", "output_invalid"])
+    );
+  });
+
   it("rejects a durable Delegation whose task offer differs from the protected launch binding", () => {
     const fixture = verificationFixture();
     fixture.delegation.state.offer.task_offer_hash = hash("different-task");

@@ -312,7 +312,18 @@ export function interpretGovernedCodeReviewOutcome(input: {
   }
   const output = isObject(input.output) ? input.output : undefined;
   const verdict = typeof output?.verdict === "string" ? output.verdict : undefined;
-  const outputOutcome = verdict === "PASS" ? "pass" : verdict === "BLOCK" ? "block" : "invalid";
+  const findings = Array.isArray(output?.findings) ? output.findings : [];
+  const hasBlockingFinding = findings.some(
+    (finding) => isObject(finding) && finding.severity === "blocking"
+  );
+  const outputOutcome =
+    verdict === "PASS"
+      ? hasBlockingFinding
+        ? "invalid"
+        : "pass"
+      : verdict === "BLOCK"
+        ? "block"
+        : "invalid";
   const terminalOutcome =
     input.terminalTaskOutcome === "pass"
       ? "pass"

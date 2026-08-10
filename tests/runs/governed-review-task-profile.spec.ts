@@ -100,6 +100,19 @@ describe("governed code-review task profile", () => {
     expect(
       interpretGovernedCodeReviewOutcome({
         task,
+        verifierId: task.profile.verifier_id,
+        output: {
+          verdict: "PASS",
+          findings: [
+            { severity: "blocking", file: "src/example.ts", line: 1, message: "Must fix" },
+          ],
+        },
+        terminalTaskOutcome: "pass",
+      })
+    ).toEqual({ matched: true, outputOutcome: "invalid", terminalOutcome: "pass" });
+    expect(
+      interpretGovernedCodeReviewOutcome({
+        task,
         verifierId: "another-verifier",
         output: { verdict: "PASS", findings: [] },
         terminalTaskOutcome: "pass",
