@@ -57,6 +57,24 @@ describe("governed workspace mutation task profile", () => {
     );
   });
 
+  it("binds every normalized execution budget into the task input hash", () => {
+    const baseline = taskSpec();
+    for (const variant of [
+      taskSpec({ maxDurationMs: 300_001 }),
+      taskSpec({ maxOutputBytes: 1_048_577 }),
+      taskSpec({ maxEvidenceBytes: 16 * 1_024 * 1_024 - 1 }),
+      taskSpec({ maxToolCalls: 199 }),
+    ]) {
+      expect(variant.input_binding_hash).not.toBe(baseline.input_binding_hash);
+    }
+    expect(
+      taskSpec({
+        maxEvidenceBytes: 16 * 1_024 * 1_024,
+        maxToolCalls: 200,
+      }).input_binding_hash
+    ).toBe(baseline.input_binding_hash);
+  });
+
   it("keeps evidence records as inert claims until a protected controller consumes them", () => {
     const task = taskSpec();
     const qualification = qualificationEvidence();
@@ -127,7 +145,14 @@ describe("governed workspace mutation task profile", () => {
   });
 });
 
-function taskSpec() {
+function taskSpec(
+  options: {
+    maxDurationMs?: number;
+    maxOutputBytes?: number;
+    maxEvidenceBytes?: number;
+    maxToolCalls?: number;
+  } = {}
+) {
   return createGovernedWorkspaceMutationTaskSpec({
     attemptId: "attempt-write-1",
     delegationId: "delegation-write-1",
@@ -139,8 +164,12 @@ function taskSpec() {
     writablePathSetHash: hash("4"),
     ownershipScopeHash: hash("5"),
     rollbackBindingHash: hash("6"),
-    maxDurationMs: 300_000,
-    maxOutputBytes: 1_048_576,
+    maxDurationMs: options.maxDurationMs ?? 300_000,
+    maxOutputBytes: options.maxOutputBytes ?? 1_048_576,
+    ...(options.maxEvidenceBytes === undefined
+      ? {}
+      : { maxEvidenceBytes: options.maxEvidenceBytes }),
+    ...(options.maxToolCalls === undefined ? {} : { maxToolCalls: options.maxToolCalls }),
   });
 }
 

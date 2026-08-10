@@ -14,7 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   adapter manifest cannot mint a write receipt. A later protected controller must independently
   resolve exact-image qualification and task-specific prepared-workspace evidence by hash, validate
   freshness with its own trusted clock, and construct the generic grant only after those records
-  reconstruct the prompt, source, read, write, ownership, and rollback bindings.
+  reconstruct the prompt, source, read, write, ownership, and rollback bindings. The task input hash
+  also binds its normalized duration, output-byte, evidence-byte, and tool-call budgets.
 - **Governed task capability foundation** - Add a review-neutral task/profile binding and positive
   capability ceiling that represents recoverable workspace writes, explicitly bounded external
   effects, contained runtime execution, and attenuated nested Delegations without weakening `NO`.

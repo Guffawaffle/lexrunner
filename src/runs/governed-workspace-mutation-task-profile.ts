@@ -74,6 +74,10 @@ export const GOVERNED_WORKSPACE_MUTATION_INPUT_CONTRACT_HASH = computeCanonicalH
     "ownership_scope_hash",
     "rollback_binding_hash",
     "output_contract_hash",
+    "max_duration_ms",
+    "max_output_bytes",
+    "max_evidence_bytes",
+    "max_tool_calls",
   ],
   mutation_evidence: "independent_pre_post_manifest_and_patch",
   refusal: "uncoerced_no",
@@ -312,6 +316,10 @@ export function computeGovernedWorkspaceMutationInputBindingHash(input: {
   writablePathSetHash: string;
   ownershipScopeHash: string;
   rollbackBindingHash: string;
+  maxDurationMs: number;
+  maxOutputBytes: number;
+  maxEvidenceBytes: number;
+  maxToolCalls: number;
   outputContractHash?: string;
 }): string {
   return computeCanonicalHash({
@@ -324,6 +332,10 @@ export function computeGovernedWorkspaceMutationInputBindingHash(input: {
     rollback_binding_hash: input.rollbackBindingHash,
     output_contract_hash:
       input.outputContractHash ?? GOVERNED_WORKSPACE_MUTATION_OUTPUT_CONTRACT_HASH,
+    max_duration_ms: input.maxDurationMs,
+    max_output_bytes: input.maxOutputBytes,
+    max_evidence_bytes: input.maxEvidenceBytes,
+    max_tool_calls: input.maxToolCalls,
   });
 }
 
@@ -331,6 +343,8 @@ export function computeGovernedWorkspaceMutationInputBindingHash(input: {
 export function createGovernedWorkspaceMutationTaskSpec(
   input: CreateGovernedWorkspaceMutationTaskInput
 ): GovernedTaskSpec {
+  const maxEvidenceBytes = input.maxEvidenceBytes ?? GOVERNED_WORKSPACE_MUTATION_MAX_EVIDENCE_BYTES;
+  const maxToolCalls = input.maxToolCalls ?? GOVERNED_WORKSPACE_MUTATION_MAX_TOOL_CALLS;
   return createGovernedTaskSpec({
     schema_version: "1.0.0",
     attempt_id: input.attemptId,
@@ -345,7 +359,11 @@ export function createGovernedWorkspaceMutationTaskSpec(
       verifier_id: GOVERNED_WORKSPACE_MUTATION_VERIFIER_ID,
       verifier_version: GOVERNED_WORKSPACE_MUTATION_VERIFIER_VERSION,
     },
-    input_binding_hash: computeGovernedWorkspaceMutationInputBindingHash(input),
+    input_binding_hash: computeGovernedWorkspaceMutationInputBindingHash({
+      ...input,
+      maxEvidenceBytes,
+      maxToolCalls,
+    }),
     capability_ceiling: [
       {
         dimension: "filesystem_read",
@@ -372,8 +390,8 @@ export function createGovernedWorkspaceMutationTaskSpec(
     budget: {
       max_duration_ms: input.maxDurationMs,
       max_output_bytes: input.maxOutputBytes,
-      max_evidence_bytes: input.maxEvidenceBytes ?? GOVERNED_WORKSPACE_MUTATION_MAX_EVIDENCE_BYTES,
-      max_tool_calls: input.maxToolCalls ?? GOVERNED_WORKSPACE_MUTATION_MAX_TOOL_CALLS,
+      max_evidence_bytes: maxEvidenceBytes,
+      max_tool_calls: maxToolCalls,
     },
   });
 }

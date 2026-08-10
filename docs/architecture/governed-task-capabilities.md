@@ -101,7 +101,9 @@ binding only after it independently resolves:
 - a current exact-image qualification covering the complete write, escape, identity,
   cancellation, descendant, degraded-launch, and controller-recovery canary set; and
 - task-specific prepared-workspace evidence whose prompt, sealed source, read scope, write scope,
-  ownership scope, and rollback binding reconstruct the task's complete input hash.
+  ownership scope, and rollback binding reconstruct the workspace portion of the task input; and
+- the exact normalized duration, output-byte, evidence-byte, and tool-call budgets bound directly
+  into the complete task input hash.
 
 The execution requester will select those records only by their task and evidence hashes. The
 protected controller—not a caller-supplied interface implementation—must resolve the exact records
