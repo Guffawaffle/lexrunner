@@ -34,6 +34,9 @@ never exports `.git`, repository configuration, remotes, credentials, symlinks, 
 files, or working-tree dirt. `prepare-repository` independently validates the framed hashes and
 seals the resulting candidate, patch, and metadata. `discard-repository` is idempotent only for an
 unreferenced sealed corpus; operation-bound corpora remain until terminal `release`.
+Qualification also fails unless the provider's attested Git executable is exactly `/usr/bin/git`,
+the fixed executable used by the repository exporter; test-only path overrides cannot qualify a
+repository-review image.
 
 `observe` replays a provider-only, mode-0600 event spool and then blocks on inotify. The Windows host
 must persist each raw frame to the operator-only protected evidence store before publishing its safe

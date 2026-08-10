@@ -173,6 +173,15 @@ class GovernedCodexProviderTest(unittest.TestCase):
         ):
             install_qualification.validate_report(report, provider)
 
+    def test_qualification_rejects_git_not_used_by_the_repository_exporter(self) -> None:
+        original = provider.GIT_EXECUTABLE
+        try:
+            provider.GIT_EXECUTABLE = ROOT / "different-git"
+            with self.assertRaisesRegex(provider.ProviderError, "repository exporter"):
+                provider.fixed_execution_profile()
+        finally:
+            provider.GIT_EXECUTABLE = original
+
     def test_runtime_rejects_a_changed_qualified_execution_profile(self) -> None:
         original = REQUIREMENTS.read_bytes()
         try:

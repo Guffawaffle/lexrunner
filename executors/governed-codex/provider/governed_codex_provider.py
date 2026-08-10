@@ -73,7 +73,10 @@ QUALIFICATION_PATH = configured_path(
 )
 CODEX_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_CODEX", "/opt/lexrunner/bin/codex")
 BWRAP_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_BWRAP", "/usr/bin/bwrap")
-GIT_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_GIT", "/usr/bin/git")
+REPOSITORY_EXPORTER_GIT_EXECUTABLE = Path("/usr/bin/git")
+GIT_EXECUTABLE = configured_path(
+    "LEXRUNNER_PROVIDER_GIT", str(REPOSITORY_EXPORTER_GIT_EXECUTABLE)
+)
 SYSTEMD_RUN = configured_path("LEXRUNNER_PROVIDER_SYSTEMD_RUN", "/usr/bin/systemd-run")
 SYSTEMCTL = configured_path("LEXRUNNER_PROVIDER_SYSTEMCTL", "/usr/bin/systemctl")
 PROVIDER_EXECUTABLE = configured_path(
@@ -338,6 +341,8 @@ PHASE_ONE_DISABLED_FEATURES = (
 
 
 def fixed_execution_profile() -> dict[str, Any]:
+    if GIT_EXECUTABLE != REPOSITORY_EXPORTER_GIT_EXECUTABLE:
+        fail("qualified Git executable does not match the repository exporter")
     return {
         "protocol": "lexrunner-provider-v1",
         "codex_protocol": "jsonl-stdin",
