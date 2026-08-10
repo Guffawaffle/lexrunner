@@ -31,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - **Repository launch lease race** - Atomically require the bound active workspace lease when
   authorizing the offer, creating the durable operation, and authorizing post-acceptance work; the
   independent verifier also rejects results after lease release.
+- **Repository corpus memory bound** - Read Git blobs one at a time and reject aggregate tree size
+  from object headers before buffering payload bytes, preserving the documented 32 MiB bound.
+- **Repository receipt lifecycle projection** - Verify the provider's corpus-header receipt against
+  provider-visible fields while independently enforcing the host-owned workspace-lease revision.
 
 ## [1.4.1] - 2026-08-04
 

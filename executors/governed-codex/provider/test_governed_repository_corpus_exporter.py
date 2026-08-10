@@ -7,10 +7,17 @@ import struct
 import subprocess
 import tempfile
 import unittest
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from unittest.mock import patch
 
 
 EXPORTER = Path(__file__).with_name("governed_repository_corpus_exporter.py")
+EXPORTER_SPEC = spec_from_file_location("governed_repository_corpus_exporter", EXPORTER)
+if EXPORTER_SPEC is None or EXPORTER_SPEC.loader is None:
+    raise RuntimeError("failed to load governed repository corpus exporter")
+EXPORTER_MODULE = module_from_spec(EXPORTER_SPEC)
+EXPORTER_SPEC.loader.exec_module(EXPORTER_MODULE)
 
 
 class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
@@ -200,6 +207,94 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         result = self.run_exporter()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b"")
+
+    def test_rejects_aggregate_size_from_headers_before_reading_excess_payload(self) -> None:
+        first = b"first!"
+        second = b"second"
+        first_id = EXPORTER_MODULE.git_blob_object_id(first, "0" * 40)
+        second_id = EXPORTER_MODULE.git_blob_object_id(second, "0" * 40)
+        responses = {first_id: first, second_id: second}
+
+        class FakeStdout:
+            def __init__(self) -> None:
+                self.buffer = bytearray()
+                self.payload_reads = 0
+
+            def add(self, object_id: str) -> None:
+                if self.buffer:
+                    raise AssertionError("next object was requested before the prior response drained")
+                content = responses[object_id]
+                self.buffer.extend(f"{object_id} blob {len(content)}\n".encode("ascii"))
+                self.buffer.extend(content + b"\n")
+
+            def readline(self, limit: int) -> bytes:
+                newline = self.buffer.index(b"\n") + 1
+                result = bytes(self.buffer[: min(newline, limit)])
+                del self.buffer[: len(result)]
+                return result
+
+            def read(self, size: int) -> bytes:
+                if not self.buffer:
+                    return b""
+                self.payload_reads += 1
+                result = bytes(self.buffer[:size])
+                del self.buffer[: len(result)]
+                return result
+
+        class FakeStdin:
+            def __init__(self, stdout: FakeStdout) -> None:
+                self.stdout = stdout
+                self.closed = False
+                self.writes: list[bytes] = []
+
+            def write(self, value: bytes) -> int:
+                if value.count(b"\n") != 1 or not value.endswith(b"\n"):
+                    raise AssertionError("batch request was not issued one object at a time")
+                self.writes.append(value)
+                self.stdout.add(value[:-1].decode("ascii"))
+                return len(value)
+
+            def flush(self) -> None:
+                pass
+
+            def close(self) -> None:
+                self.closed = True
+
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.stdout = FakeStdout()
+                self.stdin = FakeStdin(self.stdout)
+                self.returncode: int | None = None
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+            def kill(self) -> None:
+                self.returncode = -9
+
+            def wait(self, timeout: int | None = None) -> int:
+                del timeout
+                if self.returncode is None:
+                    self.returncode = 0
+                return self.returncode
+
+        process = FakeProcess()
+        entries = [{"object_id": first_id}, {"object_id": second_id}]
+        with (
+            patch.object(EXPORTER_MODULE.subprocess, "Popen", return_value=process),
+            patch.object(EXPORTER_MODULE, "MAX_TREE_BYTES", 10),
+            patch.object(EXPORTER_MODULE, "MAX_FILE_BYTES", 10),
+        ):
+            with self.assertRaisesRegex(
+                EXPORTER_MODULE.ExportError, "tree exceeds its byte bound"
+            ):
+                EXPORTER_MODULE.read_blobs(Path("/unused"), entries)
+
+        self.assertEqual(
+            process.stdin.writes,
+            [first_id.encode() + b"\n", second_id.encode() + b"\n"],
+        )
+        self.assertEqual(process.stdout.payload_reads, 2)
 
 
 if __name__ == "__main__":

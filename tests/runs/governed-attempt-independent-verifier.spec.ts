@@ -324,7 +324,9 @@ function verificationFixture(options: { repository?: boolean } = {}) {
       provider_handle: "provider-handle-1",
       authorization_binding_digest: decision.authorization.binding_digest,
       input_binding: inputBinding,
-      ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
+      ...(repositoryState
+        ? { repository_corpus: providerRepositoryCorpusBinding(repositoryState.binding) }
+        : {}),
     }),
     bytes({ type: "thread.started", thread_id: "thread-1" }),
     bytes({ type: "turn.started" }),
@@ -526,6 +528,13 @@ function verificationFixture(options: { repository?: boolean } = {}) {
     delegation,
     ...(repositoryState ? { repositoryLifecycle: repositoryState.lifecycle } : {}),
   };
+}
+
+function providerRepositoryCorpusBinding<T extends { workspace_lease_revision: number }>(
+  binding: T
+): Omit<T, "workspace_lease_revision"> {
+  const { workspace_lease_revision: _hostLifecycleRevision, ...providerBinding } = binding;
+  return providerBinding;
 }
 
 function repositoryVerificationLifecycle(input: {

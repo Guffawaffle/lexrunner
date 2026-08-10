@@ -400,7 +400,9 @@ function analyzeProtocol(
     (operation.verification_context?.repository_corpus !== undefined &&
       (!firstRepositoryCorpus ||
         computeCanonicalHash(firstRepositoryCorpus) !==
-          computeCanonicalHash(operation.verification_context.repository_corpus)))
+          computeCanonicalHash(
+            providerRepositoryCorpusBinding(operation.verification_context.repository_corpus)
+          )))
   ) {
     failures.add("protocol_violation");
   }
@@ -492,6 +494,13 @@ function analyzeProtocol(
       : {}),
     ...(terminalTaskOutcome ? { terminalTaskOutcome } : {}),
   };
+}
+
+function providerRepositoryCorpusBinding(
+  binding: NonNullable<GovernedAttemptVerificationContext["repository_corpus"]>
+): Omit<typeof binding, "workspace_lease_revision"> {
+  const { workspace_lease_revision: _hostLifecycleRevision, ...providerBinding } = binding;
+  return providerBinding;
 }
 
 function contentHash(value: string): string {

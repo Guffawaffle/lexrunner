@@ -10,6 +10,7 @@ import stat
 import struct
 import subprocess
 import sys
+import threading
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
@@ -22,6 +23,8 @@ MAX_TREE_BYTES = 32 * 1024 * 1024
 MAX_PATCH_BYTES = 8 * 1024 * 1024
 MAX_FILES = 4_096
 MAX_GIT_METADATA_BYTES = 4 * 1024 * 1024
+MAX_BATCH_HEADER_BYTES = 256
+GIT_EXPORT_TIMEOUT_SECONDS = 60
 GIT = Path("/usr/bin/git")
 
 
@@ -389,7 +392,6 @@ def parse_tree(worktree: Path, candidate: str) -> list[dict[str, Any]]:
 
 
 def read_blobs(worktree: Path, entries: list[dict[str, Any]]) -> list[bytes]:
-    request = b"".join(entry["object_id"].encode("ascii") + b"\n" for entry in entries)
     process = subprocess.Popen(
         git_command(worktree, ("cat-file", "--batch")),
         stdin=subprocess.PIPE,
@@ -398,50 +400,89 @@ def read_blobs(worktree: Path, entries: list[dict[str, Any]]) -> list[bytes]:
         close_fds=True,
         env=git_environment(),
     )
-    try:
-        output, _stderr = process.communicate(input=request, timeout=60)
-    except subprocess.TimeoutExpired as error:
+    if process.stdin is None or process.stdout is None:
         process.kill()
-        process.wait(timeout=10)
-        raise ExportError("Git object export timed out") from error
-    if process.returncode != 0 or len(output) > MAX_TREE_BYTES + MAX_GIT_METADATA_BYTES:
-        fail("Git object export failed or exceeded its bound")
+        fail("Git object export pipes are unavailable")
+
+    timed_out = threading.Event()
+
+    def terminate_on_timeout() -> None:
+        timed_out.set()
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+    timer = threading.Timer(GIT_EXPORT_TIMEOUT_SECONDS, terminate_on_timeout)
+    timer.daemon = True
+    timer.start()
     blobs: list[bytes] = []
-    offset = 0
     total = 0
-    for entry in entries:
-        newline = output.find(b"\n", offset)
-        if newline < 0:
-            fail("Git object export header is truncated")
+    try:
+        for entry in entries:
+            process.stdin.write(entry["object_id"].encode("ascii") + b"\n")
+            process.stdin.flush()
+            header_line = process.stdout.readline(MAX_BATCH_HEADER_BYTES + 1)
+            if timed_out.is_set():
+                raise ExportError("Git object export timed out")
+            if not header_line.endswith(b"\n") or len(header_line) > MAX_BATCH_HEADER_BYTES:
+                fail("Git object export header is truncated or exceeds its bound")
+            try:
+                header = header_line[:-1].decode("ascii").split(" ")
+            except UnicodeDecodeError as error:
+                raise ExportError("Git object export header is invalid") from error
+            if len(header) != 3 or header[0] != entry["object_id"] or header[1] != "blob":
+                fail("Git object export binding is invalid")
+            try:
+                size = int(header[2])
+            except ValueError as error:
+                raise ExportError("Git object export size is invalid") from error
+            if size < 0 or size > MAX_FILE_BYTES:
+                fail("Repository corpus file exceeds its bound")
+            total += size
+            if total > MAX_TREE_BYTES:
+                fail("Repository corpus tree exceeds its byte bound")
+            content = read_exact_blob_bytes(process.stdout, size, timed_out)
+            if read_exact_blob_bytes(process.stdout, 1, timed_out) != b"\n":
+                fail("Git object export payload is truncated")
+            if git_blob_object_id(content, entry["object_id"]) != entry["object_id"]:
+                fail("Git blob content does not match its tree object identifier")
+            blobs.append(content)
+            entry["byte_length"] = size
+            entry["content_hash"] = content_hash(content)
+        process.stdin.close()
         try:
-            header = output[offset:newline].decode("ascii").split(" ")
-        except UnicodeDecodeError as error:
-            raise ExportError("Git object export header is invalid") from error
-        if len(header) != 3 or header[0] != entry["object_id"] or header[1] != "blob":
-            fail("Git object export binding is invalid")
-        try:
-            size = int(header[2])
-        except ValueError as error:
-            raise ExportError("Git object export size is invalid") from error
-        if size < 0 or size > MAX_FILE_BYTES:
-            fail("Repository corpus file exceeds its bound")
-        start = newline + 1
-        end = start + size
-        if end >= len(output) or output[end : end + 1] != b"\n":
+            return_code = process.wait(timeout=10)
+        except subprocess.TimeoutExpired as error:
+            raise ExportError("Git object export timed out") from error
+        if timed_out.is_set():
+            raise ExportError("Git object export timed out")
+        if return_code != 0 or process.stdout.read(1):
+            fail("Git object export failed or contains trailing bytes")
+        return blobs
+    finally:
+        timer.cancel()
+        if not process.stdin.closed:
+            process.stdin.close()
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
+def read_exact_blob_bytes(
+    stream: Any, length: int, timed_out: threading.Event
+) -> bytes:
+    chunks: list[bytes] = []
+    remaining = length
+    while remaining:
+        chunk = stream.read(remaining)
+        if not chunk:
+            if timed_out.is_set():
+                raise ExportError("Git object export timed out")
             fail("Git object export payload is truncated")
-        content = output[start:end]
-        if git_blob_object_id(content, entry["object_id"]) != entry["object_id"]:
-            fail("Git blob content does not match its tree object identifier")
-        blobs.append(content)
-        entry["byte_length"] = size
-        entry["content_hash"] = content_hash(content)
-        total += size
-        if total > MAX_TREE_BYTES:
-            fail("Repository corpus tree exceeds its byte bound")
-        offset = end + 1
-    if offset != len(output):
-        fail("Git object export contains trailing bytes")
-    return blobs
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
 
 
 def export_patch(worktree: Path, base: str, candidate: str) -> bytes:
