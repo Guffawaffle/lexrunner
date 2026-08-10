@@ -34,6 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - **Governed refusal and budget enforcement** - Persist an offer-phase `NO` directly from the
   offered Delegation state, and independently reject duration, output, evidence-byte, or tool-call
   usage beyond the exact task budget bound to execution requirements and the evidence reservation.
+- **Generic continuation and outcome isolation** - Deny both direct work and post-`ACCEPT`
+  continuation when the durable generic task/execution binding is absent, keep unbound legacy
+  offers refusal-only, reject contradictory `PASS` output with blocking findings, and make generic
+  results and verification receipts accept profile-owned outcome identifiers without embedding the
+  code-review vocabulary.
 - **Git object substitution defense** - Verify every exported file against the blob object ID in
   the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
   both the Windows corpus parser and provider boundary.

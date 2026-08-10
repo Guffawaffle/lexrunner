@@ -14,6 +14,14 @@ const opaqueId = z
 const instant = z.string().datetime({ offset: true });
 const gitObjectId = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
 
+/** Profile-owned terminal outcome identifier; only the sentinels are generic. */
+export const GovernedTaskOutcome_v1 = opaqueId;
+export type GovernedTaskOutcome_v1 = z.infer<typeof GovernedTaskOutcome_v1>;
+
+export function isProducedGovernedTaskOutcome(outcome: string): boolean {
+  return outcome !== "not_produced" && outcome !== "invalid";
+}
+
 export const GovernedControlId = z.enum([
   "corpus_read_scope",
   "filesystem_write_denied",
@@ -379,7 +387,7 @@ export const GovernedAttemptResult_v1 = z
     delegation_id: opaqueId,
     authorization_binding_digest: SHA256Hash,
     worker_outcome: z.enum(["completed", "declined", "failed", "cancelled", "lost"]),
-    task_outcome: z.enum(["pass", "block", "not_produced", "invalid"]),
+    task_outcome: GovernedTaskOutcome_v1,
     authorization_outcome: z.enum(["valid", "invalid", "expired"]),
     evidence_outcome: z.enum(["sufficient", "insufficient", "violated"]),
     admissibility: z.enum(["admissible", "inadmissible"]),
@@ -390,14 +398,15 @@ export const GovernedAttemptResult_v1 = z
     if (
       value.admissibility === "admissible" &&
       (value.worker_outcome !== "completed" ||
-        !["pass", "block"].includes(value.task_outcome) ||
+        !isProducedGovernedTaskOutcome(value.task_outcome) ||
         value.authorization_outcome !== "valid" ||
         value.evidence_outcome !== "sufficient")
     ) {
       context.addIssue({
         code: "custom",
         path: ["admissibility"],
-        message: "admissibility requires completed work, a task verdict, and valid evidence",
+        message:
+          "admissibility requires completed work, a produced profile outcome, and valid evidence",
       });
     }
   });

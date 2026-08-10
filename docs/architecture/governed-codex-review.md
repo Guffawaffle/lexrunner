@@ -48,7 +48,9 @@ safe operation event, resolves the protected generic task and attenuated grant, 
 qualified adapter and per-capability enforcement receipts, authorizes the exact `authorized_work`
 invocation, and only then sends the compatibility authorization on stdin to `continue`. The legacy
 read-only tool grant must describe exactly the same selected capability dimensions, so it cannot
-bypass or silently expand the generic grant. That gate is idempotent. Restart recovery replays it
+bypass or silently expand the generic grant. If either the generic task or its execution binding is
+absent, a legacy offer remains refusal-only: direct work is denied and `ACCEPT` is durably recorded
+but cannot cross the continuation boundary. That gate is idempotent. Restart recovery replays it
 when a crash occurs after durable ACCEPT but before continuation; it cannot invent an acceptance.
 
 ## Refusal
@@ -132,7 +134,10 @@ contracts, objective, model provider, sealed-corpus read scope, budgets, and ind
 The verifier reconstructs the expected profile from the prompt hash, output-schema hash, and
 independently attested corpus identity, then requires an exact task hash and offer-provider match.
 The generic verifier dispatches outcome interpretation through that exact profile/verifier binding;
-only the `code-review` profile maps its own `PASS`/`BLOCK` vocabulary to coordination outcomes.
+only the `code-review` profile maps its own `PASS`/`BLOCK` vocabulary to coordination outcomes, and
+it treats `PASS` with any blocking finding as invalid. Generic provider claims, results, status
+projections, and independent receipts carry a bounded profile-owned outcome identifier rather than
+enumerating review verdicts; the receipt accepts it only after the exact profile verifier succeeds.
 Duration and output limits are independently cross-checked against the authorization requirements;
 evidence bytes and tool-call limits are cross-checked against the durable evidence reservation. The
 verifier then measures the independently read capture lifetime, final output bytes, total protected

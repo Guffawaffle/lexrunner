@@ -199,6 +199,23 @@ describe("governed Attempt executor contracts", () => {
     ).not.toThrow();
   });
 
+  it("admits a produced outcome identifier owned by a non-review task profile", () => {
+    expect(() =>
+      GovernedAttemptResult_v1.parse({
+        schema_version: "1.0.0",
+        attempt_id: "attempt-1",
+        delegation_id: "delegation-1",
+        authorization_binding_digest: hash("authorization"),
+        worker_outcome: "completed",
+        task_outcome: "artifact_published",
+        authorization_outcome: "valid",
+        evidence_outcome: "sufficient",
+        admissibility: "admissible",
+        evidence_refs: [hash("evidence")],
+      })
+    ).not.toThrow();
+  });
+
   it("forbids admissibility when authorization is invalid", () => {
     expect(() =>
       GovernedAttemptResult_v1.parse({

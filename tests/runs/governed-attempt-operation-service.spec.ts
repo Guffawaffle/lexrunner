@@ -34,7 +34,7 @@ const hash = (value: string) => computeCanonicalHash({ value });
 const at = (seconds: number) => `2026-08-09T11:00:${String(seconds).padStart(2, "0")}.000Z`;
 
 describe("GovernedAttemptOperationService", () => {
-  it("starts only after the accepted Delegation and exact authorization are bound", async () => {
+  it("denies accepted legacy work that has no governed task execution binding", async () => {
     const store = new InMemoryGovernedAttemptOperationStore();
     const fixture = authorizationFixture();
     await acceptDelegation(store, fixture.authorization.grant);
@@ -49,12 +49,8 @@ describe("GovernedAttemptOperationService", () => {
       outputSchema: { type: "object" },
       now: at(3),
     });
-    expect(result).toEqual({
-      started: true,
-      operationId: "operation-1",
-      idempotentReplay: false,
-    });
-    expect(executor.startCount).toBe(1);
+    expect(result).toEqual({ started: false, reason: "authorization_denied" });
+    expect(executor.startCount).toBe(0);
     await store.close();
   });
 
@@ -82,7 +78,7 @@ describe("GovernedAttemptOperationService", () => {
     await store.close();
   });
 
-  it("latches worker ACCEPT before releasing authorized work", async () => {
+  it("latches legacy ACCEPT but denies continuation without a governed task", async () => {
     const store = new InMemoryGovernedAttemptOperationStore();
     const fixture = authorizationFixture();
     await createOfferedDelegation(store, fixture.authorization.grant);
@@ -106,12 +102,13 @@ describe("GovernedAttemptOperationService", () => {
       event("executor_event", 3),
       event("completed", 4),
     ]);
-    await expect(observation).resolves.toMatchObject({ terminal: true, status: "completed" });
-    expect(executor.continueCount).toBe(1);
+    await expect(observation).resolves.toMatchObject({ terminal: true, status: "cancelled" });
+    expect(executor.continueCount).toBe(0);
+    expect(executor.cancelCount).toBe(1);
     expect((await store.getDelegation("delegation-1"))?.status).toBe("accepted");
     expect(
       (await store.listAttemptOperationEvents("operation-1")).map((entry) => entry.event.type)
-    ).toEqual(["started", "accepted", "executor_event", "completed"]);
+    ).toEqual(["started", "accepted", "cancelled"]);
     await store.close();
   });
 
@@ -162,21 +159,9 @@ describe("GovernedAttemptOperationService", () => {
   });
 
   it("replays an authorized continuation after a crash following durable ACCEPT", async () => {
-    const store = new InMemoryGovernedAttemptOperationStore();
-    const fixture = authorizationFixture();
-    await createOfferedDelegation(store, fixture.authorization.grant);
-    const firstExecutor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
-    const service = new GovernedAttemptOperationService(store, () => at(9));
-    const started = await service.start(firstExecutor, {
-      operationMutationId: "operation-create",
-      authorizationMutationId: "delegation-offer-authorize",
-      authorization: fixture.authorization,
-      invocation: invocation(fixture.authorization, "offer"),
-      prompt: Buffer.from("synthetic prompt"),
-      outputSchema: { type: "object" },
-      now: at(3),
-    });
-    expect(started).toMatchObject({ started: true });
+    const fixture = await governedTaskOfferFixture();
+    const { store, service } = fixture;
+    expect(fixture.started).toMatchObject({ started: true });
 
     const offer = (await store.getDelegation("delegation-1"))!.state.offer;
     await store.recordDelegationDecision({
@@ -278,26 +263,10 @@ describe("GovernedAttemptOperationService", () => {
   });
 
   it("persists evidence reconstruction metadata without persisting the sink token", async () => {
-    const store = new InMemoryGovernedAttemptOperationStore();
-    const fixture = authorizationFixture();
-    await acceptDelegation(store, fixture.authorization.grant);
-    const executor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
-    const service = new GovernedAttemptOperationService(store, () => at(5));
-    const binding = evidenceBinding(fixture.authorization);
-    const started = await service.start(executor, {
-      operationMutationId: "operation-create",
-      authorizationMutationId: "delegation-authorize",
-      authorization: fixture.authorization,
-      invocation: invocation(fixture.authorization),
-      prompt: Buffer.from("synthetic prompt"),
-      outputSchema: { type: "object" },
-      evidence: binding.capture,
-      evidenceReservation: binding.reservation,
-      verificationContext: fixture.verificationContext,
-      now: at(3),
-    });
-    expect(started).toMatchObject({ started: true });
-    expect(executor.startEvidence).toBe(binding.capture);
+    const fixture = await governedTaskOfferFixture({ acceptedBeforeStart: true });
+    expect(fixture.started).toMatchObject({ started: true });
+    expect(fixture.executor.startEvidence).toBe(fixture.evidence.capture);
+    const { store } = fixture;
     const persisted = await store.getAttemptOperation("operation-1");
     expect(persisted).toMatchObject({
       evidence_reservation: { capture_id: "capture-1" },
@@ -308,21 +277,12 @@ describe("GovernedAttemptOperationService", () => {
   });
 
   it("detaches an aborted observer without cancelling or falsely losing the provider", async () => {
-    const store = new InMemoryGovernedAttemptOperationStore();
-    const fixture = authorizationFixture();
-    await acceptDelegation(store, fixture.authorization.grant);
+    const fixture = await governedTaskOfferFixture({ acceptedBeforeStart: true });
+    if (!fixture.started.started) {
+      throw new Error(`failed to start abort fixture: ${fixture.started.reason}`);
+    }
+    const { store, service } = fixture;
     const executor = new AbortAwareExecutor(handle(fixture.authorization.binding_digest));
-    const service = new GovernedAttemptOperationService(store, () => at(5));
-    const started = await service.start(executor, {
-      operationMutationId: "operation-create",
-      authorizationMutationId: "delegation-authorize",
-      authorization: fixture.authorization,
-      invocation: invocation(fixture.authorization),
-      prompt: Buffer.from("synthetic prompt"),
-      outputSchema: { type: "object" },
-      now: at(3),
-    });
-    if (!started.started) throw new Error(`failed to start abort fixture: ${started.reason}`);
     const controller = new AbortController();
     const observation = service.observeToTerminal(executor, "operation-1", controller.signal);
     controller.abort();
@@ -424,22 +384,11 @@ class DeferredExecutor implements AttemptExecutor {
 }
 
 async function runningFixture() {
-  const store = new InMemoryGovernedAttemptOperationStore();
-  const fixture = authorizationFixture();
-  await acceptDelegation(store, fixture.authorization.grant);
-  const executor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
-  const service = new GovernedAttemptOperationService(store, () => at(5));
-  const started = await service.start(executor, {
-    operationMutationId: "operation-create",
-    authorizationMutationId: "delegation-authorize",
-    authorization: fixture.authorization,
-    invocation: invocation(fixture.authorization),
-    prompt: Buffer.from("synthetic prompt"),
-    outputSchema: { type: "object" },
-    now: at(3),
-  });
-  if (!started.started) throw new Error(`failed to start fixture: ${started.reason}`);
-  return { store, service, executor };
+  const fixture = await governedTaskOfferFixture({ acceptedBeforeStart: true });
+  if (!fixture.started.started) {
+    throw new Error(`failed to start fixture: ${fixture.started.reason}`);
+  }
+  return fixture;
 }
 
 async function governedTaskOfferFixture(
@@ -582,7 +531,7 @@ async function governedTaskOfferFixture(
     verificationContext,
     now: at(3),
   });
-  return { store, service, executor, started };
+  return { store, service, executor, started, evidence, authorization: fixture.authorization };
 }
 
 function authorizationFixture() {

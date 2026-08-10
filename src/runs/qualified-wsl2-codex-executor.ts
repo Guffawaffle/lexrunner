@@ -12,6 +12,7 @@ import {
   EnvironmentAttestation_v1,
   ExecutorAttestation_v1,
   GovernedAttemptResult_v1,
+  GovernedTaskOutcome_v1,
   WorkspaceAttestation_v1,
   type AttemptAuthorization_v1 as AttemptAuthorization,
   type AttemptExecutor,
@@ -76,7 +77,7 @@ export interface QualifiedCodexProviderLaunchReceipt {
 }
 
 export interface QualifiedCodexProviderClaim {
-  taskOutcome: "pass" | "block" | "not_produced" | "invalid";
+  taskOutcome: string;
 }
 
 export const QualifiedCodexLaunchInputBinding_v1 = z
@@ -455,7 +456,7 @@ function launchReceipt(candidate: QualifiedCodexProviderLaunchReceipt) {
 function providerClaim(candidate: QualifiedCodexProviderClaim) {
   return z
     .object({
-      taskOutcome: z.enum(["pass", "block", "not_produced", "invalid"]),
+      taskOutcome: GovernedTaskOutcome_v1,
     })
     .strict()
     .parse(candidate);

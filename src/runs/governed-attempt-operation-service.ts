@@ -177,20 +177,23 @@ export class GovernedAttemptOperationService {
     ) {
       return { started: false, reason: "binding_mismatch" };
     }
-    if (
-      !offerLaunch &&
-      verificationContext?.governed_task &&
-      (!verificationContext.task_execution ||
+    if (!offerLaunch) {
+      const task = verificationContext?.governed_task;
+      const execution = verificationContext?.task_execution;
+      if (
+        !task ||
+        !execution ||
         !(await evaluateBoundTaskExecution({
           attemptId: authorization.attempt_id,
           delegationId: authorization.delegation_id,
-          task: verificationContext.governed_task,
-          execution: verificationContext.task_execution,
+          task,
+          execution,
           delegationState: delegation.state,
           evaluatedAt: input.now,
-        })))
-    ) {
-      return { started: false, reason: "authorization_denied" };
+        }))
+      ) {
+        return { started: false, reason: "authorization_denied" };
+      }
     }
     const permit = await this.store.authorizeDelegationInvocation({
       mutationId: input.authorizationMutationId,
@@ -518,7 +521,7 @@ export class GovernedAttemptOperationService {
   ): Promise<boolean> {
     const context = record.verification_context;
     const task = context?.governed_task;
-    if (!task) return true;
+    if (!task) return false;
     const execution = context.task_execution;
     if (!execution) return false;
     const delegation = await this.store.getDelegation(record.delegation_id);

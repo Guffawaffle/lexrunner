@@ -4,7 +4,9 @@ import {
   EnvironmentAttestation_v1,
   ExecutorAttestation_v1,
   GovernedReviewRequirements_v1,
+  GovernedTaskOutcome_v1,
   WorkspaceAttestation_v1,
+  isProducedGovernedTaskOutcome,
 } from "./governed-attempt-executor.js";
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import {
@@ -242,7 +244,7 @@ const verificationReceiptBody = z
     capture_root: SHA256Hash,
     capture_verification_hash: SHA256Hash,
     decision: z.enum(["accepted", "rejected"]),
-    task_outcome: z.enum(["pass", "block", "not_produced", "invalid"]),
+    task_outcome: GovernedTaskOutcome_v1,
     admissibility: z.enum(["admissible", "inadmissible"]),
     failure_codes: z.array(GovernedAttemptVerificationFailureCode).max(32),
     verified_at: instant,
@@ -258,12 +260,13 @@ export const GovernedAttemptVerificationReceipt_v1 = verificationReceiptBody
     if (
       accepted !== (value.admissibility === "admissible") ||
       accepted !== (value.failure_codes.length === 0) ||
-      (accepted && !["pass", "block"].includes(value.task_outcome))
+      (accepted && !isProducedGovernedTaskOutcome(value.task_outcome))
     ) {
       context.addIssue({
         code: "custom",
         path: ["decision"],
-        message: "accepted verification requires an admissible PASS/BLOCK and no failures",
+        message:
+          "accepted verification requires an admissible produced profile outcome and no failures",
       });
     }
     const { receipt_hash: _receiptHash, ...body } = value;
