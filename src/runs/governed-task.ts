@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { SHA256Hash, computeCanonicalHash } from "../schemas/task-contract.js";
 import {
+  DelegationProtocolState_v1,
   DelegatedAuthorityGrant_v1,
   type DelegatedAuthorityCapability_v1,
   computeAuthorityGrantHash,
@@ -224,6 +225,16 @@ export function createGovernedTaskSpec(
   });
 }
 
+/** Canonical binding used by a parent's delegation effect to authorize one child task ceiling. */
+export function computeGovernedTaskCapabilityCeilingHash(
+  capabilities: readonly GovernedTaskCapability_v1[]
+): string {
+  const parsed = capabilities
+    .map((capability) => GovernedTaskCapability_v1.parse(capability))
+    .sort((left, right) => compareCanonicalStrings(left.capability_id, right.capability_id));
+  return computeCanonicalHash(parsed);
+}
+
 export type GovernedTaskGrantEvaluation =
   | {
       permitted: true;
@@ -235,9 +246,11 @@ export type GovernedTaskGrantEvaluation =
       reason:
         | "invalid_authority_selection"
         | "authority_unavailable"
+        | "delegation_not_accepted"
         | "grant_not_active"
         | "identity_mismatch"
         | "invalid_grant_chain"
+        | "provider_mismatch"
         | "capability_expansion";
     };
 
@@ -337,14 +350,24 @@ export type GovernedTaskAuthoritySelection_v1 = z.infer<typeof GovernedTaskAutho
 
 const GovernedTaskAuthorityResolution_v1 = z
   .object({
-    task: GovernedTaskSpec_v1,
+    task_chain: z.array(GovernedTaskSpec_v1).min(1).max(32),
     grant_chain: z.array(DelegatedAuthorityGrant_v1).min(1).max(32),
+    delegation: DelegationProtocolState_v1,
   })
-  .strict();
+  .strict()
+  .superRefine((resolution, context) => {
+    if (resolution.task_chain.length !== resolution.grant_chain.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["task_chain"],
+        message: "task and grant chains must have the same length",
+      });
+    }
+  });
 
 /**
- * Trusted host port. Implementations resolve only protected task/grant records and must authorize
- * the root operator issuer before returning a chain. Caller-provided grant bodies are never input.
+ * Trusted host port. Implementations resolve only protected task/grant/delegation records, authorize
+ * the root operator issuer, and return the accepted offer. Caller-provided bodies are never input.
  */
 export interface GovernedTaskGrantAuthority {
   resolveAuthorizedTaskGrant(input: {
@@ -382,7 +405,8 @@ export async function evaluateGovernedTaskGrant(
   if (candidate === null) return { permitted: false, reason: "authority_unavailable" };
   const resolution = GovernedTaskAuthorityResolution_v1.safeParse(candidate);
   if (!resolution.success) return { permitted: false, reason: "authority_unavailable" };
-  const { task, grant_chain: grantChain } = resolution.data;
+  const { task_chain: taskChain, grant_chain: grantChain, delegation } = resolution.data;
+  const task = taskChain[taskChain.length - 1]!;
   const grant = grantChain[grantChain.length - 1]!;
   if (
     task.attempt_id !== selection.data.attempt_id ||
@@ -394,12 +418,32 @@ export async function evaluateGovernedTaskGrant(
   ) {
     return { permitted: false, reason: "identity_mismatch" };
   }
+  if (delegation.status !== "accepted") {
+    return { permitted: false, reason: "delegation_not_accepted" };
+  }
+  if (
+    delegation.offer.attempt_id !== selection.data.attempt_id ||
+    delegation.offer.delegation_id !== selection.data.delegation_id ||
+    delegation.offer.task_offer_hash !== selection.data.task_spec_hash ||
+    delegation.offer.authority_grant_hash !== selection.data.authority_grant_hash
+  ) {
+    return { permitted: false, reason: "identity_mismatch" };
+  }
+  if (delegation.offer.worker.provider_id !== task.authorized_model_provider) {
+    return { permitted: false, reason: "provider_mismatch" };
+  }
   if (grantChain[0]!.issuer.kind !== "operator") {
     return { permitted: false, reason: "invalid_grant_chain" };
   }
+  for (let index = 0; index < grantChain.length - 1; index += 1) {
+    if (!taskAndGrantAlign(taskChain[index]!, grantChain[index]!)) {
+      return { permitted: false, reason: "invalid_grant_chain" };
+    }
+  }
   for (let index = 1; index < grantChain.length; index += 1) {
     if (
-      !evaluateDelegatedAuthorityContainment(grantChain[index - 1], grantChain[index]).contained
+      !evaluateDelegatedAuthorityContainment(grantChain[index - 1], grantChain[index]).contained ||
+      !taskAuthorizesChildCeiling(taskChain[index - 1]!, grantChain[index - 1]!, taskChain[index]!)
     ) {
       return { permitted: false, reason: "invalid_grant_chain" };
     }
@@ -498,6 +542,34 @@ function capabilityKey(
     capability_id: capability.capability_id,
     scope_hash: capability.scope_hash,
   });
+}
+
+function taskAndGrantAlign(task: GovernedTaskSpec_v1, grant: DelegatedAuthorityGrant_v1): boolean {
+  if (task.attempt_id !== grant.attempt_id || task.delegation_id !== grant.delegation_id) {
+    return false;
+  }
+  const ceiling = new Set(task.capability_ceiling.map((capability) => capabilityKey(capability)));
+  return grant.capabilities.every((capability) => ceiling.has(capabilityKey(capability)));
+}
+
+function taskAuthorizesChildCeiling(
+  parentTask: GovernedTaskSpec_v1,
+  parentGrant: DelegatedAuthorityGrant_v1,
+  childTask: GovernedTaskSpec_v1
+): boolean {
+  const grantedDelegations = new Set(
+    parentGrant.capabilities
+      .filter(({ dimension }) => dimension === "nested_delegation")
+      .map((capability) => capabilityKey(capability))
+  );
+  const childCeilingHash = computeGovernedTaskCapabilityCeilingHash(childTask.capability_ceiling);
+  return parentTask.capability_ceiling.some(
+    (capability) =>
+      capability.dimension === "nested_delegation" &&
+      grantedDelegations.has(capabilityKey(capability)) &&
+      capability.effect.class === "delegation" &&
+      capability.effect.child_authority_ceiling_hash === childCeilingHash
+  );
 }
 
 function compareCanonicalStrings(left: string, right: string): number {

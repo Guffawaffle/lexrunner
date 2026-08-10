@@ -19,11 +19,16 @@ Every governed task composes the same lifecycle:
 6. the executor emits bounded events and protected evidence for independent verification.
 
 The caller supplies only the Attempt, Delegation, task-spec hash, and authority-grant hash. A trusted
-host grant authority resolves the exact protected task plus the complete grant chain and authorizes
-the root operator issuer. The evaluator rechecks every identity and hash, requires the selected grant
-to be active at the explicit authorization instant, and verifies every delegated link with the
-shared attenuation evaluator. Caller-supplied task or grant bodies are never authority, and a child
-cannot claim a capability its protected parent did not hold.
+host grant authority resolves aligned protected task/grant chains, authorizes the root operator
+issuer, and supplies the protected accepted offer. The evaluator rechecks every identity and hash,
+binds the selected task hash and grant hash to that offer, verifies its worker provider against the
+task-authorized provider, and requires the selected grant to be active at the explicit authorization
+instant. Caller-supplied task, grant, provider, or offer bodies are never authority.
+
+Every delegated link passes the shared exact-subset attenuation evaluator. It must also carry a
+granted `nested_delegation` capability whose effect hash exactly binds the protected child task's
+canonical capability ceiling. A child therefore cannot claim authority its parent did not hold or
+authority excluded by the parent's child-ceiling decision.
 
 The caller likewise selects only an adapter identity and version; a trusted host qualification
 authority resolves the exact manifest and an active qualification receipt bound to its hash and

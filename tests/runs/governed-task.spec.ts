@@ -4,11 +4,15 @@ import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import {
   DelegatedAuthorityGrant_v1,
   computeAuthorityGrantHash,
+  createDelegationDecisionReceipt,
+  createDelegationProtocolState,
+  recordDelegationDecision,
   type DelegatedAuthorityCapability_v1,
 } from "../../src/runs/governed-attempt-protocol.js";
 import {
   GovernedTaskCapability_v1,
   GovernedTaskSpec_v1,
+  computeGovernedTaskCapabilityCeilingHash,
   createGovernedTaskAdapterQualification,
   createGovernedTaskSpec,
   evaluateGovernedTaskGrant,
@@ -132,25 +136,48 @@ describe("generic governed task capabilities", () => {
     ).toEqual({ permitted: false, reason: "invalid_authority_selection" });
   });
 
+  it("binds authorization to the protected accepted offer and task provider", async () => {
+    const task = taskSpec();
+    const selectedGrant = grant(task, {
+      dimension: "filesystem_read",
+      capability_id: "read-input",
+      scope_hash: hash("1"),
+    });
+    const selection = authoritySelection(task, selectedGrant);
+
+    expect(
+      await evaluateGovernedTaskGrant(
+        selection,
+        taskGrantAuthority(task, [selectedGrant], { providerId: "other-provider" }),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "provider_mismatch" });
+    expect(
+      await evaluateGovernedTaskGrant(
+        selection,
+        taskGrantAuthority(task, [selectedGrant], { taskOfferHash: hash("f") }),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "identity_mismatch" });
+    expect(
+      await evaluateGovernedTaskGrant(
+        selection,
+        taskGrantAuthority(task, [selectedGrant], { accepted: false }),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "delegation_not_accepted" });
+  });
+
   it("verifies protected delegation ancestry before accepting child capabilities", async () => {
     const task = taskSpec();
-    const parent = DelegatedAuthorityGrant_v1.parse({
-      schema_version: "1.0.0",
-      grant_id: "grant-parent",
-      attempt_id: task.attempt_id,
-      delegation_id: "delegation-parent",
-      issuer: { kind: "operator", principal_id: "operator-1" },
-      capabilities: [
-        {
-          dimension: "filesystem_read",
-          capability_id: "read-input",
-          scope_hash: hash("1"),
-        },
-      ],
-      issued_at: "2026-08-10T06:00:00.000Z",
-      not_before: "2026-08-10T06:00:00.000Z",
-      expires_at: "2026-08-10T07:00:00.000Z",
-    });
+    const readOnlyChildCeiling = computeGovernedTaskCapabilityCeilingHash([
+      task.capability_ceiling.find(({ capability_id: id }) => id === "read-input")!,
+    ]);
+    const restrictedParentTask = parentTaskSpec(task, readOnlyChildCeiling);
+    const parent = grant(
+      restrictedParentTask,
+      ...restrictedParentTask.capability_ceiling.map(grantCapability)
+    );
     const childBody = {
       schema_version: "1.0.0" as const,
       grant_id: "grant-child",
@@ -175,19 +202,42 @@ describe("generic governed task capabilities", () => {
     expect(
       await evaluateGovernedTaskGrant(
         authoritySelection(task, expandedChild),
-        taskGrantAuthority(task, [parent, expandedChild]),
+        taskGrantAuthority(task, [parent, expandedChild], {
+          taskChain: [restrictedParentTask, task],
+        }),
         activeAt()
       )
     ).toEqual({ permitted: false, reason: "invalid_grant_chain" });
 
+    const authorizedParentTask = parentTaskSpec(
+      task,
+      computeGovernedTaskCapabilityCeilingHash(task.capability_ceiling)
+    );
+    const authorizedParent = grant(
+      authorizedParentTask,
+      ...authorizedParentTask.capability_ceiling.map(grantCapability)
+    );
     const attenuatedChild = DelegatedAuthorityGrant_v1.parse({
       ...childBody,
-      capabilities: parent.capabilities,
+      issuer: {
+        kind: "delegation",
+        delegation_id: authorizedParent.delegation_id,
+      },
+      parent_grant_hash: computeAuthorityGrantHash(authorizedParent),
+      capabilities: [
+        {
+          dimension: "filesystem_read",
+          capability_id: "read-input",
+          scope_hash: hash("1"),
+        },
+      ],
     });
     expect(
       await evaluateGovernedTaskGrant(
         authoritySelection(task, attenuatedChild),
-        taskGrantAuthority(task, [parent, attenuatedChild]),
+        taskGrantAuthority(task, [authorizedParent, attenuatedChild], {
+          taskChain: [authorizedParentTask, task],
+        }),
         activeAt()
       )
     ).toMatchObject({
@@ -439,6 +489,47 @@ function taskSpec() {
   });
 }
 
+function parentTaskSpec(task: ReturnType<typeof taskSpec>, childCeilingHash: string) {
+  return createGovernedTaskSpec({
+    schema_version: "1.0.0",
+    attempt_id: task.attempt_id,
+    delegation_id: "delegation-parent",
+    objective_hash: hash("8"),
+    authorized_model_provider: task.authorized_model_provider,
+    profile: {
+      profile_id: "task-delegator",
+      profile_version: "1.0.0",
+      input_contract_hash: hash("a"),
+      output_contract_hash: hash("b"),
+      verifier_id: "task-delegator-verifier",
+      verifier_version: "1.0.0",
+    },
+    input_binding_hash: hash("9"),
+    capability_ceiling: [
+      ...task.capability_ceiling,
+      {
+        dimension: "nested_delegation",
+        capability_id: "delegate-child",
+        scope_hash: hash("d"),
+        minimum_enforcement: "enforced",
+        effect: {
+          class: "delegation",
+          child_authority_ceiling_hash: childCeilingHash,
+        },
+      },
+    ],
+    budget: task.budget,
+  });
+}
+
+function grantCapability(capability: GovernedTaskCapability_v1): DelegatedAuthorityCapability_v1 {
+  return {
+    dimension: capability.dimension,
+    capability_id: capability.capability_id,
+    scope_hash: capability.scope_hash,
+  };
+}
+
 function grant(
   task: ReturnType<typeof taskSpec>,
   ...capabilities: DelegatedAuthorityCapability_v1[]
@@ -470,11 +561,51 @@ function authoritySelection(
 
 function taskGrantAuthority(
   task: ReturnType<typeof taskSpec>,
-  grantChain: DelegatedAuthorityGrant_v1[]
+  grantChain: DelegatedAuthorityGrant_v1[],
+  options: {
+    taskChain?: GovernedTaskSpec_v1[];
+    providerId?: string;
+    taskOfferHash?: string;
+    accepted?: boolean;
+  } = {}
 ) {
+  const selectedGrant = grantChain[grantChain.length - 1]!;
+  const offer = {
+    schema_version: "1.0.0" as const,
+    delegation_id: task.delegation_id,
+    attempt_id: task.attempt_id,
+    worker: {
+      provider_id: options.providerId ?? task.authorized_model_provider,
+      worker_id: "worker-1",
+      thread_id: "thread-1",
+    },
+    task_offer_hash: options.taskOfferHash ?? task.task_spec_hash,
+    requirements_hash: hash("6"),
+    authority_grant_hash: computeAuthorityGrantHash(selectedGrant),
+    transcript_start_hash: hash("7"),
+    offered_at: "2026-08-10T06:00:00.000Z",
+  };
+  let delegation = createDelegationProtocolState(offer);
+  if (options.accepted !== false) {
+    const decision = recordDelegationDecision(
+      delegation,
+      createDelegationDecisionReceipt({
+        offer,
+        decision: "ACCEPT",
+        decisionReceiptId: "decision-1",
+        decidedAt: "2026-08-10T06:01:00.000Z",
+      })
+    );
+    if (!decision.recorded) throw new Error(`test delegation rejected: ${decision.reason}`);
+    delegation = decision.state;
+  }
   return {
     async resolveAuthorizedTaskGrant() {
-      return { task, grant_chain: grantChain };
+      return {
+        task_chain: options.taskChain ?? [task],
+        grant_chain: grantChain,
+        delegation,
+      };
     },
   };
 }
