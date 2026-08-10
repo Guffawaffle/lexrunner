@@ -31,6 +31,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- **Governed refusal and budget enforcement** - Persist an offer-phase `NO` directly from the
+  offered Delegation state, and independently reject duration, output, evidence-byte, or tool-call
+  usage beyond the exact task budget bound to execution requirements and the evidence reservation.
 - **Git object substitution defense** - Verify every exported file against the blob object ID in
   the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
   both the Windows corpus parser and provider boundary.

@@ -43,7 +43,6 @@ import {
 import type { GovernedRepositoryCorpusSource } from "./external-wsl2-repository-corpus-source.js";
 import type { QualifiedCodexProviderAttestations } from "./qualified-wsl2-codex-executor.js";
 import {
-  GOVERNED_CODE_REVIEW_MAX_EVIDENCE_BYTES,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskExecutionBinding,
@@ -570,10 +569,11 @@ export class GovernedReviewRuntime {
       executor_binding_digest: authorization.authorization.executor_attestation_hash,
       environment_binding_digest: authorization.authorization.environment_attestation_hash,
       workspace_binding_digest: authorization.authorization.workspace_attestation_hash,
-      reserved_bytes: GOVERNED_CODE_REVIEW_MAX_EVIDENCE_BYTES,
+      reserved_bytes: governedTask.budget.max_evidence_bytes,
       reserved_frames: 4_096,
       reserved_events: 4_096,
       max_duration_ms: requirements.max_duration_ms,
+      max_tool_calls: governedTask.budget.max_tool_calls,
     };
     const evidence = await ProtectedEvidenceCaptureSession.open({
       store: this.dependencies.evidenceStore,

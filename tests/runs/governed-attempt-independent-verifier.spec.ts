@@ -230,9 +230,53 @@ describe("GovernedAttemptIndependentVerifier", () => {
     expect(receipt.decision).toBe("rejected");
     expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
   });
+
+  it("rejects sealed evidence that exceeds the exact task tool budget", () => {
+    const fixture = verificationFixture({ maxToolCalls: 1 });
+    fixture.evidence.frames[5]!.bytes = bytes({
+      type: "item.completed",
+      item: { type: "command_execution", command: "second read" },
+    });
+    rebindEvidenceEvents(fixture);
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-tool-budget-exceeded",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("budget_exceeded");
+
+    const oversized = verificationFixture();
+    oversized.evidence.reference.total_bytes =
+      oversized.context.governed_task!.budget.max_evidence_bytes + 1;
+    const oversizedReceipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-evidence-budget-exceeded",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...oversized,
+      verifiedAt: at(15),
+    });
+    expect(oversizedReceipt.decision).toBe("rejected");
+    expect(oversizedReceipt.failure_codes).toContain("budget_exceeded");
+
+    const drifted = verificationFixture();
+    drifted.operation.evidence_reservation!.max_tool_calls = 101;
+    const driftedReceipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-tool-budget-binding-drift",
+      verifierId: GOVERNED_CODE_REVIEW_VERIFIER_ID,
+      ...drifted,
+      verifiedAt: at(15),
+    });
+    expect(driftedReceipt.decision).toBe("rejected");
+    expect(driftedReceipt.failure_codes).toContain("task_input_binding_mismatch");
+  });
 });
 
-function verificationFixture(options: { repository?: boolean; governedTask?: boolean } = {}) {
+function verificationFixture(
+  options: { repository?: boolean; governedTask?: boolean; maxToolCalls?: number } = {}
+) {
   const usesGovernedTask = options.governedTask !== false;
   const controls = GovernedControlId.options.map((control) => ({
     control,
@@ -350,6 +394,7 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
         }),
         maxDurationMs: requirements.max_duration_ms,
         maxOutputBytes: requirements.max_output_bytes,
+        ...(options.maxToolCalls ? { maxToolCalls: options.maxToolCalls } : {}),
       })
     : undefined;
   const taskExecution = governedTask
@@ -521,10 +566,11 @@ function verificationFixture(options: { repository?: boolean; governedTask?: boo
       executor_binding_digest: reference.executor_binding_digest,
       environment_binding_digest: reference.environment_binding_digest,
       workspace_binding_digest: reference.workspace_binding_digest,
-      reserved_bytes: 1_000_000,
+      reserved_bytes: 8 * 1_024 * 1_024,
       reserved_frames: 100,
       reserved_events: 100,
       max_duration_ms: 600_000,
+      max_tool_calls: governedTask?.budget.max_tool_calls ?? 100,
     },
     evidence_declaration: {
       ...reference,

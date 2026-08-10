@@ -53,9 +53,10 @@ when a crash occurs after durable ACCEPT but before continuation; it cannot inve
 
 ## Refusal
 
-`NO` is terminal. A reason is optional and, when volunteered, is protected evidence rather than
-CoordinationStore content. The Delegation decline is latched before provider cancellation. No later
-provider event is accepted for that operation.
+`NO` is terminal from either the still-offered refusal turn or an accepted continuation. A reason is
+optional and, when volunteered, is protected evidence rather than CoordinationStore content. The
+Delegation decline is latched before provider cancellation. No later provider event is accepted for
+that operation.
 
 ## Evidence
 
@@ -132,6 +133,10 @@ The verifier reconstructs the expected profile from the prompt hash, output-sche
 independently attested corpus identity, then requires an exact task hash and offer-provider match.
 The generic verifier dispatches outcome interpretation through that exact profile/verifier binding;
 only the `code-review` profile maps its own `PASS`/`BLOCK` vocabulary to coordination outcomes.
+Duration and output limits are independently cross-checked against the authorization requirements;
+evidence bytes and tool-call limits are cross-checked against the durable evidence reservation. The
+verifier then measures the independently read capture lifetime, final output bytes, total protected
+evidence bytes, and completed tool events and rejects any exact task-budget overrun.
 Prompt transport and hashing therefore remain inside the attested host/provider launch trusted base;
 independent raw-prompt reconstruction is not claimed. For repository review, the verifier also
 reopens the Attempt, lease, packet, envelope, and path mapping and requires their hashes and

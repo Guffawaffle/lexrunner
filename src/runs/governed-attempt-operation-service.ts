@@ -152,6 +152,8 @@ export class GovernedAttemptOperationService {
           authorization.environment_attestation_hash ||
         computeCanonicalHash(verificationContext.workspace) !==
           authorization.workspace_attestation_hash ||
+        (verificationContext.governed_task !== undefined &&
+          !taskBudgetMatchesExecution(verificationContext, evidenceReservation, authorization)) ||
         (verificationContext.input_binding !== undefined &&
           (verificationContext.input_binding.prompt_hash !== contentHash(input.prompt) ||
             verificationContext.input_binding.output_schema_hash !==
@@ -412,7 +414,7 @@ export class GovernedAttemptOperationService {
     const delegation = await this.store.getDelegation(record.delegation_id);
     if (!delegation) return false;
     if (delegation.status === "declined") return true;
-    if (delegation.status !== "accepted") return false;
+    if (delegation.status !== "offered" && delegation.status !== "accepted") return false;
     const receipt = createDelegationDecisionReceipt({
       offer: delegation.state.offer,
       decision: "NO",
@@ -557,6 +559,24 @@ function legacyExecutorGrantMatchesTaskExecution(
   return (
     [...dimensions].every((dimension) => dimension === "filesystem_read") &&
     dimensions.has("filesystem_read") === legacyRead
+  );
+}
+
+function taskBudgetMatchesExecution(
+  context: GovernedAttemptVerificationContext,
+  reservation: ProtectedEvidenceReservationRequest,
+  authorization: AttemptAuthorization
+): boolean {
+  const budget = context.governed_task?.budget;
+  return (
+    budget !== undefined &&
+    budget.max_duration_ms === context.requirements.max_duration_ms &&
+    budget.max_duration_ms === reservation.max_duration_ms &&
+    budget.max_duration_ms === authorization.grant.max_duration_ms &&
+    budget.max_output_bytes === context.requirements.max_output_bytes &&
+    budget.max_output_bytes === authorization.grant.max_output_bytes &&
+    budget.max_evidence_bytes === reservation.reserved_bytes &&
+    budget.max_tool_calls === reservation.max_tool_calls
   );
 }
 

@@ -325,6 +325,7 @@ export const ProtectedEvidenceReservationRequest_v1 = z
       .int()
       .positive()
       .max(STAGE1_SYNTHETIC_EVIDENCE_PROFILE.maxDurationMs),
+    max_tool_calls: z.number().int().positive().max(10_000).optional(),
   })
   .strict();
 export type ProtectedEvidenceReservationRequest_v1 = z.infer<

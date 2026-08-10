@@ -233,6 +233,36 @@ describe("GovernedAttemptOperationService", () => {
     await store.close();
   });
 
+  it("accepts NO as a complete refusal while the Delegation is still offered", async () => {
+    const store = new InMemoryGovernedAttemptOperationStore();
+    const fixture = authorizationFixture();
+    await createOfferedDelegation(store, fixture.authorization.grant);
+    const executor = new DeferredExecutor(handle(fixture.authorization.binding_digest));
+    const service = new GovernedAttemptOperationService(store, () => at(5));
+    const started = await service.start(executor, {
+      operationMutationId: "operation-create",
+      authorizationMutationId: "delegation-offer-authorize",
+      authorization: fixture.authorization,
+      invocation: invocation(fixture.authorization, "offer"),
+      prompt: Buffer.from("synthetic prompt"),
+      outputSchema: { type: "object" },
+      now: at(3),
+    });
+    expect(started).toMatchObject({ started: true });
+
+    const observation = service.observeToTerminal(executor, "operation-1");
+    executor.emit([event("started", 1), event("declined", 2), event("completed", 3)]);
+    await expect(observation).resolves.toEqual({
+      terminal: true,
+      operationId: "operation-1",
+      status: "declined",
+    });
+    expect((await store.getDelegation("delegation-1"))?.status).toBe("declined");
+    expect(executor.continueCount).toBe(0);
+    expect(executor.cancelCount).toBe(1);
+    await store.close();
+  });
+
   it("records a provider stream ending without a terminal event as lost", async () => {
     const { store, service, executor } = await runningFixture();
     const observation = service.observeToTerminal(executor, "operation-1");
@@ -826,10 +856,11 @@ function evidenceBinding(authorization: ReturnType<typeof authorizationFixture>[
     executor_binding_digest: authorization.executor_attestation_hash,
     environment_binding_digest: authorization.environment_attestation_hash,
     workspace_binding_digest: authorization.workspace_attestation_hash,
-    reserved_bytes: 1_000_000,
+    reserved_bytes: 8 * 1_024 * 1_024,
     reserved_frames: 10,
     reserved_events: 10,
-    max_duration_ms: 60_000,
+    max_duration_ms: 600_000,
+    max_tool_calls: 100,
   };
   const reference = {
     schema_version: "1.0.0" as const,

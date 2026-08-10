@@ -42,6 +42,11 @@ runtime containment, or sensitive-data policy.
 `NO` is universal Delegation behavior. A task profile cannot require a rationale or reinterpret
 refusal as a failed task result.
 
+All four generic budget dimensions are authorization, not suggestions. Duration and output limits
+must match the execution requirements; evidence bytes and tool calls must match the durable capture
+reservation. Independent verification measures the sealed capture and refuses admissibility after
+any overrun, even when the provider reports successful completion.
+
 ## Positive capability model
 
 Absence from the capability ceiling is denial, but declared capabilities are real permission—not

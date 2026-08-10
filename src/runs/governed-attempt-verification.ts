@@ -140,6 +140,17 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
       });
     }
     if (
+      value.governed_task &&
+      (value.governed_task.budget.max_duration_ms !== value.requirements.max_duration_ms ||
+        value.governed_task.budget.max_output_bytes !== value.requirements.max_output_bytes)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["governed_task", "budget"],
+        message: "governed task duration and output budgets must match execution requirements",
+      });
+    }
+    if (
       (value.workspace.corpus_kind === "repository") !==
       (value.repository_corpus !== undefined)
     ) {
@@ -210,6 +221,7 @@ export const GovernedAttemptVerificationFailureCode = z.enum([
   "output_schema_invalid",
   "output_invalid",
   "outcome_mismatch",
+  "budget_exceeded",
 ]);
 export type GovernedAttemptVerificationFailureCode = z.infer<
   typeof GovernedAttemptVerificationFailureCode
