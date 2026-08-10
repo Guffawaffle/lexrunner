@@ -18,12 +18,18 @@ Every governed task composes the same lifecycle:
 5. after `ACCEPT`, an attenuated grant is checked against the ceiling before work is released;
 6. the executor emits bounded events and protected evidence for independent verification.
 
-Grant evaluation also requires the grant to be active at the explicit authorization instant. The
-caller selects only an adapter identity and version; a trusted host qualification authority resolves
-the exact manifest and an active qualification receipt bound to its hash and protected evidence.
-A caller-supplied authority matrix is never enforcement evidence. The resolved adapter must meet
-every granted capability's enforcement floor, so an `unenforced` authority dimension cannot be
-converted into permission by accepting a task.
+The caller supplies only the Attempt, Delegation, task-spec hash, and authority-grant hash. A trusted
+host grant authority resolves the exact protected task plus the complete grant chain and authorizes
+the root operator issuer. The evaluator rechecks every identity and hash, requires the selected grant
+to be active at the explicit authorization instant, and verifies every delegated link with the
+shared attenuation evaluator. Caller-supplied task or grant bodies are never authority, and a child
+cannot claim a capability its protected parent did not hold.
+
+The caller likewise selects only an adapter identity and version; a trusted host qualification
+authority resolves the exact manifest and an active qualification receipt bound to its hash and
+protected evidence. A caller-supplied authority matrix is never enforcement evidence. The resolved
+adapter must meet every granted capability's enforcement floor, so an `unenforced` authority
+dimension cannot be converted into permission by accepting a task.
 
 `NO` is universal Delegation behavior. A task profile cannot require a rationale or reinterpret
 refusal as a failed task result.

@@ -4,6 +4,8 @@ import { SHA256Hash, computeCanonicalHash } from "../schemas/task-contract.js";
 import {
   DelegatedAuthorityGrant_v1,
   type DelegatedAuthorityCapability_v1,
+  computeAuthorityGrantHash,
+  evaluateDelegatedAuthorityContainment,
 } from "./governed-attempt-protocol.js";
 import {
   WorkerAdapterAuthorityDimension,
@@ -231,10 +233,11 @@ export type GovernedTaskGrantEvaluation =
   | {
       permitted: false;
       reason:
-        | "invalid_task_spec"
-        | "invalid_grant"
+        | "invalid_authority_selection"
+        | "authority_unavailable"
         | "grant_not_active"
         | "identity_mismatch"
+        | "invalid_grant_chain"
         | "capability_expansion";
     };
 
@@ -322,59 +325,123 @@ export interface GovernedTaskAdapterQualificationAuthority {
   }): Promise<unknown | null>;
 }
 
+export const GovernedTaskAuthoritySelection_v1 = z
+  .object({
+    attempt_id: opaqueId,
+    delegation_id: opaqueId,
+    task_spec_hash: SHA256Hash,
+    authority_grant_hash: SHA256Hash,
+  })
+  .strict();
+export type GovernedTaskAuthoritySelection_v1 = z.infer<typeof GovernedTaskAuthoritySelection_v1>;
+
+const GovernedTaskAuthorityResolution_v1 = z
+  .object({
+    task: GovernedTaskSpec_v1,
+    grant_chain: z.array(DelegatedAuthorityGrant_v1).min(1).max(32),
+  })
+  .strict();
+
 /**
- * Evaluate an attenuated Delegation grant against the task's positive capability ceiling.
- * Absence from the ceiling is denial; the grant may remove capabilities but cannot widen them.
+ * Trusted host port. Implementations resolve only protected task/grant records and must authorize
+ * the root operator issuer before returning a chain. Caller-provided grant bodies are never input.
  */
-export function evaluateGovernedTaskGrant(
-  taskCandidate: unknown,
-  grantCandidate: unknown,
+export interface GovernedTaskGrantAuthority {
+  resolveAuthorizedTaskGrant(input: {
+    attemptId: string;
+    delegationId: string;
+    taskSpecHash: string;
+    authorityGrantHash: string;
+    evaluatedAt: string;
+  }): Promise<unknown | null>;
+}
+
+/**
+ * Resolve protected task/grant authority, verify the complete attenuation chain, and evaluate the
+ * selected grant against the task's positive capability ceiling. Absence is denial.
+ */
+export async function evaluateGovernedTaskGrant(
+  authoritySelectionCandidate: unknown,
+  grantAuthority: GovernedTaskGrantAuthority,
   evaluatedAt: string
-): GovernedTaskGrantEvaluation {
-  const task = GovernedTaskSpec_v1.safeParse(taskCandidate);
-  if (!task.success) return { permitted: false, reason: "invalid_task_spec" };
-  const grant = DelegatedAuthorityGrant_v1.safeParse(grantCandidate);
-  if (!grant.success) return { permitted: false, reason: "invalid_grant" };
-  const evaluationTime = Date.parse(evaluatedAt);
-  if (
-    !Number.isFinite(evaluationTime) ||
-    evaluationTime < Date.parse(grant.data.not_before) ||
-    evaluationTime >= Date.parse(grant.data.expires_at)
-  ) {
-    return { permitted: false, reason: "grant_not_active" };
+): Promise<GovernedTaskGrantEvaluation> {
+  const selection = GovernedTaskAuthoritySelection_v1.safeParse(authoritySelectionCandidate);
+  if (!selection.success) return { permitted: false, reason: "invalid_authority_selection" };
+  let candidate: unknown | null;
+  try {
+    candidate = await grantAuthority.resolveAuthorizedTaskGrant({
+      attemptId: selection.data.attempt_id,
+      delegationId: selection.data.delegation_id,
+      taskSpecHash: selection.data.task_spec_hash,
+      authorityGrantHash: selection.data.authority_grant_hash,
+      evaluatedAt,
+    });
+  } catch {
+    return { permitted: false, reason: "authority_unavailable" };
   }
+  if (candidate === null) return { permitted: false, reason: "authority_unavailable" };
+  const resolution = GovernedTaskAuthorityResolution_v1.safeParse(candidate);
+  if (!resolution.success) return { permitted: false, reason: "authority_unavailable" };
+  const { task, grant_chain: grantChain } = resolution.data;
+  const grant = grantChain[grantChain.length - 1]!;
   if (
-    task.data.attempt_id !== grant.data.attempt_id ||
-    task.data.delegation_id !== grant.data.delegation_id
+    task.attempt_id !== selection.data.attempt_id ||
+    task.delegation_id !== selection.data.delegation_id ||
+    task.task_spec_hash !== selection.data.task_spec_hash ||
+    grant.attempt_id !== selection.data.attempt_id ||
+    grant.delegation_id !== selection.data.delegation_id ||
+    computeAuthorityGrantHash(grant) !== selection.data.authority_grant_hash
   ) {
     return { permitted: false, reason: "identity_mismatch" };
   }
+  if (grantChain[0]!.issuer.kind !== "operator") {
+    return { permitted: false, reason: "invalid_grant_chain" };
+  }
+  for (let index = 1; index < grantChain.length; index += 1) {
+    if (
+      !evaluateDelegatedAuthorityContainment(grantChain[index - 1], grantChain[index]).contained
+    ) {
+      return { permitted: false, reason: "invalid_grant_chain" };
+    }
+  }
+  const evaluationTime = Date.parse(evaluatedAt);
+  if (
+    !Number.isFinite(evaluationTime) ||
+    evaluationTime < Date.parse(grant.not_before) ||
+    evaluationTime >= Date.parse(grant.expires_at)
+  ) {
+    return { permitted: false, reason: "grant_not_active" };
+  }
 
   const ceiling = new Map(
-    task.data.capability_ceiling.map((capability) => [capabilityKey(capability), capability])
+    task.capability_ceiling.map((capability) => [capabilityKey(capability), capability])
   );
   const capabilities: GovernedTaskCapability_v1[] = [];
-  for (const granted of grant.data.capabilities) {
+  for (const granted of grant.capabilities) {
     const permitted = ceiling.get(capabilityKey(granted));
     if (!permitted) return { permitted: false, reason: "capability_expansion" };
     capabilities.push(permitted);
   }
   return {
     permitted: true,
-    taskSpecHash: task.data.task_spec_hash,
+    taskSpecHash: task.task_spec_hash,
     capabilities,
   };
 }
 
 /** Resolve a qualified adapter and require it to meet every granted capability's floor. */
 export async function evaluateGovernedTaskGrantForAdapter(
-  taskCandidate: unknown,
-  grantCandidate: unknown,
+  authoritySelectionCandidate: unknown,
+  grantAuthority: GovernedTaskGrantAuthority,
   adapterSelectionCandidate: unknown,
   qualificationAuthority: GovernedTaskAdapterQualificationAuthority,
   evaluatedAt: string
 ): Promise<GovernedTaskAdapterEvaluation> {
-  const grant = evaluateGovernedTaskGrant(taskCandidate, grantCandidate, evaluatedAt);
+  const grant = await evaluateGovernedTaskGrant(
+    authoritySelectionCandidate,
+    grantAuthority,
+    evaluatedAt
+  );
   if (!grant.permitted) return grant;
   const selection = GovernedTaskAdapterSelection_v1.safeParse(adapterSelectionCandidate);
   if (!selection.success) return { permitted: false, reason: "invalid_adapter" };

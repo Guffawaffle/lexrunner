@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
-import { DelegatedAuthorityGrant_v1 } from "../../src/runs/governed-attempt-protocol.js";
+import {
+  DelegatedAuthorityGrant_v1,
+  computeAuthorityGrantHash,
+  type DelegatedAuthorityCapability_v1,
+} from "../../src/runs/governed-attempt-protocol.js";
 import {
   GovernedTaskCapability_v1,
   GovernedTaskSpec_v1,
@@ -18,7 +22,7 @@ import {
 const hash = (character: string): `sha256:${string}` => `sha256:${character.repeat(64)}`;
 
 describe("generic governed task capabilities", () => {
-  it("allows an attenuated grant to carry an owned, recoverable write capability", () => {
+  it("allows an attenuated grant to carry an owned, recoverable write capability", async () => {
     const task = taskSpec();
     expect(task.capability_ceiling.map(({ capability_id: id }) => id)).toEqual([
       "read-input",
@@ -43,7 +47,13 @@ describe("generic governed task capabilities", () => {
       expires_at: "2026-08-10T07:00:00.000Z",
     });
 
-    expect(evaluateGovernedTaskGrant(task, grant, activeAt())).toMatchObject({
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, grant),
+        taskGrantAuthority(task, [grant]),
+        activeAt()
+      )
+    ).toMatchObject({
       permitted: true,
       taskSpecHash: task.task_spec_hash,
       capabilities: [
@@ -58,26 +68,131 @@ describe("generic governed task capabilities", () => {
     });
   });
 
-  it("rejects capability scope expansion while allowing capability attenuation", () => {
+  it("rejects capability scope expansion while allowing capability attenuation", async () => {
     const task = taskSpec();
     const expanded = grant(task, {
       dimension: "filesystem_write",
       capability_id: "write-owned-workspace",
       scope_hash: hash("f"),
     });
-    expect(evaluateGovernedTaskGrant(task, expanded, activeAt())).toEqual({
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, expanded),
+        taskGrantAuthority(task, [expanded]),
+        activeAt()
+      )
+    ).toEqual({
       permitted: false,
       reason: "capability_expansion",
     });
 
     const empty = grant(task);
-    expect(evaluateGovernedTaskGrant(task, empty, activeAt())).toMatchObject({
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, empty),
+        taskGrantAuthority(task, [empty]),
+        activeAt()
+      )
+    ).toMatchObject({
       permitted: true,
       capabilities: [],
     });
-    expect(evaluateGovernedTaskGrant(task, empty, "2026-08-10T07:00:00.000Z")).toEqual({
-      permitted: false,
-      reason: "grant_not_active",
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, empty),
+        taskGrantAuthority(task, [empty]),
+        "2026-08-10T07:00:00.000Z"
+      )
+    ).toEqual({ permitted: false, reason: "grant_not_active" });
+  });
+
+  it("does not treat caller-supplied task or grant bodies as authority", async () => {
+    const task = taskSpec();
+    const protectedGrant = grant(task, {
+      dimension: "filesystem_read",
+      capability_id: "read-input",
+      scope_hash: hash("1"),
+    });
+    const forgedGrant = grant(task, {
+      dimension: "filesystem_write",
+      capability_id: "write-owned-workspace",
+      scope_hash: hash("2"),
+    });
+    const authority = taskGrantAuthority(task, [protectedGrant]);
+
+    expect(
+      await evaluateGovernedTaskGrant(authoritySelection(task, forgedGrant), authority, activeAt())
+    ).toEqual({ permitted: false, reason: "identity_mismatch" });
+    expect(
+      await evaluateGovernedTaskGrant(
+        { ...authoritySelection(task, protectedGrant), grant: forgedGrant },
+        authority,
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "invalid_authority_selection" });
+  });
+
+  it("verifies protected delegation ancestry before accepting child capabilities", async () => {
+    const task = taskSpec();
+    const parent = DelegatedAuthorityGrant_v1.parse({
+      schema_version: "1.0.0",
+      grant_id: "grant-parent",
+      attempt_id: task.attempt_id,
+      delegation_id: "delegation-parent",
+      issuer: { kind: "operator", principal_id: "operator-1" },
+      capabilities: [
+        {
+          dimension: "filesystem_read",
+          capability_id: "read-input",
+          scope_hash: hash("1"),
+        },
+      ],
+      issued_at: "2026-08-10T06:00:00.000Z",
+      not_before: "2026-08-10T06:00:00.000Z",
+      expires_at: "2026-08-10T07:00:00.000Z",
+    });
+    const childBody = {
+      schema_version: "1.0.0" as const,
+      grant_id: "grant-child",
+      attempt_id: task.attempt_id,
+      delegation_id: task.delegation_id,
+      issuer: { kind: "delegation" as const, delegation_id: parent.delegation_id },
+      parent_grant_hash: computeAuthorityGrantHash(parent),
+      issued_at: "2026-08-10T06:05:00.000Z",
+      not_before: "2026-08-10T06:05:00.000Z",
+      expires_at: "2026-08-10T06:55:00.000Z",
+    };
+    const expandedChild = DelegatedAuthorityGrant_v1.parse({
+      ...childBody,
+      capabilities: [
+        {
+          dimension: "filesystem_write",
+          capability_id: "write-owned-workspace",
+          scope_hash: hash("2"),
+        },
+      ],
+    });
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, expandedChild),
+        taskGrantAuthority(task, [parent, expandedChild]),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "invalid_grant_chain" });
+
+    const attenuatedChild = DelegatedAuthorityGrant_v1.parse({
+      ...childBody,
+      capabilities: parent.capabilities,
+    });
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, attenuatedChild),
+        taskGrantAuthority(task, [parent, attenuatedChild]),
+        activeAt()
+      )
+    ).toMatchObject({
+      permitted: true,
+      capabilities: [{ capability_id: "read-input" }],
     });
   });
 
@@ -90,8 +205,8 @@ describe("generic governed task capabilities", () => {
     });
     expect(
       await evaluateGovernedTaskGrantForAdapter(
-        task,
-        writeGrant,
+        authoritySelection(task, writeGrant),
+        taskGrantAuthority(task, [writeGrant]),
         adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
         qualificationAuthority(HOST_ASSISTED_ADAPTER_MANIFEST),
         activeAt()
@@ -116,8 +231,8 @@ describe("generic governed task capabilities", () => {
     });
     expect(
       await evaluateGovernedTaskGrantForAdapter(
-        task,
-        writeGrant,
+        authoritySelection(task, writeGrant),
+        taskGrantAuthority(task, [writeGrant]),
         adapterSelection(qualified),
         qualificationAuthority(qualified),
         activeAt()
@@ -144,8 +259,8 @@ describe("generic governed task capabilities", () => {
     });
     expect(
       await evaluateGovernedTaskGrantForAdapter(
-        task,
-        writeGrant,
+        authoritySelection(task, writeGrant),
+        taskGrantAuthority(task, [writeGrant]),
         {
           ...adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
           manifest: forged,
@@ -157,8 +272,8 @@ describe("generic governed task capabilities", () => {
 
     expect(
       await evaluateGovernedTaskGrantForAdapter(
-        task,
-        writeGrant,
+        authoritySelection(task, writeGrant),
+        taskGrantAuthority(task, [writeGrant]),
         adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
         qualificationAuthority(HOST_ASSISTED_ADAPTER_MANIFEST, {
           manifestHash: hash("f"),
@@ -326,11 +441,7 @@ function taskSpec() {
 
 function grant(
   task: ReturnType<typeof taskSpec>,
-  ...capabilities: Array<{
-    dimension: "filesystem_write";
-    capability_id: string;
-    scope_hash: string;
-  }>
+  ...capabilities: DelegatedAuthorityCapability_v1[]
 ) {
   return DelegatedAuthorityGrant_v1.parse({
     schema_version: "1.0.0",
@@ -343,6 +454,29 @@ function grant(
     not_before: "2026-08-10T06:00:00.000Z",
     expires_at: "2026-08-10T07:00:00.000Z",
   });
+}
+
+function authoritySelection(
+  task: ReturnType<typeof taskSpec>,
+  selectedGrant: DelegatedAuthorityGrant_v1
+) {
+  return {
+    attempt_id: task.attempt_id,
+    delegation_id: task.delegation_id,
+    task_spec_hash: task.task_spec_hash,
+    authority_grant_hash: computeAuthorityGrantHash(selectedGrant),
+  };
+}
+
+function taskGrantAuthority(
+  task: ReturnType<typeof taskSpec>,
+  grantChain: DelegatedAuthorityGrant_v1[]
+) {
+  return {
+    async resolveAuthorizedTaskGrant() {
+      return { task, grant_chain: grantChain };
+    },
+  };
 }
 
 function activeAt(): string {
