@@ -4,6 +4,21 @@ import type {
   ProtectedEvidenceIndependentReader,
 } from "./governed-attempt-verification.js";
 import type { GovernedAttemptOperationStore } from "../store/governed-attempt-operation-store.js";
+import type { GovernedDelegationStore } from "../store/governed-delegation-store.js";
+import type {
+  LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
+  WorkspaceLifecycleStore,
+} from "../store/workspace-lifecycle-store.js";
+
+type GovernedVerificationStore = GovernedAttemptOperationStore &
+  Partial<Pick<GovernedDelegationStore, "getDelegation">>;
+type GovernedRepositoryLifecycleReader = Pick<
+  WorkspaceLifecycleStore,
+  "getAttempt" | "getWorkspaceLease"
+> &
+  Pick<LaunchEnvelopeBindingStore, "getLaunchEnvelopeBinding"> &
+  Pick<TaskPacketBindingStore, "getTaskPacketBinding">;
 
 export interface VerifyGovernedAttemptOperationInput {
   mutationId: string;
@@ -32,9 +47,10 @@ export type VerifyGovernedAttemptOperationResult =
 /** Coordinates a fresh protected read, independent semantics, and durable receipt. */
 export class GovernedAttemptVerificationService {
   constructor(
-    private readonly store: GovernedAttemptOperationStore,
+    private readonly store: GovernedVerificationStore,
     private readonly evidence: ProtectedEvidenceIndependentReader,
-    private readonly verifier = new GovernedAttemptIndependentVerifier()
+    private readonly verifier = new GovernedAttemptIndependentVerifier(),
+    private readonly repositoryLifecycle?: GovernedRepositoryLifecycleReader
   ) {}
 
   async verifyAndRecord(
@@ -58,6 +74,25 @@ export class GovernedAttemptVerificationService {
       return { verified: false, reason: "evidence_unavailable" };
     }
     const events = await this.store.listAttemptOperationEvents(operation.operation_id);
+    const delegation = this.store.getDelegation
+      ? await this.store.getDelegation(operation.delegation_id)
+      : undefined;
+    const repositoryBinding = operation.verification_context.repository_corpus;
+    const repositoryLifecycle =
+      repositoryBinding && this.repositoryLifecycle
+        ? {
+            attempt: await this.repositoryLifecycle.getAttempt(operation.attempt_id),
+            lease: await this.repositoryLifecycle.getWorkspaceLease(
+              repositoryBinding.workspace_lease_id
+            ),
+            launchBinding: await this.repositoryLifecycle.getLaunchEnvelopeBinding(
+              operation.attempt_id
+            ),
+            packetBinding: await this.repositoryLifecycle.getTaskPacketBinding(
+              operation.attempt_id
+            ),
+          }
+        : undefined;
     const receipt = this.verifier.verify({
       verificationId: input.verificationId,
       verifierId: input.verifierId,
@@ -65,6 +100,8 @@ export class GovernedAttemptVerificationService {
       events,
       context: operation.verification_context,
       evidence: capture,
+      ...(delegation ? { delegation } : {}),
+      ...(repositoryLifecycle ? { repositoryLifecycle } : {}),
       verifiedAt: input.verifiedAt,
     });
     const recorded = await this.store.recordAttemptOperationVerification({

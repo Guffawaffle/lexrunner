@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trusted synthetic-only Codex provider for one disposable WSL2 environment."""
+"""Trusted read-only Codex provider for one disposable WSL2 environment."""
 
 from __future__ import annotations
 
@@ -29,6 +29,14 @@ from typing import Any, BinaryIO, Iterable
 PROTOCOL_VERSION = "1.0.0"
 MAX_CONTROL_BYTES = 256 * 1024
 MAX_PROMPT_BYTES = 1024 * 1024
+MAX_REPOSITORY_HEADER_BYTES = 2 * 1024 * 1024
+MAX_REPOSITORY_FILE_BYTES = 4 * 1024 * 1024
+MAX_REPOSITORY_TREE_BYTES = 32 * 1024 * 1024
+MAX_REPOSITORY_PATCH_BYTES = 8 * 1024 * 1024
+MAX_REPOSITORY_FILES = 4_096
+MAX_REPOSITORY_FRAME_BYTES = (
+    4 + MAX_REPOSITORY_HEADER_BYTES + MAX_REPOSITORY_TREE_BYTES + MAX_REPOSITORY_PATCH_BYTES
+)
 MAX_RAW_EVENT_BYTES = 768 * 1024
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_EVENTS = 10_000
@@ -65,15 +73,21 @@ QUALIFICATION_PATH = configured_path(
 )
 CODEX_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_CODEX", "/opt/lexrunner/bin/codex")
 BWRAP_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_BWRAP", "/usr/bin/bwrap")
+GIT_EXECUTABLE = configured_path("LEXRUNNER_PROVIDER_GIT", "/usr/bin/git")
 SYSTEMD_RUN = configured_path("LEXRUNNER_PROVIDER_SYSTEMD_RUN", "/usr/bin/systemd-run")
 SYSTEMCTL = configured_path("LEXRUNNER_PROVIDER_SYSTEMCTL", "/usr/bin/systemctl")
 PROVIDER_EXECUTABLE = configured_path(
     "LEXRUNNER_PROVIDER_EXECUTABLE", "/opt/lexrunner/bin/governed-codex-provider"
 )
+REPOSITORY_EXPORTER = configured_path(
+    "LEXRUNNER_PROVIDER_REPOSITORY_EXPORTER",
+    "/opt/lexrunner/bin/governed-repository-corpus-exporter",
+)
 MANAGED_REQUIREMENTS = configured_path(
     "LEXRUNNER_PROVIDER_REQUIREMENTS", "/etc/codex/requirements.toml"
 )
 SYNTHETIC_CORPUS = STATE_ROOT / "synthetic-corpus"
+REPOSITORY_CORPORA = STATE_ROOT / "repository-corpora"
 AUTH_SEED = STATE_ROOT / "credential-seed" / "auth.json"
 ATTESTATIONS = STATE_ROOT / "attestations"
 OPERATIONS = STATE_ROOT / "operations"
@@ -234,24 +248,24 @@ def load_qualification() -> dict[str, Any]:
         raise ProviderError("qualification manifest is invalid") from error
     if not isinstance(value, dict):
         fail("qualification manifest must be an object")
-    require_keys(
-        value,
-        (
-            "schema_version",
-            "provider_id",
-            "environment_id",
-            "topology_hash",
-            "controls",
-            "qualified_at",
-            "expires_at",
-        ),
-        "qualification",
-    )
+    legacy_fields = {
+        "schema_version",
+        "provider_id",
+        "environment_id",
+        "topology_hash",
+        "controls",
+        "qualified_at",
+        "expires_at",
+    }
+    if set(value) not in (legacy_fields, legacy_fields | {"execution_profile_hash"}):
+        fail("qualification has unexpected or missing fields")
     if value["schema_version"] != PROTOCOL_VERSION:
         fail("qualification schema version is unsupported")
     require_opaque(value["provider_id"], "provider_id")
     require_opaque(value["environment_id"], "environment_id")
     require_hash(value["topology_hash"], "topology_hash")
+    if "execution_profile_hash" in value:
+        require_hash(value["execution_profile_hash"], "execution_profile_hash")
     controls = value["controls"]
     if not isinstance(controls, list) or len(controls) != len(CONTROL_IDS):
         fail("qualification must contain every denial control")
@@ -282,6 +296,13 @@ def load_qualification() -> dict[str, Any]:
     expires_at = parse_instant(value["expires_at"], "expires_at")
     if expires_at <= qualified_at or expires_at <= now_utc():
         fail("qualification manifest is stale")
+    # Legacy manifests are accepted only for their existing short TTL so an
+    # already-qualified image can bootstrap this additive enforcement field.
+    if value.get("execution_profile_hash") not in (
+        None,
+        canonical_hash(fixed_execution_profile()),
+    ):
+        fail("qualified execution profile no longer matches the installed image")
     return value
 
 
@@ -315,6 +336,9 @@ def fixed_execution_profile() -> dict[str, Any]:
         "managed_requirements_hash": content_hash(
             ensure_trusted_file(MANAGED_REQUIREMENTS, root_owned=True, max_bytes=64 * 1024)
         ),
+        "repository_exporter_hash": executable_hash(REPOSITORY_EXPORTER),
+        "git_executable_hash": executable_hash(GIT_EXECUTABLE),
+        "git_version": git_version(),
         "phase_one": {
             "corpus": "empty",
             "shell_tool": "stable-read-only-capability",
@@ -322,7 +346,7 @@ def fixed_execution_profile() -> dict[str, Any]:
             "disabled_features": list(PHASE_ONE_DISABLED_FEATURES),
         },
         "phase_two": {
-            "corpus": "synthetic-read-only",
+            "corpus": "sealed-synthetic-or-repository-read-only",
             "sandbox": "read-only",
             "shell_tool": True,
             "network": "sandbox-default-deny",
@@ -352,6 +376,24 @@ def codex_version() -> str:
     match = re.fullmatch(r"codex-cli ([A-Za-z0-9._+-]{1,128})", text)
     if not match:
         fail("Codex version output is not recognized")
+    return match.group(1)
+
+
+def git_version() -> str:
+    data = subprocess.run(
+        [str(GIT_EXECUTABLE), "--version"],
+        check=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=10,
+    ).stdout
+    if len(data) == 0 or len(data) > 256:
+        fail("Git version output is outside its bound")
+    text = data.decode("ascii", errors="strict").strip()
+    match = re.fullmatch(r"git version ([A-Za-z0-9._+-]{1,128})", text)
+    if not match:
+        fail("Git version output is not recognized")
     return match.group(1)
 
 
@@ -427,6 +469,383 @@ def hash_synthetic_tree() -> tuple[str, str]:
         {"kind": "synthetic-selection-v1", "paths": [entry["path"] for entry in entries]}
     )
     return corpus_hash, selection_hash
+
+
+def require_repository_path(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > 1024:
+        fail(f"{field} is not a bounded repository path")
+    parts = value.split("/")
+    if (
+        value.startswith("/")
+        or value.endswith("/")
+        or "\\" in value
+        or "\0" in value
+        or any(part in ("", ".", "..") or part.lower() == ".git" for part in parts)
+    ):
+        fail(f"{field} is not a canonical repository path")
+    return value
+
+
+def repository_header_hashes(header: dict[str, Any]) -> dict[str, str]:
+    source_binding_hash = canonical_hash(header["source_binding"])
+    candidate_tree_hash = canonical_hash(
+        {"kind": "governed-repository-candidate-tree-v1", "entries": header["entries"]}
+    )
+    selection_hash = canonical_hash(
+        {
+            "kind": "governed-repository-selection-v1",
+            "repository_id": header["repository_id"],
+            "base_object_id": header["base_object_id"],
+            "candidate_object_id": header["candidate_object_id"],
+            "paths": [entry["path"] for entry in header["entries"]],
+        }
+    )
+    corpus_hash = canonical_hash(
+        {
+            "kind": "governed-repository-corpus-v1",
+            "source_binding_hash": source_binding_hash,
+            "candidate_tree_hash": candidate_tree_hash,
+            "patch_hash": header["patch_hash"],
+            "selection_hash": selection_hash,
+        }
+    )
+    return {
+        "source_binding_hash": source_binding_hash,
+        "candidate_tree_hash": candidate_tree_hash,
+        "selection_hash": selection_hash,
+        "corpus_hash": corpus_hash,
+    }
+
+
+def validate_repository_header(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        fail("repository corpus header must be an object")
+    require_keys(
+        value,
+        (
+            "schema_version",
+            "environment_id",
+            "repository_id",
+            "base_object_id",
+            "candidate_object_id",
+            "source_binding",
+            "source_binding_hash",
+            "entries",
+            "candidate_tree_bytes",
+            "candidate_tree_hash",
+            "patch_bytes",
+            "patch_hash",
+            "selection_hash",
+            "corpus_hash",
+        ),
+        "repository corpus header",
+    )
+    if value["schema_version"] != PROTOCOL_VERSION:
+        fail("repository corpus schema version is unsupported")
+    for field in ("environment_id", "repository_id"):
+        require_opaque(value[field], field)
+    for field in ("base_object_id", "candidate_object_id"):
+        require_git_id(value[field], field)
+    if value["base_object_id"] == value["candidate_object_id"]:
+        fail("repository review candidate must differ from its base")
+    source = value["source_binding"]
+    if not isinstance(source, dict):
+        fail("repository source binding must be an object")
+    require_keys(
+        source,
+        (
+            "attempt_id",
+            "workspace_lease_id",
+            "task_packet_hash",
+            "launch_envelope_hash",
+            "path_mapping_hash",
+        ),
+        "repository source binding",
+    )
+    for field in ("attempt_id", "workspace_lease_id"):
+        require_opaque(source[field], f"source_binding.{field}")
+    for field in ("task_packet_hash", "launch_envelope_hash", "path_mapping_hash"):
+        require_hash(source[field], f"source_binding.{field}")
+    for field in (
+        "source_binding_hash",
+        "candidate_tree_hash",
+        "patch_hash",
+        "selection_hash",
+        "corpus_hash",
+    ):
+        require_hash(value[field], field)
+    entries = value["entries"]
+    if not isinstance(entries, list) or not 0 < len(entries) <= MAX_REPOSITORY_FILES:
+        fail("repository corpus file count is outside its bound")
+    previous = ""
+    tree_bytes = 0
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            fail("repository corpus entry must be an object")
+        require_keys(
+            entry,
+            ("path", "byte_length", "content_hash", "executable"),
+            f"repository corpus entry {index}",
+        )
+        path = require_repository_path(entry["path"], f"entries[{index}].path")
+        if path <= previous:
+            fail("repository corpus paths must be unique and strictly ordered")
+        previous = path
+        length = entry["byte_length"]
+        if (
+            not isinstance(length, int)
+            or isinstance(length, bool)
+            or length < 0
+            or length > MAX_REPOSITORY_FILE_BYTES
+        ):
+            fail("repository corpus file size is outside its bound")
+        require_hash(entry["content_hash"], f"entries[{index}].content_hash")
+        if not isinstance(entry["executable"], bool):
+            fail("repository corpus executable flag must be a boolean")
+        tree_bytes += length
+        if tree_bytes > MAX_REPOSITORY_TREE_BYTES:
+            fail("repository corpus tree bytes exceed their bound")
+    if value["candidate_tree_bytes"] != tree_bytes:
+        fail("repository corpus tree byte count is invalid")
+    patch_bytes = value["patch_bytes"]
+    if (
+        not isinstance(patch_bytes, int)
+        or isinstance(patch_bytes, bool)
+        or not 0 < patch_bytes <= MAX_REPOSITORY_PATCH_BYTES
+    ):
+        fail("repository corpus patch size is outside its bound")
+    expected = repository_header_hashes(value)
+    if any(value[field] != expected[field] for field in expected):
+        fail("repository corpus canonical hash binding is invalid")
+    return value
+
+
+def parse_repository_frame() -> tuple[dict[str, Any], list[bytes], bytes]:
+    data = read_stdin_bounded(MAX_REPOSITORY_FRAME_BYTES)
+    if len(data) < 5:
+        fail("repository corpus frame is truncated")
+    header_length = struct.unpack(">I", data[:4])[0]
+    if header_length == 0 or header_length > MAX_REPOSITORY_HEADER_BYTES:
+        fail("repository corpus header length is invalid")
+    payload_offset = 4 + header_length
+    if payload_offset >= len(data):
+        fail("repository corpus payload is missing")
+    try:
+        header = validate_repository_header(json.loads(data[4:payload_offset]))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProviderError("repository corpus header is invalid") from error
+    if len(data) - payload_offset != header["candidate_tree_bytes"] + header["patch_bytes"]:
+        fail("repository corpus payload length is invalid")
+    files: list[bytes] = []
+    offset = payload_offset
+    for entry in header["entries"]:
+        end = offset + entry["byte_length"]
+        content = data[offset:end]
+        if content_hash(content) != entry["content_hash"]:
+            fail("repository corpus file hash is invalid")
+        files.append(content)
+        offset = end
+    patch = data[offset:]
+    if len(patch) != header["patch_bytes"] or content_hash(patch) != header["patch_hash"]:
+        fail("repository corpus patch hash is invalid")
+    return header, files, patch
+
+
+def repository_corpus_path(workspace_id: str) -> Path:
+    if not re.fullmatch(r"repository-[0-9a-f]{24}", workspace_id):
+        fail("repository workspace identity is invalid")
+    return REPOSITORY_CORPORA / workspace_id
+
+
+def write_repository_file(root: Path, relative: str, data: bytes, executable: bool) -> None:
+    current = root
+    parts = relative.split("/")
+    for component in parts[:-1]:
+        current = current / component
+        if current.exists():
+            info = current.lstat()
+            if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+                fail("repository corpus staging path is ambiguous")
+        else:
+            current.mkdir(mode=0o700)
+    target = current / parts[-1]
+    if target.exists():
+        fail("repository corpus staging path conflicts")
+    write_atomic(target, data, 0o500 if executable else 0o400)
+
+
+def seal_repository_directories(path: Path) -> None:
+    directories = [candidate for candidate in path.rglob("*") if candidate.is_dir()]
+    for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+        os.chmod(directory, 0o500)
+    os.chmod(path, 0o500)
+
+
+def make_repository_tree_removable(path: Path) -> None:
+    if not path.exists():
+        return
+    for candidate in path.rglob("*"):
+        if candidate.is_dir() and not candidate.is_symlink():
+            os.chmod(candidate, 0o700)
+    os.chmod(path, 0o700)
+
+
+def verify_repository_corpus(path: Path) -> dict[str, Any]:
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or info.st_uid != os.geteuid():
+        fail("repository corpus directory authority is invalid")
+    header = validate_repository_header(read_json_file(path / "CORPUS_MANIFEST.json", MAX_REPOSITORY_HEADER_BYTES))
+    if {candidate.name for candidate in path.iterdir()} != {
+        "candidate",
+        "CORPUS_MANIFEST.json",
+        "REVIEW_METADATA.json",
+        "REVIEW_PATCH.diff",
+    }:
+        fail("sealed repository corpus contains unexpected root entries")
+    patch = ensure_trusted_file(
+        path / "REVIEW_PATCH.diff", root_owned=False, max_bytes=MAX_REPOSITORY_PATCH_BYTES
+    )
+    if len(patch) != header["patch_bytes"] or content_hash(patch) != header["patch_hash"]:
+        fail("sealed repository patch changed")
+    metadata = read_json_file(path / "REVIEW_METADATA.json")
+    expected_metadata = {
+        "schema_version": PROTOCOL_VERSION,
+        "repository_id": header["repository_id"],
+        "base_object_id": header["base_object_id"],
+        "candidate_object_id": header["candidate_object_id"],
+        "corpus_hash": header["corpus_hash"],
+        "selection_hash": header["selection_hash"],
+        "candidate_root": "candidate",
+        "patch_path": "REVIEW_PATCH.diff",
+    }
+    if metadata != expected_metadata:
+        fail("sealed repository review metadata changed")
+    candidate_root = path / "candidate"
+    candidate_info = candidate_root.lstat()
+    if not stat.S_ISDIR(candidate_info.st_mode) or stat.S_ISLNK(candidate_info.st_mode):
+        fail("sealed repository candidate root is invalid")
+    expected_paths = {entry["path"] for entry in header["entries"]}
+    observed_paths: set[str] = set()
+    for candidate in candidate_root.rglob("*"):
+        candidate_info = candidate.lstat()
+        if stat.S_ISDIR(candidate_info.st_mode):
+            continue
+        if stat.S_ISLNK(candidate_info.st_mode) or not stat.S_ISREG(candidate_info.st_mode):
+            fail("sealed repository candidate contains a non-regular file")
+        observed_paths.add(candidate.relative_to(candidate_root).as_posix())
+    if observed_paths != expected_paths:
+        fail("sealed repository candidate path selection changed")
+    for entry in header["entries"]:
+        target = candidate_root.joinpath(*entry["path"].split("/"))
+        data = ensure_trusted_file(target, root_owned=False, max_bytes=MAX_REPOSITORY_FILE_BYTES)
+        target_info = target.lstat()
+        if (
+            len(data) != entry["byte_length"]
+            or content_hash(data) != entry["content_hash"]
+            or bool(target_info.st_mode & stat.S_IXUSR) != entry["executable"]
+        ):
+            fail("sealed repository candidate content changed")
+    return header
+
+
+def install_repository_corpus(
+    header: dict[str, Any], files: list[bytes], patch: bytes
+) -> Path:
+    workspace_id = "repository-" + canonical_hash(
+        {
+            "repository_id": header["repository_id"],
+            "base_object_id": header["base_object_id"],
+            "candidate_object_id": header["candidate_object_id"],
+            "corpus_hash": header["corpus_hash"],
+            "selection_hash": header["selection_hash"],
+        }
+    ).removeprefix("sha256:")[:24]
+    target = repository_corpus_path(workspace_id)
+    if target.exists():
+        existing = verify_repository_corpus(target)
+        if canonical_hash(existing) != canonical_hash(header):
+            fail("repository corpus identity conflicts with existing sealed content")
+        return target
+    staging = REPOSITORY_CORPORA / (".pending-" + uuid.uuid4().hex)
+    staging.mkdir(mode=0o700)
+    try:
+        candidate_root = staging / "candidate"
+        candidate_root.mkdir(mode=0o700)
+        for entry, data in zip(header["entries"], files, strict=True):
+            write_repository_file(candidate_root, entry["path"], data, entry["executable"])
+        write_atomic(staging / "REVIEW_PATCH.diff", patch, 0o400)
+        write_atomic(staging / "CORPUS_MANIFEST.json", canonical_bytes(header) + b"\n", 0o400)
+        write_atomic(
+            staging / "REVIEW_METADATA.json",
+            canonical_bytes({
+                "schema_version": PROTOCOL_VERSION,
+                "repository_id": header["repository_id"],
+                "base_object_id": header["base_object_id"],
+                "candidate_object_id": header["candidate_object_id"],
+                "corpus_hash": header["corpus_hash"],
+                "selection_hash": header["selection_hash"],
+                "candidate_root": "candidate",
+                "patch_path": "REVIEW_PATCH.diff",
+            })
+            + b"\n",
+            0o400,
+        )
+        verify_repository_corpus(staging)
+        seal_repository_directories(staging)
+        try:
+            os.rename(staging, target)
+        except FileExistsError:
+            existing = verify_repository_corpus(target)
+            if canonical_hash(existing) != canonical_hash(header):
+                fail("repository corpus publication raced with conflicting content")
+        fsync_directory(REPOSITORY_CORPORA)
+    finally:
+        if staging.exists():
+            make_repository_tree_removable(staging)
+            shutil.rmtree(staging)
+    verify_repository_corpus(target)
+    return target
+
+
+def prepare_repository_bundle(
+    header: dict[str, Any], files: list[bytes], patch: bytes
+) -> dict[str, Any]:
+    qualification = load_qualification()
+    if header["environment_id"] != qualification["environment_id"]:
+        fail("repository corpus environment does not match the qualified environment")
+    ensure_secure_directory(REPOSITORY_CORPORA, create=True)
+    corpus = install_repository_corpus(header, files, patch)
+    workspace_id = corpus.name
+    observed = now_utc()
+    expires = attestation_expiry(observed, qualification)
+    bundle = {
+        "executor": current_executor_attestation(qualification, observed),
+        "environment": {
+            "schema_version": PROTOCOL_VERSION,
+            "provider_id": qualification["provider_id"],
+            "environment_id": header["environment_id"],
+            "topology_hash": qualification["topology_hash"],
+            "controls": qualification["controls"],
+            "observed_at": instant(observed),
+            "expires_at": instant(expires),
+        },
+        "workspace": {
+            "schema_version": PROTOCOL_VERSION,
+            "workspace_id": workspace_id,
+            "repository_id": header["repository_id"],
+            "base_object_id": header["base_object_id"],
+            "candidate_object_id": header["candidate_object_id"],
+            "corpus_hash": header["corpus_hash"],
+            "selection_hash": header["selection_hash"],
+            "corpus_kind": "repository",
+            "observed_at": instant(observed),
+            "expires_at": instant(expires),
+        },
+    }
+    hashes = bundle_hashes(bundle)
+    record = {"schema_version": PROTOCOL_VERSION, "hashes": hashes, "bundle": bundle}
+    write_atomic(attestation_path(hashes), canonical_bytes(record) + b"\n")
+    return bundle
 
 
 def prepare_bundle(spec: dict[str, Any]) -> dict[str, Any]:
@@ -625,13 +1044,26 @@ def exact_attestation_bundle(authorization: dict[str, Any], *, require_live: boo
             or environment["controls"] != qualification["controls"]
         ):
             fail("qualified environment changed after authorization")
-        corpus_hash, selection_hash = hash_synthetic_tree()
-        if (
-            workspace["corpus_kind"] != "synthetic"
-            or workspace["corpus_hash"] != corpus_hash
-            or workspace["selection_hash"] != selection_hash
-        ):
-            fail("synthetic workspace changed after authorization")
+        if workspace["corpus_kind"] == "synthetic":
+            corpus_hash, selection_hash = hash_synthetic_tree()
+            if (
+                workspace["corpus_hash"] != corpus_hash
+                or workspace["selection_hash"] != selection_hash
+            ):
+                fail("synthetic workspace changed after authorization")
+        elif workspace["corpus_kind"] == "repository":
+            header = verify_repository_corpus(repository_corpus_path(workspace["workspace_id"]))
+            if (
+                header["source_binding"]["attempt_id"] != authorization["attempt_id"]
+                or header["repository_id"] != workspace["repository_id"]
+                or header["base_object_id"] != workspace["base_object_id"]
+                or header["candidate_object_id"] != workspace["candidate_object_id"]
+                or header["corpus_hash"] != workspace["corpus_hash"]
+                or header["selection_hash"] != workspace["selection_hash"]
+            ):
+                fail("repository workspace changed after authorization")
+        else:
+            fail("attested workspace corpus kind is unsupported")
     return bundle
 
 
@@ -733,7 +1165,7 @@ def append_terminal(handle: str, event_type: str, payload: dict[str, Any]) -> No
     )
 
 
-def provider_offer(authorization: dict[str, Any]) -> bytes:
+def provider_offer(authorization: dict[str, Any], corpus_kind: str) -> bytes:
     offer = {
         "attempt_id": authorization["attempt_id"],
         "delegation_id": authorization["delegation_id"],
@@ -741,7 +1173,7 @@ def provider_offer(authorization: dict[str, Any]) -> bytes:
         "authority_binding": authorization["binding_digest"],
     }
     text = (
-        "You are being offered a governed synthetic read-only review delegation.\n"
+        f"You are being offered a governed {corpus_kind} read-only review delegation.\n"
         "No task corpus is mounted in this offer phase. The session has the same read-only shell "
         "capability it would retain after acceptance, but you do not need to use it to decide.\n"
         "You may freely decline. Reply with exactly ACCEPT or exactly NO.\n"
@@ -753,10 +1185,10 @@ def provider_offer(authorization: dict[str, Any]) -> bytes:
     return text.encode("utf-8")
 
 
-def phase_two_prompt(prompt: bytes, output_schema: dict[str, Any]) -> bytes:
+def phase_two_prompt(prompt: bytes, output_schema: dict[str, Any], corpus_kind: str) -> bytes:
     schema = json.dumps(output_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
     prefix = (
-        "This is the authorized synthetic read-only review you accepted.\n"
+        f"This is the authorized {corpus_kind} read-only review you accepted.\n"
         "You retain the right to stop: a final response exactly equal to NO is a terminal refusal.\n"
         "Otherwise your final response must be only one JSON value conforming exactly to the "
         "schema below. Do not wrap it in markdown.\n\n"
@@ -794,13 +1226,18 @@ def parse_launch_frame() -> tuple[dict[str, Any], bytes]:
 
 
 def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
-    require_keys(metadata, ("authorization", "output_schema", "mode"), "launch metadata")
-    if metadata["mode"] != "synthetic_only":
-        fail("provider is restricted to synthetic-only launch")
+    expected_launch_keys = {"authorization", "output_schema", "mode"}
+    if set(metadata) not in (expected_launch_keys, expected_launch_keys | {"input_binding"}):
+        fail("launch metadata has unexpected or missing fields")
+    if metadata["mode"] not in ("synthetic_only", "repository_read_only"):
+        fail("provider launch mode is unsupported")
     authorization = metadata["authorization"]
     if not isinstance(authorization, dict):
         fail("launch authorization must be an object")
-    exact_attestation_bundle(authorization, require_live=True)
+    bundle = exact_attestation_bundle(authorization, require_live=True)
+    expected_kind = "synthetic" if metadata["mode"] == "synthetic_only" else "repository"
+    if bundle["workspace"]["corpus_kind"] != expected_kind:
+        fail("provider launch mode does not match its attested workspace")
     authorization = validate_authorization(authorization)
     if parse_instant(authorization["authorized_at"], "authorized_at") > now_utc():
         fail("authorization is not active yet")
@@ -809,6 +1246,24 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
     output_schema = metadata["output_schema"]
     if not isinstance(output_schema, dict) or len(canonical_bytes(output_schema)) > MAX_CONTROL_BYTES:
         fail("result schema is not a bounded JSON object")
+    input_binding = metadata.get("input_binding")
+    if input_binding is not None:
+        if not isinstance(input_binding, dict):
+            fail("launch input binding must be an object")
+        require_keys(
+            input_binding,
+            ("prompt_hash", "output_schema_hash", "task_offer_hash", "delegation_offer_hash"),
+            "launch input binding",
+        )
+        for field in input_binding:
+            require_hash(input_binding[field], f"input_binding.{field}")
+        if (
+            input_binding["prompt_hash"] != content_hash(prompt)
+            or input_binding["output_schema_hash"] != canonical_hash(output_schema)
+        ):
+            fail("launch input bytes do not match their exact binding")
+    if expected_kind == "repository" and input_binding is None:
+        fail("repository launch requires an exact task input binding")
     handle = "provider-" + uuid.uuid4().hex
     operation_id = "operation-" + uuid.uuid4().hex
     directory = operation_directory(handle)
@@ -825,6 +1280,9 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
         "unit": "lexrunner-" + handle + ".service",
         "started_at": instant(now_utc()),
         "authorization": authorization,
+        "workspace_id": bundle["workspace"]["workspace_id"],
+        "corpus_kind": bundle["workspace"]["corpus_kind"],
+        **({"input_binding": input_binding} if input_binding is not None else {}),
         "max_output_bytes": authorization["grant"]["max_output_bytes"],
         "max_duration_ms": authorization["grant"]["max_duration_ms"],
     }
@@ -840,6 +1298,25 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
         "providerHandle": handle,
         "startedAt": operation["started_at"],
     }
+
+
+def validate_operation_input_binding(record: dict[str, Any]) -> dict[str, str] | None:
+    binding = record.get("input_binding")
+    if binding is None:
+        if record.get("corpus_kind") == "repository":
+            fail("repository operation lost its exact task input binding")
+        return None
+    prompt = ensure_trusted_file(
+        operation_directory(record["provider_handle"]) / "prompt.bin",
+        root_owned=False,
+        max_bytes=MAX_PROMPT_BYTES,
+    )
+    schema = read_json_file(operation_directory(record["provider_handle"]) / "schema.json")
+    if binding.get("prompt_hash") != content_hash(prompt) or binding.get(
+        "output_schema_hash"
+    ) != canonical_hash(schema):
+        fail("persisted operation input changed after launch")
+    return binding
 
 
 def start_worker(operation: dict[str, Any]) -> None:
@@ -899,7 +1376,12 @@ def operation(handle: str) -> dict[str, Any]:
 def bwrap_command(handle: str, *, phase: str, thread_id: str | None = None) -> list[str]:
     record = operation(handle)
     directory = operation_directory(handle)
-    workspace = directory / "offer-workspace" if phase == "offer" else SYNTHETIC_CORPUS
+    if phase == "offer":
+        workspace = directory / "offer-workspace"
+    elif record["corpus_kind"] == "synthetic":
+        workspace = SYNTHETIC_CORPUS
+    else:
+        workspace = repository_corpus_path(record["workspace_id"])
     command = [
         str(BWRAP_EXECUTABLE),
         "--die-with-parent",
@@ -1222,21 +1704,38 @@ def run_worker(handle: str) -> None:
     record = operation(handle)
     authorization = validate_authorization(record["authorization"])
     exact_attestation_bundle(authorization, require_live=True)
+    input_binding = validate_operation_input_binding(record)
+    started_receipt = {
+        "operation_id": record["operation_id"],
+        "provider_handle": handle,
+        "authorization_binding_digest": authorization["binding_digest"],
+    }
+    if input_binding is not None:
+        started_receipt["input_binding"] = input_binding
+    if record["corpus_kind"] == "repository":
+        header = verify_repository_corpus(repository_corpus_path(record["workspace_id"]))
+        started_receipt["repository_corpus"] = {
+            "manifest_hash": canonical_hash(header),
+            "source_binding_hash": header["source_binding_hash"],
+            "workspace_lease_id": header["source_binding"]["workspace_lease_id"],
+            "task_packet_hash": header["source_binding"]["task_packet_hash"],
+            "launch_envelope_hash": header["source_binding"]["launch_envelope_hash"],
+            "path_mapping_hash": header["source_binding"]["path_mapping_hash"],
+            "candidate_tree_hash": header["candidate_tree_hash"],
+            "patch_hash": header["patch_hash"],
+        }
     append_event(
         handle,
         "started",
-        canonical_bytes(
-            {
-                "operation_id": record["operation_id"],
-                "provider_handle": handle,
-                "authorization_binding_digest": authorization["binding_digest"],
-            }
-        ),
+        canonical_bytes(started_receipt),
         "provider_receipt",
     )
     maximum = record["max_output_bytes"]
     return_code, thread_id, messages, declined = stream_codex(
-        handle, bwrap_command(handle, phase="offer"), provider_offer(authorization), maximum
+        handle,
+        bwrap_command(handle, phase="offer"),
+        provider_offer(authorization, record["corpus_kind"]),
+        maximum,
     )
     if declined:
         append_terminal(handle, "declined", {"decision": "NO", "reason_present": False})
@@ -1273,6 +1772,7 @@ def run_worker(handle: str) -> None:
         cleanup_operation_secrets(handle)
         return
     exact_attestation_bundle(authorization, require_live=True)
+    validate_operation_input_binding(record)
     prompt = ensure_trusted_file(
         operation_directory(handle) / "prompt.bin", root_owned=False, max_bytes=MAX_PROMPT_BYTES
     )
@@ -1280,7 +1780,7 @@ def run_worker(handle: str) -> None:
     return_code, _thread, messages, declined = stream_codex(
         handle,
         bwrap_command(handle, phase="review", thread_id=thread_id),
-        phase_two_prompt(prompt, schema),
+        phase_two_prompt(prompt, schema, record["corpus_kind"]),
         maximum,
     )
     if declined:
@@ -1422,11 +1922,51 @@ def release_operation(handle: str) -> None:
     if not directory.exists():
         return
     ensure_secure_directory(directory)
+    record = operation(handle)
     if terminal_event(handle) is None:
         fail("provider operation cannot be released before a terminal event")
     cleanup_operation_secrets(handle)
     shutil.rmtree(directory)
     fsync_directory(OPERATIONS)
+    if record.get("corpus_kind") == "repository":
+        workspace_id = record.get("workspace_id")
+        still_referenced = False
+        for candidate in OPERATIONS.iterdir():
+            if not candidate.is_dir() or candidate.is_symlink():
+                continue
+            try:
+                other = read_json_file(candidate / "operation.json")
+            except (ProviderError, OSError):
+                still_referenced = True
+                break
+            if other.get("workspace_id") == workspace_id:
+                still_referenced = True
+                break
+        if not still_referenced:
+            corpus = repository_corpus_path(workspace_id)
+            if corpus.exists():
+                make_repository_tree_removable(corpus)
+                shutil.rmtree(corpus)
+                fsync_directory(REPOSITORY_CORPORA)
+
+
+def discard_repository(workspace_id: str) -> None:
+    corpus = repository_corpus_path(workspace_id)
+    if not corpus.exists():
+        return
+    verify_repository_corpus(corpus)
+    for candidate in OPERATIONS.iterdir():
+        if not candidate.is_dir() or candidate.is_symlink():
+            continue
+        try:
+            record = read_json_file(candidate / "operation.json")
+        except (ProviderError, OSError):
+            fail("repository corpus reference state is ambiguous")
+        if record.get("workspace_id") == workspace_id:
+            fail("repository corpus is referenced by an operation")
+    make_repository_tree_removable(corpus)
+    shutil.rmtree(corpus)
+    fsync_directory(REPOSITORY_CORPORA)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1437,6 +1977,12 @@ def build_parser() -> argparse.ArgumentParser:
     for command in ("prepare", "attest"):
         child = subparsers.add_parser(command)
         child.add_argument("--stdin-format", choices=("canonical-json-v1",), required=True)
+    repository = subparsers.add_parser("prepare-repository")
+    repository.add_argument(
+        "--stdin-framing", choices=("lexrunner-repository-corpus-v1",), required=True
+    )
+    discard = subparsers.add_parser("discard-repository")
+    discard.add_argument("--workspace-id", required=True)
     launch = subparsers.add_parser("launch")
     launch.add_argument("--stdin-framing", choices=("lexrunner-provider-v1",), required=True)
     observe = subparsers.add_parser("observe")
@@ -1463,6 +2009,12 @@ def dispatch(arguments: argparse.Namespace) -> None:
         emit_json(current_executor_attestation(qualification))
     elif arguments.command == "prepare":
         emit_json(prepare_bundle(read_json_stdin()))
+    elif arguments.command == "prepare-repository":
+        header, files, patch = parse_repository_frame()
+        emit_json(prepare_repository_bundle(header, files, patch))
+    elif arguments.command == "discard-repository":
+        discard_repository(arguments.workspace_id)
+        emit_json({"discarded": True})
     elif arguments.command == "attest":
         emit_json(exact_attestation_bundle(read_json_stdin(), require_live=True))
     elif arguments.command == "launch":

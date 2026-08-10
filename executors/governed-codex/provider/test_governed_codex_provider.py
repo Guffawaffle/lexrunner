@@ -26,6 +26,9 @@ os.environ.update(
         "LEXRUNNER_PROVIDER_EXECUTABLE": str(
             Path(__file__).with_name("governed_codex_provider.py")
         ),
+        "LEXRUNNER_PROVIDER_REPOSITORY_EXPORTER": str(
+            Path(__file__).with_name("governed_repository_corpus_exporter.py")
+        ),
     }
 )
 
@@ -34,6 +37,13 @@ SPEC = importlib.util.spec_from_file_location("governed_codex_provider", MODULE_
 assert SPEC is not None and SPEC.loader is not None
 provider = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(provider)
+
+INSTALL_SPEC = importlib.util.spec_from_file_location(
+    "install_qualification", Path(__file__).with_name("install_qualification.py")
+)
+assert INSTALL_SPEC is not None and INSTALL_SPEC.loader is not None
+install_qualification = importlib.util.module_from_spec(INSTALL_SPEC)
+INSTALL_SPEC.loader.exec_module(install_qualification)
 
 
 def when(seconds: int) -> str:
@@ -61,6 +71,9 @@ class GovernedCodexProviderTest(unittest.TestCase):
             "provider_id": "lexrunner.wsl2-bwrap",
             "environment_id": "disposable-environment-1",
             "topology_hash": provider.canonical_hash({"topology": "qualified"}),
+            "execution_profile_hash": provider.canonical_hash(
+                provider.fixed_execution_profile()
+            ),
             "controls": [
                 {
                     "control": control,
@@ -131,6 +144,65 @@ class GovernedCodexProviderTest(unittest.TestCase):
             provider.exact_attestation_bundle(authorization, require_live=True)
         corpus.write_text("Synthetic review corpus.\n", encoding="utf-8")
 
+    def test_qualification_report_binds_git_and_the_repository_exporter(self) -> None:
+        report = {
+            "schema_version": "1.0.0",
+            "codex_version": provider.codex_version(),
+            "provider_hash": provider.executable_hash(Path(provider.__file__).resolve()),
+            "codex_hash": provider.executable_hash(provider.CODEX_EXECUTABLE),
+            "bwrap_hash": provider.executable_hash(provider.BWRAP_EXECUTABLE),
+            "repository_exporter_hash": provider.executable_hash(
+                provider.REPOSITORY_EXPORTER
+            ),
+            "git_hash": provider.executable_hash(provider.GIT_EXECUTABLE),
+            "git_version": provider.git_version(),
+            "controls": {
+                control: True for control in install_qualification.EXPECTED_CONTROLS
+            },
+            "diagnostics": {
+                "command_outputs": 1,
+                "final_message_is_object": True,
+                "retained_handle": None,
+            },
+            "passed": True,
+        }
+        install_qualification.validate_report(report, provider)
+        report["git_hash"] = provider.canonical_hash({"git": "replaced"})
+        with self.assertRaisesRegex(
+            install_qualification.QualificationError, "git_hash no longer matches"
+        ):
+            install_qualification.validate_report(report, provider)
+
+    def test_runtime_rejects_a_changed_qualified_execution_profile(self) -> None:
+        original = REQUIREMENTS.read_bytes()
+        try:
+            REQUIREMENTS.write_bytes(original + b"# changed after qualification\n")
+            with self.assertRaisesRegex(
+                provider.ProviderError, "execution profile no longer matches"
+            ):
+                provider.load_qualification()
+        finally:
+            REQUIREMENTS.write_bytes(original)
+
+    def test_seals_and_rehashes_a_credential_free_repository_corpus(self) -> None:
+        content = b"candidate\n"
+        patch = b"diff --git a/a.txt b/a.txt\n"
+        header = self.repository_header(content, patch)
+        bundle = provider.prepare_repository_bundle(header, [content], patch)
+
+        self.assertEqual(bundle["workspace"]["corpus_kind"], "repository")
+        self.assertEqual(bundle["workspace"]["corpus_hash"], header["corpus_hash"])
+        corpus = provider.repository_corpus_path(bundle["workspace"]["workspace_id"])
+        self.assertEqual(provider.verify_repository_corpus(corpus), header)
+        self.assertFalse((corpus / "candidate" / ".git").exists())
+
+        provider.make_repository_tree_removable(corpus)
+        (corpus / "unexpected").write_text("tamper", encoding="utf-8")
+        with self.assertRaisesRegex(provider.ProviderError, "unexpected root entries"):
+            provider.verify_repository_corpus(corpus)
+        (corpus / "unexpected").unlink()
+        provider.seal_repository_directories(corpus)
+
     def test_continuation_requires_durable_accept_and_exact_authorization(self) -> None:
         handle = "provider-" + "d" * 32
         directory = provider.operation_directory(handle)
@@ -175,6 +247,37 @@ class GovernedCodexProviderTest(unittest.TestCase):
             continuation["authorization_binding_digest"], authorization["binding_digest"]
         )
 
+    def test_discards_only_an_unreferenced_repository_corpus(self) -> None:
+        content = b"disposable candidate\n"
+        patch = b"diff --git a/disposable.txt b/disposable.txt\n"
+        header = self.repository_header(content, patch)
+        bundle = provider.prepare_repository_bundle(header, [content], patch)
+        workspace_id = bundle["workspace"]["workspace_id"]
+        corpus = provider.repository_corpus_path(workspace_id)
+
+        handle = "provider-" + "e" * 32
+        directory = provider.operation_directory(handle)
+        directory.mkdir(mode=0o700, parents=True)
+        provider.write_atomic(
+            directory / "operation.json",
+            provider.canonical_bytes(
+                {
+                    "provider_handle": handle,
+                    "corpus_kind": "repository",
+                    "workspace_id": workspace_id,
+                }
+            )
+            + b"\n",
+        )
+        with self.assertRaisesRegex(provider.ProviderError, "referenced"):
+            provider.discard_repository(workspace_id)
+        self.assertTrue(corpus.exists())
+
+        provider.append_terminal(handle, "cancelled", {"reason": "test"})
+        provider.release_operation(handle)
+        self.assertFalse(corpus.exists())
+        provider.discard_repository(workspace_id)
+
     def test_terminal_event_closes_the_provider_stream(self) -> None:
         handle = "provider-" + "a" * 32
         directory = provider.operation_directory(handle)
@@ -205,6 +308,8 @@ class GovernedCodexProviderTest(unittest.TestCase):
                 {
                     "provider_handle": handle,
                     "authorization": {"grant": {"tools": ["read_only_shell"]}},
+                    "corpus_kind": "synthetic",
+                    "workspace_id": "synthetic-workspace",
                 }
             )
             + b"\n",
@@ -223,6 +328,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         resumed_prompt = provider.phase_two_prompt(
             b"Review the bounded candidate.",
             {"type": "object", "required": ["verdict"]},
+            "synthetic",
         ).decode("utf-8")
         self.assertIn("final response exactly equal to NO", resumed_prompt)
         self.assertIn(
@@ -233,6 +339,17 @@ class GovernedCodexProviderTest(unittest.TestCase):
         handle = "provider-" + "c" * 32
         directory = provider.operation_directory(handle)
         directory.mkdir(mode=0o700, parents=True)
+        provider.write_atomic(
+            directory / "operation.json",
+            provider.canonical_bytes(
+                {
+                    "provider_handle": handle,
+                    "corpus_kind": "synthetic",
+                    "workspace_id": "synthetic-workspace",
+                }
+            )
+            + b"\n",
+        )
         provider.append_event(handle, "started", b"{}", "provider_receipt")
         with self.assertRaisesRegex(provider.ProviderError, "terminal"):
             provider.release_operation(handle)
@@ -241,6 +358,36 @@ class GovernedCodexProviderTest(unittest.TestCase):
         provider.release_operation(handle)
         self.assertFalse(directory.exists())
         provider.release_operation(handle)
+
+    def repository_header(self, content: bytes, patch: bytes) -> dict:
+        source = {
+            "attempt_id": "attempt-1",
+            "workspace_lease_id": "workspace-1",
+            "task_packet_hash": provider.canonical_hash({"packet": 1}),
+            "launch_envelope_hash": provider.canonical_hash({"envelope": 1}),
+            "path_mapping_hash": provider.canonical_hash({"mapping": 1}),
+        }
+        entries = [
+            {
+                "path": "a.txt",
+                "byte_length": len(content),
+                "content_hash": provider.content_hash(content),
+                "executable": False,
+            }
+        ]
+        header = {
+            "schema_version": "1.0.0",
+            "environment_id": "disposable-environment-1",
+            "repository_id": "repository-1",
+            "base_object_id": "1" * 40,
+            "candidate_object_id": "2" * 40,
+            "source_binding": source,
+            "entries": entries,
+            "candidate_tree_bytes": len(content),
+            "patch_bytes": len(patch),
+            "patch_hash": provider.content_hash(patch),
+        }
+        return {**header, **provider.repository_header_hashes(header)}
 
 
 if __name__ == "__main__":

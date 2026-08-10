@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Governed committed-corpus review** - Bind a clean committed native-WSL candidate to its exact
+  Attempt, workspace lease, task packet, launch envelope, and path mapping; export only bounded Git
+  object bytes and the exact patch; seal them read-only for the asynchronous two-phase Codex review.
+- **Independent repository verification** - Reopen the authoritative lifecycle records and require
+  protected provider receipts to match the corpus, prompt, schema, task offer, and Delegation before
+  a review can become admissible.
+
+### Changed
+
+- **Qualified provider topology** - Bind the root-owned repository exporter and exact Git executable
+  and version into live qualification evidence, and securely discard sealed corpora that never
+  become operation-bound.
+
 ## [1.4.1] - 2026-08-04
 
 ### Added

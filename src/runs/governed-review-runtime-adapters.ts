@@ -9,6 +9,10 @@ import type {
   AgentWorkHandlerResult,
 } from "./agent-work-adapters.js";
 import { ExternalWsl2CodexProviderBridge } from "./external-wsl2-codex-provider-bridge.js";
+import {
+  ExternalWsl2RepositoryCorpusSource,
+  type GovernedRepositoryCorpusSource,
+} from "./external-wsl2-repository-corpus-source.js";
 import { PersistentGovernedReviewSupervisor } from "./governed-review-persistent-supervisor.js";
 import { GovernedReviewRuntime } from "./governed-review-runtime.js";
 import type { QualifiedCodexProviderBridge } from "./qualified-wsl2-codex-executor.js";
@@ -22,7 +26,11 @@ import {
   WindowsProtectedEvidenceAuthority,
   defaultWindowsProtectedEvidenceRoot,
 } from "../store/windows-protected-evidence-authority.js";
-import type { WorkspaceLifecycleStore } from "../store/workspace-lifecycle-store.js";
+import type {
+  LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
+  WorkspaceLifecycleStore,
+} from "../store/workspace-lifecycle-store.js";
 
 const MAX_PROMPT_BYTES = 1 * 1_024 * 1_024;
 const opaqueId = z
@@ -48,6 +56,7 @@ export const GovernedReviewStartRequest_v1 = z
     attemptId: opaqueId,
     distribution,
     environmentId: opaqueId,
+    corpusKind: z.enum(["synthetic", "repository"]).default("synthetic"),
     objective: z.string().trim().min(1).max(4_096),
     prompt: z.instanceof(Uint8Array).refine((value) => value.byteLength <= MAX_PROMPT_BYTES),
   })
@@ -68,6 +77,9 @@ export interface GovernedReviewStartProjection {
   delegationId?: string;
   captureId?: string;
   supervisionStarted?: boolean;
+  corpusKind?: "synthetic" | "repository";
+  candidateObjectId?: string;
+  corpusHash?: string;
   reason?: string;
 }
 
@@ -87,7 +99,11 @@ export interface GovernedReviewRuntimeHandlers {
 
 type ReviewStore = GovernedAttemptOperationStore &
   GovernedDelegationStore & { close(): Promise<void> };
-type LifecycleReader = Pick<WorkspaceLifecycleStore, "getAttempt"> & { close(): Promise<void> };
+type RepositoryLifecycleReader = Pick<WorkspaceLifecycleStore, "getWorkspaceLease"> &
+  Pick<LaunchEnvelopeBindingStore, "getLaunchEnvelopeBinding"> &
+  Pick<TaskPacketBindingStore, "getTaskPacketBinding">;
+type LifecycleReader = Pick<WorkspaceLifecycleStore, "getAttempt"> &
+  Partial<RepositoryLifecycleReader> & { close(): Promise<void> };
 interface ProtectedRootAuthority {
   attestRoot(root: string): Promise<boolean>;
   syncDirectory(directory: string): Promise<void>;
@@ -100,6 +116,7 @@ export interface GovernedReviewRuntimeHandlerDependencies {
   createAuthority?: () => ProtectedRootAuthority;
   evidenceRoot?: () => string;
   createBridge?: (distribution: string) => QualifiedCodexProviderBridge;
+  createRepositoryCorpusSource?: (distribution: string) => GovernedRepositoryCorpusSource;
   launchSupervisor?: (input: {
     databasePath: string;
     operationId: string;
@@ -123,6 +140,9 @@ export function createGovernedReviewRuntimeHandlers(
   const createBridge =
     dependencies.createBridge ??
     ((candidate: string) => new ExternalWsl2CodexProviderBridge({ distribution: candidate }));
+  const createRepositoryCorpusSource =
+    dependencies.createRepositoryCorpusSource ??
+    ((candidate: string) => new ExternalWsl2RepositoryCorpusSource({ distribution: candidate }));
   const launchSupervisor = dependencies.launchSupervisor ?? launchDetachedSupervisor;
   const now = dependencies.now ?? (() => new Date().toISOString());
 
@@ -156,17 +176,25 @@ export function createGovernedReviewRuntimeHandlers(
         const runtime = new GovernedReviewRuntime({
           store,
           lifecycle,
+          ...(isRepositoryLifecycleReader(lifecycle) ? { repositoryLifecycle: lifecycle } : {}),
           evidenceStore,
           bridge: createBridge(parsed.data.distribution),
+          ...(parsed.data.corpusKind === "repository"
+            ? { repositoryCorpusSource: createRepositoryCorpusSource(parsed.data.distribution) }
+            : {}),
           now,
         });
-        const result = await runtime.startSynthetic({
+        const startInput = {
           runId: parsed.data.runId,
           attemptId: parsed.data.attemptId,
           environmentId: parsed.data.environmentId,
           objective: parsed.data.objective,
           prompt: parsed.data.prompt,
-        });
+        };
+        const result =
+          parsed.data.corpusKind === "repository"
+            ? await runtime.startRepository(startInput)
+            : await runtime.startSynthetic(startInput);
         if (!result.started) {
           return {
             ok: true,
@@ -182,6 +210,13 @@ export function createGovernedReviewRuntimeHandlers(
           operationId: result.operationId,
           distribution: parsed.data.distribution,
         });
+        const corpus =
+          parsed.data.corpusKind === "repository" && "corpus" in result
+            ? (result.corpus as {
+                candidate_object_id: string;
+                corpus_hash: string;
+              })
+            : undefined;
         return {
           ok: true,
           result: {
@@ -190,6 +225,13 @@ export function createGovernedReviewRuntimeHandlers(
             operationId: result.operationId,
             delegationId: result.delegationId,
             captureId: result.captureId,
+            corpusKind: parsed.data.corpusKind,
+            ...(corpus
+              ? {
+                  candidateObjectId: corpus.candidate_object_id,
+                  corpusHash: corpus.corpus_hash,
+                }
+              : {}),
             supervisionStarted,
             ...(!supervisionStarted ? { reason: "supervisor_launch_failed" } : {}),
           },
@@ -207,11 +249,14 @@ export function createGovernedReviewRuntimeHandlers(
       const parsed = GovernedReviewSuperviseRequest_v1.safeParse(candidate);
       if (!parsed.success) return invalid("supervise", parsed.error.issues);
       let store: ReviewStore | undefined;
+      let lifecycle: LifecycleReader | undefined;
       let authority: ProtectedRootAuthority | undefined;
       try {
         store = openStore(parsed.data.databasePath);
+        lifecycle = openLifecycle(parsed.data.databasePath);
         authority = createAuthority();
       } catch (error) {
+        await lifecycle?.close().catch(() => undefined);
         await store?.close().catch(() => undefined);
         await authority?.close().catch(() => undefined);
         return operationFailed(error);
@@ -234,6 +279,7 @@ export function createGovernedReviewRuntimeHandlers(
           evidenceStore,
           evidenceReader,
           bridge: createBridge(parsed.data.distribution),
+          ...(isRepositoryLifecycleReader(lifecycle) ? { repositoryLifecycle: lifecycle } : {}),
           now,
         }).run(parsed.data.operationId);
         return {
@@ -255,6 +301,7 @@ export function createGovernedReviewRuntimeHandlers(
       } catch (error) {
         return operationFailed(error);
       } finally {
+        await lifecycle.close().catch(() => undefined);
         await store.close().catch(() => undefined);
         await authority.close().catch(() => undefined);
       }
@@ -312,6 +359,16 @@ function sanitizedSupervisorEnvironment(): NodeJS.ProcessEnv {
     if (value) environment[name] = value;
   }
   return environment;
+}
+
+function isRepositoryLifecycleReader(
+  candidate: LifecycleReader
+): candidate is LifecycleReader & RepositoryLifecycleReader {
+  return (
+    typeof candidate.getWorkspaceLease === "function" &&
+    typeof candidate.getLaunchEnvelopeBinding === "function" &&
+    typeof candidate.getTaskPacketBinding === "function"
+  );
 }
 
 function invalid(

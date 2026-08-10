@@ -9,15 +9,20 @@ import {
   authorizeGovernedReview,
 } from "../../src/runs/governed-attempt-executor.js";
 import { GovernedAttemptIndependentVerifier } from "../../src/runs/governed-attempt-independent-verifier.js";
+import { computeDelegationOfferHash } from "../../src/runs/governed-attempt-protocol.js";
 import {
   createGovernedAttemptVerificationContext,
   type IndependentlyReadEvidenceFrame,
 } from "../../src/runs/governed-attempt-verification.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
+import { createAgentTaskPacket, ExecutionEnvelope_v1 } from "../../src/schemas/agent-work.js";
+import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
+import { canonicalJSONStringify } from "../../src/util/canonicalJson.js";
 import {
   GovernedAttemptOperationEvent_v1,
   GovernedAttemptOperationRecord_v1,
 } from "../../src/store/governed-attempt-operation-store.js";
+import { GovernedDelegationRecord_v1 } from "../../src/store/governed-delegation-store.js";
 import {
   computeProtectedEvidenceFrameHash,
   initialProtectedEvidenceChainHead,
@@ -123,9 +128,54 @@ describe("GovernedAttemptIndependentVerifier", () => {
       expect.arrayContaining(["outcome_mismatch", "provider_claim_elevated"])
     );
   });
+
+  it("rejects a durable Delegation whose task offer differs from the protected launch binding", () => {
+    const fixture = verificationFixture();
+    fixture.delegation.state.offer.task_offer_hash = hash("different-task");
+
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-task-input",
+      verifierId: "lexrunner-host-verifier",
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("task_input_binding_mismatch");
+  });
+
+  it("independently admits a repository corpus only with the exact durable lifecycle", () => {
+    const fixture = verificationFixture({ repository: true });
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-repository",
+      verifierId: "lexrunner-host-verifier",
+      ...fixture,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt).toMatchObject({
+      decision: "accepted",
+      task_outcome: "block",
+      failure_codes: [],
+    });
+  });
+
+  it("rejects a repository result when the independent lifecycle read is unavailable", () => {
+    const fixture = verificationFixture({ repository: true });
+    const { repositoryLifecycle: _repositoryLifecycle, ...withoutLifecycle } = fixture;
+    const receipt = new GovernedAttemptIndependentVerifier().verify({
+      verificationId: "verification-repository-missing-lifecycle",
+      verifierId: "lexrunner-host-verifier",
+      ...withoutLifecycle,
+      verifiedAt: at(15),
+    });
+
+    expect(receipt.decision).toBe("rejected");
+    expect(receipt.failure_codes).toContain("lifecycle_binding_mismatch");
+  });
 });
 
-function verificationFixture() {
+function verificationFixture(options: { repository?: boolean } = {}) {
   const controls = GovernedControlId.options.map((control) => ({
     control,
     minimum_strength: "host_enforced_indirect" as const,
@@ -183,6 +233,13 @@ function verificationFixture() {
     })),
     ...observed,
   };
+  const repositoryState = options.repository
+    ? repositoryVerificationLifecycle({
+        attemptId: requirements.attempt_id,
+        repositoryId: requirements.repository_id,
+        baseObjectId: requirements.base_object_id,
+      })
+    : undefined;
   const workspace = {
     schema_version: "1.0.0" as const,
     workspace_id: "workspace-1",
@@ -191,7 +248,7 @@ function verificationFixture() {
     candidate_object_id: requirements.candidate_object_id,
     corpus_hash: hash("corpus"),
     selection_hash: hash("selection"),
-    corpus_kind: "synthetic" as const,
+    corpus_kind: repositoryState ? ("repository" as const) : ("synthetic" as const),
     ...observed,
   };
   const decision = authorizeGovernedReview({
@@ -216,18 +273,44 @@ function verificationFixture() {
       findings: { type: "array", maxItems: 16 },
     },
   };
+  const inputBindingBase = {
+    prompt_hash: hash("prompt"),
+    output_schema_hash: computeCanonicalHash(outputSchema),
+    task_offer_hash: hash("task-offer"),
+  };
+  const offer = {
+    schema_version: "1.0.0" as const,
+    delegation_id: requirements.delegation_id,
+    attempt_id: requirements.attempt_id,
+    worker: {
+      provider_id: "openai-codex",
+      worker_id: executor.executor_id,
+      thread_id: "logical-thread-1",
+    },
+    task_offer_hash: inputBindingBase.task_offer_hash,
+    requirements_hash: computeCanonicalHash(requirements),
+    authority_grant_hash: computeCanonicalHash(grant),
+    transcript_start_hash: hash("transcript"),
+    offered_at: at(1),
+  };
+  const offerHash = computeDelegationOfferHash(offer);
+  const inputBinding = { ...inputBindingBase, delegation_offer_hash: offerHash };
   const context = createGovernedAttemptVerificationContext({
     requirements,
     executor,
     environment,
     workspace,
     output_schema: outputSchema,
+    input_binding: inputBinding,
+    ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
   });
   const raw = [
     bytes({
       operation_id: "operation-1",
       provider_handle: "provider-handle-1",
       authorization_binding_digest: decision.authorization.binding_digest,
+      input_binding: inputBinding,
+      ...(repositoryState ? { repository_corpus: repositoryState.binding } : {}),
     }),
     bytes({ type: "thread.started", thread_id: "thread-1" }),
     bytes({ type: "turn.started" }),
@@ -336,6 +419,7 @@ function verificationFixture() {
       started_at: at(3),
     },
     authorization: decision.authorization,
+    verification_context: context,
     evidence_reservation: {
       capture_id: reference.capture_id,
       attempt_id: reference.attempt_id,
@@ -404,7 +488,214 @@ function verificationFixture() {
       created_at: frame.observedAt,
     })
   );
-  return { operation, events, context, evidence: { reference, frames } };
+  const delegation = GovernedDelegationRecord_v1.parse({
+    schema_version: "1.0.0",
+    delegation_id: offer.delegation_id,
+    attempt_id: offer.attempt_id,
+    revision: 0,
+    status: "offered",
+    state: {
+      schema_version: "1.0.0",
+      offer,
+      offer_hash: offerHash,
+      status: "offered",
+    },
+    offer_hash: offerHash,
+    created_at: at(1),
+    updated_at: at(1),
+  });
+  return {
+    operation,
+    events,
+    context,
+    evidence: { reference, frames },
+    delegation,
+    ...(repositoryState ? { repositoryLifecycle: repositoryState.lifecycle } : {}),
+  };
+}
+
+function repositoryVerificationLifecycle(input: {
+  attemptId: string;
+  repositoryId: string;
+  baseObjectId: string;
+}) {
+  const packet = createAgentTaskPacket({
+    schema_version: "1.0.0",
+    packet_id: "packet-1",
+    run_id: "run-1",
+    work_item: { work_item_id: "work-1", revision: 0 },
+    attempt_id: input.attemptId,
+    repository: { id: input.repositoryId, base_sha: input.baseObjectId },
+    objective: "Review the committed candidate",
+    acceptance_criteria: [],
+    instructions: [],
+    scope: {
+      read_globs: ["**"],
+      write_globs: ["**"],
+      deny_globs: [],
+      cross_repo_allowed: false,
+    },
+    authority: {
+      edit: true,
+      git_write: false,
+      github_write: false,
+      external_runtime: false,
+      secrets: false,
+      signing: false,
+      release: false,
+    },
+    verification: [],
+    budget: {},
+    created_at: at(0),
+  });
+  const mapping = createNativeExecutionPathMapping({
+    schema_version: "1.0.0",
+    mapping_kind: "native_linux",
+    repository_id: input.repositoryId,
+    base_sha: input.baseObjectId,
+    native_host_id: "host-1",
+    git_runtime: "wsl-git",
+    roots: {
+      native_repository: {
+        runtime_id: "wsl-git",
+        path: "/srv/repository",
+        verification: "directory_identity",
+        directory_identity: { device: "1", inode: "2" },
+      },
+      native_allocation_root: {
+        runtime_id: "wsl-git",
+        path: "/srv/worktrees",
+        verification: "directory_identity",
+        directory_identity: { device: "1", inode: "3" },
+      },
+      native_worktree: {
+        runtime_id: "wsl-git",
+        path: "/srv/worktrees/attempt-1",
+        verification: "directory_identity",
+        directory_identity: { device: "1", inode: "4" },
+      },
+    },
+  });
+  const envelope = ExecutionEnvelope_v1.parse({
+    schema_version: "1.0.0",
+    envelope_id: "envelope-1",
+    run_id: "run-1",
+    attempt_id: input.attemptId,
+    packet_id: packet.packet_id,
+    packet_hash: packet.packet_hash,
+    workspace_lease_id: "workspace-1",
+    workspace_lease_revision: 1,
+    expected_head_sha: input.baseObjectId,
+    branch: "agent/attempt-1",
+    runtime: {
+      host_id: "host-1",
+      os: "linux",
+      architecture: "x64",
+      worker_runtime: "codex",
+      git_runtime: "wsl-git",
+    },
+    paths: {
+      project_root: "/srv/worktrees/attempt-1",
+      execution_root: "/srv/worktrees/attempt-1",
+      allocation_root: "/srv/worktrees",
+      worktree_root: "/srv/worktrees/attempt-1",
+    },
+    path_mappings: [mapping],
+    exposed_environment_keys: [],
+    created_at: at(0),
+  });
+  const envelopeHash = computeCanonicalHash(envelope);
+  const source = {
+    attempt_id: input.attemptId,
+    workspace_lease_id: "workspace-1",
+    task_packet_hash: packet.packet_hash,
+    launch_envelope_hash: envelopeHash,
+    path_mapping_hash: mapping.mapping_digest,
+  };
+  const attempt = {
+    attemptId: input.attemptId,
+    runId: "run-1",
+    runRevision: 0,
+    workItemId: "work-1",
+    workItemRevision: 0,
+    packetId: packet.packet_id,
+    packetHash: packet.packet_hash,
+    baseSha: input.baseObjectId,
+    revision: 2,
+    status: "running" as const,
+    workspaceLeaseId: "workspace-1",
+    receiptId: null,
+    verificationId: null,
+    createdAt: at(0),
+    updatedAt: at(1),
+    completedAt: null,
+  };
+  const lease = {
+    leaseId: "workspace-1",
+    runId: "run-1",
+    runRevision: 0,
+    workItemId: "work-1",
+    workItemRevision: 0,
+    packetId: packet.packet_id,
+    packetHash: packet.packet_hash,
+    revision: 2,
+    controllerId: "controller-1",
+    controllerLeaseId: "controller-lease-1",
+    fencingToken: 1,
+    repositoryId: input.repositoryId,
+    hostId: "host-1",
+    gitRuntime: "wsl-git",
+    projectRoot: "/srv/repository",
+    branch: "agent/attempt-1",
+    worktreePath: "/srv/worktrees/attempt-1",
+    attemptId: input.attemptId,
+    baseSha: input.baseObjectId,
+    status: "active" as const,
+    acquiredAt: at(0),
+    heartbeatAt: at(1),
+    expiresAt: at(59),
+  };
+  return {
+    binding: {
+      manifest_hash: hash("manifest"),
+      source_binding_hash: computeCanonicalHash(source),
+      workspace_lease_id: source.workspace_lease_id,
+      task_packet_hash: source.task_packet_hash,
+      launch_envelope_hash: source.launch_envelope_hash,
+      path_mapping_hash: source.path_mapping_hash,
+      candidate_tree_hash: hash("candidate-tree"),
+      patch_hash: hash("patch"),
+    },
+    lifecycle: {
+      attempt,
+      lease,
+      launchBinding: {
+        runId: attempt.runId,
+        attemptId: attempt.attemptId,
+        workspaceLeaseId: lease.leaseId,
+        attemptRevision: 1,
+        workspaceLeaseRevision: 1,
+        authorizationMutationId: "authorize-1",
+        envelopeId: envelope.envelope_id,
+        envelopeHash,
+        envelopeJson: canonicalJSONStringify(envelope),
+        controllerId: "controller-1",
+        controllerLeaseId: "controller-lease-1",
+        fencingToken: 1,
+        createdAt: at(0),
+      },
+      packetBinding: {
+        runId: attempt.runId,
+        attemptId: attempt.attemptId,
+        workItemId: attempt.workItemId,
+        workItemRevision: attempt.workItemRevision,
+        packetId: packet.packet_id,
+        packetHash: packet.packet_hash,
+        packetJson: canonicalJSONStringify(packet),
+        createdAt: at(0),
+      },
+    },
+  };
 }
 
 function bytes(value: unknown): Buffer {

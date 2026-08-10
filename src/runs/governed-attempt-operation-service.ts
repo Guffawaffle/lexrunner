@@ -25,6 +25,7 @@ import {
   GovernedAttemptVerificationContext_v1,
   type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
 } from "./governed-attempt-verification.js";
+import { contentHash } from "./governed-review-repository-corpus.js";
 
 type GovernedOperationStore = GovernedAttemptOperationStore & GovernedDelegationStore;
 
@@ -149,7 +150,15 @@ export class GovernedAttemptOperationService {
         computeCanonicalHash(verificationContext.environment) !==
           authorization.environment_attestation_hash ||
         computeCanonicalHash(verificationContext.workspace) !==
-          authorization.workspace_attestation_hash
+          authorization.workspace_attestation_hash ||
+        (verificationContext.input_binding !== undefined &&
+          (verificationContext.input_binding.prompt_hash !== contentHash(input.prompt) ||
+            verificationContext.input_binding.output_schema_hash !==
+              computeCanonicalHash(input.outputSchema) ||
+            verificationContext.input_binding.task_offer_hash !==
+              delegation.state.offer.task_offer_hash ||
+            verificationContext.input_binding.delegation_offer_hash !== delegation.offer_hash ||
+            verificationContext.input_binding.delegation_offer_hash !== invocation.offer_hash))
       ) {
         return { started: false, reason: "binding_mismatch" };
       }
@@ -169,6 +178,9 @@ export class GovernedAttemptOperationService {
         prompt: input.prompt,
         outputSchema: input.outputSchema,
         ...(input.evidence ? { evidence: input.evidence } : {}),
+        ...(verificationContext?.input_binding
+          ? { inputBinding: verificationContext.input_binding }
+          : {}),
       })
     );
     if (
@@ -177,6 +189,7 @@ export class GovernedAttemptOperationService {
       handle.authorization_binding_digest !== authorization.binding_digest
     ) {
       await executor.cancel(handle).catch(() => undefined);
+      await executor.release(handle).catch(() => undefined);
       return { started: false, reason: "executor_mismatch" };
     }
     const created = await this.store.createAttemptOperation({
@@ -194,6 +207,7 @@ export class GovernedAttemptOperationService {
     });
     if (!created.created) {
       await executor.cancel(handle).catch(() => undefined);
+      await executor.release(handle).catch(() => undefined);
       return { started: false, reason: "store_rejected" };
     }
     return {

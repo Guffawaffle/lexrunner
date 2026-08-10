@@ -13,6 +13,12 @@ import type { ProtectedEvidenceIndependentReader } from "./governed-attempt-veri
 import type { GovernedAttemptOperationStore } from "../store/governed-attempt-operation-store.js";
 import { LocalProtectedEvidenceVerifier } from "../store/local-protected-evidence-verifier.js";
 import { SqliteGovernedAttemptOperationStore } from "../store/sqlite/governed-attempt-operation-store.js";
+import { SqliteWorkspaceLifecycleStore } from "../store/sqlite/workspace-lifecycle-store.js";
+import type {
+  LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
+  WorkspaceLifecycleStore,
+} from "../store/workspace-lifecycle-store.js";
 import {
   WindowsProtectedEvidenceAuthority,
   defaultWindowsProtectedEvidenceRoot,
@@ -59,6 +65,12 @@ export interface GovernedAttemptVerificationHandlers {
 }
 
 type CloseableOperationStore = GovernedAttemptOperationStore & { close(): Promise<void> };
+type CloseableRepositoryLifecycleReader = Pick<
+  WorkspaceLifecycleStore,
+  "getAttempt" | "getWorkspaceLease"
+> &
+  Pick<LaunchEnvelopeBindingStore, "getLaunchEnvelopeBinding"> &
+  Pick<TaskPacketBindingStore, "getTaskPacketBinding"> & { close(): Promise<void> };
 interface ProtectedRootAuthority {
   attestRoot(root: string): Promise<boolean>;
   close(): Promise<void>;
@@ -66,6 +78,7 @@ interface ProtectedRootAuthority {
 
 export interface GovernedAttemptVerificationHandlerDependencies {
   openStore?: (databasePath: string) => CloseableOperationStore;
+  openLifecycle?: (databasePath: string) => CloseableRepositoryLifecycleReader;
   createAuthority?: () => ProtectedRootAuthority;
   evidenceRoot?: () => string;
   createReader?: (
@@ -88,6 +101,9 @@ export function createGovernedAttemptVerificationHandlers(
     dependencies.createReader ??
     ((root, attestRoot) => new LocalProtectedEvidenceVerifier(root, { attestRoot }));
   const now = dependencies.now ?? (() => new Date().toISOString());
+  const openLifecycle =
+    dependencies.openLifecycle ??
+    ((databasePath: string) => new SqliteWorkspaceLifecycleStore(databasePath, { readOnly: true }));
 
   return {
     async verify(candidate) {
@@ -106,18 +122,28 @@ export function createGovernedAttemptVerificationHandlers(
       } catch {
         return invalid([{ path: "databasePath", message: "must be a file" }]);
       }
-      let store: CloseableOperationStore;
-      let authority: ProtectedRootAuthority;
+      let store: CloseableOperationStore | undefined;
+      let lifecycle: CloseableRepositoryLifecycleReader | undefined;
+      let authority: ProtectedRootAuthority | undefined;
       try {
         store = openStore(parsed.data.databasePath);
+        lifecycle = openLifecycle(parsed.data.databasePath);
         authority = createAuthority();
       } catch (error) {
+        await lifecycle?.close().catch(() => undefined);
+        await store?.close().catch(() => undefined);
+        await authority?.close().catch(() => undefined);
         return operationFailed(error);
       }
       try {
         const root = evidenceRoot();
         const reader = createReader(root, (candidateRoot) => authority.attestRoot(candidateRoot));
-        const result = await new GovernedAttemptVerificationService(store, reader).verifyAndRecord({
+        const result = await new GovernedAttemptVerificationService(
+          store,
+          reader,
+          undefined,
+          lifecycle
+        ).verifyAndRecord({
           mutationId: `${parsed.data.verificationId}:record`,
           verificationId: parsed.data.verificationId,
           verifierId: parsed.data.verifierId,
@@ -154,6 +180,7 @@ export function createGovernedAttemptVerificationHandlers(
       } catch (error) {
         return operationFailed(error);
       } finally {
+        await lifecycle.close().catch(() => undefined);
         await store.close().catch(() => undefined);
         await authority.close().catch(() => undefined);
       }

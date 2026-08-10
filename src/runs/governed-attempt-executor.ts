@@ -413,6 +413,12 @@ export interface AttemptExecutor {
     prompt: Uint8Array;
     outputSchema: unknown;
     evidence?: GovernedAttemptEvidenceCapture;
+    inputBinding?: {
+      prompt_hash: string;
+      output_schema_hash: string;
+      task_offer_hash: string;
+      delegation_offer_hash: string;
+    };
   }): Promise<AttemptExecutorHandle_v1>;
   observe(
     handle: AttemptExecutorHandle_v1,
