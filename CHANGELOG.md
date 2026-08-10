@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Governed task capability foundation** - Add a review-neutral task/profile binding and positive
+  capability ceiling that represents recoverable workspace writes, explicitly bounded external
+  effects, contained runtime execution, and attenuated nested Delegations without weakening `NO`.
 - **Governed committed-corpus review** - Bind a clean committed native-WSL candidate to its exact
   Attempt, workspace lease, task packet, launch envelope, and path mapping; export only bounded Git
   object bytes and the exact patch; seal them read-only for the asynchronous two-phase Codex review.
