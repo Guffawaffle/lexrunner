@@ -156,6 +156,27 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b"")
 
+    def test_rejects_git_replacement_objects_for_the_bound_candidate(self) -> None:
+        candidate = self.git("rev-parse", "HEAD", cwd=self.worktree).strip()
+        (self.worktree / "a.txt").write_text("replacement\n", encoding="utf-8")
+        self.git("add", "a.txt", cwd=self.worktree)
+        replacement_tree = self.git("write-tree", cwd=self.worktree).strip()
+        replacement = self.git(
+            "commit-tree",
+            replacement_tree,
+            "-p",
+            self.base,
+            "-m",
+            "replacement",
+            cwd=self.worktree,
+        ).strip()
+        self.git("reset", "--hard", candidate, cwd=self.worktree)
+        self.git("replace", candidate, replacement, cwd=self.worktree)
+
+        result = self.run_exporter()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"")
+
 
 if __name__ == "__main__":
     unittest.main()

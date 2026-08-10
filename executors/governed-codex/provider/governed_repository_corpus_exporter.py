@@ -132,6 +132,7 @@ def git_environment() -> dict[str, str]:
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1",
     }
 
 
@@ -246,6 +247,14 @@ def validate_live_workspace(request: dict[str, Any]) -> tuple[Path, Path, Path, 
     assert_identity(worktree, identities["worktree"], "worktree_root")
     if not is_strictly_within(worktree, allocation):
         fail("Attempt worktree is outside its allocation root")
+
+    _code, replacement_refs = run_git(
+        worktree,
+        ("for-each-ref", "--format=%(refname)", "refs/replace"),
+        maximum=64 * 1024,
+    )
+    if replacement_refs:
+        fail("Git replacement refs are forbidden in an exact repository corpus")
 
     top_level = Path(git_text(worktree, ("rev-parse", "--show-toplevel"), "Git top level")).resolve()
     if top_level != worktree:

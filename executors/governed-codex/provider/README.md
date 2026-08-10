@@ -30,10 +30,11 @@ hash is part of the executor configuration attestation.
 only a canonical bounded request on stdin, verifies native repository/allocation/worktree directory
 identities and the Attempt marker, requires a clean committed descendant of the bound base, and uses
 sanitized `/usr/bin/git` object reads to produce regular-file bytes plus the exact binary patch. It
-never exports `.git`, repository configuration, remotes, credentials, symlinks, gitlinks, special
-files, or working-tree dirt. `prepare-repository` independently validates the framed hashes and
-seals the resulting candidate, patch, and metadata. `discard-repository` is idempotent only for an
-unreferenced sealed corpus; operation-bound corpora remain until terminal `release`.
+disables replacement-object resolution, rejects `refs/replace`, and never exports `.git`, repository
+configuration, remotes, credentials, symlinks, gitlinks, special files, or working-tree dirt.
+`prepare-repository` independently validates the framed hashes and seals the resulting candidate,
+patch, and metadata. `discard-repository` is idempotent only for an unreferenced sealed corpus;
+operation-bound corpora remain until terminal `release`.
 Qualification also fails unless the provider's attested Git executable is exactly `/usr/bin/git`,
 the fixed executable used by the repository exporter; test-only path overrides cannot qualify a
 repository-review image.
