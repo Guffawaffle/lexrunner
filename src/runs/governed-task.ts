@@ -322,18 +322,88 @@ export function createGovernedTaskAdapterQualification(
   });
 }
 
+const governedTaskCapabilityEnforcementReceiptBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_TASK_CONTRACT_VERSION),
+    receipt_id: opaqueId,
+    adapter_id: opaqueId,
+    adapter_version: z.string().min(1).max(256),
+    manifest_hash: SHA256Hash,
+    qualification_hash: SHA256Hash,
+    capability_hash: SHA256Hash,
+    dimension: WorkerAdapterAuthorityDimension,
+    scope_hash: SHA256Hash,
+    effect_policy_hash: SHA256Hash,
+    enforcement: z.enum(["enforced", "brokered"]),
+    evidence_hash: SHA256Hash,
+    verified_at: z.string().datetime({ offset: true }),
+    expires_at: z.string().datetime({ offset: true }),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (Date.parse(receipt.verified_at) >= Date.parse(receipt.expires_at)) {
+      context.addIssue({
+        code: "custom",
+        path: ["expires_at"],
+        message: "capability enforcement expiry must be later than verification time",
+      });
+    }
+  });
+
+export const GovernedTaskCapabilityEnforcementReceipt_v1 =
+  governedTaskCapabilityEnforcementReceiptBody
+    .extend({ receipt_hash: SHA256Hash })
+    .strict()
+    .superRefine((receipt, context) => {
+      const { receipt_hash: _receiptHash, ...body } = receipt;
+      if (computeCanonicalHash(body) !== receipt.receipt_hash) {
+        context.addIssue({
+          code: "custom",
+          path: ["receipt_hash"],
+          message: "capability enforcement receipt hash does not match its canonical body",
+        });
+      }
+    });
+export type GovernedTaskCapabilityEnforcementReceipt_v1 = z.infer<
+  typeof GovernedTaskCapabilityEnforcementReceipt_v1
+>;
+
+export function createGovernedTaskCapabilityEnforcementReceipt(
+  candidate: z.input<typeof governedTaskCapabilityEnforcementReceiptBody>
+): GovernedTaskCapabilityEnforcementReceipt_v1 {
+  const body = governedTaskCapabilityEnforcementReceiptBody.parse(candidate);
+  return GovernedTaskCapabilityEnforcementReceipt_v1.parse({
+    ...body,
+    receipt_hash: computeCanonicalHash(body),
+  });
+}
+
 const GovernedTaskQualifiedAdapterResolution_v1 = z
   .object({
     manifest: WorkerAdapterManifest_v1,
     qualification: GovernedTaskAdapterQualification_v1,
+    capability_enforcements: z.array(GovernedTaskCapabilityEnforcementReceipt_v1).max(32),
   })
-  .strict();
+  .strict()
+  .superRefine((resolution, context) => {
+    const hashes = resolution.capability_enforcements.map(
+      ({ capability_hash: capabilityHash }) => capabilityHash
+    );
+    if (new Set(hashes).size !== hashes.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["capability_enforcements"],
+        message: "capability enforcement receipts must have unique capability hashes",
+      });
+    }
+  });
 
 /** Trusted host port; implementations resolve only protected, independently qualified records. */
 export interface GovernedTaskAdapterQualificationAuthority {
   resolveQualifiedAdapter(input: {
     adapterId: string;
     adapterVersion: string;
+    capabilities: readonly GovernedTaskCapability_v1[];
     evaluatedAt: string;
   }): Promise<unknown | null>;
 }
@@ -494,6 +564,7 @@ export async function evaluateGovernedTaskGrantForAdapter(
     candidate = await qualificationAuthority.resolveQualifiedAdapter({
       adapterId: selection.data.adapter_id,
       adapterVersion: selection.data.adapter_version,
+      capabilities: grant.capabilities,
       evaluatedAt,
     });
   } catch {
@@ -502,25 +573,46 @@ export async function evaluateGovernedTaskGrantForAdapter(
   if (candidate === null) return { permitted: false, reason: "adapter_unqualified" };
   const resolution = GovernedTaskQualifiedAdapterResolution_v1.safeParse(candidate);
   if (!resolution.success) return { permitted: false, reason: "adapter_unqualified" };
-  const { manifest: adapter, qualification } = resolution.data;
+  const {
+    manifest: adapter,
+    qualification,
+    capability_enforcements: capabilityEnforcements,
+  } = resolution.data;
   const evaluationTime = Date.parse(evaluatedAt);
+  const manifestHash = computeCanonicalHash(adapter);
   if (
     adapter.adapter.id !== selection.data.adapter_id ||
     adapter.adapter.version !== selection.data.adapter_version ||
     qualification.adapter_id !== selection.data.adapter_id ||
     qualification.adapter_version !== selection.data.adapter_version ||
-    qualification.manifest_hash !== computeCanonicalHash(adapter) ||
+    qualification.manifest_hash !== manifestHash ||
     evaluationTime < Date.parse(qualification.qualified_at) ||
     evaluationTime >= Date.parse(qualification.expires_at)
   ) {
     return { permitted: false, reason: "adapter_unqualified" };
   }
+  const receipts = new Map(
+    capabilityEnforcements.map((receipt) => [receipt.capability_hash, receipt])
+  );
   const blockedCapabilityIds = grant.capabilities
     .filter((capability) => {
       const actual = adapter.authority[capability.dimension];
-      return capability.minimum_enforcement === "enforced"
-        ? actual !== "enforced"
-        : !["enforced", "brokered"].includes(actual);
+      const receipt = receipts.get(computeCanonicalHash(capability));
+      return (
+        !enforcementMeetsFloor(actual, capability.minimum_enforcement) ||
+        !receipt ||
+        receipt.adapter_id !== selection.data.adapter_id ||
+        receipt.adapter_version !== selection.data.adapter_version ||
+        receipt.manifest_hash !== manifestHash ||
+        receipt.qualification_hash !== qualification.qualification_hash ||
+        receipt.dimension !== capability.dimension ||
+        receipt.scope_hash !== capability.scope_hash ||
+        receipt.effect_policy_hash !== computeCanonicalHash(capability.effect) ||
+        !enforcementMeetsFloor(receipt.enforcement, capability.minimum_enforcement) ||
+        Date.parse(receipt.verified_at) < Date.parse(qualification.qualified_at) ||
+        evaluationTime < Date.parse(receipt.verified_at) ||
+        evaluationTime >= Date.parse(receipt.expires_at)
+      );
     })
     .map(({ capability_id: capabilityId }) => capabilityId)
     .sort(compareCanonicalStrings);
@@ -532,6 +624,15 @@ export async function evaluateGovernedTaskGrantForAdapter(
     };
   }
   return grant;
+}
+
+function enforcementMeetsFloor(
+  actual: "enforced" | "brokered" | "unenforced" | "unsupported",
+  minimum: "enforced" | "brokered"
+): boolean {
+  return minimum === "enforced"
+    ? actual === "enforced"
+    : actual === "enforced" || actual === "brokered";
 }
 
 function capabilityKey(

@@ -32,9 +32,12 @@ authority excluded by the parent's child-ceiling decision.
 
 The caller likewise selects only an adapter identity and version; a trusted host qualification
 authority resolves the exact manifest and an active qualification receipt bound to its hash and
-protected evidence. A caller-supplied authority matrix is never enforcement evidence. The resolved
-adapter must meet every granted capability's enforcement floor, so an `unenforced` authority
-dimension cannot be converted into permission by accepting a task.
+protected evidence. It must also resolve one protected enforcement receipt per granted capability.
+Each receipt binds the manifest, adapter qualification, complete capability hash, scope hash, effect
+policy hash, achieved enforcement level, evidence, and validity window. Missing, duplicated, stale,
+or mismatched receipts fail closed by capability ID. A coarse authority dimension or caller-supplied
+authority matrix is never enough to prove an owned write scope, rollback path, external consequence,
+runtime containment, or sensitive-data policy.
 
 `NO` is universal Delegation behavior. A task profile cannot require a rationale or reinterpret
 refusal as a failed task result.

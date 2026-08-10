@@ -14,6 +14,7 @@ import {
   GovernedTaskSpec_v1,
   computeGovernedTaskCapabilityCeilingHash,
   createGovernedTaskAdapterQualification,
+  createGovernedTaskCapabilityEnforcementReceipt,
   createGovernedTaskSpec,
   evaluateGovernedTaskGrant,
   evaluateGovernedTaskGrantForAdapter,
@@ -333,6 +334,51 @@ describe("generic governed task capabilities", () => {
     ).toEqual({ permitted: false, reason: "adapter_unqualified" });
   });
 
+  it("requires protected enforcement evidence for the exact capability scope and effect", async () => {
+    const task = taskSpec();
+    const writeGrant = grant(task, {
+      dimension: "filesystem_write",
+      capability_id: "write-owned-workspace",
+      scope_hash: hash("2"),
+    });
+    const qualified = WorkerAdapterManifest_v1.parse({
+      ...HOST_ASSISTED_ADAPTER_MANIFEST,
+      adapter: {
+        ...HOST_ASSISTED_ADAPTER_MANIFEST.adapter,
+        id: "lexrunner.contained-writer",
+      },
+      authority: {
+        ...HOST_ASSISTED_ADAPTER_MANIFEST.authority,
+        filesystem_read: "enforced",
+        filesystem_write: "enforced",
+      },
+    });
+    const evaluate = (options: Parameters<typeof qualificationAuthority>[1]) =>
+      evaluateGovernedTaskGrantForAdapter(
+        authoritySelection(task, writeGrant),
+        taskGrantAuthority(task, [writeGrant]),
+        adapterSelection(qualified),
+        qualificationAuthority(qualified, options),
+        activeAt()
+      );
+
+    await expect(evaluate({ omitCapabilityReceipts: true })).resolves.toEqual({
+      permitted: false,
+      reason: "enforcement_unavailable",
+      blockedCapabilityIds: ["write-owned-workspace"],
+    });
+    await expect(evaluate({ effectPolicyHash: hash("f") })).resolves.toEqual({
+      permitted: false,
+      reason: "enforcement_unavailable",
+      blockedCapabilityIds: ["write-owned-workspace"],
+    });
+    await expect(evaluate({ scopeHash: hash("f") })).resolves.toEqual({
+      permitted: false,
+      reason: "enforcement_unavailable",
+      blockedCapabilityIds: ["write-owned-workspace"],
+    });
+  });
+
   it("will not disguise filesystem writes as observation", () => {
     expect(() =>
       GovernedTaskCapability_v1.parse({
@@ -622,7 +668,15 @@ function adapterSelection(candidate: unknown) {
   };
 }
 
-function qualificationAuthority(candidate: unknown, options: { manifestHash?: string } = {}) {
+function qualificationAuthority(
+  candidate: unknown,
+  options: {
+    manifestHash?: string;
+    omitCapabilityReceipts?: boolean;
+    effectPolicyHash?: string;
+    scopeHash?: string;
+  } = {}
+) {
   const manifest = WorkerAdapterManifest_v1.parse(candidate);
   const qualification = createGovernedTaskAdapterQualification({
     schema_version: "1.0.0",
@@ -638,8 +692,36 @@ function qualificationAuthority(candidate: unknown, options: { manifestHash?: st
     expires_at: "2026-08-10T07:00:00.000Z",
   });
   return {
-    async resolveQualifiedAdapter() {
-      return { manifest, qualification };
+    async resolveQualifiedAdapter(input: { capabilities: readonly GovernedTaskCapability_v1[] }) {
+      const capabilityEnforcements = options.omitCapabilityReceipts
+        ? []
+        : input.capabilities.map((capability) => {
+            const manifestEnforcement = manifest.authority[capability.dimension];
+            return createGovernedTaskCapabilityEnforcementReceipt({
+              schema_version: "1.0.0",
+              receipt_id: `enforcement-${capability.capability_id}`,
+              adapter_id: manifest.adapter.id,
+              adapter_version: manifest.adapter.version,
+              manifest_hash: computeCanonicalHash(manifest),
+              qualification_hash: qualification.qualification_hash,
+              capability_hash: computeCanonicalHash(capability),
+              dimension: capability.dimension,
+              scope_hash: options.scopeHash ?? capability.scope_hash,
+              effect_policy_hash:
+                options.effectPolicyHash ?? computeCanonicalHash(capability.effect),
+              enforcement: ["enforced", "brokered"].includes(manifestEnforcement)
+                ? (manifestEnforcement as "enforced" | "brokered")
+                : "brokered",
+              evidence_hash: hash("d"),
+              verified_at: "2026-08-10T06:00:00.000Z",
+              expires_at: "2026-08-10T07:00:00.000Z",
+            });
+          });
+      return {
+        manifest,
+        qualification,
+        capability_enforcements: capabilityEnforcements,
+      };
     },
   };
 }
