@@ -62,6 +62,7 @@ export const ProtectedEvidenceReasonCode = z.enum([
   "byte_limit_exceeded",
   "event_limit_exceeded",
   "line_limit_exceeded",
+  "provider_failure",
   "cancelled",
   "sink_unavailable",
   "integrity_failure",

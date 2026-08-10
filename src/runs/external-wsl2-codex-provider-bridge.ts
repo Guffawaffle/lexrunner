@@ -14,6 +14,7 @@ import {
 } from "./governed-attempt-executor.js";
 import {
   QualifiedCodexProviderEmission_v1,
+  QualifiedCodexProviderStreamError,
   type QualifiedCodexProviderAttestations,
   type QualifiedCodexProviderBridge,
   type QualifiedCodexProviderClaim,
@@ -202,43 +203,53 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
       ...(options.signal ? { signal: options.signal } : {}),
       maxLineBytes: MAX_STREAM_LINE_BYTES,
     });
-    for await (const line of stream) {
-      const candidate = z
-        .object({
-          type: z.enum([
-            "started",
-            "accepted",
-            "executor_event",
-            "declined",
-            "completed",
-            "failed",
-            "cancelled",
-            "lost",
-          ]),
-          sequence: z.number().int().positive(),
-          observed_at: z.string().datetime({ offset: true }),
-          frame_class: z.enum([
-            "executor_stdout",
-            "executor_stderr",
-            "executor_event",
-            "executor_claim",
-            "provider_receipt",
-            "control_evidence",
-            "verifier_evidence",
-            "capture_lifecycle",
-          ]),
-          raw_base64: z.string().max(Math.ceil((MAX_STREAM_LINE_BYTES * 4) / 3) + 4),
-          executor_event_type: z.string().min(1).max(128).optional(),
-          reason_present: z.boolean().optional(),
-        })
-        .strict()
-        .parse(parseJson(line));
-      const rawBytes = decodeCanonicalBase64(candidate.raw_base64);
-      const { raw_base64: _rawBase64, ...semantic } = candidate;
-      yield QualifiedCodexProviderEmission_v1.parse({
-        ...semantic,
-        raw_bytes: rawBytes,
-      });
+    try {
+      for await (const line of stream) {
+        try {
+          const candidate = z
+            .object({
+              type: z.enum([
+                "started",
+                "accepted",
+                "executor_event",
+                "declined",
+                "completed",
+                "failed",
+                "cancelled",
+                "lost",
+              ]),
+              sequence: z.number().int().positive(),
+              observed_at: z.string().datetime({ offset: true }),
+              frame_class: z.enum([
+                "executor_stdout",
+                "executor_stderr",
+                "executor_event",
+                "executor_claim",
+                "provider_receipt",
+                "control_evidence",
+                "verifier_evidence",
+                "capture_lifecycle",
+              ]),
+              raw_base64: z.string().max(Math.ceil((MAX_STREAM_LINE_BYTES * 4) / 3) + 4),
+              executor_event_type: z.string().min(1).max(128).optional(),
+              reason_present: z.boolean().optional(),
+            })
+            .strict()
+            .parse(parseJson(line));
+          const rawBytes = decodeCanonicalBase64(candidate.raw_base64);
+          const { raw_base64: _rawBase64, ...semantic } = candidate;
+          yield QualifiedCodexProviderEmission_v1.parse({
+            ...semantic,
+            raw_bytes: rawBytes,
+          });
+        } catch (error) {
+          if (error instanceof QualifiedCodexProviderStreamError) throw error;
+          throw new QualifiedCodexProviderStreamError("invalid_event");
+        }
+      }
+    } catch (error) {
+      if (error instanceof QualifiedCodexProviderStreamError) throw error;
+      throw new QualifiedCodexProviderStreamError("transport_failed");
     }
   }
 
@@ -351,7 +362,7 @@ export class NativeWsl2CodexProviderTransport implements Wsl2CodexProviderTransp
         buffered = Buffer.concat([buffered, chunk]);
         if (buffered.byteLength > input.maxLineBytes && !buffered.includes(0x0a)) {
           child.kill();
-          throw new Error("WSL2 provider event line exceeds its bound");
+          throw new QualifiedCodexProviderStreamError("line_limit_exceeded");
         }
         let newline = buffered.indexOf(0x0a);
         while (newline >= 0) {
@@ -359,7 +370,7 @@ export class NativeWsl2CodexProviderTransport implements Wsl2CodexProviderTransp
           buffered = buffered.subarray(newline + 1);
           if (line.byteLength > input.maxLineBytes) {
             child.kill();
-            throw new Error("WSL2 provider event line exceeds its bound");
+            throw new QualifiedCodexProviderStreamError("line_limit_exceeded");
           }
           if (line.byteLength > 0) yield line;
           newline = buffered.indexOf(0x0a);
@@ -368,7 +379,7 @@ export class NativeWsl2CodexProviderTransport implements Wsl2CodexProviderTransp
       if (buffered.byteLength > 0) yield buffered;
       const exitCode = child.exitCode ?? (await waitForExit(child, CONTROL_TIMEOUT_MS));
       if (exitCode !== 0 && !input.signal?.aborted) {
-        throw new Error("WSL2 provider event stream failed");
+        throw new QualifiedCodexProviderStreamError("transport_failed");
       }
     } finally {
       input.signal?.removeEventListener("abort", abort);

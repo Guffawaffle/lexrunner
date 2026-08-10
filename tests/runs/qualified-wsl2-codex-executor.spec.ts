@@ -15,6 +15,7 @@ import {
 } from "../../src/runs/governed-attempt-executor.js";
 import {
   QualifiedWsl2CodexExecutor,
+  QualifiedCodexProviderStreamError,
   type QualifiedCodexProviderAttestations,
   type QualifiedCodexProviderBridge,
   type QualifiedCodexProviderClaim,
@@ -121,6 +122,79 @@ describe("QualifiedWsl2CodexExecutor", () => {
     expect(evidence.getReference().status).toBe("complete");
   });
 
+  it("turns a known provider stream failure into bounded protected failed terminality", async () => {
+    const fixture = authorizationFixture("synthetic");
+    const evidence = await evidenceSession(fixture);
+    const bridge = new DeferredBridge(fixture.attestations);
+    const executor = new QualifiedWsl2CodexExecutor(bridge, () => at(10));
+    const handle = await executor.start({
+      authorization: fixture.authorization,
+      prompt: Buffer.from("synthetic offer"),
+      outputSchema: { type: "object" },
+      evidence,
+    });
+    const observed = collectEvents(executor.observe(handle));
+    bridge.failAfter(
+      [emission("started", 1, '{"type":"thread.started"}')],
+      new QualifiedCodexProviderStreamError("line_limit_exceeded")
+    );
+
+    const events = await observed;
+    expect(events.map((event) => event.type)).toEqual(["started", "failed"]);
+    expect(events[1]).toMatchObject({ type: "failed", sequence: 2, observed_at: at(10) });
+    expect(JSON.stringify(events)).not.toContain("provider event line exceeds");
+    expect(bridge.cancelCount).toBe(1);
+    expect(evidence.getReference()).toMatchObject({ status: "complete", frame_count: 2 });
+    await executor.release(handle);
+    expect(bridge.releaseCount).toBe(1);
+  });
+
+  it("fails a sequence mismatch instead of silently degrading it to lost", async () => {
+    const fixture = authorizationFixture("synthetic");
+    const evidence = await evidenceSession(fixture);
+    const bridge = new DeferredBridge(fixture.attestations);
+    const executor = new QualifiedWsl2CodexExecutor(bridge, () => at(10));
+    const handle = await executor.start({
+      authorization: fixture.authorization,
+      prompt: Buffer.from("synthetic offer"),
+      outputSchema: { type: "object" },
+      evidence,
+    });
+    const observed = collectEvents(executor.observe(handle));
+    bridge.emit([emission("started", 2, '{"type":"thread.started"}')]);
+
+    await expect(observed).resolves.toEqual([
+      expect.objectContaining({ type: "failed", sequence: 1 }),
+    ]);
+    expect(bridge.cancelCount).toBe(1);
+    expect(evidence.getReference().status).toBe("complete");
+  });
+
+  it("keeps failed terminality when the bounded failure frame cannot fit", async () => {
+    const fixture = authorizationFixture("synthetic");
+    const evidence = await evidenceSession(fixture, { reservedBytes: 1 });
+    const bridge = new DeferredBridge(fixture.attestations);
+    const executor = new QualifiedWsl2CodexExecutor(bridge, () => at(10));
+    const handle = await executor.start({
+      authorization: fixture.authorization,
+      prompt: Buffer.from("synthetic offer"),
+      outputSchema: { type: "object" },
+      evidence,
+    });
+    const observed = collectEvents(executor.observe(handle));
+    bridge.failAfter([], new QualifiedCodexProviderStreamError("transport_failed"));
+
+    await expect(observed).resolves.toEqual([
+      expect.objectContaining({ type: "failed", sequence: 1 }),
+    ]);
+    expect(evidence.getReference()).toMatchObject({
+      status: "incomplete",
+      reason_code: "byte_limit_exceeded",
+    });
+    await executor.release(handle);
+    expect(bridge.releaseCount).toBe(1);
+  });
+
   it("launches an exactly input-bound repository corpus read-only", async () => {
     const fixture = authorizationFixture("repository");
     const evidence = await evidenceSession(fixture);
@@ -152,6 +226,7 @@ class DeferredBridge implements QualifiedCodexProviderBridge {
   continueCount = 0;
   releaseCount = 0;
   private releaseEmissions!: (events: QualifiedCodexProviderEmission_v1[]) => void;
+  private observationFailure?: unknown;
   private readonly emissions = new Promise<QualifiedCodexProviderEmission_v1[]>((resolve) => {
     this.releaseEmissions = resolve;
   });
@@ -183,6 +258,7 @@ class DeferredBridge implements QualifiedCodexProviderBridge {
 
   async *observe(): AsyncIterable<QualifiedCodexProviderEmission_v1> {
     for (const event of await this.emissions) yield structuredClone(event);
+    if (this.observationFailure) throw this.observationFailure;
   }
 
   async cancel(): Promise<void> {
@@ -202,6 +278,11 @@ class DeferredBridge implements QualifiedCodexProviderBridge {
   }
 
   emit(events: QualifiedCodexProviderEmission_v1[]): void {
+    this.releaseEmissions(events);
+  }
+
+  failAfter(events: QualifiedCodexProviderEmission_v1[], error: unknown): void {
+    this.observationFailure = error;
     this.releaseEmissions(events);
   }
 }
@@ -231,7 +312,10 @@ function emission(
   return common;
 }
 
-async function evidenceSession(fixture: ReturnType<typeof authorizationFixture>) {
+async function evidenceSession(
+  fixture: ReturnType<typeof authorizationFixture>,
+  options: { reservedBytes?: number } = {}
+) {
   const root = await mkdtemp(path.join(tmpdir(), "lexrunner-qualified-codex-"));
   roots.push(root);
   const store = new LocalProtectedEvidenceStore(root, {
@@ -250,7 +334,7 @@ async function evidenceSession(fixture: ReturnType<typeof authorizationFixture>)
       executor_binding_digest: fixture.authorization.executor_attestation_hash,
       environment_binding_digest: fixture.authorization.environment_attestation_hash,
       workspace_binding_digest: fixture.authorization.workspace_attestation_hash,
-      reserved_bytes: 1_000_000,
+      reserved_bytes: options.reservedBytes ?? 1_000_000,
       reserved_frames: 10,
       reserved_events: 10,
       max_duration_ms: 60_000,

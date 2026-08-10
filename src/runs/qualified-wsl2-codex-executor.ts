@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { ProtectedEvidenceFrameClass } from "../store/protected-evidence-store.js";
+import type { ProtectedEvidenceReasonCode } from "../store/protected-evidence-store.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import type { GovernedAttemptEvidenceCapture } from "./governed-attempt-evidence.js";
 import type { GovernedRepositoryCorpusFrame } from "./governed-review-repository-corpus.js";
 import { GovernedRepositoryId } from "./governed-repository-identity.js";
@@ -63,6 +65,27 @@ export const QualifiedCodexProviderEmission_v1 = z.discriminatedUnion("type", [
     .strict(),
 ]);
 export type QualifiedCodexProviderEmission_v1 = z.infer<typeof QualifiedCodexProviderEmission_v1>;
+
+export const QualifiedCodexProviderStreamFailureCode_v1 = z.enum([
+  "line_limit_exceeded",
+  "invalid_event",
+  "sequence_mismatch",
+  "transport_failed",
+]);
+export type QualifiedCodexProviderStreamFailureCode_v1 = z.infer<
+  typeof QualifiedCodexProviderStreamFailureCode_v1
+>;
+
+/** Bounded provider-stream failure that never carries raw provider output. */
+export class QualifiedCodexProviderStreamError extends Error {
+  readonly code: QualifiedCodexProviderStreamFailureCode_v1;
+
+  constructor(code: QualifiedCodexProviderStreamFailureCode_v1) {
+    super("Qualified Codex provider stream failed");
+    this.name = "QualifiedCodexProviderStreamError";
+    this.code = QualifiedCodexProviderStreamFailureCode_v1.parse(code);
+  }
+}
 
 export interface QualifiedCodexProviderAttestations {
   executor: ExecutorAttestation;
@@ -270,7 +293,9 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
         ...(options.signal ? { signal: options.signal } : {}),
       })) {
         const emission = QualifiedCodexProviderEmission_v1.parse(candidate);
-        if (emission.sequence !== expectedSequence) return;
+        if (emission.sequence !== expectedSequence) {
+          throw new QualifiedCodexProviderStreamError("sequence_mismatch");
+        }
         const evidence = await active.evidence.append({
           frameClass: emission.frame_class,
           bytes: emission.raw_bytes,
@@ -292,10 +317,9 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
         }
         yield event;
       }
-    } catch {
-      if (!options.signal?.aborted) {
-        await this.bridge.cancel(handle.provider_handle).catch(() => undefined);
-      }
+    } catch (error) {
+      if (options.signal?.aborted) return;
+      yield await this.providerStreamFailed(active, expectedSequence, error);
       return;
     }
   }
@@ -362,6 +386,58 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
     }
     await this.bridge.release(handle.provider_handle);
     this.active.delete(handle.provider_handle);
+  }
+
+  private async providerStreamFailed(
+    active: ActiveOperation,
+    sequence: number,
+    error: unknown
+  ): Promise<AttemptExecutorEvent> {
+    const observedAt = this.now();
+    const failureCode =
+      error instanceof QualifiedCodexProviderStreamError ? error.code : "transport_failed";
+    const reasonCode: ProtectedEvidenceReasonCode =
+      failureCode === "line_limit_exceeded" ? "line_limit_exceeded" : "provider_failure";
+    const failureRecord = {
+      schema_version: "1.0.0",
+      type: "provider_stream_failed",
+      failure_code: failureCode,
+    } as const;
+    let evidenceRef = computeCanonicalHash({
+      ...failureRecord,
+      attempt_id: active.authorization.attempt_id,
+      delegation_id: active.authorization.delegation_id,
+      sequence,
+    });
+    await this.bridge.cancel(active.handle.provider_handle).catch(() => undefined);
+    if (active.evidence.getReference().status === "open") {
+      try {
+        const appended = await active.evidence.append({
+          frameClass: "capture_lifecycle",
+          bytes: Buffer.from(`${canonicalJSONStringify(failureRecord)}\n`, "utf8"),
+          observedAt,
+        });
+        evidenceRef = appended.evidenceRef;
+        await active.evidence.sealAndVerify({ sealedAt: observedAt, indexedAt: observedAt });
+      } catch {
+        await active.evidence
+          .markIncomplete({ reasonCode, terminalAt: observedAt })
+          .catch(() => undefined);
+      }
+    } else if (active.evidence.getReference().status === "sealed_unindexed") {
+      await active.evidence
+        .markIncomplete({ reasonCode, terminalAt: observedAt })
+        .catch(() => undefined);
+    }
+    active.lastObservedAt = observedAt;
+    active.terminalType = "failed";
+    return AttemptExecutorEvent_v1.parse({
+      schema_version: "1.0.0",
+      type: "failed",
+      sequence,
+      observed_at: observedAt,
+      evidence_ref: evidenceRef,
+    });
   }
 
   private async attestExact(
