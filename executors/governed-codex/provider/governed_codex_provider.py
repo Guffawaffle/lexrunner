@@ -1315,8 +1315,7 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
     try:
         start_worker(operation)
     except (OSError, subprocess.SubprocessError):
-        cleanup_operation_secrets(handle)
-        append_terminal(handle, "failed", {"phase": "launch", "reason": "worker_start_failed"})
+        cleanup_failed_launch(operation)
         raise
     return {
         "operationId": operation_id,
@@ -1387,6 +1386,43 @@ def start_worker(operation: dict[str, Any]) -> None:
         stderr=subprocess.DEVNULL,
         timeout=20,
     )
+
+
+def cleanup_failed_launch(operation: dict[str, Any]) -> None:
+    handle = operation["provider_handle"]
+    if not TEST_MODE:
+        subprocess.run(
+            [str(SYSTEMCTL), "--user", "stop", operation["unit"]],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=20,
+        )
+        state = subprocess.run(
+            [str(SYSTEMCTL), "--user", "is-active", "--quiet", operation["unit"]],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+        if state.returncode not in (3, 4):
+            fail("failed launch worker unit did not become inactive")
+    cleanup_operation_secrets(handle)
+    directory = operation_directory(handle)
+    ensure_secure_directory(directory)
+    shutil.rmtree(directory)
+    fsync_directory(OPERATIONS)
+    if operation.get("corpus_kind") == "repository":
+        workspace_id = operation.get("workspace_id")
+        if not repository_corpus_is_referenced(workspace_id, ambiguous_is_reference=True):
+            corpus = repository_corpus_path(workspace_id)
+            if corpus.exists():
+                verify_repository_corpus(corpus)
+                make_repository_tree_removable(corpus)
+                shutil.rmtree(corpus)
+                fsync_directory(REPOSITORY_CORPORA)
 
 
 def operation(handle: str) -> dict[str, Any]:
@@ -1955,19 +1991,7 @@ def release_operation(handle: str) -> None:
     fsync_directory(OPERATIONS)
     if record.get("corpus_kind") == "repository":
         workspace_id = record.get("workspace_id")
-        still_referenced = False
-        for candidate in OPERATIONS.iterdir():
-            if not candidate.is_dir() or candidate.is_symlink():
-                continue
-            try:
-                other = read_json_file(candidate / "operation.json")
-            except (ProviderError, OSError):
-                still_referenced = True
-                break
-            if other.get("workspace_id") == workspace_id:
-                still_referenced = True
-                break
-        if not still_referenced:
+        if not repository_corpus_is_referenced(workspace_id):
             corpus = repository_corpus_path(workspace_id)
             if corpus.exists():
                 make_repository_tree_removable(corpus)
@@ -1980,18 +2004,28 @@ def discard_repository(workspace_id: str) -> None:
     if not corpus.exists():
         return
     verify_repository_corpus(corpus)
+    if repository_corpus_is_referenced(workspace_id):
+        fail("repository corpus is referenced by an operation")
+    make_repository_tree_removable(corpus)
+    shutil.rmtree(corpus)
+    fsync_directory(REPOSITORY_CORPORA)
+
+
+def repository_corpus_is_referenced(
+    workspace_id: str, *, ambiguous_is_reference: bool = False
+) -> bool:
     for candidate in OPERATIONS.iterdir():
         if not candidate.is_dir() or candidate.is_symlink():
             continue
         try:
             record = read_json_file(candidate / "operation.json")
         except (ProviderError, OSError):
+            if ambiguous_is_reference:
+                return True
             fail("repository corpus reference state is ambiguous")
         if record.get("workspace_id") == workspace_id:
-            fail("repository corpus is referenced by an operation")
-    make_repository_tree_removable(corpus)
-    shutil.rmtree(corpus)
-    fsync_directory(REPOSITORY_CORPORA)
+            return True
+    return False
 
 
 def build_parser() -> argparse.ArgumentParser:

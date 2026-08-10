@@ -5,9 +5,11 @@ import importlib.util
 import json
 import os
 import stat
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 TEMPORARY = tempfile.TemporaryDirectory(prefix="lexrunner-provider-test-")
@@ -66,6 +68,8 @@ class GovernedCodexProviderTest(unittest.TestCase):
             encoding="utf-8",
         )
         REQUIREMENTS.chmod(0o600)
+        provider.ensure_secure_directory(provider.AUTH_SEED.parent, create=True)
+        provider.write_atomic(provider.AUTH_SEED, b"{}\n")
         qualification = {
             "schema_version": "1.0.0",
             "provider_id": "lexrunner.wsl2-bwrap",
@@ -90,8 +94,8 @@ class GovernedCodexProviderTest(unittest.TestCase):
         QUALIFICATION.write_text(json.dumps(qualification), encoding="utf-8")
         QUALIFICATION.chmod(0o600)
 
-    def authorization(self) -> tuple[dict, dict]:
-        bundle = provider.prepare_bundle(
+    def authorization(self, bundle: dict | None = None) -> tuple[dict, dict]:
+        bundle = bundle or provider.prepare_bundle(
             {
                 "environment_id": "disposable-environment-1",
                 "repository_id": "owner/synthetic-repository",
@@ -100,13 +104,14 @@ class GovernedCodexProviderTest(unittest.TestCase):
             }
         )
         hashes = provider.bundle_hashes(bundle)
+        workspace = bundle["workspace"]
         grant = {
             "schema_version": "1.0.0",
             "attempt_id": "attempt-1",
             "delegation_id": "delegation-1",
-            "repository_id": "owner/synthetic-repository",
-            "base_object_id": "1" * 40,
-            "candidate_object_id": "2" * 40,
+            "repository_id": workspace["repository_id"],
+            "base_object_id": workspace["base_object_id"],
+            "candidate_object_id": workspace["candidate_object_id"],
             "authorized_model_provider": "openai",
             "source_disclosure_allowed": True,
             "controls": [
@@ -315,6 +320,46 @@ class GovernedCodexProviderTest(unittest.TestCase):
 
         provider.append_terminal(handle, "cancelled", {"reason": "test"})
         provider.release_operation(handle)
+        self.assertFalse(corpus.exists())
+        provider.discard_repository(workspace_id)
+
+    def test_failed_worker_start_removes_unreachable_operation_and_corpus(self) -> None:
+        content = b"launch failure candidate\n"
+        patch_bytes = b"diff --git a/launch-failure.txt b/launch-failure.txt\n"
+        header = self.repository_header(content, patch_bytes)
+        bundle = provider.prepare_repository_bundle(header, [content], patch_bytes)
+        workspace_id = bundle["workspace"]["workspace_id"]
+        corpus = provider.repository_corpus_path(workspace_id)
+        _, authorization = self.authorization(bundle)
+        prompt = b"Review the sealed corpus."
+        output_schema = {"type": "object"}
+        input_binding = {
+            "prompt_hash": provider.content_hash(prompt),
+            "output_schema_hash": provider.canonical_hash(output_schema),
+            "task_offer_hash": provider.canonical_hash({"task": "launch-failure"}),
+            "delegation_offer_hash": provider.canonical_hash(
+                {"delegation": "launch-failure"}
+            ),
+        }
+        operations_before = set(provider.OPERATIONS.iterdir())
+
+        with patch.object(
+            provider,
+            "start_worker",
+            side_effect=subprocess.CalledProcessError(1, ["systemd-run"]),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                provider.launch_operation(
+                    {
+                        "authorization": authorization,
+                        "output_schema": output_schema,
+                        "mode": "repository_read_only",
+                        "input_binding": input_binding,
+                    },
+                    prompt,
+                )
+
+        self.assertEqual(set(provider.OPERATIONS.iterdir()), operations_before)
         self.assertFalse(corpus.exists())
         provider.discard_repository(workspace_id)
 
