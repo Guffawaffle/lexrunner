@@ -2,14 +2,9 @@ import { z } from "zod";
 
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { WorkerAdapterManifest_v1 } from "./agent-work-worker-runtime.js";
-import { DelegatedAuthorityGrant_v1 } from "./governed-attempt-protocol.js";
 import {
   GovernedTaskSpec_v1,
-  createGovernedTaskAdapterQualification,
-  createGovernedTaskCapabilityEnforcementReceipt,
-  createGovernedTaskExecutionBinding,
   createGovernedTaskSpec,
-  type GovernedTaskExecutionBinding_v1 as GovernedTaskExecutionBinding,
   type GovernedTaskSpec_v1 as GovernedTaskSpec,
 } from "./governed-task.js";
 
@@ -21,8 +16,6 @@ export const GOVERNED_WORKSPACE_MUTATION_VERIFIER_VERSION = "1.0.0" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID =
   "lexrunner.qualified-wsl2-codex-writer" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION = "1.0.0" as const;
-export const GOVERNED_WORKSPACE_MUTATION_OPERATOR_PRINCIPAL_ID =
-  "lexrunner.workspace-mutation-runtime" as const;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_EVIDENCE_BYTES = 16 * 1_024 * 1_024;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_TOOL_CALLS = 200;
 
@@ -100,6 +93,14 @@ export const GOVERNED_WORKSPACE_MUTATION_OUTPUT_SCHEMA = Object.freeze({
 export const GOVERNED_WORKSPACE_MUTATION_OUTPUT_CONTRACT_HASH = computeCanonicalHash(
   GOVERNED_WORKSPACE_MUTATION_OUTPUT_SCHEMA
 );
+
+export const GovernedWorkspaceMutationOutput_v1 = z
+  .object({
+    result: z.enum(["CHANGED", "UNCHANGED"]),
+    summary: z.string().min(1).max(4_096),
+  })
+  .strict();
+export type GovernedWorkspaceMutationOutput_v1 = z.infer<typeof GovernedWorkspaceMutationOutput_v1>;
 
 export const GovernedWorkspaceMutationQualificationControlId_v1 = z.enum([
   "attempt_owned_writable_root",
@@ -293,13 +294,6 @@ export interface CreateGovernedWorkspaceMutationTaskInput {
   maxToolCalls?: number;
 }
 
-export interface CreateGovernedWorkspaceMutationTaskExecutionInput {
-  task: GovernedTaskSpec;
-  authorizedAt: string;
-  expiresAt: string;
-  evidenceSelection: GovernedWorkspaceMutationEvidenceSelection_v1;
-}
-
 export const GovernedWorkspaceMutationEvidenceSelection_v1 = z
   .object({
     task_spec_hash: SHA256Hash,
@@ -310,20 +304,6 @@ export const GovernedWorkspaceMutationEvidenceSelection_v1 = z
 export type GovernedWorkspaceMutationEvidenceSelection_v1 = z.infer<
   typeof GovernedWorkspaceMutationEvidenceSelection_v1
 >;
-
-const GovernedWorkspaceMutationEvidenceResolution_v1 = z
-  .object({
-    qualification: GovernedWorkspaceMutationQualificationEvidence_v1,
-    prepared_workspace: GovernedWorkspaceMutationPreparedWorkspaceEvidence_v1,
-  })
-  .strict();
-
-/** Trusted host port backed by protected qualification and workspace records. */
-export interface GovernedWorkspaceMutationEvidenceAuthority {
-  resolveWorkspaceMutationEvidence(
-    selection: GovernedWorkspaceMutationEvidenceSelection_v1
-  ): Promise<unknown | null>;
-}
 
 export function computeGovernedWorkspaceMutationInputBindingHash(input: {
   promptHash: string;
@@ -398,158 +378,6 @@ export function createGovernedWorkspaceMutationTaskSpec(
   });
 }
 
-/**
- * A write receipt cannot be constructed from adapter metadata alone. It needs
- * both a live image qualification and task-specific prepared-workspace proof.
- */
-export async function createGovernedWorkspaceMutationTaskExecutionBinding(
-  input: CreateGovernedWorkspaceMutationTaskExecutionInput,
-  authority: GovernedWorkspaceMutationEvidenceAuthority
-): Promise<GovernedTaskExecutionBinding> {
-  const task = GovernedTaskSpec_v1.parse(input.task);
-  const selection = GovernedWorkspaceMutationEvidenceSelection_v1.parse(input.evidenceSelection);
-  const resolved = GovernedWorkspaceMutationEvidenceResolution_v1.safeParse(
-    await authority.resolveWorkspaceMutationEvidence(selection)
-  );
-  if (!resolved.success) {
-    throw new Error("protected workspace mutation evidence is unavailable");
-  }
-  const qualificationEvidence = resolved.data.qualification;
-  const prepared = resolved.data.prepared_workspace;
-  if (
-    selection.task_spec_hash !== task.task_spec_hash ||
-    selection.qualification_evidence_hash !== qualificationEvidence.evidence_hash ||
-    selection.prepared_workspace_evidence_hash !== prepared.evidence_hash
-  ) {
-    throw new Error("protected workspace mutation evidence selection does not match");
-  }
-  const authorizedAt = Date.parse(input.authorizedAt);
-  const expiresAt = Date.parse(input.expiresAt);
-  if (
-    !Number.isFinite(authorizedAt) ||
-    !Number.isFinite(expiresAt) ||
-    expiresAt <= authorizedAt ||
-    Date.parse(qualificationEvidence.qualified_at) > authorizedAt ||
-    Date.parse(qualificationEvidence.expires_at) < expiresAt ||
-    Date.parse(prepared.observed_at) < Date.parse(qualificationEvidence.qualified_at) ||
-    Date.parse(prepared.observed_at) > authorizedAt ||
-    Date.parse(prepared.expires_at) < expiresAt
-  ) {
-    throw new Error("workspace mutation qualification or prepared workspace is not active");
-  }
-  if (
-    task.profile.profile_id !== GOVERNED_WORKSPACE_MUTATION_PROFILE_ID ||
-    task.profile.profile_version !== GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION ||
-    task.profile.input_contract_hash !== GOVERNED_WORKSPACE_MUTATION_INPUT_CONTRACT_HASH ||
-    task.profile.output_contract_hash !== GOVERNED_WORKSPACE_MUTATION_OUTPUT_CONTRACT_HASH ||
-    task.profile.verifier_id !== GOVERNED_WORKSPACE_MUTATION_VERIFIER_ID ||
-    task.input_binding_hash !==
-      computeGovernedWorkspaceMutationInputBindingHash({
-        promptHash: prepared.prompt_hash,
-        sourceManifestHash: prepared.source_manifest_hash,
-        workspaceReadScopeHash: prepared.workspace_read_scope_hash,
-        writablePathSetHash: prepared.writable_path_set_hash,
-        ownershipScopeHash: prepared.ownership_scope_hash,
-        rollbackBindingHash: prepared.rollback.binding_hash,
-      }) ||
-    prepared.attempt_id !== task.attempt_id ||
-    prepared.task_spec_hash !== task.task_spec_hash ||
-    prepared.environment_id !== qualificationEvidence.environment_id
-  ) {
-    throw new Error("workspace mutation task and protected evidence do not align");
-  }
-  const readCapability = task.capability_ceiling.find(
-    ({ capability_id: capabilityId }) => capabilityId === "read-owned-workspace"
-  );
-  const writeCapability = task.capability_ceiling.find(
-    ({ capability_id: capabilityId }) => capabilityId === "write-authorized-paths"
-  );
-  if (
-    !readCapability ||
-    readCapability.dimension !== "filesystem_read" ||
-    readCapability.scope_hash !== prepared.workspace_read_scope_hash ||
-    !writeCapability ||
-    writeCapability.dimension !== "filesystem_write" ||
-    writeCapability.scope_hash !== prepared.writable_path_set_hash ||
-    writeCapability.effect.class !== "workspace_mutation" ||
-    writeCapability.effect.ownership_scope_hash !== prepared.ownership_scope_hash ||
-    writeCapability.effect.rollback.strategy !== prepared.rollback.strategy ||
-    writeCapability.effect.rollback.binding_hash !== prepared.rollback.binding_hash
-  ) {
-    throw new Error("prepared workspace does not enforce the task capability ceiling");
-  }
-
-  const grant = DelegatedAuthorityGrant_v1.parse({
-    schema_version: "1.0.0",
-    grant_id: `grant-${task.delegation_id}`,
-    attempt_id: task.attempt_id,
-    delegation_id: task.delegation_id,
-    issuer: {
-      kind: "operator",
-      principal_id: GOVERNED_WORKSPACE_MUTATION_OPERATOR_PRINCIPAL_ID,
-    },
-    capabilities: task.capability_ceiling.map(({ dimension, capability_id, scope_hash }) => ({
-      dimension,
-      capability_id,
-      scope_hash,
-    })),
-    issued_at: input.authorizedAt,
-    not_before: input.authorizedAt,
-    expires_at: input.expiresAt,
-  });
-  const manifestHash = computeCanonicalHash(GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST);
-  const qualification = createGovernedTaskAdapterQualification({
-    schema_version: "1.0.0",
-    qualification_id: qualificationEvidence.qualification_id,
-    adapter_id: GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID,
-    adapter_version: GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION,
-    manifest_hash: manifestHash,
-    qualification_profile_id: "governed-workspace-mutation-live-canaries",
-    qualification_profile_version: GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION,
-    evidence_hash: qualificationEvidence.evidence_hash,
-    decision: "qualified",
-    qualified_at: qualificationEvidence.qualified_at,
-    expires_at: qualificationEvidence.expires_at,
-  });
-  const capabilityEnforcements = task.capability_ceiling.map((capability) =>
-    createGovernedTaskCapabilityEnforcementReceipt({
-      schema_version: "1.0.0",
-      receipt_id: `enforcement-${task.delegation_id}-${capability.capability_id}`,
-      adapter_id: GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID,
-      adapter_version: GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION,
-      manifest_hash: manifestHash,
-      qualification_hash: qualification.qualification_hash,
-      capability_hash: computeCanonicalHash(capability),
-      dimension: capability.dimension,
-      scope_hash: capability.scope_hash,
-      effect_policy_hash: computeCanonicalHash(capability.effect),
-      enforcement: "enforced",
-      evidence_hash: computeCanonicalHash({
-        qualification_evidence_hash: qualificationEvidence.evidence_hash,
-        prepared_workspace_evidence_hash: prepared.evidence_hash,
-        capability_hash: computeCanonicalHash(capability),
-      }),
-      verified_at: prepared.observed_at,
-      expires_at: prepared.expires_at,
-    })
-  );
-  return createGovernedTaskExecutionBinding({
-    schema_version: "1.0.0",
-    task_spec_hash: task.task_spec_hash,
-    authority_grant: grant,
-    authority_grant_hash: computeCanonicalHash(grant),
-    adapter_selection: {
-      adapter_id: GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID,
-      adapter_version: GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION,
-    },
-    adapter_resolution: {
-      manifest: GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST,
-      qualification,
-      capability_enforcements: capabilityEnforcements,
-    },
-  });
-}
-
 export type GovernedWorkspaceMutationOutcome = "changed" | "unchanged" | "invalid";
 
 /** Task-quality vocabulary only; mutation evidence still decides admissibility separately. */
@@ -577,11 +405,11 @@ export function interpretGovernedWorkspaceMutationOutcome(input: {
   ) {
     return { matched: false };
   }
-  const output = isObject(input.output) ? input.output : undefined;
+  const output = GovernedWorkspaceMutationOutput_v1.safeParse(input.output);
   const outputOutcome =
-    output?.result === "CHANGED"
+    output.success && output.data.result === "CHANGED"
       ? "changed"
-      : output?.result === "UNCHANGED"
+      : output.success && output.data.result === "UNCHANGED"
         ? "unchanged"
         : "invalid";
   const terminalOutcome =
@@ -616,8 +444,4 @@ function requireExactQualificationControls(
       message: "every workspace mutation qualification control must appear exactly once",
     });
   }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

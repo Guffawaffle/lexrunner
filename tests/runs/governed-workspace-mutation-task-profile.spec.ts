@@ -1,21 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
+import * as workspaceMutationProfile from "../../src/runs/governed-workspace-mutation-task-profile.js";
 import {
   GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST,
-  GOVERNED_WORKSPACE_MUTATION_OPERATOR_PRINCIPAL_ID,
   GOVERNED_WORKSPACE_MUTATION_VERIFIER_ID,
   GovernedWorkspaceMutationQualificationControlId_v1,
   createGovernedWorkspaceMutationPreparedWorkspaceEvidence,
   createGovernedWorkspaceMutationQualificationEvidence,
-  createGovernedWorkspaceMutationTaskExecutionBinding,
   createGovernedWorkspaceMutationTaskSpec,
   interpretGovernedWorkspaceMutationOutcome,
 } from "../../src/runs/governed-workspace-mutation-task-profile.js";
 
 const hash = (character: string): `sha256:${string}` => `sha256:${character.repeat(64)}`;
-const AUTHORIZED_AT = "2026-08-10T12:00:00.000Z";
-const EXPIRES_AT = "2026-08-10T12:30:00.000Z";
 
 describe("governed workspace mutation task profile", () => {
   it("expresses a non-review task with an owned, discardable write scope", () => {
@@ -51,73 +48,25 @@ describe("governed workspace mutation task profile", () => {
     );
   });
 
-  it("creates write enforcement receipts only from exact protected live and prepared evidence", async () => {
-    const task = taskSpec();
-    const qualification = qualificationEvidence();
-    const prepared = preparedEvidence(task.task_spec_hash);
-    const binding = await createGovernedWorkspaceMutationTaskExecutionBinding(
-      executionInput(task, qualification, prepared),
-      protectedEvidenceAuthority(qualification, prepared)
+  it("does not expose an authority-minting or caller-clock execution binding", () => {
+    expect(workspaceMutationProfile).not.toHaveProperty(
+      "createGovernedWorkspaceMutationTaskExecutionBinding"
     );
-
-    expect(binding.authority_grant.issuer).toEqual({
-      kind: "operator",
-      principal_id: GOVERNED_WORKSPACE_MUTATION_OPERATOR_PRINCIPAL_ID,
-    });
-    expect(binding.adapter_resolution.qualification.evidence_hash).toBe(
-      qualification.evidence_hash
-    );
-    expect(binding.adapter_resolution.capability_enforcements).toHaveLength(2);
-    expect(binding.adapter_resolution.capability_enforcements).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          dimension: "filesystem_write",
-          scope_hash: hash("4"),
-          enforcement: "enforced",
-        }),
-      ])
+    expect(workspaceMutationProfile).not.toHaveProperty(
+      "GOVERNED_WORKSPACE_MUTATION_OPERATOR_PRINCIPAL_ID"
     );
   });
 
-  it("rejects a prepared root whose writable scope does not match the task grant", async () => {
+  it("keeps evidence records as inert claims until a protected controller consumes them", () => {
     const task = taskSpec();
-    const prepared = preparedEvidence(task.task_spec_hash, { writablePathSetHash: hash("f") });
     const qualification = qualificationEvidence();
+    const prepared = createGovernedWorkspaceMutationPreparedWorkspaceEvidence(
+      preparedEvidenceBody(task.task_spec_hash)
+    );
 
-    await expect(
-      createGovernedWorkspaceMutationTaskExecutionBinding(
-        executionInput(task, qualification, prepared),
-        protectedEvidenceAuthority(qualification, prepared)
-      )
-    ).rejects.toThrow(/task and protected evidence do not align/u);
-  });
-
-  it("reconstructs the exact task input binding from protected workspace evidence", async () => {
-    const task = taskSpec();
-    const prepared = createGovernedWorkspaceMutationPreparedWorkspaceEvidence({
-      ...preparedEvidenceBody(task.task_spec_hash),
-      source_manifest_hash: hash("f"),
-    });
-    const qualification = qualificationEvidence();
-
-    await expect(
-      createGovernedWorkspaceMutationTaskExecutionBinding(
-        executionInput(task, qualification, prepared),
-        protectedEvidenceAuthority(qualification, prepared)
-      )
-    ).rejects.toThrow(/task and protected evidence do not align/u);
-  });
-
-  it("rejects stale qualifications and prepared rollback state", async () => {
-    const task = taskSpec();
-    const qualification = qualificationEvidence({ expiresAt: "2026-08-10T12:10:00.000Z" });
-    const prepared = preparedEvidence(task.task_spec_hash);
-    await expect(
-      createGovernedWorkspaceMutationTaskExecutionBinding(
-        executionInput(task, qualification, prepared),
-        protectedEvidenceAuthority(qualification, prepared)
-      )
-    ).rejects.toThrow(/not active/u);
+    expect(qualification.evidence_hash).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(prepared.evidence_hash).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(workspaceMutationProfile).not.toHaveProperty("resolveWorkspaceMutationEvidence");
 
     expect(() =>
       createGovernedWorkspaceMutationPreparedWorkspaceEvidence({
@@ -128,23 +77,6 @@ describe("governed workspace mutation task profile", () => {
         },
       } as never)
     ).toThrow();
-  });
-
-  it("cannot turn caller-created evidence bodies into authority without a protected resolver", async () => {
-    const task = taskSpec();
-    const qualification = qualificationEvidence();
-    const prepared = preparedEvidence(task.task_spec_hash);
-
-    await expect(
-      createGovernedWorkspaceMutationTaskExecutionBinding(
-        executionInput(task, qualification, prepared),
-        {
-          async resolveWorkspaceMutationEvidence() {
-            return null;
-          },
-        }
-      )
-    ).rejects.toThrow(/protected workspace mutation evidence is unavailable/u);
   });
 
   it("requires every negative and recovery canary before qualification", () => {
@@ -175,6 +107,21 @@ describe("governed workspace mutation task profile", () => {
         terminalTaskOutcome: "not_produced",
       })
     ).toEqual({ matched: true, outputOutcome: "invalid" });
+    for (const output of [
+      { result: "CHANGED" },
+      { result: "UNCHANGED", summary: "" },
+      { result: "CHANGED", summary: "valid", extra: true },
+      { result: "CHANGED", summary: "x".repeat(4_097) },
+    ]) {
+      expect(
+        interpretGovernedWorkspaceMutationOutcome({
+          task,
+          verifierId: GOVERNED_WORKSPACE_MUTATION_VERIFIER_ID,
+          output,
+          terminalTaskOutcome: "invalid",
+        })
+      ).toEqual({ matched: true, outputOutcome: "invalid", terminalOutcome: "invalid" });
+    }
     expect(task).not.toHaveProperty("refusal_reason_required");
     expect(task).not.toHaveProperty("changed_paths");
   });
@@ -197,10 +144,10 @@ function taskSpec() {
   });
 }
 
-function qualificationEvidence(options: { expiresAt?: string } = {}) {
+function qualificationEvidence() {
   return createGovernedWorkspaceMutationQualificationEvidence({
     ...qualificationEvidenceBody(),
-    expires_at: options.expiresAt ?? "2026-08-10T13:00:00.000Z",
+    expires_at: "2026-08-10T13:00:00.000Z",
   });
 }
 
@@ -235,13 +182,6 @@ function qualificationControls() {
   }));
 }
 
-function preparedEvidence(taskSpecHash: string, options: { writablePathSetHash?: string } = {}) {
-  return createGovernedWorkspaceMutationPreparedWorkspaceEvidence({
-    ...preparedEvidenceBody(taskSpecHash),
-    writable_path_set_hash: options.writablePathSetHash ?? hash("4"),
-  });
-}
-
 function preparedEvidenceBody(taskSpecHash: string) {
   return {
     schema_version: "1.0.0" as const,
@@ -274,44 +214,5 @@ function preparedEvidenceBody(taskSpecHash: string) {
     evidence_refs: [hash("e")],
     observed_at: "2026-08-10T11:55:00.000Z",
     expires_at: "2026-08-10T12:45:00.000Z",
-  };
-}
-
-function executionInput(
-  task: ReturnType<typeof taskSpec>,
-  qualification: ReturnType<typeof qualificationEvidence>,
-  prepared: ReturnType<typeof preparedEvidence>
-) {
-  return {
-    task,
-    authorizedAt: AUTHORIZED_AT,
-    expiresAt: EXPIRES_AT,
-    evidenceSelection: {
-      task_spec_hash: task.task_spec_hash,
-      qualification_evidence_hash: qualification.evidence_hash,
-      prepared_workspace_evidence_hash: prepared.evidence_hash,
-    },
-  };
-}
-
-function protectedEvidenceAuthority(
-  qualification: ReturnType<typeof qualificationEvidence>,
-  prepared: ReturnType<typeof preparedEvidence>
-) {
-  return {
-    async resolveWorkspaceMutationEvidence(selection: {
-      task_spec_hash: string;
-      qualification_evidence_hash: string;
-      prepared_workspace_evidence_hash: string;
-    }) {
-      if (
-        selection.task_spec_hash !== prepared.task_spec_hash ||
-        selection.qualification_evidence_hash !== qualification.evidence_hash ||
-        selection.prepared_workspace_evidence_hash !== prepared.evidence_hash
-      ) {
-        return null;
-      }
-      return { qualification, prepared_workspace: prepared };
-    },
   };
 }

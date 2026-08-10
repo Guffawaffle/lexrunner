@@ -91,30 +91,35 @@ not treated as a conformant sandbox.
 
 The first non-review profile is `workspace-mutation`. It binds a sealed source manifest, the
 Attempt-owned read scope, an explicit writable-path-set hash, ownership, and a
-`discard_workspace` recovery binding. Its adapter manifest grants filesystem read and write only;
-Git, GitHub, network, secrets, signing, release, external runtime, and nested Delegation remain
-unsupported. A task execution binding cannot mint its per-capability enforcement receipts from
-that manifest alone. It additionally requires:
+`discard_workspace` recovery binding. Its adapter manifest declares filesystem read and write as
+the enforcement expected from a future provider; Git, GitHub, network, secrets, signing, release,
+external runtime, and nested Delegation remain unsupported. The manifest grants nothing by itself.
+This profile deliberately exports no task-execution-binding constructor: inert schema records and
+an adapter manifest are not authority. A future protected controller may construct the generic
+binding only after it independently resolves:
 
 - a current exact-image qualification covering the complete write, escape, identity,
   cancellation, descendant, degraded-launch, and controller-recovery canary set; and
 - task-specific prepared-workspace evidence whose prompt, sealed source, read scope, write scope,
   ownership scope, and rollback binding reconstruct the task's complete input hash.
 
-The execution caller selects those records only by their task and evidence hashes. A trusted host
-evidence authority must resolve the exact records from protected qualification and workspace
-preparation stores. Public schema helpers can validate and hash controller output, but those
-self-authored bodies cannot be passed directly across the authority-minting boundary. The resolved
-records also name their controller executable and protected receipt identities.
+The execution requester will select those records only by their task and evidence hashes. The
+protected controller—not a caller-supplied interface implementation—must resolve the exact records
+from protected qualification and workspace-preparation stores, evaluate their validity against its
+own trusted current and authorization times, and construct the grant and enforcement receipts.
+Public schema helpers can validate and hash controller output, but self-authored bodies are inert
+claims and cannot cross an authority-minting boundary in this profile. The records also name their
+controller executable and protected receipt identities.
 
 On the current disposable WSL2 topology, Windows automount and interop are disabled. The ReFS host
 checkout is not visible inside the provider; the candidate writable root lives in the disposable
 distro's ext4 VHDX. The selected recovery model is therefore whole-workspace discard by a separate
 controller, not a claim that ReFS snapshots undo agent effects.
 
-This is the authorization and evidence contract, not a live write qualification. No provider
-operation may select the writer adapter until the checked-in outer-sandbox canaries and independent
-recovery controller produce protected evidence satisfying it.
+This is the authorization and evidence contract, not a live write qualification or grant path. No
+provider operation may select the writer adapter until the checked-in outer-sandbox canaries,
+independent recovery controller, protected authority integration, and trusted controller clock
+produce and validate evidence satisfying it.
 
 ## Migration boundary
 
