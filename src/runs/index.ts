@@ -248,6 +248,8 @@ export * from "./governed-attempt-independent-verifier.js";
 export * from "./governed-attempt-verification-service.js";
 export * from "./governed-attempt-verification-adapters.js";
 export * from "./governed-review-runtime.js";
+export * from "./governed-review-repository-corpus.js";
+export * from "./external-wsl2-repository-corpus-source.js";
 export * from "./governed-review-persistent-supervisor.js";
 export * from "./governed-review-runtime-adapters.js";
 export * from "./governed-delegation-service.js";

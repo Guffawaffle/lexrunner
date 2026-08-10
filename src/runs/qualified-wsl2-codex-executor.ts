@@ -1,8 +1,10 @@
 import { z } from "zod";
 
-import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { ProtectedEvidenceFrameClass } from "../store/protected-evidence-store.js";
 import type { GovernedAttemptEvidenceCapture } from "./governed-attempt-evidence.js";
+import type { GovernedRepositoryCorpusFrame } from "./governed-review-repository-corpus.js";
+import { GovernedRepositoryId } from "./governed-repository-identity.js";
 import {
   AttemptAuthorization_v1,
   AttemptExecutorEvent_v1,
@@ -77,6 +79,18 @@ export interface QualifiedCodexProviderClaim {
   taskOutcome: "pass" | "block" | "not_produced" | "invalid";
 }
 
+export const QualifiedCodexLaunchInputBinding_v1 = z
+  .object({
+    prompt_hash: SHA256Hash,
+    output_schema_hash: SHA256Hash,
+    task_offer_hash: SHA256Hash,
+    delegation_offer_hash: SHA256Hash,
+  })
+  .strict();
+export type QualifiedCodexLaunchInputBinding_v1 = z.infer<
+  typeof QualifiedCodexLaunchInputBinding_v1
+>;
+
 /**
  * Pre-authorization identity input for the fixed synthetic corpus. The
  * provider computes the actual corpus/selection hashes and returns a
@@ -85,7 +99,7 @@ export interface QualifiedCodexProviderClaim {
 export const QualifiedCodexSyntheticPreparation_v1 = z
   .object({
     environment_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u),
     candidate_object_id: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u),
   })
@@ -108,12 +122,17 @@ export interface QualifiedCodexProviderBridge {
   prepareSynthetic(
     input: QualifiedCodexSyntheticPreparation_v1
   ): Promise<QualifiedCodexProviderAttestations>;
+  prepareRepository?(
+    input: GovernedRepositoryCorpusFrame
+  ): Promise<QualifiedCodexProviderAttestations>;
+  discardRepository?(workspaceId: string): Promise<void>;
   attest(authorization: AttemptAuthorization): Promise<QualifiedCodexProviderAttestations>;
   launch(input: {
     authorization: AttemptAuthorization;
     promptStdin: Uint8Array;
     outputSchema: unknown;
-    mode: "synthetic_only";
+    mode: "synthetic_only" | "repository_read_only";
+    inputBinding?: QualifiedCodexLaunchInputBinding_v1;
   }): Promise<QualifiedCodexProviderLaunchReceipt>;
   observe(
     providerHandle: string,
@@ -137,8 +156,8 @@ interface ActiveOperation {
 }
 
 /**
- * Synthetic-only executor adapter. It will not dispatch a repository corpus;
- * changing that requires a separate reviewed policy transition.
+ * Qualified read-only executor adapter. Repository launch remains reachable
+ * only through a provider-issued exact workspace attestation.
  */
 export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
   private readonly active = new Map<string, ActiveOperation>();
@@ -157,6 +176,7 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
     prompt: Uint8Array;
     outputSchema: unknown;
     evidence?: GovernedAttemptEvidenceCapture;
+    inputBinding?: QualifiedCodexLaunchInputBinding_v1;
   }): Promise<AttemptExecutorHandle> {
     const authorization = AttemptAuthorization_v1.parse(input.authorization);
     if (!input.evidence) throw new Error("Qualified Codex launch requires protected evidence");
@@ -164,13 +184,23 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
       throw new Error("Qualified Codex prompt exceeds its bounded stdin contract");
     }
     const attestations = await this.attestExact(authorization);
-    this.requireSyntheticEvidenceBinding(authorization, attestations, input.evidence, ["open"]);
+    const inputBinding = input.inputBinding
+      ? QualifiedCodexLaunchInputBinding_v1.parse(input.inputBinding)
+      : undefined;
+    if (attestations.workspace.corpus_kind === "repository" && !inputBinding) {
+      throw new Error("Qualified repository launch requires an exact task input binding");
+    }
+    this.requireEvidenceBinding(authorization, attestations, input.evidence, ["open"]);
     const launched = launchReceipt(
       await this.bridge.launch({
         authorization,
         promptStdin: Uint8Array.from(input.prompt),
         outputSchema: structuredClone(input.outputSchema),
-        mode: "synthetic_only",
+        mode:
+          attestations.workspace.corpus_kind === "synthetic"
+            ? "synthetic_only"
+            : "repository_read_only",
+        ...(inputBinding ? { inputBinding } : {}),
       })
     );
     const handle = AttemptExecutorHandle_v1.parse({
@@ -208,7 +238,7 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
       throw new Error("Qualified Codex durable operation binding mismatch");
     }
     const attestations = await this.attestExact(authorization);
-    this.requireSyntheticEvidenceBinding(authorization, attestations, input.evidence, [
+    this.requireEvidenceBinding(authorization, attestations, input.evidence, [
       "open",
       "sealed_unindexed",
       "complete",
@@ -352,14 +382,14 @@ export class QualifiedWsl2CodexExecutor implements AttemptExecutor {
     }
     if (
       attestations.executor.protocol !== "jsonl-stdin" ||
-      attestations.workspace.corpus_kind !== "synthetic"
+      !["synthetic", "repository"].includes(attestations.workspace.corpus_kind)
     ) {
-      throw new Error("Qualified Codex executor is restricted to synthetic JSONL-stdin launch");
+      throw new Error("Qualified Codex executor requires a read-only JSONL-stdin corpus");
     }
     return attestations;
   }
 
-  private requireSyntheticEvidenceBinding(
+  private requireEvidenceBinding(
     authorization: AttemptAuthorization,
     attestations: QualifiedCodexProviderAttestations,
     evidence: GovernedAttemptEvidenceCapture,

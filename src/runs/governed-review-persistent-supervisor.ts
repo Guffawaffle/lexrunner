@@ -7,8 +7,19 @@ import type { QualifiedCodexProviderBridge } from "./qualified-wsl2-codex-execut
 import type { GovernedAttemptOperationStore } from "../store/governed-attempt-operation-store.js";
 import type { GovernedDelegationStore } from "../store/governed-delegation-store.js";
 import type { ProtectedEvidenceStore } from "../store/protected-evidence-store.js";
+import type {
+  LaunchEnvelopeBindingStore,
+  TaskPacketBindingStore,
+  WorkspaceLifecycleStore,
+} from "../store/workspace-lifecycle-store.js";
 
 type GovernedReviewStore = GovernedAttemptOperationStore & GovernedDelegationStore;
+type GovernedReviewLifecycleReader = Pick<
+  WorkspaceLifecycleStore,
+  "getAttempt" | "getWorkspaceLease"
+> &
+  Pick<LaunchEnvelopeBindingStore, "getLaunchEnvelopeBinding"> &
+  Pick<TaskPacketBindingStore, "getTaskPacketBinding">;
 
 export type PersistentGovernedReviewSupervisorResult =
   | {
@@ -28,6 +39,7 @@ export interface PersistentGovernedReviewSupervisorDependencies {
   evidenceStore: ProtectedEvidenceStore;
   evidenceReader: ProtectedEvidenceIndependentReader;
   bridge: QualifiedCodexProviderBridge;
+  repositoryLifecycle?: GovernedReviewLifecycleReader;
   now?: () => string;
 }
 
@@ -44,7 +56,9 @@ export class PersistentGovernedReviewSupervisor {
     if (!initial) return { supervised: false, operationId, reason: "not_found" };
     const verifier = new GovernedAttemptVerificationService(
       this.dependencies.store,
-      this.dependencies.evidenceReader
+      this.dependencies.evidenceReader,
+      undefined,
+      this.dependencies.repositoryLifecycle
     );
     const supervisor = new GovernedAttemptAsyncSupervisor(
       this.dependencies.store,

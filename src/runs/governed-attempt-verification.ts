@@ -33,6 +33,33 @@ const BoundedOutputSchema = z.record(z.string(), z.unknown()).refine(
   { message: "output schema must be bounded canonical JSON" }
 );
 
+export const GovernedAttemptInputBinding_v1 = z
+  .object({
+    prompt_hash: SHA256Hash,
+    output_schema_hash: SHA256Hash,
+    task_offer_hash: SHA256Hash,
+    delegation_offer_hash: SHA256Hash,
+  })
+  .strict();
+export type GovernedAttemptInputBinding_v1 = z.infer<typeof GovernedAttemptInputBinding_v1>;
+
+export const GovernedRepositoryCorpusVerificationBinding_v1 = z
+  .object({
+    manifest_hash: SHA256Hash,
+    source_binding_hash: SHA256Hash,
+    workspace_lease_id: opaqueId,
+    workspace_lease_revision: z.number().int().nonnegative(),
+    task_packet_hash: SHA256Hash,
+    launch_envelope_hash: SHA256Hash,
+    path_mapping_hash: SHA256Hash,
+    candidate_tree_hash: SHA256Hash,
+    patch_hash: SHA256Hash,
+  })
+  .strict();
+export type GovernedRepositoryCorpusVerificationBinding_v1 = z.infer<
+  typeof GovernedRepositoryCorpusVerificationBinding_v1
+>;
+
 const verificationContextBody = z
   .object({
     schema_version: z.literal(GOVERNED_ATTEMPT_VERIFICATION_VERSION),
@@ -42,6 +69,8 @@ const verificationContextBody = z
     workspace: WorkspaceAttestation_v1,
     output_schema: BoundedOutputSchema,
     output_schema_hash: SHA256Hash,
+    input_binding: GovernedAttemptInputBinding_v1.optional(),
+    repository_corpus: GovernedRepositoryCorpusVerificationBinding_v1.optional(),
   })
   .strict();
 
@@ -58,6 +87,33 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
         code: "custom",
         path: ["output_schema_hash"],
         message: "output schema hash does not match the canonical schema",
+      });
+    }
+    if (
+      value.input_binding &&
+      value.input_binding.output_schema_hash !== value.output_schema_hash
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["input_binding", "output_schema_hash"],
+        message: "input binding must name the exact output schema",
+      });
+    }
+    if (
+      (value.workspace.corpus_kind === "repository") !==
+      (value.repository_corpus !== undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["repository_corpus"],
+        message: "repository workspace requires exactly one repository corpus binding",
+      });
+    }
+    if (value.workspace.corpus_kind === "repository" && !value.input_binding) {
+      context.addIssue({
+        code: "custom",
+        path: ["input_binding"],
+        message: "repository workspace requires an exact task input binding",
       });
     }
     const { context_hash: _contextHash, ...body } = value;
@@ -96,6 +152,8 @@ export const GovernedAttemptVerificationFailureCode = z.enum([
   "authorization_invalid",
   "authorization_expired",
   "context_binding_mismatch",
+  "lifecycle_binding_mismatch",
+  "task_input_binding_mismatch",
   "control_unverifiable",
   "evidence_incomplete",
   "evidence_binding_mismatch",
@@ -127,7 +185,7 @@ const verificationReceiptBody = z
     decision: z.enum(["accepted", "rejected"]),
     task_outcome: z.enum(["pass", "block", "not_produced", "invalid"]),
     admissibility: z.enum(["admissible", "inadmissible"]),
-    failure_codes: z.array(GovernedAttemptVerificationFailureCode).max(16),
+    failure_codes: z.array(GovernedAttemptVerificationFailureCode).max(32),
     verified_at: instant,
   })
   .strict();

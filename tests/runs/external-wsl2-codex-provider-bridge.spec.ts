@@ -122,6 +122,20 @@ describe("ExternalWsl2CodexProviderBridge", () => {
     ]);
   });
 
+  it("discards an unattached sealed repository only through its opaque workspace identity", async () => {
+    const transport = new FakeTransport();
+    const bridge = new ExternalWsl2CodexProviderBridge({
+      distribution: "lexrunner-attempt-01234567",
+      transport,
+    });
+    await bridge.discardRepository("repository-0123456789abcdef01234567");
+    expect(transport.requests.at(-1)?.args).toEqual([
+      "discard-repository",
+      "--workspace-id",
+      "repository-0123456789abcdef01234567",
+    ]);
+  });
+
   it("accepts only the disposable distribution namespace", () => {
     expect(
       () =>
@@ -168,6 +182,8 @@ class FakeTransport implements Wsl2CodexProviderTransport {
         return json({ continued: true });
       case "release":
         return json({ released: true });
+      case "discard-repository":
+        return json({ discarded: true });
       default:
         throw new Error("unexpected fake transport request");
     }

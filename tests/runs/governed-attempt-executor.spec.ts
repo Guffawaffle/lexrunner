@@ -44,7 +44,7 @@ function fixture() {
     schema_version: "1.0.0",
     attempt_id: "attempt-1",
     delegation_id: "delegation-1",
-    repository_id: "synthetic-repository",
+    repository_id: "owner/synthetic-repository",
     base_object_id: base,
     candidate_object_id: candidate,
     objective_hash: hash("objective"),

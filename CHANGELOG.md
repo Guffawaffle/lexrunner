@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Governed committed-corpus review** - Bind a clean committed native-WSL candidate to its exact
+  Attempt, workspace lease, task packet, launch envelope, and path mapping; export only bounded Git
+  object bytes and the exact patch; seal them read-only for the asynchronous two-phase Codex review.
+- **Independent repository verification** - Reopen the authoritative lifecycle records and require
+  protected provider receipts to match the corpus, prompt, schema, task offer, and Delegation before
+  a review can become admissible.
+
+### Changed
+
+- **Qualified provider topology** - Bind the root-owned repository exporter and exact Git executable
+  and version into live qualification evidence, and securely discard sealed corpora that never
+  become operation-bound.
+
+### Fixed
+
+- **Git object substitution defense** - Verify every exported file against the blob object ID in
+  the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
+  both the Windows corpus parser and provider boundary.
+- **Qualification upgrade boundary** - Reject pre-profile qualification manifests so repository
+  review cannot use a legacy attestation that omits the exporter and Git executable hashes.
+- **Repository launch lease race** - Atomically require the bound active workspace lease when
+  authorizing the offer, creating the durable operation, and authorizing post-acceptance work; the
+  independent verifier also rejects results after lease release.
+- **Repository corpus memory bounds** - Read Git blobs one at a time, reject aggregate tree size from
+  object headers before buffering payloads, and stop every Git metadata or patch stream after its
+  declared maximum plus one byte.
+- **Repository receipt lifecycle projection** - Verify the provider's corpus-header receipt against
+  provider-visible fields while independently enforcing the host-owned workspace-lease revision.
+- **Failed repository launch cleanup** - Treat post-validation launch construction transactionally:
+  stop partially created worker units and remove partial spools and unreferenced sealed corpora
+  whenever launch fails before returning a handle.
+
 ## [1.4.1] - 2026-08-04
 
 ### Added

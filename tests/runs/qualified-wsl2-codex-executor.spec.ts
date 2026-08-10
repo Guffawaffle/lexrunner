@@ -121,20 +121,28 @@ describe("QualifiedWsl2CodexExecutor", () => {
     expect(evidence.getReference().status).toBe("complete");
   });
 
-  it("refuses repository corpus launch while the adapter is synthetic-only", async () => {
+  it("launches an exactly input-bound repository corpus read-only", async () => {
     const fixture = authorizationFixture("repository");
     const evidence = await evidenceSession(fixture);
     const bridge = new DeferredBridge(fixture.attestations);
     const executor = new QualifiedWsl2CodexExecutor(bridge, () => at(10));
-    await expect(
-      executor.start({
-        authorization: fixture.authorization,
-        prompt: Buffer.from("real review"),
-        outputSchema: { type: "object" },
-        evidence,
-      })
-    ).rejects.toThrow("restricted to synthetic JSONL-stdin launch");
-    expect(bridge.launchInput).toBeUndefined();
+    const inputBinding = {
+      prompt_hash: hash("prompt"),
+      output_schema_hash: hash("schema"),
+      task_offer_hash: hash("task-offer"),
+      delegation_offer_hash: hash("delegation-offer"),
+    };
+    await executor.start({
+      authorization: fixture.authorization,
+      prompt: Buffer.from("real review"),
+      outputSchema: { type: "object" },
+      evidence,
+      inputBinding,
+    });
+    expect(bridge.launchInput).toMatchObject({
+      mode: "repository_read_only",
+      inputBinding,
+    });
   });
 });
 
@@ -259,7 +267,7 @@ function authorizationFixture(corpusKind: "synthetic" | "repository") {
     schema_version: "1.0.0",
     attempt_id: "attempt-1",
     delegation_id: "delegation-1",
-    repository_id: "synthetic-repository",
+    repository_id: "owner/synthetic-repository",
     base_object_id: "1".repeat(40),
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),

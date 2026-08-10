@@ -187,6 +187,16 @@ export class SqliteGovernedAttemptOperationStore
       if (!this.getDelegationSync(handle.delegation_id)) {
         return { created: false, reason: "binding_mismatch" } as const;
       }
+      if (
+        verificationContext?.repository_corpus &&
+        !this.repositoryLifecycleMatches(
+          handle.attempt_id,
+          verificationContext.repository_corpus,
+          now
+        )
+      ) {
+        return { created: false, reason: "binding_mismatch" } as const;
+      }
       const mutation =
         this.db
           .prepare("SELECT 1 FROM governed_attempt_operation_events WHERE mutationId=?")

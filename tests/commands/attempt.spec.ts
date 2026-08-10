@@ -462,12 +462,45 @@ describe("attempt commands", () => {
       distribution: "lexrunner-attempt-01234567",
       environmentId: "environment-1",
       objective: "Review the synthetic retry-window corpus",
+      corpusKind: "synthetic",
       prompt: Buffer.from("You may answer ACCEPT or NO."),
     });
     expect(outputs.at(-1)).toMatchObject({
       ok: true,
       result: { operation: "agent-work.review.start", supervisionStarted: true },
     });
+  });
+
+  it("selects the sealed repository corpus only when explicitly requested", async () => {
+    const databasePath = join(directory, "operations.db");
+    const promptPath = join(directory, "repository-review-prompt.txt");
+    await fs.writeFile(promptPath, "Review the exact committed candidate.", "utf8");
+    await program.parseAsync([
+      "node",
+      "lex-pr",
+      "attempt",
+      "review",
+      "start",
+      "--database-path",
+      databasePath,
+      "--run-id",
+      "run-1",
+      "--attempt-id",
+      "attempt-1",
+      "--distribution",
+      "lexrunner-attempt-01234567",
+      "--environment-id",
+      "environment-1",
+      "--objective",
+      "Review the candidate",
+      "--prompt",
+      promptPath,
+      "--repository",
+      "--json",
+    ]);
+    expect(governedReviewRuntimeHandlers.start).toHaveBeenCalledWith(
+      expect.objectContaining({ corpusKind: "repository" })
+    );
   });
 
   it("forwards detached governed review supervision without prompt or evidence access", async () => {

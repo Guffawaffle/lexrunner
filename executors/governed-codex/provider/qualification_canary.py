@@ -201,6 +201,8 @@ def run(provider: Any) -> dict[str, Any]:
         "unit": "qualification.service",
         "started_at": provider.instant(provider.now_utc()),
         "authorization": authorization,
+        "corpus_kind": "synthetic",
+        "workspace_id": "synthetic-qualification",
         "max_output_bytes": provider.MAX_OUTPUT_BYTES,
         "max_duration_ms": 300_000,
     }
@@ -219,7 +221,7 @@ def run(provider: Any) -> dict[str, Any]:
     return_code, thread_id, messages, declined = provider.stream_codex(
         handle,
         phase_one,
-        provider.provider_offer(authorization),
+        provider.provider_offer(authorization, "synthetic"),
         provider.MAX_OUTPUT_BYTES,
     )
     offer_events = raw_events(provider, handle)
@@ -291,6 +293,9 @@ def run(provider: Any) -> dict[str, Any]:
         "provider_hash": provider.executable_hash(Path(provider.__file__).resolve()),
         "codex_hash": provider.executable_hash(provider.CODEX_EXECUTABLE),
         "bwrap_hash": provider.executable_hash(provider.BWRAP_EXECUTABLE),
+        "repository_exporter_hash": provider.executable_hash(provider.REPOSITORY_EXPORTER),
+        "git_hash": provider.executable_hash(provider.GIT_EXECUTABLE),
+        "git_version": provider.git_version(),
         "controls": controls,
         "diagnostics": {
             "command_outputs": len(outputs),

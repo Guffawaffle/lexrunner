@@ -451,7 +451,7 @@ export function registerAttemptCommand(
     );
   review
     .command("start")
-    .description("Launch a synthetic-only governed Codex offer and detached supervisor")
+    .description("Launch a governed Codex review offer and detached supervisor")
     .requiredOption("--database-path <path>", "Absolute path to the lifecycle SQLite database")
     .requiredOption("--run-id <id>", "Run identifier")
     .requiredOption("--attempt-id <id>", "Attempt identifier")
@@ -459,6 +459,7 @@ export function registerAttemptCommand(
     .requiredOption("--environment-id <id>", "Qualified environment identifier")
     .requiredOption("--objective <text>", "Bounded review objective")
     .requiredOption("--prompt <file|->", "Prompt file, or - for stdin")
+    .option("--repository", "Review the Attempt's sealed committed repository corpus")
     .option("--json", "Output canonical JSON")
     .action(
       async (options: {
@@ -469,6 +470,7 @@ export function registerAttemptCommand(
         environmentId: string;
         objective: string;
         prompt: string;
+        repository?: boolean;
         json?: boolean;
       }) => {
         requireJsonMode(options.json, dependencies.jsonModeActive());
@@ -485,6 +487,7 @@ export function registerAttemptCommand(
           environmentId: options.environmentId,
           objective: options.objective,
           prompt,
+          corpusKind: options.repository ? "repository" : "synthetic",
         });
         (dependencies.writeJson ?? writeJsonOutput)(output);
         setFailureExitCode(output);

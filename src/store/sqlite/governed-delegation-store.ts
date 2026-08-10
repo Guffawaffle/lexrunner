@@ -300,6 +300,9 @@ export class SqliteGovernedDelegationStore
       delegation_id: input.delegationId,
       expected_revision: input.expectedRevision,
       request,
+      ...(input.repositoryLifecycleGuard
+        ? { repository_lifecycle_guard: input.repositoryLifecycleGuard }
+        : {}),
     });
     return this.db.transaction(() => {
       const replay = this.mutationEvent(input.delegationId, input.mutationId);
@@ -325,6 +328,17 @@ export class SqliteGovernedDelegationStore
             idempotentReplay: true,
           } as const;
         }
+        if (
+          input.repositoryLifecycleGuard &&
+          !this.repositoryLifecycleMatches(current.attempt_id, input.repositoryLifecycleGuard, now)
+        ) {
+          return {
+            authorized: false,
+            reason: "binding_mismatch",
+            record: current,
+            idempotentReplay: true,
+          } as const;
+        }
         return {
           authorized: true,
           record: current,
@@ -339,17 +353,22 @@ export class SqliteGovernedDelegationStore
       if (current.revision !== input.expectedRevision) {
         return { authorized: false, reason: "stale_revision" } as const;
       }
-      const authorization = authorizeDelegationInvocationBinding(
-        {
-          status: current.status,
-          offer: current.state.offer,
-          offerHash: current.offer_hash,
-          ...(current.acceptance_receipt_hash
-            ? { acceptanceReceiptHash: current.acceptance_receipt_hash }
-            : {}),
-        },
-        request
-      );
+      const lifecycleAuthorized =
+        !input.repositoryLifecycleGuard ||
+        this.repositoryLifecycleMatches(current.attempt_id, input.repositoryLifecycleGuard, now);
+      const authorization = lifecycleAuthorized
+        ? authorizeDelegationInvocationBinding(
+            {
+              status: current.status,
+              offer: current.state.offer,
+              offerHash: current.offer_hash,
+              ...(current.acceptance_receipt_hash
+                ? { acceptanceReceiptHash: current.acceptance_receipt_hash }
+                : {}),
+            },
+            request
+          )
+        : ({ authorized: false, reason: "binding_mismatch" } as const);
       const event = this.insertEvent({
         schema_version: GOVERNED_DELEGATION_STORE_VERSION,
         delegation_id: current.delegation_id,
@@ -391,6 +410,56 @@ export class SqliteGovernedDelegationStore
 
   async listDelegationEvents(delegationId: string): Promise<GovernedDelegationEvent[]> {
     return this.events(delegationId);
+  }
+
+  protected repositoryLifecycleMatches(
+    attemptId: string,
+    binding: AuthorizeGovernedDelegationInvocationInput["repositoryLifecycleGuard"] & {},
+    now: string
+  ): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT a.status AS attemptStatus, a.workspaceLeaseId AS attemptWorkspaceLeaseId,
+                a.packetHash AS attemptPacketHash, l.status AS leaseStatus,
+                l.revision AS leaseRevision, l.packetHash AS leasePacketHash,
+                l.expiresAt AS leaseExpiresAt, e.workspaceLeaseId AS envelopeWorkspaceLeaseId,
+                e.workspaceLeaseRevision AS envelopeWorkspaceLeaseRevision,
+                e.envelopeHash AS envelopeHash, p.packetHash AS packetBindingHash
+           FROM attempts a
+           JOIN workspace_leases l ON l.leaseId=a.workspaceLeaseId AND l.attemptId=a.attemptId
+           JOIN launch_envelope_bindings e ON e.attemptId=a.attemptId
+           JOIN task_packet_bindings p ON p.attemptId=a.attemptId
+          WHERE a.attemptId=?`
+      )
+      .get(attemptId) as
+      | {
+          attemptStatus: string;
+          attemptWorkspaceLeaseId: string;
+          attemptPacketHash: string;
+          leaseStatus: string;
+          leaseRevision: number;
+          leasePacketHash: string;
+          leaseExpiresAt: string;
+          envelopeWorkspaceLeaseId: string;
+          envelopeWorkspaceLeaseRevision: number;
+          envelopeHash: string;
+          packetBindingHash: string;
+        }
+      | undefined;
+    return Boolean(
+      row &&
+      row.attemptStatus === "running" &&
+      row.attemptWorkspaceLeaseId === binding.workspace_lease_id &&
+      row.attemptPacketHash === binding.task_packet_hash &&
+      row.leaseStatus === "active" &&
+      row.leaseRevision >= binding.workspace_lease_revision &&
+      row.leasePacketHash === binding.task_packet_hash &&
+      Date.parse(row.leaseExpiresAt) > Date.parse(now) &&
+      row.envelopeWorkspaceLeaseId === binding.workspace_lease_id &&
+      row.envelopeWorkspaceLeaseRevision === binding.workspace_lease_revision &&
+      row.envelopeHash === binding.launch_envelope_hash &&
+      row.packetBindingHash === binding.task_packet_hash
+    );
   }
 
   private delegation(delegationId: string): GovernedDelegationRecord | null {

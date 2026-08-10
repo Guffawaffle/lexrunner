@@ -18,8 +18,14 @@ import {
   type QualifiedCodexProviderClaim,
   type QualifiedCodexProviderEmission_v1 as QualifiedCodexProviderEmission,
   type QualifiedCodexProviderLaunchReceipt,
+  QualifiedCodexLaunchInputBinding_v1,
   QualifiedCodexSyntheticPreparation_v1,
 } from "./qualified-wsl2-codex-executor.js";
+import {
+  MAX_REPOSITORY_CORPUS_FRAME_BYTES,
+  parseGovernedRepositoryCorpusFrame,
+  type GovernedRepositoryCorpusFrame,
+} from "./governed-review-repository-corpus.js";
 
 const MAX_CONTROL_BYTES = 256 * 1_024;
 const MAX_STREAM_LINE_BYTES = 1 * 1_024 * 1_024;
@@ -96,6 +102,40 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
     return parseAttestationBundle(output);
   }
 
+  async prepareRepository(
+    input: GovernedRepositoryCorpusFrame
+  ): Promise<QualifiedCodexProviderAttestations> {
+    const frame = parseGovernedRepositoryCorpusFrame(input.bytes);
+    if (frame.bytes.byteLength > MAX_REPOSITORY_CORPUS_FRAME_BYTES) {
+      throw new Error("Qualified Codex repository corpus exceeds its transport bound");
+    }
+    const output = await this.transport.request({
+      args: ["prepare-repository", "--stdin-framing", "lexrunner-repository-corpus-v1"],
+      stdin: frame.bytes,
+      maxOutputBytes: MAX_CONTROL_BYTES,
+    });
+    const attestations = parseAttestationBundle(output);
+    if (
+      attestations.workspace.corpus_kind !== "repository" ||
+      attestations.environment.environment_id !== frame.header.environment_id ||
+      attestations.workspace.repository_id !== frame.header.repository_id ||
+      attestations.workspace.base_object_id !== frame.header.base_object_id ||
+      attestations.workspace.candidate_object_id !== frame.header.candidate_object_id ||
+      attestations.workspace.corpus_hash !== frame.header.corpus_hash ||
+      attestations.workspace.selection_hash !== frame.header.selection_hash
+    ) {
+      throw new Error("Qualified Codex provider returned a mismatched repository attestation");
+    }
+    return attestations;
+  }
+
+  async discardRepository(workspaceId: string): Promise<void> {
+    await this.transport.request({
+      args: ["discard-repository", "--workspace-id", opaqueId.parse(workspaceId)],
+      maxOutputBytes: MAX_CONTROL_BYTES,
+    });
+  }
+
   async attest(
     authorization: AttemptAuthorization_v1
   ): Promise<QualifiedCodexProviderAttestations> {
@@ -111,12 +151,16 @@ export class ExternalWsl2CodexProviderBridge implements QualifiedCodexProviderBr
     authorization: AttemptAuthorization_v1;
     promptStdin: Uint8Array;
     outputSchema: unknown;
-    mode: "synthetic_only";
+    mode: "synthetic_only" | "repository_read_only";
+    inputBinding?: z.input<typeof QualifiedCodexLaunchInputBinding_v1>;
   }): Promise<QualifiedCodexProviderLaunchReceipt> {
     const metadata = encodeCanonical({
       authorization: input.authorization,
       output_schema: input.outputSchema,
       mode: input.mode,
+      ...(input.inputBinding
+        ? { input_binding: QualifiedCodexLaunchInputBinding_v1.parse(input.inputBinding) }
+        : {}),
     });
     if (metadata.byteLength > MAX_CONTROL_BYTES) {
       throw new Error("Qualified Codex launch metadata exceeds its bound");

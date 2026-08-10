@@ -6,7 +6,16 @@ import {
   type GovernedAttemptOperationEvent_v1 as GovernedAttemptOperationEvent,
   type GovernedAttemptOperationRecord_v1 as GovernedAttemptOperationRecord,
 } from "../store/governed-attempt-operation-store.js";
+import type { GovernedDelegationRecord_v1 as GovernedDelegationRecord } from "../store/governed-delegation-store.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
+import { AgentTaskPacket_v1, ExecutionEnvelope_v1 } from "../schemas/agent-work.js";
+import { validateAgentExecutionPathBinding } from "../schemas/agent-work-projection.js";
+import type {
+  AttemptRecord,
+  LaunchEnvelopeBindingRecord,
+  TaskPacketBindingRecord,
+  WorkspaceLifecycleLeaseRecord,
+} from "../store/workspace-lifecycle-store.js";
 import {
   createGovernedAttemptVerificationReceipt,
   type GovernedAttemptVerificationContext_v1 as GovernedAttemptVerificationContext,
@@ -36,6 +45,13 @@ export interface GovernedAttemptIndependentVerificationInput {
   events: readonly GovernedAttemptOperationEvent[];
   context: GovernedAttemptVerificationContext;
   evidence: IndependentlyVerifiedEvidenceCapture;
+  delegation?: GovernedDelegationRecord;
+  repositoryLifecycle?: {
+    attempt: AttemptRecord | null;
+    lease: WorkspaceLifecycleLeaseRecord | null;
+    launchBinding: LaunchEnvelopeBindingRecord | null;
+    packetBinding: TaskPacketBindingRecord | null;
+  };
   verifiedAt: string;
 }
 
@@ -143,9 +159,41 @@ export class GovernedAttemptIndependentVerifier {
       context.workspace.repository_id !== authorization.grant.repository_id ||
       context.workspace.base_object_id !== authorization.grant.base_object_id ||
       context.workspace.candidate_object_id !== authorization.grant.candidate_object_id ||
-      context.workspace.corpus_kind !== "synthetic"
+      !["synthetic", "repository"].includes(context.workspace.corpus_kind)
     ) {
       failures.add("context_binding_mismatch");
+    }
+    if (context.input_binding) {
+      if (
+        !input.delegation ||
+        input.delegation.delegation_id !== operation.delegation_id ||
+        input.delegation.attempt_id !== operation.attempt_id ||
+        input.delegation.offer_hash !== context.input_binding.delegation_offer_hash ||
+        input.delegation.state.offer.task_offer_hash !== context.input_binding.task_offer_hash ||
+        context.input_binding.output_schema_hash !== context.output_schema_hash
+      ) {
+        failures.add("task_input_binding_mismatch");
+      }
+    } else if (context.workspace.corpus_kind === "repository") {
+      failures.add("task_input_binding_mismatch");
+    }
+    const repository = context.repository_corpus;
+    if (
+      context.workspace.corpus_kind === "repository" &&
+      (!repository ||
+        repository.source_binding_hash !==
+          computeCanonicalHash({
+            attempt_id: operation.attempt_id,
+            workspace_lease_id: repository.workspace_lease_id,
+            task_packet_hash: repository.task_packet_hash,
+            launch_envelope_hash: repository.launch_envelope_hash,
+            path_mapping_hash: repository.path_mapping_hash,
+          }))
+    ) {
+      failures.add("context_binding_mismatch");
+    }
+    if (context.workspace.corpus_kind === "repository") {
+      this.verifyRepositoryLifecycle(input, failures);
     }
     if (operation.result?.authorization_outcome !== "valid") {
       failures.add("authorization_invalid");
@@ -173,6 +221,83 @@ export class GovernedAttemptIndependentVerifier {
       ) {
         failures.add("control_unverifiable");
       }
+    }
+  }
+
+  private verifyRepositoryLifecycle(
+    input: GovernedAttemptIndependentVerificationInput,
+    failures: Set<GovernedAttemptVerificationFailureCode>
+  ): void {
+    const repository = input.context.repository_corpus;
+    const lifecycle = input.repositoryLifecycle;
+    if (!repository || !lifecycle) {
+      failures.add("lifecycle_binding_mismatch");
+      return;
+    }
+    const { attempt, lease, launchBinding, packetBinding } = lifecycle;
+    if (!attempt || !lease || !launchBinding || !packetBinding) {
+      failures.add("lifecycle_binding_mismatch");
+      return;
+    }
+    try {
+      const envelope = ExecutionEnvelope_v1.parse(JSON.parse(launchBinding.envelopeJson));
+      const packet = AgentTaskPacket_v1.parse(JSON.parse(packetBinding.packetJson));
+      const pathBinding = validateAgentExecutionPathBinding(envelope.path_mappings, {
+        repositoryId: lease.repositoryId,
+        baseSha: lease.baseSha,
+        hostId: lease.hostId,
+        gitRuntime: lease.gitRuntime,
+        repositoryRoot: lease.projectRoot,
+        allocationRoot: envelope.paths.allocation_root ?? "",
+        worktreePath: lease.worktreePath,
+      });
+      if (
+        !pathBinding.valid ||
+        pathBinding.mappingDigest !== repository.path_mapping_hash ||
+        attempt.attemptId !== input.operation.attempt_id ||
+        attempt.workspaceLeaseId !== repository.workspace_lease_id ||
+        attempt.packetHash !== repository.task_packet_hash ||
+        attempt.baseSha !== input.context.workspace.base_object_id ||
+        lease.leaseId !== repository.workspace_lease_id ||
+        lease.status !== "active" ||
+        Date.parse(lease.expiresAt) <= Date.parse(input.verifiedAt) ||
+        lease.revision < repository.workspace_lease_revision ||
+        lease.attemptId !== attempt.attemptId ||
+        lease.runId !== attempt.runId ||
+        lease.packetId !== attempt.packetId ||
+        lease.packetHash !== attempt.packetHash ||
+        lease.repositoryId !== input.context.workspace.repository_id ||
+        lease.baseSha !== attempt.baseSha ||
+        launchBinding.attemptId !== attempt.attemptId ||
+        launchBinding.runId !== attempt.runId ||
+        launchBinding.workspaceLeaseId !== lease.leaseId ||
+        launchBinding.workspaceLeaseRevision !== repository.workspace_lease_revision ||
+        launchBinding.envelopeHash !== repository.launch_envelope_hash ||
+        launchBinding.envelopeId !== envelope.envelope_id ||
+        launchBinding.workspaceLeaseRevision !== envelope.workspace_lease_revision ||
+        computeCanonicalHash(envelope) !== launchBinding.envelopeHash ||
+        envelope.run_id !== attempt.runId ||
+        envelope.attempt_id !== attempt.attemptId ||
+        envelope.workspace_lease_id !== lease.leaseId ||
+        envelope.packet_id !== attempt.packetId ||
+        envelope.packet_hash !== attempt.packetHash ||
+        envelope.expected_head_sha !== attempt.baseSha ||
+        envelope.branch !== lease.branch ||
+        envelope.paths.worktree_root !== lease.worktreePath ||
+        packetBinding.attemptId !== attempt.attemptId ||
+        packetBinding.runId !== attempt.runId ||
+        packetBinding.packetHash !== repository.task_packet_hash ||
+        packet.packet_hash !== packetBinding.packetHash ||
+        packet.packet_id !== attempt.packetId ||
+        packet.run_id !== attempt.runId ||
+        packet.attempt_id !== attempt.attemptId ||
+        packet.repository.id !== lease.repositoryId ||
+        packet.repository.base_sha !== attempt.baseSha
+      ) {
+        failures.add("lifecycle_binding_mismatch");
+      }
+    } catch {
+      failures.add("lifecycle_binding_mismatch");
     }
   }
 
@@ -259,11 +384,25 @@ function analyzeProtocol(
     return {};
   }
   const first = parseObject(frames[0]!.bytes);
+  const firstInputBinding = isObject(first?.input_binding) ? first.input_binding : undefined;
+  const firstRepositoryCorpus = isObject(first?.repository_corpus)
+    ? first.repository_corpus
+    : undefined;
   if (
     frames[0]!.frameClass !== "provider_receipt" ||
     first?.operation_id !== operation.operation_id ||
     first?.provider_handle !== operation.handle.provider_handle ||
-    first?.authorization_binding_digest !== operation.authorization.binding_digest
+    first?.authorization_binding_digest !== operation.authorization.binding_digest ||
+    (operation.verification_context?.input_binding !== undefined &&
+      (!firstInputBinding ||
+        computeCanonicalHash(firstInputBinding) !==
+          computeCanonicalHash(operation.verification_context.input_binding))) ||
+    (operation.verification_context?.repository_corpus !== undefined &&
+      (!firstRepositoryCorpus ||
+        computeCanonicalHash(firstRepositoryCorpus) !==
+          computeCanonicalHash(
+            providerRepositoryCorpusBinding(operation.verification_context.repository_corpus)
+          )))
   ) {
     failures.add("protocol_violation");
   }
@@ -355,6 +494,13 @@ function analyzeProtocol(
       : {}),
     ...(terminalTaskOutcome ? { terminalTaskOutcome } : {}),
   };
+}
+
+function providerRepositoryCorpusBinding(
+  binding: NonNullable<GovernedAttemptVerificationContext["repository_corpus"]>
+): Omit<typeof binding, "workspace_lease_revision"> {
+  const { workspace_lease_revision: _hostLifecycleRevision, ...providerBinding } = binding;
+  return providerBinding;
 }
 
 function contentHash(value: string): string {
