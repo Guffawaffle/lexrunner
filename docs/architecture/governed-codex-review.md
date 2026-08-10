@@ -1,5 +1,10 @@
 # Governed Codex review
 
+This runtime is a deliberately read-only code-review profile, not the universal governed-agent
+contract. Review-neutral task/profile and positive capability semantics—including recoverable
+writes—are defined in [Governed task capabilities](governed-task-capabilities.md). The current v1
+review authorization remains specialized until it is migrated through that profile boundary.
+
 Status: governed synthetic and exact committed repository-corpus review are available through the
 persistent asynchronous CLI.
 

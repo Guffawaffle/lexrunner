@@ -236,6 +236,7 @@ export type {
   WorkerRuntimeSignal,
 } from "./agent-work-worker-runtime.js";
 export * from "./governed-attempt-protocol.js";
+export * from "./governed-task.js";
 export * from "./governed-attempt-executor.js";
 export * from "./governed-attempt-evidence.js";
 export * from "./governed-attempt-async-supervisor.js";
