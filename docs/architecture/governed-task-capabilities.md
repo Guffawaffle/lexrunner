@@ -89,6 +89,27 @@ The desired freedom lives inside the qualified boundary: arbitrary problem-solvi
 are welcome when the outer environment enforces the declared effects. Command allowlists alone are
 not treated as a conformant sandbox.
 
+The first non-review profile is `workspace-mutation`. It binds a sealed source manifest, the
+Attempt-owned read scope, an explicit writable-path-set hash, ownership, and a
+`discard_workspace` recovery binding. Its adapter manifest grants filesystem read and write only;
+Git, GitHub, network, secrets, signing, release, external runtime, and nested Delegation remain
+unsupported. A task execution binding cannot mint its per-capability enforcement receipts from
+that manifest alone. It additionally requires:
+
+- a current exact-image qualification covering the complete write, escape, identity,
+  cancellation, descendant, degraded-launch, and controller-recovery canary set; and
+- task-specific prepared-workspace evidence whose prompt, sealed source, read scope, write scope,
+  ownership scope, and rollback binding reconstruct the task's complete input hash.
+
+On the current disposable WSL2 topology, Windows automount and interop are disabled. The ReFS host
+checkout is not visible inside the provider; the candidate writable root lives in the disposable
+distro's ext4 VHDX. The selected recovery model is therefore whole-workspace discard by a separate
+controller, not a claim that ReFS snapshots undo agent effects.
+
+This is the authorization and evidence contract, not a live write qualification. No provider
+operation may select the writer adapter until the checked-in outer-sandbox canaries and independent
+recovery controller produce protected evidence satisfying it.
+
 ## Migration boundary
 
 The governed review path now creates and durably verifies a `code-review` profile over the generic
@@ -100,6 +121,8 @@ must match the generic grant's selected dimensions. A legacy offer without both 
 execution binding may still reach the refusal turn, but `ACCEPT` cannot release work and a direct
 authorized-work launch fails closed. Generic results and verification receipts carry a bounded
 profile-owned outcome identifier; only `not_produced` and `invalid` are protocol sentinels. Review
-output interpretation likewise lives in the bound profile, not the generic independent verifier. A
-second non-review profile must now prove that the protocol, operation store, supervisor, refusal
-behavior, and evidence store require no task-specific changes.
+output interpretation likewise lives in the bound profile, not the generic independent verifier.
+The non-review `workspace-mutation` contract is the next portability probe; its live qualification
+and synthetic disposable-write Attempt must prove that the protocol, operation store, supervisor,
+refusal behavior, and evidence store require no task-specific changes before real task mutation is
+released.

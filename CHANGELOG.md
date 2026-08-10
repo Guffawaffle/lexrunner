@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Governed workspace mutation profile** - Add a non-review task profile whose positive authority
+  is limited to an Attempt-owned read scope and exact writable-path-set hash with whole-workspace
+  discard recovery. Writer execution bindings require both a complete exact-image canary
+  qualification and task-specific prepared-workspace evidence that reconstructs the prompt,
+  source, read, write, ownership, and rollback bindings; an adapter manifest alone cannot mint a
+  write enforcement receipt.
 - **Governed task capability foundation** - Add a review-neutral task/profile binding and positive
   capability ceiling that represents recoverable workspace writes, explicitly bounded external
   effects, contained runtime execution, and attenuated nested Delegations without weakening `NO`.
