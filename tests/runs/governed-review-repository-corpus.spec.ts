@@ -6,6 +6,7 @@ import { ExternalWsl2RepositoryCorpusSource } from "../../src/runs/external-wsl2
 import {
   computeGovernedRepositoryCorpusHashes,
   contentHash,
+  gitBlobObjectId,
   parseGovernedRepositoryCorpusFrame,
   type GovernedRepositoryCorpusExportRequest_v1,
   type GovernedRepositoryCorpusHeader_v1,
@@ -41,6 +42,12 @@ describe("governed repository corpus", () => {
       attempt_id: "attempt-other",
       worktree_root: "/srv/lexrunner/worktrees/attempt-1",
     });
+  });
+
+  it("rejects file bytes that do not match the manifest Git blob object", () => {
+    expect(() => parseGovernedRepositoryCorpusFrame(corpusFrame("0".repeat(40)))).toThrow(
+      "Git object mismatch"
+    );
   });
 });
 
@@ -84,7 +91,7 @@ function exportRequest(): GovernedRepositoryCorpusExportRequest_v1 {
   };
 }
 
-function corpusFrame(): Buffer {
+function corpusFrame(objectId?: string): Buffer {
   const file = Buffer.from("alpha\n");
   const patch = Buffer.from("diff --git a/a.txt b/a.txt\n");
   const sourceBinding = {
@@ -97,6 +104,7 @@ function corpusFrame(): Buffer {
   const entries = [
     {
       path: "a.txt",
+      object_id: objectId ?? gitBlobObjectId(file, "0".repeat(40)),
       byte_length: file.byteLength,
       content_hash: contentHash(file),
       executable: false,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import struct
 import subprocess
 import tempfile
@@ -129,6 +130,10 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
             header["candidate_object_id"], self.git("rev-parse", "HEAD", cwd=self.worktree).strip()
         )
         self.assertEqual([entry["path"] for entry in header["entries"]], ["a.txt"])
+        self.assertEqual(
+            header["entries"][0]["object_id"],
+            self.git("rev-parse", "HEAD:a.txt", cwd=self.worktree).strip(),
+        )
         self.assertEqual(payload[: header["candidate_tree_bytes"]], b"candidate\n")
         self.assertIn(b"diff --git a/a.txt b/a.txt", payload)
         self.assertNotIn(b"credential-canary", result.stdout)
@@ -172,6 +177,25 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         ).strip()
         self.git("reset", "--hard", candidate, cwd=self.worktree)
         self.git("replace", candidate, replacement, cwd=self.worktree)
+
+        result = self.run_exporter()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"")
+
+    def test_rejects_blob_bytes_that_do_not_match_the_tree_object_id(self) -> None:
+        candidate_blob = self.git("rev-parse", "HEAD:a.txt", cwd=self.worktree).strip()
+        malicious_file = self.root / "malicious.txt"
+        malicious_file.write_text("substituted\n", encoding="utf-8")
+        malicious_blob = self.git(
+            "hash-object", "-w", str(malicious_file), cwd=self.repository
+        ).strip()
+        object_root = Path(
+            self.git("rev-parse", "--git-path", "objects", cwd=self.worktree).strip()
+        ).resolve()
+        shutil.copyfile(
+            object_root / malicious_blob[:2] / malicious_blob[2:],
+            object_root / candidate_blob[:2] / candidate_blob[2:],
+        )
 
         result = self.run_exporter()
         self.assertNotEqual(result.returncode, 0)

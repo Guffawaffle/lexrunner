@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   and version into live qualification evidence, and securely discard sealed corpora that never
   become operation-bound.
 
+### Fixed
+
+- **Git object substitution defense** - Verify every exported file against the blob object ID in
+  the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
+  both the Windows corpus parser and provider boundary.
+
 ## [1.4.1] - 2026-08-04
 
 ### Added

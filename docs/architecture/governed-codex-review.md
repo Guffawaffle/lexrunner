@@ -81,10 +81,11 @@ For repository review, the runtime reopens the authoritative Attempt, active wor
 immutable task packet, immutable launch envelope, and exact native path mapping. A root-owned,
 fixed-argv exporter then requires a clean native-Linux Git worktree whose committed candidate HEAD
 descends from and differs from the bound base. It reads regular-file bytes from Git objects, emits
-the exact base-to-candidate binary patch, and rejects untracked or ignored dirt, symlinks, gitlinks,
-special modes, replacement directory identities, external Git admin state, and non-canonical paths.
-Repository config, remotes, `.git`, credentials, and working-file contents are never placed in the
-corpus.
+the exact base-to-candidate binary patch, verifies every file byte sequence against the blob object
+ID recorded by the candidate tree, and carries those IDs into the independently rehashed manifest.
+It rejects untracked or ignored dirt, symlinks, gitlinks, special modes, replacement directory
+identities, external Git admin state, and non-canonical paths. Repository config, remotes, `.git`,
+credentials, and working-file contents are never placed in the corpus.
 
 The provider independently rehashes and seals the framed corpus under its private state root. Only
 the sealed candidate, patch, and bounded metadata enter `/workspace`, read-only, after durable

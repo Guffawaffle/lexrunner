@@ -47,6 +47,12 @@ def content_hash(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
 
+def git_blob_object_id(value: bytes, expected: str) -> str:
+    algorithm = hashlib.sha1 if len(expected) == 40 else hashlib.sha256
+    framed = b"blob " + str(len(value)).encode("ascii") + b"\0" + value
+    return algorithm(framed).hexdigest()
+
+
 def require_keys(value: dict[str, Any], required: Iterable[str], field: str) -> None:
     if set(value) != set(required):
         fail(f"{field} has unexpected or missing fields")
@@ -424,6 +430,8 @@ def read_blobs(worktree: Path, entries: list[dict[str, Any]]) -> list[bytes]:
         if end >= len(output) or output[end : end + 1] != b"\n":
             fail("Git object export payload is truncated")
         content = output[start:end]
+        if git_blob_object_id(content, entry["object_id"]) != entry["object_id"]:
+            fail("Git blob content does not match its tree object identifier")
         blobs.append(content)
         entry["byte_length"] = size
         entry["content_hash"] = content_hash(content)
@@ -483,6 +491,7 @@ def export() -> None:
     public_entries = [
         {
             "path": entry["path"],
+            "object_id": entry["object_id"],
             "byte_length": entry["byte_length"],
             "content_hash": entry["content_hash"],
             "executable": entry["executable"],

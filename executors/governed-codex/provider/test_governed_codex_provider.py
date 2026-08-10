@@ -222,6 +222,16 @@ class GovernedCodexProviderTest(unittest.TestCase):
         self.assertEqual((corpus / "candidate" / "a.txt").read_bytes(), b"")
         self.assertEqual(provider.verify_repository_corpus(corpus), header)
 
+    def test_rejects_repository_content_with_a_mismatched_git_blob_id(self) -> None:
+        content = b"candidate\n"
+        patch = b"diff --git a/a.txt b/a.txt\n"
+        header = self.repository_header(content, patch)
+        header["entries"][0]["object_id"] = "0" * 40
+        header.update(provider.repository_header_hashes(header))
+
+        with self.assertRaisesRegex(provider.ProviderError, "Git object binding"):
+            provider.prepare_repository_bundle(header, [content], patch)
+
     def test_continuation_requires_durable_accept_and_exact_authorization(self) -> None:
         handle = "provider-" + "d" * 32
         directory = provider.operation_directory(handle)
@@ -389,6 +399,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         entries = [
             {
                 "path": "a.txt",
+                "object_id": provider.git_blob_object_id(content, "0" * 40),
                 "byte_length": len(content),
                 "content_hash": provider.content_hash(content),
                 "executable": False,

@@ -12,6 +12,7 @@ import {
 import {
   computeGovernedRepositoryCorpusHashes,
   contentHash,
+  gitBlobObjectId,
   type GovernedRepositoryCorpusFrame,
 } from "../../src/runs/governed-review-repository-corpus.js";
 import type { QualifiedCodexProviderBridge } from "../../src/runs/qualified-wsl2-codex-executor.js";
@@ -491,6 +492,7 @@ function repositoryCorpusFixture(
   const entries = [
     {
       path: "a.txt",
+      object_id: gitBlobObjectId(file, "0".repeat(40)),
       byte_length: file.byteLength,
       content_hash: contentHash(file),
       executable: false,

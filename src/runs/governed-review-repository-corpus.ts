@@ -106,6 +106,7 @@ export type GovernedRepositoryCorpusExportRequest_v1 = z.infer<
 export const GovernedRepositoryCorpusEntry_v1 = z
   .object({
     path: corpusPath,
+    object_id: gitObjectId,
     byte_length: z.number().int().nonnegative().max(MAX_REPOSITORY_CORPUS_FILE_BYTES),
     content_hash: SHA256Hash,
     executable: z.boolean(),
@@ -263,6 +264,9 @@ export function parseGovernedRepositoryCorpusFrame(
     if (contentHash(content) !== entry.content_hash) {
       throw new Error(`Repository corpus content hash mismatch for ${entry.path}`);
     }
+    if (gitBlobObjectId(content, entry.object_id) !== entry.object_id) {
+      throw new Error(`Repository corpus Git object mismatch for ${entry.path}`);
+    }
     files.push(Uint8Array.from(content));
     offset += entry.byte_length;
   }
@@ -280,4 +284,10 @@ export function parseGovernedRepositoryCorpusFrame(
 
 export function contentHash(bytes: Uint8Array): string {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+export function gitBlobObjectId(bytes: Uint8Array, expectedObjectId: string): string {
+  const algorithm = expectedObjectId.length === 40 ? "sha1" : "sha256";
+  const prefix = Buffer.from(`blob ${bytes.byteLength}\0`, "ascii");
+  return createHash(algorithm).update(prefix).update(bytes).digest("hex");
 }

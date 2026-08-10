@@ -118,6 +118,12 @@ def content_hash(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
+def git_blob_object_id(data: bytes, expected: str) -> str:
+    algorithm = hashlib.sha1 if len(expected) == 40 else hashlib.sha256
+    framed = b"blob " + str(len(data)).encode("ascii") + b"\0" + data
+    return algorithm(framed).hexdigest()
+
+
 def emit_json(value: Any) -> None:
     sys.stdout.buffer.write(canonical_bytes(value) + b"\n")
     sys.stdout.buffer.flush()
@@ -597,13 +603,14 @@ def validate_repository_header(value: Any) -> dict[str, Any]:
             fail("repository corpus entry must be an object")
         require_keys(
             entry,
-            ("path", "byte_length", "content_hash", "executable"),
+            ("path", "object_id", "byte_length", "content_hash", "executable"),
             f"repository corpus entry {index}",
         )
         path = require_repository_path(entry["path"], f"entries[{index}].path")
         if path <= previous:
             fail("repository corpus paths must be unique and strictly ordered")
         previous = path
+        require_git_id(entry["object_id"], f"entries[{index}].object_id")
         length = entry["byte_length"]
         if (
             not isinstance(length, int)
@@ -656,6 +663,8 @@ def parse_repository_frame() -> tuple[dict[str, Any], list[bytes], bytes]:
         content = data[offset:end]
         if content_hash(content) != entry["content_hash"]:
             fail("repository corpus file hash is invalid")
+        if git_blob_object_id(content, entry["object_id"]) != entry["object_id"]:
+            fail("repository corpus Git object binding is invalid")
         files.append(content)
         offset = end
     patch = data[offset:]
@@ -763,6 +772,8 @@ def verify_repository_corpus(path: Path) -> dict[str, Any]:
             or bool(target_info.st_mode & stat.S_IXUSR) != entry["executable"]
         ):
             fail("sealed repository candidate content changed")
+        if git_blob_object_id(data, entry["object_id"]) != entry["object_id"]:
+            fail("sealed repository candidate Git object binding changed")
     return header
 
 
