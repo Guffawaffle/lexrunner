@@ -16,6 +16,8 @@ export const GOVERNED_WORKSPACE_MUTATION_VERIFIER_VERSION = "1.0.0" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID =
   "lexrunner.qualified-wsl2-codex-writer" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION = "1.0.0" as const;
+export const GOVERNED_WORKSPACE_MUTATION_RECOVERY_CONTROLLER_ID =
+  "lexrunner.workspace-recovery-controller" as const;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_EVIDENCE_BYTES = 16 * 1_024 * 1_024;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_TOOL_CALLS = 200;
 
@@ -25,6 +27,18 @@ const opaqueId = z
   .max(256)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "Must be an opaque identifier");
 const instant = z.string().datetime({ offset: true });
+const boundedRelativePath = z
+  .string()
+  .min(1)
+  .max(4_096)
+  .refine(
+    (value) =>
+      !value.startsWith("/") &&
+      !value.includes("\\") &&
+      !value.includes("\0") &&
+      value.split("/").every((part) => part !== "" && part !== "." && part !== ".."),
+    "Must be a normalized relative path"
+  );
 
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST = WorkerAdapterManifest_v1.parse({
   schema_version: "1.0.0",
@@ -280,6 +294,81 @@ export function createGovernedWorkspaceMutationPreparedWorkspaceEvidence(
     evidence_hash: computeCanonicalHash(body),
   });
 }
+
+export const GovernedWorkspaceMutationRecoveryReceipt_v1 = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    controller_id: z.literal(GOVERNED_WORKSPACE_MUTATION_RECOVERY_CONTROLLER_ID),
+    controller_executable_hash: SHA256Hash,
+    workspace_id: opaqueId,
+    attempt_id: opaqueId,
+    task_spec_hash: SHA256Hash,
+    rollback_binding_hash: SHA256Hash,
+    writable_root_identity_hash: SHA256Hash,
+    before_filesystem_manifest_hash: SHA256Hash,
+    after_filesystem_manifest_hash: SHA256Hash,
+    before_git_identity_hash: SHA256Hash,
+    after_git_identity_hash: SHA256Hash,
+    patch_identity_hash: SHA256Hash,
+    changed_paths: z.array(boundedRelativePath).max(4_096),
+    worker_absence_evidence_hash: SHA256Hash,
+    recovery_authorization_hash: SHA256Hash,
+    reason: z.enum([
+      "cancelled",
+      "client_lost",
+      "worker_lost",
+      "task_terminal",
+      "qualification_cleanup",
+    ]),
+    evidence_status: z.enum(["complete", "incomplete"]),
+    evidence_failure_reason: z.enum([
+      "none",
+      "file_size_limit_exceeded",
+      "total_bytes_limit_exceeded",
+      "entry_limit_exceeded",
+      "symlink_target_limit_exceeded",
+      "change_limit_exceeded",
+    ]),
+    result: z.literal("discarded"),
+    workspace_absent: z.literal(true),
+    discarded_at: instant,
+    receipt_hash: SHA256Hash,
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (
+      (receipt.evidence_status === "complete" && receipt.evidence_failure_reason !== "none") ||
+      (receipt.evidence_status === "incomplete" && receipt.evidence_failure_reason === "none")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidence_failure_reason"],
+        message: "recovery evidence status and failure reason are inconsistent",
+      });
+    }
+    if (
+      receipt.changed_paths.some(
+        (path, index) => index > 0 && path <= receipt.changed_paths[index - 1]!
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["changed_paths"],
+        message: "changed paths must be unique and strictly ordered",
+      });
+    }
+    const { receipt_hash: _receiptHash, ...body } = receipt;
+    if (computeCanonicalHash(body) !== receipt.receipt_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["receipt_hash"],
+        message: "recovery receipt hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedWorkspaceMutationRecoveryReceipt_v1 = z.infer<
+  typeof GovernedWorkspaceMutationRecoveryReceipt_v1
+>;
 
 export interface CreateGovernedWorkspaceMutationTaskInput {
   attemptId: string;

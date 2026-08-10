@@ -63,3 +63,16 @@ protected-evidence capture. The report and installer bind the exact provider, Co
 repository exporter, Git executable, and Git version. The installer recomputes installed hashes and
 writes a 24-hour manifest plus root-readable qualification evidence. These tools qualify the
 provider image; they do not accept repository-review inputs themselves.
+
+`workspace_mutation_controller.py` is a separate root-owned prepare/inspect/collect/discard
+executable for
+the future writer profile. It accepts a bounded canonical request, reconstructs and hashes the
+sealed regular-file source and capability scopes, creates one opaque Attempt-owned ext4 root for the
+unprivileged provider account, and persists its metadata in controller-only state. It never launches
+Codex and never constructs a capability grant. Recovery requires the exact prepared identities plus
+protected worker-absence and recovery-authorization hashes. The controller captures the dirty
+post-state and patch identity, atomically detaches the root, resumes deletion after a crash, and
+reports success only after both active and quarantine paths are absent. Oversized adversarial dirt
+does not block discard: it produces an explicitly incomplete evidence receipt that cannot support
+mutation admissibility. Its records remain inert until the protected host authority validates them
+against a current writer qualification and its own clock.

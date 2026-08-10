@@ -8,14 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Disposable workspace recovery controller** - Add a root-owned WSL2 controller that prepares
+  bounded Attempt-owned ext4 roots from a hash-checked sealed source, records pre-mutation
+  filesystem and Git identities, and atomically detaches and discards only the exactly bound root.
+  Recovery is resumable across the detach/delete crash window and emits strict pre/post, patch,
+  worker-absence, recovery-authorization, and workspace-absence evidence without creating a writer
+  grant or launch path.
 - **Governed workspace mutation profile** - Add a non-review task profile whose proposed authority
   is limited to an Attempt-owned read scope and exact writable-path-set hash with whole-workspace
   discard recovery. The profile exports no execution-binding constructor: schema records and an
-  adapter manifest cannot mint a write receipt. A later protected controller must independently
-  resolve exact-image qualification and task-specific prepared-workspace evidence by hash, validate
+  adapter manifest cannot mint a write receipt. Protected authority integration must independently
+  resolve exact-image qualification and controller-prepared workspace evidence by hash, validate
   freshness with its own trusted clock, and construct the generic grant only after those records
-  reconstruct the prompt, source, read, write, ownership, and rollback bindings. The task input hash
-  also binds its normalized duration, output-byte, evidence-byte, and tool-call budgets.
+  reconstruct the prompt, source, read, write, ownership, and rollback bindings. The task input
+  hash also binds its normalized duration, output-byte, evidence-byte, and tool-call budgets.
 - **Governed task capability foundation** - Add a review-neutral task/profile binding and positive
   capability ceiling that represents recoverable workspace writes, explicitly bounded external
   effects, contained runtime execution, and attenuated nested Delegations without weakening `NO`.
