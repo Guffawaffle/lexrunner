@@ -18,6 +18,7 @@ import {
 } from "../../src/runs/governed-attempt-verification.js";
 import {
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskExecutionBinding,
   createGovernedCodeReviewTaskSpec,
@@ -562,6 +563,7 @@ function verificationBoundFixture(repository = false) {
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 60_000,

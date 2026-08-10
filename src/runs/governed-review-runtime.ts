@@ -43,6 +43,7 @@ import {
 import type { GovernedRepositoryCorpusSource } from "./external-wsl2-repository-corpus-source.js";
 import type { QualifiedCodexProviderAttestations } from "./qualified-wsl2-codex-executor.js";
 import {
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskExecutionBinding,
@@ -439,6 +440,7 @@ export class GovernedReviewRuntime {
       candidate_object_id: prepared.candidateObjectId,
       objective_hash: objectiveHash,
       authorized_model_provider: "openai",
+      authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
       source_disclosure_allowed: true,
       controls,
       max_duration_ms: SYNTHETIC_GOVERNED_REVIEW.maxDurationMs,

@@ -50,8 +50,10 @@ invocation, and only then sends the compatibility authorization on stdin to `con
 read-only tool grant must describe exactly the same selected capability dimensions, so it cannot
 bypass or silently expand the generic grant. If either the generic task or its execution binding is
 absent, a legacy offer remains refusal-only: direct work is denied and `ACCEPT` is durably recorded
-but cannot cross the continuation boundary. That gate is idempotent. Restart recovery replays it
-when a crash occurs after durable ACCEPT but before continuation; it cannot invent an acceptance.
+but cannot cross the continuation boundary. The root generic grant must also name the exact operator
+principal in the protected authorization requirements; merely claiming operator issuance is not
+sufficient. That gate is idempotent. Restart recovery replays it when a crash occurs after durable
+ACCEPT but before continuation; it cannot invent an acceptance.
 
 ## Refusal
 

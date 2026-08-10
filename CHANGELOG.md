@@ -38,7 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   continuation when the durable generic task/execution binding is absent, keep unbound legacy
   offers refusal-only, reject contradictory `PASS` output with blocking findings, and make generic
   results and verification receipts accept profile-owned outcome identifiers without embedding the
-  code-review vocabulary.
+  code-review vocabulary. Bind the root task grant issuer to the operator principal named by the
+  protected authorization requirements so a self-consistent caller grant cannot mint authority.
 - **Git object substitution defense** - Verify every exported file against the blob object ID in
   the candidate tree, preserve that object ID in the sealed manifest, and recheck the binding at
   both the Windows corpus parser and provider boundary.

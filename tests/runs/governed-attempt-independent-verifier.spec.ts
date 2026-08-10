@@ -30,6 +30,7 @@ import {
 import { ProtectedEvidenceReference_v1 } from "../../src/store/protected-evidence-store.js";
 import {
   GOVERNED_CODE_REVIEW_VERIFIER_ID,
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskExecutionBinding,
@@ -326,6 +327,7 @@ function verificationFixture(
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 600_000,

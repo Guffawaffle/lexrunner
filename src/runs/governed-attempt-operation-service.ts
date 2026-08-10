@@ -180,15 +180,19 @@ export class GovernedAttemptOperationService {
     if (!offerLaunch) {
       const task = verificationContext?.governed_task;
       const execution = verificationContext?.task_execution;
+      const authorizedOperatorPrincipalId =
+        verificationContext?.requirements.authorized_operator_principal_id;
       if (
         !task ||
         !execution ||
+        !authorizedOperatorPrincipalId ||
         !(await evaluateBoundTaskExecution({
           attemptId: authorization.attempt_id,
           delegationId: authorization.delegation_id,
           task,
           execution,
           delegationState: delegation.state,
+          authorizedOperatorPrincipalId,
           evaluatedAt: input.now,
         }))
       ) {
@@ -532,6 +536,7 @@ export class GovernedAttemptOperationService {
       task,
       execution,
       delegationState: delegation.state,
+      authorizedOperatorPrincipalId: context.requirements.authorized_operator_principal_id,
       evaluatedAt: event.observed_at,
     });
   }
@@ -589,6 +594,7 @@ async function evaluateBoundTaskExecution(input: {
   task: NonNullable<GovernedAttemptVerificationContext["governed_task"]>;
   execution: NonNullable<GovernedAttemptVerificationContext["task_execution"]>;
   delegationState: DelegationProtocolState;
+  authorizedOperatorPrincipalId: string;
   evaluatedAt: string;
 }): Promise<boolean> {
   const evaluated = await evaluateGovernedTaskGrantForAdapter(
@@ -597,6 +603,7 @@ async function evaluateBoundTaskExecution(input: {
       delegation_id: input.delegationId,
       task_spec_hash: input.task.task_spec_hash,
       authority_grant_hash: input.execution.authority_grant_hash,
+      authorized_operator_principal_id: input.authorizedOperatorPrincipalId,
     },
     {
       resolveAuthorizedTaskGrant: async (selection) => {

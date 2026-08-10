@@ -137,6 +137,27 @@ describe("generic governed task capabilities", () => {
     ).toEqual({ permitted: false, reason: "invalid_authority_selection" });
   });
 
+  it("rejects a self-consistent root grant from an operator principal not named by authority", async () => {
+    const task = taskSpec();
+    const authorized = grant(task, {
+      dimension: "filesystem_read",
+      capability_id: "read-input",
+      scope_hash: hash("1"),
+    });
+    const forged = DelegatedAuthorityGrant_v1.parse({
+      ...authorized,
+      issuer: { kind: "operator", principal_id: "forged-operator" },
+    });
+
+    expect(
+      await evaluateGovernedTaskGrant(
+        authoritySelection(task, forged),
+        taskGrantAuthority(task, [forged]),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "invalid_grant_chain" });
+  });
+
   it("binds authorization to the protected accepted offer and task provider", async () => {
     const task = taskSpec();
     const selectedGrant = grant(task, {
@@ -602,6 +623,7 @@ function authoritySelection(
     delegation_id: task.delegation_id,
     task_spec_hash: task.task_spec_hash,
     authority_grant_hash: computeAuthorityGrantHash(selectedGrant),
+    authorized_operator_principal_id: "operator-1",
   };
 }
 

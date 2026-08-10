@@ -78,6 +78,7 @@ export const GovernedReviewRequirements_v1 = z
     candidate_object_id: gitObjectId,
     objective_hash: SHA256Hash,
     authorized_model_provider: opaqueId,
+    authorized_operator_principal_id: opaqueId,
     source_disclosure_allowed: z.literal(true),
     controls: z.array(RequiredControl_v1).length(GovernedControlId.options.length),
     max_duration_ms: z

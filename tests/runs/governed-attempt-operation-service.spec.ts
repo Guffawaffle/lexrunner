@@ -20,6 +20,7 @@ import {
 } from "../../src/runs/governed-attempt-protocol.js";
 import {
   GOVERNED_CODE_REVIEW_OUTPUT_SCHEMA,
+  GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
   computeGovernedCodeReviewCorpusScopeHash,
   createGovernedCodeReviewTaskExecutionBinding,
   createGovernedCodeReviewTaskSpec,
@@ -156,6 +157,10 @@ describe("GovernedAttemptOperationService", () => {
     expect(legacyExpansion.started).toEqual({ started: false, reason: "binding_mismatch" });
     expect(legacyExpansion.executor.startCount).toBe(0);
     await legacyExpansion.store.close();
+
+    await expect(governedTaskOfferFixture({ forgeRootIssuer: true })).rejects.toThrow(
+      /authorized root operator/u
+    );
   });
 
   it("replays an authorized continuation after a crash following durable ACCEPT", async () => {
@@ -396,6 +401,7 @@ async function governedTaskOfferFixture(
     invalidateQualification?: boolean;
     acceptedBeforeStart?: boolean;
     omitGrantCapabilities?: boolean;
+    forgeRootIssuer?: boolean;
   } = {}
 ) {
   const store = new InMemoryGovernedAttemptOperationStore();
@@ -445,6 +451,18 @@ async function governedTaskOfferFixture(
   if (options.omitGrantCapabilities) {
     const { execution_binding_hash: _executionBindingHash, ...body } = taskExecution;
     const authorityGrant = { ...body.authority_grant, capabilities: [] };
+    taskExecution = createGovernedTaskExecutionBinding({
+      ...body,
+      authority_grant: authorityGrant,
+      authority_grant_hash: computeCanonicalHash(authorityGrant),
+    });
+  }
+  if (options.forgeRootIssuer) {
+    const { execution_binding_hash: _executionBindingHash, ...body } = taskExecution;
+    const authorityGrant = {
+      ...body.authority_grant,
+      issuer: { kind: "operator" as const, principal_id: "forged-operator" },
+    };
     taskExecution = createGovernedTaskExecutionBinding({
       ...body,
       authority_grant: authorityGrant,
@@ -548,6 +566,7 @@ function authorizationFixture() {
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),
     authorized_model_provider: "openai",
+    authorized_operator_principal_id: GOVERNED_CODE_REVIEW_OPERATOR_PRINCIPAL_ID,
     source_disclosure_allowed: true,
     controls,
     max_duration_ms: 600_000,

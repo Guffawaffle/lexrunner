@@ -23,7 +23,9 @@ host grant authority resolves aligned protected task/grant chains, authorizes th
 issuer, and supplies the protected accepted offer. The evaluator rechecks every identity and hash,
 binds the selected task hash and grant hash to that offer, verifies its worker provider against the
 task-authorized provider, and requires the selected grant to be active at the explicit authorization
-instant. Caller-supplied task, grant, provider, or offer bodies are never authority.
+instant. The root grant's operator principal must equal the principal named by the protected,
+authorization-hashed execution requirements; an arbitrary `issuer.kind: operator` is not authority.
+Caller-supplied task, grant, provider, or offer bodies are never authority.
 
 Every delegated link passes the shared exact-subset attenuation evaluator. It must also carry a
 granted `nested_delegation` capability whose effect hash exactly binds the protected child task's

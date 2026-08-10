@@ -473,6 +473,7 @@ export const GovernedTaskAuthoritySelection_v1 = z
     delegation_id: opaqueId,
     task_spec_hash: SHA256Hash,
     authority_grant_hash: SHA256Hash,
+    authorized_operator_principal_id: opaqueId,
   })
   .strict();
 export type GovernedTaskAuthoritySelection_v1 = z.infer<typeof GovernedTaskAuthoritySelection_v1>;
@@ -561,7 +562,11 @@ export async function evaluateGovernedTaskGrant(
   if (delegation.offer.worker.provider_id !== task.authorized_model_provider) {
     return { permitted: false, reason: "provider_mismatch" };
   }
-  if (grantChain[0]!.issuer.kind !== "operator") {
+  const rootIssuer = grantChain[0]!.issuer;
+  if (
+    rootIssuer.kind !== "operator" ||
+    rootIssuer.principal_id !== selection.data.authorized_operator_principal_id
+  ) {
     return { permitted: false, reason: "invalid_grant_chain" };
   }
   for (let index = 0; index < grantChain.length - 1; index += 1) {

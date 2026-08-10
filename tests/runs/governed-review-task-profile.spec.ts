@@ -78,6 +78,7 @@ describe("governed code-review task profile", () => {
     expect(execution).toMatchObject({
       task_spec_hash: task.task_spec_hash,
       authority_grant: {
+        issuer: { kind: "operator", principal_id: "lexrunner.governed-review-runtime" },
         capabilities: [{ capability_id: "read-sealed-review-corpus" }],
       },
       adapter_resolution: {

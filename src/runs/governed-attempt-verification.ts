@@ -133,12 +133,16 @@ export const GovernedAttemptVerificationContext_v1 = verificationContextBody
       value.task_execution &&
       (value.task_execution.task_spec_hash !== value.governed_task.task_spec_hash ||
         value.task_execution.authority_grant.attempt_id !== value.governed_task.attempt_id ||
-        value.task_execution.authority_grant.delegation_id !== value.governed_task.delegation_id)
+        value.task_execution.authority_grant.delegation_id !== value.governed_task.delegation_id ||
+        value.task_execution.authority_grant.issuer.kind !== "operator" ||
+        value.task_execution.authority_grant.issuer.principal_id !==
+          value.requirements.authorized_operator_principal_id)
     ) {
       context.addIssue({
         code: "custom",
         path: ["task_execution"],
-        message: "task execution authority must bind the exact governed task and delegation",
+        message:
+          "task execution authority must bind the exact governed task, delegation, and authorized root operator",
       });
     }
     if (
