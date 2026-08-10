@@ -51,17 +51,14 @@ describe("governed workspace mutation task profile", () => {
     );
   });
 
-  it("creates write enforcement receipts only from exact live and prepared evidence", () => {
+  it("creates write enforcement receipts only from exact protected live and prepared evidence", async () => {
     const task = taskSpec();
     const qualification = qualificationEvidence();
     const prepared = preparedEvidence(task.task_spec_hash);
-    const binding = createGovernedWorkspaceMutationTaskExecutionBinding({
-      task,
-      authorizedAt: AUTHORIZED_AT,
-      expiresAt: EXPIRES_AT,
-      qualificationEvidence: qualification,
-      preparedWorkspaceEvidence: prepared,
-    });
+    const binding = await createGovernedWorkspaceMutationTaskExecutionBinding(
+      executionInput(task, qualification, prepared),
+      protectedEvidenceAuthority(qualification, prepared)
+    );
 
     expect(binding.authority_grant.issuer).toEqual({
       kind: "operator",
@@ -82,52 +79,45 @@ describe("governed workspace mutation task profile", () => {
     );
   });
 
-  it("rejects a prepared root whose writable scope does not match the task grant", () => {
+  it("rejects a prepared root whose writable scope does not match the task grant", async () => {
     const task = taskSpec();
     const prepared = preparedEvidence(task.task_spec_hash, { writablePathSetHash: hash("f") });
+    const qualification = qualificationEvidence();
 
-    expect(() =>
-      createGovernedWorkspaceMutationTaskExecutionBinding({
-        task,
-        authorizedAt: AUTHORIZED_AT,
-        expiresAt: EXPIRES_AT,
-        qualificationEvidence: qualificationEvidence(),
-        preparedWorkspaceEvidence: prepared,
-      })
-    ).toThrow(/task and protected evidence do not align/u);
+    await expect(
+      createGovernedWorkspaceMutationTaskExecutionBinding(
+        executionInput(task, qualification, prepared),
+        protectedEvidenceAuthority(qualification, prepared)
+      )
+    ).rejects.toThrow(/task and protected evidence do not align/u);
   });
 
-  it("reconstructs the exact task input binding from protected workspace evidence", () => {
+  it("reconstructs the exact task input binding from protected workspace evidence", async () => {
     const task = taskSpec();
     const prepared = createGovernedWorkspaceMutationPreparedWorkspaceEvidence({
       ...preparedEvidenceBody(task.task_spec_hash),
       source_manifest_hash: hash("f"),
     });
+    const qualification = qualificationEvidence();
 
-    expect(() =>
-      createGovernedWorkspaceMutationTaskExecutionBinding({
-        task,
-        authorizedAt: AUTHORIZED_AT,
-        expiresAt: EXPIRES_AT,
-        qualificationEvidence: qualificationEvidence(),
-        preparedWorkspaceEvidence: prepared,
-      })
-    ).toThrow(/task and protected evidence do not align/u);
+    await expect(
+      createGovernedWorkspaceMutationTaskExecutionBinding(
+        executionInput(task, qualification, prepared),
+        protectedEvidenceAuthority(qualification, prepared)
+      )
+    ).rejects.toThrow(/task and protected evidence do not align/u);
   });
 
-  it("rejects stale qualifications and prepared rollback state", () => {
+  it("rejects stale qualifications and prepared rollback state", async () => {
     const task = taskSpec();
-    expect(() =>
-      createGovernedWorkspaceMutationTaskExecutionBinding({
-        task,
-        authorizedAt: AUTHORIZED_AT,
-        expiresAt: EXPIRES_AT,
-        qualificationEvidence: qualificationEvidence({
-          expiresAt: "2026-08-10T12:10:00.000Z",
-        }),
-        preparedWorkspaceEvidence: preparedEvidence(task.task_spec_hash),
-      })
-    ).toThrow(/not active/u);
+    const qualification = qualificationEvidence({ expiresAt: "2026-08-10T12:10:00.000Z" });
+    const prepared = preparedEvidence(task.task_spec_hash);
+    await expect(
+      createGovernedWorkspaceMutationTaskExecutionBinding(
+        executionInput(task, qualification, prepared),
+        protectedEvidenceAuthority(qualification, prepared)
+      )
+    ).rejects.toThrow(/not active/u);
 
     expect(() =>
       createGovernedWorkspaceMutationPreparedWorkspaceEvidence({
@@ -138,6 +128,23 @@ describe("governed workspace mutation task profile", () => {
         },
       } as never)
     ).toThrow();
+  });
+
+  it("cannot turn caller-created evidence bodies into authority without a protected resolver", async () => {
+    const task = taskSpec();
+    const qualification = qualificationEvidence();
+    const prepared = preparedEvidence(task.task_spec_hash);
+
+    await expect(
+      createGovernedWorkspaceMutationTaskExecutionBinding(
+        executionInput(task, qualification, prepared),
+        {
+          async resolveWorkspaceMutationEvidence() {
+            return null;
+          },
+        }
+      )
+    ).rejects.toThrow(/protected workspace mutation evidence is unavailable/u);
   });
 
   it("requires every negative and recovery canary before qualification", () => {
@@ -207,6 +214,11 @@ function qualificationEvidenceBody() {
     environment_id: "environment-writer-1",
     provider_image_hash: hash("7"),
     execution_profile_hash: hash("8"),
+    issuer: {
+      controller_id: "qualification-controller",
+      controller_executable_hash: hash("9"),
+      protected_receipt_hash: hash("a"),
+    },
     controls: qualificationControls(),
     qualified_at: "2026-08-10T11:00:00.000Z",
     expires_at: "2026-08-10T13:00:00.000Z",
@@ -254,8 +266,52 @@ function preparedEvidenceBody(taskSpecHash: string) {
       state: "prepared" as const,
       evidence_refs: [hash("d")],
     },
+    issuer: {
+      controller_id: "workspace-preparation-controller",
+      controller_executable_hash: hash("f"),
+      protected_receipt_hash: hash("0"),
+    },
     evidence_refs: [hash("e")],
     observed_at: "2026-08-10T11:55:00.000Z",
     expires_at: "2026-08-10T12:45:00.000Z",
+  };
+}
+
+function executionInput(
+  task: ReturnType<typeof taskSpec>,
+  qualification: ReturnType<typeof qualificationEvidence>,
+  prepared: ReturnType<typeof preparedEvidence>
+) {
+  return {
+    task,
+    authorizedAt: AUTHORIZED_AT,
+    expiresAt: EXPIRES_AT,
+    evidenceSelection: {
+      task_spec_hash: task.task_spec_hash,
+      qualification_evidence_hash: qualification.evidence_hash,
+      prepared_workspace_evidence_hash: prepared.evidence_hash,
+    },
+  };
+}
+
+function protectedEvidenceAuthority(
+  qualification: ReturnType<typeof qualificationEvidence>,
+  prepared: ReturnType<typeof preparedEvidence>
+) {
+  return {
+    async resolveWorkspaceMutationEvidence(selection: {
+      task_spec_hash: string;
+      qualification_evidence_hash: string;
+      prepared_workspace_evidence_hash: string;
+    }) {
+      if (
+        selection.task_spec_hash !== prepared.task_spec_hash ||
+        selection.qualification_evidence_hash !== qualification.evidence_hash ||
+        selection.prepared_workspace_evidence_hash !== prepared.evidence_hash
+      ) {
+        return null;
+      }
+      return { qualification, prepared_workspace: prepared };
+    },
   };
 }

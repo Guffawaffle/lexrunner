@@ -138,6 +138,13 @@ const workspaceMutationQualificationEvidenceBody = z
     environment_id: opaqueId,
     provider_image_hash: SHA256Hash,
     execution_profile_hash: SHA256Hash,
+    issuer: z
+      .object({
+        controller_id: opaqueId,
+        controller_executable_hash: SHA256Hash,
+        protected_receipt_hash: SHA256Hash,
+      })
+      .strict(),
     controls: z
       .array(qualificationControl)
       .length(GovernedWorkspaceMutationQualificationControlId_v1.options.length),
@@ -220,6 +227,13 @@ const preparedWorkspaceEvidenceBody = z
         evidence_refs: z.array(SHA256Hash).min(1).max(16),
       })
       .strict(),
+    issuer: z
+      .object({
+        controller_id: opaqueId,
+        controller_executable_hash: SHA256Hash,
+        protected_receipt_hash: SHA256Hash,
+      })
+      .strict(),
     evidence_refs: z.array(SHA256Hash).min(1).max(32),
     observed_at: instant,
     expires_at: instant,
@@ -283,8 +297,32 @@ export interface CreateGovernedWorkspaceMutationTaskExecutionInput {
   task: GovernedTaskSpec;
   authorizedAt: string;
   expiresAt: string;
-  qualificationEvidence: GovernedWorkspaceMutationQualificationEvidence_v1;
-  preparedWorkspaceEvidence: GovernedWorkspaceMutationPreparedWorkspaceEvidence_v1;
+  evidenceSelection: GovernedWorkspaceMutationEvidenceSelection_v1;
+}
+
+export const GovernedWorkspaceMutationEvidenceSelection_v1 = z
+  .object({
+    task_spec_hash: SHA256Hash,
+    qualification_evidence_hash: SHA256Hash,
+    prepared_workspace_evidence_hash: SHA256Hash,
+  })
+  .strict();
+export type GovernedWorkspaceMutationEvidenceSelection_v1 = z.infer<
+  typeof GovernedWorkspaceMutationEvidenceSelection_v1
+>;
+
+const GovernedWorkspaceMutationEvidenceResolution_v1 = z
+  .object({
+    qualification: GovernedWorkspaceMutationQualificationEvidence_v1,
+    prepared_workspace: GovernedWorkspaceMutationPreparedWorkspaceEvidence_v1,
+  })
+  .strict();
+
+/** Trusted host port backed by protected qualification and workspace records. */
+export interface GovernedWorkspaceMutationEvidenceAuthority {
+  resolveWorkspaceMutationEvidence(
+    selection: GovernedWorkspaceMutationEvidenceSelection_v1
+  ): Promise<unknown | null>;
 }
 
 export function computeGovernedWorkspaceMutationInputBindingHash(input: {
@@ -364,16 +402,27 @@ export function createGovernedWorkspaceMutationTaskSpec(
  * A write receipt cannot be constructed from adapter metadata alone. It needs
  * both a live image qualification and task-specific prepared-workspace proof.
  */
-export function createGovernedWorkspaceMutationTaskExecutionBinding(
-  input: CreateGovernedWorkspaceMutationTaskExecutionInput
-): GovernedTaskExecutionBinding {
+export async function createGovernedWorkspaceMutationTaskExecutionBinding(
+  input: CreateGovernedWorkspaceMutationTaskExecutionInput,
+  authority: GovernedWorkspaceMutationEvidenceAuthority
+): Promise<GovernedTaskExecutionBinding> {
   const task = GovernedTaskSpec_v1.parse(input.task);
-  const qualificationEvidence = GovernedWorkspaceMutationQualificationEvidence_v1.parse(
-    input.qualificationEvidence
+  const selection = GovernedWorkspaceMutationEvidenceSelection_v1.parse(input.evidenceSelection);
+  const resolved = GovernedWorkspaceMutationEvidenceResolution_v1.safeParse(
+    await authority.resolveWorkspaceMutationEvidence(selection)
   );
-  const prepared = GovernedWorkspaceMutationPreparedWorkspaceEvidence_v1.parse(
-    input.preparedWorkspaceEvidence
-  );
+  if (!resolved.success) {
+    throw new Error("protected workspace mutation evidence is unavailable");
+  }
+  const qualificationEvidence = resolved.data.qualification;
+  const prepared = resolved.data.prepared_workspace;
+  if (
+    selection.task_spec_hash !== task.task_spec_hash ||
+    selection.qualification_evidence_hash !== qualificationEvidence.evidence_hash ||
+    selection.prepared_workspace_evidence_hash !== prepared.evidence_hash
+  ) {
+    throw new Error("protected workspace mutation evidence selection does not match");
+  }
   const authorizedAt = Date.parse(input.authorizedAt);
   const expiresAt = Date.parse(input.expiresAt);
   if (

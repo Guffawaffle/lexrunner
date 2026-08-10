@@ -101,6 +101,12 @@ that manifest alone. It additionally requires:
 - task-specific prepared-workspace evidence whose prompt, sealed source, read scope, write scope,
   ownership scope, and rollback binding reconstruct the task's complete input hash.
 
+The execution caller selects those records only by their task and evidence hashes. A trusted host
+evidence authority must resolve the exact records from protected qualification and workspace
+preparation stores. Public schema helpers can validate and hash controller output, but those
+self-authored bodies cannot be passed directly across the authority-minting boundary. The resolved
+records also name their controller executable and protected receipt identities.
+
 On the current disposable WSL2 topology, Windows automount and interop are disabled. The ReFS host
 checkout is not visible inside the provider; the candidate writable root lives in the disposable
 distro's ext4 VHDX. The selected recovery model is therefore whole-workspace discard by a separate

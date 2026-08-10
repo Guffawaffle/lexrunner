@@ -13,7 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   discard recovery. Writer execution bindings require both a complete exact-image canary
   qualification and task-specific prepared-workspace evidence that reconstructs the prompt,
   source, read, write, ownership, and rollback bindings; an adapter manifest alone cannot mint a
-  write enforcement receipt.
+  write enforcement receipt. Callers select those records only by hash, and a trusted protected
+  evidence authority must resolve their controller-issued bodies before the grant is constructed.
 - **Governed task capability foundation** - Add a review-neutral task/profile binding and positive
   capability ceiling that represents recoverable workspace writes, explicitly bounded external
   effects, contained runtime execution, and attenuated nested Delegations without weakening `NO`.
