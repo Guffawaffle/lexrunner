@@ -1292,12 +1292,6 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
     handle = "provider-" + uuid.uuid4().hex
     operation_id = "operation-" + uuid.uuid4().hex
     directory = operation_directory(handle)
-    ensure_secure_directory(directory, create=True)
-    codex_home = directory / "codex-home"
-    initialize_codex_home(codex_home)
-    (directory / "offer-workspace").mkdir(mode=0o700)
-    write_atomic(directory / "prompt.bin", prompt)
-    write_atomic(directory / "schema.json", canonical_bytes(output_schema) + b"\n")
     operation = {
         "schema_version": PROTOCOL_VERSION,
         "operation_id": operation_id,
@@ -1311,11 +1305,19 @@ def launch_operation(metadata: dict[str, Any], prompt: bytes) -> dict[str, Any]:
         "max_output_bytes": authorization["grant"]["max_output_bytes"],
         "max_duration_ms": authorization["grant"]["max_duration_ms"],
     }
-    write_atomic(directory / "operation.json", canonical_bytes(operation) + b"\n")
+    worker_start_attempted = False
     try:
+        ensure_secure_directory(directory, create=True)
+        codex_home = directory / "codex-home"
+        initialize_codex_home(codex_home)
+        (directory / "offer-workspace").mkdir(mode=0o700)
+        write_atomic(directory / "prompt.bin", prompt)
+        write_atomic(directory / "schema.json", canonical_bytes(output_schema) + b"\n")
+        write_atomic(directory / "operation.json", canonical_bytes(operation) + b"\n")
+        worker_start_attempted = True
         start_worker(operation)
-    except (OSError, subprocess.SubprocessError):
-        cleanup_failed_launch(operation)
+    except (OSError, subprocess.SubprocessError, ProviderError):
+        cleanup_failed_launch(operation, stop_worker=worker_start_attempted)
         raise
     return {
         "operationId": operation_id,
@@ -1388,9 +1390,9 @@ def start_worker(operation: dict[str, Any]) -> None:
     )
 
 
-def cleanup_failed_launch(operation: dict[str, Any]) -> None:
+def cleanup_failed_launch(operation: dict[str, Any], *, stop_worker: bool) -> None:
     handle = operation["provider_handle"]
-    if not TEST_MODE:
+    if stop_worker and not TEST_MODE:
         subprocess.run(
             [str(SYSTEMCTL), "--user", "stop", operation["unit"]],
             check=False,
@@ -1409,11 +1411,17 @@ def cleanup_failed_launch(operation: dict[str, Any]) -> None:
         )
         if state.returncode not in (3, 4):
             fail("failed launch worker unit did not become inactive")
-    cleanup_operation_secrets(handle)
     directory = operation_directory(handle)
-    ensure_secure_directory(directory)
-    shutil.rmtree(directory)
-    fsync_directory(OPERATIONS)
+    if directory.exists():
+        info = directory.lstat()
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or stat.S_ISLNK(info.st_mode)
+            or info.st_uid != os.geteuid()
+        ):
+            fail("failed launch operation path authority is invalid")
+        shutil.rmtree(directory)
+        fsync_directory(OPERATIONS)
     if operation.get("corpus_kind") == "repository":
         workspace_id = operation.get("workspace_id")
         if not repository_corpus_is_referenced(workspace_id, ambiguous_is_reference=True):

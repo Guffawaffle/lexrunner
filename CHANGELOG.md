@@ -35,8 +35,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   from object headers before buffering payload bytes, preserving the documented 32 MiB bound.
 - **Repository receipt lifecycle projection** - Verify the provider's corpus-header receipt against
   provider-visible fields while independently enforcing the host-owned workspace-lease revision.
-- **Failed repository launch cleanup** - Stop partially created worker units and remove unreachable
-  operation spools and unreferenced sealed corpora when launch fails before returning a handle.
+- **Failed repository launch cleanup** - Treat post-validation launch construction transactionally:
+  stop partially created worker units and remove partial spools and unreferenced sealed corpora
+  whenever launch fails before returning a handle.
 
 ## [1.4.1] - 2026-08-04
 

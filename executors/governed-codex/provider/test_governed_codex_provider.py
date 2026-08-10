@@ -137,6 +137,28 @@ class GovernedCodexProviderTest(unittest.TestCase):
         }
         return bundle, {**body, "binding_digest": provider.canonical_hash(body)}
 
+    def repository_launch(self, label: str) -> tuple[dict, bytes, str, Path]:
+        content = f"{label} candidate\n".encode()
+        patch_bytes = f"diff --git a/{label}.txt b/{label}.txt\n".encode()
+        header = self.repository_header(content, patch_bytes)
+        bundle = provider.prepare_repository_bundle(header, [content], patch_bytes)
+        workspace_id = bundle["workspace"]["workspace_id"]
+        _, authorization = self.authorization(bundle)
+        prompt = b"Review the sealed corpus."
+        output_schema = {"type": "object"}
+        metadata = {
+            "authorization": authorization,
+            "output_schema": output_schema,
+            "mode": "repository_read_only",
+            "input_binding": {
+                "prompt_hash": provider.content_hash(prompt),
+                "output_schema_hash": provider.canonical_hash(output_schema),
+                "task_offer_hash": provider.canonical_hash({"task": label}),
+                "delegation_offer_hash": provider.canonical_hash({"delegation": label}),
+            },
+        }
+        return metadata, prompt, workspace_id, provider.repository_corpus_path(workspace_id)
+
     def test_prepares_and_reloads_the_exact_pre_authorization_bundle(self) -> None:
         bundle, authorization = self.authorization()
         self.assertEqual(
@@ -324,23 +346,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         provider.discard_repository(workspace_id)
 
     def test_failed_worker_start_removes_unreachable_operation_and_corpus(self) -> None:
-        content = b"launch failure candidate\n"
-        patch_bytes = b"diff --git a/launch-failure.txt b/launch-failure.txt\n"
-        header = self.repository_header(content, patch_bytes)
-        bundle = provider.prepare_repository_bundle(header, [content], patch_bytes)
-        workspace_id = bundle["workspace"]["workspace_id"]
-        corpus = provider.repository_corpus_path(workspace_id)
-        _, authorization = self.authorization(bundle)
-        prompt = b"Review the sealed corpus."
-        output_schema = {"type": "object"}
-        input_binding = {
-            "prompt_hash": provider.content_hash(prompt),
-            "output_schema_hash": provider.canonical_hash(output_schema),
-            "task_offer_hash": provider.canonical_hash({"task": "launch-failure"}),
-            "delegation_offer_hash": provider.canonical_hash(
-                {"delegation": "launch-failure"}
-            ),
-        }
+        metadata, prompt, workspace_id, corpus = self.repository_launch("worker-start-failure")
         operations_before = set(provider.OPERATIONS.iterdir())
 
         with patch.object(
@@ -349,15 +355,23 @@ class GovernedCodexProviderTest(unittest.TestCase):
             side_effect=subprocess.CalledProcessError(1, ["systemd-run"]),
         ):
             with self.assertRaises(subprocess.CalledProcessError):
-                provider.launch_operation(
-                    {
-                        "authorization": authorization,
-                        "output_schema": output_schema,
-                        "mode": "repository_read_only",
-                        "input_binding": input_binding,
-                    },
-                    prompt,
-                )
+                provider.launch_operation(metadata, prompt)
+
+        self.assertEqual(set(provider.OPERATIONS.iterdir()), operations_before)
+        self.assertFalse(corpus.exists())
+        provider.discard_repository(workspace_id)
+
+    def test_failed_launch_initialization_removes_partial_directory_and_corpus(self) -> None:
+        metadata, prompt, workspace_id, corpus = self.repository_launch("initialization-failure")
+        operations_before = set(provider.OPERATIONS.iterdir())
+
+        with patch.object(
+            provider,
+            "initialize_codex_home",
+            side_effect=OSError("simulated credential-home write failure"),
+        ):
+            with self.assertRaises(OSError):
+                provider.launch_operation(metadata, prompt)
 
         self.assertEqual(set(provider.OPERATIONS.iterdir()), operations_before)
         self.assertFalse(corpus.exists())

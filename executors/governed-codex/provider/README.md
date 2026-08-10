@@ -47,9 +47,9 @@ must persist each raw frame to the operator-only protected evidence store before
 coordination event. The spool is restart recovery material, not admissible evidence by itself.
 After the terminal event and result are durably recorded and the Windows capture is terminal, the
 host calls `release` to delete the transient WSL copy. A pre-terminal release fails closed.
-If the worker cannot start before a provider handle is returned, the provider stops any partially
-created user unit, removes the unreachable spool, and deletes the sealed corpus only when no other
-operation references it.
+If launch construction or worker startup fails before a provider handle is returned, the provider
+stops any partially created user unit, removes the partial or unreachable spool, and deletes the
+sealed corpus only when no other operation references it.
 
 The executable fails closed unless a root-owned qualification manifest names every required denial
 control with strong evidence references. Creating that manifest is a separate canary step; installing
