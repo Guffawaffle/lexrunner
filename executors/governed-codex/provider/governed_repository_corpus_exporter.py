@@ -170,21 +170,53 @@ def run_git(
     maximum: int,
     expected_codes: tuple[int, ...] = (0,),
 ) -> tuple[int, bytes]:
-    completed = subprocess.run(
+    process = subprocess.Popen(
         git_command(worktree, arguments),
-        check=False,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         close_fds=True,
         env=git_environment(),
-        timeout=60,
     )
-    if completed.returncode not in expected_codes:
-        fail("bounded Git inspection failed")
-    if len(completed.stdout) > maximum:
-        fail("bounded Git inspection exceeded its output limit")
-    return completed.returncode, completed.stdout
+    if process.stdout is None:
+        process.kill()
+        process.wait(timeout=10)
+        fail("bounded Git inspection pipe is unavailable")
+    timed_out = threading.Event()
+
+    def terminate_on_timeout() -> None:
+        timed_out.set()
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+    timer = threading.Timer(GIT_EXPORT_TIMEOUT_SECONDS, terminate_on_timeout)
+    timer.daemon = True
+    timer.start()
+    try:
+        output = process.stdout.read(maximum + 1)
+        if timed_out.is_set():
+            raise ExportError("bounded Git inspection timed out")
+        if len(output) > maximum:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=10)
+            fail("bounded Git inspection exceeded its output limit")
+        try:
+            return_code = process.wait(timeout=10)
+        except subprocess.TimeoutExpired as error:
+            raise ExportError("bounded Git inspection timed out") from error
+        if timed_out.is_set():
+            raise ExportError("bounded Git inspection timed out")
+        if return_code not in expected_codes:
+            fail("bounded Git inspection failed")
+        return return_code, output
+    finally:
+        timer.cancel()
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
 
 
 def git_text(worktree: Path, arguments: Iterable[str], field: str) -> str:

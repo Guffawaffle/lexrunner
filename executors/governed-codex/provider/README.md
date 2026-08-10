@@ -30,6 +30,8 @@ hash is part of the executor configuration attestation.
 only a canonical bounded request on stdin, verifies native repository/allocation/worktree directory
 identities and the Attempt marker, requires a clean committed descendant of the bound base, and uses
 sanitized `/usr/bin/git` object reads to produce regular-file bytes plus the exact binary patch. It
+streams every Git command only to its declared maximum plus one byte and terminates the child on
+overflow, so repository-controlled metadata or patch output cannot bypass the memory bounds. It
 disables replacement-object resolution, rejects `refs/replace`, cryptographically verifies every
 file against its candidate-tree blob object ID, and preserves that binding in the sealed manifest.
 It never exports `.git`, repository configuration, remotes, credentials, symlinks, gitlinks,

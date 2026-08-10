@@ -296,6 +296,44 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         )
         self.assertEqual(process.stdout.payload_reads, 2)
 
+    def test_bounded_git_inspection_stops_reading_at_maximum_plus_one(self) -> None:
+        class FakeStdout:
+            def __init__(self) -> None:
+                self.requested = 0
+
+            def read(self, size: int) -> bytes:
+                self.requested = size
+                return b"x" * size
+
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.stdout = FakeStdout()
+                self.returncode: int | None = None
+                self.killed = False
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+            def kill(self) -> None:
+                self.killed = True
+                self.returncode = -9
+
+            def wait(self, timeout: int | None = None) -> int:
+                del timeout
+                if self.returncode is None:
+                    self.returncode = 0
+                return self.returncode
+
+        process = FakeProcess()
+        with patch.object(EXPORTER_MODULE.subprocess, "Popen", return_value=process):
+            with self.assertRaisesRegex(
+                EXPORTER_MODULE.ExportError, "exceeded its output limit"
+            ):
+                EXPORTER_MODULE.run_git(Path("/unused"), ("diff",), maximum=8)
+
+        self.assertEqual(process.stdout.requested, 9)
+        self.assertTrue(process.killed)
+
 
 if __name__ == "__main__":
     unittest.main()
