@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
+import { GovernedRepositoryId } from "./governed-repository-identity.js";
 
 export const GOVERNED_REPOSITORY_CORPUS_VERSION = "1.0.0" as const;
 export const MAX_REPOSITORY_CORPUS_HEADER_BYTES = 2 * 1_024 * 1_024;
@@ -76,7 +77,7 @@ export const GovernedRepositoryCorpusExportRequest_v1 = z
   .object({
     schema_version: z.literal(GOVERNED_REPOSITORY_CORPUS_VERSION),
     environment_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     attempt_id: opaqueId,
     workspace_lease_id: opaqueId,
     task_packet_hash: SHA256Hash,
@@ -116,13 +117,13 @@ const repositoryCorpusHeaderBody = z
   .object({
     schema_version: z.literal(GOVERNED_REPOSITORY_CORPUS_VERSION),
     environment_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: gitObjectId,
     candidate_object_id: gitObjectId,
     source_binding: GovernedRepositoryCorpusSourceBinding_v1,
     source_binding_hash: SHA256Hash,
     entries: z.array(GovernedRepositoryCorpusEntry_v1).min(1).max(MAX_REPOSITORY_CORPUS_FILES),
-    candidate_tree_bytes: z.number().int().positive().max(MAX_REPOSITORY_CORPUS_TREE_BYTES),
+    candidate_tree_bytes: z.number().int().nonnegative().max(MAX_REPOSITORY_CORPUS_TREE_BYTES),
     candidate_tree_hash: SHA256Hash,
     patch_bytes: z.number().int().positive().max(MAX_REPOSITORY_CORPUS_PATCH_BYTES),
     patch_hash: SHA256Hash,

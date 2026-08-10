@@ -51,7 +51,7 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         )
         marker = {
             "schemaVersion": 1,
-            "repositoryId": "repository-1",
+            "repositoryId": "owner/repository",
             "attemptId": "attempt-1",
             "hostId": "host-1",
             "gitRuntime": "wsl-test-git",
@@ -87,7 +87,7 @@ class GovernedRepositoryCorpusExporterTest(unittest.TestCase):
         return {
             "schema_version": "1.0.0",
             "environment_id": "environment-1",
-            "repository_id": "repository-1",
+            "repository_id": "owner/repository",
             "attempt_id": "attempt-1",
             "workspace_lease_id": "workspace-1",
             "task_packet_hash": "sha256:" + "1" * 64,

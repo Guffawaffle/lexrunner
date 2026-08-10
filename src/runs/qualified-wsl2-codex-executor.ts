@@ -4,6 +4,7 @@ import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import { ProtectedEvidenceFrameClass } from "../store/protected-evidence-store.js";
 import type { GovernedAttemptEvidenceCapture } from "./governed-attempt-evidence.js";
 import type { GovernedRepositoryCorpusFrame } from "./governed-review-repository-corpus.js";
+import { GovernedRepositoryId } from "./governed-repository-identity.js";
 import {
   AttemptAuthorization_v1,
   AttemptExecutorEvent_v1,
@@ -98,7 +99,7 @@ export type QualifiedCodexLaunchInputBinding_v1 = z.infer<
 export const QualifiedCodexSyntheticPreparation_v1 = z
   .object({
     environment_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u),
     candidate_object_id: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u),
   })

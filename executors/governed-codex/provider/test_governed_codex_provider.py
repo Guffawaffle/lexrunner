@@ -94,7 +94,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         bundle = provider.prepare_bundle(
             {
                 "environment_id": "disposable-environment-1",
-                "repository_id": "synthetic-repository",
+                "repository_id": "owner/synthetic-repository",
                 "base_object_id": "1" * 40,
                 "candidate_object_id": "2" * 40,
             }
@@ -104,7 +104,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
             "schema_version": "1.0.0",
             "attempt_id": "attempt-1",
             "delegation_id": "delegation-1",
-            "repository_id": "synthetic-repository",
+            "repository_id": "owner/synthetic-repository",
             "base_object_id": "1" * 40,
             "candidate_object_id": "2" * 40,
             "authorized_model_provider": "openai",
@@ -202,6 +202,16 @@ class GovernedCodexProviderTest(unittest.TestCase):
             provider.verify_repository_corpus(corpus)
         (corpus / "unexpected").unlink()
         provider.seal_repository_directories(corpus)
+
+    def test_seals_an_empty_tracked_repository_file(self) -> None:
+        content = b""
+        patch = b"diff --git a/empty.txt b/empty.txt\n"
+        header = self.repository_header(content, patch)
+        bundle = provider.prepare_repository_bundle(header, [content], patch)
+
+        corpus = provider.repository_corpus_path(bundle["workspace"]["workspace_id"])
+        self.assertEqual((corpus / "candidate" / "a.txt").read_bytes(), b"")
+        self.assertEqual(provider.verify_repository_corpus(corpus), header)
 
     def test_continuation_requires_durable_accept_and_exact_authorization(self) -> None:
         handle = "provider-" + "d" * 32
@@ -378,7 +388,7 @@ class GovernedCodexProviderTest(unittest.TestCase):
         header = {
             "schema_version": "1.0.0",
             "environment_id": "disposable-environment-1",
-            "repository_id": "repository-1",
+            "repository_id": "owner/repository",
             "base_object_id": "1" * 40,
             "candidate_object_id": "2" * 40,
             "source_binding": source,

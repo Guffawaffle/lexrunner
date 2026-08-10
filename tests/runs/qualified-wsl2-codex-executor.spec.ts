@@ -267,7 +267,7 @@ function authorizationFixture(corpusKind: "synthetic" | "repository") {
     schema_version: "1.0.0",
     attempt_id: "attempt-1",
     delegation_id: "delegation-1",
-    repository_id: "synthetic-repository",
+    repository_id: "owner/synthetic-repository",
     base_object_id: "1".repeat(40),
     candidate_object_id: "2".repeat(40),
     objective_hash: hash("objective"),

@@ -170,6 +170,12 @@ def require_opaque(value: Any, field: str) -> str:
     return value
 
 
+def require_repository_id(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > 4_096 or "\0" in value:
+        fail(f"{field} is not a bounded repository identifier")
+    return value
+
+
 def require_hash(value: Any, field: str) -> str:
     if not isinstance(value, str) or not SHA256.fullmatch(value):
         fail(f"{field} is not a SHA-256 reference")
@@ -193,14 +199,16 @@ def ensure_secure_directory(path: Path, *, create: bool = False) -> None:
         fail("provider state directory authority is invalid")
 
 
-def ensure_trusted_file(path: Path, *, root_owned: bool, max_bytes: int) -> bytes:
+def ensure_trusted_file(
+    path: Path, *, root_owned: bool, max_bytes: int, allow_empty: bool = False
+) -> bytes:
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
         fail("trusted provider input is not a regular file")
     expected_uid = os.geteuid() if TEST_MODE or not root_owned else 0
     if info.st_uid != expected_uid or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         fail("trusted provider input has invalid ownership or mode")
-    if info.st_size <= 0 or info.st_size > max_bytes:
+    if info.st_size > max_bytes or (not allow_empty and info.st_size <= 0):
         fail("trusted provider input is outside its bound")
     return path.read_bytes()
 
@@ -542,8 +550,8 @@ def validate_repository_header(value: Any) -> dict[str, Any]:
     )
     if value["schema_version"] != PROTOCOL_VERSION:
         fail("repository corpus schema version is unsupported")
-    for field in ("environment_id", "repository_id"):
-        require_opaque(value[field], field)
+    require_opaque(value["environment_id"], "environment_id")
+    require_repository_id(value["repository_id"], "repository_id")
     for field in ("base_object_id", "candidate_object_id"):
         require_git_id(value[field], field)
     if value["base_object_id"] == value["candidate_object_id"]:
@@ -737,7 +745,12 @@ def verify_repository_corpus(path: Path) -> dict[str, Any]:
         fail("sealed repository candidate path selection changed")
     for entry in header["entries"]:
         target = candidate_root.joinpath(*entry["path"].split("/"))
-        data = ensure_trusted_file(target, root_owned=False, max_bytes=MAX_REPOSITORY_FILE_BYTES)
+        data = ensure_trusted_file(
+            target,
+            root_owned=False,
+            max_bytes=MAX_REPOSITORY_FILE_BYTES,
+            allow_empty=True,
+        )
         target_info = target.lstat()
         if (
             len(data) != entry["byte_length"]
@@ -858,7 +871,7 @@ def prepare_bundle(spec: dict[str, Any]) -> dict[str, Any]:
     environment_id = require_opaque(spec["environment_id"], "environment_id")
     if environment_id != qualification["environment_id"]:
         fail("requested environment does not match the qualified environment")
-    repository_id = require_opaque(spec["repository_id"], "repository_id")
+    repository_id = require_repository_id(spec["repository_id"], "repository_id")
     base_object_id = require_git_id(spec["base_object_id"], "base_object_id")
     candidate_object_id = require_git_id(spec["candidate_object_id"], "candidate_object_id")
     if base_object_id == candidate_object_id:
@@ -980,8 +993,9 @@ def validate_authorization(value: dict[str, Any]) -> dict[str, Any]:
         or grant["source_disclosure_allowed"] is not True
     ):
         fail("authorization grant is not an OpenAI source-disclosing grant")
-    for field in ("attempt_id", "delegation_id", "repository_id"):
+    for field in ("attempt_id", "delegation_id"):
         require_opaque(grant.get(field), f"grant.{field}")
+    require_repository_id(grant.get("repository_id"), "grant.repository_id")
     require_git_id(grant.get("base_object_id"), "grant.base_object_id")
     require_git_id(grant.get("candidate_object_id"), "grant.candidate_object_id")
     if grant["attempt_id"] != value["attempt_id"] or grant["delegation_id"] != value["delegation_id"]:

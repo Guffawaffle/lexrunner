@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { computeCanonicalHash, SHA256Hash } from "../schemas/task-contract.js";
 import type { GovernedAttemptEvidenceCapture } from "./governed-attempt-evidence.js";
+import { GovernedRepositoryId } from "./governed-repository-identity.js";
 
 export const GOVERNED_ATTEMPT_EXECUTOR_VERSION = "1.0.0" as const;
 
@@ -64,7 +65,7 @@ export const GovernedReviewRequirements_v1 = z
     schema_version: z.literal(GOVERNED_ATTEMPT_EXECUTOR_VERSION),
     attempt_id: opaqueId,
     delegation_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: gitObjectId,
     candidate_object_id: gitObjectId,
     objective_hash: SHA256Hash,
@@ -132,7 +133,7 @@ export const WorkspaceAttestation_v1 = z
   .object({
     schema_version: z.literal(GOVERNED_ATTEMPT_EXECUTOR_VERSION),
     workspace_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: gitObjectId,
     candidate_object_id: gitObjectId,
     corpus_hash: SHA256Hash,
@@ -150,7 +151,7 @@ export const GovernedCapabilityGrant_v1 = z
     schema_version: z.literal(GOVERNED_ATTEMPT_EXECUTOR_VERSION),
     attempt_id: opaqueId,
     delegation_id: opaqueId,
-    repository_id: opaqueId,
+    repository_id: GovernedRepositoryId,
     base_object_id: gitObjectId,
     candidate_object_id: gitObjectId,
     authorized_model_provider: opaqueId,

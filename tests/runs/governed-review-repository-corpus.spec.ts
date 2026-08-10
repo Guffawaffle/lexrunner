@@ -63,7 +63,7 @@ function exportRequest(): GovernedRepositoryCorpusExportRequest_v1 {
   return {
     schema_version: "1.0.0",
     environment_id: "environment-1",
-    repository_id: "repository-1",
+    repository_id: "owner/repository",
     attempt_id: "attempt-1",
     workspace_lease_id: "lease-1",
     task_packet_hash: hash("packet"),
@@ -103,7 +103,7 @@ function corpusFrame(): Buffer {
     },
   ];
   const hashes = computeGovernedRepositoryCorpusHashes({
-    repositoryId: "repository-1",
+    repositoryId: "owner/repository",
     baseObjectId: "1".repeat(40),
     candidateObjectId: "2".repeat(40),
     sourceBinding,
@@ -113,7 +113,7 @@ function corpusFrame(): Buffer {
   const header: GovernedRepositoryCorpusHeader_v1 = {
     schema_version: "1.0.0",
     environment_id: "environment-1",
-    repository_id: "repository-1",
+    repository_id: "owner/repository",
     base_object_id: "1".repeat(40),
     candidate_object_id: "2".repeat(40),
     source_binding: sourceBinding,
