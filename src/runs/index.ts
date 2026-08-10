@@ -238,6 +238,7 @@ export type {
 export * from "./governed-attempt-protocol.js";
 export * from "./governed-task.js";
 export * from "./governed-review-task-profile.js";
+export * from "./governed-workspace-mutation-task-profile.js";
 export * from "./governed-attempt-executor.js";
 export * from "./governed-attempt-evidence.js";
 export * from "./governed-attempt-async-supervisor.js";

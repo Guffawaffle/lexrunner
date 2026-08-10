@@ -89,6 +89,40 @@ The desired freedom lives inside the qualified boundary: arbitrary problem-solvi
 are welcome when the outer environment enforces the declared effects. Command allowlists alone are
 not treated as a conformant sandbox.
 
+The first non-review profile is `workspace-mutation`. It binds a sealed source manifest, the
+Attempt-owned read scope, an explicit writable-path-set hash, ownership, and a
+`discard_workspace` recovery binding. Its adapter manifest declares filesystem read and write as
+the enforcement expected from a future provider; Git, GitHub, network, secrets, signing, release,
+external runtime, and nested Delegation remain unsupported. The manifest grants nothing by itself.
+This profile deliberately exports no task-execution-binding constructor: inert schema records and
+an adapter manifest are not authority. A future protected controller may construct the generic
+binding only after it independently resolves:
+
+- a current exact-image qualification covering the complete write, escape, identity,
+  cancellation, descendant, degraded-launch, and controller-recovery canary set; and
+- task-specific prepared-workspace evidence whose prompt, sealed source, read scope, write scope,
+  ownership scope, and rollback binding reconstruct the workspace portion of the task input; and
+- the exact normalized duration, output-byte, evidence-byte, and tool-call budgets bound directly
+  into the complete task input hash.
+
+The execution requester will select those records only by their task and evidence hashes. The
+protected controller—not a caller-supplied interface implementation—must resolve the exact records
+from protected qualification and workspace-preparation stores, evaluate their validity against its
+own trusted current and authorization times, and construct the grant and enforcement receipts.
+Public schema helpers can validate and hash controller output, but self-authored bodies are inert
+claims and cannot cross an authority-minting boundary in this profile. The records also name their
+controller executable and protected receipt identities.
+
+On the current disposable WSL2 topology, Windows automount and interop are disabled. The ReFS host
+checkout is not visible inside the provider; the candidate writable root lives in the disposable
+distro's ext4 VHDX. The selected recovery model is therefore whole-workspace discard by a separate
+controller, not a claim that ReFS snapshots undo agent effects.
+
+This is the authorization and evidence contract, not a live write qualification or grant path. No
+provider operation may select the writer adapter until the checked-in outer-sandbox canaries,
+independent recovery controller, protected authority integration, and trusted controller clock
+produce and validate evidence satisfying it.
+
 ## Migration boundary
 
 The governed review path now creates and durably verifies a `code-review` profile over the generic
@@ -100,6 +134,8 @@ must match the generic grant's selected dimensions. A legacy offer without both 
 execution binding may still reach the refusal turn, but `ACCEPT` cannot release work and a direct
 authorized-work launch fails closed. Generic results and verification receipts carry a bounded
 profile-owned outcome identifier; only `not_produced` and `invalid` are protocol sentinels. Review
-output interpretation likewise lives in the bound profile, not the generic independent verifier. A
-second non-review profile must now prove that the protocol, operation store, supervisor, refusal
-behavior, and evidence store require no task-specific changes.
+output interpretation likewise lives in the bound profile, not the generic independent verifier.
+The non-review `workspace-mutation` contract is the next portability probe; its live qualification
+and synthetic disposable-write Attempt must prove that the protocol, operation store, supervisor,
+refusal behavior, and evidence store require no task-specific changes before real task mutation is
+released.
