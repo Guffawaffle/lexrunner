@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import { DelegatedAuthorityGrant_v1 } from "../../src/runs/governed-attempt-protocol.js";
 import {
   GovernedTaskCapability_v1,
   GovernedTaskSpec_v1,
+  createGovernedTaskAdapterQualification,
   createGovernedTaskSpec,
   evaluateGovernedTaskGrant,
   evaluateGovernedTaskGrantForAdapter,
@@ -79,7 +81,7 @@ describe("generic governed task capabilities", () => {
     });
   });
 
-  it("releases writes only to an adapter that enforces the granted scope", () => {
+  it("releases writes only through a trusted active adapter qualification", async () => {
     const task = taskSpec();
     const writeGrant = grant(task, {
       dimension: "filesystem_write",
@@ -87,10 +89,11 @@ describe("generic governed task capabilities", () => {
       scope_hash: hash("2"),
     });
     expect(
-      evaluateGovernedTaskGrantForAdapter(
+      await evaluateGovernedTaskGrantForAdapter(
         task,
         writeGrant,
-        HOST_ASSISTED_ADAPTER_MANIFEST,
+        adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
+        qualificationAuthority(HOST_ASSISTED_ADAPTER_MANIFEST),
         activeAt()
       )
     ).toEqual({
@@ -112,11 +115,57 @@ describe("generic governed task capabilities", () => {
       },
     });
     expect(
-      evaluateGovernedTaskGrantForAdapter(task, writeGrant, qualified, activeAt())
+      await evaluateGovernedTaskGrantForAdapter(
+        task,
+        writeGrant,
+        adapterSelection(qualified),
+        qualificationAuthority(qualified),
+        activeAt()
+      )
     ).toMatchObject({
       permitted: true,
       capabilities: [{ capability_id: "write-owned-workspace" }],
     });
+  });
+
+  it("rejects caller-supplied enforcement claims and mismatched qualifications", async () => {
+    const task = taskSpec();
+    const writeGrant = grant(task, {
+      dimension: "filesystem_write",
+      capability_id: "write-owned-workspace",
+      scope_hash: hash("2"),
+    });
+    const forged = WorkerAdapterManifest_v1.parse({
+      ...HOST_ASSISTED_ADAPTER_MANIFEST,
+      authority: {
+        ...HOST_ASSISTED_ADAPTER_MANIFEST.authority,
+        filesystem_write: "enforced",
+      },
+    });
+    expect(
+      await evaluateGovernedTaskGrantForAdapter(
+        task,
+        writeGrant,
+        {
+          ...adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
+          manifest: forged,
+        },
+        qualificationAuthority(HOST_ASSISTED_ADAPTER_MANIFEST),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "invalid_adapter" });
+
+    expect(
+      await evaluateGovernedTaskGrantForAdapter(
+        task,
+        writeGrant,
+        adapterSelection(HOST_ASSISTED_ADAPTER_MANIFEST),
+        qualificationAuthority(HOST_ASSISTED_ADAPTER_MANIFEST, {
+          manifestHash: hash("f"),
+        }),
+        activeAt()
+      )
+    ).toEqual({ permitted: false, reason: "adapter_unqualified" });
   });
 
   it("will not disguise filesystem writes as observation", () => {
@@ -249,4 +298,34 @@ function grant(
 
 function activeAt(): string {
   return "2026-08-10T06:30:00.000Z";
+}
+
+function adapterSelection(candidate: unknown) {
+  const manifest = WorkerAdapterManifest_v1.parse(candidate);
+  return {
+    adapter_id: manifest.adapter.id,
+    adapter_version: manifest.adapter.version,
+  };
+}
+
+function qualificationAuthority(candidate: unknown, options: { manifestHash?: string } = {}) {
+  const manifest = WorkerAdapterManifest_v1.parse(candidate);
+  const qualification = createGovernedTaskAdapterQualification({
+    schema_version: "1.0.0",
+    qualification_id: `qualification-${manifest.adapter.id}`,
+    adapter_id: manifest.adapter.id,
+    adapter_version: manifest.adapter.version,
+    manifest_hash: options.manifestHash ?? computeCanonicalHash(manifest),
+    qualification_profile_id: "worker-adapter-canary-suite",
+    qualification_profile_version: "1.0.0",
+    evidence_hash: hash("e"),
+    decision: "qualified",
+    qualified_at: "2026-08-10T06:00:00.000Z",
+    expires_at: "2026-08-10T07:00:00.000Z",
+  });
+  return {
+    async resolveQualifiedAdapter() {
+      return { manifest, qualification };
+    },
+  };
 }

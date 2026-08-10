@@ -260,10 +260,85 @@ export type GovernedTaskAdapterEvaluation =
   | Extract<GovernedTaskGrantEvaluation, { permitted: false }>
   | {
       permitted: false;
-      reason: "invalid_adapter" | "enforcement_unavailable";
+      reason: "invalid_adapter" | "adapter_unqualified" | "enforcement_unavailable";
       blockedCapabilityIds?: string[];
     }
   | Extract<GovernedTaskGrantEvaluation, { permitted: true }>;
+
+const GovernedTaskAdapterSelection_v1 = z
+  .object({
+    adapter_id: opaqueId,
+    adapter_version: z.string().min(1).max(256),
+  })
+  .strict();
+
+const governedTaskAdapterQualificationBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_TASK_CONTRACT_VERSION),
+    qualification_id: opaqueId,
+    adapter_id: opaqueId,
+    adapter_version: z.string().min(1).max(256),
+    manifest_hash: SHA256Hash,
+    qualification_profile_id: opaqueId,
+    qualification_profile_version: semanticVersion,
+    evidence_hash: SHA256Hash,
+    decision: z.literal("qualified"),
+    qualified_at: z.string().datetime({ offset: true }),
+    expires_at: z.string().datetime({ offset: true }),
+  })
+  .strict()
+  .superRefine((qualification, context) => {
+    if (Date.parse(qualification.qualified_at) >= Date.parse(qualification.expires_at)) {
+      context.addIssue({
+        code: "custom",
+        path: ["expires_at"],
+        message: "qualification expiry must be later than qualification time",
+      });
+    }
+  });
+
+export const GovernedTaskAdapterQualification_v1 = governedTaskAdapterQualificationBody
+  .extend({ qualification_hash: SHA256Hash })
+  .strict()
+  .superRefine((qualification, context) => {
+    const { qualification_hash: _qualificationHash, ...body } = qualification;
+    if (computeCanonicalHash(body) !== qualification.qualification_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["qualification_hash"],
+        message: "adapter qualification hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedTaskAdapterQualification_v1 = z.infer<
+  typeof GovernedTaskAdapterQualification_v1
+>;
+
+export function createGovernedTaskAdapterQualification(
+  candidate: z.input<typeof governedTaskAdapterQualificationBody>
+): GovernedTaskAdapterQualification_v1 {
+  const body = governedTaskAdapterQualificationBody.parse(candidate);
+  return GovernedTaskAdapterQualification_v1.parse({
+    ...body,
+    qualification_hash: computeCanonicalHash(body),
+  });
+}
+
+const GovernedTaskQualifiedAdapterResolution_v1 = z
+  .object({
+    manifest: WorkerAdapterManifest_v1,
+    qualification: GovernedTaskAdapterQualification_v1,
+  })
+  .strict();
+
+/** Trusted host port; implementations resolve only protected, independently qualified records. */
+export interface GovernedTaskAdapterQualificationAuthority {
+  resolveQualifiedAdapter(input: {
+    adapterId: string;
+    adapterVersion: string;
+    evaluatedAt: string;
+  }): Promise<unknown | null>;
+}
 
 /**
  * Evaluate an attenuated Delegation grant against the task's positive capability ceiling.
@@ -309,20 +384,47 @@ export function evaluateGovernedTaskGrant(
   };
 }
 
-/** Require the selected adapter to meet every granted capability's enforcement floor. */
-export function evaluateGovernedTaskGrantForAdapter(
+/** Resolve a qualified adapter and require it to meet every granted capability's floor. */
+export async function evaluateGovernedTaskGrantForAdapter(
   taskCandidate: unknown,
   grantCandidate: unknown,
-  adapterCandidate: unknown,
+  adapterSelectionCandidate: unknown,
+  qualificationAuthority: GovernedTaskAdapterQualificationAuthority,
   evaluatedAt: string
-): GovernedTaskAdapterEvaluation {
+): Promise<GovernedTaskAdapterEvaluation> {
   const grant = evaluateGovernedTaskGrant(taskCandidate, grantCandidate, evaluatedAt);
   if (!grant.permitted) return grant;
-  const adapter = WorkerAdapterManifest_v1.safeParse(adapterCandidate);
-  if (!adapter.success) return { permitted: false, reason: "invalid_adapter" };
+  const selection = GovernedTaskAdapterSelection_v1.safeParse(adapterSelectionCandidate);
+  if (!selection.success) return { permitted: false, reason: "invalid_adapter" };
+  let candidate: unknown | null;
+  try {
+    candidate = await qualificationAuthority.resolveQualifiedAdapter({
+      adapterId: selection.data.adapter_id,
+      adapterVersion: selection.data.adapter_version,
+      evaluatedAt,
+    });
+  } catch {
+    return { permitted: false, reason: "adapter_unqualified" };
+  }
+  if (candidate === null) return { permitted: false, reason: "adapter_unqualified" };
+  const resolution = GovernedTaskQualifiedAdapterResolution_v1.safeParse(candidate);
+  if (!resolution.success) return { permitted: false, reason: "adapter_unqualified" };
+  const { manifest: adapter, qualification } = resolution.data;
+  const evaluationTime = Date.parse(evaluatedAt);
+  if (
+    adapter.adapter.id !== selection.data.adapter_id ||
+    adapter.adapter.version !== selection.data.adapter_version ||
+    qualification.adapter_id !== selection.data.adapter_id ||
+    qualification.adapter_version !== selection.data.adapter_version ||
+    qualification.manifest_hash !== computeCanonicalHash(adapter) ||
+    evaluationTime < Date.parse(qualification.qualified_at) ||
+    evaluationTime >= Date.parse(qualification.expires_at)
+  ) {
+    return { permitted: false, reason: "adapter_unqualified" };
+  }
   const blockedCapabilityIds = grant.capabilities
     .filter((capability) => {
-      const actual = adapter.data.authority[capability.dimension];
+      const actual = adapter.authority[capability.dimension];
       return capability.minimum_enforcement === "enforced"
         ? actual !== "enforced"
         : !["enforced", "brokered"].includes(actual);
