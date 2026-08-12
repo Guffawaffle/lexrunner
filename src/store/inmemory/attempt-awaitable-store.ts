@@ -1,4 +1,5 @@
 import { isTerminalAttemptStatus } from "../../schemas/agent-work.js";
+import { isTerminalWorkerSession } from "../workspace-lifecycle-domains.js";
 import { computeCanonicalHash } from "../../schemas/task-contract.js";
 import {
   ATTEMPT_AWAITABLE_CONTRACT_VERSION,
@@ -78,7 +79,11 @@ export class InMemoryAttemptAwaitableStore
     }
     if (input.workerSessionId) {
       const session = await this.getWorkerSession(input.workerSessionId);
-      if (!session || session.attemptId !== input.attemptId) {
+      if (
+        !session ||
+        session.attemptId !== input.attemptId ||
+        isTerminalWorkerSession(session.status)
+      ) {
         return { registered: false, reason: "target_mismatch" };
       }
     }

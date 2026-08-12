@@ -22,7 +22,23 @@ if (mode === "invalid") {
         underlyingCancellation: false,
         effectiveDeadlineMs: Number(args[deadlineIndex + 1]),
         observationCount: 1,
-        evidence: { receivedCapability: args[1], receivedHead: descriptor.subject.headSha },
+        evidence:
+          outcome === "observation-error"
+            ? null
+            : {
+                repository: descriptor.subject.repository,
+                headSha: descriptor.subject.headSha,
+                pullRequestNumber: descriptor.subject.pullRequestNumber ?? null,
+                requiredChecks: descriptor.condition.requiredChecks.map((selector) => ({
+                  source: selector.source,
+                  name: selector.name,
+                  appSlug: selector.appSlug ?? null,
+                  state: "completed",
+                  conclusion: selector.source === "check-run" ? "success" : undefined,
+                  terminal: true,
+                  successful: true,
+                })),
+              },
       },
       ...(outcome === "observation-error" ? { error: { message: "bounded failure" } } : {}),
       meta: {},

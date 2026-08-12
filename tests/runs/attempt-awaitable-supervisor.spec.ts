@@ -69,12 +69,20 @@ describe("AttemptAwaitableSupervisor", () => {
   it("replays an unacknowledged notification at least once with the same delivery ID", async () => {
     const store = await liveStore();
     const firstDeliveries: string[] = [];
-    const first = createSupervisor(store, immediateObserver("satisfied"), {
-      async deliver(completion) {
-        firstDeliveries.push(completion.delivery_id);
-        throw new Error("continuation host unavailable");
+    const firstAttempt = deferred<void>();
+    const first = createSupervisor(
+      store,
+      immediateObserver("satisfied"),
+      {
+        async deliver(completion) {
+          firstDeliveries.push(completion.delivery_id);
+          firstAttempt.resolve();
+          throw new Error("continuation host unavailable");
+        },
       },
-    });
+      "primary",
+      60_000
+    );
     await first.register({
       awaitableId: "awaitable-replay",
       attemptId: "attempt-1",
@@ -82,7 +90,7 @@ describe("AttemptAwaitableSupervisor", () => {
       deadlineMs: 60_000,
       mutationId: "register-replay",
     });
-    await first.wait("awaitable-replay");
+    await firstAttempt.promise;
     expect(await first.get("awaitable-replay")).toMatchObject({
       delivery: { status: "pending", attempt_count: 1 },
     });
@@ -105,6 +113,40 @@ describe("AttemptAwaitableSupervisor", () => {
       delivery: { status: "delivered", attempt_count: 2 },
     });
     await recovered.shutdown();
+    await store.close();
+  });
+
+  it("retries a transient notifier failure without waiting for process recovery", async () => {
+    const store = await liveStore();
+    const deliveryIds: string[] = [];
+    const supervisor = createSupervisor(
+      store,
+      immediateObserver("satisfied"),
+      {
+        async deliver(completion) {
+          deliveryIds.push(completion.delivery_id);
+          if (deliveryIds.length === 1) throw new Error("transient notifier failure");
+        },
+      },
+      "retry",
+      1
+    );
+    await supervisor.register({
+      awaitableId: "awaitable-live-retry",
+      attemptId: "attempt-1",
+      descriptor: descriptor(),
+      deadlineMs: 60_000,
+      mutationId: "register-live-retry",
+    });
+    await supervisor.wait("awaitable-live-retry");
+    expect(deliveryIds).toEqual([
+      deliveryIdForAttemptAwaitable("awaitable-live-retry"),
+      deliveryIdForAttemptAwaitable("awaitable-live-retry"),
+    ]);
+    expect(await supervisor.get("awaitable-live-retry")).toMatchObject({
+      delivery: { status: "delivered", attempt_count: 2 },
+    });
+    await supervisor.shutdown();
     await store.close();
   });
 
@@ -298,12 +340,15 @@ function createSupervisor(
   store: InMemoryAttemptAwaitableStore,
   observer: AttemptAwaitableObserver,
   notifier: AttemptAwaitableNotifier,
-  identity = "primary"
+  identity = "primary",
+  deliveryRetryInitialMs = 1_000
 ) {
   return new AttemptAwaitableSupervisor(store, observer, notifier, {
     observerId: `observer-${identity}`,
     now: () => T0,
     createLeaseId: (awaitableId) => `${awaitableId}:lease:${identity}`,
+    deliveryRetryInitialMs,
+    deliveryRetryMaxMs: Math.max(deliveryRetryInitialMs, 1_000),
   });
 }
 
@@ -330,7 +375,22 @@ function axfResult(outcome: "satisfied" | "terminal-failed", effectiveDeadlineMs
     underlyingCancellation: false,
     effectiveDeadlineMs,
     observationCount: 1,
-    evidence: { headSha: "a".repeat(40) },
+    evidence: {
+      repository: "owner/repo",
+      headSha: "a".repeat(40),
+      pullRequestNumber: null,
+      requiredChecks: [
+        {
+          source: "check-run",
+          name: "Windows",
+          appSlug: null,
+          state: "completed",
+          conclusion: outcome === "satisfied" ? "success" : "failure",
+          terminal: true,
+          successful: outcome === "satisfied",
+        },
+      ],
+    },
   });
 }
 

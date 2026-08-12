@@ -77,7 +77,8 @@ The durable record additionally binds:
 - immutable terminal result and result hash; and
 - delivery ID, completion hash, attempt count, and delivery status.
 
-AXF terminal data retains its original schema. LexRunner wraps it only to identify whether the
+AXF terminal data retains its original schema. LexRunner admits it to durable storage only through
+a closed, kind-specific descriptor and evidence schema, then wraps it to identify whether the
 terminal outcome came from AXF or from durable orchestration:
 
 ```json
@@ -97,7 +98,22 @@ terminal outcome came from AXF or from durable orchestration:
     "underlyingCancellation": false,
     "effectiveDeadlineMs": 600000,
     "observationCount": 4,
-    "evidence": {}
+    "evidence": {
+      "repository": "owner/repository",
+      "headSha": "0123456789abcdef0123456789abcdef01234567",
+      "pullRequestNumber": null,
+      "requiredChecks": [
+        {
+          "source": "check-run",
+          "name": "Windows",
+          "appSlug": "github-actions",
+          "state": "completed",
+          "conclusion": "success",
+          "terminal": true,
+          "successful": true
+        }
+      ]
+    }
   }
 }
 ```
@@ -110,9 +126,17 @@ The completion delivered to a continuation target contains the stable `delivery_
 Attempt/session, descriptor hash, terminal result and hash, and terminal timestamp. Consumers must
 deduplicate by `delivery_id`.
 
-Descriptors and evidence are structurally and byte bounded. Credential-shaped fields are rejected
-recursively. Credentials are supplied by the observer host at execution time and are never placed
-in the descriptor, result, event, or completion record.
+The first slice allowlists AXF's `github.required-checks` provider. Its descriptor and normalized
+evidence shapes are mirrored as closed schemas; a new provider is not durable until LexRunner adds
+and tests another explicit schema. This prevents arbitrary provider JSON from becoming a secret
+storage channel. Payloads are also structurally and byte bounded, unknown fields are rejected, and
+credential-shaped fields and high-confidence credential values are rejected recursively.
+Credentials are supplied by the observer host at execution time and are never placed in the
+descriptor, result, event, or completion record.
+
+When `worker_session_id` is supplied, registration atomically requires both a live Attempt and a
+nonterminal WorkerSession bound to that Attempt. Attempt-only registration remains available for a
+continuation host that routes through an Attempt inbox instead of a live session.
 
 ## Lifecycle
 
@@ -141,7 +165,8 @@ Terminal statuses are `satisfied`, `terminal_failed`, `deadline`, `cancelled`, `
   treated as an interrupted watch, not as semantic cancellation of the durable awaitable.
 - **Crash while recording terminal state:** the result and pending delivery are one store mutation;
   neither can exist alone.
-- **Notifier failure:** the completion remains pending for recovery.
+- **Notifier failure:** the live supervisor retries with capped exponential backoff; the completion
+  remains pending for restart recovery throughout.
 - **Crash after notifying but before acknowledgement:** the same completion may be delivered again
   with the same `delivery_id`.
 - **Crash after acknowledgement:** the completion is not selected for delivery again.
@@ -160,7 +185,8 @@ The initial slice contains:
   `src/runs/attempt-awaitable-contract.ts`;
 - in-memory and SQLite stores, migration 016, immutable events, revisions, fencing, and outbox state;
 - `AttemptAwaitableSupervisor`, with non-blocking registration, one-read restart recovery,
-  cooperative shutdown, cancellation, terminal latching, and replayable notification;
+  cooperative shutdown, cancellation, terminal latching, and replayable notification with capped
+  retry backoff;
 - a provider-neutral observer port and continuation notifier port; and
 - a no-shell AXF CLI observer for `global.wait.external`, with the published
   `global.await.external` compatibility alias available only by explicit configuration.

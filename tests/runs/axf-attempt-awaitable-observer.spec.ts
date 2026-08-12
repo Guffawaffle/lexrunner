@@ -29,8 +29,9 @@ describe("AxfCliAttemptAwaitableObserver", () => {
       outcome: "satisfied",
       effectiveDeadlineMs: 12_345,
       evidence: {
-        receivedCapability: "global.wait.external",
-        receivedHead: "a".repeat(40),
+        repository: "owner/repo",
+        headSha: "a".repeat(40),
+        requiredChecks: [{ name: "Windows", state: "completed", successful: true }],
       },
     });
     expect(JSON.stringify(result)).not.toContain("host-only-test-token");

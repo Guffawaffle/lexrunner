@@ -21,6 +21,8 @@ import type {
 import { computeCanonicalHash } from "../schemas/task-contract.js";
 
 const DEFAULT_LEASE_GRACE_MS = 60_000;
+const DEFAULT_DELIVERY_RETRY_INITIAL_MS = 1_000;
+const DEFAULT_DELIVERY_RETRY_MAX_MS = 60_000;
 
 export interface AttemptAwaitableObservationRequest {
   descriptor: ExternalAwaitableDescriptor;
@@ -58,6 +60,8 @@ export interface AttemptAwaitableSupervisorOptions {
   now?: () => string;
   leaseGraceMs?: number;
   createLeaseId?: (awaitableId: string) => string;
+  deliveryRetryInitialMs?: number;
+  deliveryRetryMaxMs?: number;
   onNotice?: (notice: AttemptAwaitableSupervisorNotice) => void | Promise<void>;
 }
 
@@ -93,7 +97,10 @@ export class AttemptAwaitableSupervisor {
     string,
     { controller: AbortController; completion: Promise<void> }
   >();
-  private readonly deliveries = new Map<string, Promise<void>>();
+  private readonly deliveries = new Map<
+    string,
+    { controller: AbortController; completion: Promise<void> }
+  >();
   private readonly leaseExpiryWakeups = new Map<
     string,
     { timer: ReturnType<typeof setTimeout>; completion: Promise<void>; resolve: () => void }
@@ -101,6 +108,8 @@ export class AttemptAwaitableSupervisor {
   private readonly now: () => string;
   private readonly leaseGraceMs: number;
   private readonly createLeaseId: (awaitableId: string) => string;
+  private readonly deliveryRetryInitialMs: number;
+  private readonly deliveryRetryMaxMs: number;
   private stopping = false;
 
   constructor(
@@ -112,6 +121,17 @@ export class AttemptAwaitableSupervisor {
     this.now = options.now ?? (() => new Date().toISOString());
     this.leaseGraceMs = normalizeLeaseGrace(options.leaseGraceMs ?? DEFAULT_LEASE_GRACE_MS);
     this.createLeaseId = options.createLeaseId ?? (() => `lease:${randomUUID()}`);
+    this.deliveryRetryInitialMs = normalizeRetryDelay(
+      options.deliveryRetryInitialMs ?? DEFAULT_DELIVERY_RETRY_INITIAL_MS,
+      "deliveryRetryInitialMs"
+    );
+    this.deliveryRetryMaxMs = normalizeRetryDelay(
+      options.deliveryRetryMaxMs ?? DEFAULT_DELIVERY_RETRY_MAX_MS,
+      "deliveryRetryMaxMs"
+    );
+    if (this.deliveryRetryMaxMs < this.deliveryRetryInitialMs) {
+      throw new Error("deliveryRetryMaxMs must be greater than or equal to deliveryRetryInitialMs");
+    }
   }
 
   async register(
@@ -236,7 +256,7 @@ export class AttemptAwaitableSupervisor {
   async wait(awaitableId: string): Promise<void> {
     await this.leaseExpiryWakeups.get(awaitableId)?.completion;
     await this.observations.get(awaitableId)?.completion;
-    await this.deliveries.get(awaitableId);
+    await this.deliveries.get(awaitableId)?.completion;
   }
 
   async shutdown(): Promise<void> {
@@ -245,9 +265,10 @@ export class AttemptAwaitableSupervisor {
       this.clearLeaseExpiryWakeup(awaitableId);
     }
     for (const observation of this.observations.values()) observation.controller.abort();
+    for (const delivery of this.deliveries.values()) delivery.controller.abort();
     await Promise.allSettled([
       ...[...this.observations.values()].map((value) => value.completion),
-      ...this.deliveries.values(),
+      ...[...this.deliveries.values()].map((value) => value.completion),
     ]);
   }
 
@@ -388,10 +409,11 @@ export class AttemptAwaitableSupervisor {
 
   private attachDelivery(awaitableId: string): boolean {
     if (this.stopping || this.deliveries.has(awaitableId)) return false;
-    const delivery = this.runDelivery(awaitableId).finally(() => {
+    const controller = new AbortController();
+    const completion = this.runDelivery(awaitableId, controller.signal).finally(() => {
       this.deliveries.delete(awaitableId);
     });
-    this.deliveries.set(awaitableId, delivery);
+    this.deliveries.set(awaitableId, { controller, completion });
     return true;
   }
 
@@ -420,54 +442,73 @@ export class AttemptAwaitableSupervisor {
     wakeup.resolve();
   }
 
-  private async runDelivery(awaitableId: string): Promise<void> {
-    const current = await this.store.getAttemptAwaitable(awaitableId);
-    if (!current?.delivery || current.delivery.status !== "pending") return;
-    const attemptNumber = current.delivery.attempt_count + 1;
-    const begun = await this.store.beginAttemptAwaitableDelivery({
-      awaitableId,
-      expectedRevision: current.revision,
-      mutationId: derivedMutationId("deliver", {
-        delivery_id: current.delivery.delivery_id,
-        attempt: attemptNumber,
-      }),
-      now: this.now(),
-    });
-    if (!begun.updated || begun.record.delivery?.status !== "pending") return;
-    const completion = completionForAttemptAwaitable(begun.record);
-    try {
-      await this.notifier.deliver(completion);
-    } catch (error) {
-      await this.notice({
-        type: "operation_failed",
+  private async runDelivery(awaitableId: string, signal: AbortSignal): Promise<void> {
+    while (!this.stopping && !signal.aborted) {
+      const current = await this.store.getAttemptAwaitable(awaitableId);
+      if (!current?.delivery || current.delivery.status !== "pending") return;
+      const attemptNumber = current.delivery.attempt_count + 1;
+      const begun = await this.store.beginAttemptAwaitableDelivery({
         awaitableId,
-        operation: "deliver",
-        message: safeErrorName(error),
+        expectedRevision: current.revision,
+        mutationId: derivedMutationId("deliver", {
+          delivery_id: current.delivery.delivery_id,
+          attempt: attemptNumber,
+        }),
+        now: this.now(),
       });
+      if (!begun.updated || begun.record.delivery?.status !== "pending") {
+        const refreshed = await this.store.getAttemptAwaitable(awaitableId);
+        if (!refreshed?.delivery || refreshed.delivery.status !== "pending") return;
+        if (!(await waitForRetry(this.deliveryRetryInitialMs, signal))) return;
+        continue;
+      }
+      const completion = completionForAttemptAwaitable(begun.record);
+      try {
+        await this.notifier.deliver(completion);
+      } catch (error) {
+        await this.notice({
+          type: "operation_failed",
+          awaitableId,
+          operation: "deliver",
+          message: safeErrorName(error),
+        });
+        const delayMs = this.retryDelay(attemptNumber);
+        if (!(await waitForRetry(delayMs, signal))) return;
+        continue;
+      }
+      const acknowledged = await this.store.acknowledgeAttemptAwaitableDelivery({
+        awaitableId,
+        expectedRevision: begun.record.revision,
+        deliveryId: completion.delivery_id,
+        completionHash: begun.record.delivery.completion_hash,
+        mutationId: derivedMutationId("acknowledge", completion.delivery_id),
+        now: this.now(),
+      });
+      if (acknowledged.updated) {
+        await this.notice({
+          type: "delivery_succeeded",
+          awaitableId,
+          deliveryId: completion.delivery_id,
+        });
+      } else {
+        await this.notice({
+          type: "operation_failed",
+          awaitableId,
+          operation: "deliver",
+          message: acknowledged.reason,
+        });
+        if (!(await waitForRetry(this.retryDelay(attemptNumber), signal))) return;
+        continue;
+      }
       return;
     }
-    const acknowledged = await this.store.acknowledgeAttemptAwaitableDelivery({
-      awaitableId,
-      expectedRevision: begun.record.revision,
-      deliveryId: completion.delivery_id,
-      completionHash: begun.record.delivery.completion_hash,
-      mutationId: derivedMutationId("acknowledge", completion.delivery_id),
-      now: this.now(),
-    });
-    if (acknowledged.updated) {
-      await this.notice({
-        type: "delivery_succeeded",
-        awaitableId,
-        deliveryId: completion.delivery_id,
-      });
-    } else {
-      await this.notice({
-        type: "operation_failed",
-        awaitableId,
-        operation: "deliver",
-        message: acknowledged.reason,
-      });
-    }
+  }
+
+  private retryDelay(attemptNumber: number): number {
+    return Math.min(
+      this.deliveryRetryMaxMs,
+      this.deliveryRetryInitialMs * 2 ** Math.min(attemptNumber - 1, 20)
+    );
   }
 
   private async notice(notice: AttemptAwaitableSupervisorNotice): Promise<void> {
@@ -497,6 +538,28 @@ function normalizeLeaseGrace(value: number): number {
     throw new Error("leaseGraceMs must be an integer between 0 and 60000");
   }
   return value;
+}
+
+function normalizeRetryDelay(value: number, name: string): number {
+  if (!Number.isInteger(value) || value < 1 || value > 60_000) {
+    throw new Error(`${name} must be an integer between 1 and 60000`);
+  }
+  return value;
+}
+
+function waitForRetry(delayMs: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function isLive(record: AttemptAwaitableRecord): boolean {

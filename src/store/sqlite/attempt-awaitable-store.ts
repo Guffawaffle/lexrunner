@@ -33,6 +33,7 @@ import {
 } from "../attempt-awaitable-store.js";
 import type { JsonValue } from "../coordination-store.js";
 import type { SqliteCoordinationStoreOptions } from "./coordination-store.js";
+import { WorkerSessionStatus, isTerminalWorkerSession } from "../workspace-lifecycle-domains.js";
 import { SqliteWorkspaceLifecycleStore } from "./workspace-lifecycle-store.js";
 
 const INLINE_MIGRATION = `
@@ -156,9 +157,15 @@ export class SqliteAttemptAwaitableStore
       }
       if (input.workerSessionId) {
         const session = this.db
-          .prepare("SELECT attemptId FROM worker_sessions WHERE sessionId=?")
-          .get(input.workerSessionId) as { attemptId: string } | undefined;
-        if (!session || session.attemptId !== input.attemptId) {
+          .prepare("SELECT attemptId,status FROM worker_sessions WHERE sessionId=?")
+          .get(input.workerSessionId) as { attemptId: string; status: string } | undefined;
+        const sessionStatus = WorkerSessionStatus.safeParse(session?.status);
+        if (
+          !session ||
+          session.attemptId !== input.attemptId ||
+          !sessionStatus.success ||
+          isTerminalWorkerSession(sessionStatus.data)
+        ) {
           return { registered: false, reason: "target_mismatch" } as const;
         }
       }
