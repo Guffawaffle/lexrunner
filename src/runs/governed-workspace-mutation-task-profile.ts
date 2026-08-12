@@ -16,6 +16,8 @@ export const GOVERNED_WORKSPACE_MUTATION_VERIFIER_VERSION = "1.0.0" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_ID =
   "lexrunner.qualified-wsl2-codex-writer" as const;
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_VERSION = "1.0.0" as const;
+export const GOVERNED_WORKSPACE_MUTATION_RECOVERY_CONTROLLER_ID =
+  "lexrunner.workspace-recovery-controller" as const;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_EVIDENCE_BYTES = 16 * 1_024 * 1_024;
 export const GOVERNED_WORKSPACE_MUTATION_MAX_TOOL_CALLS = 200;
 
@@ -25,6 +27,149 @@ const opaqueId = z
   .max(256)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "Must be an opaque identifier");
 const instant = z.string().datetime({ offset: true });
+const boundedRelativePath = z
+  .string()
+  .min(1)
+  .max(4_096)
+  .refine(
+    (value) =>
+      !value.startsWith("/") &&
+      !value.includes("\\") &&
+      !value.includes("\0") &&
+      value.split("/").every((part) => part !== "" && part !== "." && part !== ".."),
+    "Must be a normalized relative path"
+  );
+const boundedMode = z.number().int().min(0).max(0o7777);
+const workspaceEvidenceFailureReason = z.enum([
+  "file_size_limit_exceeded",
+  "total_bytes_limit_exceeded",
+  "entry_limit_exceeded",
+  "symlink_target_limit_exceeded",
+  "change_limit_exceeded",
+  "evidence_payload_limit_exceeded",
+]);
+const workspaceFilesystemEntry = z.discriminatedUnion("kind", [
+  z.object({ path: boundedRelativePath, kind: z.literal("directory"), mode: boundedMode }).strict(),
+  z
+    .object({
+      path: boundedRelativePath,
+      kind: z.literal("file"),
+      mode: boundedMode,
+      byte_length: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(1 * 1_024 * 1_024),
+      content_hash: SHA256Hash,
+    })
+    .strict(),
+  z
+    .object({
+      path: boundedRelativePath,
+      kind: z.literal("symbolic_link"),
+      mode: boundedMode,
+      target_byte_length: z.number().int().nonnegative().max(4_096),
+      target_hash: SHA256Hash,
+    })
+    .strict(),
+  z
+    .object({
+      path: boundedRelativePath,
+      kind: z.literal("special"),
+      special_kind: z.enum(["fifo", "socket", "character_device", "block_device", "unknown"]),
+      mode: boundedMode,
+    })
+    .strict(),
+]);
+
+function requireStrictlyOrderedPaths(
+  values: readonly { path: string }[],
+  context: z.RefinementCtx,
+  field: "entries" | "changes"
+): void {
+  if (values.some(({ path }, index) => index > 0 && path <= values[index - 1]!.path)) {
+    context.addIssue({
+      code: "custom",
+      path: [field],
+      message: "evidence paths must be unique and strictly ordered",
+    });
+  }
+}
+
+const completeFilesystemManifest = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    entries: z.array(workspaceFilesystemEntry).max(4_096),
+    total_file_bytes: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(4 * 1_024 * 1_024),
+  })
+  .strict()
+  .superRefine((manifest, context) =>
+    requireStrictlyOrderedPaths(manifest.entries, context, "entries")
+  );
+const completeGitIdentity = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    kind: z.enum(["absent", "present"]),
+    paths: z.array(boundedRelativePath).max(4_096),
+  })
+  .strict()
+  .superRefine((identity, context) => {
+    if (
+      identity.paths.some((path, index) => index > 0 && path <= identity.paths[index - 1]!) ||
+      (identity.kind === "absent" && identity.paths.length !== 0) ||
+      (identity.kind === "present" && identity.paths.length === 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["paths"],
+        message: "Git identity kind and strictly ordered paths are inconsistent",
+      });
+    }
+  });
+const completeFilesystemDelta = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    changes: z
+      .array(
+        z
+          .object({
+            path: boundedRelativePath,
+            before: workspaceFilesystemEntry.nullable(),
+            after: workspaceFilesystemEntry.nullable(),
+          })
+          .strict()
+      )
+      .max(4_096),
+  })
+  .strict()
+  .superRefine((delta, context) => {
+    requireStrictlyOrderedPaths(delta.changes, context, "changes");
+    if (
+      delta.changes.some(
+        (change) =>
+          (change.before !== null && change.before.path !== change.path) ||
+          (change.after !== null && change.after.path !== change.path) ||
+          computeCanonicalHash(change.before) === computeCanonicalHash(change.after)
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["changes"],
+        message: "delta entries must describe an actual change at their bound path",
+      });
+    }
+  });
+const incompleteWorkspaceEvidence = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    status: z.literal("incomplete"),
+    reason: workspaceEvidenceFailureReason,
+  })
+  .strict();
 
 export const GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST = WorkerAdapterManifest_v1.parse({
   schema_version: "1.0.0",
@@ -280,6 +425,142 @@ export function createGovernedWorkspaceMutationPreparedWorkspaceEvidence(
     evidence_hash: computeCanonicalHash(body),
   });
 }
+
+const workspaceMutationRecoveryEvidenceBody = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    workspace_id: opaqueId,
+    attempt_id: opaqueId,
+    task_spec_hash: SHA256Hash,
+    after_filesystem_manifest: z.union([completeFilesystemManifest, incompleteWorkspaceEvidence]),
+    after_filesystem_manifest_hash: SHA256Hash,
+    after_git_identity: z.union([completeGitIdentity, incompleteWorkspaceEvidence]),
+    after_git_identity_hash: SHA256Hash,
+    patch: z.union([completeFilesystemDelta, incompleteWorkspaceEvidence]),
+    patch_identity_hash: SHA256Hash,
+    evidence_status: z.enum(["complete", "incomplete"]),
+    evidence_failure_reason: z.union([z.literal("none"), workspaceEvidenceFailureReason]),
+  })
+  .strict()
+  .superRefine((evidence, context) => {
+    for (const [bodyField, hashField] of [
+      ["after_filesystem_manifest", "after_filesystem_manifest_hash"],
+      ["after_git_identity", "after_git_identity_hash"],
+      ["patch", "patch_identity_hash"],
+    ] as const) {
+      if (computeCanonicalHash(evidence[bodyField]) !== evidence[hashField]) {
+        context.addIssue({
+          code: "custom",
+          path: [hashField],
+          message: `${hashField} does not match its canonical body`,
+        });
+      }
+    }
+    const incomplete = [
+      evidence.after_filesystem_manifest,
+      evidence.after_git_identity,
+      evidence.patch,
+    ].filter((item) => "status" in item);
+    if (
+      evidence.evidence_status === "complete"
+        ? evidence.evidence_failure_reason !== "none" || incomplete.length !== 0
+        : evidence.evidence_failure_reason === "none" ||
+          incomplete.length !== 3 ||
+          incomplete.some((item) => item.reason !== evidence.evidence_failure_reason)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidence_status"],
+        message: "recovery evidence status, bodies, and failure reason are inconsistent",
+      });
+    }
+  });
+
+export const GovernedWorkspaceMutationRecoveryEvidence_v1 = workspaceMutationRecoveryEvidenceBody
+  .extend({ evidence_hash: SHA256Hash })
+  .strict()
+  .superRefine((evidence, context) => {
+    const { evidence_hash: _evidenceHash, ...body } = evidence;
+    if (computeCanonicalHash(body) !== evidence.evidence_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidence_hash"],
+        message: "recovery evidence hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedWorkspaceMutationRecoveryEvidence_v1 = z.infer<
+  typeof GovernedWorkspaceMutationRecoveryEvidence_v1
+>;
+
+export const GovernedWorkspaceMutationRecoveryReceipt_v1 = z
+  .object({
+    schema_version: z.literal(GOVERNED_WORKSPACE_MUTATION_PROFILE_VERSION),
+    controller_id: z.literal(GOVERNED_WORKSPACE_MUTATION_RECOVERY_CONTROLLER_ID),
+    controller_executable_hash: SHA256Hash,
+    workspace_id: opaqueId,
+    attempt_id: opaqueId,
+    task_spec_hash: SHA256Hash,
+    rollback_binding_hash: SHA256Hash,
+    writable_root_identity_hash: SHA256Hash,
+    before_filesystem_manifest_hash: SHA256Hash,
+    after_filesystem_manifest_hash: SHA256Hash,
+    before_git_identity_hash: SHA256Hash,
+    after_git_identity_hash: SHA256Hash,
+    patch_identity_hash: SHA256Hash,
+    recovery_evidence_hash: SHA256Hash,
+    changed_paths: z.array(boundedRelativePath).max(4_096),
+    worker_absence_evidence_hash: SHA256Hash,
+    recovery_authorization_hash: SHA256Hash,
+    reason: z.enum([
+      "cancelled",
+      "client_lost",
+      "worker_lost",
+      "task_terminal",
+      "qualification_cleanup",
+    ]),
+    evidence_status: z.enum(["complete", "incomplete"]),
+    evidence_failure_reason: z.union([z.literal("none"), workspaceEvidenceFailureReason]),
+    result: z.literal("discarded"),
+    workspace_absent: z.literal(true),
+    discarded_at: instant,
+    receipt_hash: SHA256Hash,
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (
+      (receipt.evidence_status === "complete" && receipt.evidence_failure_reason !== "none") ||
+      (receipt.evidence_status === "incomplete" && receipt.evidence_failure_reason === "none")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidence_failure_reason"],
+        message: "recovery evidence status and failure reason are inconsistent",
+      });
+    }
+    if (
+      receipt.changed_paths.some(
+        (path, index) => index > 0 && path <= receipt.changed_paths[index - 1]!
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["changed_paths"],
+        message: "changed paths must be unique and strictly ordered",
+      });
+    }
+    const { receipt_hash: _receiptHash, ...body } = receipt;
+    if (computeCanonicalHash(body) !== receipt.receipt_hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["receipt_hash"],
+        message: "recovery receipt hash does not match its canonical body",
+      });
+    }
+  });
+export type GovernedWorkspaceMutationRecoveryReceipt_v1 = z.infer<
+  typeof GovernedWorkspaceMutationRecoveryReceipt_v1
+>;
 
 export interface CreateGovernedWorkspaceMutationTaskInput {
   attemptId: string;
