@@ -127,6 +127,7 @@ class WorkspaceMutationControllerTest(unittest.TestCase):
                 "workspaceId": evidence["workspace_id"],
                 "status": "prepared",
                 "workspacePresent": True,
+                "stagingPresent": False,
                 "quarantinePresent": False,
                 "preparedEvidenceHash": evidence["evidence_hash"],
                 "recoveryReceiptHash": None,
@@ -149,6 +150,26 @@ class WorkspaceMutationControllerTest(unittest.TestCase):
         self.assertEqual(receipt["evidence_status"], "complete")
         self.assertEqual(receipt["evidence_failure_reason"], "none")
         self.assertIn("authorized/result.txt", receipt["changed_paths"])
+        recovery_evidence = controller.collect_workspace(evidence["workspace_id"])[
+            "recoveryEvidence"
+        ]
+        self.assertEqual(
+            receipt["recovery_evidence_hash"], recovery_evidence["evidence_hash"]
+        )
+        self.assertEqual(
+            recovery_evidence["after_filesystem_manifest_hash"],
+            controller.canonical_hash(
+                recovery_evidence["after_filesystem_manifest"]
+            ),
+        )
+        self.assertEqual(
+            recovery_evidence["patch_identity_hash"],
+            controller.canonical_hash(recovery_evidence["patch"]),
+        )
+        self.assertIn(
+            "authorized/result.txt",
+            [change["path"] for change in recovery_evidence["patch"]["changes"]],
+        )
         self.assertNotEqual(
             receipt["before_filesystem_manifest_hash"],
             receipt["after_filesystem_manifest_hash"],
@@ -162,6 +183,13 @@ class WorkspaceMutationControllerTest(unittest.TestCase):
                 "workspaceId": evidence["workspace_id"],
                 "status": "discarded",
                 "preparedEvidence": evidence,
+                "beforeFilesystemManifest": controller.read_record(
+                    controller.RECORDS / f"{evidence['workspace_id']}.json"
+                )["before_filesystem_manifest"],
+                "beforeGitIdentity": controller.read_record(
+                    controller.RECORDS / f"{evidence['workspace_id']}.json"
+                )["before_git_identity"],
+                "recoveryEvidence": recovery_evidence,
                 "recoveryReceipt": receipt,
             },
         )
@@ -188,6 +216,84 @@ class WorkspaceMutationControllerTest(unittest.TestCase):
         self.assertEqual(
             controller.inspect_workspace(evidence["workspace_id"])["status"],
             "discarded",
+        )
+
+    def test_preparation_journal_recovers_a_crash_before_final_exposure(self) -> None:
+        with patch.object(controller.os, "rename", side_effect=OSError("simulated crash")):
+            with self.assertRaisesRegex(OSError, "simulated crash"):
+                controller.prepare_workspace(prepare_request())
+
+        records = list(controller.RECORDS.glob("workspace-*.json"))
+        self.assertEqual(len(records), 1)
+        workspace_id = records[0].stem
+        collected = controller.collect_workspace(workspace_id)
+        evidence = collected["preparedEvidence"]
+        status = controller.inspect_workspace(workspace_id)
+        self.assertEqual(status["status"], "preparing")
+        self.assertFalse(status["workspacePresent"])
+        self.assertTrue(status["stagingPresent"])
+
+        receipt = controller.discard_workspace(discard_request(evidence))["receipt"]
+        self.assertTrue(receipt["workspace_absent"])
+        self.assertEqual(
+            controller.inspect_workspace(workspace_id)["status"], "discarded"
+        )
+
+    def test_resumes_when_detach_completed_before_discard_journal(self) -> None:
+        evidence = controller.prepare_workspace(prepare_request())["evidence"]
+        request = discard_request(evidence)
+        original = controller.write_atomic
+        crashed = False
+
+        def fail_discard_record(path: Path, data: bytes, mode: int = 0o600) -> None:
+            nonlocal crashed
+            if (
+                not crashed
+                and path.parent == controller.RECORDS
+                and b'"state":"discarding"' in data
+            ):
+                crashed = True
+                raise OSError("simulated crash")
+            original(path, data, mode)
+
+        with patch.object(controller, "write_atomic", side_effect=fail_discard_record):
+            with self.assertRaisesRegex(OSError, "simulated crash"):
+                controller.discard_workspace(request)
+
+        status = controller.inspect_workspace(evidence["workspace_id"])
+        self.assertEqual(status["status"], "prepared")
+        self.assertFalse(status["workspacePresent"])
+        self.assertTrue(status["quarantinePresent"])
+
+        receipt = controller.discard_workspace(request)["receipt"]
+        self.assertTrue(receipt["workspace_absent"])
+
+    def test_resumes_a_discarding_record_when_the_rename_was_missing(self) -> None:
+        evidence = controller.prepare_workspace(prepare_request())["evidence"]
+        request = discard_request(evidence)
+        record_path, record = controller.workspace_record(evidence["workspace_id"])
+        record = {
+            **record,
+            "state": "discarding",
+            "pending_recovery": {
+                "worker_absence_evidence_hash": request[
+                    "worker_absence_evidence_hash"
+                ],
+                "recovery_authorization_hash": request[
+                    "recovery_authorization_hash"
+                ],
+                "reason": request["reason"],
+                "discarded_at": controller.instant(controller.now_utc()),
+            },
+        }
+        controller.write_atomic(
+            record_path, controller.canonical_bytes(record) + b"\n"
+        )
+
+        receipt = controller.discard_workspace(request)["receipt"]
+        self.assertTrue(receipt["workspace_absent"])
+        self.assertFalse(
+            (controller.WORKSPACES / evidence["workspace_id"]).exists()
         )
 
     def test_rejects_scope_hash_drift_and_git_or_parent_traversal(self) -> None:

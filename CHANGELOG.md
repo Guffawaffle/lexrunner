@@ -10,10 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - **Disposable workspace recovery controller** - Add a root-owned WSL2 controller that prepares
   bounded Attempt-owned ext4 roots from a hash-checked sealed source, records pre-mutation
-  filesystem and Git identities, and atomically detaches and discards only the exactly bound root.
-  Recovery is resumable across the detach/delete crash window and emits strict pre/post, patch,
-  worker-absence, recovery-authorization, and workspace-absence evidence without creating a writer
-  grant or launch path.
+  filesystem and Git identities, journals each root before exposing it, and atomically detaches and
+  discards only the exactly bound root. Recovery is resumable across preparation, detach, evidence,
+  and delete crash windows. Complete bounded pre/post manifests and canonical deltas remain
+  resolvable from controller-only evidence after deletion, while strict receipts bind their hashes,
+  worker absence, recovery authorization, and workspace absence without creating a writer grant or
+  launch path.
 - **Governed workspace mutation profile** - Add a non-review task profile whose proposed authority
   is limited to an Attempt-owned read scope and exact writable-path-set hash with whole-workspace
   discard recovery. The profile exports no execution-binding constructor: schema records and an

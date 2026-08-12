@@ -15,6 +15,7 @@ schemas/*.json
 artifacts/
 tmp/
 coverage/
+.mypy_cache/
 *.db
 
 # Lock files

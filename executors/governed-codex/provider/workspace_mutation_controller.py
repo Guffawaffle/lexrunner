@@ -29,6 +29,7 @@ MAX_SOURCE_FILE_BYTES = 1 * 1024 * 1024
 MAX_SOURCE_FILES = 512
 MAX_CHANGED_PATHS = 4_096
 MAX_TTL_SECONDS = 60 * 60
+MAX_RECOVERY_EVIDENCE_BYTES = MAX_CONTROL_BYTES
 OPAQUE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 WORKSPACE_ID = re.compile(r"^workspace-[0-9a-f]{32}$")
@@ -50,6 +51,7 @@ STATE_ROOT = configured_path(
 WORKSPACES = STATE_ROOT / "workspaces"
 RECORDS = STATE_ROOT / "records"
 RECEIPTS = STATE_ROOT / "receipts"
+EVIDENCE = STATE_ROOT / "evidence"
 WORKSPACE_OWNER = os.environ.get(
     "LEXRUNNER_WORKSPACE_CONTROLLER_OWNER", "lexrunner-provider"
 )
@@ -206,6 +208,7 @@ def ensure_state() -> None:
     ensure_directory(WORKSPACES, 0o711, create=True)
     ensure_directory(RECORDS, 0o700, create=True)
     ensure_directory(RECEIPTS, 0o700, create=True)
+    ensure_directory(EVIDENCE, 0o700, create=True)
 
 
 def fsync_directory(path: Path) -> None:
@@ -231,7 +234,7 @@ def write_atomic(path: Path, data: bytes, mode: int = 0o600) -> None:
             os.unlink(temporary)
 
 
-def read_record(path: Path) -> dict[str, Any]:
+def read_protected_object(path: Path, field: str, maximum_bytes: int) -> dict[str, Any]:
     info = path.lstat()
     if (
         not stat.S_ISREG(info.st_mode)
@@ -239,16 +242,20 @@ def read_record(path: Path) -> dict[str, Any]:
         or info.st_uid != controller_uid()
         or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
         or info.st_size <= 0
-        or info.st_size > MAX_CONTROL_BYTES
+        or info.st_size > maximum_bytes
     ):
-        fail("workspace controller record authority is invalid")
+        fail(f"{field} authority is invalid")
     try:
         value = json.loads(path.read_bytes())
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise WorkspaceControllerError("workspace controller record is invalid") from error
+        raise WorkspaceControllerError(f"{field} is invalid") from error
     if not isinstance(value, dict):
-        fail("workspace controller record must be an object")
+        fail(f"{field} must be an object")
     return value
+
+
+def read_record(path: Path) -> dict[str, Any]:
+    return read_protected_object(path, "workspace controller record", MAX_CONTROL_BYTES)
 
 
 def controller_executable_hash() -> str:
@@ -667,17 +674,17 @@ def prepare_workspace(value: dict[str, Any]) -> dict[str, Any]:
     observed = now_utc()
     expires = observed + dt.timedelta(seconds=request["ttl_seconds"])
     uid, gid = workspace_owner_identity()
+    record_path = RECORDS / f"{workspace_id}.json"
+    record_durable = False
     staging.mkdir(mode=0o700)
     try:
         for metadata, content in request["source_entries"]:
             write_source_file(staging, metadata, content)
         ensure_writable_paths(staging, request["writable_paths"])
         chown_tree(staging, uid, gid)
-        os.rename(staging, target)
-        fsync_directory(WORKSPACES)
-        before_manifest = filesystem_manifest(target)
+        before_manifest = filesystem_manifest(staging)
         before_git = git_identity(before_manifest)
-        root_identity = writable_root_identity(target, workspace_id)
+        root_identity = writable_root_identity(staging, workspace_id)
         if before_git["kind"] != "absent":
             fail("prepared workspace unexpectedly contains Git metadata")
         preparation_receipt = {
@@ -743,10 +750,11 @@ def prepare_workspace(value: dict[str, Any]) -> dict[str, Any]:
         evidence = {**evidence_body, "evidence_hash": canonical_hash(evidence_body)}
         record = {
             "schema_version": PROTOCOL_VERSION,
-            "state": "prepared",
+            "state": "preparing",
             "workspace_id": workspace_id,
             "workspace_name": workspace_id,
-            "quarantine_name": None,
+            "staging_name": staging.name,
+            "quarantine_name": ".discarding-" + uuid.uuid4().hex,
             "request": {
                 key: request[key]
                 for key in (
@@ -767,15 +775,27 @@ def prepare_workspace(value: dict[str, Any]) -> dict[str, Any]:
             "preparation_receipt": preparation_receipt,
             "prepared_evidence": evidence,
             "pending_recovery": None,
+            "recovery_evidence_hash": None,
             "recovery_receipt": None,
         }
-        write_atomic(RECORDS / f"{workspace_id}.json", canonical_bytes(record) + b"\n")
+        if len(canonical_bytes(record)) + 1 > MAX_CONTROL_BYTES:
+            fail("prepared workspace record exceeds its bound")
+        write_atomic(record_path, canonical_bytes(record) + b"\n")
+        record_durable = True
+        os.rename(staging, target)
+        fsync_directory(WORKSPACES)
+        record = {**record, "state": "prepared", "staging_name": None}
+        write_atomic(record_path, canonical_bytes(record) + b"\n")
         return {"prepared": True, "evidence": evidence}
     except BaseException:
-        if staging.exists():
-            shutil.rmtree(staging)
-        if target.exists() and not (RECORDS / f"{workspace_id}.json").exists():
-            shutil.rmtree(target)
+        # Once the journal is durable, leave every possible root in place so the
+        # protected controller can identify and discard it after restart.
+        record_durable = record_durable or record_path.exists()
+        if not record_durable:
+            if staging.exists():
+                shutil.rmtree(staging)
+            if target.exists():
+                shutil.rmtree(target)
         raise
 
 
@@ -847,6 +867,142 @@ def manifest_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, A
     return {"schema_version": PROTOCOL_VERSION, "changes": changed}
 
 
+def build_recovery_evidence(record: dict[str, Any], root: Path) -> dict[str, Any]:
+    try:
+        after_manifest = filesystem_manifest(root)
+        after_git = git_identity(after_manifest)
+        delta = manifest_delta(record["before_filesystem_manifest"], after_manifest)
+        evidence_status = "complete"
+        evidence_failure_reason = "none"
+    except WorkspaceEvidenceIncomplete as error:
+        incomplete = {
+            "schema_version": PROTOCOL_VERSION,
+            "status": "incomplete",
+            "reason": error.reason,
+        }
+        after_manifest = incomplete
+        after_git = incomplete
+        delta = incomplete
+        evidence_status = "incomplete"
+        evidence_failure_reason = error.reason
+
+    def body() -> dict[str, Any]:
+        return {
+            "schema_version": PROTOCOL_VERSION,
+            "workspace_id": record["workspace_id"],
+            "attempt_id": record["request"]["attempt_id"],
+            "task_spec_hash": record["request"]["task_spec_hash"],
+            "after_filesystem_manifest": after_manifest,
+            "after_filesystem_manifest_hash": canonical_hash(after_manifest),
+            "after_git_identity": after_git,
+            "after_git_identity_hash": canonical_hash(after_git),
+            "patch": delta,
+            "patch_identity_hash": canonical_hash(delta),
+            "evidence_status": evidence_status,
+            "evidence_failure_reason": evidence_failure_reason,
+        }
+
+    evidence_body = body()
+    evidence = {**evidence_body, "evidence_hash": canonical_hash(evidence_body)}
+    if len(canonical_bytes(evidence)) + 1 > MAX_RECOVERY_EVIDENCE_BYTES:
+        reason = "evidence_payload_limit_exceeded"
+        incomplete = {
+            "schema_version": PROTOCOL_VERSION,
+            "status": "incomplete",
+            "reason": reason,
+        }
+        after_manifest = incomplete
+        after_git = incomplete
+        delta = incomplete
+        evidence_status = "incomplete"
+        evidence_failure_reason = reason
+        evidence_body = body()
+        evidence = {**evidence_body, "evidence_hash": canonical_hash(evidence_body)}
+    return evidence
+
+
+def read_recovery_evidence(record: dict[str, Any]) -> dict[str, Any]:
+    expected_hash = require_hash(
+        record.get("recovery_evidence_hash"), "recovery_evidence_hash"
+    )
+    evidence = read_protected_object(
+        EVIDENCE / f"{record['workspace_id']}.json",
+        "workspace recovery evidence",
+        MAX_RECOVERY_EVIDENCE_BYTES,
+    )
+    require_exact_keys(
+        evidence,
+        (
+            "schema_version",
+            "workspace_id",
+            "attempt_id",
+            "task_spec_hash",
+            "after_filesystem_manifest",
+            "after_filesystem_manifest_hash",
+            "after_git_identity",
+            "after_git_identity_hash",
+            "patch",
+            "patch_identity_hash",
+            "evidence_status",
+            "evidence_failure_reason",
+            "evidence_hash",
+        ),
+        "workspace recovery evidence",
+    )
+    if (
+        evidence["schema_version"] != PROTOCOL_VERSION
+        or evidence["workspace_id"] != record["workspace_id"]
+        or evidence["attempt_id"] != record["request"]["attempt_id"]
+        or evidence["task_spec_hash"] != record["request"]["task_spec_hash"]
+    ):
+        fail("workspace recovery evidence identity is invalid")
+    for body_field, hash_field in (
+        ("after_filesystem_manifest", "after_filesystem_manifest_hash"),
+        ("after_git_identity", "after_git_identity_hash"),
+        ("patch", "patch_identity_hash"),
+    ):
+        require_hash_binding(evidence[hash_field], evidence[body_field], hash_field)
+    evidence_body = {
+        key: item for key, item in evidence.items() if key != "evidence_hash"
+    }
+    require_hash_binding(evidence["evidence_hash"], evidence_body, "evidence_hash")
+    if evidence["evidence_hash"] != expected_hash:
+        fail("workspace recovery evidence does not match its record")
+    return evidence
+
+
+def persist_recovery_evidence(record: dict[str, Any], root: Path) -> dict[str, Any]:
+    evidence = build_recovery_evidence(record, root)
+    write_atomic(
+        EVIDENCE / f"{record['workspace_id']}.json",
+        canonical_bytes(evidence) + b"\n",
+    )
+    return evidence
+
+
+def pending_recovery_body(
+    request: dict[str, Any], evidence: dict[str, Any], discarded_at: str | None = None
+) -> dict[str, Any]:
+    patch = evidence["patch"]
+    return {
+        "recovery_evidence_hash": evidence["evidence_hash"],
+        "after_filesystem_manifest_hash": evidence["after_filesystem_manifest_hash"],
+        "after_git_identity_hash": evidence["after_git_identity_hash"],
+        "patch_identity_hash": evidence["patch_identity_hash"],
+        "changed_paths": (
+            [change["path"] for change in patch["changes"]]
+            if evidence["evidence_status"] == "complete"
+            else []
+        ),
+        "worker_absence_evidence_hash": request["worker_absence_evidence_hash"],
+        "recovery_authorization_hash": request["recovery_authorization_hash"],
+        "reason": request["reason"],
+        "evidence_status": evidence["evidence_status"],
+        "evidence_failure_reason": evidence["evidence_failure_reason"],
+        "discarded_at": discarded_at or instant(now_utc()),
+    }
+
+
 def recovery_receipt_body(record: dict[str, Any], pending: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": PROTOCOL_VERSION,
@@ -862,6 +1018,7 @@ def recovery_receipt_body(record: dict[str, Any], pending: dict[str, Any]) -> di
         "before_git_identity_hash": record["prepared_evidence"]["before_git_identity_hash"],
         "after_git_identity_hash": pending["after_git_identity_hash"],
         "patch_identity_hash": pending["patch_identity_hash"],
+        "recovery_evidence_hash": pending["recovery_evidence_hash"],
         "changed_paths": pending["changed_paths"],
         "worker_absence_evidence_hash": pending["worker_absence_evidence_hash"],
         "recovery_authorization_hash": pending["recovery_authorization_hash"],
@@ -894,55 +1051,46 @@ def discard_workspace(value: dict[str, Any]) -> dict[str, Any]:
             fail("idempotent discard request does not match the recovery receipt")
         return {"discarded": True, "receipt": receipt}
     target = WORKSPACES / record["workspace_name"]
+    staging = (
+        WORKSPACES / record["staging_name"]
+        if isinstance(record.get("staging_name"), str)
+        else None
+    )
+    quarantine = WORKSPACES / record["quarantine_name"]
     pending = record.get("pending_recovery")
-    if record.get("state") == "prepared":
-        if not target.exists():
-            fail("prepared workspace is unexpectedly absent")
-        current_identity = writable_root_identity(target, record["workspace_id"])
-        if canonical_hash(current_identity) != record["prepared_evidence"]["writable_root_identity_hash"]:
-            fail("prepared workspace root identity changed")
-        try:
-            after_manifest = filesystem_manifest(target)
-            after_git = git_identity(after_manifest)
-            delta = manifest_delta(record["before_filesystem_manifest"], after_manifest)
-            evidence_status = "complete"
-            evidence_failure_reason = "none"
-            changed_paths = [change["path"] for change in delta["changes"]]
-        except WorkspaceEvidenceIncomplete as error:
-            incomplete = {
-                "schema_version": PROTOCOL_VERSION,
-                "status": "incomplete",
-                "reason": error.reason,
-            }
-            after_manifest = incomplete
-            after_git = incomplete
-            delta = incomplete
-            evidence_status = "incomplete"
-            evidence_failure_reason = error.reason
-            changed_paths = []
-        quarantine_name = ".discarding-" + record["workspace_id"]
-        pending = {
-            "after_filesystem_manifest_hash": canonical_hash(after_manifest),
-            "after_git_identity_hash": canonical_hash(after_git),
-            "patch_identity_hash": canonical_hash(delta),
-            "changed_paths": changed_paths,
-            "worker_absence_evidence_hash": request["worker_absence_evidence_hash"],
-            "recovery_authorization_hash": request["recovery_authorization_hash"],
-            "reason": request["reason"],
-            "evidence_status": evidence_status,
-            "evidence_failure_reason": evidence_failure_reason,
-            "discarded_at": instant(now_utc()),
-        }
+    active_paths = [path for path in (target, staging) if path is not None and path.exists()]
+    if record.get("state") in ("preparing", "prepared"):
+        if quarantine.exists():
+            if active_paths:
+                fail("workspace recovery has ambiguous active and quarantine roots")
+        else:
+            if len(active_paths) != 1:
+                fail("workspace recovery cannot identify exactly one active root")
+            active = active_paths[0]
+            current_identity = writable_root_identity(active, record["workspace_id"])
+            if (
+                canonical_hash(current_identity)
+                != record["prepared_evidence"]["writable_root_identity_hash"]
+            ):
+                fail("prepared workspace root identity changed")
+            os.rename(active, quarantine)
+            fsync_directory(WORKSPACES)
+        quarantine_identity = writable_root_identity(quarantine, record["workspace_id"])
+        if (
+            canonical_hash(quarantine_identity)
+            != record["prepared_evidence"]["writable_root_identity_hash"]
+        ):
+            fail("quarantined workspace root identity changed")
+        recovery_evidence = persist_recovery_evidence(record, quarantine)
+        pending = pending_recovery_body(request, recovery_evidence)
         record = {
             **record,
             "state": "discarding",
-            "quarantine_name": quarantine_name,
+            "staging_name": None,
+            "recovery_evidence_hash": recovery_evidence["evidence_hash"],
             "pending_recovery": pending,
         }
         write_atomic(record_path, canonical_bytes(record) + b"\n")
-        quarantine = WORKSPACES / quarantine_name
-        os.rename(target, quarantine)
-        fsync_directory(WORKSPACES)
     elif record.get("state") == "discarding":
         if not isinstance(pending, dict):
             fail("discarding workspace lost its pending recovery evidence")
@@ -955,17 +1103,67 @@ def discard_workspace(value: dict[str, Any]) -> dict[str, Any]:
             )
         ):
             fail("resumed discard request does not match pending recovery")
+        if quarantine.exists() and active_paths:
+            fail("workspace recovery has ambiguous active and quarantine roots")
+        if not quarantine.exists() and active_paths:
+            if len(active_paths) != 1:
+                fail("workspace recovery cannot identify exactly one active root")
+            active = active_paths[0]
+            current_identity = writable_root_identity(active, record["workspace_id"])
+            if (
+                canonical_hash(current_identity)
+                != record["prepared_evidence"]["writable_root_identity_hash"]
+            ):
+                fail("prepared workspace root identity changed")
+            os.rename(active, quarantine)
+            fsync_directory(WORKSPACES)
+            recovery_evidence = persist_recovery_evidence(record, quarantine)
+            pending = pending_recovery_body(
+                request, recovery_evidence, pending.get("discarded_at")
+            )
+            record = {
+                **record,
+                "staging_name": None,
+                "recovery_evidence_hash": recovery_evidence["evidence_hash"],
+                "pending_recovery": pending,
+            }
+            write_atomic(record_path, canonical_bytes(record) + b"\n")
+        elif quarantine.exists() and not isinstance(
+            record.get("recovery_evidence_hash"), str
+        ):
+            recovery_evidence = persist_recovery_evidence(record, quarantine)
+            pending = pending_recovery_body(
+                request, recovery_evidence, pending.get("discarded_at")
+            )
+            record = {
+                **record,
+                "recovery_evidence_hash": recovery_evidence["evidence_hash"],
+                "pending_recovery": pending,
+            }
+            write_atomic(record_path, canonical_bytes(record) + b"\n")
     else:
         fail("workspace recovery state is invalid")
-    quarantine = WORKSPACES / record["quarantine_name"]
+
+    assert isinstance(pending, dict)
+    recovery_evidence = read_recovery_evidence(record)
+    for field in (
+        "recovery_evidence_hash",
+        "after_filesystem_manifest_hash",
+        "after_git_identity_hash",
+        "patch_identity_hash",
+        "evidence_status",
+        "evidence_failure_reason",
+    ):
+        evidence_field = "evidence_hash" if field == "recovery_evidence_hash" else field
+        if pending[field] != recovery_evidence[evidence_field]:
+            fail("pending recovery does not match protected evidence")
     if quarantine.exists():
         if not shutil.rmtree.avoids_symlink_attacks:
             fail("platform deletion does not resist symlink attacks")
         shutil.rmtree(quarantine)
         fsync_directory(WORKSPACES)
-    if target.exists() or quarantine.exists():
+    if target.exists() or (staging is not None and staging.exists()) or quarantine.exists():
         fail("workspace remains after discard")
-    assert isinstance(pending, dict)
     receipt_body = recovery_receipt_body(record, pending)
     receipt = {**receipt_body, "receipt_hash": canonical_hash(receipt_body)}
     write_atomic(
@@ -975,6 +1173,7 @@ def discard_workspace(value: dict[str, Any]) -> dict[str, Any]:
     record = {
         **record,
         "state": "discarded",
+        "staging_name": None,
         "pending_recovery": None,
         "recovery_receipt": receipt,
     }
@@ -986,6 +1185,11 @@ def inspect_workspace(workspace_id: str) -> dict[str, Any]:
     ensure_state()
     _, record = workspace_record(workspace_id)
     target = WORKSPACES / record["workspace_name"]
+    staging = (
+        WORKSPACES / record["staging_name"]
+        if isinstance(record.get("staging_name"), str)
+        else None
+    )
     quarantine = (
         WORKSPACES / record["quarantine_name"]
         if isinstance(record.get("quarantine_name"), str)
@@ -995,6 +1199,7 @@ def inspect_workspace(workspace_id: str) -> dict[str, Any]:
         "workspaceId": workspace_id,
         "status": record["state"],
         "workspacePresent": target.exists(),
+        "stagingPresent": staging is not None and staging.exists(),
         "quarantinePresent": quarantine is not None and quarantine.exists(),
         "preparedEvidenceHash": record["prepared_evidence"]["evidence_hash"],
         "recoveryReceiptHash": (
@@ -1008,10 +1213,18 @@ def inspect_workspace(workspace_id: str) -> dict[str, Any]:
 def collect_workspace(workspace_id: str) -> dict[str, Any]:
     ensure_state()
     _, record = workspace_record(workspace_id)
+    recovery_evidence = (
+        read_recovery_evidence(record)
+        if isinstance(record.get("recovery_evidence_hash"), str)
+        else None
+    )
     return {
         "workspaceId": workspace_id,
         "status": record["state"],
         "preparedEvidence": record["prepared_evidence"],
+        "beforeFilesystemManifest": record["before_filesystem_manifest"],
+        "beforeGitIdentity": record["before_git_identity"],
+        "recoveryEvidence": recovery_evidence,
         "recoveryReceipt": record["recovery_receipt"],
     }
 

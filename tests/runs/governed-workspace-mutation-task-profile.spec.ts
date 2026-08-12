@@ -6,6 +6,7 @@ import {
   GOVERNED_WORKSPACE_MUTATION_ADAPTER_MANIFEST,
   GOVERNED_WORKSPACE_MUTATION_VERIFIER_ID,
   GovernedWorkspaceMutationQualificationControlId_v1,
+  GovernedWorkspaceMutationRecoveryEvidence_v1,
   GovernedWorkspaceMutationRecoveryReceipt_v1,
   createGovernedWorkspaceMutationPreparedWorkspaceEvidence,
   createGovernedWorkspaceMutationQualificationEvidence,
@@ -109,6 +110,67 @@ describe("governed workspace mutation task profile", () => {
   });
 
   it("strictly validates controller discard receipts without minting them", () => {
+    const recoveryEvidenceBody = {
+      schema_version: "1.0.0" as const,
+      workspace_id: "workspace-0123456789abcdef0123456789abcdef",
+      attempt_id: "attempt-write-1",
+      task_spec_hash: hash("1"),
+      after_filesystem_manifest: {
+        schema_version: "1.0.0" as const,
+        entries: [
+          {
+            path: "authorized/result.txt",
+            kind: "file" as const,
+            mode: 0o600,
+            byte_length: 8,
+            content_hash: hash("f"),
+          },
+        ],
+        total_file_bytes: 8,
+      },
+      after_filesystem_manifest_hash: "",
+      after_git_identity: {
+        schema_version: "1.0.0" as const,
+        kind: "absent" as const,
+        paths: [],
+      },
+      after_git_identity_hash: "",
+      patch: {
+        schema_version: "1.0.0" as const,
+        changes: [
+          {
+            path: "authorized/result.txt",
+            before: null,
+            after: {
+              path: "authorized/result.txt",
+              kind: "file" as const,
+              mode: 0o600,
+              byte_length: 8,
+              content_hash: hash("f"),
+            },
+          },
+        ],
+      },
+      patch_identity_hash: "",
+      evidence_status: "complete" as const,
+      evidence_failure_reason: "none" as const,
+    };
+    const recoveryEvidenceBodyWithHashes = {
+      ...recoveryEvidenceBody,
+      after_filesystem_manifest_hash: computeCanonicalHash(
+        recoveryEvidenceBody.after_filesystem_manifest
+      ),
+      after_git_identity_hash: computeCanonicalHash(recoveryEvidenceBody.after_git_identity),
+      patch_identity_hash: computeCanonicalHash(recoveryEvidenceBody.patch),
+    };
+    const recoveryEvidence = {
+      ...recoveryEvidenceBodyWithHashes,
+      evidence_hash: computeCanonicalHash(recoveryEvidenceBodyWithHashes),
+    };
+    expect(GovernedWorkspaceMutationRecoveryEvidence_v1.parse(recoveryEvidence)).toEqual(
+      recoveryEvidence
+    );
+
     const body = {
       schema_version: "1.0.0" as const,
       controller_id: "lexrunner.workspace-recovery-controller",
@@ -119,10 +181,11 @@ describe("governed workspace mutation task profile", () => {
       rollback_binding_hash: hash("2"),
       writable_root_identity_hash: hash("3"),
       before_filesystem_manifest_hash: hash("4"),
-      after_filesystem_manifest_hash: hash("5"),
+      after_filesystem_manifest_hash: recoveryEvidence.after_filesystem_manifest_hash,
       before_git_identity_hash: hash("6"),
-      after_git_identity_hash: hash("7"),
-      patch_identity_hash: hash("8"),
+      after_git_identity_hash: recoveryEvidence.after_git_identity_hash,
+      patch_identity_hash: recoveryEvidence.patch_identity_hash,
+      recovery_evidence_hash: recoveryEvidence.evidence_hash,
       changed_paths: ["authorized", "authorized/result.txt"],
       worker_absence_evidence_hash: hash("9"),
       recovery_authorization_hash: hash("a"),
@@ -151,6 +214,12 @@ describe("governed workspace mutation task profile", () => {
         workspace_absent: false,
       })
     ).toThrow();
+    expect(() =>
+      GovernedWorkspaceMutationRecoveryEvidence_v1.parse({
+        ...recoveryEvidence,
+        patch_identity_hash: hash("8"),
+      })
+    ).toThrow(/does not match its canonical body/u);
   });
 
   it("keeps task claims separate from refusal and mutation admissibility", () => {

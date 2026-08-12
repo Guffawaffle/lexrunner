@@ -68,11 +68,14 @@ provider image; they do not accept repository-review inputs themselves.
 executable for
 the future writer profile. It accepts a bounded canonical request, reconstructs and hashes the
 sealed regular-file source and capability scopes, creates one opaque Attempt-owned ext4 root for the
-unprivileged provider account, and persists its metadata in controller-only state. It never launches
-Codex and never constructs a capability grant. Recovery requires the exact prepared identities plus
-protected worker-absence and recovery-authorization hashes. The controller captures the dirty
-post-state and patch identity, atomically detaches the root, resumes deletion after a crash, and
-reports success only after both active and quarantine paths are absent. Oversized adversarial dirt
-does not block discard: it produces an explicitly incomplete evidence receipt that cannot support
-mutation admissibility. Its records remain inert until the protected host authority validates them
-against a current writer qualification and its own clock.
+unprivileged provider account, and durably journals its hidden staging identity before exposing the
+final workspace name. It never launches Codex and never constructs a capability grant. Recovery
+requires the exact prepared identities plus protected worker-absence and recovery-authorization
+hashes. The controller atomically detaches the root before changing its journal phase, captures and
+persists the bounded dirty post-state and canonical delta in controller-only evidence, resumes every
+preparation/detach/evidence/delete crash window, and reports success only after the staging, active,
+and quarantine paths are absent. `collect` resolves the protected before-state and terminal
+post-state/delta bodies as well as their receipt hashes. Oversized adversarial dirt does not block
+discard: it produces explicitly incomplete evidence that cannot support mutation admissibility. Its
+records remain inert until the protected host authority validates them against a current writer
+qualification and its own clock.

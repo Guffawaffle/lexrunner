@@ -131,19 +131,24 @@ and receipts outside the provider-owned state root. Its `prepare` operation acce
 hash-checked regular-file source with no Git metadata, the exact task/prompt/environment hashes,
 canonical read and writable path sets, Attempt ownership, and a rollback binding naming this
 controller. It creates an opaque ext4 workspace for the unprivileged provider account and returns
-prepared-workspace evidence matching the profile schema. The opaque record is evidence, not a
-grant, and the controller deliberately has no task-launch command.
+prepared-workspace evidence matching the profile schema. It journals the hidden staging identity
+before renaming the root to the worker-visible workspace name, so a crash cannot leave an
+unidentified provider-owned tree. The opaque record is evidence, not a grant, and the controller
+deliberately has no task-launch command.
 
 `discard` requires the same Attempt, task, rollback, and writable-root identities plus protected
-worker-absence and recovery-authorization evidence hashes. It records the dirty post-state and
-canonical patch identity before atomically moving the root to a controller-only quarantine name.
-Deletion then resumes idempotently across a controller crash. Only after both the active name and
-quarantine are absent does it emit a recovery receipt with `workspace_absent: true`. A changed root
-identity, ambiguous record, mismatched retry, or capture race fails closed. The sealed input remains
-regular-file-only, while post-state capture records symbolic links and special files without
-following or reading them so adversarial dirt cannot strand a recoverable root. Dirt outside the
-capture budget is still discarded, but the receipt is explicitly `incomplete` with a bounded
-failure reason and cannot support an admissible mutation outcome.
+worker-absence and recovery-authorization evidence hashes. It atomically moves the root to a
+controller quarantine before advancing the journal, then durably stores the complete bounded dirty
+post-state manifest and canonical delta before deletion. Retries discover whether staging, active,
+or quarantine is present and resume idempotently across preparation, detach, evidence-persistence,
+and deletion crashes. Only after all three names are absent does it emit a recovery receipt with
+`workspace_absent: true`. `collect` returns the protected before manifest, before Git identity,
+terminal recovery evidence, and receipt, making every advertised evidence hash resolvable after the
+workspace is gone. A changed root identity, ambiguous record, mismatched retry, or capture race fails
+closed. The sealed input remains regular-file-only, while post-state capture records symbolic links
+and special files without following or reading them so adversarial dirt cannot strand a recoverable
+root. Dirt outside the capture budget is still discarded, but the receipt is explicitly
+`incomplete` with a bounded failure reason and cannot support an admissible mutation outcome.
 
 This controller makes discard recovery concrete but does not qualify the writer image. The exact
 outer sandbox still has to pass the live in-scope write, out-of-scope escape, network/IPC,
