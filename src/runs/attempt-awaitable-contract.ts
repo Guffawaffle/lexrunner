@@ -17,19 +17,30 @@ const opaqueId = z
   .string()
   .min(1)
   .max(256)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "Must be an opaque identifier");
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "Must be an opaque identifier")
+  .refine(
+    (value) => !containsAttemptAwaitableCredentialValue(value),
+    "opaque identifiers must not contain credential material"
+  );
 const instant = z.string().datetime({ offset: true });
 const supportedProviderKind = z.literal("github.required-checks");
 const githubRepository = z
   .string()
-  .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u, "must be an owner/name repository identity");
+  .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u, "must be an owner/name repository identity")
+  .refine(
+    (value) => !containsAttemptAwaitableCredentialValue(value),
+    "repository identity must not contain credential material"
+  );
 const gitCommitSha = z.string().regex(/^[a-f0-9]{40}$/iu, "must be an exact commit SHA");
 const publicName = (maximum: number) =>
   z
     .string()
     .min(1)
     .max(maximum)
-    .refine((value) => !containsCredentialValue(value), "must not contain credential material");
+    .refine(
+      (value) => !containsAttemptAwaitableCredentialValue(value),
+      "must not contain credential material"
+    );
 const authorityFieldNames = new Set([
   "auth",
   "authorization",
@@ -568,7 +579,7 @@ function inspectJson(value: unknown): {
       continue;
     }
     if (typeof current.value === "string") {
-      if (!authorityValue && containsCredentialValue(current.value)) {
+      if (!authorityValue && containsAttemptAwaitableCredentialValue(current.value)) {
         authorityValue = current.path;
       }
       continue;
@@ -624,7 +635,7 @@ function isAuthorityField(field: string): boolean {
   );
 }
 
-function containsCredentialValue(value: string): boolean {
+export function containsAttemptAwaitableCredentialValue(value: string): boolean {
   if (/^\s*(?:basic|bearer)\s+\S+/iu.test(value)) return true;
   if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/iu.test(value)) return true;
   if (
@@ -633,7 +644,7 @@ function containsCredentialValue(value: string): boolean {
     return true;
   }
   if (
-    /^(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,})$/u.test(
+    /(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,})/u.test(
       value
     )
   ) {

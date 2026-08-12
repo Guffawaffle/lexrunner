@@ -131,8 +131,9 @@ evidence shapes are mirrored as closed schemas; a new provider is not durable un
 and tests another explicit schema. This prevents arbitrary provider JSON from becoming a secret
 storage channel. Payloads are also structurally and byte bounded, unknown fields are rejected, and
 credential-shaped fields and high-confidence credential values are rejected recursively.
-Credentials are supplied by the observer host at execution time and are never placed in the
-descriptor, result, event, or completion record.
+Known credential forms are detected even when embedded inside otherwise allowlisted public names,
+repository identities, or opaque identifiers. Credentials are supplied by the observer host at
+execution time and are never placed in the descriptor, result, event, or completion record.
 
 When `worker_session_id` is supplied, registration atomically requires both a live Attempt and a
 nonterminal WorkerSession bound to that Attempt. Attempt-only registration remains available for a

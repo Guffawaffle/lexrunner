@@ -228,6 +228,20 @@ for (const factory of factories) {
           })
         ).toThrow(/credential material/u);
         expect(() =>
+          ExternalAwaitableDescriptor_v1.parse({
+            ...descriptor(),
+            condition: {
+              type: "all-required-checks-terminal",
+              requiredChecks: [
+                {
+                  source: "check-run",
+                  name: "build ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890 result",
+                },
+              ],
+            },
+          })
+        ).toThrow(/credential material/u);
+        expect(() =>
           terminalResult("satisfied", T2, {
             ...requiredCheckEvidence("satisfied"),
             access_token: "must-not-persist",
@@ -241,6 +255,43 @@ for (const factory of factories) {
             subject: deeplyNested,
           }).success
         ).toBe(false);
+      } finally {
+        await store.close();
+      }
+    });
+
+    it("rejects embedded credentials in persisted opaque identifiers", async () => {
+      const store = await factory.create();
+      try {
+        await createLiveAttempt(store);
+        const embeddedToken = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+        await expect(
+          store.registerAttemptAwaitable({
+            awaitableId: `awaitable:${embeddedToken}`,
+            attemptId: "attempt-1",
+            descriptor: descriptor(),
+            deadlineAt: "2026-08-12T12:10:00.000Z",
+            mutationId: "register-credential-id",
+            now: T0,
+          })
+        ).rejects.toThrow(/credential material/u);
+        await expect(store.getAttemptAwaitable(`awaitable:${embeddedToken}`)).resolves.toBeNull();
+
+        await register(store, "awaitable-safe-id");
+        await expect(
+          store.claimAttemptAwaitableObservation({
+            awaitableId: "awaitable-safe-id",
+            expectedRevision: 0,
+            observerId: `observer:${embeddedToken}`,
+            leaseId: "safe-lease",
+            ttlMs: 1_000,
+            mutationId: "claim-credential-id",
+            now: T1,
+          })
+        ).rejects.toThrow(/credential material/u);
+        const unchanged = await store.getAttemptAwaitable("awaitable-safe-id");
+        expect(unchanged).toMatchObject({ revision: 0, status: "registered" });
+        expect(unchanged?.observer_lease).toBeUndefined();
       } finally {
         await store.close();
       }

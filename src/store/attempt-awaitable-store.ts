@@ -5,6 +5,7 @@ import {
   AttemptAwaitableRecord_v1,
   AttemptAwaitableTerminalResult_v1,
   ExternalAwaitableDescriptor_v1,
+  containsAttemptAwaitableCredentialValue,
   type AttemptAwaitableObserverLease_v1 as AttemptAwaitableObserverLease,
   type AttemptAwaitableRecord_v1 as AttemptAwaitableRecord,
   type AttemptAwaitableTerminalResult_v1 as AttemptAwaitableTerminalResult,
@@ -17,7 +18,11 @@ const opaqueId = z
   .string()
   .min(1)
   .max(256)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u);
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u)
+  .refine(
+    (value) => !containsAttemptAwaitableCredentialValue(value),
+    "opaque identifiers must not contain credential material"
+  );
 const instant = z.string().datetime({ offset: true });
 
 export const AttemptAwaitableEventType_v1 = z.enum([
