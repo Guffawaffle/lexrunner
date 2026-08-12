@@ -257,6 +257,9 @@ export * from "./governed-review-persistent-supervisor.js";
 export * from "./governed-review-runtime-adapters.js";
 export * from "./governed-delegation-service.js";
 export * from "./governed-delegation-adapters.js";
+export * from "./attempt-awaitable-contract.js";
+export * from "./attempt-awaitable-supervisor.js";
+export * from "./axf-attempt-awaitable-observer.js";
 export {
   AttemptReceiptStatusRequestJsonSchema,
   AttemptReceiptStatusRequestSchema,

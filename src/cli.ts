@@ -1334,6 +1334,12 @@ export type {
   DecideAgentWorkFanInInput,
   ExecuteAgentWorkPreparationInput,
 } from "./runs/index.js";
+export * from "./runs/attempt-awaitable-contract.js";
+export * from "./runs/attempt-awaitable-supervisor.js";
+export * from "./runs/axf-attempt-awaitable-observer.js";
+export * from "./store/attempt-awaitable-store.js";
+export { InMemoryAttemptAwaitableStore } from "./store/inmemory/attempt-awaitable-store.js";
+export { SqliteAttemptAwaitableStore } from "./store/sqlite/attempt-awaitable-store.js";
 
 // AX-004: MCP/CLI parity exports
 export { computeMergeOrder } from "./mergeOrder.js";

@@ -34,6 +34,10 @@ The [orchestration primitives decision record](./architecture/orchestration-prim
 these principles to current Cursor, OpenClaw, Claude Code, Codex/Symphony, and GitHub Copilot
 patterns without importing their product assumptions wholesale.
 
+The [durable Attempt awaitables decision](./architecture/durable-attempt-awaitables.md) separates
+AXF-owned external observation from LexRunner-owned registration, restart recovery, and targeted
+at-least-once completion delivery.
+
 ## System Architecture
 
 ```
