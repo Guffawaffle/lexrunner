@@ -115,11 +115,12 @@ The checked-in package version is the single source for `lexrunner --version` an
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **1.4.1**. npm availability and dist-tags are separate
+Current repository package version: **1.5.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [1.4.1 release notes](docs/releases/1.4.1.md), the
+See the [1.5.0 release notes](docs/releases/1.5.0.md), the
+[1.4.1 canonical CLI release](docs/releases/1.4.1.md), the
 [1.4.0 native-host boundary release](docs/releases/1.4.0.md), the
 [1.3.0 dogfood release](docs/releases/1.3.0.md), the
 [1.2.1 publication repair](docs/releases/1.2.1.md), and the underlying

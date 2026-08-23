@@ -6,8 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-23
+
 ### Added
 
+- **Durable Attempt awaitables** - Add bounded lifecycle observation and wakeup contracts that bind
+  the exact Attempt revision and terminal state without embedding credentials or accepting unsafe
+  replay state.
+- **Executable gate receipts** - Retain fresh per-attempt command evidence with exact cwd,
+  shell/argv identity, duration, exit and failure classification, bounded stream hashes, and
+  declared artifact hashes.
 - **Disposable workspace recovery controller** - Add a root-owned WSL2 controller that prepares
   bounded Attempt-owned ext4 roots from a hash-checked sealed source, records pre-mutation
   filesystem and Git identities, journals each root before exposing it, and atomically detaches and
@@ -36,6 +44,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- **Native Windows gate execution** - Run local command gates through a resolved PowerShell runtime
+  with explicit argument and working-directory identity instead of accidentally crossing into WSL
+  or relying on a platform shell shim.
 - **Provider stream failure terminality** - Convert bounded-line, invalid-event, sequence, and
   transport failures into a durable `failed` executor event with a bounded protected failure frame;
   cancel the provider, never retain raw failure output in lifecycle state, and reserve `lost` for
@@ -51,6 +62,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- **Gate artifact freshness** - Fail closed when declared evidence is missing, stale, unsupported,
+  changed during retention, or cannot be preserved with identical bytes.
+- **Cross-platform package smoke** - Invoke npm and installed package bin targets through the active
+  Node runtime so packed-consumer validation works on Windows without spawning `.cmd` shims.
+- **Windows Git-backed verification** - Render prompt-search diagnostics with stable separators,
+  use privilege-free junction fixtures, and bound process-restart tests with Windows-sized timing
+  and cleanup retries.
 - **Governed refusal and budget enforcement** - Persist an offer-phase `NO` directly from the
   offered Delegation state, and independently reject duration, output, evidence-byte, or tool-call
   usage beyond the exact task budget bound to execution requirements and the evidence reservation.

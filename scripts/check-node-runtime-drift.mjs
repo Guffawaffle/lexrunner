@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -67,6 +68,20 @@ for (const path of filesUnder(".github/workflows", /\.ya?ml$/)) {
   if (/actions\/create-release@/i.test(source)) {
     failures.push(`${path}: retired create-release action must be replaced by GitHub CLI`);
   }
+}
+
+const releaseWorkflow = parse(read(".github/workflows/release.yml"));
+const stableReleaseUses = releaseWorkflow?.jobs?.["stable-release"]?.steps
+  ?.map((step) => step.uses)
+  .filter(Boolean);
+const expectedStableReleaseUses = [
+  "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+  "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+];
+if (JSON.stringify(stableReleaseUses) !== JSON.stringify(expectedStableReleaseUses)) {
+  failures.push(
+    ".github/workflows/release.yml: stable-release actions must match the reviewed SHA allowlist"
+  );
 }
 
 const guidanceFiles = [

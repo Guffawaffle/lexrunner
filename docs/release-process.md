@@ -16,10 +16,11 @@ trusted-publisher configuration and any explicit recovery action.
 
 - **Canary candidate:** each merge to `main` validates a version shaped like
   `X.Y.Z-canary.<commit>`. Canary npm publication remains disabled.
-- **Stable release:** a signed `lexrunner-vX.Y.Z` tag targeting a commit signed by the authorized
-  release-owner GPG fingerprint and contained in `main` validates the matching package version and
-  permits `.github/workflows/release.yml` to publish with the `latest` dist-tag through npm trusted
-  publishing before creating the GitHub release.
+- **Stable release:** a `lexrunner-vX.Y.Z` annotated tag and its target commit must both be signed
+  by the authorized release-owner GPG fingerprint. Once that commit is contained in `main`, the
+  workflow validates the matching package version and permits `.github/workflows/release.yml` to
+  publish with the `latest` dist-tag through npm trusted publishing before creating the GitHub
+  release.
 
 LexRunner follows Semantic Versioning. Breaking changes normally require a major release; an
 explicitly governed pre-release or ecosystem release may declare a narrower migration policy in
@@ -77,9 +78,11 @@ git push origin lexrunner-vX.Y.Z
 ```
 
 Wait for the release workflow to finish. It rejects workflow dispatch, verifies the annotated tag
-and its exact API-reported target through GitHub, verifies the target commit against the authorized
-release-owner GPG fingerprint and `origin/main`, builds, tests, checks determinism and version
-alignment, and validates npm's exact dry-run publication behavior. It then executes:
+and its exact API-reported target through GitHub, verifies both tag and target commit against the
+authorized release-owner GPG fingerprint, verifies target containment in `origin/main`, runs
+`npm test`, builds, checks determinism and version alignment, and validates npm's exact dry-run
+publication behavior. Its privileged third-party action revisions are pinned to reviewed commit
+SHAs. It then executes:
 
 ```bash
 npm publish --access restricted --tag latest --json
@@ -152,12 +155,13 @@ not silently retarget an existing version or rewrite a published tag.
 ## Automation boundary
 
 Only the `stable-release` job in `.github/workflows/release.yml` receives `id-token: write`, and it
-runs only for push events on `lexrunner-v*.*.*` tags. The job requires a GitHub-verified signed
-annotated tag, an exact API-reported target commit signed by release-owner primary fingerprint
+runs only for push events on `lexrunner-v*.*.*` tags. The job requires a GitHub-verified annotated
+tag and exact API-reported target commit, both signed by release-owner primary fingerprint
 `65C94BA03E88F53D365C36CF7145A1CE635B1902`, containment of that commit in `origin/main`, exact
-tag/manifest version agreement, full tests, deterministic source, the package boundary, and the npm
-dry run before publishing. All other jobs inherit read-only repository permissions and cannot
-request an OIDC publish credential.
+tag/manifest version agreement, `npm test`, deterministic source, the package boundary, and the
+npm dry run before publishing. Privileged third-party actions are pinned to reviewed commit SHAs.
+All other jobs inherit read-only repository permissions and cannot request an OIDC publish
+credential.
 
 ## Related records
 

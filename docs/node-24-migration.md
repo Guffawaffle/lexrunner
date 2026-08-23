@@ -53,7 +53,7 @@ $smoke = Join-Path $env:TEMP ("lexrunner-node24-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $smoke | Out-Null
 Push-Location $smoke
 npm init -y
-npm install @smartergpt/lexrunner@1.4.1
+npm install @smartergpt/lexrunner@1.5.0
 npx lexrunner --version
 npx lexrunner --help
 npx lex-pr --version
@@ -63,8 +63,8 @@ Pop-Location
 ```
 
 The release owner records the Windows version, Node/npm versions, installed package integrity,
-both CLI-alias results, MCP `tools/list` result, and timestamp in the release evidence tracked by
-issue #911.
+both CLI-alias results, MCP `tools/list` result, and timestamp in the release evidence for the
+matching release candidate.
 Before each private package is published, use `npm run test:package` on Node 24 for the equivalent
 packed-tarball import, require, CLI, bounded Attempt status, and MCP smoke.
 

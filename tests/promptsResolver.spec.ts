@@ -367,7 +367,11 @@ Time: {{now}}`;
       });
 
       // Create symlink
-      fs.symlinkSync(lexPromptsDir, runnerLocalPromptsDir, "dir");
+      fs.symlinkSync(
+        lexPromptsDir,
+        runnerLocalPromptsDir,
+        process.platform === "win32" ? "junction" : "dir"
+      );
 
       // Load prompt from runner, should get Lex prompt
       const loaded = loadPrompt("shared", runnerRepoDir);
