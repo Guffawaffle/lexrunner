@@ -38,6 +38,35 @@ import {
 } from "./learning/prompts.js";
 import { storeCounterExample } from "./learning/storage.js";
 import { terminateProcessTree, type ProcessTreeTerminationResult } from "./process/process-tree.js";
+import {
+  captureDeclaredArtifactBaselines,
+  collectFreshGateArtifacts,
+  fileIdentity,
+  gateOutputEvidence,
+  GATE_EXECUTION_RECEIPT_SCHEMA_VERSION,
+  resolveSpawnExecutable,
+  writeLocalGateExecutionReceipt,
+  type DeclaredArtifactBaseline,
+  type GateArtifactFileIdentity,
+} from "./gates/execution-receipt.js";
+
+export interface LocalGateShellInvocation {
+  command: "bash" | "pwsh";
+  arguments: string[];
+}
+
+/** Resolve the host-native shell used for a frozen local gate command. */
+export function resolveLocalGateShell(
+  command: string,
+  platform: NodeJS.Platform = process.platform
+): LocalGateShellInvocation {
+  return platform === "win32"
+    ? {
+        command: "pwsh",
+        arguments: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+      }
+    : { command: "bash", arguments: ["-c", command] };
+}
 
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
@@ -299,6 +328,58 @@ async function executeLocalGate(
   timeoutMs: number,
   repoRoot?: string
 ): Promise<GateResult> {
+  // Use gate.cwd if specified, otherwise fall back to repoRoot (captured at execution start).
+  // If neither is available, use process.cwd() as a last resort fallback.
+  const workingDirectory = path.resolve(gate.cwd || repoRoot || process.cwd());
+  const gateArtifactDirectory = path.join(artifactDir, gate.name);
+  const environment = { ...process.env, ...gate.env };
+  const shell = resolveLocalGateShell(gate.run);
+  const artifactBaselines = captureDeclaredArtifactBaselines(
+    gate.artifacts ?? [],
+    workingDirectory
+  );
+  let shellExecutable: string;
+  let shellIdentityBefore: GateArtifactFileIdentity | null = null;
+  try {
+    shellExecutable = resolveSpawnExecutable(
+      shell.command,
+      environment,
+      workingDirectory,
+      process.platform
+    );
+    shellIdentityBefore = fileIdentity(shellExecutable);
+    if (!shellIdentityBefore) throw new Error("Resolved shell is not an evidence-bindable file.");
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return finalizeLocalGateAttempt({
+      gate,
+      artifactBaselines,
+      gateArtifactDirectory,
+      workingDirectory,
+      attempt,
+      startedAt,
+      startTime,
+      shell,
+      shellExecutable: null,
+      shellIdentityBefore: null,
+      spawned: false,
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.from(errorMessage, "utf8"),
+      result: {
+        gate: gate.name,
+        status: "fail",
+        exitCode: 1,
+        duration: Date.now() - startTime,
+        stdout: "",
+        stderr: errorMessage,
+        failureKind: "spawn_error",
+        artifacts: [],
+        attempts: attempt,
+        lastAttempt: startedAt,
+      },
+    });
+  }
+
   // Validate command before execution (security check)
   try {
     const { getCommandValidator } = await import("./security/commandValidator.js");
@@ -310,43 +391,54 @@ async function executeLocalGate(
     const errorMessage =
       validationError instanceof Error ? validationError.message : String(validationError);
 
-    return {
-      gate: gate.name,
-      status: "fail",
-      exitCode: 1,
-      duration,
-      stdout: "",
-      stderr: `Command validation failed: ${errorMessage}`,
-      artifacts: [],
-      attempts: attempt,
-      lastAttempt: startedAt,
-    };
+    return finalizeLocalGateAttempt({
+      gate,
+      artifactBaselines,
+      gateArtifactDirectory,
+      workingDirectory,
+      attempt,
+      startedAt,
+      startTime,
+      shell,
+      shellExecutable,
+      shellIdentityBefore,
+      spawned: false,
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.from(`Command validation failed: ${errorMessage}`, "utf8"),
+      result: {
+        gate: gate.name,
+        status: "fail",
+        exitCode: 1,
+        duration,
+        stdout: "",
+        stderr: `Command validation failed: ${errorMessage}`,
+        artifacts: [],
+        attempts: attempt,
+        lastAttempt: startedAt,
+      },
+    });
   }
 
   return new Promise((resolve) => {
     let timedOut = false;
-
-    // Use gate.cwd if specified, otherwise fall back to repoRoot (captured at execution start)
-    // If neither is available, use process.cwd() as a last resort fallback
-    // This ensures gates always run in a valid, stable working directory
-    const workingDirectory = gate.cwd || repoRoot || process.cwd();
-
-    const childProcess = spawn("bash", ["-c", gate.run], {
+    let settled = false;
+    const childProcess = spawn(shellExecutable, shell.arguments, {
       cwd: workingDirectory,
-      env: { ...process.env, ...gate.env },
+      env: environment,
       stdio: ["pipe", "pipe", "pipe"],
       detached: process.platform !== "win32",
+      windowsHide: true,
     });
 
-    let stdout = "";
-    let stderr = "";
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
 
     childProcess.stdout?.on("data", (data) => {
-      stdout += data.toString();
+      stdoutChunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
     });
 
     childProcess.stderr?.on("data", (data) => {
-      stderr += data.toString();
+      stderrChunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
     });
 
     let timeoutCleanup: Promise<ProcessTreeTerminationResult> | undefined;
@@ -356,52 +448,179 @@ async function executeLocalGate(
     }, timeoutMs);
 
     childProcess.on("close", async (exitCode) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       const cleanup = timeoutCleanup ? await timeoutCleanup : undefined;
       const duration = Date.now() - startTime;
+      const stdout = Buffer.concat(stdoutChunks);
+      const stderr = Buffer.concat(stderrChunks);
+      const stdoutText = stdout.toString("utf8");
+      const stderrText = stderr.toString("utf8");
 
-      // Collect artifacts if specified
-      const artifacts = collectArtifacts(gate, artifactDir);
-
-      resolve({
-        gate: gate.name,
-        status: exitCode === 0 && !timedOut ? "pass" : "fail",
-        exitCode: timedOut ? 124 : (exitCode ?? 1),
-        duration,
-        stdout: stdout.trim(),
-        stderr: timedOut
-          ? `GATE_TIMEOUT: exceeded ${timeoutMs}ms; descendantsReaped=${cleanup?.descendantsReaped ?? false}`
-          : stderr.trim(),
-        failureKind: timedOut ? "timeout" : exitCode === 0 ? undefined : "nonzero_exit",
-        ...(cleanup ? { timeoutCleanup: cleanup } : {}),
-        artifacts,
-        attempts: attempt,
-        lastAttempt: startedAt,
-      });
+      const projectedStderr = timedOut
+        ? `GATE_TIMEOUT: exceeded ${timeoutMs}ms; descendantsReaped=${cleanup?.descendantsReaped ?? false}`
+        : stderrText.trim();
+      resolve(
+        finalizeLocalGateAttempt({
+          gate,
+          artifactBaselines,
+          gateArtifactDirectory,
+          workingDirectory,
+          attempt,
+          startedAt,
+          startTime,
+          shell,
+          shellExecutable,
+          shellIdentityBefore,
+          spawned: true,
+          stdout,
+          stderr,
+          result: {
+            gate: gate.name,
+            status: exitCode === 0 && !timedOut ? "pass" : "fail",
+            exitCode: timedOut ? 124 : (exitCode ?? 1),
+            duration,
+            stdout: stdoutText.trim(),
+            stderr: projectedStderr,
+            failureKind: timedOut ? "timeout" : exitCode === 0 ? undefined : "nonzero_exit",
+            ...(cleanup ? { timeoutCleanup: cleanup } : {}),
+            artifacts: [],
+            attempts: attempt,
+            lastAttempt: startedAt,
+          },
+        })
+      );
     });
 
     childProcess.on("error", (error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       const duration = Date.now() - startTime;
+      const stdout = Buffer.concat(stdoutChunks);
 
       // Classify the error for better diagnostics
       const classified = classifyError(error, `Gate '${gate.name}' process error`);
       console.error(formatErrorForUser(classified));
 
-      resolve({
-        gate: gate.name,
-        status: "fail",
-        exitCode: 1,
-        duration,
-        stdout: stdout.trim(),
-        stderr: `${classified.context}: ${error.message}`,
-        failureKind: "spawn_error",
-        artifacts: [],
-        attempts: attempt,
-        lastAttempt: startedAt,
-      });
+      const projectedStderr = `${classified.context}: ${error.message}`;
+      resolve(
+        finalizeLocalGateAttempt({
+          gate,
+          artifactBaselines,
+          gateArtifactDirectory,
+          workingDirectory,
+          attempt,
+          startedAt,
+          startTime,
+          shell,
+          shellExecutable,
+          shellIdentityBefore,
+          spawned: false,
+          stdout,
+          stderr: Buffer.from(projectedStderr, "utf8"),
+          result: {
+            gate: gate.name,
+            status: "fail",
+            exitCode: 1,
+            duration,
+            stdout: stdout.toString("utf8").trim(),
+            stderr: projectedStderr,
+            failureKind: "spawn_error",
+            artifacts: [],
+            attempts: attempt,
+            lastAttempt: startedAt,
+          },
+        })
+      );
     });
   });
+}
+
+interface FinalizeLocalGateAttemptInput {
+  gate: Gate;
+  artifactBaselines: DeclaredArtifactBaseline[];
+  gateArtifactDirectory: string;
+  workingDirectory: string;
+  attempt: number;
+  startedAt: string;
+  startTime: number;
+  shell: LocalGateShellInvocation;
+  shellExecutable: string | null;
+  shellIdentityBefore: GateArtifactFileIdentity | null;
+  spawned: boolean;
+  stdout: Buffer;
+  stderr: Buffer;
+  result: GateResult;
+}
+
+function finalizeLocalGateAttempt(input: FinalizeLocalGateAttemptInput): GateResult {
+  const collected = collectFreshGateArtifacts(input.artifactBaselines, input.gateArtifactDirectory);
+  const shellIdentityAfter = input.shellExecutable ? fileIdentity(input.shellExecutable) : null;
+  const shellUnchanged =
+    input.shellIdentityBefore !== null &&
+    shellIdentityAfter !== null &&
+    input.shellIdentityBefore.sha256 === shellIdentityAfter.sha256 &&
+    input.shellIdentityBefore.bytes === shellIdentityAfter.bytes;
+  const evidenceComplete =
+    collected.complete &&
+    (!input.spawned || (input.shellIdentityBefore !== null && shellUnchanged));
+  const result = { ...input.result };
+  if (result.status === "pass" && !evidenceComplete) {
+    result.status = "fail";
+    result.exitCode = 1;
+    result.failureKind = "evidence_error";
+    result.stderr = [
+      result.stderr,
+      "GATE_EVIDENCE_INVALID: declared output or shell identity failed",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+  const finishedAt = new Date().toISOString();
+  const duration = Date.now() - input.startTime;
+  result.duration = duration;
+
+  const receiptPath = writeLocalGateExecutionReceipt(input.gateArtifactDirectory, {
+    schemaVersion: GATE_EXECUTION_RECEIPT_SCHEMA_VERSION,
+    attempt: input.attempt,
+    declaredGate: {
+      name: input.gate.name,
+      run: input.gate.run,
+      cwd: input.gate.cwd ?? null,
+      runtime: input.gate.runtime,
+      artifacts: [...(input.gate.artifacts ?? [])],
+    },
+    execution: {
+      cwd: input.workingDirectory,
+      startedAt: input.startedAt,
+      finishedAt,
+      durationMs: duration,
+      shell: {
+        command: input.shell.command,
+        executable: input.shellIdentityBefore,
+        argv: [...input.shell.arguments],
+        identityAfter: shellIdentityAfter,
+        unchanged: shellUnchanged,
+        spawned: input.spawned,
+      },
+    },
+    outcome: {
+      status: result.status,
+      exitCode: result.exitCode ?? null,
+      failureKind: result.failureKind ?? null,
+      timeoutCleanup: result.timeoutCleanup ?? null,
+      evidenceComplete,
+    },
+    output: {
+      stdout: gateOutputEvidence(input.stdout),
+      stderr: gateOutputEvidence(input.stderr),
+    },
+    artifacts: collected.identities,
+  });
+  result.artifacts = [...collected.paths, receiptPath];
+  return result;
 }
 
 /**
@@ -449,37 +668,6 @@ async function executeCiServiceGate(
     attempts: attempt,
     lastAttempt: startedAt,
   };
-}
-
-/**
- * Collect artifacts from gate execution
- */
-function collectArtifacts(gate: Gate, artifactDir: string): string[] {
-  if (!gate.artifacts || gate.artifacts.length === 0) {
-    return [];
-  }
-
-  const collected: string[] = [];
-  const gateArtifactDir = path.join(artifactDir, gate.name);
-
-  // Ensure artifact directory exists
-  if (!fs.existsSync(gateArtifactDir)) {
-    fs.mkdirSync(gateArtifactDir, { recursive: true });
-  }
-
-  for (const artifactPath of gate.artifacts) {
-    try {
-      if (fs.existsSync(artifactPath)) {
-        const destPath = path.join(gateArtifactDir, path.basename(artifactPath));
-        fs.copyFileSync(artifactPath, destPath);
-        collected.push(destPath);
-      }
-    } catch (error) {
-      console.warn(`Failed to collect artifact ${artifactPath}:`, error);
-    }
-  }
-
-  return collected;
 }
 
 /**

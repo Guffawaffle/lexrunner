@@ -33,7 +33,7 @@ describe("Gate Working Directory Stability", () => {
   it("should use repoRoot as working directory when gate.cwd is not specified", async () => {
     const gate: Gate = {
       name: "test-cwd",
-      run: "pwd",
+      run: 'node -e "process.stdout.write(process.cwd())"',
       runtime: "local",
     };
 
@@ -55,7 +55,7 @@ describe("Gate Working Directory Stability", () => {
     const customCwd = tempDir;
     const gate: Gate = {
       name: "test-custom-cwd",
-      run: "pwd",
+      run: 'node -e "process.stdout.write(process.cwd())"',
       cwd: customCwd,
       runtime: "local",
     };
@@ -78,17 +78,17 @@ describe("Gate Working Directory Stability", () => {
     const gates: Gate[] = [
       {
         name: "test-cwd-1",
-        run: "pwd",
+        run: 'node -e "process.stdout.write(process.cwd())"',
         runtime: "local",
       },
       {
         name: "test-cwd-2",
-        run: "pwd",
+        run: 'node -e "process.stdout.write(process.cwd())"',
         runtime: "local",
       },
       {
         name: "test-cwd-3",
-        run: "pwd",
+        run: 'node -e "process.stdout.write(process.cwd())"',
         runtime: "local",
       },
     ];
@@ -152,13 +152,13 @@ describe("Gate Working Directory Stability", () => {
     // First gate changes directory but should not affect the second gate
     const gate1: Gate = {
       name: "test-cd-internal",
-      run: `cd ${tempDir} && pwd`,
+      run: `node -e "process.chdir(process.argv[1]); process.stdout.write(process.cwd())" ${JSON.stringify(tempDir)}`,
       runtime: "local",
     };
 
     const gate2: Gate = {
       name: "test-after-cd",
-      run: "pwd",
+      run: 'node -e "process.stdout.write(process.cwd())"',
       runtime: "local",
     };
 
@@ -191,7 +191,7 @@ describe("Gate Working Directory Stability", () => {
   it("should fall back to process.cwd() when repoRoot is not provided", async () => {
     const gate: Gate = {
       name: "test-fallback",
-      run: "pwd",
+      run: 'node -e "process.stdout.write(process.cwd())"',
       runtime: "local",
     };
 

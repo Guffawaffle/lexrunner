@@ -30,7 +30,7 @@ export interface BoundedGateRunResult {
     gates: Array<{
       name: string;
       status: string;
-      failureKind?: "nonzero_exit" | "spawn_error" | "timeout";
+      failureKind?: "nonzero_exit" | "spawn_error" | "timeout" | "evidence_error";
       timeoutCleanup?: {
         method: "process-group" | "taskkill" | "direct-child";
         forceKilled: boolean;

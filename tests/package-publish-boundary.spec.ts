@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type PackageManifest,
+  resolveNpmCliPath,
   validatePackageManifestForPublish,
 } from "../scripts/validate-package-boundary.js";
 import {
@@ -54,6 +55,15 @@ describe("npm publication boundary", () => {
 
   it("uses the repository-scoped release tag prefix", () => {
     expect(releaseTagForVersion("1.2.1")).toBe("lexrunner-v1.2.1");
+  });
+
+  it("invokes npm through its JavaScript CLI instead of a platform shell shim", () => {
+    expect(
+      resolveNpmCliPath({ npm_execpath: "C:\\toolchain\\npm-cli.js" }, "C:\\node\\node.exe")
+    ).toBe("C:\\toolchain\\npm-cli.js");
+    expect(resolveNpmCliPath({}, "C:\\node\\node.exe")).toBe(
+      "C:\\node\\node_modules\\npm\\bin\\npm-cli.js"
+    );
   });
 });
 

@@ -36,6 +36,17 @@ LexRunner terminates the tree, waits for cleanup, escalates when necessary, and 
 gate until descendant cleanup is observed. The result uses exit code `124`, failure kind `timeout`,
 and a bounded cleanup projection. Assertion/nonzero failures use failure kind `nonzero_exit`.
 
+The local gate shell follows the host boundary: POSIX hosts use `bash -c`, while Windows hosts use
+PowerShell 7 with profiles disabled. Windows worktrees are never routed through WSL by the local
+gate executor.
+
+Every local gate attempt writes `gate-execution-receipt.attempt-N.json` below that gate's artifact
+directory. The receipt binds the declared gate, resolved working directory, exact shell executable
+identity and arguments, exit and timeout outcome, duration, full-output hashes with bounded content,
+and source/retained artifact identities. Declared artifacts are snapshotted before execution and are
+collected only when their content is new or changed; a successful command with missing, unsupported,
+stale, or mismatched evidence fails closed as `evidence_error`.
+
 ## Release tier
 
 Issue #795 remains the release gate. From the canonical release commit it must run the complete
