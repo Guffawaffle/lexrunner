@@ -29,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("1.5.0");
+    expect(packageJson.version).toBe("1.5.1");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^4.0.0");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -78,7 +78,7 @@ describe("LexRunner current release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
-      read("docs/releases/1.5.0.md"),
+      read("docs/releases/1.5.1.md"),
       read("docs/releases/1.2.1.md"),
       read("docs/releases/1.2.0.md"),
       read("docs/node-24-migration.md"),
@@ -88,7 +88,7 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **1.5.0**");
+    expect(readme).toContain("Current repository package version: **1.5.1**");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
     expect(releaseNotes).toContain("release-owner-signed, trusted-workflow npm publication");
@@ -97,7 +97,7 @@ describe("LexRunner current release readiness", () => {
     expect(compatibilityDecision).toContain("public unattended/headless worker-launch");
     expect(compatibilityDecision).toContain("separate explicitly authorized action");
     expect(compatibilityDecision).toContain("not published to npm");
-    expect(migration).toContain("@smartergpt/lexrunner@1.5.0");
+    expect(migration).toContain("@smartergpt/lexrunner@1.5.1");
     expect(migration).not.toContain("@smartergpt/lexrunner@3.1.0");
     expect(instructions).toContain("MUST NOT");
     expect(instructions).toContain("npm's package-scoped GitHub OIDC trusted publisher");
@@ -123,7 +123,12 @@ describe("LexRunner current release readiness", () => {
     );
     expect(releaseWorkflow).toContain("TAG_SIGNER_FINGERPRINT=");
     expect(releaseWorkflow).toContain('"$TAG_SIGNER_FINGERPRINT" != "$RELEASE_SIGNER_FINGERPRINT"');
-    expect(releaseWorkflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(releaseWorkflow).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/compare/${GITHUB_SHA}...${MAIN_SHA}"'
+    );
+    expect(releaseWorkflow).toContain('"$ANCESTRY_STATUS" != "ahead"');
+    expect(releaseWorkflow).toContain('"$ANCESTRY_STATUS" != "identical"');
+    expect(releaseWorkflow).not.toContain("git fetch --no-tags origin main");
     const workflow = parse(releaseWorkflow) as {
       jobs: Record<
         string,

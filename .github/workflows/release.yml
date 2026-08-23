@@ -208,8 +208,9 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+          MAIN_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
+          ANCESTRY_STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${GITHUB_SHA}...${MAIN_SHA}" --jq '.status')
+          if [ "$ANCESTRY_STATUS" != "ahead" ] && [ "$ANCESTRY_STATUS" != "identical" ]; then
             echo "❌ Signed release commit is not contained in origin/main"
             exit 1
           fi
