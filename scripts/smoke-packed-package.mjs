@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { resolveContainedPackageTarget } from "./packed-package-paths.mjs";
+
 const projectRoot = process.cwd();
 const packageVersion = JSON.parse(
   fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")
@@ -31,10 +33,11 @@ const requiredAttemptTools = [
 ];
 
 try {
+  const npmCliPath = resolveNpmCliPath();
   const packed = JSON.parse(
     execFileSync(
-      "npm",
-      ["pack", "--json", "--ignore-scripts", "--pack-destination", temporaryRoot],
+      process.execPath,
+      [npmCliPath, "pack", "--json", "--ignore-scripts", "--pack-destination", temporaryRoot],
       { cwd: projectRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 }
     )
   )[0];
@@ -46,8 +49,9 @@ try {
     `${JSON.stringify({ name: "lexrunner-packed-smoke", private: true, type: "module" })}\n`
   );
   execFileSync(
-    "npm",
+    process.execPath,
     [
+      npmCliPath,
       "install",
       "--prefer-offline",
       "--no-audit",
@@ -130,14 +134,27 @@ try {
   );
 
   const binRoot = path.join(consumerRoot, "node_modules", ".bin");
-  const canonicalCli = resolveBin(binRoot, "lexrunner");
-  const compatibilityCli = resolveBin(binRoot, "lex-pr");
+  const installedPackageRoot = path.join(consumerRoot, "node_modules", "@smartergpt", "lexrunner");
+  const installedManifest = JSON.parse(
+    fs.readFileSync(path.join(installedPackageRoot, "package.json"), "utf8")
+  );
+  for (const name of ["lexrunner", "lex-pr", "lexrunner-mcp"]) assertBinShim(binRoot, name);
+  const canonicalCli = resolvePackageBinTarget(
+    installedPackageRoot,
+    installedManifest,
+    "lexrunner"
+  );
+  const compatibilityCli = resolvePackageBinTarget(
+    installedPackageRoot,
+    installedManifest,
+    "lex-pr"
+  );
   const expectedVersion = `LexRunner ${packageVersion} (lexrunner)`;
-  const canonicalVersion = execFileSync(canonicalCli, ["--version"], {
+  const canonicalVersion = execFileSync(process.execPath, [canonicalCli, "--version"], {
     cwd: consumerRoot,
     encoding: "utf8",
   }).trim();
-  const compatibilityVersion = execFileSync(compatibilityCli, ["--version"], {
+  const compatibilityVersion = execFileSync(process.execPath, [compatibilityCli, "--version"], {
     cwd: consumerRoot,
     encoding: "utf8",
   }).trim();
@@ -148,14 +165,14 @@ try {
     throw new Error("Packed lex-pr compatibility alias did not execute the canonical CLI");
   }
 
-  const cliHelp = execFileSync(canonicalCli, ["--help"], {
+  const cliHelp = execFileSync(process.execPath, [canonicalCli, "--help"], {
     cwd: consumerRoot,
     encoding: "utf8",
   });
   if (!cliHelp.includes("Usage: lexrunner")) {
     throw new Error("Packed canonical CLI bin did not render canonical help");
   }
-  const compatibilityHelp = execFileSync(compatibilityCli, ["--help"], {
+  const compatibilityHelp = execFileSync(process.execPath, [compatibilityCli, "--help"], {
     cwd: consumerRoot,
     encoding: "utf8",
   });
@@ -166,7 +183,10 @@ try {
   smokeBoundedAttemptStatus(canonicalCli, consumerRoot);
   smokeProjectionCliSurface(canonicalCli, consumerRoot);
 
-  const toolCount = await smokeMcp(resolveBin(binRoot, "lexrunner-mcp"), consumerRoot);
+  const toolCount = await smokeMcp(
+    resolvePackageBinTarget(installedPackageRoot, installedManifest, "lexrunner-mcp"),
+    consumerRoot
+  );
   process.stdout.write(
     `${JSON.stringify({
       installed: "@smartergpt/lexrunner",
@@ -183,21 +203,50 @@ try {
   fs.rmSync(temporaryRoot, { recursive: true, force: true });
 }
 
-function resolveBin(binRoot, name) {
+function resolveNpmCliPath(env = process.env, nodeExecutable = process.execPath) {
+  const configured = env.npm_execpath?.trim();
+  if (configured) {
+    if (path.win32.isAbsolute(configured) || path.posix.isAbsolute(configured)) return configured;
+    return path.resolve(configured);
+  }
+  const pathApi = path.posix.isAbsolute(nodeExecutable)
+    ? path.posix
+    : path.win32.isAbsolute(nodeExecutable)
+      ? path.win32
+      : path;
+  return pathApi.join(pathApi.dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js");
+}
+
+function assertBinShim(binRoot, name) {
   const candidates =
     process.platform === "win32"
       ? [path.join(binRoot, `${name}.cmd`), path.join(binRoot, name)]
       : [path.join(binRoot, name), path.join(binRoot, `${name}.cmd`)];
   const resolved = candidates.find((candidate) => fs.existsSync(candidate));
   if (!resolved) throw new Error(`Packed package omitted the ${name} executable`);
-  return resolved;
+}
+
+function resolvePackageBinTarget(packageRoot, manifest, name) {
+  const relativeTarget = typeof manifest.bin === "object" ? manifest.bin?.[name] : undefined;
+  if (typeof relativeTarget !== "string" || relativeTarget.length === 0) {
+    throw new Error(`Packed package omitted the ${name} bin mapping`);
+  }
+  let target;
+  try {
+    target = resolveContainedPackageTarget(packageRoot, relativeTarget);
+  } catch {
+    throw new Error(`Packed package ${name} bin target escaped the package root`);
+  }
+  if (!fs.existsSync(target)) throw new Error(`Packed package omitted the ${name} bin target`);
+  return target;
 }
 
 function smokeBoundedAttemptStatus(cliPath, cwd) {
   const databasePath = path.join(cwd, "missing-attempt.db");
   const result = spawnSync(
-    cliPath,
+    process.execPath,
     [
+      cliPath,
       "attempt",
       "status",
       "--database-path",
@@ -232,8 +281,8 @@ function smokeProjectionCliSurface(cliPath, cwd) {
   fs.writeFileSync(inputPath, "{}\n");
   for (const operation of ["prepare", "status", "cleanup", "quarantine"]) {
     const result = spawnSync(
-      cliPath,
-      ["attempt", "projection", operation, "--input", inputPath, "--json"],
+      process.execPath,
+      [cliPath, "attempt", "projection", operation, "--input", inputPath, "--json"],
       { cwd, encoding: "utf8" }
     );
     if (result.error) throw result.error;
@@ -251,7 +300,7 @@ function smokeProjectionCliSurface(cliPath, cwd) {
 }
 
 async function smokeMcp(binPath, cwd) {
-  const child = spawn(binPath, [], {
+  const child = spawn(process.execPath, [binPath], {
     cwd,
     env: { ...process.env, ALLOW_MUTATIONS: "false" },
     stdio: ["pipe", "pipe", "pipe"],

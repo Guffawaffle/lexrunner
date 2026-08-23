@@ -135,11 +135,15 @@ export function resolvePromptsDir(baseDir: string = process.cwd()): ResolvedProm
   throw new PromptsResolverError(
     "Prompts directory not found. Expected one of:\n" +
       `  - LEX_PROMPTS_DIR (env var)\n` +
-      `  - ${localOverlay}\n` +
-      `  - ${workspaceDir}\n` +
+      `  - ${portableDiagnosticPath(localOverlay)}\n` +
+      `  - ${portableDiagnosticPath(workspaceDir)}\n` +
       `  - @smartergpt/lex/prompts (package defaults)\n` +
       `  - @smartergpt/lex/canon/prompts (canonical fallback)`
   );
+}
+
+function portableDiagnosticPath(value: string): string {
+  return value.replace(/\\/g, "/");
 }
 
 /**

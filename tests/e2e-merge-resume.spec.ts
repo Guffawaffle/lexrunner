@@ -15,7 +15,11 @@ import { loadCheckpoint, saveCheckpoint } from "../src/weave/checkpoint/storage.
 const roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
+  );
 });
 
 describe("merge-weave process restart", () => {
@@ -87,7 +91,7 @@ describe("merge-weave process restart", () => {
         checkpoints,
         working,
       ],
-      { cwd: process.cwd(), reject: false }
+      { cwd: process.cwd(), reject: false, timeout: 15_000 }
     );
     expect(crashed.exitCode, `${crashed.stdout}\n${crashed.stderr}`).toBe(91);
 
@@ -119,7 +123,7 @@ describe("merge-weave process restart", () => {
     });
     await git(working, "checkout", completed.metadata!.resume!.repository.integrationBranch);
     await expect(readFile(join(working, "feature.txt"), "utf-8")).resolves.toBe("feature\n");
-  });
+  }, 20_000);
 });
 
 async function configureGit(cwd: string): Promise<void> {

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const previousPackageExportKeys = [
@@ -28,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("1.4.1");
+    expect(packageJson.version).toBe("1.5.0");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("^4.0.0");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -77,7 +78,7 @@ describe("LexRunner current release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
-      read("docs/releases/1.4.1.md"),
+      read("docs/releases/1.5.0.md"),
       read("docs/releases/1.2.1.md"),
       read("docs/releases/1.2.0.md"),
       read("docs/node-24-migration.md"),
@@ -87,7 +88,7 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **1.4.1**");
+    expect(readme).toContain("Current repository package version: **1.5.0**");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
     expect(releaseNotes).toContain("release-owner-signed, trusted-workflow npm publication");
@@ -96,7 +97,7 @@ describe("LexRunner current release readiness", () => {
     expect(compatibilityDecision).toContain("public unattended/headless worker-launch");
     expect(compatibilityDecision).toContain("separate explicitly authorized action");
     expect(compatibilityDecision).toContain("not published to npm");
-    expect(migration).toContain("@smartergpt/lexrunner@1.4.1");
+    expect(migration).toContain("@smartergpt/lexrunner@1.5.0");
     expect(migration).not.toContain("@smartergpt/lexrunner@3.1.0");
     expect(instructions).toContain("MUST NOT");
     expect(instructions).toContain("npm's package-scoped GitHub OIDC trusted publisher");
@@ -111,8 +112,51 @@ describe("LexRunner current release readiness", () => {
     expect(releaseWorkflow).toContain(
       "RELEASE_SIGNER_FINGERPRINT: 65C94BA03E88F53D365C36CF7145A1CE635B1902"
     );
-    expect(releaseWorkflow).toContain('git verify-commit "$GITHUB_SHA"');
+    expect(releaseWorkflow).toContain('verify-commit "$GITHUB_SHA"');
+    expect(releaseWorkflow).toContain('verify-tag --raw "$TAG_NAME"');
+    expect(releaseWorkflow).toContain("GNUPGHOME=$(mktemp -d)");
+    expect(releaseWorkflow).toContain("VALIDSIG_COUNT=$(grep -c");
+    expect(releaseWorkflow).toContain('"$VALIDSIG_COUNT" -ne 1');
+    expect(releaseWorkflow).toContain("IMPORTED_PRIMARY_FINGERPRINT=");
+    expect(releaseWorkflow).toContain(
+      '"$IMPORTED_PRIMARY_FINGERPRINT" != "$RELEASE_SIGNER_FINGERPRINT"'
+    );
+    expect(releaseWorkflow).toContain("TAG_SIGNER_FINGERPRINT=");
+    expect(releaseWorkflow).toContain('"$TAG_SIGNER_FINGERPRINT" != "$RELEASE_SIGNER_FINGERPRINT"');
     expect(releaseWorkflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    const workflow = parse(releaseWorkflow) as {
+      jobs: Record<
+        string,
+        {
+          permissions?: Record<string, string>;
+          steps?: Array<{ uses?: string; run?: string; with?: Record<string, unknown> }>;
+        }
+      >;
+    };
+    const stableReleaseJob = workflow.jobs["stable-release"];
+    const stableActionUses = stableReleaseJob.steps
+      ?.map((step) => step.uses)
+      .filter((uses): uses is string => Boolean(uses));
+    expect(stableActionUses).toEqual([
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    ]);
+    expect(stableActionUses?.every((uses) => /@[0-9a-f]{40}$/.test(uses))).toBe(true);
+    expect(stableReleaseJob.steps?.[0]?.with?.["persist-credentials"]).toBe(false);
+    expect(stableReleaseJob.permissions?.["id-token"]).toBe("write");
+    expect(stableReleaseJob.permissions?.contents).toBe("write");
+    const oidcJobs = Object.entries(workflow.jobs)
+      .filter(([, job]) => job.permissions?.["id-token"] === "write")
+      .map(([name]) => name);
+    expect(oidcJobs).toEqual(["stable-release"]);
+    const publishingJobs = Object.entries(workflow.jobs)
+      .filter(([, job]) =>
+        job.steps?.some((step) =>
+          step.run?.includes("npm publish --access restricted --tag latest")
+        )
+      )
+      .map(([name]) => name);
+    expect(publishingJobs).toEqual(["stable-release"]);
     expect(releaseWorkflow).not.toContain("NODE_AUTH_TOKEN");
     expect(releaseWorkflow).not.toContain("secrets.NPM_TOKEN");
     expect(releaseProcess).toContain("npm trust github @smartergpt/lexrunner --file release.yml");
