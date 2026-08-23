@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-08-23
+
+### Fixed
+
+- **Credential-free release ancestry verification** - Verify that the signed release commit is
+  contained in `main` through the authenticated GitHub compare API after checkout credentials are
+  deliberately discarded. This recovery release carries forward the complete 1.5.0 feature set;
+  the immutable `lexrunner-v1.5.0` workflow failed closed before install or publication.
+
 ## [1.5.0] - 2026-08-23
 
 ### Added
