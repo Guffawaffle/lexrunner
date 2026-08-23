@@ -69,9 +69,17 @@ export function resolveNpmCliPath(
   nodeExecutable = process.execPath
 ): string {
   const configured = env.npm_execpath?.trim();
-  return configured
-    ? path.resolve(configured)
-    : path.join(path.dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js");
+  if (configured) {
+    if (path.win32.isAbsolute(configured) || path.posix.isAbsolute(configured)) return configured;
+    return path.resolve(configured);
+  }
+
+  const pathApi = path.posix.isAbsolute(nodeExecutable)
+    ? path.posix
+    : path.win32.isAbsolute(nodeExecutable)
+      ? path.win32
+      : path;
+  return pathApi.join(pathApi.dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js");
 }
 
 export function validatePackageManifestForPublish(

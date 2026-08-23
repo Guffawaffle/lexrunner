@@ -57,12 +57,27 @@ describe("npm publication boundary", () => {
     expect(releaseTagForVersion("1.2.1")).toBe("lexrunner-v1.2.1");
   });
 
-  it("invokes npm through its JavaScript CLI instead of a platform shell shim", () => {
+  it("preserves a configured absolute Windows npm CLI path on every host", () => {
     expect(
       resolveNpmCliPath({ npm_execpath: "C:\\toolchain\\npm-cli.js" }, "C:\\node\\node.exe")
     ).toBe("C:\\toolchain\\npm-cli.js");
+  });
+
+  it("derives the npm CLI beside a Windows Node executable on every host", () => {
     expect(resolveNpmCliPath({}, "C:\\node\\node.exe")).toBe(
       "C:\\node\\node_modules\\npm\\bin\\npm-cli.js"
+    );
+  });
+
+  it("preserves a configured absolute POSIX npm CLI path on every host", () => {
+    expect(resolveNpmCliPath({ npm_execpath: "/toolchain/npm-cli.js" }, "/node/bin/node")).toBe(
+      "/toolchain/npm-cli.js"
+    );
+  });
+
+  it("derives the npm CLI beside a POSIX Node executable on every host", () => {
+    expect(resolveNpmCliPath({}, "/node/bin/node")).toBe(
+      "/node/bin/node_modules/npm/bin/npm-cli.js"
     );
   });
 });
