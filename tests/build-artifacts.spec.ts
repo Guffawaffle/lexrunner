@@ -49,6 +49,17 @@ describe("build artifact validation", () => {
     });
   });
 
+  it("publishes the durable Attempt awaitable contracts and host adapters", () => {
+    const require = createRequire(import.meta.url);
+    const entry = require("../dist/cli.cjs") as Record<string, unknown>;
+
+    expect(entry.ExternalAwaitableDescriptor_v1).toBeDefined();
+    expect(entry.AttemptAwaitableSupervisor).toBeTypeOf("function");
+    expect(entry.AxfCliAttemptAwaitableObserver).toBeTypeOf("function");
+    expect(entry.InMemoryAttemptAwaitableStore).toBeTypeOf("function");
+    expect(entry.SqliteAttemptAwaitableStore).toBeTypeOf("function");
+  });
+
   it("reports the declaration that points at each missing artifact", () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexrunner-build-artifacts-"));
     temporaryDirectories.push(projectRoot);

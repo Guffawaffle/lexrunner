@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Guffawaffle/lexrunner/schemas/gate-execution-receipt.schema.json",
+  "title": "LexRunner local gate execution receipt",
+  "description": "Bounded per-attempt evidence for one locally executed frozen gate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "attempt",
+    "declaredGate",
+    "execution",
+    "outcome",
+    "output",
+    "artifacts"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "lexrunner-gate-execution-receipt/v1" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "declaredGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "run", "cwd", "runtime", "artifacts"],
+      "properties": {
+        "name": { "type": "string" },
+        "run": { "type": "string" },
+        "cwd": { "type": ["string", "null"] },
+        "runtime": { "enum": ["local", "container", "ci-service"] },
+        "artifacts": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cwd", "startedAt", "finishedAt", "durationMs", "shell"],
+      "properties": {
+        "cwd": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "finishedAt": { "type": "string", "format": "date-time" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "shell": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "executable",
+            "argv",
+            "identityAfter",
+            "unchanged",
+            "spawned"
+          ],
+          "properties": {
+            "command": { "enum": ["bash", "pwsh"] },
+            "executable": {
+              "anyOf": [{ "$ref": "#/definitions/fileIdentity" }, { "type": "null" }]
+            },
+            "argv": { "type": "array", "items": { "type": "string" } },
+            "identityAfter": {
+              "anyOf": [{ "$ref": "#/definitions/fileIdentity" }, { "type": "null" }]
+            },
+            "unchanged": { "type": "boolean" },
+            "spawned": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "exitCode",
+        "failureKind",
+        "timeoutCleanup",
+        "evidenceComplete"
+      ],
+      "properties": {
+        "status": { "enum": ["pass", "fail", "blocked", "skipped", "retrying"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "failureKind": {
+          "enum": ["nonzero_exit", "spawn_error", "timeout", "evidence_error", null]
+        },
+        "timeoutCleanup": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["method", "forceKilled", "descendantsReaped"],
+              "properties": {
+                "method": { "enum": ["process-group", "taskkill", "direct-child"] },
+                "forceKilled": { "type": "boolean" },
+                "descendantsReaped": { "type": "boolean" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "evidenceComplete": { "type": "boolean" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stdout", "stderr"],
+      "properties": {
+        "stdout": { "$ref": "#/definitions/outputEvidence" },
+        "stderr": { "$ref": "#/definitions/outputEvidence" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/artifactEvidence" }
+    }
+  },
+  "definitions": {
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "realPath", "bytes", "mtimeMs", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "realPath": { "type": "string" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "mtimeMs": { "type": "number", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "outputEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bytes", "sha256", "truncated", "content"],
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "truncated": { "type": "boolean" },
+        "content": { "type": "string", "maxLength": 65536 }
+      }
+    },
+    "artifactEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declaredPath", "resolvedPath", "status", "before", "source"],
+      "properties": {
+        "declaredPath": { "type": "string" },
+        "resolvedPath": { "type": "string" },
+        "status": {
+          "enum": ["collected", "missing", "stale", "unsupported", "collection_error"]
+        },
+        "before": {
+          "anyOf": [{ "$ref": "#/definitions/fileIdentity" }, { "type": "null" }]
+        },
+        "source": {
+          "anyOf": [{ "$ref": "#/definitions/fileIdentity" }, { "type": "null" }]
+        },
+        "retainedPath": { "type": "string" },
+        "retained": { "$ref": "#/definitions/fileIdentity" },
+        "error": { "type": "string", "maxLength": 1025 }
+      }
+    }
+  }
+}

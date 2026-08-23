@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { validatePackedBoundary } from "./validate-package-boundary.js";
+import { resolveNpmCliPath, validatePackedBoundary } from "./validate-package-boundary.js";
 
 export interface ReleaseManifest {
   name?: string;
@@ -66,8 +66,17 @@ function verifyTaggedHead(projectRoot: string, version: string): void {
 
 export function runNpmPublishDryRun(projectRoot: string, distTag: string): void {
   const result = spawnSync(
-    "npm",
-    ["publish", "--dry-run", "--access", "restricted", "--tag", distTag, "--json"],
+    process.execPath,
+    [
+      resolveNpmCliPath(),
+      "publish",
+      "--dry-run",
+      "--access",
+      "restricted",
+      "--tag",
+      distTag,
+      "--json",
+    ],
     { cwd: projectRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }
   );
   if (result.stderr) process.stderr.write(result.stderr);

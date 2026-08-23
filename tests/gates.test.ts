@@ -110,7 +110,7 @@ describe("Gate Execution", () => {
   it("respects environment variables", async () => {
     const gate: Gate = {
       name: "test-env",
-      run: "echo $TEST_VAR",
+      run: `node -e "process.stdout.write(process.env.TEST_VAR || '')"`,
       env: { TEST_VAR: "test-value" },
       runtime: "local",
       artifacts: [],

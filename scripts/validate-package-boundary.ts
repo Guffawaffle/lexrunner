@@ -64,6 +64,24 @@ const MAX_UNPACKED_SIZE = 7_000_000;
 
 const CANONICAL_REPOSITORY_URL = "git+https://github.com/Guffawaffle/lexrunner.git";
 
+export function resolveNpmCliPath(
+  env: NodeJS.ProcessEnv = process.env,
+  nodeExecutable = process.execPath
+): string {
+  const configured = env.npm_execpath?.trim();
+  if (configured) {
+    if (path.win32.isAbsolute(configured) || path.posix.isAbsolute(configured)) return configured;
+    return path.resolve(configured);
+  }
+
+  const pathApi = path.posix.isAbsolute(nodeExecutable)
+    ? path.posix
+    : path.win32.isAbsolute(nodeExecutable)
+      ? path.win32
+      : path;
+  return pathApi.join(pathApi.dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js");
+}
+
 export function validatePackageManifestForPublish(
   manifest: PackageManifest,
   projectRoot = process.cwd()
@@ -103,11 +121,15 @@ export function validatePackageManifestForPublish(
 }
 
 export function inspectPackedBoundary(projectRoot = process.cwd()): PackResult {
-  const output = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-    cwd: projectRoot,
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-  });
+  const output = execFileSync(
+    process.execPath,
+    [resolveNpmCliPath(), "pack", "--dry-run", "--json", "--ignore-scripts"],
+    {
+      cwd: projectRoot,
+      encoding: "utf8",
+      maxBuffer: 10 * 1024 * 1024,
+    }
+  );
   const parsed = JSON.parse(output) as PackResult[];
   if (parsed.length !== 1)
     throw new Error(`Expected one npm pack result, received ${parsed.length}`);

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type PackageManifest,
+  resolveNpmCliPath,
   validatePackageManifestForPublish,
 } from "../scripts/validate-package-boundary.js";
 import {
@@ -54,6 +55,30 @@ describe("npm publication boundary", () => {
 
   it("uses the repository-scoped release tag prefix", () => {
     expect(releaseTagForVersion("1.2.1")).toBe("lexrunner-v1.2.1");
+  });
+
+  it("preserves a configured absolute Windows npm CLI path on every host", () => {
+    expect(
+      resolveNpmCliPath({ npm_execpath: "C:\\toolchain\\npm-cli.js" }, "C:\\node\\node.exe")
+    ).toBe("C:\\toolchain\\npm-cli.js");
+  });
+
+  it("derives the npm CLI beside a Windows Node executable on every host", () => {
+    expect(resolveNpmCliPath({}, "C:\\node\\node.exe")).toBe(
+      "C:\\node\\node_modules\\npm\\bin\\npm-cli.js"
+    );
+  });
+
+  it("preserves a configured absolute POSIX npm CLI path on every host", () => {
+    expect(resolveNpmCliPath({ npm_execpath: "/toolchain/npm-cli.js" }, "/node/bin/node")).toBe(
+      "/toolchain/npm-cli.js"
+    );
+  });
+
+  it("derives the npm CLI beside a POSIX Node executable on every host", () => {
+    expect(resolveNpmCliPath({}, "/node/bin/node")).toBe(
+      "/node/bin/node_modules/npm/bin/npm-cli.js"
+    );
   });
 });
 

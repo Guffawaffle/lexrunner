@@ -25,7 +25,7 @@ export const GateResult = z.object({
   duration: z.number().optional(), // milliseconds
   stdout: z.string().optional(),
   stderr: z.string().optional(),
-  failureKind: z.enum(["nonzero_exit", "spawn_error", "timeout"]).optional(),
+  failureKind: z.enum(["nonzero_exit", "spawn_error", "timeout", "evidence_error"]).optional(),
   timeoutCleanup: z
     .object({
       method: z.enum(["process-group", "taskkill", "direct-child"]),

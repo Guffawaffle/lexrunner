@@ -212,7 +212,7 @@ export interface GateReceiptContext {
   /** Artifacts collected from gate execution */
   artifacts?: string[];
   /** Stable failure classification. */
-  failureKind?: "nonzero_exit" | "spawn_error" | "timeout";
+  failureKind?: "nonzero_exit" | "spawn_error" | "timeout" | "evidence_error";
   /** Whether timeout cleanup reaped the descendant tree. */
   descendantsReaped?: boolean;
 }
