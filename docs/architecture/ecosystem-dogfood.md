@@ -41,8 +41,10 @@ native cache directory lives below the disposable allocation root. Every version
 an exact stable SemVer before any registry access. The credentialed npm install forbids all package
 lifecycle scripts. After registry and integrity identities match, one separately allowlisted step
 copies the already-built `better-sqlite3-multiple-ciphers` binding from LexRunner's gated dependency
-tree into the disposable consumer. No dependency code runs with registry credentials, and the
-binding receipt records its package identity, integrity, platform, architecture, Node ABI, and hash.
+tree into the disposable consumer. Later build and smoke commands receive a scrubbed environment,
+disposable home, and empty npm configuration; this is credential-environment isolation, not an OS
+sandbox. The binding receipt records its package identity, integrity, platform, architecture, Node
+ABI, and hash.
 The accepted receipt also hashes every lock resolution and rejects any non-registry dependency other
 than the one staged LexRunner candidate tarball.
 

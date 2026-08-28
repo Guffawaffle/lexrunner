@@ -12,6 +12,8 @@ import {
   assertRegistryOnlyPackageLock,
   inspectDogfoodRun,
   reapDogfoodRun,
+  resolveOrdinaryPackageRoot,
+  scrubRuntimeEnvironment,
 } from "../scripts/dogfood-ecosystem.js";
 import { computeCanonicalHash } from "../src/schemas/task-contract.js";
 import { canonicalJSONStringify } from "../src/util/canonicalJson.js";
@@ -74,7 +76,24 @@ describe("ecosystem dogfood allocation lifecycle", () => {
         integrity: "sha512-candidate",
       },
     };
-    expect(assertRegistryOnlyPackageLock(valid, "https://registry.npmjs.org/")).toHaveLength(2);
+    const expectedCandidate = valid["node_modules/@smartergpt/lexrunner"];
+    expect(
+      assertRegistryOnlyPackageLock(valid, "https://registry.npmjs.org/", expectedCandidate)
+    ).toHaveLength(2);
+    expect(() =>
+      assertRegistryOnlyPackageLock(
+        {
+          ...valid,
+          "node_modules/@smartergpt/lexrunner": {
+            ...expectedCandidate,
+            resolved: "file:../../outside-attacker.tgz",
+            integrity: "sha512-attacker",
+          },
+        },
+        "https://registry.npmjs.org/",
+        expectedCandidate
+      )
+    ).toThrow("registry_lock_candidate_identity_invalid");
     for (const resolved of [
       "https://example.test/package.tgz",
       "git+https://github.com/example/package.git",
@@ -86,10 +105,50 @@ describe("ecosystem dogfood allocation lifecycle", () => {
             ...valid,
             "node_modules/escape": { version: "1.0.0", resolved, integrity: "sha512-x" },
           },
-          "https://registry.npmjs.org/"
+          "https://registry.npmjs.org/",
+          expectedCandidate
         )
       ).toThrow("registry_lock_external_resolution");
     }
+  });
+
+  it("rejects linked source and target package roots outside physical node_modules", async () => {
+    for (const role of ["source", "target"]) {
+      const root = await mkdtemp(path.join(os.tmpdir(), `lexrunner-native-${role}-root-test-`));
+      temporaryRoots.push(root);
+      const nodeModules = path.join(root, "node_modules");
+      const outside = path.join(root, "outside-package");
+      await Promise.all([mkdir(nodeModules), mkdir(outside)]);
+      await symlink(outside, path.join(nodeModules, "native-package"), directoryLinkType);
+      await expect(
+        resolveOrdinaryPackageRoot(nodeModules, "native-package", `native_${role}_root_invalid`)
+      ).rejects.toThrow(`native_${role}_root_invalid`);
+    }
+  });
+
+  it("scrubs registry and GitHub credentials from post-install runtime commands", () => {
+    const environment = scrubRuntimeEnvironment(
+      {
+        PATH: "safe-path",
+        NPM_TOKEN: "secret",
+        NODE_AUTH_TOKEN: "secret",
+        GH_TOKEN: "secret",
+        NPM_CONFIG_USERCONFIG: "credentialed.npmrc",
+      },
+      "disposable-home",
+      "disposable-temp",
+      "empty.npmrc"
+    );
+    expect(environment).toMatchObject({
+      PATH: "safe-path",
+      HOME: "disposable-home",
+      USERPROFILE: "disposable-home",
+      TEMP: "disposable-temp",
+      NPM_CONFIG_USERCONFIG: "empty.npmrc",
+    });
+    expect(environment).not.toHaveProperty("NPM_TOKEN");
+    expect(environment).not.toHaveProperty("NODE_AUTH_TOKEN");
+    expect(environment).not.toHaveProperty("GH_TOKEN");
   });
 
   it("inspects compact status, exposes bounded diagnostics explicitly, and reaps idempotently", async () => {

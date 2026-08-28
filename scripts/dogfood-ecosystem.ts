@@ -130,6 +130,7 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
     const consumerRoot = path.join(runRoot, "consumer");
     const cacheRoot = path.join(runRoot, "npm-cache");
     await Promise.all([mkdir(stageRoot), mkdir(consumerRoot), mkdir(cacheRoot)]);
+    const runtimeEnvironment = await createScrubbedRuntimeEnvironment(runRoot);
 
     await materializeCandidate(options.projectRoot, candidateRoot);
     const buildOutput = await runExpectedCommand(
@@ -137,14 +138,16 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
       process.execPath,
       [resolveNpmCliPath(), "run", "build"],
       candidateRoot,
-      300_000
+      300_000,
+      runtimeEnvironment
     );
     const packOutput = await runExpectedCommand(
       "candidate_pack_failed",
       process.execPath,
       [resolveNpmCliPath(), "pack", "--json", "--ignore-scripts", "--pack-destination", stageRoot],
       candidateRoot,
-      120_000
+      120_000,
+      runtimeEnvironment
     );
     const packed = (await readdir(stageRoot)).filter((entry) => entry.endsWith(".tgz"));
     if (packed.length !== 1) throw failure("pack_artifact_ambiguous");
@@ -247,7 +250,9 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
 
     const registryLockEvidence = await verifyRegistryOnlyPackageLock(
       consumerRoot,
-      DOGFOOD_INSTALL_POLICY.registries[0]!
+      DOGFOOD_INSTALL_POLICY.registries[0]!,
+      tarball,
+      (await readJson(path.join(candidateRoot, "package.json"))).version!
     );
     receipt = await advanceReceipt(runRoot, receipt, "registry-lock", registryLockEvidence);
 
@@ -264,7 +269,8 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
       process.execPath,
       ["--input-type=module", "--eval", PUBLIC_SURFACE_SMOKE],
       consumerRoot,
-      120_000
+      120_000,
+      runtimeEnvironment
     );
     if ((await gitStatus(options.projectRoot)) !== sourceState) {
       throw failure("source_checkout_changed");
@@ -530,10 +536,12 @@ async function runCommand(
   executable: string,
   args: string[],
   cwd: string,
-  timeout: number
+  timeout: number,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync(executable, args, {
     cwd,
+    env,
     encoding: "utf8",
     maxBuffer: 256 * 1024,
     timeout,
@@ -544,14 +552,25 @@ async function materializeReviewedNativeBinding(
   projectRoot: string,
   consumerRoot: string
 ): Promise<string> {
-  const sourcePackageRoot = await realpath(path.join(projectRoot, "node_modules", NATIVE_PACKAGE));
-  const targetPackageRoot = await realpath(path.join(consumerRoot, "node_modules", NATIVE_PACKAGE));
+  const sourcePackageRoot = await resolveOrdinaryPackageRoot(
+    path.join(projectRoot, "node_modules"),
+    NATIVE_PACKAGE,
+    "native_binding_source_root_invalid"
+  );
+  const targetPackageRoot = await resolveOrdinaryPackageRoot(
+    path.join(consumerRoot, "node_modules"),
+    NATIVE_PACKAGE,
+    "native_binding_target_root_invalid"
+  );
   const [sourceManifest, targetManifest, sourceLock, targetLock] = await Promise.all([
     readJson(path.join(sourcePackageRoot, "package.json")),
     readJson(path.join(targetPackageRoot, "package.json")),
     readLockPackage(projectRoot, NATIVE_PACKAGE),
     readLockPackage(consumerRoot, NATIVE_PACKAGE),
   ]);
+  if (sourceManifest.name !== NATIVE_PACKAGE || targetManifest.name !== NATIVE_PACKAGE) {
+    throw failure("native_binding_package_name_mismatch");
+  }
   for (const identity of [sourceManifest, targetManifest, sourceLock, targetLock]) {
     if (identity.version !== sourceLock.version) throw failure("native_binding_version_mismatch");
   }
@@ -564,12 +583,13 @@ async function materializeReviewedNativeBinding(
     throw failure("native_binding_registry_identity_mismatch");
   }
 
-  const sourceBinding = await realpath(path.join(sourcePackageRoot, NATIVE_BINDING_RELATIVE));
-  assertDescendant(sourcePackageRoot, sourceBinding, "native_binding_source_escape");
-  const sourceStat = await lstat(sourceBinding);
+  const sourceBindingInput = path.join(sourcePackageRoot, NATIVE_BINDING_RELATIVE);
+  const sourceStat = await lstat(sourceBindingInput);
   if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
     throw failure("native_binding_source_invalid");
   }
+  const sourceBinding = await realpath(sourceBindingInput);
+  assertDescendant(sourcePackageRoot, sourceBinding, "native_binding_source_escape");
   const targetDirectory = path.join(targetPackageRoot, "build", "Release");
   await mkdir(targetDirectory, { recursive: true });
   const resolvedTargetDirectory = await realpath(targetDirectory);
@@ -592,17 +612,53 @@ async function readJson(file: string): Promise<Record<string, string>> {
   return JSON.parse(await readFile(file, "utf8")) as Record<string, string>;
 }
 
-async function verifyRegistryOnlyPackageLock(root: string, registry: string): Promise<string> {
+async function verifyRegistryOnlyPackageLock(
+  root: string,
+  registry: string,
+  candidateTarball: string,
+  candidateVersion: string
+): Promise<string> {
   const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8")) as {
     packages?: Record<string, Record<string, string>>;
   };
   if (!lock.packages) throw failure("registry_lock_packages_missing");
-  return computeCanonicalHash(assertRegistryOnlyPackageLock(lock.packages, registry));
+  const candidateIdentity = lock.packages["node_modules/@smartergpt/lexrunner"];
+  if (!candidateIdentity?.resolved?.startsWith("file:")) {
+    throw failure("registry_lock_candidate_identity_missing");
+  }
+  const candidateInput = resolveFileSpec(root, candidateIdentity.resolved);
+  const [candidateInputStat, expectedStat] = await Promise.all([
+    lstat(candidateInput),
+    lstat(candidateTarball),
+  ]);
+  if (
+    !candidateInputStat.isFile() ||
+    candidateInputStat.isSymbolicLink() ||
+    !expectedStat.isFile() ||
+    expectedStat.isSymbolicLink()
+  ) {
+    throw failure("registry_lock_candidate_file_invalid");
+  }
+  const [resolvedCandidate, resolvedExpected, candidateBytes] = await Promise.all([
+    realpath(candidateInput),
+    realpath(candidateTarball),
+    readFile(candidateTarball),
+  ]);
+  if (resolvedCandidate !== resolvedExpected)
+    throw failure("registry_lock_candidate_path_mismatch");
+  return computeCanonicalHash(
+    assertRegistryOnlyPackageLock(lock.packages, registry, {
+      version: candidateVersion,
+      resolved: candidateIdentity.resolved,
+      integrity: hashSri(candidateBytes),
+    })
+  );
 }
 
 export function assertRegistryOnlyPackageLock(
   packages: Record<string, Record<string, string>>,
-  registry: string
+  registry: string,
+  expectedCandidate: { version: string; resolved: string; integrity: string }
 ): Array<{ path: string; version: string; resolved: string; integrity: string }> {
   let localCandidateCount = 0;
   const identities: Array<{ path: string; version: string; resolved: string; integrity: string }> =
@@ -610,7 +666,11 @@ export function assertRegistryOnlyPackageLock(
   for (const [packagePath, identity] of Object.entries(packages)) {
     if (!identity.resolved) continue;
     if (packagePath === "node_modules/@smartergpt/lexrunner") {
-      if (!identity.resolved.startsWith("file:") || !identity.integrity) {
+      if (
+        identity.version !== expectedCandidate.version ||
+        identity.resolved !== expectedCandidate.resolved ||
+        identity.integrity !== expectedCandidate.integrity
+      ) {
         throw failure("registry_lock_candidate_identity_invalid");
       }
       localCandidateCount += 1;
@@ -626,6 +686,26 @@ export function assertRegistryOnlyPackageLock(
   }
   if (localCandidateCount !== 1) throw failure("registry_lock_candidate_identity_missing");
   return identities;
+}
+
+export async function resolveOrdinaryPackageRoot(
+  nodeModulesInput: string,
+  packageName: string,
+  code: string
+): Promise<string> {
+  const nodeModulesStat = await lstat(nodeModulesInput);
+  if (!nodeModulesStat.isDirectory() || nodeModulesStat.isSymbolicLink()) throw failure(code);
+  const nodeModulesRoot = await realpath(nodeModulesInput);
+  const packageInput = path.join(nodeModulesRoot, packageName);
+  const packageStat = await lstat(packageInput);
+  if (!packageStat.isDirectory() || packageStat.isSymbolicLink()) throw failure(code);
+  const packageRoot = await realpath(packageInput);
+  assertDescendant(nodeModulesRoot, packageRoot, code);
+  return packageRoot;
+}
+
+function resolveFileSpec(root: string, resolved: string): string {
+  return path.resolve(root, decodeURIComponent(resolved.slice("file:".length)));
 }
 
 async function readLockPackage(root: string, packageName: string): Promise<Record<string, string>> {
@@ -651,15 +731,57 @@ function assertDescendant(root: string, candidate: string, code: string): void {
   }
 }
 
+async function createScrubbedRuntimeEnvironment(runRoot: string): Promise<NodeJS.ProcessEnv> {
+  const home = path.join(runRoot, "runtime-home");
+  const temporary = path.join(runRoot, "runtime-temp");
+  await Promise.all([mkdir(home), mkdir(temporary)]);
+  const userConfig = path.join(home, ".npmrc");
+  await writeFile(userConfig, "", { flag: "wx" });
+  return scrubRuntimeEnvironment(process.env, home, temporary, userConfig);
+}
+
+export function scrubRuntimeEnvironment(
+  source: NodeJS.ProcessEnv,
+  home: string,
+  temporary: string,
+  userConfig: string
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = {};
+  for (const key of [
+    "PATH",
+    "Path",
+    "PATHEXT",
+    "ComSpec",
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "LANG",
+    "LC_ALL",
+    "CI",
+  ]) {
+    if (source[key] !== undefined) result[key] = source[key];
+  }
+  return {
+    ...result,
+    HOME: home,
+    USERPROFILE: home,
+    TEMP: temporary,
+    TMP: temporary,
+    TMPDIR: temporary,
+    NPM_CONFIG_USERCONFIG: userConfig,
+  };
+}
+
 async function runExpectedCommand(
   failureCode: string,
   executable: string,
   args: string[],
   cwd: string,
-  timeout: number
+  timeout: number,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<{ stdout: string; stderr: string }> {
   try {
-    return await runCommand(executable, args, cwd, timeout);
+    return await runCommand(executable, args, cwd, timeout, env);
   } catch {
     throw failure(failureCode);
   }
@@ -726,6 +848,10 @@ function hashText(value: string): string {
 
 function hashBytes(value: Buffer): string {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function hashSri(value: Buffer): string {
+  return `sha512-${createHash("sha512").update(value).digest("base64")}`;
 }
 
 function required<T>(value: T | undefined, code: string): T {
