@@ -736,15 +736,20 @@ async function createScrubbedRuntimeEnvironment(runRoot: string): Promise<NodeJS
   const temporary = path.join(runRoot, "runtime-temp");
   await Promise.all([mkdir(home), mkdir(temporary)]);
   const userConfig = path.join(home, ".npmrc");
-  await writeFile(userConfig, "", { flag: "wx" });
-  return scrubRuntimeEnvironment(process.env, home, temporary, userConfig);
+  const globalConfig = path.join(home, "global.npmrc");
+  await Promise.all([
+    writeFile(userConfig, "", { flag: "wx" }),
+    writeFile(globalConfig, "", { flag: "wx" }),
+  ]);
+  return scrubRuntimeEnvironment(process.env, home, temporary, userConfig, globalConfig);
 }
 
 export function scrubRuntimeEnvironment(
   source: NodeJS.ProcessEnv,
   home: string,
   temporary: string,
-  userConfig: string
+  userConfig: string,
+  globalConfig: string
 ): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {};
   for (const key of [
@@ -769,6 +774,7 @@ export function scrubRuntimeEnvironment(
     TMP: temporary,
     TMPDIR: temporary,
     NPM_CONFIG_USERCONFIG: userConfig,
+    NPM_CONFIG_GLOBALCONFIG: globalConfig,
   };
 }
 

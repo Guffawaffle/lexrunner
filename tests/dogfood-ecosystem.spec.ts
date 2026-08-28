@@ -137,14 +137,16 @@ describe("ecosystem dogfood allocation lifecycle", () => {
       },
       "disposable-home",
       "disposable-temp",
-      "empty.npmrc"
+      "empty-user.npmrc",
+      "empty-global.npmrc"
     );
     expect(environment).toMatchObject({
       PATH: "safe-path",
       HOME: "disposable-home",
       USERPROFILE: "disposable-home",
       TEMP: "disposable-temp",
-      NPM_CONFIG_USERCONFIG: "empty.npmrc",
+      NPM_CONFIG_USERCONFIG: "empty-user.npmrc",
+      NPM_CONFIG_GLOBALCONFIG: "empty-global.npmrc",
     });
     expect(environment).not.toHaveProperty("NPM_TOKEN");
     expect(environment).not.toHaveProperty("NODE_AUTH_TOKEN");
