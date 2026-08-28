@@ -5,14 +5,14 @@ This document defines the event schemas for fanout and merge-weave hooks in LexR
 ## Schema Version Compatibility
 
 **LexRunner Event Schema**: v2.0 (compatible with Lex Frame Schema v2)
-**Minimum Lex Version**: 0.4.0 (see package.json: `@smartergpt/lex: ^2.0.2`)
-**Last Updated**: 2025-12-28
+**Lex Package Version**: 4.0.3 (see package.json: `@smartergpt/lex: 4.0.3`)
+**Last Updated**: 2026-08-28
 
 ### Version Contract
 
 LexRunner's event emission is guaranteed compatible with:
 
-- **Lex v2.x** (Frame schema v2 with runId, planHash, spend extensions)
+- **Lex v4.0.3** (Frame schema v2 with runId, planHash, spend extensions)
 - **Lex Frame API** endpoints (Lex#79: Frame ingestion)
 - **Lex Atlas** rebuild capabilities (Lex#80: On-demand memory refresh)
 
@@ -588,7 +588,7 @@ LexRunner pins Lex version in `package.json`:
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^2.0.2"
+    "@smartergpt/lex": "4.0.3"
   }
 }
 ```

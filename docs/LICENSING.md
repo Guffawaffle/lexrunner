@@ -15,7 +15,7 @@ LexRunner depends on various open-source libraries, each with their own license 
 ### @smartergpt/lex
 
 - **License**: MIT License
-- **Version**: 2.0.2
+- **Version**: 4.0.3
 - **Usage**: LexRunner uses Lex as a free, MIT-licensed dependency for memory, policy, and atlas framework functionality
 - **Attribution**: See [NOTICE.md](../NOTICE.md) for full attribution and license text
 

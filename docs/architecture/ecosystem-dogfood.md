@@ -25,7 +25,7 @@ after a failure.
 
 ## Real ecosystem run
 
-The default baseline is Lex 4.0.0, Lex-MCP 3.0.1, AXF 2.0.0, and LexSona 1.0.0. LexRunner is built,
+The default baseline is Lex 4.0.3, Lex-MCP 4.0.3, AXF 2.1.1, and LexSona 2.0.2. LexRunner is built,
 packed, and installed from the current checkout's staged tarball. The clean consumer then exercises
 package imports, each user-facing CLI, the new preparation and fan-in exports, and Lex-MCP's stdio
 `tools/list` surface.
@@ -37,7 +37,16 @@ npm run dogfood:ecosystem -- run \
 
 Package versions are exact CLI inputs (`--lex`, `--lex-mcp`, `--axf`, and `--lexsona`). The npm
 registry and cache policy are packet data; they are not inferred from an adjacent checkout. The
-native cache directory lives below the disposable allocation root.
+native cache directory lives below the disposable allocation root. Every version override must be
+an exact stable SemVer before any registry access. The credentialed npm install forbids all package
+lifecycle scripts. After registry and integrity identities match, one separately allowlisted step
+copies the already-built `better-sqlite3-multiple-ciphers` binding from LexRunner's gated dependency
+tree into the disposable consumer. Later build and smoke commands receive a scrubbed environment,
+disposable home, and empty npm configuration; this is credential-environment isolation, not an OS
+sandbox. The binding receipt records its package identity, integrity, platform, architecture, Node
+ABI, and hash.
+The accepted receipt also hashes every lock resolution and rejects any non-registry dependency other
+than the one staged LexRunner candidate tarball.
 
 Default output is one compact status object. `--diagnostics` adds bounded step hashes and resolved
 versions. Neither mode includes command output, dependency trees, transcripts, credentials, or

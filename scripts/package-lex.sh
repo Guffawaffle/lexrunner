@@ -5,7 +5,7 @@
 # Usage:
 #   ./scripts/package-lex.sh check        # Check for available updates
 #   ./scripts/package-lex.sh validate     # Validate current installation
-#   ./scripts/package-lex.sh update       # Update to latest compatible version
+#   ./scripts/package-lex.sh update 4.0.3 # Update to an explicitly selected version
 #   ./scripts/package-lex.sh info         # Show current Lex version info
 
 set -euo pipefail
@@ -153,10 +153,7 @@ check_updates() {
         log_warning "A newer version of Lex is available: ${latest_version}"
         echo ""
         echo "To update:"
-        echo "  npm install ${PACKAGE_NAME}@${latest_version}"
-        echo ""
-        echo "Or update to latest compatible:"
-        echo "  npm update ${PACKAGE_NAME}"
+        echo "  npm install --save-exact ${PACKAGE_NAME}@${latest_version}"
         echo ""
     fi
     
@@ -196,21 +193,26 @@ show_info() {
     fi
 }
 
-# Update to latest compatible version
+# Update to an explicitly selected exact version
 update_lex() {
-    log_info "Updating Lex to latest compatible version..."
+    local requested_version="${1:-}"
+    if [ -z "$requested_version" ]; then
+        log_error "Exact Lex version is required (for example: $0 update 4.0.3)"
+        return 1
+    fi
+
+    log_info "Updating Lex to exact version ${requested_version}..."
     
     local current_version=$(get_current_version)
     echo "Current version: ${current_version}"
     
-    # Run npm update
-    log_info "Running: npm update ${PACKAGE_NAME}"
-    npm update "${PACKAGE_NAME}"
+    log_info "Running: npm install --save-exact ${PACKAGE_NAME}@${requested_version}"
+    npm install --save-exact "${PACKAGE_NAME}@${requested_version}"
     
     local new_version=$(get_installed_version)
     
     if [ "$current_version" = "$new_version" ]; then
-        log_success "Already at latest compatible version: ${new_version}"
+        log_success "Already at exact selected version: ${new_version}"
     else
         log_success "Updated Lex from ${current_version} to ${new_version}"
         echo ""
@@ -233,7 +235,7 @@ main() {
             validate_installation
             ;;
         update)
-            update_lex
+            update_lex "${2:-}"
             ;;
         info)
             show_info
@@ -246,14 +248,14 @@ main() {
             echo "Commands:"
             echo "  check      Check for available Lex updates"
             echo "  validate   Validate current Lex installation"
-            echo "  update     Update Lex to latest compatible version"
+            echo "  update     Update Lex to an explicitly selected exact version"
             echo "  info       Show Lex package information"
             echo "  help       Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 check      # Check if newer version available"
             echo "  $0 validate   # Verify installation is correct"
-            echo "  $0 update     # Update to latest compatible"
+            echo "  $0 update 4.0.3 # Update to exact selected version"
             echo ""
             ;;
         *)

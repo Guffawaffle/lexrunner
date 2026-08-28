@@ -24,17 +24,28 @@ import {
 import { createAgentTaskPacket } from "../src/schemas/agent-work.js";
 import { computeCanonicalHash } from "../src/schemas/task-contract.js";
 import { canonicalJSONStringify } from "../src/util/canonicalJson.js";
+import { resolveNpmCliPath } from "./validate-package-boundary.js";
 
 const execFileAsync = promisify(execFile);
 const MARKER = ".lexrunner-dogfood-allocation.json";
 const RECEIPT = "dogfood-receipt.json";
 const DEFAULT_ALLOCATION_ROOT = path.join(os.tmpdir(), "lexrunner-ecosystem-dogfood");
-const DEFAULT_VERSIONS = {
-  lex: "4.0.0",
-  lexMcp: "3.0.1",
-  axf: "2.0.0",
-  lexsona: "1.0.0",
+export const DEFAULT_VERSIONS = {
+  lex: "4.0.3",
+  lexMcp: "4.0.3",
+  axf: "2.1.1",
+  lexsona: "2.0.2",
 } as const;
+export const DOGFOOD_INSTALL_POLICY = {
+  network: "registry_only",
+  registries: ["https://registry.npmjs.org/"],
+  cache: "read_write",
+  lifecycle_scripts: "forbidden",
+} as const;
+
+const EXACT_STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const NATIVE_PACKAGE = "better-sqlite3-multiple-ciphers";
+const NATIVE_BINDING_RELATIVE = path.join("build", "Release", "better_sqlite3.node");
 
 interface DogfoodMarker {
   schema_version: 1;
@@ -76,7 +87,16 @@ interface RunOptions {
   versions: typeof DEFAULT_VERSIONS;
 }
 
+export function assertExactPublishedVersions(versions: Record<string, string>): void {
+  for (const [component, version] of Object.entries(versions)) {
+    if (!EXACT_STABLE_VERSION.test(version)) {
+      throw failure(`non_exact_version_${component}`);
+    }
+  }
+}
+
 export async function runEcosystemDogfood(options: RunOptions): Promise<Record<string, unknown>> {
+  assertExactPublishedVersions(options.versions);
   const startedAt = new Date().toISOString();
   const sourceState = await gitStatus(options.projectRoot);
   const allocationRoot = await ensureAllocationRoot(options.allocationRoot);
@@ -110,21 +130,24 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
     const consumerRoot = path.join(runRoot, "consumer");
     const cacheRoot = path.join(runRoot, "npm-cache");
     await Promise.all([mkdir(stageRoot), mkdir(consumerRoot), mkdir(cacheRoot)]);
+    const runtimeEnvironment = await createScrubbedRuntimeEnvironment(runRoot);
 
     await materializeCandidate(options.projectRoot, candidateRoot);
     const buildOutput = await runExpectedCommand(
       "candidate_build_failed",
-      "npm",
-      ["run", "build"],
+      process.execPath,
+      [resolveNpmCliPath(), "run", "build"],
       candidateRoot,
-      300_000
+      300_000,
+      runtimeEnvironment
     );
     const packOutput = await runExpectedCommand(
       "candidate_pack_failed",
-      "npm",
-      ["pack", "--json", "--ignore-scripts", "--pack-destination", stageRoot],
+      process.execPath,
+      [resolveNpmCliPath(), "pack", "--json", "--ignore-scripts", "--pack-destination", stageRoot],
       candidateRoot,
-      120_000
+      120_000,
+      runtimeEnvironment
     );
     const packed = (await readdir(stageRoot)).filter((entry) => entry.endsWith(".tgz"));
     if (packed.length !== 1) throw failure("pack_artifact_ambiguous");
@@ -181,17 +204,12 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
         git_write: false,
         github_write: false,
         external_runtime: true,
-        secrets: false,
+        secrets: true,
         signing: false,
         release: false,
       },
       preparation: {
-        policy: {
-          network: "registry_only",
-          registries: ["https://registry.npmjs.org/"],
-          cache: "read_write",
-          lifecycle_scripts: "forbidden",
-        },
+        policy: DOGFOOD_INSTALL_POLICY,
         steps: [
           {
             id: "install-exact-ecosystem",
@@ -230,6 +248,20 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
     );
     if (options.faultAfter === "prepare") throw interruption("fault_after_prepare");
 
+    const registryLockEvidence = await verifyRegistryOnlyPackageLock(
+      consumerRoot,
+      DOGFOOD_INSTALL_POLICY.registries[0]!,
+      tarball,
+      (await readJson(path.join(candidateRoot, "package.json"))).version!
+    );
+    receipt = await advanceReceipt(runRoot, receipt, "registry-lock", registryLockEvidence);
+
+    const nativeBindingEvidence = await materializeReviewedNativeBinding(
+      options.projectRoot,
+      consumerRoot
+    );
+    receipt = await advanceReceipt(runRoot, receipt, "native-binding", nativeBindingEvidence);
+
     const installedVersions = await readInstalledVersions(consumerRoot);
     assertExactVersions(installedVersions, requestedVersions(options.versions));
     const smoke = await runExpectedCommand(
@@ -237,7 +269,8 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
       process.execPath,
       ["--input-type=module", "--eval", PUBLIC_SURFACE_SMOKE],
       consumerRoot,
-      120_000
+      120_000,
+      runtimeEnvironment
     );
     if ((await gitStatus(options.projectRoot)) !== sourceState) {
       throw failure("source_checkout_changed");
@@ -331,7 +364,12 @@ class NpmPreparationRunner implements AgentWorkPreparationCommandRunner {
     args.push("--registry", input.policy.registries[0]!, "--cache", this.cacheRoot);
     if (input.policy.lifecycle_scripts === "forbidden") args.push("--ignore-scripts");
     try {
-      const output = await runCommand("npm", args, input.cwd, 300_000);
+      const output = await runCommand(
+        process.execPath,
+        [resolveNpmCliPath(), ...args],
+        input.cwd,
+        300_000
+      );
       return {
         exitCode: 0,
         stdout: output.stdout,
@@ -498,14 +536,246 @@ async function runCommand(
   executable: string,
   args: string[],
   cwd: string,
-  timeout: number
+  timeout: number,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync(executable, args, {
     cwd,
+    env,
     encoding: "utf8",
     maxBuffer: 256 * 1024,
     timeout,
   });
+}
+
+async function materializeReviewedNativeBinding(
+  projectRoot: string,
+  consumerRoot: string
+): Promise<string> {
+  const sourcePackageRoot = await resolveOrdinaryPackageRoot(
+    path.join(projectRoot, "node_modules"),
+    NATIVE_PACKAGE,
+    "native_binding_source_root_invalid"
+  );
+  const targetPackageRoot = await resolveOrdinaryPackageRoot(
+    path.join(consumerRoot, "node_modules"),
+    NATIVE_PACKAGE,
+    "native_binding_target_root_invalid"
+  );
+  const [sourceManifest, targetManifest, sourceLock, targetLock] = await Promise.all([
+    readJson(path.join(sourcePackageRoot, "package.json")),
+    readJson(path.join(targetPackageRoot, "package.json")),
+    readLockPackage(projectRoot, NATIVE_PACKAGE),
+    readLockPackage(consumerRoot, NATIVE_PACKAGE),
+  ]);
+  if (sourceManifest.name !== NATIVE_PACKAGE || targetManifest.name !== NATIVE_PACKAGE) {
+    throw failure("native_binding_package_name_mismatch");
+  }
+  for (const identity of [sourceManifest, targetManifest, sourceLock, targetLock]) {
+    if (identity.version !== sourceLock.version) throw failure("native_binding_version_mismatch");
+  }
+  if (
+    sourceLock.resolved !== targetLock.resolved ||
+    sourceLock.integrity !== targetLock.integrity ||
+    !sourceLock.resolved.startsWith("https://registry.npmjs.org/") ||
+    !sourceLock.integrity.startsWith("sha512-")
+  ) {
+    throw failure("native_binding_registry_identity_mismatch");
+  }
+
+  const sourceBindingInput = path.join(sourcePackageRoot, NATIVE_BINDING_RELATIVE);
+  const sourceStat = await lstat(sourceBindingInput);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw failure("native_binding_source_invalid");
+  }
+  const sourceBinding = await realpath(sourceBindingInput);
+  assertDescendant(sourcePackageRoot, sourceBinding, "native_binding_source_escape");
+  const targetDirectory = path.join(targetPackageRoot, "build", "Release");
+  await mkdir(targetDirectory, { recursive: true });
+  const resolvedTargetDirectory = await realpath(targetDirectory);
+  assertDescendant(targetPackageRoot, resolvedTargetDirectory, "native_binding_target_escape");
+  const bytes = await readFile(sourceBinding);
+  await writeFile(path.join(resolvedTargetDirectory, "better_sqlite3.node"), bytes, { flag: "wx" });
+  return computeCanonicalHash({
+    package: NATIVE_PACKAGE,
+    version: sourceLock.version,
+    resolved: sourceLock.resolved,
+    integrity: sourceLock.integrity,
+    binding_sha256: hashBytes(bytes),
+    platform: process.platform,
+    architecture: process.arch,
+    node_abi: process.versions.modules,
+  });
+}
+
+async function readJson(file: string): Promise<Record<string, string>> {
+  return JSON.parse(await readFile(file, "utf8")) as Record<string, string>;
+}
+
+async function verifyRegistryOnlyPackageLock(
+  root: string,
+  registry: string,
+  candidateTarball: string,
+  candidateVersion: string
+): Promise<string> {
+  const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8")) as {
+    packages?: Record<string, Record<string, string>>;
+  };
+  if (!lock.packages) throw failure("registry_lock_packages_missing");
+  const candidateIdentity = lock.packages["node_modules/@smartergpt/lexrunner"];
+  if (!candidateIdentity?.resolved?.startsWith("file:")) {
+    throw failure("registry_lock_candidate_identity_missing");
+  }
+  const candidateInput = resolveFileSpec(root, candidateIdentity.resolved);
+  const [candidateInputStat, expectedStat] = await Promise.all([
+    lstat(candidateInput),
+    lstat(candidateTarball),
+  ]);
+  if (
+    !candidateInputStat.isFile() ||
+    candidateInputStat.isSymbolicLink() ||
+    !expectedStat.isFile() ||
+    expectedStat.isSymbolicLink()
+  ) {
+    throw failure("registry_lock_candidate_file_invalid");
+  }
+  const [resolvedCandidate, resolvedExpected, candidateBytes] = await Promise.all([
+    realpath(candidateInput),
+    realpath(candidateTarball),
+    readFile(candidateTarball),
+  ]);
+  if (resolvedCandidate !== resolvedExpected)
+    throw failure("registry_lock_candidate_path_mismatch");
+  return computeCanonicalHash(
+    assertRegistryOnlyPackageLock(lock.packages, registry, {
+      version: candidateVersion,
+      resolved: candidateIdentity.resolved,
+      integrity: hashSri(candidateBytes),
+    })
+  );
+}
+
+export function assertRegistryOnlyPackageLock(
+  packages: Record<string, Record<string, string>>,
+  registry: string,
+  expectedCandidate: { version: string; resolved: string; integrity: string }
+): Array<{ path: string; version: string; resolved: string; integrity: string }> {
+  let localCandidateCount = 0;
+  const identities: Array<{ path: string; version: string; resolved: string; integrity: string }> =
+    [];
+  for (const [packagePath, identity] of Object.entries(packages)) {
+    if (!identity.resolved) continue;
+    if (packagePath === "node_modules/@smartergpt/lexrunner") {
+      if (
+        identity.version !== expectedCandidate.version ||
+        identity.resolved !== expectedCandidate.resolved ||
+        identity.integrity !== expectedCandidate.integrity
+      ) {
+        throw failure("registry_lock_candidate_identity_invalid");
+      }
+      localCandidateCount += 1;
+    } else if (!identity.resolved.startsWith(registry) || !identity.integrity) {
+      throw failure("registry_lock_external_resolution");
+    }
+    identities.push({
+      path: packagePath,
+      version: identity.version ?? "",
+      resolved: identity.resolved,
+      integrity: identity.integrity,
+    });
+  }
+  if (localCandidateCount !== 1) throw failure("registry_lock_candidate_identity_missing");
+  return identities;
+}
+
+export async function resolveOrdinaryPackageRoot(
+  nodeModulesInput: string,
+  packageName: string,
+  code: string
+): Promise<string> {
+  const nodeModulesStat = await lstat(nodeModulesInput);
+  if (!nodeModulesStat.isDirectory() || nodeModulesStat.isSymbolicLink()) throw failure(code);
+  const nodeModulesRoot = await realpath(nodeModulesInput);
+  const packageInput = path.join(nodeModulesRoot, packageName);
+  const packageStat = await lstat(packageInput);
+  if (!packageStat.isDirectory() || packageStat.isSymbolicLink()) throw failure(code);
+  const packageRoot = await realpath(packageInput);
+  assertDescendant(nodeModulesRoot, packageRoot, code);
+  return packageRoot;
+}
+
+function resolveFileSpec(root: string, resolved: string): string {
+  return path.resolve(root, decodeURIComponent(resolved.slice("file:".length)));
+}
+
+async function readLockPackage(root: string, packageName: string): Promise<Record<string, string>> {
+  const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8")) as {
+    packages?: Record<string, Record<string, string>>;
+  };
+  const identity = lock.packages?.[`node_modules/${packageName}`];
+  if (!identity?.version || !identity.resolved || !identity.integrity) {
+    throw failure("native_binding_lock_identity_missing");
+  }
+  return identity;
+}
+
+function assertDescendant(root: string, candidate: string, code: string): void {
+  const relative = path.relative(root, candidate);
+  if (
+    !relative ||
+    relative.startsWith(`..${path.sep}`) ||
+    relative === ".." ||
+    path.isAbsolute(relative)
+  ) {
+    throw failure(code);
+  }
+}
+
+async function createScrubbedRuntimeEnvironment(runRoot: string): Promise<NodeJS.ProcessEnv> {
+  const home = path.join(runRoot, "runtime-home");
+  const temporary = path.join(runRoot, "runtime-temp");
+  await Promise.all([mkdir(home), mkdir(temporary)]);
+  const userConfig = path.join(home, ".npmrc");
+  const globalConfig = path.join(home, "global.npmrc");
+  await Promise.all([
+    writeFile(userConfig, "", { flag: "wx" }),
+    writeFile(globalConfig, "", { flag: "wx" }),
+  ]);
+  return scrubRuntimeEnvironment(process.env, home, temporary, userConfig, globalConfig);
+}
+
+export function scrubRuntimeEnvironment(
+  source: NodeJS.ProcessEnv,
+  home: string,
+  temporary: string,
+  userConfig: string,
+  globalConfig: string
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = {};
+  for (const key of [
+    "PATH",
+    "Path",
+    "PATHEXT",
+    "ComSpec",
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "LANG",
+    "LC_ALL",
+    "CI",
+  ]) {
+    if (source[key] !== undefined) result[key] = source[key];
+  }
+  return {
+    ...result,
+    HOME: home,
+    USERPROFILE: home,
+    TEMP: temporary,
+    TMP: temporary,
+    TMPDIR: temporary,
+    NPM_CONFIG_USERCONFIG: userConfig,
+    NPM_CONFIG_GLOBALCONFIG: globalConfig,
+  };
 }
 
 async function runExpectedCommand(
@@ -513,10 +783,11 @@ async function runExpectedCommand(
   executable: string,
   args: string[],
   cwd: string,
-  timeout: number
+  timeout: number,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<{ stdout: string; stderr: string }> {
   try {
-    return await runCommand(executable, args, cwd, timeout);
+    return await runCommand(executable, args, cwd, timeout, env);
   } catch {
     throw failure(failureCode);
   }
@@ -581,6 +852,14 @@ function hashText(value: string): string {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
+function hashBytes(value: Buffer): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function hashSri(value: Buffer): string {
+  return `sha512-${createHash("sha512").update(value).digest("base64")}`;
+}
+
 function required<T>(value: T | undefined, code: string): T {
   if (value === undefined) throw failure(code);
   return value;
@@ -608,6 +887,7 @@ function policyFailure(policyHash: string, message: string) {
 
 const PUBLIC_SURFACE_SMOKE = String.raw`
   import { spawn, execFileSync } from "node:child_process";
+  import { readFileSync } from "node:fs";
   import path from "node:path";
   const lex = await import("@smartergpt/lex");
   const lexMcp = await import("@smartergpt/lex-mcp");
@@ -619,12 +899,18 @@ const PUBLIC_SURFACE_SMOKE = String.raw`
   for (const name of ["AgentWorkPreparationReceipt_v1", "AgentWorkFanoutPlan_v1", "executeAgentWorkPreparation", "AgentWorkFanoutService"]) {
     if (!(name in lexrunner)) throw new Error("missing LexRunner surface: " + name);
   }
-  const bin = path.join(process.cwd(), "node_modules", ".bin");
-  for (const [name, args] of [["lex", ["--help"]], ["axf", ["--help"]], ["lexsona", ["--help"]], ["lex-pr", ["--help"]]]) {
-    execFileSync(path.join(bin, name), args, { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  function packageBin(packageName, binName) {
+    const packageRoot = path.join(process.cwd(), "node_modules", ...packageName.split("/"));
+    const manifest = JSON.parse(readFileSync(path.join(packageRoot, "package.json"), "utf8"));
+    const relativeTarget = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
+    if (typeof relativeTarget !== "string") throw new Error("missing package bin: " + packageName + ":" + binName);
+    return path.join(packageRoot, relativeTarget);
+  }
+  for (const [packageName, binName, args] of [["@smartergpt/lex", "lex", ["--help"]], ["@smartergpt/axf", "axf", ["--help"]], ["@smartergpt/lexsona", "lexsona", ["--help"]], ["@smartergpt/lexrunner", "lex-pr", ["--help"]]]) {
+    execFileSync(process.execPath, [packageBin(packageName, binName), ...args], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   }
   const mcp = await new Promise((resolve, reject) => {
-    const child = spawn(path.join(bin, "lex-mcp"), [], { cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [packageBin("@smartergpt/lex-mcp", "lex-mcp")], { cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timeout = setTimeout(() => { child.kill("SIGTERM"); reject(new Error("lex-mcp timeout")); }, 15000);

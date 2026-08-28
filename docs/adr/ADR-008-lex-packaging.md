@@ -32,7 +32,7 @@ We adopt **npm registry publish** as the packaging strategy for Lex.
 Lex is published to the public npm registry as:
 
 - **Package name:** `@smartergpt/lex`
-- **Current supported line:** `4.0.0` (LexRunner 1.2 and 1.3 used the prior 3.0.1 line)
+- **Current supported release:** exact `4.0.3` (LexRunner 1.2 and 1.3 used the prior 3.0.1 line)
 - **License:** MIT
 - **Registry:** https://registry.npmjs.org
 
@@ -41,7 +41,7 @@ LexRunner consumes Lex via standard npm dependency mechanism:
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^4.0.0"
+    "@smartergpt/lex": "4.0.3"
   }
 }
 ```
@@ -64,8 +64,9 @@ Lex provides modular exports for selective imports:
   - **MAJOR** — Breaking API changes
   - **MINOR** — New features, backward compatible
   - **PATCH** — Bug fixes, backward compatible
-- **LexRunner Pinning:** Use caret range (`^4.0.0`) to allow MINOR/PATCH updates within the
-  compatibility-tested Lex 4 line
+- **LexRunner Pinning:** Bind the exact compatibility-tested Lex release (`4.0.3`) in both the
+  manifest and lockfile. A Lex update is a deliberate reviewed LexRunner change rather than an
+  install-time choice.
 - **Testing:** CI validates LexRunner against pinned Lex version before merge
 
 ---
@@ -128,7 +129,8 @@ Lex provides modular exports for selective imports:
 
 ### Versioning & Updates
 
-1. **Controlled Updates** — Use caret range (`^4.0.0`) to allow PATCH/MINOR, block MAJOR
+1. **Controlled Updates** — Pin the exact tested version so fresh consumers and the checked-in
+   lock resolve the same Lex identity
 2. **Testing Gate** — CI must pass before merging Lex updates
 3. **Review Process** — PRs with Lex updates require maintainer approval
 4. **Rollback** — Revert package.json change if update breaks LexRunner
@@ -138,7 +140,8 @@ Lex provides modular exports for selective imports:
 If a Lex update breaks LexRunner:
 
 1. **Immediate Rollback** — Revert package.json to previous version
-2. **Lock Specific Version** — Change `^4.0.0` to `4.0.0` to prevent auto-updates
+2. **Lock Previous Version** — Change the exact pin back to the last independently verified Lex
+   release
 3. **Root Cause Analysis** — Identify breaking change in Lex
 4. **Upstream Issue** — File issue in Lex repository
 5. **Fix Forward** — Once Lex releases patch, update LexRunner
@@ -163,18 +166,15 @@ Manual update process:
 # 1. Check for updates
 npm outdated @smartergpt/lex
 
-# 2. Update to latest compatible version
-npm update @smartergpt/lex
+# 2. Update to the selected exact version
+npm install --save-exact @smartergpt/lex@4.0.3
 
-# 3. Or update to specific version
-npm install @smartergpt/lex@4.0.0
-
-# 4. Run tests
+# 3. Run tests
 npm test
 
-# 5. Commit if tests pass
+# 4. Commit if tests pass
 git add package.json package-lock.json
-git commit -m "Update Lex dependency to 4.0.0"
+git commit -m "Update Lex dependency to 4.0.3"
 ```
 
 Automated update (via Dependabot):
