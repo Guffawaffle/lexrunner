@@ -245,9 +245,9 @@ When Lex introduces breaking changes:
 
 ### Current Version Contract
 
-- **Lex Version**: `^2.0.2` (specified in LexRunner's `package.json`)
-- **Minimum Compatible**: `2.0.0`
-- **Tested Against**: `2.0.2`
+- **Lex Version**: exact `4.0.3` (specified in LexRunner's `package.json`)
+- **Minimum Compatible**: `4.0.3` for the current LexRunner release
+- **Tested Against**: `4.0.3`
 
 ## Internal-Only Code
 

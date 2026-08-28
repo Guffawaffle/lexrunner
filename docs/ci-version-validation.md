@@ -9,7 +9,7 @@ LexRunner uses **strict version pinning** via `package-lock.json` to ensure Lex 
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^2.0.2"
+    "@smartergpt/lex": "4.0.3"
   }
 }
 ```
@@ -34,7 +34,7 @@ LexRunner uses **strict version pinning** via `package-lock.json` to ensure Lex 
 **What it validates**:
 
 - Exact package versions from `package-lock.json`
-- Lex version matches `^2.0.2` constraint
+- Lex version matches the exact `4.0.3` manifest constraint and lock identity
 - All peer dependencies satisfied
 
 **Failure modes**:
@@ -88,8 +88,8 @@ LexRunner uses **strict version pinning** via `package-lock.json` to ensure Lex 
 # 1. Check current version
 npm list @smartergpt/lex
 
-# 2. Update (example: 2.0.2 → 2.1.0)
-npm install @smartergpt/lex@^2.1.0
+# 2. Update to an explicitly selected published version
+npm install --save-exact @smartergpt/lex@4.0.3
 
 # 3. Verify compatibility
 npm run typecheck
@@ -125,8 +125,8 @@ npm list @smartergpt/lex
 **Expected output**:
 
 ```
-lexrunner@0.6.0 /path/to/lexrunner
-└── @smartergpt/lex@2.0.2
+@smartergpt/lexrunner@1.5.2 /path/to/lexrunner
+└── @smartergpt/lex@4.0.3
 ```
 
 ### Verify Frame Schema v2 Support
@@ -178,21 +178,21 @@ npm install
 
 ### Error: "Property 'runId' does not exist on type..."
 
-**Cause**: Lex version too old (< 2.0.0)
+**Cause**: The installed Lex identity does not match the exact release validated by LexRunner.
 
 **Fix**:
 
 ```bash
-npm install @smartergpt/lex@^2.0.2
+npm install --save-exact @smartergpt/lex@4.0.3
 ```
 
 ### Error: "Frame validation failed: missing required field 'runId'"
 
-**Cause**: Runtime schema mismatch (Lex v2 not installed)
+**Cause**: Runtime schema mismatch (the exact validated Lex release is not installed).
 
-**Fix**: Same as above - update Lex to v2.x
+**Fix**: Same as above - install exact Lex 4.0.3.
 
 ---
 
-**Last Updated**: 2025-12-28  
+**Last Updated**: 2026-08-27
 **Maintainer**: LexRunner Team

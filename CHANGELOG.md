@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-08-28
+
+### Changed
+
+- **Exact Lex runtime identity** - Bind the direct runtime dependency and reproducible lock to the
+  reviewed public `@smartergpt/lex@4.0.3` release instead of allowing install-time selection across
+  the Lex 4 line.
+- **Current ecosystem dogfood baseline** - Exercise Lex 4.0.3, Lex-MCP 4.0.3, AXF 2.1.1, and
+  LexSona 2.0.2 by default while retaining explicit version overrides.
+- **Native Windows dogfood launch** - Invoke npm and installed package bins through the active Node
+  runtime so the exact ecosystem harness does not depend on platform shell shims.
+- **Complete disposable ecosystem install** - Allow reviewed package lifecycle scripts only in the
+  exact-pinned disposable dogfood consumer so Lex-MCP's native SQLite fallback is available to the
+  public-surface smoke.
+
 ## [1.5.1] - 2026-08-23
 
 ### Fixed

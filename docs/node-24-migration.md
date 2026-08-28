@@ -53,7 +53,7 @@ $smoke = Join-Path $env:TEMP ("lexrunner-node24-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $smoke | Out-Null
 Push-Location $smoke
 npm init -y
-npm install @smartergpt/lexrunner@1.5.1
+npm install @smartergpt/lexrunner@1.5.2
 npx lexrunner --version
 npx lexrunner --help
 npx lex-pr --version

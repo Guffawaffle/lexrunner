@@ -5,7 +5,12 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { inspectDogfoodRun, reapDogfoodRun } from "../scripts/dogfood-ecosystem.js";
+import {
+  DEFAULT_VERSIONS,
+  DOGFOOD_INSTALL_POLICY,
+  inspectDogfoodRun,
+  reapDogfoodRun,
+} from "../scripts/dogfood-ecosystem.js";
 import { computeCanonicalHash } from "../src/schemas/task-contract.js";
 import { canonicalJSONStringify } from "../src/util/canonicalJson.js";
 
@@ -19,6 +24,24 @@ afterEach(async () => {
 });
 
 describe("ecosystem dogfood allocation lifecycle", () => {
+  it("defaults to the coordinated published ecosystem", () => {
+    expect(DEFAULT_VERSIONS).toEqual({
+      lex: "4.0.3",
+      lexMcp: "4.0.3",
+      axf: "2.1.1",
+      lexsona: "2.0.2",
+    });
+  });
+
+  it("allows lifecycle scripts only for the exact disposable ecosystem install", () => {
+    expect(DOGFOOD_INSTALL_POLICY).toEqual({
+      network: "registry_only",
+      registries: ["https://registry.npmjs.org/"],
+      cache: "read_write",
+      lifecycle_scripts: "allowed",
+    });
+  });
+
   it("inspects compact status, exposes bounded diagnostics explicitly, and reaps idempotently", async () => {
     const { allocationRoot, runRoot } = await fixture();
     await expect(inspectDogfoodRun({ allocationRoot, runRoot })).resolves.toEqual({

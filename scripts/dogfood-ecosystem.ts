@@ -24,16 +24,23 @@ import {
 import { createAgentTaskPacket } from "../src/schemas/agent-work.js";
 import { computeCanonicalHash } from "../src/schemas/task-contract.js";
 import { canonicalJSONStringify } from "../src/util/canonicalJson.js";
+import { resolveNpmCliPath } from "./validate-package-boundary.js";
 
 const execFileAsync = promisify(execFile);
 const MARKER = ".lexrunner-dogfood-allocation.json";
 const RECEIPT = "dogfood-receipt.json";
 const DEFAULT_ALLOCATION_ROOT = path.join(os.tmpdir(), "lexrunner-ecosystem-dogfood");
-const DEFAULT_VERSIONS = {
-  lex: "4.0.0",
-  lexMcp: "3.0.1",
-  axf: "2.0.0",
-  lexsona: "1.0.0",
+export const DEFAULT_VERSIONS = {
+  lex: "4.0.3",
+  lexMcp: "4.0.3",
+  axf: "2.1.1",
+  lexsona: "2.0.2",
+} as const;
+export const DOGFOOD_INSTALL_POLICY = {
+  network: "registry_only",
+  registries: ["https://registry.npmjs.org/"],
+  cache: "read_write",
+  lifecycle_scripts: "allowed",
 } as const;
 
 interface DogfoodMarker {
@@ -114,15 +121,15 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
     await materializeCandidate(options.projectRoot, candidateRoot);
     const buildOutput = await runExpectedCommand(
       "candidate_build_failed",
-      "npm",
-      ["run", "build"],
+      process.execPath,
+      [resolveNpmCliPath(), "run", "build"],
       candidateRoot,
       300_000
     );
     const packOutput = await runExpectedCommand(
       "candidate_pack_failed",
-      "npm",
-      ["pack", "--json", "--ignore-scripts", "--pack-destination", stageRoot],
+      process.execPath,
+      [resolveNpmCliPath(), "pack", "--json", "--ignore-scripts", "--pack-destination", stageRoot],
       candidateRoot,
       120_000
     );
@@ -186,12 +193,7 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
         release: false,
       },
       preparation: {
-        policy: {
-          network: "registry_only",
-          registries: ["https://registry.npmjs.org/"],
-          cache: "read_write",
-          lifecycle_scripts: "forbidden",
-        },
+        policy: DOGFOOD_INSTALL_POLICY,
         steps: [
           {
             id: "install-exact-ecosystem",
@@ -331,7 +333,12 @@ class NpmPreparationRunner implements AgentWorkPreparationCommandRunner {
     args.push("--registry", input.policy.registries[0]!, "--cache", this.cacheRoot);
     if (input.policy.lifecycle_scripts === "forbidden") args.push("--ignore-scripts");
     try {
-      const output = await runCommand("npm", args, input.cwd, 300_000);
+      const output = await runCommand(
+        process.execPath,
+        [resolveNpmCliPath(), ...args],
+        input.cwd,
+        300_000
+      );
       return {
         exitCode: 0,
         stdout: output.stdout,
@@ -608,6 +615,7 @@ function policyFailure(policyHash: string, message: string) {
 
 const PUBLIC_SURFACE_SMOKE = String.raw`
   import { spawn, execFileSync } from "node:child_process";
+  import { readFileSync } from "node:fs";
   import path from "node:path";
   const lex = await import("@smartergpt/lex");
   const lexMcp = await import("@smartergpt/lex-mcp");
@@ -619,12 +627,18 @@ const PUBLIC_SURFACE_SMOKE = String.raw`
   for (const name of ["AgentWorkPreparationReceipt_v1", "AgentWorkFanoutPlan_v1", "executeAgentWorkPreparation", "AgentWorkFanoutService"]) {
     if (!(name in lexrunner)) throw new Error("missing LexRunner surface: " + name);
   }
-  const bin = path.join(process.cwd(), "node_modules", ".bin");
-  for (const [name, args] of [["lex", ["--help"]], ["axf", ["--help"]], ["lexsona", ["--help"]], ["lex-pr", ["--help"]]]) {
-    execFileSync(path.join(bin, name), args, { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  function packageBin(packageName, binName) {
+    const packageRoot = path.join(process.cwd(), "node_modules", ...packageName.split("/"));
+    const manifest = JSON.parse(readFileSync(path.join(packageRoot, "package.json"), "utf8"));
+    const relativeTarget = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
+    if (typeof relativeTarget !== "string") throw new Error("missing package bin: " + packageName + ":" + binName);
+    return path.join(packageRoot, relativeTarget);
+  }
+  for (const [packageName, binName, args] of [["@smartergpt/lex", "lex", ["--help"]], ["@smartergpt/axf", "axf", ["--help"]], ["@smartergpt/lexsona", "lexsona", ["--help"]], ["@smartergpt/lexrunner", "lex-pr", ["--help"]]]) {
+    execFileSync(process.execPath, [packageBin(packageName, binName), ...args], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   }
   const mcp = await new Promise((resolve, reject) => {
-    const child = spawn(path.join(bin, "lex-mcp"), [], { cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [packageBin("@smartergpt/lex-mcp", "lex-mcp")], { cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timeout = setTimeout(() => { child.kill("SIGTERM"); reject(new Error("lex-mcp timeout")); }, 15000);

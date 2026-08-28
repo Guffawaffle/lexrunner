@@ -588,7 +588,7 @@ LexRunner pins Lex version in `package.json`:
 ```json
 {
   "dependencies": {
-    "@smartergpt/lex": "^2.0.2"
+    "@smartergpt/lex": "4.0.3"
   }
 }
 ```
