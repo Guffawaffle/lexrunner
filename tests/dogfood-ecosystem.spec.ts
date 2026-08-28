@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_VERSIONS,
   DOGFOOD_INSTALL_POLICY,
+  assertExactPublishedVersions,
+  assertRegistryOnlyPackageLock,
   inspectDogfoodRun,
   reapDogfoodRun,
 } from "../scripts/dogfood-ecosystem.js";
@@ -33,13 +35,61 @@ describe("ecosystem dogfood allocation lifecycle", () => {
     });
   });
 
-  it("allows lifecycle scripts only for the exact disposable ecosystem install", () => {
+  it("forbids package lifecycle scripts during the credentialed registry install", () => {
     expect(DOGFOOD_INSTALL_POLICY).toEqual({
       network: "registry_only",
       registries: ["https://registry.npmjs.org/"],
       cache: "read_write",
-      lifecycle_scripts: "allowed",
+      lifecycle_scripts: "forbidden",
     });
+  });
+
+  it("rejects non-exact package selections before installation", () => {
+    expect(() => assertExactPublishedVersions(DEFAULT_VERSIONS)).not.toThrow();
+    for (const version of [
+      "^4.0.3",
+      "latest",
+      "npm:@smartergpt/lex@4.0.3",
+      "file:../lex",
+      "git+https://github.com/Guffawaffle/lex.git",
+      "github:Guffawaffle/lex",
+      "https://example.test/lex.tgz",
+      "4.0.3-beta.1",
+    ]) {
+      expect(() => assertExactPublishedVersions({ lex: version })).toThrow("non_exact_version_lex");
+    }
+  });
+
+  it("accepts only registry lock entries plus the staged LexRunner tarball", () => {
+    const valid = {
+      "": {},
+      "node_modules/example": {
+        version: "1.2.3",
+        resolved: "https://registry.npmjs.org/example/-/example-1.2.3.tgz",
+        integrity: "sha512-example",
+      },
+      "node_modules/@smartergpt/lexrunner": {
+        version: "1.5.2",
+        resolved: "file:../../stage/smartergpt-lexrunner-1.5.2.tgz",
+        integrity: "sha512-candidate",
+      },
+    };
+    expect(assertRegistryOnlyPackageLock(valid, "https://registry.npmjs.org/")).toHaveLength(2);
+    for (const resolved of [
+      "https://example.test/package.tgz",
+      "git+https://github.com/example/package.git",
+      "file:../../outside.tgz",
+    ]) {
+      expect(() =>
+        assertRegistryOnlyPackageLock(
+          {
+            ...valid,
+            "node_modules/escape": { version: "1.0.0", resolved, integrity: "sha512-x" },
+          },
+          "https://registry.npmjs.org/"
+        )
+      ).toThrow("registry_lock_external_resolution");
+    }
   });
 
   it("inspects compact status, exposes bounded diagnostics explicitly, and reaps idempotently", async () => {

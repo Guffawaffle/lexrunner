@@ -40,8 +40,12 @@ export const DOGFOOD_INSTALL_POLICY = {
   network: "registry_only",
   registries: ["https://registry.npmjs.org/"],
   cache: "read_write",
-  lifecycle_scripts: "allowed",
+  lifecycle_scripts: "forbidden",
 } as const;
+
+const EXACT_STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const NATIVE_PACKAGE = "better-sqlite3-multiple-ciphers";
+const NATIVE_BINDING_RELATIVE = path.join("build", "Release", "better_sqlite3.node");
 
 interface DogfoodMarker {
   schema_version: 1;
@@ -83,7 +87,16 @@ interface RunOptions {
   versions: typeof DEFAULT_VERSIONS;
 }
 
+export function assertExactPublishedVersions(versions: Record<string, string>): void {
+  for (const [component, version] of Object.entries(versions)) {
+    if (!EXACT_STABLE_VERSION.test(version)) {
+      throw failure(`non_exact_version_${component}`);
+    }
+  }
+}
+
 export async function runEcosystemDogfood(options: RunOptions): Promise<Record<string, unknown>> {
+  assertExactPublishedVersions(options.versions);
   const startedAt = new Date().toISOString();
   const sourceState = await gitStatus(options.projectRoot);
   const allocationRoot = await ensureAllocationRoot(options.allocationRoot);
@@ -188,7 +201,7 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
         git_write: false,
         github_write: false,
         external_runtime: true,
-        secrets: false,
+        secrets: true,
         signing: false,
         release: false,
       },
@@ -231,6 +244,18 @@ export async function runEcosystemDogfood(options: RunOptions): Promise<Record<s
       preparation.receipt.receipt_hash
     );
     if (options.faultAfter === "prepare") throw interruption("fault_after_prepare");
+
+    const registryLockEvidence = await verifyRegistryOnlyPackageLock(
+      consumerRoot,
+      DOGFOOD_INSTALL_POLICY.registries[0]!
+    );
+    receipt = await advanceReceipt(runRoot, receipt, "registry-lock", registryLockEvidence);
+
+    const nativeBindingEvidence = await materializeReviewedNativeBinding(
+      options.projectRoot,
+      consumerRoot
+    );
+    receipt = await advanceReceipt(runRoot, receipt, "native-binding", nativeBindingEvidence);
 
     const installedVersions = await readInstalledVersions(consumerRoot);
     assertExactVersions(installedVersions, requestedVersions(options.versions));
@@ -515,6 +540,117 @@ async function runCommand(
   });
 }
 
+async function materializeReviewedNativeBinding(
+  projectRoot: string,
+  consumerRoot: string
+): Promise<string> {
+  const sourcePackageRoot = await realpath(path.join(projectRoot, "node_modules", NATIVE_PACKAGE));
+  const targetPackageRoot = await realpath(path.join(consumerRoot, "node_modules", NATIVE_PACKAGE));
+  const [sourceManifest, targetManifest, sourceLock, targetLock] = await Promise.all([
+    readJson(path.join(sourcePackageRoot, "package.json")),
+    readJson(path.join(targetPackageRoot, "package.json")),
+    readLockPackage(projectRoot, NATIVE_PACKAGE),
+    readLockPackage(consumerRoot, NATIVE_PACKAGE),
+  ]);
+  for (const identity of [sourceManifest, targetManifest, sourceLock, targetLock]) {
+    if (identity.version !== sourceLock.version) throw failure("native_binding_version_mismatch");
+  }
+  if (
+    sourceLock.resolved !== targetLock.resolved ||
+    sourceLock.integrity !== targetLock.integrity ||
+    !sourceLock.resolved.startsWith("https://registry.npmjs.org/") ||
+    !sourceLock.integrity.startsWith("sha512-")
+  ) {
+    throw failure("native_binding_registry_identity_mismatch");
+  }
+
+  const sourceBinding = await realpath(path.join(sourcePackageRoot, NATIVE_BINDING_RELATIVE));
+  assertDescendant(sourcePackageRoot, sourceBinding, "native_binding_source_escape");
+  const sourceStat = await lstat(sourceBinding);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw failure("native_binding_source_invalid");
+  }
+  const targetDirectory = path.join(targetPackageRoot, "build", "Release");
+  await mkdir(targetDirectory, { recursive: true });
+  const resolvedTargetDirectory = await realpath(targetDirectory);
+  assertDescendant(targetPackageRoot, resolvedTargetDirectory, "native_binding_target_escape");
+  const bytes = await readFile(sourceBinding);
+  await writeFile(path.join(resolvedTargetDirectory, "better_sqlite3.node"), bytes, { flag: "wx" });
+  return computeCanonicalHash({
+    package: NATIVE_PACKAGE,
+    version: sourceLock.version,
+    resolved: sourceLock.resolved,
+    integrity: sourceLock.integrity,
+    binding_sha256: hashBytes(bytes),
+    platform: process.platform,
+    architecture: process.arch,
+    node_abi: process.versions.modules,
+  });
+}
+
+async function readJson(file: string): Promise<Record<string, string>> {
+  return JSON.parse(await readFile(file, "utf8")) as Record<string, string>;
+}
+
+async function verifyRegistryOnlyPackageLock(root: string, registry: string): Promise<string> {
+  const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8")) as {
+    packages?: Record<string, Record<string, string>>;
+  };
+  if (!lock.packages) throw failure("registry_lock_packages_missing");
+  return computeCanonicalHash(assertRegistryOnlyPackageLock(lock.packages, registry));
+}
+
+export function assertRegistryOnlyPackageLock(
+  packages: Record<string, Record<string, string>>,
+  registry: string
+): Array<{ path: string; version: string; resolved: string; integrity: string }> {
+  let localCandidateCount = 0;
+  const identities: Array<{ path: string; version: string; resolved: string; integrity: string }> =
+    [];
+  for (const [packagePath, identity] of Object.entries(packages)) {
+    if (!identity.resolved) continue;
+    if (packagePath === "node_modules/@smartergpt/lexrunner") {
+      if (!identity.resolved.startsWith("file:") || !identity.integrity) {
+        throw failure("registry_lock_candidate_identity_invalid");
+      }
+      localCandidateCount += 1;
+    } else if (!identity.resolved.startsWith(registry) || !identity.integrity) {
+      throw failure("registry_lock_external_resolution");
+    }
+    identities.push({
+      path: packagePath,
+      version: identity.version ?? "",
+      resolved: identity.resolved,
+      integrity: identity.integrity,
+    });
+  }
+  if (localCandidateCount !== 1) throw failure("registry_lock_candidate_identity_missing");
+  return identities;
+}
+
+async function readLockPackage(root: string, packageName: string): Promise<Record<string, string>> {
+  const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8")) as {
+    packages?: Record<string, Record<string, string>>;
+  };
+  const identity = lock.packages?.[`node_modules/${packageName}`];
+  if (!identity?.version || !identity.resolved || !identity.integrity) {
+    throw failure("native_binding_lock_identity_missing");
+  }
+  return identity;
+}
+
+function assertDescendant(root: string, candidate: string, code: string): void {
+  const relative = path.relative(root, candidate);
+  if (
+    !relative ||
+    relative.startsWith(`..${path.sep}`) ||
+    relative === ".." ||
+    path.isAbsolute(relative)
+  ) {
+    throw failure(code);
+  }
+}
+
 async function runExpectedCommand(
   failureCode: string,
   executable: string,
@@ -585,6 +721,10 @@ function monotonicNow(): () => string {
 }
 
 function hashText(value: string): string {
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function hashBytes(value: Buffer): string {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 

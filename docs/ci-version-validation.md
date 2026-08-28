@@ -97,7 +97,7 @@ npm test
 
 # 4. Commit lock file changes
 git add package.json package-lock.json
-git commit -m "deps: Update @smartergpt/lex to ^2.1.0"
+git commit -m "Pin Lex to exact 4.0.3"
 ```
 
 ### Breaking Change Detection

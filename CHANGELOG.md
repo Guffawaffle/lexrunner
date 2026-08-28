@@ -17,9 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   LexSona 2.0.2 by default while retaining explicit version overrides.
 - **Native Windows dogfood launch** - Invoke npm and installed package bins through the active Node
   runtime so the exact ecosystem harness does not depend on platform shell shims.
-- **Complete disposable ecosystem install** - Allow reviewed package lifecycle scripts only in the
-  exact-pinned disposable dogfood consumer so Lex-MCP's native SQLite fallback is available to the
-  public-surface smoke.
+- **Contained disposable native binding** - Forbid lifecycle scripts during the credentialed
+  ecosystem install, then copy one exact identity-checked native SQLite binding from LexRunner's
+  gated dependency tree for the public-surface smoke; reject and hash non-registry lock resolutions.
 
 ## [1.5.1] - 2026-08-23
 

@@ -37,11 +37,14 @@ npm run dogfood:ecosystem -- run \
 
 Package versions are exact CLI inputs (`--lex`, `--lex-mcp`, `--axf`, and `--lexsona`). The npm
 registry and cache policy are packet data; they are not inferred from an adjacent checkout. The
-native cache directory lives below the disposable allocation root. This exact-pinned, disposable
-consumer install allows package lifecycle scripts because Lex-MCP's SQLite fallback requires its
-reviewed native binding to be materialized before the public `tools/list` smoke. Other preparation
-packets remain governed by their own policy and keep lifecycle scripts forbidden unless they opt in
-explicitly.
+native cache directory lives below the disposable allocation root. Every version override must be
+an exact stable SemVer before any registry access. The credentialed npm install forbids all package
+lifecycle scripts. After registry and integrity identities match, one separately allowlisted step
+copies the already-built `better-sqlite3-multiple-ciphers` binding from LexRunner's gated dependency
+tree into the disposable consumer. No dependency code runs with registry credentials, and the
+binding receipt records its package identity, integrity, platform, architecture, Node ABI, and hash.
+The accepted receipt also hashes every lock resolution and rejects any non-registry dependency other
+than the one staged LexRunner candidate tarball.
 
 Default output is one compact status object. `--diagnostics` adds bounded step hashes and resolved
 versions. Neither mode includes command output, dependency trees, transcripts, credentials, or
