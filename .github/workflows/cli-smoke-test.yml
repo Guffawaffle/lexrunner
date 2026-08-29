@@ -192,14 +192,64 @@ jobs:
           fi
           echo "✅ Artifact directory created: $ARTIFACT_DIR"
 
-          # Verify individual item artifact directories exist
-          for item in check-package check-schema run-typecheck; do
-            if [ ! -d "$ARTIFACT_DIR/$item" ]; then
-              echo "❌ Missing artifact directory for: $item"
-              exit 1
-            fi
-          done
-          echo "✅ All item artifact directories created"
+          # Verify every reported gate artifact exists beneath the requested root.
+          # Item/gate names are intentionally not filesystem paths: LexRunner derives
+          # collision-resistant path segments so hostile plan names cannot escape the root.
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const data = JSON.parse(fs.readFileSync(process.argv[1], 'utf-8'));
+            const requestedRoot = fs.realpathSync(path.resolve(process.argv[2]));
+            const reportedRoot = fs.realpathSync(path.resolve(data.execution.artifactDir));
+            if (reportedRoot !== requestedRoot) {
+              console.error('❌ Reported artifact root differs from requested root');
+              process.exit(1);
+            }
+
+            const expectedItems = ['check-package', 'check-schema', 'run-typecheck'];
+            const actualItems = Object.keys(data.execution.results).sort();
+            if (actualItems.length !== data.plan.itemCount ||
+                JSON.stringify(actualItems) !== JSON.stringify(expectedItems)) {
+              console.error('❌ Execute results do not match the dogfood plan items:', actualItems);
+              process.exit(1);
+            }
+
+            for (const [itemName, result] of Object.entries(data.execution.results)) {
+              if (!Array.isArray(result.gates) || result.gates.length === 0) {
+                console.error('❌ Missing gate evidence for', itemName);
+                process.exit(1);
+              }
+
+              for (const gate of result.gates) {
+                if (!Array.isArray(gate.artifacts) || gate.artifacts.length === 0) {
+                  console.error('❌ Missing reported artifacts for', itemName, gate.gate);
+                  process.exit(1);
+                }
+
+                for (const artifact of gate.artifacts) {
+                  const resolved = path.resolve(artifact);
+                  if (!fs.existsSync(resolved)) {
+                    console.error('❌ Reported artifact does not exist:', artifact);
+                    process.exit(1);
+                  }
+                  const metadata = fs.lstatSync(resolved);
+                  if (metadata.isSymbolicLink() || !metadata.isFile()) {
+                    console.error('❌ Reported artifact is not a regular non-symlink file:', artifact);
+                    process.exit(1);
+                  }
+                  const realArtifact = fs.realpathSync(resolved);
+                  const relative = path.relative(requestedRoot, realArtifact);
+                  if (relative === '' || relative === '..' ||
+                      relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+                    console.error('❌ Artifact escaped requested root:', artifact);
+                    process.exit(1);
+                  }
+                }
+              }
+            }
+
+            console.log('✅ All reported gate artifacts are contained and present');
+          " "$STDOUT_FILE" "$ARTIFACT_DIR"
 
           # Display summary
           echo "Execution summary:"
