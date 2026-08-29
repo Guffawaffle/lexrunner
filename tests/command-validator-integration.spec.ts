@@ -230,10 +230,13 @@ describe("Gate Execution with Command Validation", () => {
         mergeRules: { type: "strict-required" },
       };
 
-      // Container runtime falls back to local, so validation should still apply
+      // Unsupported runtimes fail closed rather than silently executing locally.
       const result = await executeGate(gate, policy, artifactDir, 5000);
 
-      expect(result.status).toBe("pass");
+      expect(result).toMatchObject({
+        status: "fail",
+        failureKind: "evidence_error",
+      });
     });
 
     it("should skip validation for ci-service runtime", async () => {

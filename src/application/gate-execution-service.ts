@@ -1,6 +1,17 @@
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+
 import { ExecutionState } from "../executionState.js";
 import { executeGatesWithPolicy } from "../gates.js";
 import type { Plan } from "../schema.js";
+import { loadPlan } from "../schema.js";
+import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { captureGateCandidateIdentity, sameGateCandidate } from "./gate-candidate-identity.js";
+import {
+  writeGateEvidenceManifest,
+  type GateEvidenceArtifactReference,
+} from "./gate-evidence-service.js";
 
 const MAX_ITEMS = 256;
 const MAX_GATES_PER_ITEM = 64;
@@ -31,6 +42,7 @@ export interface BoundedGateRunResult {
       name: string;
       status: string;
       failureKind?: "nonzero_exit" | "spawn_error" | "timeout" | "evidence_error";
+      timeoutMs?: number;
       timeoutCleanup?: {
         method: "process-group" | "taskkill" | "direct-child";
         forceKilled: boolean;
@@ -39,7 +51,9 @@ export interface BoundedGateRunResult {
     }>;
   }>;
   allGreen: boolean;
-  artifactRefs: Array<{ kind: "gate-results-directory"; path: string }>;
+  artifactRefs: Array<
+    { kind: "gate-results-directory"; path: string } | GateEvidenceArtifactReference
+  >;
 }
 
 export interface GateExecutionServiceResult {
@@ -50,7 +64,11 @@ export interface GateExecutionServiceResult {
 export class GateExecutionServiceError extends Error {
   constructor(
     readonly code:
-      "GATE_EXECUTION_FAILED" | "GATE_RESULT_LIMIT_EXCEEDED" | "GATE_SELECTION_NOT_FOUND",
+      | "GATE_EXECUTION_FAILED"
+      | "GATE_RESULT_LIMIT_EXCEEDED"
+      | "GATE_SELECTION_NOT_FOUND"
+      | "GATE_TIMEOUT_INVALID"
+      | "GATE_CANDIDATE_CHANGED",
     message: string
   ) {
     super(message);
@@ -63,19 +81,33 @@ export class GateExecutionService {
   constructor(private readonly execute: GateExecutor = executeGatesWithPolicy) {}
 
   async run(input: GateExecutionServiceInput): Promise<GateExecutionServiceResult> {
-    assertSelectionExists(input);
-    const executionState = input.executionState ?? new ExecutionState(input.plan);
+    if (
+      input.timeoutMs !== undefined &&
+      (!Number.isInteger(input.timeoutMs) || input.timeoutMs < 1 || input.timeoutMs > 86_400_000)
+    ) {
+      throw new GateExecutionServiceError(
+        "GATE_TIMEOUT_INVALID",
+        "Gate timeout must be an integer from 1 through 86400000 milliseconds"
+      );
+    }
+    const plan = loadPlan(canonicalJSONStringify(input.plan));
+    const validatedInput = { ...input, plan };
+    assertSelectionExists(validatedInput);
+    const executionState = input.executionState ?? new ExecutionState(plan);
+    const artifactDir = prepareOwnedArtifactDirectory(input.artifactDir);
+    const candidate = captureGateCandidateIdentity(input.repoRoot ?? process.cwd(), artifactDir);
     try {
       await this.execute(
-        input.plan,
+        plan,
         executionState,
-        bounded(input.artifactDir, MAX_ARTIFACT_REF_BYTES),
+        bounded(artifactDir, MAX_ARTIFACT_REF_BYTES),
         input.timeoutMs,
         input.progressReporter,
         input.skipValidation,
         input.repoRoot,
         {
           ...input.options,
+          candidateDigest: candidate.worktreeDigest,
           onlyItem: input.onlyItem,
           onlyGate: input.onlyGate,
         }
@@ -84,6 +116,14 @@ export class GateExecutionService {
       throw new GateExecutionServiceError(
         "GATE_EXECUTION_FAILED",
         "Gate execution failed; inspect the gate artifact references for details"
+      );
+    }
+
+    const candidateAfter = captureGateCandidateIdentity(candidate.repositoryRoot, artifactDir);
+    if (!sameGateCandidate(candidate, candidateAfter)) {
+      throw new GateExecutionServiceError(
+        "GATE_CANDIDATE_CHANGED",
+        "The repository candidate changed during gate execution; evidence was not published"
       );
     }
 
@@ -97,6 +137,7 @@ export class GateExecutionService {
           .map((gate) => ({
             name: bounded(gate.gate, MAX_LABEL_BYTES),
             status: bounded(gate.status, MAX_LABEL_BYTES),
+            ...(gate.timeoutMs !== undefined ? { timeoutMs: gate.timeoutMs } : {}),
             ...(gate.failureKind ? { failureKind: gate.failureKind } : {}),
             ...(gate.timeoutCleanup ? { timeoutCleanup: gate.timeoutCleanup } : {}),
           })),
@@ -107,6 +148,14 @@ export class GateExecutionService {
         `Gate result exceeds ${MAX_ITEMS} items or ${MAX_GATES_PER_ITEM} gates per item`
       );
     }
+    const evidenceReference = writeGateEvidenceManifest({
+      plan,
+      executionState,
+      artifactDir,
+      candidate,
+      onlyItem: input.onlyItem,
+      onlyGate: input.onlyGate,
+    });
     return {
       executionState,
       summary: {
@@ -116,12 +165,21 @@ export class GateExecutionService {
         artifactRefs: [
           {
             kind: "gate-results-directory",
-            path: bounded(input.artifactDir, MAX_ARTIFACT_REF_BYTES),
+            path: bounded(artifactDir, MAX_ARTIFACT_REF_BYTES),
           },
+          evidenceReference,
         ],
       },
     };
   }
+}
+
+function prepareOwnedArtifactDirectory(requestedRoot: string): string {
+  const root = resolve(bounded(requestedRoot, MAX_ARTIFACT_REF_BYTES));
+  mkdirSync(root, { recursive: true });
+  const runDirectory = join(root, `gate-run-${Date.now()}-${randomUUID()}`);
+  mkdirSync(runDirectory);
+  return runDirectory;
 }
 
 function assertSelectionExists(input: GateExecutionServiceInput): void {

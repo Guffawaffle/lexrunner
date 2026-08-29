@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Plan-bound gate evidence** - Return an explicit SHA-256-bound gate evidence manifest from gate
+  execution and let CLI, SDK MCP, and published MCP status inspect that exact reference. Status
+  rejects changed plans or candidates, changed gate declarations, duplicate identities, path
+  escapes, and tampered manifests or execution receipts. Caller-supplied hashes are reported as
+  unverified observations and cannot mint merge eligibility; authoritative verification remains
+  part of the plan-pinned verifier work in #865.
+- **Owned gate evidence roots** - Write each run into a fresh unique child of the requested artifact
+  directory, exclude only that owned child from candidate freshness, and reject evidence after any
+  other tracked or untracked candidate change.
+- **Visible timeout precedence** - Allow an exact `timeoutMs` on an individual plan gate and an MCP
+  operation-default timeout. Per-gate values override the hostility-adjusted operation default and
+  the effective timeout is included in bounded gate results and evidence.
+- **Fail-closed runtime declarations** - Reject unsupported container execution instead of silently
+  running the declared command on the local host.
+
 ## [1.5.2] - 2026-08-28
 
 ### Changed

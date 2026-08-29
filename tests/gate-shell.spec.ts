@@ -129,7 +129,7 @@ describe.skipIf(process.platform !== "win32")("Windows local gate shell executio
     });
     const receipt = receiptFor(result);
     expect(receipt).toMatchObject({
-      schemaVersion: "lexrunner-gate-execution-receipt/v1",
+      schemaVersion: "lexrunner-gate-execution-receipt/v2",
       attempt: 1,
       declaredGate: {
         name: "windows-shell-contract",

@@ -185,7 +185,10 @@ Common Issues:
 
         const planContent = fs.readFileSync(planFile, "utf-8");
         let plan = loadPlan(planContent);
-        const timeoutMs = parseInt(opts.timeout);
+        const timeoutMs = Number(opts.timeout);
+        if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 86_400_000) {
+          throw new Error("--timeout must be an integer from 1 through 86400000 milliseconds");
+        }
         let impactSelection: GateImpactSelection | undefined;
         let impactReceiptPath: string | undefined;
         if (opts.implementationBase || opts.implementationHead) {

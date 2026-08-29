@@ -21,6 +21,8 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
       "Show current execution status and merge eligibility (canonical: lexrunner weave status)"
     )
     .option("--plan <file>", "Path to plan.json file", "plan.json")
+    .option("--evidence <file>", "Explicit gate evidence manifest from execute/gates_run")
+    .option("--evidence-sha256 <sha256>", "Expected SHA-256 for --evidence")
     .argument("[file]", "Path to plan.json file (alternative to --plan)")
     .option("--json", "Output JSON format")
     .addHelpText(
@@ -28,12 +30,13 @@ export function registerStatusCommand(program: Command, jsonModeActive: () => bo
       `
 Examples:
   $ lexrunner status plan.json                     # Show plan status
+  $ lexrunner status --evidence gates/gate-evidence-manifest.json --evidence-sha256 sha256:<digest>
   $ lexrunner status --json                        # JSON output for dashboards
   $ lexrunner status --json | jq '.mergeSummary'   # Extract merge summary
 
 Common Issues:
   • "Plan file not found": Verify path to plan.json
-  • Missing execution state: Run 'lexrunner execute' first to populate status`
+  • Passing gates remain pending without explicit --evidence and --evidence-sha256 inputs`
     )
     .action((file: string | undefined, opts) => {
       const planFile = opts.plan || file || "plan.json";
@@ -42,7 +45,19 @@ Common Issues:
         const planContent = fs.readFileSync(planFile, "utf-8");
         const plan = loadPlan(planContent);
 
-        const result = new IntegrationStatusQueryService().run(plan);
+        if (Boolean(opts.evidence) !== Boolean(opts.evidenceSha256)) {
+          throw new Error("--evidence and --evidence-sha256 must be supplied together");
+        }
+        const result = new IntegrationStatusQueryService().run(
+          plan,
+          opts.evidence
+            ? {
+                evidenceFile: opts.evidence,
+                evidenceSha256: opts.evidenceSha256,
+                repoRoot: process.cwd(),
+              }
+            : undefined
+        );
         const mergeSummary = result.mergeSummary;
 
         if (opts.json || jsonModeActive()) {
@@ -50,7 +65,11 @@ Common Issues:
             canonicalJSONStringify(
               program.name() === "weave"
                 ? result
-                : { plan: result.plan, mergeSummary: result.mergeSummary }
+                : {
+                    plan: result.plan,
+                    mergeSummary: result.mergeSummary,
+                    ...(result.evidence ? { evidence: result.evidence } : {}),
+                  }
             )
           );
         } else {
@@ -64,6 +83,11 @@ Common Issues:
           console.log(
             `Status: ${mergeSummary.eligible.length} eligible, ${mergeSummary.pending.length} pending, ${mergeSummary.failed.length} failed`
           );
+          if (result.evidence) {
+            console.log(
+              `Evidence: ${result.evidence.observations.passed.length} passed, ${result.evidence.observations.failed.length} failed (${result.evidence.authority})`
+            );
+          }
         }
       } catch (error) {
         const failure = asPlanValidationFailure(error);

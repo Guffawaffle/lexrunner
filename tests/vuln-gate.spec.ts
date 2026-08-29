@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { executeItemGates } from "../src/gates.js";
+import { artifactIdentitySegment, executeItemGates } from "../src/gates.js";
 import { loadPlan, Policy } from "../src/schema.js";
 import { ExecutionState } from "../src/executionState.js";
 import * as fs from "fs";
@@ -50,7 +50,7 @@ describe("Vuln Gate Integration", () => {
       });
 
       // Create item artifact directory with clean SARIF
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const cleanSarif = fs.readFileSync(
@@ -98,7 +98,7 @@ describe("Vuln Gate Integration", () => {
       });
 
       // Create item artifact directory with SARIF containing vulnerabilities
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const vulnSarif = fs.readFileSync(
@@ -142,7 +142,7 @@ describe("Vuln Gate Integration", () => {
       });
 
       // Create empty artifact directory (no SARIF or npm audit)
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const results = await executeItemGates(item, policy, executionState, tempDir);
@@ -185,7 +185,7 @@ describe("Vuln Gate Integration", () => {
       });
 
       // Create item artifact directory with npm audit JSON
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const npmAudit = fs.readFileSync(path.join(__dirname, "fixtures", "npm-audit.json"), "utf-8");
@@ -231,7 +231,7 @@ describe("Vuln Gate Integration", () => {
       });
 
       // Create SARIF with 1 critical, 1 high, 1 medium
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const vulnSarif = fs.readFileSync(
@@ -273,7 +273,7 @@ describe("Vuln Gate Integration", () => {
         items: [item],
       });
 
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const cleanSarif = fs.readFileSync(
@@ -313,7 +313,7 @@ describe("Vuln Gate Integration", () => {
         items: [item],
       });
 
-      const itemArtifactDir = path.join(tempDir, item.name);
+      const itemArtifactDir = path.join(tempDir, artifactIdentitySegment(item.name));
       fs.mkdirSync(itemArtifactDir, { recursive: true });
 
       const vulnSarif = fs.readFileSync(

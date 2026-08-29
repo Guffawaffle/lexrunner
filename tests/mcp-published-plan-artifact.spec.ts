@@ -1,5 +1,4 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -11,7 +10,11 @@ const mcpPath = join(repositoryRoot, "mcp-server.mjs");
 const roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
+  );
 });
 
 describe("published plan artifact parity", () => {
@@ -27,6 +30,17 @@ describe("published plan artifact parity", () => {
       );
       expect(tool?.inputSchema.properties.planFile).toMatchObject({ type: "string" });
     }
+    const statusTool = inventory.result.tools.find(
+      (candidate: { name: string }) => candidate.name === "status"
+    );
+    expect(statusTool.inputSchema.properties).toMatchObject({
+      evidenceFile: { type: "string", minLength: 1, maxLength: 4096 },
+      evidenceSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+    });
+    const gatesTool = inventory.result.tools.find(
+      (candidate: { name: string }) => candidate.name === "gates.run"
+    );
+    expect(gatesTool.inputSchema.properties).toMatchObject({ timeoutMs: { type: "integer" } });
 
     const calls = [
       ["status", { planFile: planPath }],
@@ -65,6 +79,28 @@ describe("published plan artifact parity", () => {
       ],
       allGreen: true,
     });
+    expect(results.status.mergeSummary.pending).toEqual(["selected", "unselected"]);
+    const evidence = results["gates.run"].artifactRefs.find(
+      ({ kind }: { kind: string }) => kind === "gate-evidence-manifest"
+    );
+    const evidenceResponse = await invokeMcp(root, env, "tools/call", {
+      name: "status",
+      arguments: {
+        planFile: planPath,
+        evidenceFile: evidence.path,
+        evidenceSha256: evidence.sha256,
+      },
+    });
+    const evidenceStatus = JSON.parse(evidenceResponse.result.content[0].text);
+    expect(evidenceStatus).toMatchObject({
+      evidence: {
+        kind: "gate-evidence-manifest",
+        applied: 1,
+        authority: "unverified",
+        observations: { passed: ["selected/selected-gate"], failed: [], other: [] },
+      },
+      mergeSummary: { eligible: [], pending: ["selected", "unselected"], failed: [] },
+    });
 
     const identities = calls.map(([name]) => results[name].planArtifact);
     expect(
@@ -77,10 +113,7 @@ describe("published plan artifact parity", () => {
       itemCount: 2,
       digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
     });
-    await expect(access(join(root, "selected.marker"), constants.F_OK)).resolves.toBeUndefined();
-    await expect(access(join(root, "unselected.marker"), constants.F_OK)).rejects.toThrow();
-    await expect(access(join(root, "profile.marker"), constants.F_OK)).rejects.toThrow();
-  });
+  }, 15_000);
 
   it("returns stable privacy-safe errors for bad explicit published references", async () => {
     const root = await fixtureRepository();
@@ -186,7 +219,7 @@ function rootPlan() {
         gates: [
           {
             name: "selected-gate",
-            run: "node -e \"require('node:fs').writeFileSync('selected.marker','yes')\"",
+            run: 'node -e "process.exit(0)"',
             env: {},
           },
         ],
@@ -197,7 +230,7 @@ function rootPlan() {
         gates: [
           {
             name: "unselected-gate",
-            run: "node -e \"require('node:fs').writeFileSync('unselected.marker','yes')\"",
+            run: 'node -e "process.exit(1)"',
             env: {},
           },
         ],

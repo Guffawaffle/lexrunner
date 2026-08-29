@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { createHash } from "node:crypto";
 import { Plan, Gate, PlanItem, Policy, GateResult, GateStatus, RetryConfig } from "./schema.js";
 import { ExecutionState } from "./executionState.js";
 import path from "path";
@@ -44,6 +45,7 @@ import {
   fileIdentity,
   gateOutputEvidence,
   GATE_EXECUTION_RECEIPT_SCHEMA_VERSION,
+  gateExecutionBinding,
   resolveSpawnExecutable,
   writeLocalGateExecutionReceipt,
   type DeclaredArtifactBaseline,
@@ -68,6 +70,18 @@ export function resolveLocalGateShell(
     : { command: "bash", arguments: ["-c", command] };
 }
 
+function sanitizedGateEnvironment(declared: Record<string, string>): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const key of Object.keys(environment)) {
+    if (key.toUpperCase().startsWith("GIT_")) delete environment[key];
+  }
+  return { ...environment, ...declared };
+}
+
+export function artifactIdentitySegment(identity: string): string {
+  return `identity-${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 32)}`;
+}
+
 /**
  * Gate execution with local command running, retry logic, and policy-aware execution
  */
@@ -84,7 +98,8 @@ export async function executeGate(
   skipValidation: boolean = false,
   repoRoot?: string,
   turnCostTracker?: MergeWeaveTurnCost,
-  suppressStdout: boolean = false
+  suppressStdout: boolean = false,
+  candidateDigest?: string
 ): Promise<GateResult> {
   // Validate gate input before execution (unless explicitly skipped)
   if (!skipValidation && gate.input) {
@@ -123,7 +138,15 @@ export async function executeGate(
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    const result = await executeGateAttempt(gate, artifactDir, attempt, timeoutMs, repoRoot);
+    const result = await executeGateAttempt(
+      gate,
+      artifactDir,
+      attempt,
+      timeoutMs,
+      repoRoot,
+      itemName,
+      candidateDigest
+    );
     lastResult = result;
     totalDuration += result.duration || 0;
 
@@ -266,7 +289,10 @@ async function writeFlakeReport(
     fs.mkdirSync(flakeReportDir, { recursive: true });
   }
 
-  const reportPath = path.join(flakeReportDir, `${itemName}-${gateName}.json`);
+  const reportPath = path.join(
+    flakeReportDir,
+    `${artifactIdentitySegment(itemName)}-${artifactIdentitySegment(gateName)}.json`
+  );
   const reportContent = canonicalJSONStringify(flakeReport);
   fs.writeFileSync(reportPath, reportContent, "utf-8");
 
@@ -283,7 +309,9 @@ async function executeGateAttempt(
   artifactDir: string,
   attempt: number,
   timeoutMs: number,
-  repoRoot?: string
+  repoRoot?: string,
+  itemName?: string,
+  candidateDigest?: string
 ): Promise<GateResult> {
   const startedAt = new Date().toISOString();
   const startTime = Date.now();
@@ -298,7 +326,8 @@ async function executeGateAttempt(
         startedAt,
         startTime,
         timeoutMs,
-        repoRoot
+        repoRoot,
+        itemName
       );
     case "ci-service":
       return executeCiServiceGate(gate, artifactDir, attempt, startedAt, startTime);
@@ -311,7 +340,9 @@ async function executeGateAttempt(
         startedAt,
         startTime,
         timeoutMs,
-        repoRoot
+        repoRoot,
+        itemName,
+        candidateDigest
       );
   }
 }
@@ -326,13 +357,15 @@ async function executeLocalGate(
   startedAt: string,
   startTime: number,
   timeoutMs: number,
-  repoRoot?: string
+  repoRoot?: string,
+  itemName?: string,
+  candidateDigest?: string
 ): Promise<GateResult> {
   // Use gate.cwd if specified, otherwise fall back to repoRoot (captured at execution start).
   // If neither is available, use process.cwd() as a last resort fallback.
   const workingDirectory = path.resolve(gate.cwd || repoRoot || process.cwd());
-  const gateArtifactDirectory = path.join(artifactDir, gate.name);
-  const environment = { ...process.env, ...gate.env };
+  const gateArtifactDirectory = path.join(artifactDir, artifactIdentitySegment(gate.name));
+  const environment = sanitizedGateEnvironment(gate.env);
   const shell = resolveLocalGateShell(gate.run);
   const artifactBaselines = captureDeclaredArtifactBaselines(
     gate.artifacts ?? [],
@@ -377,6 +410,9 @@ async function executeLocalGate(
         attempts: attempt,
         lastAttempt: startedAt,
       },
+      itemName,
+      timeoutMs,
+      candidateDigest,
     });
   }
 
@@ -416,6 +452,9 @@ async function executeLocalGate(
         attempts: attempt,
         lastAttempt: startedAt,
       },
+      itemName,
+      timeoutMs,
+      candidateDigest,
     });
   }
 
@@ -489,6 +528,9 @@ async function executeLocalGate(
             attempts: attempt,
             lastAttempt: startedAt,
           },
+          itemName,
+          timeoutMs,
+          candidateDigest,
         })
       );
     });
@@ -532,6 +574,9 @@ async function executeLocalGate(
             attempts: attempt,
             lastAttempt: startedAt,
           },
+          itemName,
+          timeoutMs,
+          candidateDigest,
         })
       );
     });
@@ -553,6 +598,9 @@ interface FinalizeLocalGateAttemptInput {
   stdout: Buffer;
   stderr: Buffer;
   result: GateResult;
+  itemName?: string;
+  timeoutMs: number;
+  candidateDigest?: string;
 }
 
 function finalizeLocalGateAttempt(input: FinalizeLocalGateAttemptInput): GateResult {
@@ -585,6 +633,12 @@ function finalizeLocalGateAttempt(input: FinalizeLocalGateAttemptInput): GateRes
   const receiptPath = writeLocalGateExecutionReceipt(input.gateArtifactDirectory, {
     schemaVersion: GATE_EXECUTION_RECEIPT_SCHEMA_VERSION,
     attempt: input.attempt,
+    binding: gateExecutionBinding(
+      input.gate,
+      input.itemName,
+      input.timeoutMs,
+      input.candidateDigest
+    ),
     declaredGate: {
       name: input.gate.name,
       run: input.gate.run,
@@ -633,14 +687,24 @@ async function executeContainerGate(
   startedAt: string,
   startTime: number,
   timeoutMs: number,
-  repoRoot?: string
+  repoRoot?: string,
+  itemName?: string
 ): Promise<GateResult> {
-  // TODO: Implement container execution using Docker/Podman
-  // For now, fall back to local execution with warning
-  console.warn(
-    `⚠️  Container runtime for gate '${gate.name}' not yet implemented, falling back to local execution`
-  );
-  return executeLocalGate(gate, artifactDir, attempt, startedAt, startTime, timeoutMs, repoRoot);
+  // A declared container runtime cannot be satisfied by a local fallback.
+  console.warn(`⚠️  Container runtime for gate '${gate.name}' is not implemented; failing closed`);
+  return {
+    gate: gate.name,
+    status: "fail",
+    exitCode: 1,
+    duration: Date.now() - startTime,
+    stdout: "",
+    stderr: "GATE_RUNTIME_UNAVAILABLE: container execution is not implemented",
+    failureKind: "evidence_error",
+    artifacts: [],
+    attempts: attempt,
+    lastAttempt: startedAt,
+    timeoutMs,
+  };
 }
 
 /**
@@ -886,6 +950,7 @@ export async function executeItemGates(
     onlyGate?: string;
     emitReceipt?: boolean;
     suppressStdout?: boolean;
+    candidateDigest?: string;
   }
 ): Promise<GateResult[]> {
   if (!item.gates || item.gates.length === 0) {
@@ -893,7 +958,7 @@ export async function executeItemGates(
   }
 
   const results: GateResult[] = [];
-  const itemArtifactDir = path.join(artifactDir, item.name);
+  const itemArtifactDir = path.join(artifactDir, artifactIdentitySegment(item.name));
 
   // Ensure item artifact directory exists
   if (!fs.existsSync(itemArtifactDir)) {
@@ -956,13 +1021,15 @@ export async function executeItemGates(
       gate,
       policy,
       itemArtifactDir,
-      timeoutMs,
+      gate.timeoutMs ?? timeoutMs,
       item.name,
       skipValidation,
       repoRoot,
       options?.turnCostTracker,
-      options?.suppressStdout
+      options?.suppressStdout,
+      options?.candidateDigest
     );
+    result.timeoutMs = gate.timeoutMs ?? timeoutMs;
     results.push(result);
 
     // Update execution state
@@ -1031,6 +1098,7 @@ export async function executeGatesWithPolicy(
     onlyGate?: string;
     emitReceipt?: boolean;
     suppressStdout?: boolean;
+    candidateDigest?: string;
   }
 ): Promise<void> {
   // Capture repository root once at the start of execution

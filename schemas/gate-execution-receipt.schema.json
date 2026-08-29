@@ -8,6 +8,7 @@
   "required": [
     "schemaVersion",
     "attempt",
+    "binding",
     "declaredGate",
     "execution",
     "outcome",
@@ -15,8 +16,27 @@
     "artifacts"
   ],
   "properties": {
-    "schemaVersion": { "const": "lexrunner-gate-execution-receipt/v1" },
+    "schemaVersion": { "const": "lexrunner-gate-execution-receipt/v2" },
     "attempt": { "type": "integer", "minimum": 1 },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "declaredGateDigest", "candidateDigest", "timeoutMs"],
+      "properties": {
+        "item": { "type": ["string", "null"], "minLength": 1 },
+        "declaredGateDigest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "candidateDigest": {
+          "anyOf": [
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "timeoutMs": { "type": "integer", "minimum": 1 }
+      }
+    },
     "declaredGate": {
       "type": "object",
       "additionalProperties": false,

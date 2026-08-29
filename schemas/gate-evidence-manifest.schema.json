@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartergpt.dev/schemas/lexrunner/gate-evidence-manifest-v1.json",
+  "title": "LexRunner Gate Evidence Manifest v1",
+  "type": "object",
+  "required": ["schemaVersion", "createdAt", "plan", "candidate", "selection", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "lexrunner-gate-evidence-manifest/v1" },
+    "createdAt": { "type": "string" },
+    "plan": {
+      "type": "object",
+      "required": ["digest", "schemaVersion", "target", "itemCount"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/sha256" },
+        "schemaVersion": { "type": "string" },
+        "target": { "type": "string" },
+        "itemCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["repositoryRoot", "head", "worktreeDigest"],
+      "properties": {
+        "repositoryRoot": { "type": "string", "minLength": 1 },
+        "head": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "worktreeDigest": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": ["onlyItem", "onlyGate"],
+      "properties": {
+        "onlyItem": { "type": ["string", "null"] },
+        "onlyGate": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "type": "object",
+        "required": ["item", "gate", "declaredGateDigest", "result", "receipt"],
+        "properties": {
+          "item": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "gate": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "declaredGateDigest": { "$ref": "#/$defs/sha256" },
+          "result": {
+            "type": "object",
+            "required": ["status", "attempts"],
+            "properties": {
+              "status": {
+                "enum": ["pass", "fail", "blocked", "skipped", "retrying"]
+              },
+              "exitCode": { "type": "number" },
+              "duration": { "type": "number", "minimum": 0 },
+              "timeoutMs": { "type": "integer", "minimum": 1 },
+              "failureKind": {
+                "enum": ["nonzero_exit", "spawn_error", "timeout", "evidence_error"]
+              },
+              "attempts": { "type": "integer", "minimum": 0 },
+              "lastAttempt": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "receipt": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false
+}
