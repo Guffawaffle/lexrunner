@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { executeGate } from "../src/gates.js";
+import { artifactIdentitySegment, executeGate } from "../src/gates.js";
 import { Policy, Gate } from "../src/schema.js";
 import { validateFlakeReport } from "../src/schema/flakeReport.js";
 import * as fs from "fs";
@@ -57,11 +57,7 @@ describe("Flake Report Generation", () => {
     expect(result.attempts).toBe(2);
 
     // Flake report should be created
-    const flakeReportPath = path.join(
-      tempDir,
-      "flake-reports",
-      "test-item-test-retry-success.json"
-    );
+    const flakeReportPath = reportPath(tempDir, "test-item", "test-retry-success");
     expect(fs.existsSync(flakeReportPath)).toBe(true);
 
     // Validate flake report structure
@@ -111,7 +107,7 @@ describe("Flake Report Generation", () => {
     expect(result.attempts).toBe(3);
 
     // Flake report should be created
-    const flakeReportPath = path.join(tempDir, "flake-reports", "test-item-test-retry-fail.json");
+    const flakeReportPath = reportPath(tempDir, "test-item", "test-retry-fail");
     expect(fs.existsSync(flakeReportPath)).toBe(true);
 
     const reportContent = fs.readFileSync(flakeReportPath, "utf-8");
@@ -143,7 +139,7 @@ describe("Flake Report Generation", () => {
     expect(result.attempts).toBe(1);
 
     // Flake report should NOT be created
-    const flakeReportPath = path.join(tempDir, "flake-reports", "test-item-test-no-retry.json");
+    const flakeReportPath = reportPath(tempDir, "test-item", "test-no-retry");
     expect(fs.existsSync(flakeReportPath)).toBe(false);
   });
 
@@ -171,11 +167,7 @@ describe("Flake Report Generation", () => {
     expect(result.attempts).toBe(1); // Only one attempt due to permanent error
 
     // No flake report since there was only one attempt
-    const flakeReportPath = path.join(
-      tempDir,
-      "flake-reports",
-      "test-item-test-permanent-error.json"
-    );
+    const flakeReportPath = reportPath(tempDir, "test-item", "test-permanent-error");
     expect(fs.existsSync(flakeReportPath)).toBe(false);
   });
 
@@ -200,8 +192,8 @@ describe("Flake Report Generation", () => {
     const result1 = await executeGate(gate, policy, tempDir, 5000, "test-item1");
     const result2 = await executeGate(gate, policy, tempDir, 5000, "test-item2");
 
-    const report1Path = path.join(tempDir, "flake-reports", "test-item1-test-determinism.json");
-    const report2Path = path.join(tempDir, "flake-reports", "test-item2-test-determinism.json");
+    const report1Path = reportPath(tempDir, "test-item1", "test-determinism");
+    const report2Path = reportPath(tempDir, "test-item2", "test-determinism");
 
     expect(fs.existsSync(report1Path)).toBe(true);
     expect(fs.existsSync(report2Path)).toBe(true);
@@ -250,11 +242,7 @@ describe("Flake Report Generation", () => {
 
     await executeGate(gate, policy, tempDir, 5000, "test-item");
 
-    const flakeReportPath = path.join(
-      tempDir,
-      "flake-reports",
-      "test-item-test-error-metadata.json"
-    );
+    const flakeReportPath = reportPath(tempDir, "test-item", "test-error-metadata");
     const reportContent = fs.readFileSync(flakeReportPath, "utf-8");
     const report = JSON.parse(reportContent);
 
@@ -265,3 +253,11 @@ describe("Flake Report Generation", () => {
     expect(report.attempts[0].timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
+
+function reportPath(root: string, itemName: string, gateName: string): string {
+  return path.join(
+    root,
+    "flake-reports",
+    `${artifactIdentitySegment(itemName)}-${artifactIdentitySegment(gateName)}.json`
+  );
+}

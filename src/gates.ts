@@ -78,7 +78,7 @@ function sanitizedGateEnvironment(declared: Record<string, string>): NodeJS.Proc
   return { ...environment, ...declared };
 }
 
-function artifactIdentitySegment(identity: string): string {
+export function artifactIdentitySegment(identity: string): string {
   return `identity-${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 32)}`;
 }
 
