@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { execa } from "execa";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { describe, expect, it } from "vitest";
 
 import { inspectRegisteredCliSurface } from "../../src/cli.js";
@@ -86,9 +87,14 @@ describe("canonical CLI and MCP surface", () => {
 
   it("gives every published MCP tool exactly one disposition and a parity decision", async () => {
     const matrix = await loadMatrix();
-    const published = await publishedMcpTools();
+    const publishedSurface = await publishedMcpSurface();
+    const published = publishedSurface.tools;
+    const packageMetadata = JSON.parse(
+      await readFile(resolve(repositoryRoot, "package.json"), "utf8")
+    ) as { version: string };
     const classified = flattenClassifications(matrix.mcp, "tool");
 
+    expect(publishedSurface.version).toBe(packageMetadata.version);
     expect(new Set(classified).size).toBe(classified.length);
     expect([...classified].sort()).toEqual([...published].sort());
 
@@ -211,34 +217,23 @@ async function loadMatrix(): Promise<SurfaceMatrix> {
   return JSON.parse(await readFile(matrixPath, "utf8")) as SurfaceMatrix;
 }
 
-async function publishedMcpTools(): Promise<string[]> {
-  const subprocess = execa("node", ["mcp-server.mjs"], {
+async function publishedMcpSurface(): Promise<{ tools: string[]; version: string }> {
+  const client = new Client({ name: "lexrunner-surface-test", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [resolve(repositoryRoot, "mcp-server.mjs")],
     cwd: repositoryRoot,
     env: { ...process.env, ALLOW_MUTATIONS: "false" },
+    stderr: "pipe",
   });
-  let stdout = "";
-  const response = new Promise<{ result: { tools: Array<{ name: string }> } }>(
-    (resolveResponse, rejectResponse) => {
-      subprocess.stdout?.on("data", (chunk: Buffer | string) => {
-        stdout += chunk.toString();
-        const newline = stdout.indexOf("\n");
-        if (newline >= 0) {
-          resolveResponse(
-            JSON.parse(stdout.slice(0, newline)) as {
-              result: { tools: Array<{ name: string }> };
-            }
-          );
-        }
-      });
-      subprocess.once("error", rejectResponse);
-    }
-  );
-
-  subprocess.stdin?.write(
-    `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} })}\n`
-  );
-  const result = await response;
-  subprocess.stdin?.end();
-  await subprocess;
-  return result.result.tools.map(({ name }) => name);
+  try {
+    await client.connect(transport);
+    const { tools } = await client.listTools();
+    return {
+      version: client.getServerVersion()?.version ?? "",
+      tools: tools.map(({ name }) => name),
+    };
+  } finally {
+    await client.close();
+  }
 }

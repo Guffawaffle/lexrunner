@@ -19,6 +19,7 @@ import "dotenv/config";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import packageMetadata from "./package.json" with { type: "json" };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1147,7 +1148,7 @@ async function handleRequest(request) {
           },
           serverInfo: {
             name: "lexrunner",
-            version: "0.1.0",
+            version: packageMetadata.version,
           },
         },
       };

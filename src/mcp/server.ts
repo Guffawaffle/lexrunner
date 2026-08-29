@@ -14,6 +14,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import packageMetadata from "../../package.json" with { type: "json" };
 
 import { loadInputs, detectGitHubMode } from "../core/inputs.js";
 import { generateSnapshot, generateGitHubSnapshot } from "../core/snapshot.js";
@@ -270,7 +271,7 @@ function createServer(options?: McpServerOptions): Server {
   const server = new Server(
     {
       name: "lexrunner",
-      version: "0.1.0",
+      version: packageMetadata.version,
     },
     {
       capabilities: {
