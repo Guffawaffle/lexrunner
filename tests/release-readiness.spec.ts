@@ -29,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("2.0.0");
+    expect(packageJson.version).toBe("2.0.1");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("4.0.3");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -67,6 +67,7 @@ describe("LexRunner current release readiness", () => {
     const [
       readme,
       changelog,
+      currentReleaseNotes,
       releaseNotes,
       priorReleaseNotes,
       compatibilityDecision,
@@ -78,6 +79,7 @@ describe("LexRunner current release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
+      read("docs/releases/2.0.1.md"),
       read("docs/releases/2.0.0.md"),
       read("docs/releases/1.2.1.md"),
       read("docs/releases/1.2.0.md"),
@@ -88,9 +90,13 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **2.0.0**");
+    expect(readme).toContain("Current repository package version: **2.0.1**");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
+    expect(currentReleaseNotes).toContain("corrects the product version returned by MCP");
+    expect(currentReleaseNotes).toContain("This is a patch release");
+    expect(currentReleaseNotes).toContain("all 33 tools");
+    expect(currentReleaseNotes).toContain("issue #865");
     expect(releaseNotes).toContain("release-owner-signed, trusted-workflow npm publication");
     expect(releaseNotes).toContain("`lexrunner`, `lex-pr`, and `lexrunner-mcp`");
     expect(releaseNotes).toContain("lexrunner-gate-execution-receipt/v2");

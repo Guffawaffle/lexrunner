@@ -1,7 +1,10 @@
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 import { resolveContainedPackageTarget } from "./packed-package-paths.mjs";
 
@@ -185,7 +188,8 @@ try {
 
   const toolCount = await smokeMcp(
     resolvePackageBinTarget(installedPackageRoot, installedManifest, "lexrunner-mcp"),
-    consumerRoot
+    consumerRoot,
+    packageVersion
   );
   process.stdout.write(
     `${JSON.stringify({
@@ -299,69 +303,47 @@ function smokeProjectionCliSurface(cliPath, cwd) {
   }
 }
 
-async function smokeMcp(binPath, cwd) {
-  const child = spawn(process.execPath, [binPath], {
+async function smokeMcp(binPath, cwd, expectedVersion) {
+  const client = new Client({ name: "lexrunner-packed-smoke", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [binPath],
     cwd,
     env: { ...process.env, ALLOW_MUTATIONS: "false" },
-    stdio: ["pipe", "pipe", "pipe"],
+    stderr: "pipe",
   });
-  let stdout = "";
   let stderr = "";
-
-  const response = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`Packed MCP smoke timed out. stderr:\n${stderr}`));
-    }, 15_000);
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-      const newline = stdout.indexOf("\n");
-      if (newline < 0) return;
-      clearTimeout(timeout);
-      try {
-        resolve(JSON.parse(stdout.slice(0, newline)));
-      } catch (error) {
-        reject(error);
-      }
-    });
-    child.once("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.once("exit", (code) => {
-      if (code && stdout.length === 0) {
-        clearTimeout(timeout);
-        reject(new Error(`Packed MCP exited ${code}. stderr:\n${stderr}`));
-      }
-    });
-    child.stdin.write(
-      `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} })}\n`
-    );
+  transport.stderr?.on("data", (chunk) => {
+    stderr += chunk.toString();
   });
+  let timeout;
 
-  child.stdin.end();
-  const tools = response?.result?.tools;
-  if (!Array.isArray(tools) || tools.length === 0) {
-    throw new Error(`Packed MCP returned no tools: ${JSON.stringify(response)}`);
+  try {
+    return await Promise.race([
+      (async () => {
+        await client.connect(transport);
+        const actualVersion = client.getServerVersion()?.version;
+        if (actualVersion !== expectedVersion) {
+          throw new Error(`Packed MCP reported unexpected version: ${actualVersion}`);
+        }
+        const { tools } = await client.listTools();
+        if (tools.length === 0) throw new Error("Packed MCP returned no tools");
+        const publishedToolNames = new Set(tools.map(({ name }) => name));
+        for (const name of requiredAttemptTools) {
+          if (!publishedToolNames.has(name))
+            throw new Error(`Packed MCP omitted Attempt tool ${name}`);
+        }
+        return tools.length;
+      })(),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Packed MCP smoke timed out. stderr:\n${stderr}`)),
+          15_000
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+    await client.close();
   }
-  const publishedToolNames = new Set(tools.map(({ name }) => name));
-  for (const name of requiredAttemptTools) {
-    if (!publishedToolNames.has(name)) throw new Error(`Packed MCP omitted Attempt tool ${name}`);
-  }
-  await new Promise((resolve, reject) => {
-    if (child.exitCode !== null) return resolve();
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`Packed MCP did not exit after stdin closed. stderr:\n${stderr}`));
-    }, 5_000);
-    child.once("exit", (code) => {
-      clearTimeout(timeout);
-      if (code === 0) resolve();
-      else reject(new Error(`Packed MCP exited ${code}. stderr:\n${stderr}`));
-    });
-  });
-  return tools.length;
 }
