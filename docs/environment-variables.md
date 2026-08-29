@@ -23,7 +23,7 @@ Specifies the profile directory to use for execution.
 - **Type:** String (path)
 - **Default:** Uses precedence chain (`.smartergpt.local/` → `.smartergpt/`)
 - **Precedence:** Second (after `--profile-dir` flag)
-- **Aliases:** `LEXRUNNER_PROFILE_DIR` (deprecated, will be removed in v2.0.0)
+- **Aliases:** `LEXRUNNER_PROFILE_DIR` (deprecated, will be removed in v3.0.0)
 
 **Example:**
 
@@ -165,7 +165,7 @@ For backward compatibility, lexrunner supports deprecated `LEXRUNNER_*` prefixes
 
 | Primary Variable     | Deprecated Alias        | Status                        |
 | -------------------- | ----------------------- | ----------------------------- |
-| `LEX_PR_PROFILE_DIR` | `LEXRUNNER_PROFILE_DIR` | Deprecated, removed in v2.0.0 |
+| `LEX_PR_PROFILE_DIR` | `LEXRUNNER_PROFILE_DIR` | Deprecated, removed in v3.0.0 |
 
 ### Deprecation Behavior
 
@@ -174,13 +174,13 @@ When a deprecated alias is used:
 1. **Precedence:** Primary variable takes precedence if both are set
 2. **Warning:** One-time deprecation notice shown to stderr
 3. **Functionality:** Full backward compatibility maintained
-4. **Timeline:** Aliases will be removed in v2.0.0
+4. **Timeline:** Aliases will be removed in v3.0.0
 
 **Example Warning:**
 
 ```
 ⚠️  Environment variable LEXRUNNER_PROFILE_DIR is deprecated.
-Use LEX_PR_PROFILE_DIR instead. Support for LEXRUNNER_PROFILE_DIR will be removed in v2.0.0.
+Use LEX_PR_PROFILE_DIR instead. Support for LEXRUNNER_PROFILE_DIR will be removed in v3.0.0.
 ```
 
 ### Migration Guide

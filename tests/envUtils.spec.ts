@@ -96,12 +96,12 @@ describe("Environment Utils", () => {
       expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
-    it("should mention v2.0.0 in deprecation notice", () => {
+    it("should mention v3.0.0 in deprecation notice", () => {
       process.env.LEXRUNNER_PROFILE_DIR = "/alias/path";
 
       getEnvWithAlias("LEX_PR_PROFILE_DIR", "LEXRUNNER_PROFILE_DIR");
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining("v2.0.0"));
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining("v3.0.0"));
     });
   });
 

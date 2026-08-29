@@ -94,10 +94,10 @@ Matrix schema: **1.0.0**. Live inventory: **139 CLI registrations** and **33 MCP
 
 ### Published deprecated MCP tools
 
-- `lexrunner.getStatus` → status for integration; get_attempt_status for ADR-010 orchestration; remove in 2.0.0.
-- `lexrunner.listArtifacts` → bounded artifact references from the owning plan.create, gates.run, or merge.apply operation; remove in 2.0.0.
-- `lexrunner.startRun` → plan.create, gates.run, or merge.apply for integration; start_attempt for ADR-010 orchestration; remove in 2.0.0.
-- `health` → doctor; remove in 2.0.0.
+- `lexrunner.getStatus` → status for integration; get_attempt_status for ADR-010 orchestration; remove in 3.0.0.
+- `lexrunner.listArtifacts` → bounded artifact references from the owning plan.create, gates.run, or merge.apply operation; remove in 3.0.0.
+- `lexrunner.startRun` → plan.create, gates.run, or merge.apply for integration; start_attempt for ADR-010 orchestration; remove in 3.0.0.
+- `health` → doctor; remove in 3.0.0.
 
 <!-- END GENERATED AX SURFACE -->
 

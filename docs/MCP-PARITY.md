@@ -42,9 +42,9 @@ This document establishes parity between the CLI interface and MCP server tools 
 
 | MCP Tool                  | CLI Equivalent | Notes                                                               |
 | ------------------------- | -------------- | ------------------------------------------------------------------- |
-| `lexrunner.startRun`      | n/a            | Deprecated IntegrationRun record adapter; remove in 2.0.0           |
-| `lexrunner.getStatus`     | n/a            | Deprecated bounded IntegrationRun status; remove in 2.0.0           |
-| `lexrunner.listArtifacts` | n/a            | Deprecated bounded artifact metadata, without inline content; 2.0.0 |
+| `lexrunner.startRun`      | n/a            | Deprecated IntegrationRun record adapter; remove in 3.0.0           |
+| `lexrunner.getStatus`     | n/a            | Deprecated bounded IntegrationRun status; remove in 3.0.0           |
+| `lexrunner.listArtifacts` | n/a            | Deprecated bounded artifact metadata, without inline content; 3.0.0 |
 
 ## Intentional Gaps
 

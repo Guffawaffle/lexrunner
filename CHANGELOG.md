@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-29
+
+### Breaking changes
+
+- **Gate execution receipts v2** - Replace `lexrunner-gate-execution-receipt/v1` with v2. Receipt
+  consumers must accept the required `binding` object for item, gate-declaration, candidate, and
+  effective-timeout identity. The receipt's top-level `attempt` identifies the execution attempt;
+  the evidence manifest separately binds the plan digest. Version-1-only parsers must migrate
+  before consuming 2.0.0 evidence.
+- **Declared containers fail closed** - A gate with a container declaration is now rejected as an
+  unsupported execution mode instead of silently running the declared command on the local host.
+
 ### Added
 
 - **Plan-bound gate evidence** - Return an explicit SHA-256-bound gate evidence manifest from gate
@@ -22,6 +34,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   the effective timeout is included in bounded gate results and evidence.
 - **Fail-closed runtime declarations** - Reject unsupported container execution instead of silently
   running the declared command on the local host.
+
+### Fixed
+
+- Preserve stable, bounded duplicate-plan diagnostics without reflecting hostile item or gate names.
+- Validate hosted CLI evidence at its hashed, workflow-owned artifact paths.
+- Align vulnerability and flake-report fixtures with hashed item and gate identities.
+
+### Compatibility
+
+- Retain deprecated CLI, MCP IntegrationRun/`health`, environment-variable, and flat-path aliases
+  through the 2.x line. Their runtime metadata, warnings, tests, and documentation now schedule
+  removal for 3.0.0.
 
 ## [1.5.2] - 2026-08-28
 

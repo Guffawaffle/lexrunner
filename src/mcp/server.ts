@@ -543,7 +543,7 @@ function createServer(options?: McpServerOptions): Server {
         {
           name: "health",
           description:
-            "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 2.0.0.",
+            "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 3.0.0.",
           inputSchema: {
             type: "object",
             properties: {
@@ -1969,7 +1969,7 @@ async function handleHealth(args: {
             deprecation: {
               tool: "health",
               replacement: "doctor",
-              removeIn: "2.0.0",
+              removeIn: "3.0.0",
             },
           },
           null,

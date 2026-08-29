@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("published IntegrationRun compatibility retirement", () => {
-  it("publishes explicit replacements, ownership, and the 2.0.0 removal window", async () => {
+  it("publishes explicit replacements, ownership, and the 3.0.0 removal window", async () => {
     const response = await invoke(fixtureRoot(), { id: 1, method: "tools/list", params: {} });
     const names = ["lexrunner.startRun", "lexrunner.getStatus", "lexrunner.listArtifacts"];
 
@@ -21,7 +21,7 @@ describe("published IntegrationRun compatibility retirement", () => {
       const tool = response.result.tools.find((entry: { name: string }) => entry.name === name);
       expect(tool.description).toContain("DEPRECATED");
       expect(tool.description).toContain("IntegrationRun");
-      expect(tool.description).toContain("2.0.0");
+      expect(tool.description).toContain("3.0.0");
     }
   });
 
@@ -50,13 +50,13 @@ describe("published IntegrationRun compatibility retirement", () => {
       contract: "bounded-ax-v1",
       kind: "IntegrationRun",
       authority: "integration-record-only",
-      deprecation: { tool: "lexrunner.startRun", removeIn: "2.0.0" },
+      deprecation: { tool: "lexrunner.startRun", removeIn: "3.0.0" },
     });
     expect(status).toMatchObject({
       contract: "bounded-ax-v1",
       kind: "IntegrationRun",
       authority: "integration-record-only",
-      deprecation: { tool: "lexrunner.getStatus", removeIn: "2.0.0" },
+      deprecation: { tool: "lexrunner.getStatus", removeIn: "3.0.0" },
       runId: started.runId,
     });
     expect(Buffer.byteLength(statusResponse.result.content[0].text, "utf8")).toBeLessThan(

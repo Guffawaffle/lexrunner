@@ -31,7 +31,7 @@ describe("IntegrationRecord compatibility retirement", () => {
       contract: "bounded-ax-v1",
       kind: "IntegrationRun",
       authority: "integration-record-only",
-      deprecation: { tool: "lexrunner.startRun", removeIn: "2.0.0" },
+      deprecation: { tool: "lexrunner.startRun", removeIn: "3.0.0" },
       status: "planning",
       initialStatus: { state: "planning" },
     });
@@ -39,7 +39,7 @@ describe("IntegrationRecord compatibility retirement", () => {
       contract: "bounded-ax-v1",
       kind: "IntegrationRun",
       authority: "integration-record-only",
-      deprecation: { tool: "lexrunner.getStatus", removeIn: "2.0.0" },
+      deprecation: { tool: "lexrunner.getStatus", removeIn: "3.0.0" },
       runId: started.runId,
       state: "planning",
     });

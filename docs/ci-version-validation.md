@@ -125,7 +125,7 @@ npm list @smartergpt/lex
 **Expected output**:
 
 ```
-@smartergpt/lexrunner@1.5.2 /path/to/lexrunner
+@smartergpt/lexrunner@2.0.0 /path/to/lexrunner
 └── @smartergpt/lex@4.0.3
 ```
 

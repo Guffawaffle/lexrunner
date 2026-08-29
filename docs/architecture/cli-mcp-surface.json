@@ -33,7 +33,7 @@
     {
       "noun": "IntegrationRun",
       "owner": "frozen RunStore",
-      "surface": "deprecated bounded lexrunner.* MCP record adapters through 2.0.0",
+      "surface": "deprecated bounded lexrunner.* MCP record adapters through 2.x",
       "decision": "gate/artifact integration record; never orchestration authority"
     },
     {
@@ -291,21 +291,21 @@
         "tool": "lexrunner.getStatus",
         "replacement": "status for integration; get_attempt_status for ADR-010 orchestration",
         "owner": "frozen RunStore integration records",
-        "removeIn": "2.0.0"
+        "removeIn": "3.0.0"
       },
       {
         "tool": "lexrunner.listArtifacts",
         "replacement": "bounded artifact references from the owning plan.create, gates.run, or merge.apply operation",
         "owner": "frozen RunStore integration records",
-        "removeIn": "2.0.0"
+        "removeIn": "3.0.0"
       },
       {
         "tool": "lexrunner.startRun",
         "replacement": "plan.create, gates.run, or merge.apply for integration; start_attempt for ADR-010 orchestration",
         "owner": "frozen RunStore integration records",
-        "removeIn": "2.0.0"
+        "removeIn": "3.0.0"
       },
-      { "tool": "health", "replacement": "doctor", "removeIn": "2.0.0" }
+      { "tool": "health", "replacement": "doctor", "removeIn": "3.0.0" }
     ],
     "internal-only": [],
     "remove": [],

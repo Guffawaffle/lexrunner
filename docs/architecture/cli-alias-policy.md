@@ -4,9 +4,9 @@ The canonical CLI/MCP matrix classifies every registered command. LexRunner appl
 runtime migration policy to every CLI registration classified as `compatibility` or `deprecated`.
 
 - Alias guidance is emitted on stderr so JSON stdout stays parseable.
-- Compatibility aliases remain supported throughout the 1.x line. They are reviewed at 2.0.0 but
+- Compatibility aliases remain supported throughout the 2.x line. They are reviewed at 3.0.0 but
   have no automatic removal promise.
-- Deprecated aliases name a canonical replacement and are removed no earlier than 2.0.0.
+- Deprecated aliases name a canonical replacement and are removed no earlier than 3.0.0.
 - Alias registrations delegate to the same owning command or application service; aliases do not
   own business logic or lifecycle transitions.
 

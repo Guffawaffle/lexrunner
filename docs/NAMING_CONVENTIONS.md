@@ -43,8 +43,8 @@ Pattern: `mcp_lexrunner_{category}_{action}`
 | `merge-order`         | `mcp_lexrunner_weave_order`               | Planned                     |
 | `doctor`              | `mcp_lexrunner_workspace_doctor`          | Planned                     |
 | `local.init`          | `mcp_lexrunner_workspace_init`            | Planned                     |
-| `lexrunner.startRun`  | Integration operations or `start_attempt` | Deprecated; remove in 2.0.0 |
-| `lexrunner.getStatus` | `status` or `get_attempt_status`          | Deprecated; remove in 2.0.0 |
+| `lexrunner.startRun`  | Integration operations or `start_attempt` | Deprecated; remove in 3.0.0 |
+| `lexrunner.getStatus` | `status` or `get_attempt_status`          | Deprecated; remove in 3.0.0 |
 
 ---
 
