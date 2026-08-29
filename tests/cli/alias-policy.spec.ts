@@ -37,7 +37,7 @@ describe("CLI alias policy", () => {
     ).toEqual(expected);
     expect(
       CLI_ALIAS_POLICY.filter(({ disposition }) => disposition === "deprecated").every(
-        ({ removeIn }) => removeIn === "2.0.0"
+        ({ removeIn }) => removeIn === "3.0.0"
       )
     ).toBe(true);
   });
@@ -54,14 +54,14 @@ describe("CLI alias policy", () => {
 
   it("gives deprecated aliases stable replacement and removal guidance", () => {
     expect(aliasWarning("status")).toBe(
-      '[lexrunner] deprecated alias "status"; use "weave status"; removal: 2.0.0.'
+      '[lexrunner] deprecated alias "status"; use "weave status"; removal: 3.0.0.'
     );
     expect(aliasWarning("weave status")).toBeNull();
   });
 
   it("keeps merge as a tested compatibility alias for weave apply", () => {
     expect(aliasWarning("merge")).toBe(
-      '[lexrunner] compatibility alias "merge"; use "weave apply"; supported through 1.x and reviewed at 2.0.0.'
+      '[lexrunner] compatibility alias "merge"; use "weave apply"; supported through 2.x and reviewed at 3.0.0.'
     );
   });
 });

@@ -635,7 +635,7 @@ const tools = {
   },
 
   health: {
-    description: "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 2.0.0.",
+    description: "DEPRECATED: use doctor. Compatibility alias scheduled for removal in 3.0.0.",
     inputSchema: {
       type: "object",
       properties: {
@@ -654,7 +654,7 @@ const tools = {
         });
         const health = {
           ...doctor,
-          deprecation: { tool: "health", replacement: "doctor", removeIn: "2.0.0" },
+          deprecation: { tool: "health", replacement: "doctor", removeIn: "3.0.0" },
         };
 
         return {

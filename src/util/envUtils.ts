@@ -54,7 +54,7 @@ function emitDeprecationNotice(oldVar: string, newVar: string): void {
 
   console.warn(
     `⚠️  Environment variable ${oldVar} is deprecated. ` +
-      `Use ${newVar} instead. Support for ${oldVar} will be removed in v2.0.0.`
+      `Use ${newVar} instead. Support for ${oldVar} will be removed in v3.0.0.`
   );
 }
 

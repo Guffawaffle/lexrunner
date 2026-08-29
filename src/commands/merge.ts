@@ -9,7 +9,7 @@ export interface MergeCommandDeps {
 }
 
 /**
- * Keep the top-level `merge` surface available through the 1.x compatibility
+ * Keep the top-level `merge` surface available through the 2.x compatibility
  * window without retaining a second merge implementation.
  */
 export function registerMergeCommand(
@@ -32,7 +32,7 @@ export function registerMergeCommand(
       "after",
       `
 Compatibility:
-  "merge" is supported through the LexRunner 1.x line and reviewed at 2.0.0.
+  "merge" is supported through the LexRunner 2.x line and reviewed at 3.0.0.
   Use "lexrunner weave apply" for new automation.
 
 Examples:

@@ -63,7 +63,7 @@ mapping; the adapter never accepts caller-supplied projection evidence as launch
 The frozen `RunStore` is different. It records stateless integration runs,
 steps, receipts, and artifacts; it cannot authorize or advance ADR-010 state.
 The three published `lexrunner.*` MCP tools are deprecated bounded IntegrationRun
-record adapters. They are scheduled for removal in `2.0.0`; the checked-in
+record adapters. They are scheduled for removal in `3.0.0`; the checked-in
 [migration decision](integration-run-compatibility.md) names the owning integration and Attempt
 replacements rather than inventing another generic Run surface.
 
@@ -124,7 +124,7 @@ listed in the matrix own implementation gaps.
 - The old AX page lists MCP tools such as `plan_validate`, `fanout_analyze`, and
   ADR-007 task tools that are not published by `mcp-server.mjs`.
 - `health` delegates to `doctor`, emits a replacement warning, and is scheduled for removal in
-  `2.0.0`.
+  `3.0.0`.
 - Top-level `discover`, `plan`, `status`, `report`, `merge-order`, `execute`,
   `doctor`, and `init` remain deprecated aliases for category/action commands.
 - `orchestrate:*` commands are legacy aliases; `senior-dev`, budget,

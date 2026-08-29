@@ -6,7 +6,7 @@ const MAX_RESULT_BYTES = 64 * 1024;
 const MAX_STRING_BYTES = 1024;
 const MAX_ARTIFACTS = 64;
 
-export const INTEGRATION_RECORD_REMOVAL_VERSION = "2.0.0" as const;
+export const INTEGRATION_RECORD_REMOVAL_VERSION = "3.0.0" as const;
 
 export const INTEGRATION_RECORD_REPLACEMENTS = {
   "lexrunner.startRun":

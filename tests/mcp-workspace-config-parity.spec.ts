@@ -86,7 +86,7 @@ describe("published MCP workspace/config parity", () => {
     const tools = await invoke(root, { id: 2, method: "tools/list", params: {} });
     const healthTool = tools.result.tools.find((tool: { name: string }) => tool.name === "health");
     expect(healthTool.description).toContain("DEPRECATED: use doctor");
-    expect(healthTool.description).toContain("2.0.0");
+    expect(healthTool.description).toContain("3.0.0");
 
     const doctor = await invoke(root, {
       id: 3,
@@ -106,7 +106,7 @@ describe("published MCP workspace/config parity", () => {
     expect(healthResult.deprecation).toEqual({
       tool: "health",
       replacement: "doctor",
-      removeIn: "2.0.0",
+      removeIn: "3.0.0",
     });
   });
 

@@ -4,7 +4,7 @@
 
 The published `lexrunner.startRun`, `lexrunner.getStatus`, and
 `lexrunner.listArtifacts` MCP tools are deprecated in the Ecosystem 3.1 release and will be removed
-in `2.0.0`. They are not renamed: a new generic run lifecycle would preserve the ambiguity that
+in `3.0.0`. They are not renamed: a new generic run lifecycle would preserve the ambiguity that
 this migration is intended to remove.
 
 Until removal, every response identifies itself as a bounded `IntegrationRun` record with
