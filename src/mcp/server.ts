@@ -22,6 +22,7 @@ import {
   GateExecutionService,
   GateExecutionServiceError,
 } from "../application/gate-execution-service.js";
+import { GateEvidenceServiceError } from "../application/gate-evidence-service.js";
 import {
   DiscoveryQueryService,
   IntegrationQueryServiceError,
@@ -86,6 +87,7 @@ import {
   FanoutAnalyzeArgs,
   FanoutHarvestResult,
   FanoutAnalyzeResult,
+  StatusArgs,
 } from "./types.js";
 import {
   resolveProfile,
@@ -480,6 +482,13 @@ function createServer(options?: McpServerOptions): Server {
                 type: "string",
                 description: "Output directory for gate results",
               },
+              timeoutMs: {
+                type: "integer",
+                minimum: 1,
+                maximum: 86400000,
+                description:
+                  "Operation-default gate timeout in milliseconds; a plan gate timeoutMs overrides it exactly",
+              },
             },
           },
         },
@@ -808,6 +817,17 @@ function createServer(options?: McpServerOptions): Server {
                 type: "string",
                 description:
                   "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
+              },
+              evidenceFile: {
+                type: "string",
+                minLength: 1,
+                maxLength: 4096,
+                description: "Explicit gate evidence manifest returned by gates_run",
+              },
+              evidenceSha256: {
+                type: "string",
+                pattern: "^sha256:[a-f0-9]{64}$",
+                description: "Expected SHA-256 returned with the gate evidence manifest",
               },
             },
           },
@@ -1144,7 +1164,7 @@ function createServer(options?: McpServerOptions): Server {
         );
 
       case "weave_status":
-        return await handleStatus(args as { planFile?: string });
+        return await handleStatus(StatusArgs.parse(args));
 
       case "merge_order":
         return await handleMergeOrder(args as { planFile?: string });
@@ -1755,22 +1775,24 @@ async function handleGatesRun(
   args: GatesRunArgs
 ): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
+    const validatedArgs = GatesRunArgs.parse(args);
     const env = getMCPEnvironment();
     const artifact = new PlanArtifactService().resolve({
-      planFile: args.planFile,
+      planFile: validatedArgs.planFile,
       workingDir: process.cwd(),
       profileDir: env.LEX_PR_PROFILE_DIR,
     });
 
     // Determine output directory
-    const outDir = args.outDir || path.join(path.dirname(artifact.filePath), "gates");
+    const outDir = validatedArgs.outDir || path.join(path.dirname(artifact.filePath), "gates");
 
     const summary = (
       await new GateExecutionService().run({
         plan: artifact.plan,
         artifactDir: outDir,
-        onlyItem: args.onlyItem,
-        onlyGate: args.onlyGate,
+        timeoutMs: validatedArgs.timeoutMs,
+        onlyItem: validatedArgs.onlyItem,
+        onlyGate: validatedArgs.onlyGate,
         options: { emitReceipt: false, suppressStdout: true },
       })
     ).summary;
@@ -2411,6 +2433,8 @@ async function handleDiscover(args: {
  */
 async function handleStatus(args: {
   planFile?: string;
+  evidenceFile?: string;
+  evidenceSha256?: string;
 }): Promise<{ content: [{ type: "text"; text: string }] }> {
   try {
     const artifact = new PlanArtifactService().resolve({
@@ -2418,7 +2442,16 @@ async function handleStatus(args: {
       workingDir: process.cwd(),
       profileDir: getMCPEnvironment().LEX_PR_PROFILE_DIR,
     });
-    const status = new IntegrationStatusQueryService().run(artifact.plan);
+    const status = new IntegrationStatusQueryService().run(
+      artifact.plan,
+      args.evidenceFile && args.evidenceSha256
+        ? {
+            evidenceFile: args.evidenceFile,
+            evidenceSha256: args.evidenceSha256,
+            repoRoot: process.cwd(),
+          }
+        : undefined
+    );
 
     // Calculate tier metrics from plan items
     const tierAssignments = suggestTiersForPlan(artifact.plan.items);
@@ -2457,6 +2490,12 @@ async function handleStatus(args: {
     }
     if (error instanceof PlanArtifactServiceError) {
       throwPlanArtifactError("status", error);
+    }
+    if (error instanceof GateEvidenceServiceError) {
+      throwMcpAXError(
+        ErrorCode.InvalidParams,
+        mcpToolError(error.code, error.message, { tool: "status" })
+      );
     }
     throwMcpToolError(ErrorCode.InternalError, "status", error, "get status");
   }

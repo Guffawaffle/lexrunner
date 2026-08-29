@@ -10,12 +10,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path";
+import { z } from "zod";
 
-import type { Gate, GateResult } from "../schema.js";
+import { Gate, type GateResult } from "../schema.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { sha256 } from "../util/hash.js";
+import { computeCanonicalHash } from "../schemas/task-contract.js";
 
-export const GATE_EXECUTION_RECEIPT_SCHEMA_VERSION = "lexrunner-gate-execution-receipt/v1" as const;
+export const GATE_EXECUTION_RECEIPT_SCHEMA_VERSION = "lexrunner-gate-execution-receipt/v2" as const;
 export const MAX_GATE_RECEIPT_OUTPUT_BYTES = 64 * 1024;
 
 export interface GateArtifactFileIdentity {
@@ -59,35 +61,118 @@ export interface SpawnedShellEvidence {
   spawned: boolean;
 }
 
-export interface LocalGateExecutionReceipt {
-  schemaVersion: typeof GATE_EXECUTION_RECEIPT_SCHEMA_VERSION;
-  attempt: number;
-  declaredGate: {
-    name: string;
-    run: string;
-    cwd: string | null;
-    runtime: Gate["runtime"];
-    artifacts: string[];
+const FileIdentitySchema = z
+  .object({
+    path: z.string(),
+    realPath: z.string(),
+    bytes: z.number().int().nonnegative(),
+    mtimeMs: z.number().nonnegative(),
+    sha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+  })
+  .strict();
+const OutputEvidenceSchema = z
+  .object({
+    bytes: z.number().int().nonnegative(),
+    sha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    truncated: z.boolean(),
+    content: z.string().max(MAX_GATE_RECEIPT_OUTPUT_BYTES),
+  })
+  .strict();
+const ArtifactIdentitySchema = z
+  .object({
+    declaredPath: z.string(),
+    resolvedPath: z.string(),
+    status: z.enum(["collected", "missing", "stale", "unsupported", "collection_error"]),
+    before: FileIdentitySchema.nullable(),
+    source: FileIdentitySchema.nullable(),
+    retainedPath: z.string().optional(),
+    retained: FileIdentitySchema.optional(),
+    error: z.string().optional(),
+  })
+  .strict();
+
+export const LocalGateExecutionReceiptSchema = z
+  .object({
+    schemaVersion: z.literal(GATE_EXECUTION_RECEIPT_SCHEMA_VERSION),
+    attempt: z.number().int().positive(),
+    binding: z
+      .object({
+        item: z.string().min(1).nullable(),
+        declaredGateDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        candidateDigest: z
+          .string()
+          .regex(/^sha256:[a-f0-9]{64}$/u)
+          .nullable(),
+        timeoutMs: z.number().int().positive(),
+      })
+      .strict(),
+    declaredGate: z
+      .object({
+        name: z.string(),
+        run: z.string(),
+        cwd: z.string().nullable(),
+        runtime: z.enum(["local", "container", "ci-service"]),
+        artifacts: z.array(z.string()),
+      })
+      .strict(),
+    execution: z
+      .object({
+        cwd: z.string(),
+        startedAt: z.string(),
+        finishedAt: z.string(),
+        durationMs: z.number().nonnegative(),
+        shell: z
+          .object({
+            command: z.enum(["bash", "pwsh"]),
+            executable: FileIdentitySchema.nullable(),
+            argv: z.array(z.string()),
+            identityAfter: FileIdentitySchema.nullable(),
+            unchanged: z.boolean(),
+            spawned: z.boolean(),
+          })
+          .strict(),
+      })
+      .strict(),
+    outcome: z
+      .object({
+        status: z.enum(["pass", "fail", "blocked", "skipped", "retrying"]),
+        exitCode: z.number().int().nullable(),
+        failureKind: z
+          .enum(["nonzero_exit", "spawn_error", "timeout", "evidence_error"])
+          .nullable(),
+        timeoutCleanup: z
+          .object({
+            method: z.enum(["process-group", "taskkill", "direct-child"]),
+            forceKilled: z.boolean(),
+            descendantsReaped: z.boolean(),
+          })
+          .strict()
+          .nullable(),
+        evidenceComplete: z.boolean(),
+      })
+      .strict(),
+    output: z.object({ stdout: OutputEvidenceSchema, stderr: OutputEvidenceSchema }).strict(),
+    artifacts: z.array(ArtifactIdentitySchema),
+  })
+  .strict();
+export type LocalGateExecutionReceipt = z.infer<typeof LocalGateExecutionReceiptSchema>;
+
+export function parseLocalGateExecutionReceipt(value: unknown): LocalGateExecutionReceipt {
+  return LocalGateExecutionReceiptSchema.parse(value);
+}
+
+export function gateExecutionBinding(
+  gate: Gate,
+  item: string | undefined,
+  timeoutMs: number,
+  candidateDigest?: string
+): LocalGateExecutionReceipt["binding"] {
+  return {
+    item: item ?? null,
+    declaredGateDigest: computeCanonicalHash(Gate.parse(gate)),
+    candidateDigest: candidateDigest ?? null,
+    timeoutMs,
   };
-  execution: {
-    cwd: string;
-    startedAt: string;
-    finishedAt: string;
-    durationMs: number;
-    shell: SpawnedShellEvidence;
-  };
-  outcome: {
-    status: GateResult["status"];
-    exitCode: number | null;
-    failureKind: GateResult["failureKind"] | null;
-    timeoutCleanup: GateResult["timeoutCleanup"] | null;
-    evidenceComplete: boolean;
-  };
-  output: {
-    stdout: GateOutputEvidence;
-    stderr: GateOutputEvidence;
-  };
-  artifacts: CollectedGateArtifactIdentity[];
 }
 
 export function resolveSpawnExecutable(

@@ -23,6 +23,7 @@ export const GateResult = z.object({
   status: GateStatus,
   exitCode: z.number().optional(),
   duration: z.number().optional(), // milliseconds
+  timeoutMs: z.number().int().positive().optional(), // effective timeout used for this gate
   stdout: z.string().optional(),
   stderr: z.string().optional(),
   failureKind: z.enum(["nonzero_exit", "spawn_error", "timeout", "evidence_error"]).optional(),
@@ -204,6 +205,13 @@ export const Gate = z
     artifacts: z.array(z.string()).default([]),
     // Optional input data for gates that require structured inputs (validated against gate-specific schemas)
     input: z.record(z.string(), z.unknown()).optional(),
+    // Exact per-gate timeout. Overrides the operation default after hostility adjustment.
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .max(24 * 60 * 60 * 1000)
+      .optional(),
   })
   .strict();
 export type Gate = z.infer<typeof Gate>;
@@ -231,7 +239,32 @@ export const Plan = z
     policy: Policy.optional(),
     items: z.array(PlanItem).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((plan, context) => {
+    const itemNames = new Set<string>();
+    for (const [itemIndex, item] of plan.items.entries()) {
+      if (itemNames.has(item.name)) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", itemIndex, "name"],
+          message: "Plan item names must be unique",
+        });
+      }
+      itemNames.add(item.name);
+
+      const gateNames = new Set<string>();
+      for (const [gateIndex, gate] of item.gates.entries()) {
+        if (gateNames.has(gate.name)) {
+          context.addIssue({
+            code: "custom",
+            path: ["items", itemIndex, "gates", gateIndex, "name"],
+            message: "Gate names must be unique within an item",
+          });
+        }
+        gateNames.add(gate.name);
+      }
+    }
+  });
 export type Plan = z.infer<typeof Plan>;
 
 /**

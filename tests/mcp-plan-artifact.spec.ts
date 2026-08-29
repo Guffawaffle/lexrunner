@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createServer } from "../src/mcp/server.js";
@@ -12,7 +13,11 @@ import { InMemoryRunStore } from "../src/store/inmemory/index.js";
 const roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
+  );
 });
 
 describe("SDK MCP plan artifact parity", () => {
@@ -29,6 +34,23 @@ describe("SDK MCP plan artifact parity", () => {
       "utf8"
     );
     await writeFile(planFile, `${JSON.stringify(plan("explicit"), null, 2)}\n`, "utf8");
+    await execa("git", ["init", "-b", "main"], { cwd: root });
+    await execa("git", ["add", "."], { cwd: root });
+    await execa(
+      "git",
+      [
+        "-c",
+        "user.name=LexRunner Test",
+        "-c",
+        "user.email=lexrunner@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "fixture",
+      ],
+      { cwd: root }
+    );
 
     const previousCwd = process.cwd();
     const previousProfile = process.env.LEX_PR_PROFILE_DIR;
@@ -52,6 +74,14 @@ describe("SDK MCP plan artifact parity", () => {
         });
       }
 
+      const gatesTool = inventory.tools.find(({ name }) => name === "gates_run");
+      expect(gatesTool?.inputSchema.properties).toMatchObject({ timeoutMs: { type: "integer" } });
+      const statusTool = inventory.tools.find(({ name }) => name === "weave_status");
+      expect(statusTool?.inputSchema.properties).toMatchObject({
+        evidenceFile: { type: "string", minLength: 1, maxLength: 4096 },
+        evidenceSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+      });
+
       const calls = [
         ["weave_status", { planFile }],
         ["merge_order", { planFile }],
@@ -64,16 +94,41 @@ describe("SDK MCP plan artifact parity", () => {
         results[name] = parseToolText(response);
       }
 
+      expect(results.weave_status.mergeSummary.pending).toEqual(["explicit"]);
+
       expect(results.weave_status.plan.itemCount).toBe(1);
       expect(results.merge_order.levels).toEqual([["explicit"]]);
       expect(results.merge_apply).toMatchObject({ mode: "dry-run", totalItems: 1 });
-      expect(results.gates_run.items).toEqual([
+      expect(results.gates_run.items).toMatchObject([
         {
           name: "explicit",
           status: "pass",
           gates: [{ name: "test", status: "pass" }],
         },
       ]);
+      const evidence = results.gates_run.artifactRefs.find(
+        ({ kind }: { kind: string }) => kind === "gate-evidence-manifest"
+      );
+      const statusWithEvidence = parseToolText(
+        await client.callTool({
+          name: "weave_status",
+          arguments: {
+            planFile,
+            evidenceFile: evidence.path,
+            evidenceSha256: evidence.sha256,
+          },
+        })
+      );
+      expect(statusWithEvidence).toMatchObject({
+        evidence: {
+          kind: "gate-evidence-manifest",
+          applied: 1,
+          authority: "unverified",
+          observations: { passed: ["explicit/test"], failed: [], other: [] },
+        },
+        mergeSummary: { eligible: [], pending: ["explicit"], failed: [] },
+      });
+      expect(statusWithEvidence.planArtifact).toEqual(results.gates_run.planArtifact);
       const identities = calls.map(([name]) => results[name].planArtifact);
       expect(
         identities.every((identity) => JSON.stringify(identity) === JSON.stringify(identities[0]))
@@ -86,7 +141,7 @@ describe("SDK MCP plan artifact parity", () => {
       if (previousProfile === undefined) delete process.env.LEX_PR_PROFILE_DIR;
       else process.env.LEX_PR_PROFILE_DIR = previousProfile;
     }
-  });
+  }, 10_000);
 });
 
 function plan(name: string) {

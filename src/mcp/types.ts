@@ -65,6 +65,12 @@ export const GatesRunArgs = z.object({
   onlyItem: z.string().optional(),
   onlyGate: z.string().optional(),
   outDir: z.string().optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(24 * 60 * 60 * 1000)
+    .optional(),
 });
 export type GatesRunArgs = z.infer<typeof GatesRunArgs>;
 
@@ -104,7 +110,7 @@ export interface GatesRunResult {
     }>;
   }>;
   allGreen: boolean;
-  artifactRefs: Array<{ kind: "gate-results-directory"; path: string }>;
+  artifactRefs: import("../application/gate-execution-service.js").BoundedGateRunResult["artifactRefs"];
   planArtifact: import("../application/plan-artifact-service.js").PlanArtifactIdentity;
 }
 
@@ -147,9 +153,18 @@ export const DiscoverArgs = z.object({
 });
 export type DiscoverArgs = z.infer<typeof DiscoverArgs>;
 
-export const StatusArgs = z.object({
-  planFile: z.string().optional(),
-});
+export const StatusArgs = z
+  .object({
+    planFile: z.string().optional(),
+    evidenceFile: z.string().min(1).max(4096).optional(),
+    evidenceSha256: z
+      .string()
+      .regex(/^sha256:[a-f0-9]{64}$/u)
+      .optional(),
+  })
+  .refine((value) => Boolean(value.evidenceFile) === Boolean(value.evidenceSha256), {
+    message: "evidenceFile and evidenceSha256 must be supplied together",
+  });
 export type StatusArgs = z.infer<typeof StatusArgs>;
 
 export const MergeOrderArgs = z.object({

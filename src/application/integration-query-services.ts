@@ -11,6 +11,7 @@ import { loadPlan, type Plan } from "../schema.js";
 import type { TierOverride } from "../tiers/schema.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
 import { createFileAnalyzer } from "../planner/fileAnalysis.js";
+import { loadGateEvidence, type GateEvidenceArtifactReference } from "./gate-evidence-service.js";
 
 const MAX_COLLECTION = 256;
 const MAX_LABEL_BYTES = 512;
@@ -114,11 +115,21 @@ export interface BoundedIntegrationStatus {
     policy?: Plan["policy"];
   };
   mergeSummary: ReturnType<MergeEligibilityEvaluator["getMergeSummary"]>;
+  evidence?: GateEvidenceArtifactReference & {
+    applied: number;
+    authority: "unverified";
+    observations: { passed: string[]; failed: string[]; other: string[] };
+  };
 }
 
 export class IntegrationStatusQueryService {
-  run(plan: Plan): BoundedIntegrationStatus {
+  run(
+    plan: Plan,
+    evidence?: { evidenceFile: string; evidenceSha256: string; repoRoot?: string }
+  ): BoundedIntegrationStatus {
     const validated = validateBoundedPlan(plan);
+    const projection = evidence ? loadGateEvidence({ plan: validated, ...evidence }) : undefined;
+    // Integrity-valid caller evidence is observable but cannot mint merge authority.
     const evaluator = new MergeEligibilityEvaluator(validated, new ExecutionState(validated));
     return boundedResult({
       contract: "bounded-ax-v1",
@@ -129,6 +140,16 @@ export class IntegrationStatusQueryService {
         ...(validated.policy ? { policy: validated.policy } : {}),
       },
       mergeSummary: evaluator.getMergeSummary(),
+      ...(projection
+        ? {
+            evidence: {
+              ...projection.reference,
+              applied: projection.applied,
+              authority: "unverified" as const,
+              observations: projection.observations,
+            },
+          }
+        : {}),
     });
   }
 }

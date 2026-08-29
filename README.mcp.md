@@ -478,6 +478,7 @@ same frozen plan.
 - `onlyItem` (string, optional): Execute gates for this item only
 - `onlyGate` (string, optional): Execute this gate only
 - `outDir` (string, optional): Output directory for gate results
+- `timeoutMs` (integer, optional): Operation-default timeout; a gate's own `timeoutMs` overrides it
 
 **Returns:**
 
@@ -490,12 +491,21 @@ same frozen plan.
       "gates": [
         {
           "name": "test",
-          "status": "pass"
+          "status": "pass",
+          "timeoutMs": 45000
         }
       ]
     }
   ],
   "allGreen": true,
+  "artifactRefs": [
+    { "kind": "gate-results-directory", "path": "..." },
+    {
+      "kind": "gate-evidence-manifest",
+      "path": ".../gate-evidence-manifest.json",
+      "sha256": "sha256:..."
+    }
+  ],
   "planArtifact": {
     "contract": "plan-artifact-identity-v1",
     "kind": "execution-plan",
@@ -507,6 +517,13 @@ same frozen plan.
   }
 }
 ```
+
+Pass the returned manifest `path` and `sha256` to `weave_status` as `evidenceFile` and
+`evidenceSha256`. Status does not scan the output directory or remember an active run. It validates
+the plan, candidate, gate, receipt, timeout, and hash bindings and reports the matching gate
+observations with `authority: "unverified"`. Those observations do not create merge eligibility:
+that requires the separately trusted, plan-pinned verifier receipt tracked by #865. Each execution
+uses a fresh unique child of `outDir`, and the returned artifact reference names that exact run.
 
 **Example (using repository or profile fallback):**
 

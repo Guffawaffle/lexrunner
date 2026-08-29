@@ -8,6 +8,7 @@ import { ensureRunDir } from "../src/runs/storage.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { execFileSync } from "node:child_process";
 
 describe("Gate Execution", () => {
   const defaultPolicy: Policy = {
@@ -200,6 +201,65 @@ describe("Gate Execution", () => {
     expect(results[0].status).toBe("pass");
     expect(results[1].gate).toBe("gate2");
     expect(results[1].status).toBe("pass");
+  });
+
+  it("uses an exact per-gate timeout ahead of the operation default", async () => {
+    const item = {
+      name: "timeout-item",
+      deps: [],
+      gates: [
+        {
+          name: "long-test",
+          run: 'node -e "setTimeout(() => {}, 75)"',
+          env: {},
+          runtime: "local" as const,
+          artifacts: [],
+          timeoutMs: 2_000,
+        },
+      ],
+    };
+    const executionState = new ExecutionState({
+      schemaVersion: "1.0.0",
+      target: "main",
+      items: [item],
+    });
+
+    const [result] = await executeItemGates(item, defaultPolicy, executionState, tempDir, 10);
+
+    expect(result.status).toBe("pass");
+    expect(result.timeoutMs).toBe(2_000);
+  });
+
+  it("scrubs ambient Git repository selectors before local gate execution", async () => {
+    const intended = path.join(tempDir, "intended");
+    const redirected = path.join(tempDir, "redirected");
+    fs.mkdirSync(intended);
+    fs.mkdirSync(redirected);
+    execFileSync("git", ["init", "--quiet"], { cwd: intended, windowsHide: true });
+    execFileSync("git", ["init", "--quiet"], { cwd: redirected, windowsHide: true });
+    const previousDir = process.env.GIT_DIR;
+    const previousWorkTree = process.env.GIT_WORK_TREE;
+    try {
+      process.env.GIT_DIR = path.join(redirected, ".git");
+      process.env.GIT_WORK_TREE = redirected;
+      const result = await executeGate(
+        { name: "git-root", run: "git rev-parse --show-toplevel", runtime: "local" },
+        defaultPolicy,
+        path.join(tempDir, "artifacts"),
+        5_000,
+        undefined,
+        false,
+        intended
+      );
+      expect(path.resolve(result.stdout ?? "").toLowerCase()).toBe(
+        path.resolve(intended).toLowerCase()
+      );
+    } finally {
+      if (previousDir === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = previousDir;
+      if (previousWorkTree === undefined) delete process.env.GIT_WORK_TREE;
+      else process.env.GIT_WORK_TREE = previousWorkTree;
+    }
   });
 
   it("handles items with no gates", async () => {

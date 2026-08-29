@@ -455,10 +455,23 @@ const tools = {
           type: "string",
           description: "Output directory for gate results",
         },
+        timeoutMs: {
+          type: "integer",
+          minimum: 1,
+          maximum: 86400000,
+          description:
+            "Operation-default gate timeout in milliseconds; a plan gate timeoutMs overrides it exactly",
+        },
       },
     },
     call: async (args) => {
       try {
+        if (
+          args.timeoutMs !== undefined &&
+          (!Number.isInteger(args.timeoutMs) || args.timeoutMs < 1 || args.timeoutMs > 86400000)
+        ) {
+          throw new Error("timeoutMs must be an integer from 1 through 86400000 milliseconds");
+        }
         const artifact = new core.PlanArtifactService().resolve({
           planFile: args.planFile,
           workingDir: process.cwd(),
@@ -472,6 +485,7 @@ const tools = {
           await new core.GateExecutionService().run({
             plan: artifact.plan,
             artifactDir: outDir,
+            timeoutMs: args.timeoutMs,
             onlyItem: args.onlyItem,
             onlyGate: args.onlyGate,
             options: { emitReceipt: false, suppressStdout: true },
@@ -884,17 +898,52 @@ const tools = {
           description:
             "Explicit plan.json path (default: repository plan.json, then profile runner fallback)",
         },
+        evidenceFile: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+          description: "Explicit gate evidence manifest returned by gates.run",
+        },
+        evidenceSha256: {
+          type: "string",
+          pattern: "^sha256:[a-f0-9]{64}$",
+          description: "Expected SHA-256 returned with the gate evidence manifest",
+        },
       },
     },
     call: async (args) => {
       try {
+        const hasEvidenceFile = args.evidenceFile !== undefined;
+        const hasEvidenceDigest = args.evidenceSha256 !== undefined;
+        if (hasEvidenceFile !== hasEvidenceDigest) {
+          throw new Error("evidenceFile and evidenceSha256 must be supplied together");
+        }
+        if (
+          hasEvidenceFile &&
+          (typeof args.evidenceFile !== "string" ||
+            args.evidenceFile.length < 1 ||
+            Buffer.byteLength(args.evidenceFile, "utf8") > 4096 ||
+            typeof args.evidenceSha256 !== "string" ||
+            !/^sha256:[a-f0-9]{64}$/u.test(args.evidenceSha256))
+        ) {
+          throw new Error("evidenceFile or evidenceSha256 is invalid");
+        }
         const artifact = new core.PlanArtifactService().resolve({
           planFile: args.planFile,
           workingDir: process.cwd(),
           profileDir: config.profileDir,
         });
         const result = {
-          ...new core.IntegrationStatusQueryService().run(artifact.plan),
+          ...new core.IntegrationStatusQueryService().run(
+            artifact.plan,
+            args.evidenceFile
+              ? {
+                  evidenceFile: args.evidenceFile,
+                  evidenceSha256: args.evidenceSha256,
+                  repoRoot: process.cwd(),
+                }
+              : undefined
+          ),
           planArtifact: artifact.identity,
         };
 

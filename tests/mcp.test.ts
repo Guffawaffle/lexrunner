@@ -3,6 +3,7 @@ import {
   getMCPEnvironment,
   PlanCreateArgs,
   GatesRunArgs,
+  StatusArgs,
   MergeApplyArgs,
 } from "../src/mcp/types.js";
 import * as fs from "fs";
@@ -100,10 +101,22 @@ describe("MCP Parameter Validation", () => {
     expect(() => GatesRunArgs.parse({ onlyItem: "item1" })).not.toThrow();
     expect(() => GatesRunArgs.parse({ onlyGate: "test" })).not.toThrow();
     expect(() => GatesRunArgs.parse({ outDir: "/tmp" })).not.toThrow();
+    expect(() => GatesRunArgs.parse({ timeoutMs: 180_000 })).not.toThrow();
 
     // Invalid args
     expect(() => GatesRunArgs.parse({ onlyItem: 123 })).toThrow();
     expect(() => GatesRunArgs.parse({ onlyGate: true })).toThrow();
+    expect(() => GatesRunArgs.parse({ timeoutMs: 0 })).toThrow();
+  });
+
+  it("should validate paired bounded status evidence references", () => {
+    const digest = `sha256:${"a".repeat(64)}`;
+    expect(() =>
+      StatusArgs.parse({ evidenceFile: "evidence.json", evidenceSha256: digest })
+    ).not.toThrow();
+    expect(() => StatusArgs.parse({ evidenceFile: "evidence.json" })).toThrow();
+    expect(() => StatusArgs.parse({ evidenceFile: "", evidenceSha256: digest })).toThrow();
+    expect(() => StatusArgs.parse({ evidenceFile: "evidence.json", evidenceSha256: "" })).toThrow();
   });
 
   it("should validate MergeApplyArgs", () => {

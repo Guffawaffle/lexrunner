@@ -139,7 +139,7 @@
               "additionalProperties": false,
               "default": {}
             },
-            "security": {
+        "security": {
               "type": "object",
               "properties": {
                 "blockCritical": {
@@ -272,6 +272,11 @@
                     "input": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "timeoutMs": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 86400000
                     }
                   },
                   "required": [
