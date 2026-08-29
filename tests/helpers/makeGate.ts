@@ -7,7 +7,6 @@ export function makeGate(overrides: GateOverrides): Gate {
   const base: Gate = {
     // Minimal fields to satisfy the Gate type used in tests
     name: "test-gate",
-    description: "",
     run: 'echo "ok"',
     runtime: "local" as any,
     timeoutMs: 30000,

@@ -91,6 +91,48 @@ describe("bounded plan validation diagnostics", () => {
     expect(JSON.stringify(dynamicKeyFailure)).not.toContain(SECRET_KEY);
   });
 
+  it("keeps duplicate item and gate diagnostics stable without echoing names", () => {
+    const duplicateItemFailure = formatPlanValidationFailure(
+      captureSchemaError(JSON.stringify(planWithSecretDuplicateName()))
+    );
+    expect(duplicateItemFailure.errors).toEqual([
+      {
+        path: "items",
+        message: "Plan item names must be unique",
+        code: "DUPLICATE_NAMES",
+      },
+    ]);
+    expect(JSON.stringify(duplicateItemFailure)).not.toContain(SECRET_VALUE);
+
+    const duplicateGateFailure = formatPlanValidationFailure(
+      captureSchemaError(
+        JSON.stringify({
+          schemaVersion: "1.0.0",
+          target: "main",
+          items: [
+            {
+              name: "one",
+              deps: [],
+              gates: [
+                { name: SECRET_VALUE, run: "true" },
+                { name: SECRET_VALUE, run: "true" },
+                { name: SECRET_VALUE, run: "true" },
+              ],
+            },
+          ],
+        })
+      )
+    );
+    expect(duplicateGateFailure.errors).toEqual([
+      {
+        path: "items.0.gates",
+        message: "Gate names must be unique within an item",
+        code: "DUPLICATE_GATE_NAMES",
+      },
+    ]);
+    expect(JSON.stringify(duplicateGateFailure)).not.toContain(SECRET_VALUE);
+  });
+
   it(
     "keeps schema CLI JSON and human output actionable",
     async () => {
@@ -499,7 +541,7 @@ function planWithSecretDuplicateName(): object {
   return {
     schemaVersion: "1.0.0",
     target: "main",
-    items: [item, { ...item }],
+    items: [item, { ...item }, { ...item }],
   };
 }
 

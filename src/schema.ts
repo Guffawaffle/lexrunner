@@ -242,27 +242,40 @@ export const Plan = z
   .strict()
   .superRefine((plan, context) => {
     const itemNames = new Set<string>();
+    let duplicateItemNameFound = false;
+    const duplicateGateNameItemIndexes: number[] = [];
     for (const [itemIndex, item] of plan.items.entries()) {
       if (itemNames.has(item.name)) {
-        context.addIssue({
-          code: "custom",
-          path: ["items", itemIndex, "name"],
-          message: "Plan item names must be unique",
-        });
+        duplicateItemNameFound = true;
       }
       itemNames.add(item.name);
 
       const gateNames = new Set<string>();
-      for (const [gateIndex, gate] of item.gates.entries()) {
+      let duplicateGateNameFound = false;
+      for (const gate of item.gates) {
         if (gateNames.has(gate.name)) {
-          context.addIssue({
-            code: "custom",
-            path: ["items", itemIndex, "gates", gateIndex, "name"],
-            message: "Gate names must be unique within an item",
-          });
+          duplicateGateNameFound = true;
         }
         gateNames.add(gate.name);
       }
+      if (duplicateGateNameFound) duplicateGateNameItemIndexes.push(itemIndex);
+    }
+
+    if (duplicateItemNameFound) {
+      context.addIssue({
+        code: "custom",
+        path: ["items"],
+        message: "Plan item names must be unique",
+        params: { validationCode: "DUPLICATE_NAMES" },
+      });
+    }
+    for (const itemIndex of duplicateGateNameItemIndexes) {
+      context.addIssue({
+        code: "custom",
+        path: ["items", itemIndex, "gates"],
+        message: "Gate names must be unique within an item",
+        params: { validationCode: "DUPLICATE_GATE_NAMES" },
+      });
     }
   });
 export type Plan = z.infer<typeof Plan>;
@@ -408,14 +421,33 @@ export function formatPlanValidationFailureText(failure: PlanValidationFailure):
 
 function normalizeValidationIssue(issue: z.ZodIssue): ValidationError {
   const path = normalizeValidationPath(issue.path);
+  const stableCustomIssue = safeCustomValidationIssue(issue);
   return {
     path: boundDiagnostic(path, MAX_SCHEMA_VALIDATION_PATH_BYTES),
     message: boundDiagnostic(
-      safeValidationMessage(issue.code),
+      stableCustomIssue?.message ?? safeValidationMessage(issue.code),
       MAX_SCHEMA_VALIDATION_MESSAGE_BYTES
     ),
-    code: issue.code,
+    code: stableCustomIssue?.code ?? issue.code,
   };
+}
+
+function safeCustomValidationIssue(
+  issue: z.ZodIssue
+): { code: string; message: string } | undefined {
+  if (issue.code !== "custom") return undefined;
+
+  switch (issue.params?.validationCode) {
+    case "DUPLICATE_NAMES":
+      return { code: "DUPLICATE_NAMES", message: "Plan item names must be unique" };
+    case "DUPLICATE_GATE_NAMES":
+      return {
+        code: "DUPLICATE_GATE_NAMES",
+        message: "Gate names must be unique within an item",
+      };
+    default:
+      return undefined;
+  }
 }
 
 function normalizeValidationPath(segments: PropertyKey[]): string {
