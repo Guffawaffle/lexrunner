@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-08-29
+
+### Fixed
+
+- **Published MCP identity** - Report the installed package version from both the SDK MCP server and
+  the published `lexrunner-mcp` launcher instead of the stale pre-release `0.1.0` value. Release
+  tests now initialize the packed MCP through the official client transport and require its server
+  identity to match the installed manifest before accepting the tool inventory.
+
 ## [2.0.0] - 2026-08-29
 
 ### Breaking changes
