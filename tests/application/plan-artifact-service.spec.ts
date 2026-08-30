@@ -8,6 +8,11 @@ import {
   PlanArtifactService,
   PlanArtifactServiceError,
 } from "../../src/application/plan-artifact-service.js";
+import {
+  ExecutionPlanArtifact_v1Schema,
+  PlanArtifactReference_v1Schema,
+  computeExecutionPlanArtifactDigest,
+} from "../../src/application/execution-plan-artifact.js";
 
 const roots: string[] = [];
 
@@ -63,6 +68,124 @@ describe("PlanArtifactService", () => {
       digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
     });
     expect(JSON.stringify(firstArtifact.identity)).not.toContain(root);
+    expect(firstArtifact.artifact).toEqual(secondArtifact.artifact);
+    expect(ExecutionPlanArtifact_v1Schema.safeParse(firstArtifact.artifact).success).toBe(true);
+    expect(PlanArtifactReference_v1Schema.safeParse(firstArtifact.reference).success).toBe(true);
+    expect(firstArtifact.artifact.identity).toMatchObject({
+      contract: "lexrunner.execution-plan-artifact.v1",
+      canonicalizationProfile: "lexrunner.execution-plan.canonical-json.v1",
+      hashProfile: "lexrunner.execution-plan-artifact.sha256.v1",
+      digestAlgorithm: "sha256",
+      canonicalByteLength: Buffer.byteLength(firstArtifact.artifact.canonicalBytes, "utf8"),
+      summary: { itemCount: 1, gateCount: 0 },
+    });
+    expect(firstArtifact.artifact.identity.digest).not.toBe(firstArtifact.identity.digest);
+  });
+
+  it("keeps portable content identity separate from registration scope", async () => {
+    const root = await fixtureRoot();
+    await writePlan(join(root, "plan.json"), plan("scoped"));
+    const service = new PlanArtifactService();
+    const first = service.resolve({
+      planFile: "plan.json",
+      workingDir: root,
+      scope: scope("tenant-a"),
+    });
+    const second = service.resolve({
+      planFile: "plan.json",
+      workingDir: root,
+      scope: scope("tenant-b"),
+    });
+
+    expect(first.artifact.identity).toEqual(second.artifact.identity);
+    expect(first.reference.scope).not.toEqual(second.reference.scope);
+    expect(first.acquisition).toEqual({
+      contract: "lexrunner.plan-artifact-acquisition.v1",
+      assurance: "portable-race-detection",
+      authority: "unverified",
+    });
+  });
+
+  it("runtime-validates scope and rejects ambiguous reference overrides", async () => {
+    const root = await fixtureRoot();
+    await writePlan(join(root, "plan.json"), plan("scope"));
+    const service = new PlanArtifactService();
+    const resolved = service.resolve({ planFile: "plan.json", workingDir: root });
+
+    for (const invalidScope of [
+      { ...scope("tenant"), tenant: "" },
+      { ...scope("tenant"), tenant: "é".repeat(300) },
+      { tenant: "tenant" },
+      { ...scope("tenant"), unexpected: "field" },
+    ]) {
+      expect(() =>
+        service.resolve({
+          planFile: "plan.json",
+          workingDir: root,
+          scope: invalidScope as ReturnType<typeof scope>,
+        })
+      ).toThrowError(
+        expect.objectContaining<Partial<PlanArtifactServiceError>>({
+          code: "PLAN_REFERENCE_INVALID",
+        })
+      );
+    }
+
+    expect(() =>
+      service.resolve({
+        planReference: resolved.reference,
+        workingDir: root,
+        scope: scope("override"),
+      })
+    ).toThrowError(
+      expect.objectContaining<Partial<PlanArtifactServiceError>>({
+        code: "PLAN_REFERENCE_INVALID",
+      })
+    );
+  });
+
+  it("fails a mismatched immutable reference without falling through", async () => {
+    const root = await fixtureRoot();
+    await writePlan(join(root, "selected.json"), plan("selected"));
+    await writePlan(join(root, "plan.json"), plan("fallback-must-not-load"));
+    const service = new PlanArtifactService();
+    const selected = service.resolve({ planFile: "selected.json", workingDir: root });
+    const badReference = {
+      ...selected.reference,
+      artifact: { ...selected.reference.artifact, target: "different" },
+    };
+
+    expect(() => service.resolve({ planReference: badReference, workingDir: root })).toThrowError(
+      expect.objectContaining<Partial<PlanArtifactServiceError>>({
+        code: "PLAN_REFERENCE_MISMATCH",
+        source: "explicit",
+      })
+    );
+  });
+
+  it("rejects self-consistent hashes over noncanonical or semantically mismatched bytes", async () => {
+    const root = await fixtureRoot();
+    await writePlan(join(root, "plan.json"), plan("artifact"));
+    const artifact = new PlanArtifactService().resolve({
+      planFile: "plan.json",
+      workingDir: root,
+    }).artifact;
+    const noncanonicalBytes = JSON.stringify(JSON.parse(artifact.canonicalBytes));
+    const noncanonical = {
+      identity: {
+        ...artifact.identity,
+        digest: computeExecutionPlanArtifactDigest(noncanonicalBytes),
+        canonicalByteLength: Buffer.byteLength(noncanonicalBytes, "utf8"),
+      },
+      canonicalBytes: noncanonicalBytes,
+    };
+    const falseSummary = {
+      ...artifact,
+      identity: { ...artifact.identity, summary: { itemCount: 0, gateCount: 0 } },
+    };
+
+    expect(ExecutionPlanArtifact_v1Schema.safeParse(noncanonical).success).toBe(false);
+    expect(ExecutionPlanArtifact_v1Schema.safeParse(falseSummary).success).toBe(false);
   });
 
   it("fails closed on an invalid, missing, or unreadable explicit reference without path disclosure", async () => {
@@ -131,6 +254,16 @@ function plan(itemName: string) {
     schemaVersion: "1.0.0",
     target: "main",
     items: [{ name: itemName, deps: [], gates: [] }],
+  };
+}
+
+function scope(tenant: string) {
+  return {
+    tenant,
+    workspace: "workspace",
+    repository: "owner/repository",
+    refNamespace: "refs/heads/main",
+    policy: "policy-v1",
   };
 }
 
