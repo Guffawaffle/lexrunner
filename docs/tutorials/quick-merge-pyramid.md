@@ -281,10 +281,8 @@ Create `.smartergpt/gates.yml`:
 gates:
   - name: lint
     run: npm run lint
-    timeout: 60
   - name: test
     run: npm test
-    timeout: 300
   - name: security
     run: npm audit
     required: true

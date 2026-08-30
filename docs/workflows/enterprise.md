@@ -90,22 +90,18 @@ scope:
 gates:
   - name: security-scan
     command: npm run security:scan
-    timeout: 300
     required: true
 
   - name: compliance-check
     command: ./scripts/compliance-check.sh
-    timeout: 120
     required: true
 
   - name: tests
     command: npm test
-    timeout: 600
     required: true
 
   - name: integration-tests
     command: npm run test:integration
-    timeout: 900
     required: true
 
 policies:
@@ -129,12 +125,10 @@ organization:
 global_gates:
   - name: license-check
     command: npm run check:licenses
-    timeout: 60
     required: true
 
   - name: dependency-audit
     command: npm audit --audit-level=high
-    timeout: 120
     required: true
 
 notifications:

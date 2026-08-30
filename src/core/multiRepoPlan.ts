@@ -13,6 +13,8 @@ import { stableSort } from "../util/canonicalJson.js";
 import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
 
+const STANDARD_TEST_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+
 /**
  * Repository target for multi-repo discovery
  */
@@ -292,6 +294,7 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
       },
       runtime: "local",
       artifacts: getGateArtifacts(gateName),
+      ...(isStandardTestGate(gateName) ? { timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS } : {}),
     });
   }
 
@@ -308,6 +311,7 @@ function getGateCommand(gateName: string): string {
   const commands: Record<string, string> = {
     lint: "npm run lint",
     test: "npm test",
+    unit: "npm test",
     typecheck: "npm run typecheck",
     build: "npm run build",
   };
@@ -321,10 +325,15 @@ function getGateArtifacts(gateName: string): string[] {
   const artifacts: Record<string, string[]> = {
     lint: ["lint-results.txt"],
     test: ["test-results.xml", "coverage/"],
+    unit: ["test-results.xml", "coverage/"],
     typecheck: ["typecheck-results.txt"],
     build: ["dist/"],
   };
   return artifacts[gateName] || [];
+}
+
+function isStandardTestGate(gateName: string): boolean {
+  return gateName === "test" || gateName === "unit";
 }
 
 /**

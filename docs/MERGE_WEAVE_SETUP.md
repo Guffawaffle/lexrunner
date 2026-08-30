@@ -102,17 +102,14 @@ gates:
   - name: lint
     run: npm run lint
     required: true
-    timeout: 60000
 
   - name: typecheck
     run: npm run typecheck
     required: true
-    timeout: 120000
 
   - name: test
     run: npm test
     required: false # Optional for merge-weave
-    timeout: 300000
 ```
 
 #### `.smartergpt/scope.yml`

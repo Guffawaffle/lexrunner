@@ -80,10 +80,8 @@ cat > .smartergpt.local/gates.yml << 'EOF'
 gates:
   - name: test
     command: npm test
-    timeout: 300
   - name: lint
     command: npm run lint
-    timeout: 60
 EOF
 
 # Execute gates
@@ -287,7 +285,7 @@ filters:
 ```bash
 # Hotfix automation (fast path)
 lex-pr plan --from-github --scope hotfix
-lex-pr execute plan.json --timeout 60  # Shorter timeout
+lex-pr execute plan.json --timeout 60000  # 60-second operation fallback
 lex-pr merge plan.json --execute
 ```
 
