@@ -568,11 +568,8 @@ curl -H "Authorization: token $GITHUB_TOKEN" \
 
 **Issue: Timeouts**
 
-```yaml
-# Increase timeout
-env:
-  LEX_PR_TIMEOUT: 600
-```
+Set an exact `timeoutMs` in the frozen plan gate, or pass the operation-default `timeoutMs` to
+`gates_run`. The gate value overrides the hostility-adjusted operation fallback.
 
 **Issue: Network errors**
 

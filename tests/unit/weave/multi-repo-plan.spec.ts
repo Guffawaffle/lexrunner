@@ -153,6 +153,28 @@ describe("Multi-Repo Plan Generator", () => {
       expect(lintGate?.env?.REPO_NAME).toBe("lex");
     });
 
+    it("pins realistic timeouts only for standard test gates", async () => {
+      const repos: RepoTarget[] = [{ owner: "Guffawaffle", repo: "lex", priority: 1 }];
+
+      const plan = await generateMultiRepoPlan(repos, {
+        policy: { requiredGates: ["lint", "test", "unit", "custom"] },
+      });
+
+      const gates = new Map(plan.items[0].gates.map((gate) => [gate.name, gate]));
+      expect(gates.get("test")).toMatchObject({
+        run: "npm test",
+        artifacts: ["test-results.xml", "coverage/"],
+        timeoutMs: 300_000,
+      });
+      expect(gates.get("unit")).toMatchObject({
+        run: "npm test",
+        artifacts: ["test-results.xml", "coverage/"],
+        timeoutMs: 300_000,
+      });
+      expect(gates.get("lint")?.timeoutMs).toBeUndefined();
+      expect(gates.get("custom")?.timeoutMs).toBeUndefined();
+    });
+
     it("returns empty plan when no PRs found", async () => {
       mockCreateGitHubClient.mockImplementation(async (opts: any) => {
         return createMockClient(opts.owner, opts.repo, []) as any;

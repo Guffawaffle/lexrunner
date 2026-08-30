@@ -84,7 +84,7 @@ describe("executeGatesWithPolicy (hostility timeout adjustment)", () => {
           gates: [
             {
               name: "slow",
-              run: 'bash -c "sleep 0.55"',
+              run: 'node -e "setTimeout(() => {}, 1500)"',
               env: {},
               runtime: "local",
               artifacts: [],
@@ -101,7 +101,7 @@ describe("executeGatesWithPolicy (hostility timeout adjustment)", () => {
     );
 
     // Base timeout is intentionally too small for the gate; high hostility should extend it.
-    await executeGatesWithPolicy(plan, executionState, tempDir, 300, undefined, true, tempDir);
+    await executeGatesWithPolicy(plan, executionState, tempDir, 1000, undefined, true, tempDir);
 
     const node = executionState.getNodeResult("A");
     expect(node).toBeDefined();
@@ -129,7 +129,7 @@ describe("executeGatesWithPolicy (hostility timeout adjustment)", () => {
           gates: [
             {
               name: "slow",
-              run: 'bash -c "sleep 0.55"',
+              run: 'node -e "setTimeout(() => {}, 1500)"',
               env: {},
               runtime: "local",
               artifacts: [],
@@ -146,11 +146,55 @@ describe("executeGatesWithPolicy (hostility timeout adjustment)", () => {
     );
 
     // Base timeout is too small, and low hostility should keep it unchanged.
-    await executeGatesWithPolicy(plan, executionState, tempDir, 300, undefined, true, tempDir);
+    await executeGatesWithPolicy(plan, executionState, tempDir, 1000, undefined, true, tempDir);
 
     const node = executionState.getNodeResult("A");
     expect(node).toBeDefined();
     expect(node?.gates.find((g) => g.gate === "slow")?.status).toBe("fail");
     expect(node?.status).toBe("fail");
+  }, 10000);
+
+  it("keeps an explicit per-gate timeout exact in a high hostility environment", async () => {
+    const plan = loadPlan(
+      JSON.stringify({
+        schemaVersion: "1.0.0",
+        target: "main",
+        policy: {
+          requiredGates: [],
+          optionalGates: [],
+          maxWorkers: 1,
+          retries: {},
+          overrides: {},
+          blockOn: [],
+          mergeRule: { type: "strict-required" },
+        },
+        items: [
+          {
+            name: "A",
+            deps: [],
+            gates: [
+              {
+                name: "explicit",
+                run: 'node -e "setTimeout(() => {}, 250)"',
+                env: {},
+                runtime: "local",
+                artifacts: [],
+                timeoutMs: 100,
+              },
+            ],
+          },
+        ],
+      })
+    );
+    const executionState = new ExecutionState(plan);
+    const { executeGatesWithPolicy } = await importGatesWithMockedHostility(
+      makeHostilityScore(1.0)
+    );
+
+    // High hostility would extend this operation fallback, but the gate owns an exact override.
+    await executeGatesWithPolicy(plan, executionState, tempDir, 200, undefined, true, tempDir);
+
+    const gate = executionState.getNodeResult("A")?.gates.find(({ gate }) => gate === "explicit");
+    expect(gate).toMatchObject({ status: "fail", failureKind: "timeout", timeoutMs: 100 });
   }, 10000);
 });

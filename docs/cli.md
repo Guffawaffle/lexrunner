@@ -218,7 +218,6 @@ Configuration values are resolved in the following order (highest to lowest prio
 | -------------------- | --------------------------------------------- | -------------------- |
 | `LEX_PR_OUT_DIR`     | Default output directory for artifacts        | `.smartergpt/runner` |
 | `LEX_PR_MAX_WORKERS` | Maximum parallel gate execution               | `1`                  |
-| `LEX_PR_TIMEOUT`     | Default gate timeout in seconds               | `300`                |
 | `NO_COLOR`           | Disable ANSI color codes when set (any value) | unset                |
 | `LOG_FORMAT`         | Log output format: 'json' or 'human'          | `human`              |
 

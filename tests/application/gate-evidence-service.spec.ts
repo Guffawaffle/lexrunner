@@ -40,6 +40,19 @@ describe("explicit gate evidence", () => {
     });
   });
 
+  it("records an exact per-gate timeout in the result, manifest, and receipt", async () => {
+    const fixture = repositoryFixture();
+    const plan = testPlan();
+    plan.items[0].gates[0].timeoutMs = 300_000;
+    const { reference, receiptPath, result } = await execute(plan, fixture.root);
+
+    expect(result.summary.items[0].gates[0]).toMatchObject({ timeoutMs: 300_000 });
+    const manifest = JSON.parse(readFileSync(reference.path, "utf8"));
+    expect(manifest.entries[0].result).toMatchObject({ timeoutMs: 300_000 });
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    expect(receipt.binding).toMatchObject({ timeoutMs: 300_000 });
+  });
+
   it("observes a bound failed receipt without treating it as authoritative state", async () => {
     const fixture = repositoryFixture();
     const plan = testPlan('node -e "process.exit(1)"');

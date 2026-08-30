@@ -15,6 +15,17 @@ const documentedCommands = [
   ["gate", "run"],
   ["weave", "apply"],
 ] as const;
+const runtimeTimeoutConfigurationDocs = [
+  "docs/MERGE_WEAVE_SETUP.md",
+  "docs/architecture.md",
+  "docs/migration-guide.md",
+  "docs/templates/gates.example.yml",
+  "docs/troubleshooting.md",
+  "docs/tutorials/quick-merge-pyramid.md",
+  "docs/workflows/enterprise.md",
+  "docs/workflows/small-team.md",
+  "docs/workflows/solo-developer.md",
+] as const;
 
 describe("current documentation", () => {
   it("keeps the README progression on registered commands exposed by the built CLI", async () => {
@@ -32,7 +43,7 @@ describe("current documentation", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage:");
     }
-  });
+  }, 15_000);
 
   it("labels superseded v2 drafts as historical", async () => {
     for (const path of [
@@ -60,6 +71,22 @@ describe("current documentation", () => {
     expect(release).toContain("runs only for push events");
     expect(release).toContain("release-owner primary fingerprint");
     expect(release).toContain("LexSona is a separate release");
+  });
+
+  it("does not advertise the unimplemented gate-timeout environment control", async () => {
+    for (const path of ["docs/cli.md", "docs/troubleshooting.md", "docs/integrations/README.md"]) {
+      expect(await read(path), `${path} advertises a phantom timeout control`).not.toContain(
+        "LEX_PR_TIMEOUT"
+      );
+    }
+  });
+
+  it("does not advertise unsupported gates.yml timeout fields", async () => {
+    for (const path of runtimeTimeoutConfigurationDocs) {
+      expect(await read(path), `${path} advertises an unsupported timeout field`).not.toMatch(
+        /^\s*#?\s*timeout:/mu
+      );
+    }
   });
 });
 

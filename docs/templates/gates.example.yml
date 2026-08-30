@@ -11,7 +11,6 @@ gates:
     description: "Run code linting to ensure code quality standards"
     run: npm run lint
     required: true
-    timeout: 60000 # 60 seconds
     retries: 0
     continueOnError: false
 
@@ -20,7 +19,6 @@ gates:
     description: "Verify TypeScript type safety"
     run: npm run typecheck
     required: true
-    timeout: 120000 # 2 minutes
     retries: 0
     continueOnError: false
 
@@ -29,7 +27,6 @@ gates:
     description: "Run unit test suite"
     run: npm test
     required: false # Set to true to make tests mandatory for merge
-    timeout: 300000 # 5 minutes
     retries: 1 # Retry once if tests fail (for flaky tests)
     continueOnError: false
 
@@ -38,7 +35,6 @@ gates:
   #   description: "Verify project builds successfully"
   #   run: npm run build
   #   required: false
-  #   timeout: 180000  # 3 minutes
   #   retries: 0
   #   continueOnError: false
 
@@ -47,7 +43,6 @@ gates:
   #   description: "Run integration tests"
   #   run: npm run test:integration
   #   required: false
-  #   timeout: 600000  # 10 minutes
   #   retries: 0
   #   continueOnError: false
 
@@ -56,7 +51,6 @@ gates:
   #   description: "Run security dependency audit"
   #   run: npm audit --audit-level=high
   #   required: false
-  #   timeout: 30000  # 30 seconds
   #   retries: 0
   #   continueOnError: true  # Don't fail on audit warnings
 

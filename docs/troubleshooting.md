@@ -446,16 +446,19 @@ cat .smartergpt/gates.yml
 
 **Solutions:**
 
-```yaml
-# Increase timeout in gates.yml
-gates:
-  - name: slow-test
-    command: npm run integration-test
-    timeout: 600  # 10 minutes instead of default 300
+```json
+{
+  "name": "slow-test",
+  "run": "npm run integration-test",
+  "timeoutMs": 600000
+}
+```
 
-# Or via environment
-export LEX_PR_TIMEOUT=600
-lex-pr execute plan.json
+An individual plan gate's `timeoutMs` is exact. To change only the operation fallback for gates
+that omit `timeoutMs`, use milliseconds with the CLI or MCP:
+
+```bash
+lexrunner gate run plan.json --timeout 600000
 ```
 
 #### Issue: `Gate execution failed: command not found`

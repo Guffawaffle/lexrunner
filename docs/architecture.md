@@ -286,7 +286,6 @@ Add gates to `gates.yml`:
 gates:
   - name: custom-check
     command: ./scripts/custom-gate.sh
-    timeout: 60
 ```
 
 ### Custom Strategies

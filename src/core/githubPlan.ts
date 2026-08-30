@@ -10,6 +10,8 @@ import { createFileAnalyzer, FileAnalysisResult } from "../planner/index.js";
 import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
 
+const STANDARD_TEST_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+
 export interface GitHubPlanOptions {
   query?: string; // GitHub search query
   labels?: string[]; // Filter by specific labels
@@ -201,6 +203,7 @@ function createStandardGate(gateName: string, pr: PullRequestDetails): Gate {
         ...baseGate,
         run: "npm test",
         artifacts: ["test-results.xml", "coverage/"],
+        timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS,
       };
     case "typecheck":
       return {

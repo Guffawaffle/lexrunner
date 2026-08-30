@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Generated test-gate timeouts** - Pin standard GitHub and multi-repository `test` and `unit`
+  gates to an explicit five-minute plan timeout while leaving faster and custom gates on the
+  operation fallback. Multi-repository `unit` gates now use the same `npm test` command and
+  artifacts as `test` gates.
+- **Timeout documentation truth** - Remove unimplemented `LEX_PR_TIMEOUT` and `gates.yml` timeout
+  claims. Document plan `timeoutMs` plus the CLI and MCP operation-default controls instead.
+
 ## [2.0.1] - 2026-08-29
 
 ### Fixed

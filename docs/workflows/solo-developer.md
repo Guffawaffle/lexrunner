@@ -51,7 +51,6 @@ filters:
 gates:
   - name: test
     command: npm test
-    timeout: 300
 ```
 
 That's it! You're ready to go.
@@ -398,15 +397,12 @@ filters:
 gates:
   - name: test
     command: npm test
-    timeout: 300
 
   - name: lint
     command: npm run lint
-    timeout: 60
 
   - name: build
     command: npm run build
-    timeout: 120
 ```
 
 **`.smartergpt.local/profile.yml`:**

@@ -61,20 +61,16 @@ filters:
 gates:
   - name: tests
     command: npm test
-    timeout: 300
 
   - name: lint
     command: npm run lint
-    timeout: 60
 
   - name: build
     command: npm run build
-    timeout: 120
 
   # Optional: type check
   - name: typecheck
     command: npm run typecheck
-    timeout: 60
 ```
 
 ### 4. Set Up Team Process
