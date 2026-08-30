@@ -1393,12 +1393,40 @@ export {
   PlanArtifactServiceError,
 } from "./application/plan-artifact-service.js";
 export type {
+  PlanArtifactAcquisition,
   PlanArtifactFailureCode,
   PlanArtifactIdentity,
   PlanArtifactSource,
   ResolvedPlanArtifact,
   ResolvePlanArtifactInput,
 } from "./application/plan-artifact-service.js";
+export {
+  EXECUTION_PLAN_ARTIFACT_CONTRACT,
+  EXECUTION_PLAN_CANONICALIZATION_PROFILE,
+  EXECUTION_PLAN_HASH_DOMAIN,
+  EXECUTION_PLAN_HASH_PROFILE,
+  PLAN_ARTIFACT_REFERENCE_CONTRACT,
+  ExecutionPlanArtifactIdentity_v1Schema,
+  ExecutionPlanArtifact_v1Schema,
+  PlanArtifactReference_v1Schema,
+  PlanArtifactScope_v1Schema,
+  computeExecutionPlanArtifactDigest,
+} from "./application/execution-plan-artifact.js";
+export type {
+  ExecutionPlanArtifactIdentity_v1,
+  ExecutionPlanArtifact_v1,
+  PlanArtifactReference_v1,
+  PlanArtifactScope_v1,
+} from "./application/execution-plan-artifact.js";
+export {
+  PlanArtifactRegistrationError,
+  PlanArtifactRegistrationService,
+} from "./application/plan-artifact-registration-service.js";
+export type {
+  PlanArtifactRegistrationFailureCode,
+  RegisterPlanArtifactInput,
+  RegisteredPlanArtifact,
+} from "./application/plan-artifact-registration-service.js";
 export type {
   BoundedMergeApplicationResult,
   MergeApplicationExecution,
