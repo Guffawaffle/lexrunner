@@ -49,9 +49,9 @@ second relationship. npm supports one trusted publisher per package; inspect and
 an old relationship by its exact ID before replacing it. The configuration command may require a
 browser/2FA confirmation and is intentionally a human step.
 
-Do not create or store an npm write token in GitHub. Downstream machines still need ordinary
-permission to read the private `@smartergpt` scope because trusted publishing applies only to the
-CI `npm publish` operation.
+Do not create or store an npm write token in GitHub. The public package can be installed without
+a private-scope read credential. Trusted publishing authorizes only the CI `npm publish` operation;
+public read access grants no publication authority.
 
 ## Prepare a stable candidate
 
@@ -119,7 +119,7 @@ exact failed tag workflow.
 The release is not complete at “npm accepted the package.” The release issue owns the final proof
 (#881 for 1.3.0):
 
-1. install the scoped package from the private registry in a clean native Windows consumer;
+1. install the scoped package from the public npm registry in a clean native Windows consumer;
 2. verify ESM, CommonJS, CLI version/help, and MCP startup/tool inventory;
 3. exercise the bounded read-only smoke path; and
 4. record versions, commands, outcomes, and cleanup without recording credentials.

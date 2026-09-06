@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-06
+
+### Added
+
+- Immutable authored-plan artifact contracts and service-level no-replace registration
+  from #947. Acquisition and storage authority remain explicitly unverified pending
+  native acquisition and verifier work.
+
+### Changed
+
+- Adopt Apache-2.0 with preserved Joseph Gustavson / Guffawaffle / SmarterGPT founder
+  attribution, contribution provenance, governance and brand policies. Public npm
+  access does not relicense earlier package versions.
+- Prepare public publication through the existing signed stable-tag OIDC workflow.
+
+### Fixed
+
+- Update fast-uri and qs to patched versions before the public release.
+- Treat branch names and labels as data in merged-branch cleanup, with fork rejection
+  before token-bearing steps.
+
 ## [2.0.2] - 2026-08-29
 
 ### Fixed
