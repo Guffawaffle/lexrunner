@@ -88,12 +88,11 @@ source tree. Canonical terms live in [`docs/TERMS.md`](docs/TERMS.md).
 
 ## Install and authenticate
 
-Ecosystem 3.1 requires Node.js 24 or newer. The source now uses Apache-2.0 and is prepared
-for public npm distribution. Until the registry transition completes, existing restricted
-releases still require an authenticated organization member; public releases need no npm login:
+Ecosystem 3.1 requires Node.js 24 or newer. The npm package is publicly readable without
+an npm login. Current source uses Apache-2.0; the first package under those terms is
+the 2.1.0 release candidate. Earlier published versions retain their applicable licenses.
 
 ```bash
-npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
 npm install --save-dev @smartergpt/lexrunner
 npx lexrunner --version
 ```
@@ -116,11 +115,12 @@ The checked-in package version is the single source for `lexrunner --version` an
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **2.0.2**. npm availability and dist-tags are separate
+Current repository package version: **2.1.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [2.0.2 generated timeout correction](docs/releases/2.0.2.md), the
+See the [2.1.0 open-source release](docs/releases/2.1.0.md), the
+[2.0.2 generated timeout correction](docs/releases/2.0.2.md), the
 [2.0.1 MCP identity correction](docs/releases/2.0.1.md), the
 [2.0.0 plan-bound evidence release](docs/releases/2.0.0.md), the
 [1.5.2 exact Lex alignment release](docs/releases/1.5.2.md), the
