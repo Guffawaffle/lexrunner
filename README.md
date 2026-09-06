@@ -88,12 +88,11 @@ source tree. Canonical terms live in [`docs/TERMS.md`](docs/TERMS.md).
 
 ## Install and authenticate
 
-Ecosystem 3.1 requires Node.js 24 or newer. The source now uses Apache-2.0 and is prepared
-for public npm distribution. Until the registry transition completes, existing restricted
-releases still require an authenticated organization member; public releases need no npm login:
+Ecosystem 3.1 requires Node.js 24 or newer. The npm package is publicly readable without
+an npm login. Current source uses Apache-2.0; the first package under those terms is
+the 2.1.0 release candidate. Earlier published versions retain their applicable licenses.
 
 ```bash
-npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
 npm install --save-dev @smartergpt/lexrunner
 npx lexrunner --version
 ```
