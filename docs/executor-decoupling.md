@@ -2,7 +2,7 @@
 
 > **v0.3.0 Thesis:** Executors decouple system design from orchestration from model choice.
 
-This document describes the separation of concerns between executors, orchestration, and model binding in LexRunner. It defines clear boundaries for what each layer owns and ensures IP clarity between source-available LexRunner components and open-source Lex components.
+This document describes the separation of concerns between executors, orchestration, and model binding in LexRunner. It defines clear boundaries for what each layer owns and ensures IP clarity between Apache-2.0 LexRunner components and open-source Lex components.
 
 ## Overview
 
@@ -373,7 +373,7 @@ jordanModeProtocol:
 
 2. **Substitutability:** Model binding layer allows swapping providers without changing executors or orchestration. Executors can be added/removed without affecting the merge pipeline.
 
-3. **IP Protection:** Clear boundary between source-available orchestration (LexRunner) and open-source foundations (Lex).
+3. **IP Protection:** Clear boundary between Apache-2.0 orchestration (LexRunner) and open-source foundations (Lex).
 
 4. **Auditability:** Each layer produces traceable artifacts. Frames capture executor decisions; orchestration logs capture merge state transitions.
 

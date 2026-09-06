@@ -269,7 +269,7 @@ jobs:
           fi
 
       - name: Publish private package through npm trusted publishing
-        run: npm publish --access restricted --tag latest --json
+        run: npm publish --access public --tag latest --json
 
       - name: Create GitHub Release
         env:

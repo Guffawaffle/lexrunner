@@ -1,6 +1,8 @@
-# Release and private npm publishing
+# Release and public npm publishing
 
-LexRunner is distributed as the restricted npm package `@smartergpt/lexrunner`. The release path
+LexRunner is prepared for public npm distribution as `@smartergpt/lexrunner`.
+The registry access transition and first Apache-2.0 package release are separate from
+merging these source changes; earlier versions retain their applicable license terms. The release path
 has one signed-tag authority chain:
 
 1. GitHub Actions validates the exact release-owner-signed stable-tag candidate after it is
@@ -85,7 +87,7 @@ publication behavior. Its privileged third-party action revisions are pinned to 
 SHAs. It then executes:
 
 ```bash
-npm publish --access restricted --tag latest --json
+npm publish --access public --tag latest --json
 ```
 
 The npm CLI obtains a short-lived OIDC credential for this workflow; no `NODE_AUTH_TOKEN` or npm
@@ -106,7 +108,7 @@ consumer when pre-stable validation is required:
 npm run test:package
 ```
 
-The `publishConfig` in `package.json` pins the npm registry and restricted access; the explicit
+The `publishConfig` in `package.json` pins the npm registry and public access; the explicit
 flags make the workflow's intent visible in the receipt. Agents and local shells must not execute,
 proxy, or retry non-dry-run publication. If trusted publishing fails, inspect the workflow filename,
 repository, tag, OIDC permission, npm version, and package trust configuration before rerunning the

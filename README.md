@@ -88,8 +88,9 @@ source tree. Canonical terms live in [`docs/TERMS.md`](docs/TERMS.md).
 
 ## Install and authenticate
 
-Ecosystem 3.1 requires Node.js 24 or newer. The package is restricted under the SmarterGPT npm
-organization, so a human with organization access must authenticate the npm CLI once:
+Ecosystem 3.1 requires Node.js 24 or newer. The source now uses Apache-2.0 and is prepared
+for public npm distribution. Until the registry transition completes, existing restricted
+releases still require an authenticated organization member; public releases need no npm login:
 
 ```bash
 npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
@@ -195,7 +196,12 @@ Release validation remains exhaustive. See [`AGENTS.md`](AGENTS.md),
 - CLI: `lexrunner` (`lex-pr` compatibility alias)
 - MCP bin: `lexrunner-mcp`
 - Runtime dependency: `@smartergpt/lex` (MIT)
-- LexRunner license: SmarterGPT Source-Available Personal Use License
+- LexRunner source license: Apache-2.0; earlier releases retain their applicable terms
 
 See [`LICENSE.md`](LICENSE.md), [`NOTICE.md`](NOTICE.md), and
 [ADR-008](docs/adr/ADR-008-lex-packaging.md).
+
+SmarterGPT was founded by Joseph Gustavson (Guffawaffle). See
+[stewardship](GOVERNANCE.md), [contributing](CONTRIBUTING.md), and
+[project identity](BRAND.md). Commercial use and forks are permitted under the
+license; code licensing grants no credentials, tenant access or runtime authority.

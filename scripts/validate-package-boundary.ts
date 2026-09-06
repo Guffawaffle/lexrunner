@@ -35,10 +35,14 @@ export const PACKAGE_FILES_ALLOWLIST = [
   "CHANGELOG.md",
   "NOTICE.md",
   "LICENSE.md",
+  "GOVERNANCE.md",
+  "BRAND.md",
 ] as const;
 
 const ALLOWED_EXACT_PATHS = new Set([
+  "BRAND.md",
   "CHANGELOG.md",
+  "GOVERNANCE.md",
   "LICENSE.md",
   "NOTICE.md",
   "README.md",

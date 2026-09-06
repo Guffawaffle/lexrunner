@@ -135,15 +135,14 @@ function checkNoLexSourceCopied() {
     const relativePath = relative(rootDir, filePath);
 
     // Check for indicators that this might be copied Lex code
-    // 1. Copyright header claiming to be from Lex or smartergpt
-    const lexCopyrightPattern =
-      /Copyright.*@smartergpt\/lex|Copyright.*SmarterGPT|Copyright.*Lex framework/i;
+    // 1. A Lex-specific claim; SmarterGPT also legitimately identifies LexRunner.
+    const lexCopyrightPattern = /Copyright.*@smartergpt\/lex\b|Copyright.*Lex framework/i;
     if (lexCopyrightPattern.test(content)) {
       violations.push(`${relativePath}: Contains Lex copyright claim`);
     }
 
     // 2. License header claiming to be Lex
-    const lexLicensePattern = /@license.*@smartergpt\/lex|This file is part of.*Lex/i;
+    const lexLicensePattern = /@license.*@smartergpt\/lex\b|This file is part of.*\bLex\b/i;
     if (lexLicensePattern.test(content)) {
       violations.push(`${relativePath}: Contains Lex license claim`);
     }
@@ -199,18 +198,18 @@ function checkLicenseHeaders() {
     const content = readFileSync(filePath, "utf-8");
     const relativePath = relative(rootDir, filePath);
 
-    // Check for non-MIT license claims
-    const nonMITPattern = /\b(GPL|Apache|BSD-3-Clause|ISC|LGPL|MPL|EPL|CDDL)\b.*License/i;
-    if (nonMITPattern.test(content)) {
+    // LexRunner is Apache-2.0; preserve Lex's MIT dependency notices separately.
+    const conflictingLicensePattern = /\b(GPL|BSD-3-Clause|ISC|LGPL|MPL|EPL|CDDL)\b.*License/i;
+    if (conflictingLicensePattern.test(content)) {
       // Exclude package.json references and import statements
       const lines = content.split("\n");
       for (const line of lines) {
         if (
-          nonMITPattern.test(line) &&
+          conflictingLicensePattern.test(line) &&
           !line.includes("import") &&
           !line.includes("package.json")
         ) {
-          fail(`${relativePath}: Contains non-MIT license claim: ${line.trim()}`);
+          fail(`${relativePath}: Contains license claim requiring review: ${line.trim()}`);
           filesWithConflicts++;
           break;
         }
