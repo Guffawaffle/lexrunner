@@ -22,7 +22,7 @@ export function trustedPublishCommand(distTag = "latest"): string {
   if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(distTag)) {
     throw new Error(`Invalid npm dist-tag: ${distTag}`);
   }
-  return `npm publish --access restricted --tag ${distTag}`;
+  return `npm publish --access public --tag ${distTag}`;
 }
 
 export function validateReleaseManifest(
@@ -36,8 +36,8 @@ export function validateReleaseManifest(
   if (!manifest.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(manifest.version)) {
     throw new Error(`Invalid package version: ${manifest.version ?? "<missing>"}`);
   }
-  if (manifest.publishConfig?.access !== "restricted") {
-    throw new Error("package.json publishConfig.access must be restricted");
+  if (manifest.publishConfig?.access !== "public") {
+    throw new Error("package.json publishConfig.access must be public");
   }
   if (manifest.publishConfig.registry !== EXPECTED_REGISTRY) {
     throw new Error(`package.json publishConfig.registry must be ${EXPECTED_REGISTRY}`);
@@ -67,16 +67,7 @@ function verifyTaggedHead(projectRoot: string, version: string): void {
 export function runNpmPublishDryRun(projectRoot: string, distTag: string): void {
   const result = spawnSync(
     process.execPath,
-    [
-      resolveNpmCliPath(),
-      "publish",
-      "--dry-run",
-      "--access",
-      "restricted",
-      "--tag",
-      distTag,
-      "--json",
-    ],
+    [resolveNpmCliPath(), "publish", "--dry-run", "--access", "public", "--tag", distTag, "--json"],
     { cwd: projectRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }
   );
   if (result.stderr) process.stderr.write(result.stderr);

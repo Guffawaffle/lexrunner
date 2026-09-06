@@ -1,3 +1,14 @@
+# LexRunner notices
+
+Copyright (c) Joseph Gustavson / Guffawaffle / SmarterGPT.
+
+SmarterGPT was founded by Joseph Gustavson (Guffawaffle).
+Contributor and third-party rights and notices are preserved.
+
+LexRunner is licensed under the Apache License, Version 2.0; see [LICENSE.md](LICENSE.md).
+This notice supplies attribution and does not add restrictions to that license.
+Earlier releases retain their applicable license terms.
+
 # Third-Party Notices
 
 LexRunner includes or depends on third-party software components that are provided under separate license terms.
@@ -6,7 +17,7 @@ LexRunner includes or depends on third-party software components that are provid
 
 ### @smartergpt/lex
 
-- **Version**: 2.1.1
+- **Version**: 4.0.3
 - **License**: MIT License
 - **Copyright**: Copyright (c) 2025 Guffawaffle
 - **Description**: MIT-licensed memory, policy, and atlas framework with MCP server. For local dev and private automation.

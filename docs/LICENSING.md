@@ -4,9 +4,10 @@ This document describes LexRunner's licensing approach and compliance requiremen
 
 ## LexRunner License
 
-LexRunner is source-available, not open source. See [LICENSE.md](../LICENSE.md) for the full license text.
-
-You may view, fork, modify, and run LexRunner for personal, non-commercial use under the SmarterGPT Source-Available Personal Use License. Commercial use, organizational use, employer/client use, production use, hosted-service use, redistribution, sublicensing, or embedding in another product or platform requires a separate written license from Joseph Gustavson / Guffawaffle / SmarterGPT.
+LexRunner is licensed under Apache-2.0. See [LICENSE.md](../LICENSE.md) for the full
+terms, [NOTICE.md](../NOTICE.md) for attribution, [GOVERNANCE.md](../GOVERNANCE.md)
+for stewardship, and [BRAND.md](../BRAND.md) for project identity. Commercial use
+and forks are permitted under the license. Earlier releases retain their terms.
 
 ## Third-Party Dependencies
 
@@ -46,9 +47,9 @@ LexRunner must not copy Lex source code into its own codebase. All Lex functiona
 
 ### 3. License Headers
 
-All LexRunner source files should include appropriate license headers or comments indicating they are part of LexRunner and covered by the SmarterGPT Source-Available Personal Use License.
+All LexRunner source files should include appropriate license headers or comments indicating they are part of LexRunner and covered by Apache-2.0.
 
-**Current Practice**: LexRunner uses JSDoc comments and file headers that describe functionality. No strict license header requirement is enforced, but copyright remains with Guffawaffle as stated in LICENSE.md.
+**Current Practice**: LexRunner uses JSDoc comments and file headers that describe functionality. No strict license header requirement is enforced, but applicable copyright notices are preserved in NOTICE.md; contributor and third-party ownership is not reassigned.
 
 **Verification**: Automated in CI via `scripts/check-license-compliance.mjs`
 

@@ -116,7 +116,7 @@ describe("LexRunner current release readiness", () => {
     expect(instructions).toContain("npm's package-scoped GitHub OIDC trusted publisher");
     expect(releaseWorkflow).toContain('"lexrunner-v*.*.*"');
     expect(releaseWorkflow).not.toContain('"v*.*.*"');
-    expect(releaseWorkflow).toContain("npm publish --access restricted --tag latest --json");
+    expect(releaseWorkflow).toContain("npm publish --access public --tag latest --json");
     expect(releaseWorkflow).toContain("id-token: write");
     expect(releaseWorkflow).toContain("package-manager-cache: false");
     expect(releaseWorkflow).toContain("github.event_name == 'push' &&");
@@ -169,9 +169,7 @@ describe("LexRunner current release readiness", () => {
     expect(oidcJobs).toEqual(["stable-release"]);
     const publishingJobs = Object.entries(workflow.jobs)
       .filter(([, job]) =>
-        job.steps?.some((step) =>
-          step.run?.includes("npm publish --access restricted --tag latest")
-        )
+        job.steps?.some((step) => step.run?.includes("npm publish --access public --tag latest"))
       )
       .map(([name]) => name);
     expect(publishingJobs).toEqual(["stable-release"]);

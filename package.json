@@ -13,10 +13,10 @@
     "url": "git+https://github.com/Guffawaffle/lexrunner.git"
   },
   "publishConfig": {
-    "access": "restricted",
+    "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "Apache-2.0",
   "files": [
     "dist/",
     "schemas/",
@@ -25,7 +25,9 @@
     "README.mcp.md",
     "CHANGELOG.md",
     "NOTICE.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "GOVERNANCE.md",
+    "BRAND.md"
   ],
   "bin": {
     "lexrunner": "dist/cli.js",

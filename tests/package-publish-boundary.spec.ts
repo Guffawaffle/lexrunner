@@ -48,13 +48,19 @@ describe("npm publication boundary", () => {
   });
 
   it("prints the stable command reserved for the trusted workflow without executing it", () => {
-    expect(trustedPublishCommand()).toBe("npm publish --access restricted --tag latest");
-    expect(trustedPublishCommand("canary")).toBe("npm publish --access restricted --tag canary");
+    expect(trustedPublishCommand()).toBe("npm publish --access public --tag latest");
+    expect(trustedPublishCommand("canary")).toBe("npm publish --access public --tag canary");
     expect(() => trustedPublishCommand("not a tag")).toThrow("Invalid npm dist-tag");
   });
 
   it("uses the repository-scoped release tag prefix", () => {
     expect(releaseTagForVersion("1.2.1")).toBe("lexrunner-v1.2.1");
+  });
+
+  it("rejects a return to restricted package access", () => {
+    const manifest = readManifest();
+    manifest.publishConfig = { ...manifest.publishConfig, access: "restricted" };
+    expect(() => validateReleaseManifest(manifest)).toThrow("publishConfig.access must be public");
   });
 
   it("preserves a configured absolute Windows npm CLI path on every host", () => {

@@ -1,5 +1,9 @@
 # ADR-008: Lex Packaging Strategy
 
+> Licensing amendment, 2026-09-06: the current LexRunner source adopts Apache-2.0.
+> Earlier source-available references below describe the prior decision and earlier releases.
+> Lex remains MIT. See [licensing](../LICENSING.md) and [stewardship](../../GOVERNANCE.md).
+
 **Status:** Accepted
 **Date:** 2026-01-01
 **Authors:** LexRunner Team

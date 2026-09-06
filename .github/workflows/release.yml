@@ -268,8 +268,8 @@ jobs:
             echo "No changelog entry found for version ${TAG_VERSION}" > release_notes.md
           fi
 
-      - name: Publish private package through npm trusted publishing
-        run: npm publish --access restricted --tag latest --json
+      - name: Publish public package through npm trusted publishing
+        run: npm publish --access public --tag latest --json
 
       - name: Create GitHub Release
         env:
