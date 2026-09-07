@@ -66,7 +66,7 @@ const REQUIRED_RUNTIME_ASSETS = [
 const MAX_FILE_COUNT = 120;
 const MAX_UNPACKED_SIZE = 7_000_000;
 
-const CANONICAL_REPOSITORY_URL = "git+https://github.com/Guffawaffle/lexrunner.git";
+const CANONICAL_REPOSITORY_URL = "git+https://github.com/SmarterGPT/lexrunner.git";
 
 export function resolveNpmCliPath(
   env: NodeJS.ProcessEnv = process.env,

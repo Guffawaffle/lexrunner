@@ -33,7 +33,7 @@ describe("npm publication boundary", () => {
 
   it("rejects repository metadata that npm publish would normalize", () => {
     const manifest = readManifest();
-    manifest.repository = { url: "https://github.com/Guffawaffle/lexrunner.git" };
+    manifest.repository = { url: "https://github.com/SmarterGPT/lexrunner.git" };
     expect(() => validatePackageManifestForPublish(manifest, repositoryRoot)).toThrow(
       "must use npm's canonical form"
     );
