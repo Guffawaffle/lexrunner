@@ -35,7 +35,7 @@ describe("LexRunner current release readiness", () => {
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
     expect(packageJson.bin["lex-pr"]).toBe("dist/cli.js");
     expect(packageJson.bin["lexrunner-mcp"]).toBe("mcp-server.mjs");
-    expect(packageJson.repository.url).toBe("git+https://github.com/Guffawaffle/lexrunner.git");
+    expect(packageJson.repository.url).toBe("git+https://github.com/SmarterGPT/lexrunner.git");
     expect(packageJson.scripts["release:publish:check"]).toBe(
       "tsx scripts/release-publish-check.ts"
     );

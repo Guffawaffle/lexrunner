@@ -10,7 +10,7 @@
   "description": "Fan-out tasks as multiple PRs in parallel, then build a merge pyramid from the blocks. Compute dependency order, run gates locally, and merge cleanly.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Guffawaffle/lexrunner.git"
+    "url": "git+https://github.com/SmarterGPT/lexrunner.git"
   },
   "publishConfig": {
     "access": "public",

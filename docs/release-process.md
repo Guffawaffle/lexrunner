@@ -40,13 +40,14 @@ npm install --global npm@^11.15.0
 npm login --scope=@smartergpt --registry=https://registry.npmjs.org/
 npm whoami
 npm trust list @smartergpt/lexrunner --json
-npm trust github @smartergpt/lexrunner --file release.yml --repo Guffawaffle/lexrunner --allow-publish
+npm trust github @smartergpt/lexrunner --file release.yml --repo SmarterGPT/lexrunner --allow-publish
 npm trust list @smartergpt/lexrunner --json
 ```
 
 If `npm trust list` already reports the exact GitHub repository and `release.yml`, do not create a
-second relationship. npm supports one trusted publisher per package; inspect and explicitly revoke
-an old relationship by its exact ID before replacing it. The configuration command may require a
+duplicate relationship. npm supports multiple trusted publisher connections. During a repository
+migration, add and verify the replacement binding and repository identity before explicitly
+revoking the obsolete relationship by its exact ID. The configuration command may require a
 browser/2FA confirmation and is intentionally a human step.
 
 Do not create or store an npm write token in GitHub. The public package can be installed without
