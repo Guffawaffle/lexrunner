@@ -29,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("2.3.0");
+    expect(packageJson.version).toBe("2.4.0");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("4.0.3");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -94,7 +94,10 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **2.3.0**");
+    expect(readme).toContain("Current repository package version: **2.4.0**");
+    const progressiveHelpNotes = await read("docs/releases/2.4.0.md");
+    expect(progressiveHelpNotes).toContain("`--help-all`");
+    expect(progressiveHelpNotes).toContain("clean registry consumer check");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
     expect(currentReleaseNotes).toContain("`materialize_attempt_input`");
