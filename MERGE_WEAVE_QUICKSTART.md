@@ -7,11 +7,11 @@ is no fixed five-minute promise: repository access and dependency setup vary.
 ## 1. Install and discover
 
 Use an existing local Git checkout with a GitHub remote, Node.js 24+ and Git.
-This guide uses the published 2.2.0 release.
+This guide uses the published 2.3.0 release.
 Run these commands from that repository's root:
 
 ```bash
-npm install --save-dev @smartergpt/lexrunner@2.2.0
+npm install --save-dev @smartergpt/lexrunner@2.3.0
 npx lexrunner --version
 npx lexrunner weave discover --json
 ```
@@ -91,7 +91,7 @@ required. See [gate and review policy](docs/review-gate.md).
 
 ## 5. Integrate the frozen inputs locally
 
-The 2.2.0 single-repository generator records explicit repository, target and source
+Since 2.2.0, the single-repository generator records explicit repository, target and source
 refs/commits in `gitInputs`. Local integration uses those commits rather than resolving
 `PR-123` as a branch name. Older 2.1.0 executors do not support this contract; upgrade
 instead of stripping bindings from a new plan. See [frozen inputs](docs/frozen-git-inputs.md).
