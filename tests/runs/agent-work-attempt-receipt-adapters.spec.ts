@@ -1,4 +1,5 @@
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -23,6 +24,8 @@ import type {
 import { createNativeWslProjectionLifecycleHandlers } from "../../src/runs/agent-work-projection-lifecycle.js";
 import { createAttemptWorkerHandlers } from "../../src/runs/agent-work-worker-adapters.js";
 import { SqliteWorkspaceLifecycleStore } from "../../src/store/sqlite/workspace-lifecycle-store.js";
+import { selectedWorkFixture } from "../fixtures/selected-work.js";
+import { materializeAttemptInput } from "../../src/runs/selected-work-materialization.js";
 
 const roots: string[] = [];
 const STFC_REMOTE_URL = "https://example.invalid/Guffawaffle/stfc-mod.git";
@@ -32,6 +35,112 @@ afterEach(async () => {
 });
 
 describe("Attempt receipt adapter handlers", () => {
+  it("carries materialized source criteria and packet identity through assisted receipt submission", async () => {
+    const base = await prepareRequest(await sandbox());
+    const input = selectedWorkFixture();
+    const source = JSON.parse(input.artifact.text);
+    source.sourceSpec.repo = base.runtime.repositoryId;
+    source.createdAt = base.packet.createdAt;
+    input.artifact.text = JSON.stringify(source);
+    input.artifact.digest = `sha256:${createHash("sha256").update(input.artifact.text).digest("hex")}`;
+    input.repository = { id: base.runtime.repositoryId, base_sha: base.identity.baseSha };
+    input.capturedAt = base.packet.createdAt;
+    input.packet = {
+      packet_id: base.packet.packetId,
+      run_id: base.identity.runId,
+      attempt_id: base.identity.attemptId,
+      instructions: base.packet.instructions,
+      scope: base.packet.scope,
+      authority: base.packet.authority,
+      verification: base.packet.verification,
+      budget: base.packet.budget,
+      created_at: base.packet.createdAt,
+    };
+    const materialized = materializeAttemptInput(input);
+    if (!materialized.ok) throw new Error(materialized.error.code);
+    const response = await createAttemptLifecycleHandlers().prepare({
+      ...base,
+      ...materialized.result.preparationInput,
+    });
+    if (!response.ok || !response.result.ok) throw new Error("expected materialized preparation");
+    // Existing request helpers only take runtime/authority from base; all receipt
+    // work/packet/criterion identities below come from the actual returned bundle.
+    const prepared = { request: base, bundle: response.result };
+    const workers = createAttemptWorkerHandlers();
+    const wrong = attachRequest(prepared);
+    wrong.attach.envelope.packet_hash = `sha256:${"f".repeat(64)}`;
+    expect(await workers.attach(wrong)).toMatchObject({
+      ok: true,
+      result: { updated: false, reason: "identity_mismatch" },
+    });
+    const attached = await workers.attach(attachRequest(prepared));
+    if (!attached.ok || !attached.result.updated) throw new Error("expected bound attachment");
+    expect(attached.result.workerSession.packetHash).toBe(
+      materialized.result.correspondence.packet_hash
+    );
+    expect(
+      prepared.bundle.packet.work_item.acceptance_criteria.map((criterion) => criterion.id)
+    ).toEqual(input.workItem.criterionIds);
+    // Deterministic test output, not a spawned agent or a provider handshake.
+    await writeFile(
+      join(base.attempt.workspace.worktreePath, "project", "result.txt"),
+      "fixture result\n"
+    );
+    const ended = await workers.end(endRequest(prepared, attached.result));
+    if (!ended.ok || !ended.result.updated) throw new Error("expected terminal session record");
+    const submission = submitRequest(prepared, ended.result);
+    submission.submission.receipt.acceptance_criteria_addressed = input.workItem.criterionIds;
+    submission.submission.receipt.summary =
+      "Deterministic fixture claim; not verified worker work.";
+    submission.submission.receipt.claimed_checks = [];
+    const observationStore = new SqliteWorkspaceLifecycleStore(base.runtime.databasePath, {
+      readOnly: true,
+    });
+    try {
+      const lease = await observationStore.getWorkspaceLease(
+        ended.result.workerSession.workspaceLeaseId
+      );
+      if (!lease) throw new Error("expected stored workspace lease");
+      const observation = await new LocalAttemptVerificationRuntime().observe({
+        lease,
+        receipt: submission.submission.receipt,
+      });
+      submission.submission.receipt.patch_hash = observation.patchHash;
+    } finally {
+      await observationStore.close();
+    }
+    const receipts = createAttemptReceiptHandlers();
+    const mismatched = structuredClone(submission);
+    mismatched.submission.receipt.packet_hash = `sha256:${"e".repeat(64)}`;
+    mismatched.submission.mutation.mutationId = "wrong-materialized-receipt";
+    expect(await receipts.submit(mismatched)).toMatchObject({
+      ok: true,
+      result: { submitted: false },
+    });
+    const submitted = await receipts.submit(submission);
+    expect(submitted).toMatchObject({
+      ok: true,
+      result: { submitted: true, disposition: "verification_pending" },
+    });
+    expect(await receipts.submit(submission)).toMatchObject({
+      ok: true,
+      result: { submitted: true, idempotentReplay: true },
+    });
+    const store = new SqliteWorkspaceLifecycleStore(base.runtime.databasePath, { readOnly: true });
+    try {
+      const persisted = await store.getAttemptReceiptForAttempt(input.packet.attempt_id);
+      expect(persisted?.packetHash).toBe(materialized.result.correspondence.packet_hash);
+      expect(persisted?.workspaceLeaseRevision).toBe(
+        attached.result.workerSession.workspaceLeaseRevision
+      );
+      expect(JSON.parse(persisted!.receiptJson).acceptance_criteria_addressed).toEqual(
+        input.workItem.criterionIds
+      );
+    } finally {
+      await store.close();
+    }
+  });
+
   it("persists a patch-only claim after a real assisted lifecycle and replays it", async () => {
     const root = await sandbox();
     const prepared = await prepare(root);

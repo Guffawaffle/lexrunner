@@ -74,3 +74,127 @@ this bound handoff. Older strict request parsers reject the new field; upgrade r
 than stripping it. Materialization works with MCP mutations disabled. `prepare_attempt`
 retains its existing ALLOW_MUTATIONS gate; enabling that gate is a separate authority
 decision. A successful preparation binds packet/envelope resources, not worker launch.
+
+## Continue with a foreground host
+
+The next result is an attached session and a durable worker claim. This is a manual
+integration contract for a host that can supply the real worker session and lifecycle
+observations. LexRunner's built-in `lexrunner.host-assisted` adapter does **not** spawn
+or dispatch a worker. Without such a host, stop at the prepared bundle.
+
+Preparation and attachment also require a supported workspace boundary. Native Windows
+preparation is not supported by the currently shipped boundary; the development native
+fixture is not a substitute. Do not strip bindings, switch hosts implicitly or install
+a service to make these examples pass.
+
+Retain the full successful preparation response privately. It contains lifecycle
+credentials and host paths. In the shared CLI/MCP handler shape, require both `ok: true`
+and `result.ok: true` with `result.outcome: "launch_bundle_ready"`. Call that returned
+`result` the **bundle** below. Keep its packet hash equal to the retained correspondence.
+The [worker request schemas](../src/runs/agent-work-worker-adapters.ts) and
+[receipt request schema](../src/runs/agent-work-attempt-receipt-adapters.ts) are the
+complete contracts; the field map below explains where their values come from.
+
+### Attach before dispatching the task
+
+The foreground host must first create a **wait-only** worker that cannot start
+repository work, obtain its real opaque session identity, then attach it. Dispatch
+the bundle's exact packet only after attachment succeeds. A task-bearing spawn
+followed by best-effort attachment does not satisfy this sequence. Do not fabricate
+an ID from the examples or assume an arbitrary host implements this handshake.
+
+Construct a request with the original explicit `runtime` and an `attach` object:
+
+| Attach field                                         | Source                                                                                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runId`, `expectedRunRevision`                       | `bundle.lifecycle.run.runId`, `.revision`                                                                                                            |
+| `controller`                                         | Only `runId`, `controllerId`, `leaseId`, `fencingToken` from the live controller lease; the initial values are in `bundle.lifecycle.controllerLease` |
+| `attemptId`, `expectedAttemptRevision`               | `bundle.lifecycle.attempt.attemptId`, `.revision`                                                                                                    |
+| `workspaceLeaseId`, `expectedWorkspaceLeaseRevision` | `bundle.lifecycle.workspace.leaseId`, `.revision`                                                                                                    |
+| `envelope`                                           | The exact `bundle.envelope`, without rewriting hashes or paths                                                                                       |
+| `workerSessionId`, `worker.workerId`                 | Stable lifecycle session ID and real opaque worker identity supplied by the host; retain their association                                           |
+| `worker.backend`, optional `worker.model`            | Actual host identity; the built-in assisted manifest requires backend `host-subagent`                                                                |
+| `worker.startedAt`, `mutation.now`                   | Observed host start and current mutation time; start must fall between envelope creation and attachment, within the lease                            |
+| `mutation.mutationId`                                | Stable unique ID for this exact mutation; preserve it for an exact replay                                                                            |
+| `adapter`                                            | Explicit adapter selection described below                                                                                                           |
+
+The built-in adapter selection uses schema `1.0.0`, ID `lexrunner.host-assisted`,
+version `1.0.0` and mode `assisted_attach`. Its `accepted_trust_gaps` list must be an
+explicit operator decision for the packet and host. For example, a packet allowing
+edits needs both filesystem read and write enforcement assessed. Listing a gap
+acknowledges it; it does not enforce scope or grant permission. Missing required
+acknowledgements or unsupported capabilities must stop attachment.
+
+After reviewing the request and authorizing its database/workspace observation effects:
+
+```sh
+lexrunner attempt worker attach --input reviewed-attach.json --json
+```
+
+Require `ok: true` **and** `result.updated: true` before host dispatch. An outer
+`ok: true` can contain a rejected lifecycle mutation such as `identity_mismatch`.
+Retain the returned attempt and worker-session revisions. If attachment fails or its
+result is uncertain, keep the worker quiescent, inspect status and reconcile the
+exact operation; do not send the task speculatively. Host cancellation and recovery
+remain the host's responsibility, not a side effect of recording a failed mutation.
+
+### Record observations, then submit the worker claim
+
+Use the existing commands with reviewed request files:
+
+```sh
+lexrunner attempt worker heartbeat --input reviewed-heartbeat.json --json
+lexrunner attempt worker end --input reviewed-end.json --json
+lexrunner attempt receipt submit --input reviewed-receipt.json --json
+```
+
+Heartbeat and end requests contain `databasePath` and a `heartbeat` or `end` object.
+Carry the same run/controller/attempt/lease/session identities, but use the latest
+returned revisions for each mutation, including `expectedWorkerSessionRevision`.
+If another actor changes state or a lease expires, reconcile first; do not guess
+revision increments or copy stale preparation revisions. End additionally records
+the observed terminal `status` and `exit`. Each mutation requires `result.updated`.
+These are controller-submitted observations, not an independent process monitor.
+
+Receipt submission contains `databasePath` and `submission`: current identity/revision
+preconditions, controller credential, `mutation`, and an `AgentTaskReceipt_v2` claim.
+Build that claim from the actual packet, attached session and observed result:
+
+| Receipt data                                                                 | Source                                                                                                                                                     |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run, work item/revision, attempt, packet ID/hash and base SHA                | The prepared packet; packet hash must still match retained materialization correspondence                                                                  |
+| Workspace lease ID/revision and worker runtime/session ID                    | The attached session; receipt `workspace_lease_revision` is its attachment revision, while outer `expectedWorkspaceLeaseRevision` fences the current lease |
+| Addressed criteria                                                           | IDs from the packet's criteria and retained correspondence; list only those the worker claims to have addressed                                            |
+| Final HEAD or canonical patch hash, files and commits                        | Actual observed result, following the [ADR-010 receipt identity contract](adr/ADR-010-agent-work-orchestration-protocol.md)                                |
+| Outcome, exit reason, summary, checks, blockers, assumptions, times and cost | Bounded worker/host evidence; do not invent passed checks or measured costs                                                                                |
+
+Require `ok: true` and `result.submitted: true`. Retain the returned receipt ID/hash,
+attempt revision and disposition. `verification_pending` is a persisted claim awaiting
+verification; it is not accepted work. The correspondence remains a caller-retained
+link to supplied source identity, not an authenticated outcome or plan acceptance.
+
+### Verify independently and reassess
+
+`lexrunner attempt verification run --input reviewed-verification.json --json` executes
+the immutable packet's checks and observes result identity. It needs current lifecycle
+preconditions plus the submitted receipt ID/hash, a new verification ID and distinct
+begin/complete mutation IDs. Authorize those command and database effects separately.
+Require `result.recorded`, then inspect the actual outcome and trust gaps; recording
+failed or inconclusive verification is still a successful persistence operation.
+
+Policy acceptance is a further operation (`attempt acceptance apply`), followed by
+separate review/integration and outcome reassessment. A completed worker, submitted
+receipt, or passing check alone does not establish fulfillment. See the
+[verification request schemas](../src/runs/agent-work-attempt-verification-adapters.ts).
+
+### Reproducible evidence and limits
+
+The selected-work composition case in
+[the receipt adapter suite](../tests/runs/agent-work-attempt-receipt-adapters.spec.ts)
+materializes authored criteria, prepares a real temporary Git/SQLite workspace,
+rejects a wrong attachment packet hash, attaches, writes deterministic fixture output,
+records end, observes its patch identity, rejects a mismatched receipt and persists
+and replays the correct claim. Its helpers show the complete request shapes above.
+The test uses fabricated **fixture** identities and launches no agent; they are not
+values to copy into a real request. This evidence covers application composition,
+not provider dispatch, protected-host acceptance or outcome fulfillment.
