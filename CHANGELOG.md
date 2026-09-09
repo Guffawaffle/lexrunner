@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-09
+
+### Added
+
+- Shared selected-work materialization through `attempt materialize` and the read-only
+  `materialize_attempt_input` MCP tool, with explicit preparation fields and source correspondence.
+- Optional expected packet hash in preparation to reject changed input before resource
+  acquisition and report possible effects if the prepared result unexpectedly differs.
+- A complete selected-work example and guidance separating materialization, preparation,
+  worker execution and verification. Older strict consumers must upgrade for the bound input.
+
+### Fixed
+
+- Preserve authored technical context and constraints through project planning and issue
+  descriptions; report missing success criteria as an actionable input failure.
+
 ## [2.2.0] - 2026-09-09
 
 ### Added

@@ -118,11 +118,12 @@ The checked-in package version is the single source for `lexrunner --version` an
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **2.2.0**. npm availability and dist-tags are separate
+Current repository package version: **2.3.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [2.2.0 frozen-input release](docs/releases/2.2.0.md), the
+See the [2.3.0 selected-work candidate](docs/releases/2.3.0.md), the
+[2.2.0 frozen-input release](docs/releases/2.2.0.md), the
 [2.1.0 open-source release](docs/releases/2.1.0.md), the
 [2.0.2 generated timeout correction](docs/releases/2.0.2.md), the
 [2.0.1 MCP identity correction](docs/releases/2.0.1.md), the
