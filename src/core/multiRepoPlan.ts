@@ -294,7 +294,7 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
         REPO_NAME: pr.repoName,
       },
       runtime: "local",
-      artifacts: getGateArtifacts(gateName),
+      artifacts: [],
       ...(isStandardTestGate(gateName) ? { timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS } : {}),
     });
   }
@@ -303,20 +303,6 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
   gates.sort((a, b) => a.name.localeCompare(b.name));
 
   return gates;
-}
-
-/**
- * Get artifacts for a gate type
- */
-function getGateArtifacts(gateName: string): string[] {
-  const artifacts: Record<string, string[]> = {
-    lint: ["lint-results.txt"],
-    test: ["test-results.xml", "coverage/"],
-    unit: ["test-results.xml", "coverage/"],
-    typecheck: ["typecheck-results.txt"],
-    build: ["dist/"],
-  };
-  return artifacts[gateName] || [];
 }
 
 function isStandardTestGate(gateName: string): boolean {

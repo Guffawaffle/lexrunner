@@ -85,6 +85,14 @@ become successful placeholder commands. For a custom check,
 author a manual plan with an explicit gate `run` command. A generated command still
 must execute successfully in the target repository to produce passing evidence.
 
+Generated gates do not assume project-specific artifact filenames. Command output and
+execution receipts remain evidence; add explicit artifact requirements to an authored
+plan when needed. Missing or stale declared outputs still fail verification.
+
+Single-repository GitHub plans also carry [frozen Git inputs](./frozen-git-inputs.md):
+an explicit repository, target and PR refs, expected commit IDs and acquisition mode.
+Multi-repository and existing manual plans remain visibly legacy-unbound.
+
 ### Max Workers
 
 Control parallel execution:

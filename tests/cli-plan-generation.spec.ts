@@ -14,6 +14,7 @@ describe("CLI Plan Generation", () => {
       "rejects an undefined required gate: %s",
       async (gateName) => {
         const mockClient = {
+          getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
           validateRepository: vi.fn().mockResolvedValue({
             owner: "testowner",
             repo: "testrepo",
@@ -25,8 +26,8 @@ describe("CLI Plan Generation", () => {
               number: 123,
               title: "Feature A",
               body: "Base feature",
-              head: { ref: "feature-a", sha: "abc123" },
-              base: { ref: "main", sha: "def456" },
+              head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+              base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
               state: "open",
               labels: [],
               draft: false,
@@ -40,8 +41,8 @@ describe("CLI Plan Generation", () => {
             number: 123,
             title: "Feature A",
             body: "Base feature",
-            head: { ref: "feature-a", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -68,6 +69,7 @@ describe("CLI Plan Generation", () => {
 
     it("should accept custom max workers", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -90,6 +92,7 @@ describe("CLI Plan Generation", () => {
 
     it("should accept custom target branch", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -219,6 +222,7 @@ describe("CLI Plan Generation", () => {
   describe("GitHub Plan Generation with Custom Options", () => {
     it("rejects an undefined PR metadata gate even with supported policy defaults", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -230,8 +234,8 @@ describe("CLI Plan Generation", () => {
             number: 200,
             title: "Security Feature",
             body: "Adds security features",
-            head: { ref: "security", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "security", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -245,8 +249,8 @@ describe("CLI Plan Generation", () => {
           number: 200,
           title: "Security Feature",
           body: "Adds security features",
-          head: { ref: "security", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "security", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -271,6 +275,7 @@ describe("CLI Plan Generation", () => {
 
     it("should handle empty required gates", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -282,8 +287,8 @@ describe("CLI Plan Generation", () => {
             number: 100,
             title: "Simple PR",
             body: "Simple change",
-            head: { ref: "simple", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "simple", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -297,8 +302,8 @@ describe("CLI Plan Generation", () => {
           number: 100,
           title: "Simple PR",
           body: "Simple change",
-          head: { ref: "simple", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "simple", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,

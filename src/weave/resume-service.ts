@@ -234,6 +234,16 @@ export function validateResumeJournal(
     };
   }
   const ids = new Set<string>();
+  const inputs = parsedPlan.data.gitInputs;
+  if (
+    inputs &&
+    (inputs.target.commit !== journal.repository.targetHeadSha ||
+      inputs.sources.some(
+        (source) => source.commit !== journal.repository.sourceHeads[source.item]
+      ))
+  ) {
+    return { valid: false, reason: "checkpoint commits do not match the plan's frozen Git inputs" };
+  }
   let seenIncomplete = false;
   for (const operation of journal.operations) {
     if (!operation.id || ids.has(operation.id)) {

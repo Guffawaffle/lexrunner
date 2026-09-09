@@ -171,12 +171,12 @@ describe("Multi-Repo Plan Generator", () => {
       const gates = new Map(plan.items[0].gates.map((gate) => [gate.name, gate]));
       expect(gates.get("test")).toMatchObject({
         run: "npm test",
-        artifacts: ["test-results.xml", "coverage/"],
+        artifacts: [],
         timeoutMs: 300_000,
       });
       expect(gates.get("unit")).toMatchObject({
         run: "npm test",
-        artifacts: ["test-results.xml", "coverage/"],
+        artifacts: [],
         timeoutMs: 300_000,
       });
       expect(gates.get("lint")?.timeoutMs).toBeUndefined();

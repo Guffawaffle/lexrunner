@@ -112,6 +112,7 @@ export interface BoundedIntegrationStatus {
     schemaVersion: string;
     target: string;
     itemCount: number;
+    gitInputBinding: "frozen" | "legacy-unbound";
     policy?: Plan["policy"];
   };
   mergeSummary: ReturnType<MergeEligibilityEvaluator["getMergeSummary"]>;
@@ -137,6 +138,7 @@ export class IntegrationStatusQueryService {
         schemaVersion: validated.schemaVersion,
         target: bounded(validated.target),
         itemCount: validated.items.length,
+        gitInputBinding: validated.gitInputs ? "frozen" : "legacy-unbound",
         ...(validated.policy ? { policy: validated.policy } : {}),
       },
       mergeSummary: evaluator.getMergeSummary(),

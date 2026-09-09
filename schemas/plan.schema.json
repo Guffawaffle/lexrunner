@@ -6,6 +6,7 @@
   "$ref": "#/definitions/Plan",
   "definitions": {
     "Plan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
       "properties": {
         "schemaVersion": {
@@ -13,52 +14,57 @@
           "pattern": "^1\\.\\d+\\.\\d+$"
         },
         "target": {
-          "type": "string",
-          "default": "main"
+          "default": "main",
+          "type": "string"
         },
         "policy": {
           "type": "object",
           "properties": {
             "requiredGates": {
+              "default": [],
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
             },
             "optionalGates": {
+              "default": [],
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
             },
             "maxWorkers": {
+              "default": 1,
               "type": "integer",
               "minimum": 1,
-              "default": 1
+              "maximum": 9007199254740991
             },
             "retries": {
+              "default": {},
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "object",
                 "properties": {
                   "maxAttempts": {
+                    "default": 1,
                     "type": "integer",
                     "minimum": 1,
-                    "default": 1
+                    "maximum": 9007199254740991
                   },
                   "backoffSeconds": {
+                    "default": 0,
                     "type": "number",
-                    "minimum": 0,
-                    "default": 0
+                    "minimum": 0
                   }
-                },
-                "additionalProperties": false
-              },
-              "default": {}
+                }
+              }
             },
             "overrides": {
+              "default": {},
               "type": "object",
               "properties": {
                 "adminGreen": {
@@ -71,108 +77,113 @@
                       }
                     },
                     "requireReason": {
-                      "type": "boolean",
-                      "default": false
+                      "default": false,
+                      "type": "boolean"
                     }
-                  },
-                  "additionalProperties": false
+                  }
                 }
-              },
-              "additionalProperties": false,
-              "default": {}
+              }
             },
             "blockOn": {
+              "default": [],
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
             },
             "mergeRule": {
+              "default": {
+                "type": "strict-required"
+              },
               "type": "object",
               "properties": {
                 "type": {
+                  "default": "strict-required",
                   "type": "string",
                   "enum": [
                     "strict-required"
-                  ],
-                  "default": "strict-required"
+                  ]
                 }
-              },
-              "additionalProperties": false,
-              "default": {
-                "type": "strict-required"
               }
             },
             "performance": {
+              "default": {
+                "batchSize": 50,
+                "cacheTTLSeconds": 3600,
+                "enableCaching": true,
+                "throttleOnMemory": true,
+                "memoryThresholdPercent": 80
+              },
               "type": "object",
               "properties": {
                 "maxMemoryMB": {
                   "type": "integer",
-                  "minimum": 128
+                  "minimum": 128,
+                  "maximum": 9007199254740991
                 },
                 "batchSize": {
+                  "default": 50,
                   "type": "integer",
                   "minimum": 1,
-                  "default": 50
+                  "maximum": 9007199254740991
                 },
                 "cacheTTLSeconds": {
+                  "default": 3600,
                   "type": "integer",
                   "minimum": 0,
-                  "default": 3600
+                  "maximum": 9007199254740991
                 },
                 "enableCaching": {
-                  "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "type": "boolean"
                 },
                 "throttleOnMemory": {
-                  "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "type": "boolean"
                 },
                 "memoryThresholdPercent": {
+                  "default": 80,
                   "type": "number",
                   "minimum": 0,
-                  "maximum": 100,
-                  "default": 80
+                  "maximum": 100
                 }
-              },
-              "additionalProperties": false,
-              "default": {}
+              }
             },
-        "security": {
-              "type": "object",
-              "properties": {
-                "blockCritical": {
-                  "type": "boolean",
-                  "default": true
-                },
-                "blockHigh": {
-                  "type": "boolean",
-                  "default": true
-                },
-                "maxMedium": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "default": 5
-                },
-                "maxLow": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "default": 10
-                }
-              },
-              "additionalProperties": false,
+            "security": {
               "default": {
                 "blockCritical": true,
                 "blockHigh": true,
                 "maxMedium": 5,
                 "maxLow": 10
+              },
+              "type": "object",
+              "properties": {
+                "blockCritical": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "blockHigh": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "maxMedium": {
+                  "default": 5,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxLow": {
+                  "default": 10,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
               }
             }
-          },
-          "additionalProperties": false
+          }
         },
         "items": {
+          "default": [],
           "type": "array",
           "items": {
             "type": "object",
@@ -181,13 +192,14 @@
                 "type": "string"
               },
               "deps": {
+                "default": [],
                 "type": "array",
                 "items": {
                   "type": "string"
-                },
-                "default": []
+                }
               },
               "gates": {
+                "default": [],
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -202,20 +214,23 @@
                       "type": "string"
                     },
                     "env": {
+                      "default": {},
                       "type": "object",
-                      "additionalProperties": {
+                      "propertyNames": {
                         "type": "string"
                       },
-                      "default": {}
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     },
                     "runtime": {
+                      "default": "local",
                       "type": "string",
                       "enum": [
                         "local",
                         "container",
                         "ci-service"
-                      ],
-                      "default": "local"
+                      ]
                     },
                     "container": {
                       "type": "object",
@@ -241,36 +256,37 @@
                                 "type": "string"
                               },
                               "type": {
+                                "default": "bind",
                                 "type": "string",
                                 "enum": [
                                   "bind",
                                   "volume"
-                                ],
-                                "default": "bind"
+                                ]
                               }
                             },
                             "required": [
                               "source",
                               "target"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         }
                       },
                       "required": [
                         "image"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "artifacts": {
+                      "default": [],
                       "type": "array",
                       "items": {
                         "type": "string"
-                      },
-                      "default": []
+                      }
                     },
                     "input": {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {}
                     },
                     "timeoutMs": {
@@ -284,16 +300,130 @@
                     "run"
                   ],
                   "additionalProperties": false
+                }
+              },
+              "tier": {
+                "type": "object",
+                "properties": {
+                  "suggested": {
+                    "type": "string",
+                    "enum": [
+                      "senior",
+                      "mid",
+                      "junior"
+                    ]
+                  },
+                  "actual": {
+                    "type": "string",
+                    "enum": [
+                      "senior",
+                      "mid",
+                      "junior"
+                    ]
+                  },
+                  "escalated": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "escalationReason": {
+                    "type": "string"
+                  },
+                  "mismatch": {
+                    "type": "boolean"
+                  }
                 },
-                "default": []
+                "required": [
+                  "suggested"
+                ]
               }
             },
             "required": [
               "name"
             ],
             "additionalProperties": false
+          }
+        },
+        "gitInputs": {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "1.0.0"
+            },
+            "repository": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "checkoutRemote": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            },
+            "acquisition": {
+              "type": "string",
+              "enum": [
+                "local-only",
+                "fetch"
+              ]
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 512,
+                  "pattern": "^refs\\/(?:heads\\/.+|pull\\/[1-9][0-9]*\\/head)$"
+                },
+                "commit": {
+                  "type": "string",
+                  "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                }
+              },
+              "required": [
+                "ref",
+                "commit"
+              ],
+              "additionalProperties": false
+            },
+            "sources": {
+              "maxItems": 256,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": "^refs\\/(?:heads\\/.+|pull\\/[1-9][0-9]*\\/head)$"
+                  },
+                  "commit": {
+                    "type": "string",
+                    "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                  },
+                  "item": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "ref",
+                  "commit",
+                  "item"
+                ],
+                "additionalProperties": false
+              }
+            }
           },
-          "default": []
+          "required": [
+            "schemaVersion",
+            "repository",
+            "checkoutRemote",
+            "acquisition",
+            "target",
+            "sources"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

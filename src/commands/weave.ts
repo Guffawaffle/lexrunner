@@ -401,6 +401,9 @@ export async function runWeaveApply(
       console.log(`Plan: ${opts.plan}`);
       console.log(`Items: ${plan.items.length}`);
       console.log(`Target: ${plan.target}\n`);
+      console.log(
+        `Git inputs: ${preview.summary.gitInputBinding}${plan.gitInputs ? `; acquisition: ${plan.gitInputs.acquisition}` : ""}\n`
+      );
       console.log("📦 Execution Plan\n");
       console.log("Execution Order (topological):\n");
       levels.forEach((level, index) => {
@@ -422,7 +425,9 @@ export async function runWeaveApply(
       console.log(`Items: ${plan.items.length}\n`);
     }
 
-    if (!opts.skipGates) {
+    // Bound execution runs gates on frozen commits inside the shared service.
+    // Running them first on the caller's checkout would test different input.
+    if (!opts.skipGates && !(opts.execute && plan.gitInputs)) {
       if (!json) console.log("Running gates...\n");
       const executionState = new ExecutionState(plan);
       const gatesDir = path.join(process.cwd(), ".smartergpt", "runner", "gates");

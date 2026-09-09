@@ -11,6 +11,7 @@ const createMockClient = (): GitHubClient => ({
   listOpenPRs: vi.fn(),
   getPRDetails: vi.fn(),
   getPRDependencies: vi.fn(),
+  getBranchHead: vi.fn(),
   validateRepository: vi.fn(),
   listIssues: vi.fn(),
   getOctokit: vi.fn(),

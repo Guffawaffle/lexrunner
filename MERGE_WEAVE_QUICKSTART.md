@@ -90,8 +90,8 @@ required. See [gate and review policy](docs/review-gate.md).
 
 ## 5. Integration requires a separately prepared candidate
 
-**The generated GitHub plan is not directly executable by the current local merge
-application path.** GitHub planning creates item names such as `PR-123`; that
+**In the pinned published 2.1.0 release, the generated GitHub plan is not directly
+executable by the local merge application path.** GitHub planning creates item names such as `PR-123`; that
 runtime resolves item names as Git refs. The recorded `PR_SHA` in a gate's
 environment does not provide that binding. A clean checkout is also required;
 installation changes, an untracked plan or other work can block preparation.
@@ -103,6 +103,11 @@ local execution path needs a separately prepared and verified input with actual
 source refs, exact heads, target and clean-checkout handling. See the
 [independent review contract](docs/review-gate.md) and the
 [local runtime implementation](src/weave/local-resume-driver.ts) for that boundary.
+
+The development source now implements [explicit frozen Git inputs](docs/frozen-git-inputs.md)
+for single-repository generation and the shared local application service. That change
+is not included in the pinned installation above. Use its source-version contract and
+reviewed evidence when evaluating it; do not strip bindings to run a new plan on 2.1.0.
 
 Before any integration, verify current PR heads and base, repository protections,
 required checks and independent review for each exact candidate. Changed inputs
