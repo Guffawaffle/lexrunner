@@ -454,4 +454,4 @@ security:
 - **Crash Prevention:** Avoid unbounded recursion or excessive memory allocation in tests.
 - **Process Isolation:** Ensure tests clean up temporary directories and processes.
 - **Git Configuration:** Tests creating git repositories MUST explicitly disable GPG signing (`git config commit.gpgsign false`) to prevent interactive prompts that hang the test runner and crash the environment.
-- **Git Tests:** Tests that perform git commits or require a git environment are EXCLUDED from the default `npm test` run. Run them explicitly with `npm run test:git`. These tests MUST NOT run in CI.
+- **Git Tests:** Tests that perform git commits or require a git environment are EXCLUDED from the default `npm test` run. Run them explicitly with `npm run test:git`, including the existing isolated `git-backed-tests` CI job. Use disposable repositories, disabled GPG signing and bounded workers; never exercise these tests against a live working checkout. This matches the required Git-backed lifecycle/recovery lane in `.github/workflows/ci.yml`.
