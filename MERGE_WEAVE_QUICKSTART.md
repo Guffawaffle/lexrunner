@@ -88,24 +88,30 @@ status. These local results describe the checkout tested; they do not prove that
 every proposed merged candidate passed. Repository CI and candidate review remain
 required. See [gate and review policy](docs/review-gate.md).
 
-## 5. Review and integrate
+## 5. Integration requires a separately prepared candidate
 
-Before applying merges, verify the frozen plan, exact current PR heads and base,
-repository protections, required checks and the independent review for each exact
-candidate. If they changed, regenerate or revise the plan and repeat the affected
-checks and review. Authorization must cover the selected repository and merges.
+**The generated GitHub plan is not directly executable by the current local merge
+application path.** GitHub planning creates item names such as `PR-123`; that
+runtime resolves item names as Git refs. The recorded `PR_SHA` in a gate's
+environment does not provide that binding. A clean checkout is also required;
+installation changes, an untracked plan or other work can block preparation.
 
-Only after those conditions are met:
+Do not run `weave apply --execute` on the generated plan as the next quickstart
+step, or rename items casually to make the command proceed. The inspected plan
+can inform your repository's existing reviewed integration process. LexRunner's
+local execution path needs a separately prepared and verified input with actual
+source refs, exact heads, target and clean-checkout handling. See the
+[independent review contract](docs/review-gate.md) and the
+[local runtime implementation](src/weave/local-resume-driver.ts) for that boundary.
 
-```bash
-npx lexrunner weave apply --plan plan.json --execute --json
-```
+Before any integration, verify current PR heads and base, repository protections,
+required checks and independent review for each exact candidate. Changed inputs
+require renewed checks and review. Authorization must cover the actual local and
+remote effects. A green preview or local gate result does not satisfy those conditions.
 
-This is the explicit mutation boundary. It runs gates and invokes the merge
-application service. Inspect its result and verify the resulting remote state;
-command success alone does not expand the scope of your review. Without `--execute`,
-`weave apply` runs gates but does not apply merges. Do not use `--skip-gates` to
-bypass missing evidence.
+The CLI's `--execute` flag opts into the merge application service; without it,
+`weave apply` runs gates without applying merges. This distinction describes the
+command, not a supported end-to-end continuation from this generated plan.
 
 ## Next choices
 

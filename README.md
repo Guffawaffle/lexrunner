@@ -33,11 +33,13 @@ reads GitHub; private repositories need an authorized `GITHUB_TOKEN` supplied to
 the process. See the [merge-weave quickstart](MERGE_WEAVE_QUICKSTART.md) for setup,
 authentication and the complete first-use journey:
 
-**Discover → freeze a plan → inspect dependencies → preview gates → review and integrate.**
+**Discover → freeze a plan → inspect dependencies → preview gates.**
 
 The first useful result is an inspected plan and gate preview. A dry run neither
 executes gates nor proves merge eligibility. The quickstart separates local writes,
-command execution, independent review and the explicit merge boundary.
+command execution, independent review and the explicit merge boundary. Generated
+GitHub plans currently need separate preparation for the local merge runtime; the
+walkthrough explains the item-name/ref mismatch before any integration attempt.
 
 [Start the walkthrough](MERGE_WEAVE_QUICKSTART.md) ·
 [Choose another SmarterGPT workflow](https://smartergpt.dev/docs/how-to-use/)
