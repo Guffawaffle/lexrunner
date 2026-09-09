@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-import { seal, resume } from "../scripts/exploration-trail.mjs";
+import { seal, resume, resumeCompact } from "../scripts/exploration-trail.mjs";
 import { captureProbe } from "../scripts/exploration-probe.mjs";
 
 function observation() {
@@ -34,6 +34,98 @@ function observation() {
   };
 }
 describe("opt-in exploration trail", () => {
+  it("compacts output without hiding failed probes, contradictory observations or limits", () => {
+    const record = {
+      ...observation(),
+      observations: ["Mostly birds on visit one", "A passage was observed on visit two"],
+      evidence: [
+        {
+          ...observation().evidence[0],
+          stdout: "鳥".repeat(2000),
+          stderr: "decisive detail",
+          termination: "timeout",
+          outputTruncated: true,
+        },
+        {
+          ...observation().evidence[0],
+          exitCode: 0,
+          stdout: "passage",
+          stderr: "",
+          outputTruncated: false,
+        },
+      ],
+    };
+    const trail = seal(record),
+      before = JSON.stringify(trail);
+    const packet = resumeCompact(trail, "/source/trail.json");
+    expect(packet.record.observations).toEqual(record.observations);
+    expect(packet.record.limitations).toEqual(record.limitations);
+    expect(packet.record.openQuestions).toEqual(record.openQuestions);
+    expect(packet.record.possibleNextExperiments).toEqual([]);
+    expect(packet.record.evidence[0]).toMatchObject({
+      exitCode: null,
+      termination: "timeout",
+      outputTruncated: true,
+      sourcePointer: "/record/evidence/0",
+      omittedExcerpts: { stdoutUtf8Bytes: 6000, stderrUtf8Bytes: 15 },
+    });
+    expect(packet.record.evidence[0]).not.toHaveProperty("stdout");
+    expect(packet.record.evidence[1].exitCode).toBe(0);
+    expect(packet.selection.caution).toContain("decisive details");
+    expect(packet.source).toEqual({ location: "/source/trail.json", digest: trail.digest });
+    expect(JSON.stringify(trail)).toBe(before);
+    expect(resume(trail, packet.source.digest).record.evidence[0].stderr).toBe("decisive detail");
+    const replacement = seal({ ...record, observations: ["Different history"] });
+    expect(() => resume(replacement, packet.source.digest)).toThrow("expected source digest");
+  });
+  it("refuses oversized compact narratives and tampered sources instead of silently dropping meaning", () => {
+    const large = seal({ ...observation(), observations: Array(5).fill("x".repeat(3990)) });
+    expect(() => resumeCompact(large, "/source")).toThrow("16 KiB");
+    expect(resume(large).record.observations).toHaveLength(5);
+    const altered = seal(observation());
+    altered.record.limitations = ["Changed after sealing"];
+    expect(() => resumeCompact(altered, "/source")).toThrow("digest mismatch");
+  });
+  it("retrieves omitted details in a separate CLI process only from the expected source", async () => {
+    const root = await mkdtemp(join(tmpdir(), "exploration-compact-"));
+    try {
+      const source = join(root, "trail.json"),
+        script = resolve("scripts/exploration-trail.mjs");
+      const trail = seal(observation());
+      await writeFile(source, JSON.stringify(trail));
+      const packet = JSON.parse(
+        execFileSync(process.execPath, [script, "resume", source, "--compact"], {
+          encoding: "utf8",
+        })
+      );
+      const full = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [script, "resume", packet.source.location, "--expect-digest", packet.source.digest],
+          { encoding: "utf8" }
+        )
+      );
+      expect(full.record).toEqual(trail.record);
+      await writeFile(
+        source,
+        JSON.stringify(seal({ ...observation(), observations: ["Replacement"] }))
+      );
+      expect(() =>
+        execFileSync(
+          process.execPath,
+          [script, "resume", source, "--expect-digest", packet.source.digest],
+          { stdio: "pipe" }
+        )
+      ).toThrow();
+      expect(() =>
+        execFileSync(process.execPath, [script, "resume", source, "--compact", "--compact"], {
+          stdio: "pipe",
+        })
+      ).toThrow();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it("preserves exact argv including whitespace and empty arguments", () => {
     const record = observation();
     record.evidence[0].command = ["node", " spaced ", ""];
