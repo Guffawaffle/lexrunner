@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-09
+
+### Added
+
+- Progressive root CLI help shows seven existing work, integration and setup families.
+  `--help-all` exposes every registered command family and compatibility alias;
+  nested help and typo suggestions retain the complete command inventory.
+
+### Fixed
+
+- First-use help saves the actual integration plan with `--output plan.json` instead
+  of redirecting the planner summary. Guidance distinguishes reads, writes, gate
+  execution, worker handoff and separate merge authority.
+
+### Documentation
+
+- Explain the selected-work assisted handoff through preparation, attachment,
+  observed effects, receipts and verification. Controlled composition tests do not
+  establish a real worker provider or native Windows preparation support.
+- Repository exploration and compact-resumption scripts remain opt-in development
+  tools, outside the npm package. No token, cost or efficacy improvement is claimed.
+
 ## [2.3.0] - 2026-09-09
 
 ### Added

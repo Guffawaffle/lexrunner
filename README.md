@@ -17,7 +17,7 @@ branch, pushing, opening a PR, or merging requires separate approval.
 
 ## Start here
 
-Current source (pending release) makes `lexrunner --help` show the main work and integration families with a first-use
+The [2.4.0 candidate](docs/releases/2.4.0.md) (pending release) makes `lexrunner --help` show the main work and integration families with a first-use
 path. Use `lexrunner --help-all` for every family and compatibility alias, or
 `lexrunner <command> --help` for full options and nested operations. Help changes
 presentation only; command effects and authority requirements still apply.
@@ -124,7 +124,7 @@ The checked-in package version is the single source for `lexrunner --version` an
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **2.3.0**. npm availability and dist-tags are separate
+Current repository package version: **2.4.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
