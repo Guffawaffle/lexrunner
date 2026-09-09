@@ -19,7 +19,7 @@ function fixture() {
   root.command("weave").command("recover").action(action);
   root.command("idea").action(action);
   root.command("advanced").command("repair").action(action);
-  root.command("legacy").action(action);
+  root.command("legacy").alias("compatibility").action(action);
   return { root, action, output: () => output };
 }
 
@@ -31,7 +31,11 @@ describe("progressive root help", () => {
       .createHelp()
       .visibleCommands(root)
       .map((command) => command.name());
-    expect(visible).toEqual(["weave", "idea", "help"]);
+    expect(visible).toEqual(["weave", "idea", "advanced", "legacy", "help"]);
+    const rendered = root.helpInformation();
+    expect(rendered).toContain("weave");
+    expect(rendered).not.toContain("advanced");
+    expect(rendered).not.toContain("legacy");
     expect(
       root.commands.find((command) => command.name() === "advanced")!.helpInformation()
     ).toContain("repair");
@@ -62,6 +66,23 @@ describe("progressive root help", () => {
     const { root, action } = fixture();
     root.parse(["legacy"], { from: "user" });
     expect(action).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["advancd", "advanced"],
+    ["compatibilty", "compatibility"],
+  ])("retains typo discovery for omitted commands and aliases: %s", (typo, expected) => {
+    const { root, output, action } = fixture();
+    try {
+      root.parse([typo], { from: "user" });
+      throw new Error("expected unknown-command exit");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CommanderError);
+      expect((error as CommanderError).code).toBe("commander.unknownCommand");
+      expect((error as CommanderError).exitCode).toBe(1);
+    }
+    expect(output()).toContain(`Did you mean ${expected}?`);
+    expect(action).not.toHaveBeenCalled();
   });
 
   it("shows the real plan output contract and separates preview from authority", () => {

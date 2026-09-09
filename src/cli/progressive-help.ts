@@ -14,10 +14,20 @@ const FIRST_USE_COMMANDS = new Set([
 /** Presentation only: retain the registered tree and all command-specific help. */
 export function configureProgressiveHelp(root: Command): void {
   root.configureHelp({
-    visibleCommands(command) {
-      const commands = Help.prototype.visibleCommands.call(this, command);
-      if (command !== root || root.opts().helpAll) return commands;
-      return commands.filter((entry) => FIRST_USE_COMMANDS.has(entry.name()));
+    formatHelp(command, helper) {
+      if (command !== root || root.opts().helpAll) {
+        return Help.prototype.formatHelp.call(this, command, helper);
+      }
+      // Commander also uses visibleCommands for unknown-command suggestions.
+      // Scope the smaller inventory to this rendering, preserving error discovery.
+      const presentation: Help = Object.create(helper);
+      presentation.visibleCommands = (entry) => {
+        const commands = helper.visibleCommands(entry);
+        return entry === root
+          ? commands.filter((child) => FIRST_USE_COMMANDS.has(child.name()))
+          : commands;
+      };
+      return Help.prototype.formatHelp.call(this, command, presentation);
     },
   });
   root
