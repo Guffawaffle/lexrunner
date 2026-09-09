@@ -68,6 +68,13 @@ digest and source/target commits on resume. No additional label resolution or fe
 occurs inside a bound merge operation. Legacy `GitOperations.executeWeave` rejects
 bound plans; use the shared application/resume service.
 
+Bound operations verify clean index/worktree state, the expected HEAD and integration
+branch at operation boundaries. A command that exits zero after changing tracked files,
+staging changes or creating a commit does not pass the integration gate. Unexpected
+changes remain available for inspection; the runner does not clean or reset them.
+Post-check mutation also prevents a completed outcome, even if earlier merges succeeded.
+These are bounded Git observations, not isolation against a concurrent hostile writer.
+
 ## Gates and evidence
 
 Generated standard gates use actual npm commands and reject unknown selected gate

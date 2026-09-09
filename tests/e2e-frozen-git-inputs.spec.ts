@@ -225,6 +225,69 @@ describe("frozen generated Git inputs (local repositories, simulated GitHub meta
     ).toBe(f.base);
   }, 30_000);
 
+  it.each(["worktree", "index", "commit"])(
+    "blocks a passing gate that changes the frozen %s",
+    async (mode) => {
+      const f = await fixture();
+      const script =
+        "require('node:fs').writeFileSync('feature.txt','changed');" +
+        (mode !== "worktree"
+          ? "require('node:child_process').execFileSync('git',['add','feature.txt']);"
+          : "") +
+        (mode === "commit"
+          ? "require('node:child_process').execFileSync('git',['commit','-m','gate-created']);"
+          : "");
+      f.plan.items[0].gates[0].run = `node -e "${script}"`;
+      const { summary, execution } = await new MergeApplicationService().run({
+        plan: f.plan,
+        workingDir: f.working,
+        dryRun: false,
+        mutationAuthorized: true,
+      });
+      expect(summary.ok).toBe(false);
+      expect(execution?.operations[0].error).toContain("Frozen checkout");
+      expect(summary.operations?.find((op) => op.phase === "merge")?.status).toBe("pending");
+      expect(await readFile(join(f.working, "feature.txt"), "utf8")).toBe("changed");
+      if (mode === "commit") expect(await git(f.working, "rev-parse", "HEAD")).not.toBe(f.source);
+      const checkpoint = await loadCheckpoint(summary.runId!, { checkpointDir: f.checkpointDir });
+      expect(
+        await git(f.working, "rev-parse", checkpoint.metadata!.resume!.repository.integrationBranch)
+      ).toBe(f.base);
+    },
+    30_000
+  );
+
+  it("blocks a mutating post-check and preserves its changes for inspection", async () => {
+    const f = await fixture();
+    f.plan.items[0].gates[0].run = `node -e "let branch;try{branch=require('node:child_process').execFileSync('git',['symbolic-ref','-q','HEAD'],{stdio:'pipe'}).toString()}catch{};if(branch)require('node:fs').writeFileSync('feature.txt','post-check change')"`;
+    const { summary, execution } = await new MergeApplicationService().run({
+      plan: f.plan,
+      workingDir: f.working,
+      dryRun: false,
+      mutationAuthorized: true,
+    });
+    expect(summary.ok).toBe(false);
+    expect(execution?.operations.find((op) => op.phase === "post_check")).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Frozen checkout"),
+    });
+    expect(await readFile(join(f.working, "feature.txt"), "utf8")).toBe("post-check change");
+  }, 30_000);
+
+  it("blocks a gate that moves the integration ref while leaving source HEAD clean", async () => {
+    const f = await fixture();
+    f.plan.items[0].gates[0].run = `node -e "const cp=require('node:child_process');const ref=cp.execFileSync('git',['for-each-ref','--format=%(refname)','refs/heads/weave/']).toString().trim();cp.execFileSync('git',['update-ref',ref,'HEAD'])"`;
+    const { summary, execution } = await new MergeApplicationService().run({
+      plan: f.plan,
+      workingDir: f.working,
+      dryRun: false,
+      mutationAuthorized: true,
+    });
+    expect(summary.ok).toBe(false);
+    expect(execution?.operations[0].error).toContain("Gate changed the frozen integration branch");
+    expect(summary.operations?.find((op) => op.phase === "merge")?.status).toBe("pending");
+  }, 30_000);
+
   it("still rejects a missing explicitly declared gate output", async () => {
     const f = await fixture();
     f.plan.items[0].gates[0].artifacts = ["missing-results.xml"];
@@ -246,6 +309,12 @@ describe("frozen generated Git inputs (local repositories, simulated GitHub meta
     expect(validateResumeJournal(checkpoint)).toMatchObject({
       valid: false,
       reason: expect.stringContaining("frozen Git inputs"),
+    });
+    checkpoint.metadata!.resume!.repository.sourceHeads["PR-123"] = f.source;
+    checkpoint.metadata!.resume!.repository.integrationBranch = "main";
+    expect(validateResumeJournal(checkpoint)).toMatchObject({
+      valid: false,
+      reason: expect.stringContaining("integration branch"),
     });
   }, 30_000);
 });

@@ -35,7 +35,7 @@ export async function createLocalResumeCheckpoint(input: {
   let targetHeadSha: string;
   if (input.plan.gitInputs) {
     const status = await git.status();
-    if (status.files.some((file) => !isRunnerStatePath(file.path))) {
+    if (status.files.some(isUnexpectedBoundChange)) {
       throw new Error("Working tree must be clean before acquiring frozen Git inputs");
     }
     const verified = await verifyFrozenGitInputs(git, input.plan.gitInputs);
@@ -99,7 +99,11 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
     if (!journal) return { valid: false, reason: "resume journal is missing" };
     try {
       const status = await this.git.status();
-      const unexpectedChanges = status.files.filter((file) => !isRunnerStatePath(file.path));
+      const unexpectedChanges = status.files.filter(
+        checkpoint.plan.gitInputs
+          ? isUnexpectedBoundChange
+          : (file) => !isRunnerStatePath(file.path)
+      );
       if (unexpectedChanges.length > 0) {
         return {
           valid: false,
@@ -186,6 +190,23 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
 
   async execute(operation: Readonly<ResumeOperation>, checkpoint: Readonly<WeaveCheckpoint>) {
     const journal = checkpoint.metadata!.resume!;
+    const bound = !!checkpoint.plan.gitInputs;
+    const expectedIntegration =
+      lastCompletedMergeSha(journal.operations) ?? journal.repository.targetHeadSha;
+    if (bound) {
+      const stateError = await this.boundStateError();
+      if (stateError) return { completed: false as const, reason: stateError };
+      const integrationHead = await localBranchHead(this.git, journal.repository.integrationBranch);
+      if (
+        (integrationHead && integrationHead !== expectedIntegration) ||
+        (!integrationHead && lastCompletedMergeSha(journal.operations))
+      ) {
+        return {
+          completed: false as const,
+          reason: "Frozen integration branch changed before operation; preserve and inspect it",
+        };
+      }
+    }
     await this.ensureIntegrationBranch(
       journal.repository.integrationBranch,
       journal.repository.targetHeadSha
@@ -193,6 +214,10 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
 
     if (operation.phase === "merge") {
       await this.git.checkout(journal.repository.integrationBranch);
+      if (bound) {
+        const stateError = await this.boundStateError(expectedIntegration);
+        if (stateError) return { completed: false as const, reason: stateError };
+      }
       const item = checkpoint.plan.items.find((candidate) => candidate.name === operation.item);
       if (!item) return { completed: false as const, reason: "plan item is missing" };
       const result = await this.operations.executeMergeOperation({
@@ -203,6 +228,10 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
           ? { sourceCommit: journal.repository.sourceHeads[operation.item] }
           : {}),
       });
+      if (bound && result.success && result.sha) {
+        const stateError = await this.boundStateError(result.sha);
+        if (stateError) return { completed: false as const, reason: stateError };
+      }
       return result.success && result.sha
         ? { completed: true as const, externalId: result.sha }
         : { completed: false as const, reason: result.message ?? "merge failed" };
@@ -220,6 +249,14 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
       }
     } else {
       await this.git.checkout(journal.repository.integrationBranch);
+    }
+    const expectedGateHead =
+      operation.phase === "gate"
+        ? journal.repository.sourceHeads[operation.item]
+        : expectedIntegration;
+    if (bound) {
+      const stateError = await this.boundStateError(expectedGateHead);
+      if (stateError) return { completed: false as const, reason: stateError };
     }
     const artifactDir = join(
       this.workingDir,
@@ -239,6 +276,19 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
       false,
       this.workingDir
     );
+    if (bound) {
+      const stateError = await this.boundStateError(expectedGateHead);
+      if (stateError) return { completed: false as const, reason: stateError };
+      if (
+        (await localBranchHead(this.git, journal.repository.integrationBranch)) !==
+        expectedIntegration
+      ) {
+        return {
+          completed: false as const,
+          reason: "Gate changed the frozen integration branch; preserve and inspect it",
+        };
+      }
+    }
     const receipt = result.artifacts?.find((path) =>
       /gate-execution-receipt\.attempt-\d+\.json$/.test(path)
     );
@@ -253,6 +303,17 @@ export class LocalWeaveResumeDriver implements WeaveResumeDriver {
   private async ensureIntegrationBranch(branch: string, targetHeadSha: string): Promise<void> {
     if (await localBranchHead(this.git, branch)) return;
     await this.git.checkoutBranch(branch, targetHeadSha);
+  }
+
+  private async boundStateError(expectedHead?: string): Promise<string | null> {
+    if (expectedHead && (await this.git.revparse(["HEAD"])).trim() !== expectedHead) {
+      return "Frozen checkout HEAD changed during the operation; preserve and inspect the new commit";
+    }
+    const status = await this.git.status();
+    if (status.files.some(isUnexpectedBoundChange)) {
+      return "Frozen checkout index or working tree changed; preserve and inspect the modifications before continuing";
+    }
+    return null;
   }
 }
 
@@ -316,4 +377,12 @@ function isRunnerStatePath(path: string): boolean {
     path === "weave-lock.json" ||
     path.endsWith("/weave-lock.json")
   );
+}
+
+function isUnexpectedBoundChange(file: {
+  path: string;
+  index: string;
+  working_dir: string;
+}): boolean {
+  return !(file.index === "?" && file.working_dir === "?" && isRunnerStatePath(file.path));
 }

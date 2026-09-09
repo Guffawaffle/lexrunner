@@ -237,6 +237,12 @@ export function validateResumeJournal(
   const inputs = parsedPlan.data.gitInputs;
   if (
     inputs &&
+    journal.repository.integrationBranch !== `weave/resume-${checkpoint.runId.toLowerCase()}`
+  ) {
+    return { valid: false, reason: "checkpoint integration branch does not match its bound run" };
+  }
+  if (
+    inputs &&
     (inputs.target.commit !== journal.repository.targetHeadSha ||
       inputs.sources.some(
         (source) => source.commit !== journal.repository.sourceHeads[source.item]
