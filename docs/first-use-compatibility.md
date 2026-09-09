@@ -1,6 +1,6 @@
 # Choose the smallest installation
 
-This guide targets `@smartergpt/lexrunner@2.3.0`, Node.js 24+ and Git.
+This guide targets `@smartergpt/lexrunner@2.4.0`, Node.js 24+ and Git.
 GitHub discovery needs repository access; running gates also needs the tools and
 project dependencies named by the plan. npm installs package dependencies. You do
 not need every SmarterGPT component or an MCP connection for the CLI walkthrough.
@@ -32,7 +32,7 @@ authorize those tool calls separately through your client's controls.
 
 ## Why does LexRunner depend on Lex 4.0.3?
 
-LexRunner 2.3.0 declares exact `@smartergpt/lex@4.0.3`. The
+LexRunner 2.4.0 declares exact `@smartergpt/lex@4.0.3`. The
 [1.5.2 alignment record](releases/1.5.2.md) explains the deliberate pin: preserve
 reproducible consumer dependency identity instead of selecting a changing Lex 4
 version during installation. It is historical rationale, not proof that every
