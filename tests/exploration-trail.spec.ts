@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { seal, resume } from "../scripts/exploration-trail.mjs";
+import { captureProbe } from "../scripts/exploration-probe.mjs";
 
 function observation() {
   return {
@@ -33,6 +34,31 @@ function observation() {
   };
 }
 describe("opt-in exploration trail", () => {
+  it("preserves exact argv including whitespace and empty arguments", () => {
+    const record = observation();
+    record.evidence[0].command = ["node", " spaced ", ""];
+    record.evidence[0].cwd = "/path with trailing space ";
+    expect(resume(seal(record)).record).toEqual(record);
+  });
+  it("drains large process output without replacing completion with a buffer failure", async () => {
+    const result = await captureProbe(
+      [process.execPath, "-e", "process.stdout.write('x'.repeat(100000))"],
+      process.cwd()
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdoutBytes).toBe(100000);
+    expect(result.stdout.length).toBe(4096);
+    expect(result.outputTruncated).toBe(true);
+  });
+  it("retains an explicit process timeout without calling it successful completion", async () => {
+    const result = await captureProbe(
+      [process.execPath, "-e", "setInterval(()=>{},1000)"],
+      process.cwd(),
+      100
+    );
+    expect(result.termination).toContain("timeout");
+    expect(result.exitCode).not.toBe(0);
+  });
   it("retains an unremarkable observation, limits and open question without inventing a next step", () => {
     const result = resume(seal(observation()));
     expect(result.questionDisposition).toBe("open");

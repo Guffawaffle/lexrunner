@@ -23,9 +23,11 @@ node scripts/exploration-trail.mjs resume /absolute/new-startup-trail.json
 ```
 
 Use native paths on Windows. The sampler executes nine fixed read-only version/help
-probes (30seconds and8KiB output maximum each) and writes one new file. It does not
+probes (30seconds per direct child, streams drained and counted, first4KiB per stream retained) and writes one new file. It does not
 prepare workspaces, launch workers or modify a store. Probe failures are retained.
-Its hypothesis is deliberately modest: a small version response may still incur
+A successor run may pass a previous trail as the second argument. The sampler verifies
+its digest and records an explicit previousTrail location/digest; it never overwrites it.
+This link does not authenticate the previous source. Its hypothesis is deliberately modest: a small version response may still incur
 shared initialization costs. Timing does not itself identify their cause.
 
 For another investigation, author JSON matching the small `TrailRecord` schema in
@@ -35,7 +37,8 @@ interpretation, limits, open questions and bounded evidence. Omit private reason
 credentials and unnecessary transcripts. Empty suggested-next-experiment lists are valid.
 The 64KiB limit is a pilot transport bound, not a claim of optimal context budgeting.
 
-Sealing uses no-replace file creation and a content digest. A new observation gets a
+Sealing uses no-replace file creation and a content digest. Exact command arguments, including empty strings and whitespace, are preserved.
+A new observation gets a
 new file; keep prior files addressable. A digest detects inconsistency, not malicious
 rewriting or authenticity. It does not prove claims, authority, source freshness or
 durable custody. Resume reads one explicitly supplied file, verifies its consistency

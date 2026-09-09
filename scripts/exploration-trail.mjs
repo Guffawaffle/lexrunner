@@ -4,13 +4,21 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 // An opt-in experiment artifact, not a new Attempt state or authority receipt.
-const text = z.string().trim().min(1).max(4000);
+const text = z
+  .string()
+  .min(1)
+  .max(4000)
+  .refine((value) => value.trim().length > 0);
 const strings = z.array(text).max(24);
 export const TrailRecord = z
   .object({
     profile: z.literal("exploration-trail-pilot/v1"),
     question: text,
     attempt: text,
+    previousTrail: z
+      .object({ location: text, digest: z.string().regex(/^sha256:[a-f0-9]{64}$/) })
+      .strict()
+      .optional(),
     capturedAt: z.string().datetime(),
     conditions: strings.min(1),
     premise: text,
@@ -24,13 +32,21 @@ export const TrailRecord = z
       .array(
         z
           .object({
-            command: z.array(text).min(1).max(20),
+            command: z
+              .array(z.string().max(4000))
+              .min(1)
+              .max(20)
+              .refine((argv) => argv[0].length > 0),
             cwd: text,
             startedAt: z.string().datetime(),
             durationMs: z.number().nonnegative().finite(),
             exitCode: z.number().int().nullable(),
             stdout: z.string().max(8192),
             stderr: z.string().max(8192),
+            stdoutBytes: z.number().int().nonnegative().optional(),
+            stderrBytes: z.number().int().nonnegative().optional(),
+            outputTruncated: z.boolean().optional(),
+            termination: z.string().max(1000).optional(),
           })
           .strict()
       )
@@ -72,7 +88,7 @@ export function resume(input) {
     record: envelope.record,
   };
 }
-async function readBounded(path) {
+export async function readBounded(path) {
   const file = await open(path, "r");
   try {
     const bytes = Buffer.alloc(LIMIT + 1);
