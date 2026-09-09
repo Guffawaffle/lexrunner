@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { selectedWorkFixture } from "../fixtures/selected-work.js";
+import { materializeAttemptInput } from "../../src/runs/selected-work-materialization.js";
 import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +27,73 @@ afterEach(async () => {
 });
 
 describe("attempt lifecycle adapter handlers", () => {
+  it("prepares the exact materialized packet and rejects drift before opening the store", async () => {
+    const root = await sandbox();
+    const base = await prepareFixture(root);
+    const input = selectedWorkFixture();
+    const source = JSON.parse(input.artifact.text);
+    source.sourceSpec.repo = base.runtime.repositoryId;
+    source.createdAt = base.packet.createdAt;
+    input.artifact.text = JSON.stringify(source);
+    input.artifact.digest = `sha256:${createHash("sha256").update(input.artifact.text).digest("hex")}`;
+    input.repository = { id: base.runtime.repositoryId, base_sha: base.identity.baseSha };
+    input.packet = {
+      packet_id: base.packet.packetId,
+      run_id: base.identity.runId,
+      attempt_id: base.identity.attemptId,
+      instructions: base.packet.instructions,
+      scope: base.packet.scope,
+      authority: base.packet.authority,
+      verification: base.packet.verification,
+      budget: base.packet.budget,
+      created_at: base.packet.createdAt,
+    };
+    input.capturedAt = base.packet.createdAt;
+    const materialized = materializeAttemptInput(input);
+    if (!materialized.ok) throw new Error(materialized.error.code);
+    const request = { ...base, ...materialized.result.preparationInput };
+    const handlers = createAttemptLifecycleHandlers();
+    const drifted = {
+      ...request,
+      packet: {
+        ...request.packet,
+        instructions: [...request.packet.instructions, "Unreviewed change"],
+      },
+    };
+    expect(await handlers.prepare(drifted)).toMatchObject({
+      ok: false,
+      error: { code: "invalid_input", issues: [{ path: "expectedPacketHash" }] },
+    });
+    await expect(access(request.runtime.databasePath)).rejects.toThrow();
+    const prepared = await handlers.prepare(request);
+    expect(prepared).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        outcome: "launch_bundle_ready",
+        packet: { packet_hash: materialized.result.correspondence.packet_hash },
+      },
+    });
+    if (!prepared.ok || !prepared.result.ok) throw new Error("expected real preparation");
+    const store = new SqliteWorkspaceLifecycleStore(request.runtime.databasePath);
+    try {
+      const binding = await store.getLaunchEnvelopeBinding(request.identity.attemptId);
+      expect(binding).not.toBeNull();
+      if (!binding) throw new Error("expected persisted launch envelope");
+      expect(JSON.parse(binding.envelopeJson)).toEqual(prepared.result.envelope);
+      const packetBinding = await store.getTaskPacketBinding(request.identity.attemptId);
+      expect(packetBinding?.packetHash).toBe(materialized.result.correspondence.packet_hash);
+      if (!packetBinding) throw new Error("expected persisted task packet");
+      expect(JSON.parse(packetBinding.packetJson)).toEqual(prepared.result.packet);
+    } finally {
+      store.close();
+    }
+    const replay = await handlers.prepare(request);
+    if (!replay.ok || !replay.result.ok) throw new Error("expected bound replay");
+    expect(replay.result.packet).toEqual(prepared.result.packet);
+    expect(replay.result.envelope).toEqual(prepared.result.envelope);
+  });
+
   it("prepares a canonically bound assisted launch bundle and replays it stably", async () => {
     const root = await sandbox();
     const request = await prepareFixture(root);

@@ -1,4 +1,5 @@
-import { access, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { materializeAttemptInput } from "../src/runs/selected-work-materialization.js";
+import { access, mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -16,6 +17,29 @@ afterEach(async () => {
 });
 
 describe("published MCP Attempt lifecycle", () => {
+  it("materializes identical selected input through built CLI and mutations-disabled MCP", async () => {
+    const input = JSON.parse(
+      await readFile(join(repositoryRoot, "examples/selected-work-input.json"), "utf8")
+    );
+    const expected = materializeAttemptInput(input);
+    const [response] = await invoke({
+      id: 90,
+      method: "tools/call",
+      params: { name: "materialize_attempt_input", arguments: input },
+    });
+    expect(JSON.parse(response.result.content[0].text)).toEqual(expected);
+    const cli = await execa(
+      "node",
+      ["dist/cli.js", "attempt", "materialize", "--input", "-", "--json"],
+      {
+        cwd: repositoryRoot,
+        input: JSON.stringify(input),
+      }
+    );
+    expect(JSON.parse(cli.stdout)).toEqual(expected);
+    expect(expected.ok).toBe(true);
+  });
+
   it("advertises the shared bounded schemas from the npm launcher", async () => {
     const [response] = await invoke({ id: 1, method: "tools/list", params: {} });
     const tools = response.result.tools as Array<{
@@ -32,6 +56,11 @@ describe("published MCP Attempt lifecycle", () => {
     );
     const start = tools.find((tool) => tool.name === "start_attempt");
     const prepare = tools.find((tool) => tool.name === "prepare_attempt");
+    const materialize = tools.find((tool) => tool.name === "materialize_attempt_input");
+    expect(materialize?.inputSchema.properties).toHaveProperty("artifact");
+    expect(materialize?.inputSchema.properties).toHaveProperty("selectedItemId");
+    expect(prepare?.inputSchema.properties).toHaveProperty("expectedPacketHash");
+    expect(prepare?.inputSchema.required).not.toContain("expectedPacketHash");
     const status = tools.find((tool) => tool.name === "get_attempt_status");
     const workerAttach = tools.find((tool) => tool.name === "attach_attempt_worker");
     const workerHeartbeat = tools.find((tool) => tool.name === "heartbeat_attempt_worker");

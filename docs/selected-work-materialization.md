@@ -1,9 +1,10 @@
 # Selected-work materialization
 
-This internal pure conversion boundary in `src/runs/selected-work-materialization.ts`
+The shared conversion boundary in `src/runs/selected-work-materialization.ts`
 constructs one WorkItem and existing AgentTaskPacket from an explicitly selected,
-dependency-free Execution Plan 1.0.0 item. It is not registered as a CLI/MCP operation
-and is not yet a user-facing journey. It performs no I/O, preparation or dispatch.
+dependency-free Execution Plan 1.0.0 item. It is exposed through `attempt materialize` and MCP `materialize_attempt_input`.
+The pure conversion performs no I/O, preparation or dispatch. CLI input reads are
+explicit; saving stdout is a separate caller-selected write.
 
 The caller supplies exact UTF-8 source text and its expected SHA-256 digest, selected
 item ID, stable work/criterion IDs, repository/base identity and explicit packet
@@ -32,3 +33,43 @@ Validation uses actual project and packet schemas, including existing agent-work
 schema fixtures. It establishes construction behavior, not live issue creation,
 worker execution or outcome fulfillment. Publication and public-surface adoption
 remain separate delivery steps.
+
+## Materialize, then prepare explicitly
+
+This surface is implemented in source after 2.2.0; use a release containing it before
+following these commands. Existing 2.2.0 installations do not expose this operation.
+
+```sh
+lexrunner attempt materialize --input examples/selected-work-input.json --json
+```
+
+[The complete example](../examples/selected-work-input.json) uses illustrative identities
+and source bytes. It demonstrates materialization only; replace them with the selected
+real artifact, expected digest, identities and explicit policy before preparation.
+
+The input is the complete `SelectedWorkInputJsonSchema` advertised by MCP: inline
+project artifact text and its digest, supplied outcome/work-plan references, selected
+item and stable criterion IDs, repository/base, capture time and explicit packet
+policy. A successful result contains `preparationInput`, `correspondence`, and the
+remaining required field names. It contains no controller credentials or guessed host.
+
+Retain the correspondence, review the returned requirements/policy and construct a
+full preparation request by adding your explicitly authorized `runtime`, `envelope`
+and `attempt` lifecycle inputs to `preparationInput`. Keep `expectedPacketHash`.
+Then, only with authority for preparation's workspace/database effects:
+
+```sh
+lexrunner attempt prepare --input reviewed-preparation.json --json
+```
+
+Preparation checks `expectedPacketHash` before opening its runtime/store and compares
+the actual returned packet as well. Changing instructions, criteria, identity or
+policy requires a new materialization and review; do not remove the expected hash to
+bypass a mismatch. A post-preparation mismatch reports affected attempt references
+and requires inspection because effects may already exist. No automatic retry occurs.
+
+The new expected hash is optional for legacy request compatibility, not optional for
+this bound handoff. Older strict request parsers reject the new field; upgrade rather
+than stripping it. Materialization works with MCP mutations disabled. `prepare_attempt`
+retains its existing ALLOW_MUTATIONS gate; enabling that gate is a separate authority
+decision. A successful preparation binds packet/envelope resources, not worker launch.

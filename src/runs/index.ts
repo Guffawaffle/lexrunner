@@ -425,3 +425,8 @@ export { AttributionTracker, createAttributionTracker } from "./attribution.js";
 // Context - LR-TSF-001
 export type { ExecutionContext } from "./context.js";
 export { createExecutionContext, logAttribution } from "./context.js";
+
+export {
+  materializeAttemptInput,
+  SelectedWorkInputJsonSchema,
+} from "./selected-work-materialization.js";

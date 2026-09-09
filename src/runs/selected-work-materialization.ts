@@ -180,3 +180,42 @@ export function materializeSelectedWork(input: unknown) {
     return failure("invalid_input");
   }
 }
+
+/** Machine discovery for the same bounded input accepted by CLI and MCP. */
+export const SelectedWorkInputJsonSchema = z.toJSONSchema(SelectedWorkInputSchema, {
+  target: "draft-7",
+  unrepresentable: "any",
+});
+
+/** Return only the fragment needed by existing preparation, not duplicate packet text. */
+export function materializeAttemptInput(input: unknown) {
+  const materialized = materializeSelectedWork(input);
+  if (!materialized.ok) return materialized;
+  const { packet, workItem, correspondence } = materialized;
+  return {
+    ok: true as const,
+    result: {
+      outcome: "materialized_input" as const,
+      preparationInput: {
+        workItem,
+        identity: {
+          runId: packet.run_id,
+          attemptId: packet.attempt_id,
+          baseSha: packet.repository.base_sha,
+        },
+        packet: {
+          packetId: packet.packet_id,
+          instructions: packet.instructions,
+          scope: packet.scope,
+          authority: packet.authority,
+          verification: packet.verification,
+          budget: packet.budget,
+          createdAt: packet.created_at,
+        },
+        expectedPacketHash: packet.packet_hash,
+      },
+      requiredPreparationFields: ["runtime", "envelope", "attempt"],
+      correspondence,
+    },
+  };
+}

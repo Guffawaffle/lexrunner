@@ -1,0 +1,60 @@
+{
+  "artifact": {
+    "id": "project-artifact",
+    "text": "{\"schemaVersion\":\"1.0.0\",\"sourceSpec\":{\"schemaVersion\":\"0.1.0\",\"title\":\"Outcome\",\"description\":\"Desired result\",\"acceptanceCriteria\":[\"Accepted result\"],\"repo\":\"example/repo\",\"technicalContext\":\"Existing runtime\\nRetain interfaces\",\"constraints\":\"No deployment\\nKeep stored data\"},\"epic\":{\"title\":\"Outcome\",\"description\":\"Desired result\",\"acceptanceCriteria\":[\"Accepted result\"]},\"subIssues\":[{\"id\":\"impl\",\"title\":\"Implement result\",\"description\":\"Make the bounded change\",\"type\":\"feature\",\"acceptanceCriteria\":[\"Test the behavior\",\"Preserve the data\"],\"dependsOn\":[]}],\"createdAt\":\"2026-09-09T06:56:20Z\"}",
+    "digest": "sha256:878d2f174b2ca4d6d97e9c3328f5b51c2c5165180e964103eb44d9d432c98ac9"
+  },
+  "outcome": {
+    "id": "outcome",
+    "revision": "1",
+    "digest": "sha256:3956e45ab26fa7934358b05a69a3ab6a7e439087887bd32d548df16f2de1da70"
+  },
+  "workPlan": {
+    "id": "work-plan",
+    "revision": "1",
+    "digest": "sha256:fbbd5ac7b80f358ed0311257838c644caf6db86290423871337ab17ec0102f70"
+  },
+  "selectedItemId": "impl",
+  "workItem": {
+    "id": "work-impl",
+    "revision": 1,
+    "criterionIds": ["behavior", "data"]
+  },
+  "capturedAt": "2026-09-09T06:56:20Z",
+  "repository": {
+    "id": "example/repo",
+    "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "packet": {
+    "packet_id": "packet",
+    "run_id": "run",
+    "attempt_id": "attempt",
+    "instructions": ["Use the explicitly selected task"],
+    "scope": {
+      "read_globs": ["src/**"],
+      "write_globs": ["src/**"],
+      "deny_globs": [".env"],
+      "cross_repo_allowed": false
+    },
+    "authority": {
+      "edit": true,
+      "git_write": false,
+      "github_write": false,
+      "external_runtime": false,
+      "secrets": false,
+      "signing": false,
+      "release": false
+    },
+    "verification": [
+      {
+        "id": "test",
+        "argv": ["npm", "test"],
+        "expected_exit_codes": [0]
+      }
+    ],
+    "budget": {
+      "max_tool_calls": 10
+    },
+    "created_at": "2026-09-09T06:56:20Z"
+  }
+}

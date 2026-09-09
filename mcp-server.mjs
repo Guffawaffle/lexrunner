@@ -190,6 +190,13 @@ const tools = {
     },
   },
 
+  materialize_attempt_input: {
+    description:
+      "Construct selected-work preparation input and correspondence without resources, network or dispatch",
+    inputSchema: core.SelectedWorkInputJsonSchema,
+    call: async (args) => canonicalToolResult(core.materializeAttemptInput(args)),
+  },
+
   prepare_attempt: {
     description:
       "Prepare an ADR-010 assisted launch packet and envelope (requires ALLOW_MUTATIONS=true)",

@@ -151,6 +151,7 @@ const AttemptLaunchEnvelopePolicySchema = z
 
 export const AttemptPrepareRequestSchema = z
   .object({
+    expectedPacketHash: SHA256Hash.optional(),
     runtime: AgentWorkRuntimeConfigSchema,
     workItem: WorkItem_v1,
     identity: z
@@ -238,7 +239,7 @@ export const AttemptPrepareRequestSchema = z
       });
     }
     try {
-      createAgentTaskPacket({
+      const packet = createAgentTaskPacket({
         schema_version: AGENT_WORK_CONTRACT_VERSION,
         packet_id: value.packet.packetId,
         run_id: value.identity.runId,
@@ -257,6 +258,13 @@ export const AttemptPrepareRequestSchema = z
         budget: value.packet.budget,
         created_at: value.packet.createdAt,
       });
+      if (value.expectedPacketHash && packet.packet_hash !== value.expectedPacketHash) {
+        context.addIssue({
+          code: "custom",
+          path: ["expectedPacketHash"],
+          message: "does not match the constructed packet; no preparation was performed",
+        });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         for (const issue of error.issues.slice(0, MAX_ISSUES)) {
@@ -305,6 +313,12 @@ export interface AdapterInputError {
 export interface AdapterOperationError {
   code: "operation_failed";
   message: string;
+  preparationEffects?: {
+    runId: string;
+    attemptId: string;
+    expectedPacketHash: string;
+    observedPacketHash: string;
+  };
 }
 
 export type AdapterError = AdapterInputError | AdapterOperationError;
@@ -339,6 +353,26 @@ export function createAttemptLifecycleHandlers(): AttemptLifecycleHandlers &
       }
       try {
         const result = await prepareAttemptLaunchBundle(runtime.service, parsed.data, runtime);
+        if (
+          result.ok &&
+          parsed.data.expectedPacketHash &&
+          result.packet.packet_hash !== parsed.data.expectedPacketHash
+        ) {
+          return {
+            ok: false,
+            error: {
+              code: "operation_failed",
+              message:
+                "Preparation ran but returned an unexpected packet. Preserve lifecycle state and inspect the attempt before recovery; do not retry automatically.",
+              preparationEffects: {
+                runId: parsed.data.identity.runId,
+                attemptId: parsed.data.identity.attemptId,
+                expectedPacketHash: parsed.data.expectedPacketHash,
+                observedPacketHash: result.packet.packet_hash,
+              },
+            },
+          };
+        }
         if (result.ok) {
           const envelopeJson = canonicalJSONStringify(result.envelope);
           const packetJson = canonicalJSONStringify(result.packet);

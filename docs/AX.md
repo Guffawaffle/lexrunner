@@ -45,12 +45,12 @@ itself is tested against `inspectRegisteredCliSurface()` and the published MCP `
 
 <!-- BEGIN GENERATED AX SURFACE -->
 
-Matrix schema: **1.0.0**. Live inventory: **139 CLI registrations** and **33 MCP tools**.
+Matrix schema: **1.0.0**. Live inventory: **140 CLI registrations** and **34 MCP tools**.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |       100 |             9 |         15 |            15 |      0 |
-| MCP     |        29 |             0 |          4 |             0 |      0 |
+| CLI     |       101 |             9 |         15 |            15 |      0 |
+| MCP     |        30 |             0 |          4 |             0 |      0 |
 
 ### Canonical CLI/MCP semantic pairs
 
@@ -77,6 +77,7 @@ Matrix schema: **1.0.0**. Live inventory: **139 CLI registrations** and **33 MCP
 | `plan.create`                              | `lexrunner weave plan`                    | `PlanCreationService`                   |
 | `preflight_attempt_containment`            | `lexrunner attempt preflight`             | `AgentWorkContainmentCapabilityService` |
 | `prepare_native_wsl_projection`            | `lexrunner attempt projection prepare`    | `NativeWslProjectionLifecycleHandlers`  |
+| `materialize_attempt_input`                | `lexrunner attempt materialize`           | `materializeAttemptInput`               |
 | `prepare_attempt`                          | `lexrunner attempt prepare`               | `AgentWorkLifecycleService`             |
 | `profile.resolve`                          | `lexrunner config show`                   | `ConfigurationQueryService`             |
 | `start_attempt`                            | `lexrunner attempt start`                 | `AgentWorkLifecycleService`             |
