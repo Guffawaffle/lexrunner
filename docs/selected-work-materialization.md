@@ -36,8 +36,9 @@ remain separate delivery steps.
 
 ## Materialize, then prepare explicitly
 
-This surface is implemented in source after 2.2.0; use a release containing it before
-following these commands. Existing 2.2.0 installations do not expose this operation.
+This surface is available in the published 2.3.0 release. Install
+`@smartergpt/lexrunner@2.3.0` before following these commands.
+Existing 2.2.0 installations do not expose this operation.
 
 ```sh
 lexrunner attempt materialize --input examples/selected-work-input.json --json
