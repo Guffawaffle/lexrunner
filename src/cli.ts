@@ -99,6 +99,7 @@ import {
   type RegisteredCliCommand,
 } from "./cli/registered-surface.js";
 import { emitAliasWarning } from "./cli/alias-policy.js";
+import { configureProgressiveHelp } from "./cli/progressive-help.js";
 import { registerWeaveCommand } from "./commands/weave.js";
 import { registerExplainCommand } from "./commands/explain.js";
 import {
@@ -268,64 +269,9 @@ program
       setFrameEmissionEnabled(globalFlags.emitFrames);
     }
     emitAliasWarning(actionCommand);
-  })
-  .addHelpText(
-    "after",
-    `
-Examples (Canonical Category-Action Pattern):
-	$ lexrunner workspace init                 Initialize workspace with interactive setup
-	$ lexrunner workspace doctor               Validate environment and configuration
-	$ lexrunner idea                           Capture feature idea interactively
-	$ lexrunner idea --title "..." --description "..." --dry-run
-	$ lexrunner config show                    Display configuration with precedence chain
-	$ lexrunner config show --key scope.target Show specific configuration value
-	$ lexrunner config show --json             Output configuration in JSON format
-	$ lexrunner config:inspect                 Display merged configuration with provenance map
-	$ lexrunner weave discover                 Find open PRs matching scope
-	$ lexrunner weave discover --suggest       Generate dependency suggestions with heuristics
-	$ lexrunner weave plan --from-github       Generate merge plan from GitHub PRs
-	$ lexrunner plan-review plan.json          Interactively review and edit plan
-	$ lexrunner plan-diff plan1.json plan2.json  Compare two plans
-	$ lexrunner gate run plan.json             Run quality gates on plan
-	$ lexrunner orchestrate:analyze-issues     Analyze issues for parallel work planning (fanout commands coming soon)
-	$ lexrunner orchestrate:analyze-issues --labels priority:P1 --json
-	$ lexrunner security check-rotation        Check token rotation status
-	$ lexrunner security scan-plan             Scan a plan file for secrets
-	$ lexrunner security validate-secrets GITHUB_TOKEN OTHER_SECRET
+  });
 
-Governance (LexSona Shadow Mode):
-	$ lexrunner governance:report              Analyze shadow governance logs
-	$ lexrunner governance:report --format markdown --disagreements-only
-	$ lexrunner governance:report --since 2025-12-01 --persona quality-first_engineering
-	$ lexrunner governance:cleanup             Clean up old governance logs
-
-Power User Commands:
-	$ lexrunner view plan.json                 Interactive plan viewer
-	$ lexrunner query plan.json --stats        Plan statistics and analysis
-	$ lexrunner query plan.json "level eq 1"   Query items by criteria
-	$ lexrunner retry --filter failed          Retry failed gates
-	$ lexrunner completion bash                Generate bash completion script
-
-Canonical Workflow:
-	1. Ideate:      lexrunner idea (capture feature ideas as GitHub Issues)
-	2. Discover:    lexrunner weave discover (optionally add --suggest for dependencies)
-	3. Plan:        lexrunner weave plan --from-github --json > plan.json
-	4. Review:      lexrunner plan-review plan.json
-	5. Execute:     lexrunner gate run plan.json
-	6. Report:      lexrunner weave report artifacts --out md
-
-Legacy Commands (Deprecated, use canonical forms above):
-	$ lexrunner init       → lexrunner workspace init
-	$ lexrunner doctor     → lexrunner workspace doctor
-	$ lexrunner discover   → lexrunner weave discover
-	$ lexrunner plan       → lexrunner weave plan
-	$ lexrunner status     → lexrunner weave status
-	$ lexrunner report     → lexrunner weave report
-	$ lexrunner execute    → lexrunner gate run
-	$ lexrunner orchestrate:analyze-issues → lexrunner fanout analyze
-	$ lexrunner orchestrate:assign-batch   → lexrunner fanout assign
-`
-  );
+configureProgressiveHelp(program);
 
 // Gate report validation command - modular implementation
 registerGateReportCommand(program);

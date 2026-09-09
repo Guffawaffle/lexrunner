@@ -37,9 +37,9 @@ describe("End-to-End Integration Tests", () => {
       expect(stdout).toContain("LexRunner");
       expect(stdout).toContain("discover");
       expect(stdout).toContain("merge");
-      expect(stdout).toContain("bootstrap");
-      expect(stdout).toContain("doctor");
-      expect(stdout).toContain("init");
+      expect(stdout).toContain("workspace");
+      expect(stdout).toContain("attempt");
+      expect(stdout).toContain("--help-all");
       expect(stderr).toBe("");
     });
 

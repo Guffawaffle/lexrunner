@@ -17,6 +17,12 @@ branch, pushing, opening a PR, or merging requires separate approval.
 
 ## Start here
 
+Current source (pending release) makes `lexrunner --help` show the main work and integration families with a first-use
+path. Use `lexrunner --help-all` for every family and compatibility alias, or
+`lexrunner <command> --help` for full options and nested operations. Help changes
+presentation only; command effects and authority requirements still apply.
+The public 2.3.0 package does not yet contain this help view or `--help-all`.
+
 For your first trial, install **LexRunner only** in a GitHub repository with open
 PRs. Node.js 24+ and Git are required. npm installs LexRunner's dependencies; you
 do not need to install Lex, AXF, LexSona, a policy-host service, or an MCP server
