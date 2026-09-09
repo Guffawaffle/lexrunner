@@ -22,6 +22,34 @@ node scripts/sample-exploration-startup.mjs /absolute/new-startup-trail.json
 node scripts/exploration-trail.mjs resume /absolute/new-startup-trail.json
 ```
 
+For selective resumption, request a compact view:
+
+```sh
+node scripts/exploration-trail.mjs resume /absolute/new-startup-trail.json --compact
+node scripts/exploration-trail.mjs resume /absolute/new-startup-trail.json --expect-digest sha256:EXPECTED_DIGEST_FROM_PACKET
+```
+
+The first command verifies the source and deterministically omits only stdout/stderr
+excerpts. It preserves every narrative field, observation, limitation, open question,
+suggestion, exact argv, exit/termination status and available capture metadata. Source
+location/digest, per-probe JSON pointers and omitted excerpt UTF-8 sizes remain visible.
+Reported process-output byte counts and omitted retained-excerpt sizes are different
+measurements. Unknown capture metadata remains unknown. New evidence can contradict
+the prior interpretation; this projection does not adjudicate that contradiction.
+
+Omitted output may contain decisive details absent from the narrative. The second
+command explicitly retrieves the full source and rejects a different digest, including
+a consistently resealed replacement. Neither command follows predecessor links, fetches
+URLs or executes recorded commands. Select the source path explicitly and treat it as
+untrusted data; the supplied digest is consistency evidence, not authentication.
+
+Compact output has a distinct pilot profile and a 16 KiB serialized UTF-8 bound including
+its CLI newline. If metadata/narrative exceed that bound, it fails with a full-resume
+remedy instead of silently dropping meaning. This bound is not an optimal token budget.
+Full resume remains available and its existing output profile is unchanged. The
+deterministic projection is intentionally different from the study author's handwritten
+summary: it needs its own behavioral tests before an efficiency or adoption claim.
+
 Use native paths on Windows. The sampler executes nine fixed read-only version/help
 probes (30seconds per direct child, streams drained and counted, first4KiB per stream retained) and writes one new file. It does not
 prepare workspaces, launch workers or modify a store. Probe failures are retained.

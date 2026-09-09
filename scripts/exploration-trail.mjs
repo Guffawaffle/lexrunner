@@ -70,10 +70,13 @@ export function seal(input) {
   const record = TrailRecord.parse(input);
   return bounded({ record, digest: digest(record) });
 }
-export function resume(input) {
+export function resume(input, expectedDigest) {
   bounded(input);
   const envelope = z.object({ record: TrailRecord, digest: z.string() }).strict().parse(input);
   if (digest(envelope.record) !== envelope.digest) throw new Error("Trail digest mismatch");
+  if (expectedDigest !== undefined && envelope.digest !== expectedDigest) {
+    throw new Error("Trail does not match expected source digest");
+  }
   return {
     profile: "exploration-resumption-pilot/v1",
     sourceDigest: envelope.digest,
@@ -87,6 +90,41 @@ export function resume(input) {
     ],
     record: envelope.record,
   };
+}
+export function resumeCompact(input, sourceLocation, expectedDigest) {
+  const full = resume(input, expectedDigest);
+  const location = text.parse(sourceLocation);
+  const { evidence, ...context } = full.record;
+  const packet = {
+    ...full,
+    profile: "exploration-compact-resumption-pilot/v1",
+    source: { location, digest: full.sourceDigest },
+    selection: {
+      policy: "retain all narrative and probe metadata; omit stdout/stderr excerpts only",
+      omissions: ["record.evidence[*].stdout", "record.evidence[*].stderr"],
+      retrieval:
+        "Read the explicitly selected source with resume and --expect-digest; no automatic retrieval or command execution.",
+      caution:
+        "Omitted output can contain decisive details absent from the narrative. Retrieve it when needed; absence from this view is not absence from the source.",
+    },
+    record: {
+      ...context,
+      evidence: evidence.map(({ stdout, stderr, ...metadata }, index) => ({
+        ...metadata,
+        sourcePointer: `/record/evidence/${index}`,
+        omittedExcerpts: {
+          stdoutUtf8Bytes: Buffer.byteLength(stdout, "utf8"),
+          stderrUtf8Bytes: Buffer.byteLength(stderr, "utf8"),
+        },
+      })),
+    },
+  };
+  if (Buffer.byteLength(JSON.stringify(packet), "utf8") + 1 > 16 * 1024) {
+    throw new Error(
+      "Compact view exceeds 16 KiB; use full resume. No narrative was silently dropped."
+    );
+  }
+  return packet;
 }
 export async function readBounded(path) {
   const file = await open(path, "r");
@@ -105,23 +143,33 @@ export async function readBounded(path) {
   }
 }
 async function main() {
-  const [operation, input, output, ...extra] = process.argv.slice(2);
-  if (
-    extra.length ||
-    !input ||
-    !["seal", "resume"].includes(operation) ||
-    (operation === "seal" ? !output : Boolean(output))
-  ) {
+  const [operation, input, ...options] = process.argv.slice(2);
+  const usage = () => {
     throw new Error(
-      "Usage: node scripts/exploration-trail.mjs seal input.json new-trail.json | resume trail.json"
+      "Usage: node scripts/exploration-trail.mjs seal input.json new-trail.json | resume trail.json [--compact] [--expect-digest sha256:...]"
     );
-  }
+  };
+  if (!input || !["seal", "resume"].includes(operation)) usage();
+  let compact = false,
+    expectedDigest;
+  if (operation === "seal") {
+    if (options.length !== 1 || !options[0]) usage();
+  } else
+    for (let i = 0; i < options.length; i++) {
+      if (options[i] === "--compact" && !compact) compact = true;
+      else if (options[i] === "--expect-digest" && expectedDigest === undefined) {
+        expectedDigest = options[++i];
+        if (!/^sha256:[a-f0-9]{64}$/.test(expectedDigest ?? "")) usage();
+      } else usage();
+    }
   const data = await readBounded(input);
   if (operation === "seal") {
     const result = seal(data);
+    const output = options[0];
     await writeFile(output, JSON.stringify(result), { flag: "wx" });
     console.log(JSON.stringify({ written: output, digest: result.digest }));
-  } else console.log(JSON.stringify(resume(data), null, 2));
+  } else if (compact) console.log(JSON.stringify(resumeCompact(data, input, expectedDigest)));
+  else console.log(JSON.stringify(resume(data, expectedDigest), null, 2));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
