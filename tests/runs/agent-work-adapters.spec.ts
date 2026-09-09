@@ -78,7 +78,13 @@ describe("attempt lifecycle adapter handlers", () => {
     const store = new SqliteWorkspaceLifecycleStore(request.runtime.databasePath);
     try {
       const binding = await store.getLaunchEnvelopeBinding(request.identity.attemptId);
-      expect(binding?.packetHash).toBe(materialized.result.correspondence.packet_hash);
+      expect(binding).not.toBeNull();
+      if (!binding) throw new Error("expected persisted launch envelope");
+      expect(JSON.parse(binding.envelopeJson)).toEqual(prepared.result.envelope);
+      const packetBinding = await store.getTaskPacketBinding(request.identity.attemptId);
+      expect(packetBinding?.packetHash).toBe(materialized.result.correspondence.packet_hash);
+      if (!packetBinding) throw new Error("expected persisted task packet");
+      expect(JSON.parse(packetBinding.packetJson)).toEqual(prepared.result.packet);
     } finally {
       store.close();
     }
