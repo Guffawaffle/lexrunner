@@ -197,18 +197,16 @@ describe("Advanced CLI Features E2E", () => {
   });
 
   describe("help system", () => {
-    it("should show power user commands in main help", () => {
+    it("should guide first use and point to complete help", () => {
       const output = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
 
-      expect(output).toContain("Power User Commands");
-      expect(output).toContain("lexrunner view");
-      expect(output).toContain("lexrunner query");
-      expect(output).toContain("lexrunner retry");
-      expect(output).toContain("lexrunner completion");
+      expect(output).toContain("--help-all");
+      expect(output).toContain("--output plan.json --json");
+      expect(output).not.toContain("--json > plan.json");
     });
 
     it("should list all commands including new ones", () => {
-      const output = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
+      const output = execSync(`node ${cliPath} --help-all`, { encoding: "utf8" });
 
       expect(output).toContain("view");
       expect(output).toContain("query");
