@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
+import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -62,7 +63,7 @@ function runCli(
       `const _origExit = process.exit.bind(process);\n` +
       `// Ensure process.exit calls the real exit synchronously to avoid uncaught async throws\n` +
       `process.exit = (code = 0) => { _origExit(code); };\n` +
-      `import(${JSON.stringify(cliPath)}).then(mod => {\n` +
+      `import(${JSON.stringify(pathToFileURL(cliPath).href)}).then(mod => {\n` +
       `  if (mod.main) {\n` +
       `    mod.main().catch(e => {\n` +
       `      console.error('CLI main error:', e);\n` +
@@ -78,7 +79,11 @@ function runCli(
 
     const proc = spawn(process.execPath, [bootstrapPath, ...args], {
       cwd: repoRoot,
-      env: { ...process.env, ...options.env },
+      env: {
+        ...process.env,
+        LEX_PR_PROFILE_DIR: path.join(repoRoot, ".smartergpt"),
+        ...options.env,
+      },
     });
 
     let stdout = "";
@@ -126,6 +131,7 @@ describe("CLI JSON purity", () => {
     const fake = {
       rest: {
         repos: {
+          getBranch: async () => ({ data: { commit: { sha: "b".repeat(40) } } }),
           get: async () => ({
             data: {
               default_branch: "main",
@@ -140,8 +146,8 @@ describe("CLI JSON purity", () => {
                 number: 1,
                 title: "Test PR",
                 body: "",
-                head: { ref: "feature/test", sha: "abc123" },
-                base: { ref: "main", sha: "base123" },
+                head: { ref: "feature/test", sha: "a".repeat(40) },
+                base: { ref: "main", sha: "b".repeat(40) },
                 state: "open",
                 labels: [],
                 draft: false,
@@ -157,8 +163,8 @@ describe("CLI JSON purity", () => {
               number: 1,
               title: "Test PR",
               body: "",
-              head: { ref: "feature/test", sha: "abc123" },
-              base: { ref: "main", sha: "base123" },
+              head: { ref: "feature/test", sha: "a".repeat(40) },
+              base: { ref: "main", sha: "b".repeat(40) },
               state: "open",
               labels: [],
               draft: false,
@@ -174,8 +180,8 @@ describe("CLI JSON purity", () => {
         {
           number: 1,
           title: "Test PR",
-          head: { ref: "feature/test", sha: "abc123" },
-          base: { ref: "main", sha: "base123" },
+          head: { ref: "feature/test", sha: "a".repeat(40) },
+          base: { ref: "main", sha: "b".repeat(40) },
           state: "open",
           labels: [],
           draft: false,
@@ -188,11 +194,15 @@ describe("CLI JSON purity", () => {
     };
 
     const { stdout, stderr, code } = await runCliWithFakeOctokit(fake);
-    expect(code).toBe(0);
+    expect(code, stderr).toBe(0);
     // stdout should be pure JSON
     expect(() => JSON.parse(stdout)).not.toThrow();
     const obj = JSON.parse(stdout);
     expect(obj).toHaveProperty("items");
+    expect(obj.gitInputs.target).toEqual({ ref: "refs/heads/main", commit: "b".repeat(40) });
+    expect(obj.gitInputs.sources).toEqual([
+      { item: "PR-1", ref: "refs/pull/1/head", commit: "a".repeat(40) },
+    ]);
     // stderr should include our diagnostic line
     expect(stderr).toMatch(/\[from-github\] repo=.* discovered=\d+/);
   });
