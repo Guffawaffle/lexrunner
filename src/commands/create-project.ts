@@ -85,7 +85,7 @@ async function runCreateProjectCommand(options: CreateProjectOptions): Promise<v
     console.log(chalk.blue(`Loading Feature Spec: ${specPath}`));
 
     const spec = (await loadAndValidate(specPath, FeatureSpecV0Schema)) as FeatureSpecV0;
-    console.log(chalk.green(`âœ“ Feature Spec v0 validated`));
+    console.log(chalk.green(`✓ Feature Spec v0 validated`));
     console.log(chalk.gray(`  Title: ${spec.title}`));
     console.log(chalk.gray(`  Repository: ${spec.repo}`));
 
@@ -112,7 +112,7 @@ async function runCreateProjectCommand(options: CreateProjectOptions): Promise<v
     // Write Execution Plan to file
     await ensureDir(path.dirname(normalizedOutput));
     await fs.writeFile(normalizedOutput, JSON.stringify(validatedPlan, null, 2), "utf-8");
-    console.log(chalk.green(`âœ“ Execution Plan v1 written to: ${normalizedOutput}`));
+    console.log(chalk.green(`✓ Execution Plan v1 written to: ${normalizedOutput}`));
 
     // Create Epic + Sub-Issues
     if (!options.dryRun) {
@@ -122,7 +122,7 @@ async function runCreateProjectCommand(options: CreateProjectOptions): Promise<v
       console.log(chalk.gray("Run without --dry-run to create actual GitHub Issues"));
     }
 
-    console.log(chalk.green("\nâœ“ Command completed successfully"));
+    console.log(chalk.green("\n✓ Command completed successfully"));
   } catch (error) {
     if (error instanceof Error) {
       console.error(chalk.red(`\nError: ${error.message}`));
@@ -247,7 +247,7 @@ async function createIssuesOnGitHub(
     labels: ["epic", ...options.epicLabels],
   });
 
-  console.log(chalk.green(`âœ“ Epic created: ${epic.html_url}`));
+  console.log(chalk.green(`✓ Epic created: ${epic.html_url}`));
   console.log(chalk.blue(`  Issue #${epic.number}`));
 
   // Create Sub-Issues
@@ -263,7 +263,7 @@ async function createIssuesOnGitHub(
       labels: [subIssue.type, ...options.issueLabels],
     });
 
-    console.log(chalk.green(`âœ“ Sub-Issue created: ${issue.html_url}`));
+    console.log(chalk.green(`✓ Sub-Issue created: ${issue.html_url}`));
     console.log(chalk.blue(`  Issue #${issue.number}`));
 
     subIssueMap.set(subIssue.id, issue.number);
@@ -288,10 +288,10 @@ async function createIssuesOnGitHub(
           issue_number: issueNumber,
           body: currentIssue.body + `\n\n---\n**Parent Epic:** #${epic.number}`,
         });
-        console.log(chalk.green(`âœ“ Linked #${issueNumber} â†’ #${epic.number}`));
+        console.log(chalk.green(`✓ Linked #${issueNumber} → #${epic.number}`));
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.warn(chalk.yellow(`âš  Could not link #${issueNumber}: ${errorMessage}`));
+        console.warn(chalk.yellow(`⚠ Could not link #${issueNumber}: ${errorMessage}`));
       }
     }
   }
@@ -300,11 +300,11 @@ async function createIssuesOnGitHub(
   if (options.project) {
     console.log(chalk.blue(`\nLinking to GitHub Project: ${options.project}`));
     console.warn(
-      chalk.yellow("âš  GitHub Projects linking not yet implemented (requires GraphQL API)")
+      chalk.yellow("⚠ GitHub Projects linking not yet implemented (requires GraphQL API)")
     );
   }
 
-  console.log(chalk.green(`\nâœ“ Project created successfully!`));
+  console.log(chalk.green(`\n✓ Project created successfully!`));
   console.log(chalk.gray(`  Epic: #${epic.number}`));
   console.log(
     chalk.gray(
