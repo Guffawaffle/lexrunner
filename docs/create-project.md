@@ -18,6 +18,17 @@ This command implements the front-end capture pipeline for feature planning:
 4. **Links** Sub-Issues to the parent Epic
 5. **Outputs** the Execution Plan to a file
 
+The decomposition is a fixed implementation/tests/docs template for review, not an
+approved work plan or worker dispatch. Optional `technicalContext` and `constraints`
+from idea capture are retained in `sourceSpec` and included in every generated issue
+description. They remain supplied requirements, not enforced runtime policy or
+permission to execute. Older specs without those fields remain supported.
+
+Idea capture may precede defining success. Before planning, add at least one acceptance
+criterion to the input spec's `acceptanceCriteria` array. The command rejects an empty
+array before writing a plan or creating issues. `--dry-run` writes the local plan;
+it does not create GitHub issues.
+
 ## Options
 
 | Option                    | Description                                   | Default                                                         |
