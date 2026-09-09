@@ -1,6 +1,10 @@
 # MCP Server for lexrunner
 
-The Model Context Protocol (MCP) server for lexrunner provides read-only tools for plan creation, gate execution, and merge operations.
+The Model Context Protocol (MCP) server for lexrunner provides tools for plan creation, gate execution, and merge operations.
+Plan creation can write files and gate execution runs commands. `ALLOW_MUTATIONS=false`
+blocks protected mutations such as merging; it is not a read-only sandbox.
+
+Start with [installation and interface choices](docs/first-use-compatibility.md).
 
 **Architecture:** This server is aligned with LexBrain and LexMap MCP implementations, using direct stdio JSON-RPC 2.0 protocol handling for consistency and maintainability across the Lex ecosystem.
 

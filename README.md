@@ -15,7 +15,34 @@ fit for a repository with one occasional PR and no integration-order problem.
 That evaluation is deliberately read-only. Installing the package, writing a plan, creating a
 branch, pushing, opening a PR, or merging requires separate approval.
 
-## What works today
+## Start here
+
+For your first trial, install **LexRunner only** in a GitHub repository with open
+PRs. Node.js 24+ and Git are required. npm installs LexRunner's dependencies; you
+do not need to install Lex, AXF, LexSona, a policy-host service, or an MCP server
+separately for this CLI workflow.
+
+```bash
+npm install --save-dev @smartergpt/lexrunner@2.1.0
+npx lexrunner --version
+npx lexrunner weave discover --json
+```
+
+Installation changes your package manifest, lockfile and dependencies. Discovery
+reads GitHub; private repositories need an authorized `GITHUB_TOKEN` supplied to
+the process. See the [merge-weave quickstart](MERGE_WEAVE_QUICKSTART.md) for setup,
+authentication and the complete first-use journey:
+
+**Discover → freeze a plan → inspect dependencies → preview gates → review and integrate.**
+
+The first useful result is an inspected plan and gate preview. A dry run neither
+executes gates nor proves merge eligibility. The quickstart separates local writes,
+command execution, independent review and the explicit merge boundary.
+
+[Start the walkthrough](MERGE_WEAVE_QUICKSTART.md) ·
+[Choose another SmarterGPT workflow](https://smartergpt.dev/docs/how-to-use/)
+
+## Add capabilities when needed
 
 LexRunner’s supported workflow has grown in layers. A normal user can stop at any layer.
 
@@ -33,31 +60,6 @@ general production supervisor: there is no approved public headless launch surfa
 host/reboot recovery remains release evidence, and Stage 5 fault-injection and authority expansion
 remain unproven. See [ADR-010](docs/adr/ADR-010-agent-work-orchestration-protocol.md) and the
 [headless proof boundary](docs/architecture/headless-supervisor.md).
-
-## Smallest useful trial
-
-First inspect without mutation:
-
-```bash
-lexrunner --version
-lexrunner workspace doctor --json
-lexrunner weave discover --json
-```
-
-After approving a local, reversible artifact, freeze and inspect a plan:
-
-```bash
-lexrunner weave plan --from-github --output plan.json --json
-lexrunner schema validate plan.json --json
-lexrunner weave merge-order plan.json --json
-lexrunner gate run plan.json --dry-run --json
-```
-
-These commands do not merge. `lexrunner weave apply --execute` is a separate mutation and should be
-run only after reviewing the frozen plan, authority, gates, and target branch.
-
-For a guided merge-weave walkthrough, use
-[MERGE_WEAVE_QUICKSTART.md](MERGE_WEAVE_QUICKSTART.md).
 
 ## Architecture boundary
 
@@ -89,8 +91,7 @@ source tree. Canonical terms live in [`docs/TERMS.md`](docs/TERMS.md).
 ## Install and authenticate
 
 Ecosystem 3.1 requires Node.js 24 or newer. The npm package is publicly readable without
-an npm login. Current source uses Apache-2.0; the first package under those terms is
-the 2.1.0 release candidate. Earlier published versions retain their applicable licenses.
+an npm login. Current source uses Apache-2.0; 2.1.0 is the first public npm release under those terms. Earlier published versions retain their applicable licenses.
 
 ```bash
 npm install --save-dev @smartergpt/lexrunner
@@ -134,9 +135,11 @@ supported assisted behavior, and deferred guarantees.
 
 ## Choose a surface
 
-- **Human CLI:** start with `workspace doctor`, `weave discover`, `weave plan`,
-  `weave merge-order`, and `gate run`.
-- **Agent/MCP:** use the matching canonical tools and bounded contracts in
+- **Human CLI:** follow the [first-use walkthrough](MERGE_WEAVE_QUICKSTART.md).
+- **Agent/MCP:** LexRunner ships `lexrunner-mcp`; use it for plans, gates and
+  integration. No MCP setup is needed for the CLI trial. Tool calls can write
+  artifacts or run commands even when merge mutations are disabled. See the
+  [compatibility and setup guide](docs/first-use-compatibility.md), plus
   [`docs/AX.md`](docs/AX.md) and [`README.mcp.md`](README.mcp.md).
 - **Assisted agent work:** run `attempt preflight` before packet construction. When it reports
   `broker_required`, use `attempt projection status|prepare` to bind the exact committed base into
