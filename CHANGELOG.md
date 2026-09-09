@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-09
+
+### Added
+
+- Optional explicit `gitInputs` in plan Schema 1.0.1: repository identity, acquisition
+  mode and frozen target/source refs and commits for single-repository integration.
+- Visible `frozen` and `legacy-unbound` status, with compatibility guidance for old
+  plans and older strict parsers. Existing unbound plans remain supported.
+
+### Fixed
+
+- Execute generated GitHub plans through the shared local CLI/MCP integration path
+  using frozen commits instead of PR display names. Reject moved inputs, mismatched
+  checkouts and failed acquisition without local-ref fallback.
+- Reject passing commands that mutate tracked state, HEAD or the integration branch;
+  preserve unexpected changes and separate gate/post-check receipt references.
+- Resolve generated gate names to executable commands. Remove guessed output paths
+  while retaining strict validation of explicitly declared artifacts.
+- Export the complete plan JSON Schema through the installed Zod version.
+- Update vulnerable runtime/test dependencies, including Hono, sharp, js-yaml and
+  Vitest; the prepared lockfile passes npm audit with zero reported vulnerabilities.
+
+### Documentation
+
+- Explain the first integration trial, explicit local effects and retained review
+  boundaries; align Git test guidance with the existing isolated CI lane.
+- Use canonical SmarterGPT repository links and organization publisher guidance.
+
 ## [2.1.0] - 2026-09-06
 
 ### Added
