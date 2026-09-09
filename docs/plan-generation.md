@@ -79,8 +79,9 @@ lex-pr plan --from-github --required-gates ""
 ```
 
 GitHub generation resolves `lint`, `test`, `unit`, `typecheck`, `build`, and `format`
-to their standard npm commands. Unknown gate names from policy or PR metadata fail
-generation; they never become successful placeholder commands. For a custom check,
+to their standard npm commands in single- and multi-repository plans. Unknown names
+selected for generated gates from policy or PR metadata fail generation; they never
+become successful placeholder commands. For a custom check,
 author a manual plan with an explicit gate `run` command. A generated command still
 must execute successfully in the target repository to produce passing evidence.
 

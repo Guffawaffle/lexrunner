@@ -9,6 +9,7 @@ import { stableSort } from "../util/canonicalJson.js";
 import { createFileAnalyzer, FileAnalysisResult } from "../planner/index.js";
 import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
+import { getStandardGateCommand } from "./standardGateCommands.js";
 
 const STANDARD_TEST_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -220,28 +221,6 @@ function createStandardGate(gateName: string, pr: PullRequestDetails): Gate {
     default:
       return baseGate;
   }
-}
-
-/**
- * Get default command for standard gate types
- */
-function getStandardGateCommand(gateName: string): string {
-  const standardCommands: Record<string, string> = {
-    lint: "npm run lint",
-    test: "npm test",
-    unit: "npm test",
-    typecheck: "npm run typecheck",
-    build: "npm run build",
-    format: "npm run format",
-  };
-
-  if (!Object.prototype.hasOwnProperty.call(standardCommands, gateName)) {
-    throw new Error(
-      `No executable command is defined for gate ${JSON.stringify(gateName)}. ` +
-        "Author an explicit gate run command in a manual plan, or select a supported standard gate."
-    );
-  }
-  return standardCommands[gateName];
 }
 
 /**
