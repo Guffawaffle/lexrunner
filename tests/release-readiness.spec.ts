@@ -29,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("2.2.0");
+    expect(packageJson.version).toBe("2.3.0");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("4.0.3");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -68,6 +68,7 @@ describe("LexRunner current release readiness", () => {
       readme,
       changelog,
       currentReleaseNotes,
+      frozenInputReleaseNotes,
       openSourceReleaseNotes,
       releaseNotes,
       priorReleaseNotes,
@@ -80,6 +81,7 @@ describe("LexRunner current release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
+      read("docs/releases/2.3.0.md"),
       read("docs/releases/2.2.0.md"),
       read("docs/releases/2.1.0.md"),
       read("docs/releases/2.0.0.md"),
@@ -92,13 +94,18 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **2.2.0**");
+    expect(readme).toContain("Current repository package version: **2.3.0**");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
-    expect(currentReleaseNotes).toContain("Plan Schema 1.0.1");
-    expect(currentReleaseNotes).toContain("existing unbound plan support");
-    expect(currentReleaseNotes).toContain("Multi-repository plans remain legacy-unbound");
-    expect(currentReleaseNotes).toContain("Preparation does not publish the package");
+    expect(currentReleaseNotes).toContain("`materialize_attempt_input`");
+    expect(currentReleaseNotes).toContain("`expectedPacketHash`");
+    expect(currentReleaseNotes).toContain("Older strict");
+    expect(currentReleaseNotes).toContain("Materialization does not write lifecycle state");
+    expect(currentReleaseNotes).toContain("clean registry consumer check");
+    expect(frozenInputReleaseNotes).toContain("Plan Schema 1.0.1");
+    expect(frozenInputReleaseNotes).toContain("existing unbound plan support");
+    expect(frozenInputReleaseNotes).toContain("Multi-repository plans remain legacy-unbound");
+    expect(frozenInputReleaseNotes).toContain("Preparation does not publish the package");
     expect(openSourceReleaseNotes).toContain("Apache-2.0");
     expect(openSourceReleaseNotes).toContain("This minor release");
     expect(openSourceReleaseNotes).toContain("issue #947");
