@@ -627,7 +627,7 @@ lex-pr plan --from-github --github-token $GITHUB_TOKEN
 
 # Custom policy configuration
 lex-pr plan --from-github \
-  --required-gates "lint,test,security-scan" \
+  --required-gates "lint,test,build" \
   --max-workers 4 \
   --target develop
 

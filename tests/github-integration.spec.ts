@@ -316,7 +316,7 @@ describe("GitHub Integration", () => {
 
       const plan = await generatePlanFromGitHub(mockClient as any, {
         policy: {
-          requiredGates: ["custom", "lint", "test", "unit"],
+          requiredGates: ["build", "lint", "test", "unit"],
           maxWorkers: 2,
         },
       });
@@ -335,15 +335,15 @@ describe("GitHub Integration", () => {
 
       // Check gates
       expect(plan.items[0].gates).toHaveLength(4);
-      expect(plan.items[0].gates.map((g) => g.name)).toEqual(["custom", "lint", "test", "unit"]);
+      expect(plan.items[0].gates.map((g) => g.name)).toEqual(["build", "lint", "test", "unit"]);
       expect(plan.items[0].gates.find((gate) => gate.name === "test")?.timeoutMs).toBe(300_000);
       expect(plan.items[0].gates.find((gate) => gate.name === "unit")?.timeoutMs).toBe(300_000);
       expect(plan.items[0].gates.find((gate) => gate.name === "lint")?.timeoutMs).toBeUndefined();
-      expect(plan.items[0].gates.find((gate) => gate.name === "custom")?.timeoutMs).toBeUndefined();
+      expect(plan.items[0].gates.find((gate) => gate.name === "build")?.run).toBe("npm run build");
 
       // Check policy
       expect(plan.policy).toBeDefined();
-      expect(plan.policy?.requiredGates).toEqual(["custom", "lint", "test", "unit"]);
+      expect(plan.policy?.requiredGates).toEqual(["build", "lint", "test", "unit"]);
       expect(plan.policy?.maxWorkers).toBe(2);
     });
 

@@ -235,7 +235,13 @@ function getStandardGateCommand(gateName: string): string {
     format: "npm run format",
   };
 
-  return standardCommands[gateName] || `echo "Running ${gateName} gate"`;
+  if (!Object.prototype.hasOwnProperty.call(standardCommands, gateName)) {
+    throw new Error(
+      `No executable command is defined for gate ${JSON.stringify(gateName)}. ` +
+        "Author an explicit gate run command in a manual plan, or select a supported standard gate."
+    );
+  }
+  return standardCommands[gateName];
 }
 
 /**

@@ -71,12 +71,18 @@ Specify which gates must pass for each PR:
 # Default gates
 lex-pr plan --from-github  # Uses: lint,typecheck,test
 
-# Custom gates
-lex-pr plan --from-github --required-gates "lint,test,security-scan"
+# Select standard gates
+lex-pr plan --from-github --required-gates "lint,test,build"
 
 # No gates (empty list)
 lex-pr plan --from-github --required-gates ""
 ```
+
+GitHub generation resolves `lint`, `test`, `unit`, `typecheck`, `build`, and `format`
+to their standard npm commands. Unknown gate names from policy or PR metadata fail
+generation; they never become successful placeholder commands. For a custom check,
+author a manual plan with an explicit gate `run` command. A generated command still
+must execute successfully in the target repository to produce passing evidence.
 
 ### Max Workers
 
@@ -285,7 +291,7 @@ lex-pr merge plan.json --execute
 
 ```bash
 lex-pr plan --from-github \
-  --required-gates "lint,test,build,deploy" \
+  --required-gates "lint,test,build" \
   --max-workers 3 \
   --target production \
   --optimize
@@ -298,7 +304,7 @@ lex-pr plan --from-github \
 lex-pr plan --from-github \
   --query "is:open label:priority-high" \
   --labels "feature" \
-  --required-gates "security-scan,performance-test"
+  --required-gates "lint,typecheck,test"
 ```
 
 ### Stack-based Workflow

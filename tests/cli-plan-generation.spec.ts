@@ -10,16 +10,33 @@ import { Plan } from "../src/schema.js";
 
 describe("CLI Plan Generation", () => {
   describe("Policy Configuration", () => {
-    it("should accept custom required gates", async () => {
-      const mockClient = {
-        validateRepository: vi.fn().mockResolvedValue({
-          owner: "testowner",
-          repo: "testrepo",
-          defaultBranch: "main",
-          url: "https://github.com/testowner/testrepo",
-        }),
-        listOpenPRs: vi.fn().mockResolvedValue([
-          {
+    it.each(["custom-gate", "security-scan", "toString", "__proto__"])(
+      "rejects an undefined required gate: %s",
+      async (gateName) => {
+        const mockClient = {
+          validateRepository: vi.fn().mockResolvedValue({
+            owner: "testowner",
+            repo: "testrepo",
+            defaultBranch: "main",
+            url: "https://github.com/testowner/testrepo",
+          }),
+          listOpenPRs: vi.fn().mockResolvedValue([
+            {
+              number: 123,
+              title: "Feature A",
+              body: "Base feature",
+              head: { ref: "feature-a", sha: "abc123" },
+              base: { ref: "main", sha: "def456" },
+              state: "open",
+              labels: [],
+              draft: false,
+              mergeable: true,
+              user: { login: "dev1" },
+              createdAt: "2023-01-01T00:00:00Z",
+              updatedAt: "2023-01-02T00:00:00Z",
+            },
+          ]),
+          getPRDetails: vi.fn().mockResolvedValue({
             number: 123,
             title: "Feature A",
             body: "Base feature",
@@ -32,37 +49,22 @@ describe("CLI Plan Generation", () => {
             user: { login: "dev1" },
             createdAt: "2023-01-01T00:00:00Z",
             updatedAt: "2023-01-02T00:00:00Z",
-          },
-        ]),
-        getPRDetails: vi.fn().mockResolvedValue({
-          number: 123,
-          title: "Feature A",
-          body: "Base feature",
-          head: { ref: "feature-a", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
-          state: "open",
-          labels: [],
-          draft: false,
-          mergeable: true,
-          user: { login: "dev1" },
-          createdAt: "2023-01-01T00:00:00Z",
-          updatedAt: "2023-01-02T00:00:00Z",
-          dependencies: [],
-          tags: [],
-          requiredGates: [],
-        }),
-      };
+            dependencies: [],
+            tags: [],
+            requiredGates: [],
+          }),
+        };
 
-      const plan = await generatePlanFromGitHub(mockClient as any, {
-        policy: {
-          requiredGates: ["custom-gate", "security-scan"],
-          maxWorkers: 1,
-        },
-      });
-
-      expect(plan.policy?.requiredGates).toEqual(["custom-gate", "security-scan"]);
-      expect(plan.items[0].gates.map((g) => g.name)).toEqual(["custom-gate", "security-scan"]);
-    });
+        await expect(
+          generatePlanFromGitHub(mockClient as any, {
+            policy: {
+              requiredGates: [gateName],
+              maxWorkers: 1,
+            },
+          })
+        ).rejects.toThrow("No executable command is defined for gate");
+      }
+    );
 
     it("should accept custom max workers", async () => {
       const mockClient = {
@@ -215,7 +217,7 @@ describe("CLI Plan Generation", () => {
   });
 
   describe("GitHub Plan Generation with Custom Options", () => {
-    it("should generate plan with custom gates from CLI options", async () => {
+    it("rejects an undefined PR metadata gate even with supported policy defaults", async () => {
       const mockClient = {
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
@@ -258,19 +260,13 @@ describe("CLI Plan Generation", () => {
         }),
       };
 
-      const plan = await generatePlanFromGitHub(mockClient as any, {
-        policy: {
-          requiredGates: ["security-scan", "vulnerability-check"],
-          maxWorkers: 1,
-        },
-      });
-
-      expect(plan.items).toHaveLength(1);
-      expect(plan.items[0].gates.map((g) => g.name)).toEqual([
-        "security-scan",
-        "vulnerability-check",
-      ]);
-      expect(plan.policy?.requiredGates).toEqual(["security-scan", "vulnerability-check"]);
+      const details = await mockClient.getPRDetails();
+      mockClient.getPRDetails.mockResolvedValue({ ...details, requiredGates: ["security-scan"] });
+      await expect(
+        generatePlanFromGitHub(mockClient as any, {
+          policy: { requiredGates: ["lint"], maxWorkers: 1 },
+        })
+      ).rejects.toThrow('No executable command is defined for gate "security-scan"');
     });
 
     it("should handle empty required gates", async () => {
