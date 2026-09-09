@@ -78,9 +78,9 @@ describe("Attempt receipt adapter handlers", () => {
     expect(attached.result.workerSession.packetHash).toBe(
       materialized.result.correspondence.packet_hash
     );
-    expect(
-      prepared.bundle.packet.work_item.acceptance_criteria.map((criterion) => criterion.id)
-    ).toEqual(input.workItem.criterionIds);
+    expect(prepared.bundle.packet.acceptance_criteria.map((criterion) => criterion.id)).toEqual(
+      input.workItem.criterionIds
+    );
     // Deterministic test output, not a spawned agent or a provider handshake.
     await writeFile(
       join(base.attempt.workspace.worktreePath, "project", "result.txt"),
