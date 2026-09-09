@@ -1,6 +1,6 @@
 # Choose the smallest installation
 
-The 2.2.0 candidate guide targets `@smartergpt/lexrunner@2.2.0`, Node.js 24+ and Git.
+This guide targets `@smartergpt/lexrunner@2.2.0`, Node.js 24+ and Git.
 GitHub discovery needs repository access; running gates also needs the tools and
 project dependencies named by the plan. npm installs package dependencies. You do
 not need every SmarterGPT component or an MCP connection for the CLI walkthrough.

@@ -7,7 +7,7 @@ is no fixed five-minute promise: repository access and dependency setup vary.
 ## 1. Install and discover
 
 Use an existing local Git checkout with a GitHub remote, Node.js 24+ and Git.
-This guide targets the 2.2.0 candidate; verify npm availability before installing.
+This guide uses the published 2.2.0 release.
 Run these commands from that repository's root:
 
 ```bash

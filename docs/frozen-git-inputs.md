@@ -1,7 +1,7 @@
 # Frozen Git inputs for local integration
 
-Contract for the 2.2.0 release candidate. Source/version metadata does not establish
-npm publication; this capability is absent from 2.1.0.
+Contract shipped in [LexRunner 2.2.0](releases/2.2.0.md). This capability is absent
+from 2.1.0.
 
 Single-repository GitHub generation emits Schema `1.0.1` with explicit `gitInputs`.
 Each `PR-123` remains a graph identity and display label. The source ref is

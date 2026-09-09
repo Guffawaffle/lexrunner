@@ -20,8 +20,7 @@ branch, pushing, opening a PR, or merging requires separate approval.
 For your first trial, install **LexRunner only** in a GitHub repository with open
 PRs. Node.js 24+ and Git are required. npm installs LexRunner's dependencies; you
 do not need to install Lex, AXF, LexSona, a policy-host service, or an MCP server
-separately for this CLI workflow. These examples target the 2.2.0 candidate; verify
-npm availability before installation.
+separately for this CLI workflow. These examples use the published 2.2.0 release.
 
 ```bash
 npm install --save-dev @smartergpt/lexrunner@2.2.0
@@ -123,7 +122,7 @@ Current repository package version: **2.2.0**. npm availability and dist-tags ar
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [2.2.0 frozen-input release candidate](docs/releases/2.2.0.md), the
+See the [2.2.0 frozen-input release](docs/releases/2.2.0.md), the
 [2.1.0 open-source release](docs/releases/2.1.0.md), the
 [2.0.2 generated timeout correction](docs/releases/2.0.2.md), the
 [2.0.1 MCP identity correction](docs/releases/2.0.1.md), the
