@@ -145,10 +145,14 @@ function generateExecutionPlan(spec: FeatureSpecV0): ExecutionPlanV1 {
     priority: spec.priority || "medium",
   };
 
+  // Preserve authored context in every generated work description, without treating
+  // prose requirements as execution authority or enforcement.
+  const context = formatAuthoredContext(sourceSpec);
+
   // Create Epic from Feature Spec
   const epic = {
     title: sourceSpec.title,
-    description: sourceSpec.description,
+    description: sourceSpec.description + context,
     acceptanceCriteria: sourceSpec.acceptanceCriteria,
   };
 
@@ -157,7 +161,7 @@ function generateExecutionPlan(spec: FeatureSpecV0): ExecutionPlanV1 {
     {
       id: "feature-impl",
       title: `Implement ${sourceSpec.title}`,
-      description: `Core implementation of feature: ${sourceSpec.description}`,
+      description: `Core implementation of feature: ${sourceSpec.description}${context}`,
       type: "feature" as const,
       acceptanceCriteria: sourceSpec.acceptanceCriteria,
       dependsOn: [],
@@ -165,7 +169,7 @@ function generateExecutionPlan(spec: FeatureSpecV0): ExecutionPlanV1 {
     {
       id: "tests",
       title: `Add tests for ${sourceSpec.title}`,
-      description: `Unit and integration tests for ${sourceSpec.description}`,
+      description: `Unit and integration tests for ${sourceSpec.description}${context}`,
       type: "testing" as const,
       acceptanceCriteria: ["Unit tests pass", "Integration tests pass", "Coverage > 80%"],
       dependsOn: ["feature-impl"],
@@ -173,7 +177,7 @@ function generateExecutionPlan(spec: FeatureSpecV0): ExecutionPlanV1 {
     {
       id: "docs",
       title: `Document ${sourceSpec.title}`,
-      description: `User-facing documentation for ${sourceSpec.description}`,
+      description: `User-facing documentation for ${sourceSpec.description}${context}`,
       type: "docs" as const,
       acceptanceCriteria: ["README updated", "Examples added", "API docs complete"],
       dependsOn: ["feature-impl"],
@@ -187,6 +191,17 @@ function generateExecutionPlan(spec: FeatureSpecV0): ExecutionPlanV1 {
     subIssues,
     createdAt: new Date().toISOString(),
   };
+}
+
+function formatAuthoredContext(spec: FeatureSpecV0): string {
+  let context = "";
+  if (spec.technicalContext) {
+    context += `\n\n### Supplied technical context\n\n${spec.technicalContext}`;
+  }
+  if (spec.constraints) {
+    context += `\n\n### Supplied constraints\n\n${spec.constraints}`;
+  }
+  return context;
 }
 
 /**

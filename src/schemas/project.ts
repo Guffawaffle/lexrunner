@@ -13,7 +13,14 @@ export const FeatureSpecV0Schema = z.object({
   schemaVersion: z.string().default("0.1.0"),
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  acceptanceCriteria: z.array(z.string()).min(1, "At least one acceptance criterion is required"),
+  acceptanceCriteria: z
+    .array(z.string())
+    .min(
+      1,
+      "Define success before planning: add at least one acceptance criterion to the input spec acceptanceCriteria array"
+    ),
+  technicalContext: z.string().optional(),
+  constraints: z.string().optional(),
   repo: z.string().regex(/^[^/]+\/[^/]+$/, "Repository must be in format 'owner/repo'"),
   labels: z.array(z.string()).default([]),
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
@@ -27,6 +34,8 @@ export type FeatureSpecV0 = {
   title: string;
   description: string;
   acceptanceCriteria: string[];
+  technicalContext?: string;
+  constraints?: string;
   repo: string;
   labels: string[];
   priority: "low" | "medium" | "high" | "critical";
