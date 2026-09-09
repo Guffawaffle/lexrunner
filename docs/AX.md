@@ -77,6 +77,7 @@ Matrix schema: **1.0.0**. Live inventory: **140 CLI registrations** and **34 MCP
 | `plan.create`                              | `lexrunner weave plan`                    | `PlanCreationService`                   |
 | `preflight_attempt_containment`            | `lexrunner attempt preflight`             | `AgentWorkContainmentCapabilityService` |
 | `prepare_native_wsl_projection`            | `lexrunner attempt projection prepare`    | `NativeWslProjectionLifecycleHandlers`  |
+| `materialize_attempt_input`                | `lexrunner attempt materialize`           | `materializeAttemptInput`               |
 | `prepare_attempt`                          | `lexrunner attempt prepare`               | `AgentWorkLifecycleService`             |
 | `profile.resolve`                          | `lexrunner config show`                   | `ConfigurationQueryService`             |
 | `start_attempt`                            | `lexrunner attempt start`                 | `AgentWorkLifecycleService`             |
@@ -84,7 +85,6 @@ Matrix schema: **1.0.0**. Live inventory: **140 CLI registrations** and **34 MCP
 | `submit_attempt_receipt`                   | `lexrunner attempt receipt submit`        | `AgentWorkAttemptReceiptService`        |
 | `inspect_native_wsl_projection_quarantine` | `lexrunner attempt projection quarantine` | `NativeWslProjectionLifecycleHandlers`  |
 | `verify_attempt`                           | `lexrunner attempt verification run`      | `AgentWorkAttemptVerificationService`   |
-| `materialize_attempt_input`                | `lexrunner attempt materialize`           | `materializeAttemptInput`               |
 
 ### Intentional parity exceptions
 
