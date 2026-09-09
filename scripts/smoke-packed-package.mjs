@@ -15,6 +15,7 @@ const packageVersion = JSON.parse(
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexrunner-packed-smoke-"));
 const consumerRoot = path.join(temporaryRoot, "consumer");
 const requiredAttemptTools = [
+  "materialize_attempt_input",
   "preflight_attempt_containment",
   "prepare_attempt",
   "start_attempt",

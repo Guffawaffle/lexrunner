@@ -1454,3 +1454,8 @@ export { createWorkflowGuide } from "./mcp/workflow/state-machine.js";
 export * from "./schemas/agent-work.js";
 export * from "./schemas/agent-work-projection.js";
 export * from "./runs/agent-work-projection-planner.js";
+
+export {
+  materializeAttemptInput,
+  SelectedWorkInputJsonSchema,
+} from "./runs/selected-work-materialization.js";

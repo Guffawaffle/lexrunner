@@ -75,6 +75,7 @@
       "attempt projection prepare",
       "attempt projection quarantine",
       "attempt projection status",
+      "attempt materialize",
       "attempt prepare",
       "attempt receipt",
       "attempt receipt status",
@@ -236,6 +237,7 @@
           "attempt projection prepare",
           "attempt projection quarantine",
           "attempt projection status",
+          "attempt materialize",
           "attempt prepare",
           "attempt receipt status",
           "attempt receipt submit",
@@ -276,6 +278,7 @@
       "plan.create",
       "preflight_attempt_containment",
       "prepare_native_wsl_projection",
+      "materialize_attempt_input",
       "prepare_attempt",
       "profile.resolve",
       "start_attempt",
@@ -326,6 +329,7 @@
           "heartbeat_attempt_worker",
           "preflight_attempt_containment",
           "prepare_native_wsl_projection",
+          "materialize_attempt_input",
           "prepare_attempt",
           "start_attempt",
           "submit_attempt_receipt",
@@ -440,6 +444,11 @@
         "tool": "prepare_native_wsl_projection",
         "cli": "attempt projection prepare",
         "owner": "NativeWslProjectionLifecycleHandlers"
+      },
+      {
+        "tool": "materialize_attempt_input",
+        "cli": "attempt materialize",
+        "owner": "materializeAttemptInput"
       },
       {
         "tool": "prepare_attempt",

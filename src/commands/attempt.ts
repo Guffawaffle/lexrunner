@@ -1,3 +1,7 @@
+import {
+  materializeAttemptInput,
+  MAX_SELECTED_WORK_BYTES,
+} from "../runs/selected-work-materialization.js";
 import { createReadStream, promises as fs } from "node:fs";
 
 import type { Command } from "commander";
@@ -89,6 +93,24 @@ export function registerAttemptCommand(
   const governedReviewRuntimeHandlers =
     dependencies.governedReviewRuntimeHandlers ?? createGovernedReviewRuntimeHandlers();
   const attempt = program.command("attempt").description("Manage fenced agent-work Attempts");
+
+  attempt
+    .command("materialize")
+    .description(
+      "Construct selected-work preparation input without creating resources or dispatching"
+    )
+    .requiredOption("--input <file|->", "JSON request file, or - for stdin")
+    .option("--json", "Output canonical JSON")
+    .action(async (options: { input: string; json?: boolean }) => {
+      requireJsonMode(options.json, dependencies.jsonModeActive());
+      const input = await readJsonInput(
+        options.input,
+        Math.min(dependencies.maxInputBytes ?? MAX_SELECTED_WORK_BYTES, MAX_SELECTED_WORK_BYTES)
+      );
+      const output = materializeAttemptInput(input);
+      (dependencies.writeJson ?? writeJsonOutput)(output);
+      setFailureExitCode(output);
+    });
 
   attempt
     .command("preflight")

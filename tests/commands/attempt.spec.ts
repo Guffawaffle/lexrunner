@@ -309,6 +309,7 @@ describe("attempt commands", () => {
   it("registers projection and Attempt lifecycle commands beneath one machine-facing surface", () => {
     const attempt = program.commands.find((command) => command.name() === "attempt");
     expect(attempt?.commands.map((command) => command.name())).toEqual([
+      "materialize",
       "preflight",
       "projection",
       "worker",
@@ -321,56 +322,56 @@ describe("attempt commands", () => {
       "delegation",
       "review",
     ]);
-    expect(attempt?.commands[0].options.map((option) => option.long)).toEqual([
+    expect(attempt?.commands[1].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
-    expect(attempt?.commands[1].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
       "prepare",
       "status",
       "cleanup",
       "quarantine",
     ]);
-    expect(attempt?.commands[2].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
       "attach",
       "heartbeat",
       "end",
       "status",
     ]);
-    expect(attempt?.commands[3].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[4].commands.map((command) => command.name())).toEqual([
       "submit",
       "status",
     ]);
-    expect(attempt?.commands[4].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[5].commands.map((command) => command.name())).toEqual([
       "run",
       "status",
     ]);
-    expect(attempt?.commands[4].commands[1].options.map((option) => option.long)).toContain(
+    expect(attempt?.commands[5].commands[1].options.map((option) => option.long)).toContain(
       "--diagnostics"
     );
-    expect(attempt?.commands[5].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[6].commands.map((command) => command.name())).toEqual([
       "apply",
       "status",
-    ]);
-    expect(attempt?.commands[6].options.map((option) => option.long)).toEqual([
-      "--input",
-      "--json",
     ]);
     expect(attempt?.commands[7].options.map((option) => option.long)).toEqual([
       "--input",
       "--json",
     ]);
     expect(attempt?.commands[8].options.map((option) => option.long)).toEqual([
+      "--input",
+      "--json",
+    ]);
+    expect(attempt?.commands[9].options.map((option) => option.long)).toEqual([
       "--database-path",
       "--run-id",
       "--attempt-id",
       "--json",
     ]);
-    expect(attempt?.commands[9].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[10].commands.map((command) => command.name())).toEqual([
       "synthetic",
       "status",
     ]);
-    expect(attempt?.commands[10].commands.map((command) => command.name())).toEqual([
+    expect(attempt?.commands[11].commands.map((command) => command.name())).toEqual([
       "status",
       "verify",
       "start",

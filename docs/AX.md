@@ -45,12 +45,12 @@ itself is tested against `inspectRegisteredCliSurface()` and the published MCP `
 
 <!-- BEGIN GENERATED AX SURFACE -->
 
-Matrix schema: **1.0.0**. Live inventory: **139 CLI registrations** and **33 MCP tools**.
+Matrix schema: **1.0.0**. Live inventory: **140 CLI registrations** and **34 MCP tools**.
 
 | Surface | Canonical | Compatibility | Deprecated | Internal only | Remove |
 | ------- | --------: | ------------: | ---------: | ------------: | -----: |
-| CLI     |       100 |             9 |         15 |            15 |      0 |
-| MCP     |        29 |             0 |          4 |             0 |      0 |
+| CLI     |       101 |             9 |         15 |            15 |      0 |
+| MCP     |        30 |             0 |          4 |             0 |      0 |
 
 ### Canonical CLI/MCP semantic pairs
 
@@ -84,6 +84,7 @@ Matrix schema: **1.0.0**. Live inventory: **139 CLI registrations** and **33 MCP
 | `submit_attempt_receipt`                   | `lexrunner attempt receipt submit`        | `AgentWorkAttemptReceiptService`        |
 | `inspect_native_wsl_projection_quarantine` | `lexrunner attempt projection quarantine` | `NativeWslProjectionLifecycleHandlers`  |
 | `verify_attempt`                           | `lexrunner attempt verification run`      | `AgentWorkAttemptVerificationService`   |
+| `materialize_attempt_input`                | `lexrunner attempt materialize`           | `materializeAttemptInput`               |
 
 ### Intentional parity exceptions
 
