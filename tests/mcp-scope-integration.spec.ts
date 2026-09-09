@@ -49,6 +49,7 @@ pin_commits: false
 
       // Mock GitHub client
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -60,8 +61,8 @@ pin_commits: false
             number: 101,
             title: "Feature PR",
             body: "Ready to merge",
-            head: { ref: "feature-101", sha: "abc101" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-101", sha: "bd9a944306b6a41cb61302f67ffac4f26ee38088" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: ["ready-merge"],
             draft: false,
@@ -74,8 +75,8 @@ pin_commits: false
             number: 102,
             title: "Another PR",
             body: "Also ready",
-            head: { ref: "feature-102", sha: "abc102" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-102", sha: "91ae0b1b64ca2b8cbaa6c9ba90ae17a861c3afe8" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: ["ready-merge"],
             draft: false,
@@ -91,8 +92,8 @@ pin_commits: false
               number: 101,
               title: "Feature PR",
               body: "Ready to merge",
-              head: { ref: "feature-101", sha: "abc101" },
-              base: { ref: "main", sha: "def456" },
+              head: { ref: "feature-101", sha: "bd9a944306b6a41cb61302f67ffac4f26ee38088" },
+              base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
               state: "open",
               labels: ["ready-merge"],
               draft: false,
@@ -109,8 +110,8 @@ pin_commits: false
               number: 102,
               title: "Another PR",
               body: "Also ready",
-              head: { ref: "feature-102", sha: "abc102" },
-              base: { ref: "main", sha: "def456" },
+              head: { ref: "feature-102", sha: "91ae0b1b64ca2b8cbaa6c9ba90ae17a861c3afe8" },
+              base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
               state: "open",
               labels: ["ready-merge"],
               draft: false,
@@ -144,7 +145,7 @@ pin_commits: false
       expect(plan.items[0].name).toBe("PR-101");
       expect(plan.items[1].name).toBe("PR-102");
       expect(plan.target).toBe("main");
-      expect(plan.schemaVersion).toBe("1.0.0");
+      expect(plan.schemaVersion).toBe("1.0.1");
     });
 
     it("should auto-detect GitHub mode with query from scope.yml", async () => {
@@ -211,6 +212,7 @@ pin_commits: false
 
       // Mock GitHub client with NO matching PRs
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -232,7 +234,7 @@ pin_commits: false
       // Verify empty plan
       expect(plan.items).toHaveLength(0);
       expect(plan.target).toBe("main");
-      expect(plan.schemaVersion).toBe("1.0.0");
+      expect(plan.schemaVersion).toBe("1.0.1");
     });
 
     it("should merge scope.yml filters with explicit parameters (explicit takes precedence)", async () => {
@@ -260,6 +262,7 @@ pin_commits: false
 
       // Mock GitHub client
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -271,8 +274,8 @@ pin_commits: false
             number: 201,
             title: "High priority PR",
             body: "Urgent fix",
-            head: { ref: "hotfix-201", sha: "abc201" },
-            base: { ref: "develop", sha: "def789" },
+            head: { ref: "hotfix-201", sha: "aed2378902405ce12c433d3225416dcc91be5519" },
+            base: { ref: "develop", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
             state: "open",
             labels: ["priority:high"],
             draft: false,
@@ -286,8 +289,8 @@ pin_commits: false
           number: 201,
           title: "High priority PR",
           body: "Urgent fix",
-          head: { ref: "hotfix-201", sha: "abc201" },
-          base: { ref: "develop", sha: "def789" },
+          head: { ref: "hotfix-201", sha: "aed2378902405ce12c433d3225416dcc91be5519" },
+          base: { ref: "develop", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
           state: "open",
           labels: ["priority:high"],
           draft: false,

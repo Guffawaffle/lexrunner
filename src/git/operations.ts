@@ -9,11 +9,13 @@ import { metrics, METRICS } from "../monitoring/metrics.js";
 import { profiler } from "../monitoring/profiler.js";
 import { ProgressReporter } from "../util/progress.js";
 import { emitActionReceipt, emitFailureReceipt } from "../receipts/emit.js";
+import { GitCommitId } from "./input-schema.js";
 
 export interface MergeOperation {
   item: PlanItem;
   targetBranch: string;
   strategy: "rebase-weave" | "merge-weave" | "squash-weave";
+  sourceCommit?: string;
 }
 
 export interface WeaveResult {
@@ -166,27 +168,35 @@ export class GitOperations {
       const premergeLog = await this.git.log(["-1"]);
       previousHead = premergeLog.latest?.hash || "HEAD";
 
-      // Check if branch exists
-      const branches = await this.git.branch(["-a"]);
-      const branchExists = branches.all.some(
-        (branch) =>
-          branch === branchName ||
-          branch === `origin/${branchName}` ||
-          branch === `remotes/origin/${branchName}`
-      );
+      let sourceRef = `origin/${branchName}`;
+      if (operation.sourceCommit !== undefined) {
+        sourceRef = GitCommitId.parse(operation.sourceCommit);
+        if ((await this.git.raw(["cat-file", "-t", sourceRef])).trim() !== "commit") {
+          throw new Error("Frozen merge source is not a commit object");
+        }
+      } else {
+        // Legacy unbound branch resolution.
+        const branches = await this.git.branch(["-a"]);
+        const branchExists = branches.all.some(
+          (branch) =>
+            branch === branchName ||
+            branch === `origin/${branchName}` ||
+            branch === `remotes/origin/${branchName}`
+        );
 
-      if (!branchExists) {
-        profiler.end(operationId);
-        metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: "branch_not_found" });
-        return {
-          success: false,
-          item,
-          message: `Branch ${branchName} not found`,
-        };
+        if (!branchExists) {
+          profiler.end(operationId);
+          metrics.incrementCounter(METRICS.MERGE_FAILURE_TOTAL, { reason: "branch_not_found" });
+          return {
+            success: false,
+            item,
+            message: `Branch ${branchName} not found`,
+          };
+        }
+
+        // Fetch latest changes
+        await this.git.fetch("origin", branchName);
       }
-
-      // Fetch latest changes
-      await this.git.fetch("origin", branchName);
 
       let gitMergeResult: any;
       let sha: string | undefined;
@@ -195,11 +205,11 @@ export class GitOperations {
       try {
         switch (strategy) {
           case "merge-weave":
-            gitMergeResult = await this.git.merge([`origin/${branchName}`, "--no-ff"]);
+            gitMergeResult = await this.git.merge([sourceRef, "--no-ff"]);
             break;
 
           case "squash-weave":
-            gitMergeResult = await this.git.merge([`origin/${branchName}`, "--squash"]);
+            gitMergeResult = await this.git.merge([sourceRef, "--squash"]);
             if (gitMergeResult && !gitMergeResult.failed) {
               // For squash merges, we need to commit manually
               await this.git.commit(`Squash merge: ${item.name}`);
@@ -209,8 +219,8 @@ export class GitOperations {
           case "rebase-weave":
             // For rebase weave, we actually merge with --ff-only after rebasing
             try {
-              await this.git.rebase([`origin/${branchName}`]);
-              gitMergeResult = await this.git.merge([`origin/${branchName}`, "--ff-only"]);
+              await this.git.rebase([sourceRef]);
+              gitMergeResult = await this.git.merge([sourceRef, "--ff-only"]);
             } catch (rebaseError) {
               // Get conflicted files for rebase
               const conflictedFiles = await this.getConflictedFiles();
@@ -368,6 +378,9 @@ export class GitOperations {
     levels: string[][],
     progressReporter?: ProgressReporter
   ): Promise<WeaveExecutionResult> {
+    if (plan.gitInputs) {
+      throw new Error("Frozen Git inputs require the shared merge application/resume service");
+    }
     const results: WeaveResult[] = [];
     let successful = 0;
     let failed = 0;

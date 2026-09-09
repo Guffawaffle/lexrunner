@@ -82,6 +82,14 @@ describe("Multi-Repo Plan Generator", () => {
   });
 
   describe("generateMultiRepoPlan", () => {
+    it.each(["custom", "toString", "__proto__"])("rejects undefined gate %s", async (name) => {
+      await expect(
+        generateMultiRepoPlan([{ owner: "Guffawaffle", repo: "lex" }], {
+          policy: { requiredGates: [name] },
+        })
+      ).rejects.toThrow("No executable command is defined for gate");
+    });
+
     it("discovers PRs from multiple repositories", async () => {
       const repos: RepoTarget[] = [
         { owner: "Guffawaffle", repo: "lex", priority: 1 },
@@ -157,22 +165,23 @@ describe("Multi-Repo Plan Generator", () => {
       const repos: RepoTarget[] = [{ owner: "Guffawaffle", repo: "lex", priority: 1 }];
 
       const plan = await generateMultiRepoPlan(repos, {
-        policy: { requiredGates: ["lint", "test", "unit", "custom"] },
+        policy: { requiredGates: ["lint", "test", "unit", "format"] },
       });
 
       const gates = new Map(plan.items[0].gates.map((gate) => [gate.name, gate]));
       expect(gates.get("test")).toMatchObject({
         run: "npm test",
-        artifacts: ["test-results.xml", "coverage/"],
+        artifacts: [],
         timeoutMs: 300_000,
       });
       expect(gates.get("unit")).toMatchObject({
         run: "npm test",
-        artifacts: ["test-results.xml", "coverage/"],
+        artifacts: [],
         timeoutMs: 300_000,
       });
       expect(gates.get("lint")?.timeoutMs).toBeUndefined();
-      expect(gates.get("custom")?.timeoutMs).toBeUndefined();
+      expect(gates.get("format")?.timeoutMs).toBeUndefined();
+      expect(gates.get("format")?.run).toBe("npm run format");
     });
 
     it("returns empty plan when no PRs found", async () => {

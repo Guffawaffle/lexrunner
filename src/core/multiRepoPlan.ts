@@ -12,6 +12,7 @@ import { GitHubClient, createGitHubClient, PullRequestDetails } from "../github/
 import { stableSort } from "../util/canonicalJson.js";
 import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
+import { getStandardGateCommand } from "./standardGateCommands.js";
 
 const STANDARD_TEST_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -284,7 +285,7 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
   for (const gateName of requiredGates) {
     gates.push({
       name: gateName,
-      run: getGateCommand(gateName),
+      run: getStandardGateCommand(gateName),
       env: {
         PR_NUMBER: pr.number.toString(),
         PR_BRANCH: pr.head.ref,
@@ -293,7 +294,7 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
         REPO_NAME: pr.repoName,
       },
       runtime: "local",
-      artifacts: getGateArtifacts(gateName),
+      artifacts: [],
       ...(isStandardTestGate(gateName) ? { timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS } : {}),
     });
   }
@@ -302,34 +303,6 @@ function generateGatesForMultiRepoPR(pr: PRWithRepo, options: MultiRepoPlanOptio
   gates.sort((a, b) => a.name.localeCompare(b.name));
 
   return gates;
-}
-
-/**
- * Get command for a gate type
- */
-function getGateCommand(gateName: string): string {
-  const commands: Record<string, string> = {
-    lint: "npm run lint",
-    test: "npm test",
-    unit: "npm test",
-    typecheck: "npm run typecheck",
-    build: "npm run build",
-  };
-  return commands[gateName] || `echo "Running ${gateName}"`;
-}
-
-/**
- * Get artifacts for a gate type
- */
-function getGateArtifacts(gateName: string): string[] {
-  const artifacts: Record<string, string[]> = {
-    lint: ["lint-results.txt"],
-    test: ["test-results.xml", "coverage/"],
-    unit: ["test-results.xml", "coverage/"],
-    typecheck: ["typecheck-results.txt"],
-    build: ["dist/"],
-  };
-  return artifacts[gateName] || [];
 }
 
 function isStandardTestGate(gateName: string): boolean {

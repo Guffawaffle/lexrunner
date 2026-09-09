@@ -21,6 +21,32 @@ afterEach(async () => {
 });
 
 describe("PlanArtifactService", () => {
+  it("retains frozen Git inputs in canonical bytes and binds their identity", async () => {
+    const root = await fixtureRoot();
+    const original = {
+      ...plan("bound"),
+      schemaVersion: "1.0.1",
+      gitInputs: {
+        schemaVersion: "1.0.0",
+        repository: "https://github.com/example/repo.git",
+        checkoutRemote: "origin",
+        acquisition: "local-only",
+        target: { ref: "refs/heads/main", commit: "a".repeat(40) },
+        sources: [{ item: "bound", ref: "refs/pull/123/head", commit: "b".repeat(40) }],
+      },
+    };
+    await writePlan(join(root, "plan.json"), original);
+    const service = new PlanArtifactService();
+    const first = service.resolve({ workingDir: root });
+    expect(first.plan.gitInputs).toEqual(original.gitInputs);
+    expect(JSON.parse(first.artifact.canonicalBytes).gitInputs).toEqual(original.gitInputs);
+    const changed = structuredClone(original);
+    changed.gitInputs.sources[0].commit = "c".repeat(40);
+    await writePlan(join(root, "plan.json"), changed);
+    const second = service.resolve({ workingDir: root });
+    expect(second.identity.digest).not.toBe(first.identity.digest);
+    expect(second.artifact.identity.digest).not.toBe(first.artifact.identity.digest);
+  });
   it("resolves explicit, repository-root, and profile plans in deterministic precedence order", async () => {
     const root = await fixtureRoot();
     const profile = join(root, "profile");

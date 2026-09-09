@@ -9,6 +9,7 @@ import { stableSort } from "../util/canonicalJson.js";
 import { createFileAnalyzer, FileAnalysisResult } from "../planner/index.js";
 import { createTierAssignment } from "../tiers/suggest.js";
 import type { TierOverride } from "../tiers/schema.js";
+import { getStandardGateCommand } from "./standardGateCommands.js";
 
 const STANDARD_TEST_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -18,6 +19,7 @@ export interface GitHubPlanOptions {
   excludePRs?: number[]; // Exclude specific PR numbers
   includeDrafts?: boolean; // Include draft PRs
   target?: string; // Target branch (defaults to repo default)
+  gitAcquisition?: "local-only" | "fetch";
   policy?: {
     requiredGates?: string[];
     maxWorkers?: number;
@@ -35,10 +37,20 @@ export async function generatePlanFromGitHub(
   // Validate repository access
   const repoInfo = await client.validateRepository();
   const target = options.target || repoInfo.defaultBranch;
+  const targetCommit = await client.getBranchHead(target);
+  const gitInputs: NonNullable<Plan["gitInputs"]> = {
+    schemaVersion: "1.0.0",
+    repository: `${repoInfo.url.replace(/\/$/, "").replace(/\.git$/, "")}.git`,
+    checkoutRemote: "origin",
+    acquisition: options.gitAcquisition ?? "fetch",
+    target: { ref: `refs/heads/${target}`, commit: targetCommit },
+    sources: [],
+  };
 
   // Discover PRs based on query/filters
   const prs = await client.listOpenPRs({
     state: "open",
+    base: target,
     labels: options.labels,
     // If no specific query, find PRs with stack labels or open PRs
     ...(options.query ? { query: options.query } : {}),
@@ -58,8 +70,9 @@ export async function generatePlanFromGitHub(
   if (finalPRs.length === 0) {
     // Return empty plan if no PRs found
     const emptyPlan: Plan = {
-      schemaVersion: "1.0.0",
+      schemaVersion: "1.0.1",
       target,
+      gitInputs,
       items: [],
     };
 
@@ -76,14 +89,28 @@ export async function generatePlanFromGitHub(
       };
     }
 
-    return emptyPlan;
+    return Plan.parse(emptyPlan);
   }
 
   // Get detailed information for each PR
   const prDetails = await Promise.all(finalPRs.map((pr) => client.getPRDetails(pr.number)));
+  if (prDetails.some((pr) => pr.base.ref !== target)) {
+    throw new Error(
+      "Selected PR targets a different branch; refresh discovery for the intended target"
+    );
+  }
 
   // Transform PRs to plan items
-  const planItems = prDetails.map((pr) => transformPRToPlanItem(pr, options));
+  const planItems = prDetails.map((pr) =>
+    transformPRToPlanItem(pr, options, `${repoInfo.owner}/${repoInfo.repo}`)
+  );
+  gitInputs.sources = prDetails
+    .map((pr) => ({
+      item: `PR-${pr.number}`,
+      ref: `refs/pull/${pr.number}/head`,
+      commit: pr.head.sha,
+    }))
+    .sort((a, b) => a.item.localeCompare(b.item));
 
   // Sort items by name for deterministic ordering
   planItems.sort((a, b) => a.name.localeCompare(b.name));
@@ -93,8 +120,9 @@ export async function generatePlanFromGitHub(
 
   // Build the plan
   const plan: Plan = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.0.1",
     target,
+    gitInputs,
     items: planItems,
   };
 
@@ -111,13 +139,17 @@ export async function generatePlanFromGitHub(
     };
   }
 
-  return plan;
+  return Plan.parse(plan);
 }
 
 /**
  * Transform GitHub PR to plan item
  */
-function transformPRToPlanItem(pr: PullRequestDetails, options: GitHubPlanOptions): PlanItem {
+function transformPRToPlanItem(
+  pr: PullRequestDetails,
+  options: GitHubPlanOptions,
+  repository: string
+): PlanItem {
   // Generate item name from PR - use PR number as identifier
   const name = `PR-${pr.number}`;
 
@@ -127,7 +159,13 @@ function transformPRToPlanItem(pr: PullRequestDetails, options: GitHubPlanOption
     .filter((dep: string) => {
       // Only include same-repo dependencies for now
       // Dependencies like "testowner/testrepo#123" or just "#123"
-      return dep.includes("#");
+      const match = /^(?:([^#]+))?#([1-9][0-9]*)$/.exec(dep);
+      if (!match || (match[1] && match[1].toLowerCase() !== repository.toLowerCase())) {
+        throw new Error(
+          `Dependency ${JSON.stringify(dep)} is outside this single-repository plan; declare a valid repository-bound dependency`
+        );
+      }
+      return true;
     })
     .map((dep: string) => {
       // Convert dependency references to plan item names
@@ -189,53 +227,11 @@ function createStandardGate(gateName: string, pr: PullRequestDetails): Gate {
     artifacts: [],
   };
 
-  // Add specific configurations for common gates
-  switch (gateName) {
-    case "lint":
-      return {
-        ...baseGate,
-        run: "npm run lint",
-        artifacts: ["lint-results.txt"],
-      };
-    case "test":
-    case "unit":
-      return {
-        ...baseGate,
-        run: "npm test",
-        artifacts: ["test-results.xml", "coverage/"],
-        timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS,
-      };
-    case "typecheck":
-      return {
-        ...baseGate,
-        run: "npm run typecheck",
-        artifacts: ["typecheck-results.txt"],
-      };
-    case "build":
-      return {
-        ...baseGate,
-        run: "npm run build",
-        artifacts: ["dist/", "build-log.txt"],
-      };
-    default:
-      return baseGate;
-  }
-}
-
-/**
- * Get default command for standard gate types
- */
-function getStandardGateCommand(gateName: string): string {
-  const standardCommands: Record<string, string> = {
-    lint: "npm run lint",
-    test: "npm test",
-    unit: "npm test",
-    typecheck: "npm run typecheck",
-    build: "npm run build",
-    format: "npm run format",
-  };
-
-  return standardCommands[gateName] || `echo "Running ${gateName} gate"`;
+  // A standard command does not imply project-specific output files.
+  // Execution receipts capture stdout/stderr; authored artifact requirements stay explicit.
+  return gateName === "test" || gateName === "unit"
+    ? { ...baseGate, timeoutMs: STANDARD_TEST_GATE_TIMEOUT_MS }
+    : baseGate;
 }
 
 /**

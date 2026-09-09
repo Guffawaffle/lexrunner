@@ -15,28 +15,48 @@ afterEach(async () => {
 });
 
 describe("published merge application parity", () => {
-  it("returns equivalent bounded dry-run JSON through CLI, MCP, and the merge alias", async () => {
-    const root = await fixtureRepository(planWithOneItem());
-    const planPath = join(root, "profile", "runner", "plan.json");
+  it.each([false, true])(
+    "returns equivalent CLI/MCP/alias preview for frozen=%s",
+    async (frozen) => {
+      const plan = planWithOneItem();
+      const root = await fixtureRepository(
+        frozen
+          ? {
+              ...plan,
+              schemaVersion: "1.0.1",
+              gitInputs: {
+                schemaVersion: "1.0.0",
+                repository: "https://github.com/example/repo.git",
+                checkoutRemote: "origin",
+                acquisition: "local-only",
+                target: { ref: "refs/heads/main", commit: "a".repeat(40) },
+                sources: [{ item: "feature", ref: "refs/pull/123/head", commit: "b".repeat(40) }],
+              },
+            }
+          : plan
+      );
+      const planPath = join(root, "profile", "runner", "plan.json");
 
-    const canonical = await execa(
-      "node",
-      [cliPath, "weave", "apply", "--plan", planPath, "--dry-run", "--no-constraints", "--json"],
-      { cwd: root }
-    );
-    const compatibility = await execa(
-      "node",
-      [cliPath, "merge", "--plan", planPath, "--no-constraints", "--json"],
-      { cwd: root }
-    );
-    const response = await invokeMcp(root, false, { dryRun: true });
-    const mcpResult = JSON.parse(response.result.content[0].text);
+      const canonical = await execa(
+        "node",
+        [cliPath, "weave", "apply", "--plan", planPath, "--dry-run", "--no-constraints", "--json"],
+        { cwd: root }
+      );
+      const compatibility = await execa(
+        "node",
+        [cliPath, "merge", "--plan", planPath, "--no-constraints", "--json"],
+        { cwd: root }
+      );
+      const response = await invokeMcp(root, false, { dryRun: true });
+      const mcpResult = JSON.parse(response.result.content[0].text);
+      expect(mcpResult.gitInputBinding).toBe(frozen ? "frozen" : "legacy-unbound");
 
-    expect(withoutPlanArtifact(mcpResult)).toEqual(JSON.parse(canonical.stdout));
-    expect(mcpResult.planArtifact.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(JSON.parse(compatibility.stdout)).toEqual(JSON.parse(canonical.stdout));
-    expect(compatibility.stderr).toContain('compatibility alias "merge"; use "weave apply"');
-  });
+      expect(withoutPlanArtifact(mcpResult)).toEqual(JSON.parse(canonical.stdout));
+      expect(mcpResult.planArtifact.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(JSON.parse(compatibility.stdout)).toEqual(JSON.parse(canonical.stdout));
+      expect(compatibility.stderr).toContain('compatibility alias "merge"; use "weave apply"');
+    }
+  );
 
   it("returns semantically equivalent authorized execution summaries through CLI and MCP", async () => {
     const cliRoot = await fixtureRepository(emptyPlan());

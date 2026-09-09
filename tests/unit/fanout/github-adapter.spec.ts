@@ -39,6 +39,7 @@ describe("HarvestGitHubAdapter", () => {
     listOpenPRs: vi.fn(),
     getPRDetails: vi.fn(),
     getPRDependencies: vi.fn(),
+    getBranchHead: vi.fn(),
     validateRepository: vi.fn(),
     listIssues: vi.fn(),
     getPRDiff: vi.fn(),

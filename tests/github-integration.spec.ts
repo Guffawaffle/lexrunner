@@ -13,6 +13,7 @@ const mockOctokit = {
   rest: {
     repos: {
       get: vi.fn(),
+      getBranch: vi.fn(),
     },
     pulls: {
       list: vi.fn(),
@@ -41,6 +42,17 @@ describe("GitHub Integration", () => {
   });
 
   describe("GitHubClient", () => {
+    it("captures the requested branch head independently from pull request metadata", async () => {
+      mockOctokit.rest.repos.getBranch.mockResolvedValue({
+        data: { commit: { sha: "a".repeat(40) } },
+      });
+      expect(await client.getBranchHead("release/next")).toBe("a".repeat(40));
+      expect(mockOctokit.rest.repos.getBranch).toHaveBeenCalledWith({
+        owner: "testowner",
+        repo: "testrepo",
+        branch: "release/next",
+      });
+    });
     it("should validate repository successfully", async () => {
       mockOctokit.rest.repos.get.mockResolvedValue({
         data: {
@@ -109,8 +121,8 @@ describe("GitHub Integration", () => {
           number: 123,
           title: "Feature A",
           body: "Implements feature A",
-          head: { ref: "feature-a", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [{ name: "enhancement", color: "0052cc" }],
           draft: false,
@@ -143,8 +155,8 @@ describe("GitHub Integration", () => {
         number: 123,
         title: "Feature B",
         body: "Implements feature B\n\nDepends-on: #456, #789\n\nMore description",
-        head: { ref: "feature-b", sha: "abc123" },
-        base: { ref: "main", sha: "def456" },
+        head: { ref: "feature-b", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+        base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
         state: "open",
         labels: [],
         draft: false,
@@ -164,8 +176,8 @@ describe("GitHub Integration", () => {
         number: 123,
         title: "Feature C",
         body: "Depends-on: #456\nDepends-on: otherowner/otherrepo#789, #101",
-        head: { ref: "feature-c", sha: "abc123" },
-        base: { ref: "main", sha: "def456" },
+        head: { ref: "feature-c", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+        base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
         state: "open",
         labels: [],
         draft: false,
@@ -189,8 +201,8 @@ describe("GitHub Integration", () => {
         number: 123,
         title: "Independent Feature",
         body: "This feature has no dependencies",
-        head: { ref: "independent", sha: "abc123" },
-        base: { ref: "main", sha: "def456" },
+        head: { ref: "independent", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+        base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
         state: "open",
         labels: [],
         draft: false,
@@ -210,8 +222,8 @@ describe("GitHub Integration", () => {
         number: 123,
         title: "Feature with Gates",
         body: "Feature description\n\nDepends-on: #456\nRequired-gates: lint, test, custom",
-        head: { ref: "feature", sha: "abc123" },
-        base: { ref: "main", sha: "def456" },
+        head: { ref: "feature", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+        base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
         state: "open",
         labels: [
           { name: "stack:feature", color: "0052cc" },
@@ -238,6 +250,7 @@ describe("GitHub Integration", () => {
     it("should generate plan from GitHub PRs", async () => {
       // Mock repository validation
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -249,8 +262,8 @@ describe("GitHub Integration", () => {
             number: 123,
             title: "Feature A",
             body: "Base feature",
-            head: { ref: "feature-a", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -263,8 +276,8 @@ describe("GitHub Integration", () => {
             number: 456,
             title: "Feature B",
             body: "Depends on A\n\nDepends-on: #123",
-            head: { ref: "feature-b", sha: "def789" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-b", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -283,8 +296,8 @@ describe("GitHub Integration", () => {
           number: 123,
           title: "Feature A",
           body: "Base feature",
-          head: { ref: "feature-a", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -300,8 +313,8 @@ describe("GitHub Integration", () => {
           number: 456,
           title: "Feature B",
           body: "Depends on A\n\nDepends-on: #123",
-          head: { ref: "feature-b", sha: "def789" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-b", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -316,12 +329,12 @@ describe("GitHub Integration", () => {
 
       const plan = await generatePlanFromGitHub(mockClient as any, {
         policy: {
-          requiredGates: ["custom", "lint", "test", "unit"],
+          requiredGates: ["build", "lint", "test", "unit"],
           maxWorkers: 2,
         },
       });
 
-      expect(plan.schemaVersion).toBe("1.0.0");
+      expect(plan.schemaVersion).toBe("1.0.1");
       expect(plan.target).toBe("main");
       expect(plan.items).toHaveLength(2);
 
@@ -335,20 +348,21 @@ describe("GitHub Integration", () => {
 
       // Check gates
       expect(plan.items[0].gates).toHaveLength(4);
-      expect(plan.items[0].gates.map((g) => g.name)).toEqual(["custom", "lint", "test", "unit"]);
+      expect(plan.items[0].gates.map((g) => g.name)).toEqual(["build", "lint", "test", "unit"]);
       expect(plan.items[0].gates.find((gate) => gate.name === "test")?.timeoutMs).toBe(300_000);
       expect(plan.items[0].gates.find((gate) => gate.name === "unit")?.timeoutMs).toBe(300_000);
       expect(plan.items[0].gates.find((gate) => gate.name === "lint")?.timeoutMs).toBeUndefined();
-      expect(plan.items[0].gates.find((gate) => gate.name === "custom")?.timeoutMs).toBeUndefined();
+      expect(plan.items[0].gates.find((gate) => gate.name === "build")?.run).toBe("npm run build");
 
       // Check policy
       expect(plan.policy).toBeDefined();
-      expect(plan.policy?.requiredGates).toEqual(["custom", "lint", "test", "unit"]);
+      expect(plan.policy?.requiredGates).toEqual(["build", "lint", "test", "unit"]);
       expect(plan.policy?.maxWorkers).toBe(2);
     });
 
     it("should generate empty plan when no PRs found", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -360,13 +374,14 @@ describe("GitHub Integration", () => {
 
       const plan = await generatePlanFromGitHub(mockClient as any);
 
-      expect(plan.schemaVersion).toBe("1.0.0");
+      expect(plan.schemaVersion).toBe("1.0.1");
       expect(plan.target).toBe("main");
       expect(plan.items).toHaveLength(0);
     });
 
     it("should filter out draft PRs when includeDrafts is false", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -378,8 +393,8 @@ describe("GitHub Integration", () => {
             number: 123,
             title: "Draft PR",
             body: "Work in progress",
-            head: { ref: "draft", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "draft", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: true,
@@ -400,6 +415,7 @@ describe("GitHub Integration", () => {
 
     it("should exclude specific PRs when excludePRs is provided", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -411,8 +427,8 @@ describe("GitHub Integration", () => {
             number: 123,
             title: "Feature A",
             body: "Base feature",
-            head: { ref: "feature-a", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -425,8 +441,8 @@ describe("GitHub Integration", () => {
             number: 154,
             title: "Integration PR",
             body: "Integration branch",
-            head: { ref: "integration", sha: "int123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "integration", sha: "454c95397721185913d9e0e95b8801c0b18246ca" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -439,8 +455,8 @@ describe("GitHub Integration", () => {
             number: 456,
             title: "Feature B",
             body: "Another feature",
-            head: { ref: "feature-b", sha: "def789" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-b", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -459,8 +475,8 @@ describe("GitHub Integration", () => {
           number: 123,
           title: "Feature A",
           body: "Base feature",
-          head: { ref: "feature-a", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -476,8 +492,8 @@ describe("GitHub Integration", () => {
           number: 456,
           title: "Feature B",
           body: "Another feature",
-          head: { ref: "feature-b", sha: "def789" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-b", sha: "31a28f6a184782b392d17310fadfa6880605184b" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -507,6 +523,7 @@ describe("GitHub Integration", () => {
 
     it("should exclude multiple PRs when excludePRs contains multiple numbers", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -518,8 +535,8 @@ describe("GitHub Integration", () => {
             number: 100,
             title: "PR 100",
             body: "Feature",
-            head: { ref: "pr-100", sha: "sha100" },
-            base: { ref: "main", sha: "mainsha" },
+            head: { ref: "pr-100", sha: "b31f26b163436457f3b111f774f7592db070fa69" },
+            base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
             state: "open",
             labels: [],
             draft: false,
@@ -532,8 +549,8 @@ describe("GitHub Integration", () => {
             number: 101,
             title: "PR 101",
             body: "Feature",
-            head: { ref: "pr-101", sha: "sha101" },
-            base: { ref: "main", sha: "mainsha" },
+            head: { ref: "pr-101", sha: "9fcaa24e9cacf75ff256b0b8fd9e4b222445ef49" },
+            base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
             state: "open",
             labels: [],
             draft: false,
@@ -546,8 +563,8 @@ describe("GitHub Integration", () => {
             number: 102,
             title: "PR 102",
             body: "Feature",
-            head: { ref: "pr-102", sha: "sha102" },
-            base: { ref: "main", sha: "mainsha" },
+            head: { ref: "pr-102", sha: "8eb923f84de850feb8e88c35a8c10cde44b9b77f" },
+            base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
             state: "open",
             labels: [],
             draft: false,
@@ -560,8 +577,8 @@ describe("GitHub Integration", () => {
             number: 103,
             title: "PR 103",
             body: "Feature",
-            head: { ref: "pr-103", sha: "sha103" },
-            base: { ref: "main", sha: "mainsha" },
+            head: { ref: "pr-103", sha: "35ee79d6d868b7a7f29a417ff1c7133a8ef034e8" },
+            base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
             state: "open",
             labels: [],
             draft: false,
@@ -580,8 +597,8 @@ describe("GitHub Integration", () => {
           number: 100,
           title: "PR 100",
           body: "Feature",
-          head: { ref: "pr-100", sha: "sha100" },
-          base: { ref: "main", sha: "mainsha" },
+          head: { ref: "pr-100", sha: "b31f26b163436457f3b111f774f7592db070fa69" },
+          base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
           state: "open",
           labels: [],
           draft: false,
@@ -597,8 +614,8 @@ describe("GitHub Integration", () => {
           number: 102,
           title: "PR 102",
           body: "Feature",
-          head: { ref: "pr-102", sha: "sha102" },
-          base: { ref: "main", sha: "mainsha" },
+          head: { ref: "pr-102", sha: "8eb923f84de850feb8e88c35a8c10cde44b9b77f" },
+          base: { ref: "main", sha: "81af1944abac522a9319d9fc5b6c19b4069d73e2" },
           state: "open",
           labels: [],
           draft: false,
@@ -624,6 +641,7 @@ describe("GitHub Integration", () => {
 
     it("should handle excludePRs with empty array", async () => {
       const mockClient = {
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn().mockResolvedValue({
           owner: "testowner",
           repo: "testrepo",
@@ -635,8 +653,8 @@ describe("GitHub Integration", () => {
             number: 123,
             title: "Feature A",
             body: "Base feature",
-            head: { ref: "feature-a", sha: "abc123" },
-            base: { ref: "main", sha: "def456" },
+            head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+            base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
             state: "open",
             labels: [],
             draft: false,
@@ -650,8 +668,8 @@ describe("GitHub Integration", () => {
           number: 123,
           title: "Feature A",
           body: "Base feature",
-          head: { ref: "feature-a", sha: "abc123" },
-          base: { ref: "main", sha: "def456" },
+          head: { ref: "feature-a", sha: "6367c48dd193d56ea7b0baad25b19455e529f5ee" },
+          base: { ref: "main", sha: "0b3d8b29493059afd7f9912106279c4643ac4939" },
           state: "open",
           labels: [],
           draft: false,
@@ -722,6 +740,7 @@ describe("GitHub Integration", () => {
         listOpenPRs: vi.fn(),
         getPRDetails: vi.fn(),
         getPRDependencies: vi.fn(),
+        getBranchHead: vi.fn().mockResolvedValue("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         validateRepository: vi.fn(),
         getOctokit: vi.fn(() => localMockOctokit),
         getOwner: vi.fn(() => "testowner"),
@@ -733,8 +752,8 @@ describe("GitHub Integration", () => {
         number: 201,
         title: "Feature A",
         body: "Implements feature A",
-        head: { ref: "feature-a", sha: "sha201" },
-        base: { ref: "main", sha: "main-sha" },
+        head: { ref: "feature-a", sha: "cad1e19f716f57b6ef6b20767c1a39ad9a64e1c6" },
+        base: { ref: "main", sha: "b4f3eb37b5e9c0b0f023e424d0bf275a7b175d69" },
         state: "open",
         labels: [],
         draft: false,
@@ -751,8 +770,8 @@ describe("GitHub Integration", () => {
         number: 202,
         title: "Feature B",
         body: "Implements feature B",
-        head: { ref: "feature-b", sha: "sha202" },
-        base: { ref: "main", sha: "main-sha" },
+        head: { ref: "feature-b", sha: "7d9d75e1e8825c2a3e6b01599f516c7decab8873" },
+        base: { ref: "main", sha: "b4f3eb37b5e9c0b0f023e424d0bf275a7b175d69" },
         state: "open",
         labels: [],
         draft: false,

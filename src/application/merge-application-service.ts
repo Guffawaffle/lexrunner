@@ -1,4 +1,6 @@
 import { createGitOperations } from "../git/operations.js";
+import { join } from "node:path";
+import { FrozenGitInputError } from "../git/frozen-inputs.js";
 import { computeMergeOrder } from "../mergeOrder.js";
 import type { Plan } from "../schema.js";
 import {
@@ -34,6 +36,7 @@ export interface BoundedMergeApplicationResult {
   ok: boolean;
   status: "preview" | "completed" | "paused" | "failed";
   totalItems: number;
+  gitInputBinding: "frozen" | "legacy-unbound";
   levels?: string[][];
   maxParallelism?: number;
   runId?: string;
@@ -81,6 +84,7 @@ export class MergeApplicationService {
           ok: true,
           status: "preview",
           totalItems: input.plan.items.length,
+          gitInputBinding: input.plan.gitInputs ? "frozen" : "legacy-unbound",
           levels,
           maxParallelism:
             levels.length === 0 ? 0 : Math.max(...levels.map((level) => level.length)),
@@ -103,10 +107,12 @@ export class MergeApplicationService {
     let runId: string;
     try {
       runId = await this.runtime.prepare(input.plan, input.workingDir);
-    } catch {
+    } catch (error) {
       throw new MergeApplicationServiceError(
         "MERGE_STALE_INPUT",
-        "Merge input could not be bound to current source and target heads"
+        error instanceof FrozenGitInputError
+          ? error.message
+          : "Merge input could not be bound to current source and target heads"
       );
     }
     return this.executePrepared({ plan: input.plan, workingDir: input.workingDir, runId });
@@ -141,6 +147,7 @@ export class MergeApplicationService {
       ok: completed,
       status: execution.result.ok ? execution.result.outcome : "failed",
       totalItems: input.plan.items.length,
+      gitInputBinding: input.plan.gitInputs ? "frozen" : "legacy-unbound",
       runId: bound(input.runId),
       operations: execution.operations.map((operation) => ({
         id: bound(operation.id),
@@ -165,16 +172,23 @@ class LocalMergeApplicationRuntime implements MergeApplicationRuntime {
 
   async prepare(plan: Plan, workingDir: string): Promise<string> {
     const checkpoint = await createLocalResumeCheckpoint({ plan, workingDir });
-    await saveCheckpoint(checkpoint, { skipCleanup: true });
+    await saveCheckpoint(checkpoint, {
+      checkpointDir: join(workingDir, ".lexrunner", "checkpoints"),
+      skipCleanup: true,
+    });
     return checkpoint.runId;
   }
 
   async resume(runId: string, workingDir: string): Promise<MergeApplicationExecution> {
     const result = await resumePersistedWeave({
       runId,
+      checkpointDir: join(workingDir, ".lexrunner", "checkpoints"),
       driver: new LocalWeaveResumeDriver(workingDir),
     });
-    const checkpoint = await loadCheckpoint(runId, { validatePlanHash: false });
+    const checkpoint = await loadCheckpoint(runId, {
+      checkpointDir: join(workingDir, ".lexrunner", "checkpoints"),
+      validatePlanHash: false,
+    });
     return { result, operations: checkpoint.metadata?.resume?.operations ?? [] };
   }
 }

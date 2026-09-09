@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TierAssignment } from "./tiers/schema.js";
+import { FrozenGitInputs } from "./git/input-schema.js";
 import { AXErrorException, planValidationError, configInvalidError } from "./errors/index.js";
 
 /**
@@ -238,10 +239,26 @@ export const Plan = z
     target: z.string().default("main"),
     policy: Policy.optional(),
     items: z.array(PlanItem).default([]),
+    gitInputs: FrozenGitInputs.optional(),
   })
   .strict()
   .superRefine((plan, context) => {
     const itemNames = new Set<string>();
+    if (plan.gitInputs) {
+      const sources = plan.gitInputs.sources.map((source) => source.item);
+      if (
+        plan.gitInputs.target.ref !== `refs/heads/${plan.target}` ||
+        new Set(sources).size !== sources.length ||
+        sources.length !== plan.items.length ||
+        plan.items.some((item) => !sources.includes(item.name))
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["gitInputs"],
+          message: "Git inputs must bind the target and every plan item exactly once",
+        });
+      }
+    }
     let duplicateItemNameFound = false;
     const duplicateGateNameItemIndexes: number[] = [];
     for (const [itemIndex, item] of plan.items.entries()) {

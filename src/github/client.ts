@@ -36,6 +36,7 @@ export interface GitHubClient {
   getPRDetails(number: number): Promise<PullRequestDetails>;
   getPRDependencies(pr: PullRequest): Promise<string[]>;
   validateRepository(): Promise<RepositoryInfo>;
+  getBranchHead(branch: string): Promise<string>;
   // Issue operations
   listIssues(options?: IssueQueryOptions): Promise<GitHubIssue[]>;
   // File analysis support
@@ -137,6 +138,15 @@ export class GitHubClientImpl implements GitHubClient {
     }
 
     return undefined;
+  }
+
+  async getBranchHead(branch: string): Promise<string> {
+    const response = await this.octokit.rest.repos.getBranch({
+      owner: this.owner,
+      repo: this.repo,
+      branch,
+    });
+    return response.data.commit.sha;
   }
 
   async validateRepository(): Promise<RepositoryInfo> {
