@@ -20,10 +20,11 @@ branch, pushing, opening a PR, or merging requires separate approval.
 For your first trial, install **LexRunner only** in a GitHub repository with open
 PRs. Node.js 24+ and Git are required. npm installs LexRunner's dependencies; you
 do not need to install Lex, AXF, LexSona, a policy-host service, or an MCP server
-separately for this CLI workflow.
+separately for this CLI workflow. These examples target the 2.2.0 candidate; verify
+npm availability before installation.
 
 ```bash
-npm install --save-dev @smartergpt/lexrunner@2.1.0
+npm install --save-dev @smartergpt/lexrunner@2.2.0
 npx lexrunner --version
 npx lexrunner weave discover --json
 ```
@@ -37,9 +38,9 @@ authentication and the complete first-use journey:
 
 The first useful result is an inspected plan and gate preview. A dry run neither
 executes gates nor proves merge eligibility. The quickstart separates local writes,
-command execution, independent review and the explicit merge boundary. Generated
-GitHub plans currently need separate preparation for the local merge runtime; the
-walkthrough explains the item-name/ref mismatch before any integration attempt.
+command execution, independent review and the explicit merge boundary. Single-repository
+GitHub plans bind explicit refs and commits for local integration. The walkthrough
+explains clean-checkout preparation, exact-input checks and separately authorized execution.
 
 [Start the walkthrough](MERGE_WEAVE_QUICKSTART.md) ·
 [Choose another SmarterGPT workflow](https://smartergpt.dev/docs/how-to-use/)
@@ -118,11 +119,12 @@ The checked-in package version is the single source for `lexrunner --version` an
 
 <!-- BEGIN GENERATED PACKAGE VERSION -->
 
-Current repository package version: **2.1.0**. npm availability and dist-tags are separate
+Current repository package version: **2.2.0**. npm availability and dist-tags are separate
 release evidence; inspect the registry rather than inferring publication from source metadata.
 <!-- END GENERATED PACKAGE VERSION -->
 
-See the [2.1.0 open-source release](docs/releases/2.1.0.md), the
+See the [2.2.0 frozen-input release candidate](docs/releases/2.2.0.md), the
+[2.1.0 open-source release](docs/releases/2.1.0.md), the
 [2.0.2 generated timeout correction](docs/releases/2.0.2.md), the
 [2.0.1 MCP identity correction](docs/releases/2.0.1.md), the
 [2.0.0 plan-bound evidence release](docs/releases/2.0.0.md), the

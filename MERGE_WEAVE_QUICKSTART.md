@@ -7,10 +7,11 @@ is no fixed five-minute promise: repository access and dependency setup vary.
 ## 1. Install and discover
 
 Use an existing local Git checkout with a GitHub remote, Node.js 24+ and Git.
+This guide targets the 2.2.0 candidate; verify npm availability before installing.
 Run these commands from that repository's root:
 
 ```bash
-npm install --save-dev @smartergpt/lexrunner@2.1.0
+npm install --save-dev @smartergpt/lexrunner@2.2.0
 npx lexrunner --version
 npx lexrunner weave discover --json
 ```
@@ -88,35 +89,38 @@ status. These local results describe the checkout tested; they do not prove that
 every proposed merged candidate passed. Repository CI and candidate review remain
 required. See [gate and review policy](docs/review-gate.md).
 
-## 5. Integration requires a separately prepared candidate
+## 5. Integrate the frozen inputs locally
 
-**In the pinned published 2.1.0 release, the generated GitHub plan is not directly
-executable by the local merge application path.** GitHub planning creates item names such as `PR-123`; that
-runtime resolves item names as Git refs. The recorded `PR_SHA` in a gate's
-environment does not provide that binding. A clean checkout is also required;
-installation changes, an untracked plan or other work can block preparation.
+The 2.2.0 single-repository generator records explicit repository, target and source
+refs/commits in `gitInputs`. Local integration uses those commits rather than resolving
+`PR-123` as a branch name. Older 2.1.0 executors do not support this contract; upgrade
+instead of stripping bindings from a new plan. See [frozen inputs](docs/frozen-git-inputs.md).
 
-Do not run `weave apply --execute` on the generated plan as the next quickstart
-step, or rename items casually to make the command proceed. The inspected plan
-can inform your repository's existing reviewed integration process. LexRunner's
-local execution path needs a separately prepared and verified input with actual
-source refs, exact heads, target and clean-checkout handling. See the
-[independent review contract](docs/review-gate.md) and the
-[local runtime implementation](src/weave/local-resume-driver.ts) for that boundary.
+Before execution, select the intended clean checkout and settle installation changes
+under repository policy. Keep the reviewed plan and other untracked outputs outside
+the checkout or in paths already covered by its ignore policy. Verify repository
+identity, current PR heads/base, protections, required checks and independent review.
+Changed inputs require a new plan and renewed evidence; do not rewrite frozen SHAs
+merely to make execution succeed. Authorization must cover fetching, checkout changes,
+gate commands and local merges.
 
-The development source now implements [explicit frozen Git inputs](docs/frozen-git-inputs.md)
-for single-repository generation and the shared local application service. That change
-is not included in the pinned installation above. Use its source-version contract and
-reviewed evidence when evaluating it; do not strip bindings to run a new plan on 2.1.0.
+From that clean checkout, with the reviewed plan's absolute path:
 
-Before any integration, verify current PR heads and base, repository protections,
-required checks and independent review for each exact candidate. Changed inputs
-require renewed checks and review. Authorization must cover the actual local and
-remote effects. A green preview or local gate result does not satisfy those conditions.
+```bash
+npx lexrunner weave apply --plan "<absolute-path-to-reviewed-plan.json>" --execute --json
+```
 
-The CLI's `--execute` flag opts into the merge application service; without it,
-`weave apply` runs gates without applying merges. This distinction describes the
-command, not a supported end-to-end continuation from this generated plan.
+Execution fetches the declared refs by default, verifies their exact commits, checks
+out frozen sources for gates and builds a local integration branch with receipts.
+Moved or missing inputs fail explicitly. A passing command that changes tracked files,
+staging, HEAD or the integration branch fails the operation boundary; unexpected
+changes are preserved for inspection. This is bounded local evidence, not isolation
+from concurrent hostile writers or remote merge eligibility. Remote PR integration
+still follows its own exact-candidate review, checks and authorization.
+
+The `--execute` flag selects the shared merge application service. Without it,
+`weave apply` runs gates without applying merges. Multi-repository generation remains
+legacy-unbound and is outside this frozen-input walkthrough.
 
 ## Next choices
 

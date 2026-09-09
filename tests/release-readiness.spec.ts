@@ -29,7 +29,7 @@ describe("LexRunner current release readiness", () => {
       scripts: Record<string, string>;
     }>("package.json");
 
-    expect(packageJson.version).toBe("2.1.0");
+    expect(packageJson.version).toBe("2.2.0");
     expect(packageJson.engines.node).toBe(">=24");
     expect(packageJson.dependencies["@smartergpt/lex"]).toBe("4.0.3");
     expect(packageJson.bin["lexrunner"]).toBe("dist/cli.js");
@@ -68,6 +68,7 @@ describe("LexRunner current release readiness", () => {
       readme,
       changelog,
       currentReleaseNotes,
+      openSourceReleaseNotes,
       releaseNotes,
       priorReleaseNotes,
       compatibilityDecision,
@@ -79,6 +80,7 @@ describe("LexRunner current release readiness", () => {
     ] = await Promise.all([
       read("README.md"),
       read("CHANGELOG.md"),
+      read("docs/releases/2.2.0.md"),
       read("docs/releases/2.1.0.md"),
       read("docs/releases/2.0.0.md"),
       read("docs/releases/1.2.1.md"),
@@ -90,14 +92,18 @@ describe("LexRunner current release readiness", () => {
       read("scripts/check-release-drift.mjs"),
     ]);
 
-    expect(readme).toContain("Current repository package version: **2.1.0**");
+    expect(readme).toContain("Current repository package version: **2.2.0**");
     expect(readme).toContain("`lex-pr` executable remains an additive");
     expect(changelog).toContain("## [1.4.1] - 2026-08-04");
-    expect(currentReleaseNotes).toContain("Apache-2.0");
-    expect(currentReleaseNotes).toContain("This minor release");
-    expect(currentReleaseNotes).toContain("issue #947");
-    expect(currentReleaseNotes).toContain("observed artifacts cannot grant merge eligibility");
-    expect(currentReleaseNotes).toContain("Earlier immutable npm versions");
+    expect(currentReleaseNotes).toContain("Plan Schema 1.0.1");
+    expect(currentReleaseNotes).toContain("existing unbound plan support");
+    expect(currentReleaseNotes).toContain("Multi-repository plans remain legacy-unbound");
+    expect(currentReleaseNotes).toContain("Preparation does not publish the package");
+    expect(openSourceReleaseNotes).toContain("Apache-2.0");
+    expect(openSourceReleaseNotes).toContain("This minor release");
+    expect(openSourceReleaseNotes).toContain("issue #947");
+    expect(openSourceReleaseNotes).toContain("observed artifacts cannot grant merge eligibility");
+    expect(openSourceReleaseNotes).toContain("Earlier immutable npm versions");
     expect(releaseNotes).toContain("release-owner-signed, trusted-workflow npm publication");
     expect(releaseNotes).toContain("`lexrunner`, `lex-pr`, and `lexrunner-mcp`");
     expect(releaseNotes).toContain("lexrunner-gate-execution-receipt/v2");
