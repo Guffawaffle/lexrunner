@@ -1111,6 +1111,40 @@ export class InMemoryWorkspaceLifecycleStore
     });
   }
 
+  /** Synchronous critical section for additive stores; no provider effect belongs here. */
+  protected withLiveWorkerSession<T>(
+    input: HeartbeatWorkerSessionInput,
+    action: (session: WorkerSessionRecord) => T
+  ): T | Extract<WorkerSessionMutationResult, { updated: false }> {
+    const denied = (reason: WorkerSessionMutationFailureReason) => ({
+      updated: false as const,
+      reason,
+    });
+    if (!Number.isFinite(Date.parse(input.now))) return denied("invalid_time");
+    if (input.controller.runId !== input.runId) return denied("lease_mismatch");
+    const authenticated = this.withActiveControllerCredential(
+      input.controller,
+      input.now,
+      input.expectedRunRevision,
+      () => {
+        const binding = this.validateWorkerBinding(input);
+        if (!binding.valid) {
+          if (binding.failure.updated) throw new Error("Expected failed worker binding");
+          return binding.failure;
+        }
+        const session = this.workerSessions.get(input.sessionId);
+        const failure = this.validateSession(session, input, binding.attempt, binding.lease);
+        if (failure) {
+          if (failure.updated) throw new Error("Expected failed worker session");
+          return failure;
+        }
+        if (Date.parse(input.now) < Date.parse(session!.heartbeatAt)) return denied("invalid_time");
+        return action({ ...session! });
+      }
+    );
+    return authenticated.authenticated ? authenticated.value : denied(authenticated.reason);
+  }
+
   async getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null> {
     const session = this.workerSessions.get(sessionId);
     return session ? { ...session } : null;

@@ -1651,6 +1651,57 @@ export class SqliteWorkspaceLifecycleStore
     });
   }
 
+  /** Authentication, live binding and additive mutation share one SQLite transaction. */
+  protected withLiveWorkerSession<T>(
+    input: HeartbeatWorkerSessionInput,
+    action: (session: WorkerSessionRecord) => T
+  ): T | Extract<WorkerSessionMutationResult, { updated: false }> {
+    const denied = (reason: WorkerSessionMutationFailureReason) => ({
+      updated: false as const,
+      reason,
+    });
+    if (!Number.isFinite(Date.parse(input.now))) return denied("invalid_time");
+    if (input.controller.runId !== input.runId) return denied("lease_mismatch");
+    return this.immediateTransaction(() => {
+      const controller = this.db
+        .prepare(
+          "SELECT revision, controllerId, leaseId, fencingToken, expiresAt FROM run_coordination WHERE runId = ?"
+        )
+        .get(input.runId) as
+        | {
+            revision: number;
+            controllerId: string | null;
+            leaseId: string | null;
+            fencingToken: number;
+            expiresAt: string | null;
+          }
+        | undefined;
+      if (!controller?.controllerId) return denied("no_active_lease");
+      if (controller.fencingToken !== input.controller.fencingToken) return denied("stale_fence");
+      if (
+        controller.controllerId !== input.controller.controllerId ||
+        controller.leaseId !== input.controller.leaseId
+      )
+        return denied("lease_mismatch");
+      if (controller.revision !== input.expectedRunRevision) return denied("stale_run_revision");
+      if (!controller.expiresAt || Date.parse(controller.expiresAt) <= Date.parse(input.now))
+        return denied("lease_expired");
+      const binding = this.validateWorkerBinding(input);
+      if (!binding.valid) {
+        if (binding.failure.updated) throw new Error("Expected failed worker binding");
+        return binding.failure;
+      }
+      const session = this.workerSession(input.sessionId);
+      const failure = this.validateSession(session, input, binding.attempt, binding.lease);
+      if (failure) {
+        if (failure.updated) throw new Error("Expected failed worker session");
+        return failure;
+      }
+      if (Date.parse(input.now) < Date.parse(session!.heartbeatAt)) return denied("invalid_time");
+      return action({ ...session! });
+    });
+  }
+
   async getWorkerSession(sessionId: string): Promise<WorkerSessionRecord | null> {
     return this.hasTable("worker_sessions") ? this.workerSession(sessionId) : null;
   }
