@@ -1,3 +1,4 @@
+import { AgentWorkWorkerAdapterNegotiator } from "../../src/runs/agent-work-worker-runtime.js";
 // Synthetic lifecycle fixture only; no Git, provider, or qualified host execution.
 import { createAgentTaskPacket } from "../../src/schemas/agent-work.js";
 import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
@@ -11,7 +12,10 @@ const T0 = "2026-08-12T12:00:00.000Z";
 const T1 = "2026-08-12T12:00:01.000Z";
 const T2 = "2026-08-12T12:00:02.000Z";
 const T3 = "2026-08-12T12:00:03.000Z";
-async function createLiveAttempt(store: Harness): Promise<ControllerLeaseCredential> {
+async function createLiveAttempt(
+  store: Harness,
+  packet = taskPacket()
+): Promise<ControllerLeaseCredential> {
   const acquired = await store.acquireControllerLease({
     runId: "run-1",
     controllerId: "controller-1",
@@ -22,7 +26,6 @@ async function createLiveAttempt(store: Harness): Promise<ControllerLeaseCredent
   });
   if (!acquired.acquired) throw new Error("controller setup failed");
   const controller: ControllerLeaseCredential = acquired.lease;
-  const packet = taskPacket();
   const created = await store.createAttempt({
     runId: "run-1",
     controller,
@@ -42,10 +45,11 @@ async function createLiveAttempt(store: Harness): Promise<ControllerLeaseCredent
 
 export async function createAttachedWorker(
   store: Harness,
-  sessionId = "worker-session-1"
+  sessionId = "worker-session-1",
+  options: { externalRuntime?: boolean; bindAdapter?: boolean } = {}
 ): Promise<ControllerLeaseCredential> {
-  const controller = await createLiveAttempt(store);
-  const packet = taskPacket();
+  const packet = taskPacket(options.externalRuntime ?? false);
+  const controller = await createLiveAttempt(store, packet);
   const identity = {
     repositoryId: "repo-1",
     hostId: "host-1",
@@ -146,7 +150,27 @@ export async function createAttachedWorker(
     createdAt: T2,
   });
   if (!bound.bound) throw new Error(`envelope setup failed: ${bound.reason}`);
+  const negotiation = options.bindAdapter
+    ? await new AgentWorkWorkerAdapterNegotiator(store).negotiate("attempt-1", {
+        schema_version: "1.0.0",
+        adapter_id: "lexrunner.host-assisted",
+        adapter_version: "1.0.0",
+        mode: "assisted_attach",
+        accepted_trust_gaps: ["filesystem_read", "external_runtime"],
+      })
+    : undefined;
+  if (negotiation && !negotiation.go) throw new Error("fixture negotiation failed");
   const attached = await store.attachWorkerSession({
+    ...(negotiation?.go
+      ? {
+          adapter: {
+            adapterId: negotiation.adapter.id,
+            adapterVersion: negotiation.adapter.version,
+            enforcementSummaryHash: negotiation.enforcementSummaryHash,
+            trustGapDimensions: negotiation.trustGaps,
+          },
+        }
+      : {}),
     runId: "run-1",
     controller,
     expectedRunRevision: 0,
@@ -172,7 +196,7 @@ export async function createAttachedWorker(
   return controller;
 }
 
-export function taskPacket() {
+export function taskPacket(externalRuntime = false) {
   return createAgentTaskPacket({
     schema_version: "1.0.0",
     packet_id: "packet-1",
@@ -188,7 +212,7 @@ export function taskPacket() {
       edit: false,
       git_write: false,
       github_write: false,
-      external_runtime: false,
+      external_runtime: externalRuntime,
       secrets: false,
       signing: false,
       release: false,
