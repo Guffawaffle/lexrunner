@@ -160,6 +160,9 @@ export * from "./governed-attempt-operation-store.js";
 export { InMemoryGovernedAttemptOperationStore } from "./inmemory/governed-attempt-operation-store.js";
 export { SqliteGovernedAttemptOperationStore } from "./sqlite/governed-attempt-operation-store.js";
 export * from "./attempt-awaitable-store.js";
+export * from "./worker-dispatch-store.js";
+export { InMemoryWorkerDispatchStore } from "./inmemory/worker-dispatch-store.js";
+export { SqliteWorkerDispatchStore } from "./sqlite/worker-dispatch-store.js";
 export { InMemoryAttemptAwaitableStore } from "./inmemory/attempt-awaitable-store.js";
 export { SqliteAttemptAwaitableStore } from "./sqlite/attempt-awaitable-store.js";
 

@@ -13,3 +13,4 @@ export { InMemoryWorkspaceLifecycleStore } from "./workspace-lifecycle-store.js"
 export { InMemoryGovernedDelegationStore } from "./governed-delegation-store.js";
 export { InMemoryGovernedAttemptOperationStore } from "./governed-attempt-operation-store.js";
 export { InMemoryAttemptAwaitableStore } from "./attempt-awaitable-store.js";
+export { InMemoryWorkerDispatchStore } from "./worker-dispatch-store.js";
