@@ -430,3 +430,11 @@ export {
   materializeAttemptInput,
   SelectedWorkInputJsonSchema,
 } from "./selected-work-materialization.js";
+
+export { CodexWorkerDispatcher } from "./codex-worker-dispatch.js";
+export type {
+  AttachedCodexTransport,
+  CodexTurnStartParams,
+  CodexWorkerDispatchResult,
+  DispatchAttachedCodexWorkerInput,
+} from "./codex-worker-dispatch.js";
