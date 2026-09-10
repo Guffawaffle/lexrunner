@@ -4,6 +4,7 @@ import type {
   WorkerSessionRecord,
   WorkerSessionMutationFailureReason,
 } from "./workspace-lifecycle-store.js";
+import { WorkerSession_v1 } from "../schemas/agent-work.js";
 import { SHA256Hash } from "../schemas/task-contract.js";
 
 const id = z
@@ -11,27 +12,31 @@ const id = z
   .min(1)
   .max(256)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u);
+const canonicalId = WorkerSession_v1.shape.session_id;
 const instant = z.string().datetime({ offset: true });
 export const WorkerDispatchRecord_v1 = z
   .object({
     schemaVersion: z.literal("1.0.0"),
-    sessionId: id,
-    attemptId: id,
-    runId: id,
+    sessionId: canonicalId,
+    attemptId: canonicalId,
+    runId: canonicalId,
     claimId: id,
-    packetId: id,
+    packetId: canonicalId,
     packetHash: SHA256Hash,
-    envelopeId: id,
+    envelopeId: canonicalId,
     envelopeHash: SHA256Hash,
     requestHash: SHA256Hash,
-    workerId: z.string().min(1).max(1024),
-    workspaceLeaseId: id,
+    workerId: canonicalId,
+    workspaceLeaseId: canonicalId,
     workspaceLeaseRevision: z.number().int().nonnegative(),
-    controllerId: id,
-    controllerLeaseId: id,
+    controllerId: canonicalId,
+    controllerLeaseId: canonicalId,
     fencingToken: z.number().int().positive(),
     claimedAt: instant,
-    acknowledgement: z.object({ turnId: id, observedAt: instant }).strict().optional(),
+    acknowledgement: z
+      .object({ turnId: z.string().min(1), observedAt: instant })
+      .strict()
+      .optional(),
   })
   .strict();
 export type WorkerDispatchRecord = z.infer<typeof WorkerDispatchRecord_v1>;
@@ -81,7 +86,7 @@ export function reduceWorkerDispatch(
   prior: WorkerDispatchRecord | null,
   acknowledgement?: { turnId: string }
 ): WorkerDispatchResult {
-  if (acknowledgement) id.parse(acknowledgement.turnId);
+  if (acknowledgement) z.string().min(1).parse(acknowledgement.turnId);
   if (input.packetHash !== session.packetHash)
     return { recorded: false, reason: "identity_mismatch" };
   if (

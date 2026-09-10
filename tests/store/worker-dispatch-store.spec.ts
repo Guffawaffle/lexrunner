@@ -19,11 +19,11 @@ async function database() {
   directories.push(directory);
   return join(directory, "store.db");
 }
-async function setup(kind: string) {
+async function setup(kind: string, sessionId = "worker-session-1") {
   const path = kind === "sqlite" ? await database() : undefined;
   const store = path ? new SqliteWorkerDispatchStore(path) : new InMemoryWorkerDispatchStore();
   stores.push(store);
-  const controller = await createAttachedWorker(store);
+  const controller = await createAttachedWorker(store, sessionId);
   const input: ClaimWorkerDispatchInput = {
     controller,
     runId: "run-1",
@@ -32,7 +32,7 @@ async function setup(kind: string) {
     expectedAttemptRevision: 3,
     workspaceLeaseId: "workspace-lease-1",
     expectedWorkspaceLeaseRevision: 0,
-    sessionId: "worker-session-1",
+    sessionId,
     expectedSessionRevision: 0,
     claimId: "claim-1",
     packetHash: taskPacket().packet_hash,
@@ -44,6 +44,22 @@ async function setup(kind: string) {
 
 for (const kind of ["memory", "sqlite"])
   describe(`${kind} worker dispatch`, () => {
+    it("preserves canonical opaque identities and unrestricted provider turn IDs", async () => {
+      const sessionId = "worker/session α/" + "x".repeat(17000);
+      const { store, input } = await setup(kind, sessionId);
+      expect(await store.claimWorkerDispatch(input)).toMatchObject({
+        recorded: true,
+        newlyClaimed: true,
+        record: { sessionId },
+      });
+      expect(
+        await store.acknowledgeWorkerDispatch({ ...input, turnId: "turn/opaque α" })
+      ).toMatchObject({
+        recorded: true,
+        newlyClaimed: false,
+        record: { acknowledgement: { turnId: "turn/opaque α" } },
+      });
+    });
     it("claims once, preserves binding, and never renews a claim on replay", async () => {
       const { store, input } = await setup(kind);
       const results = await Promise.all([

@@ -24,7 +24,7 @@ export class SqliteWorkerDispatchStore
         this.db.exec(`
         CREATE TABLE IF NOT EXISTS worker_dispatches (
           sessionId TEXT PRIMARY KEY,
-          recordJson TEXT NOT NULL CHECK(length(recordJson) <= 16384),
+          recordJson TEXT NOT NULL,
           FOREIGN KEY(sessionId) REFERENCES worker_sessions(sessionId) ON DELETE RESTRICT
         );
         INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)

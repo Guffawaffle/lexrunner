@@ -40,7 +40,10 @@ async function createLiveAttempt(store: Harness): Promise<ControllerLeaseCredent
   return controller;
 }
 
-export async function createAttachedWorker(store: Harness): Promise<ControllerLeaseCredential> {
+export async function createAttachedWorker(
+  store: Harness,
+  sessionId = "worker-session-1"
+): Promise<ControllerLeaseCredential> {
   const controller = await createLiveAttempt(store);
   const packet = taskPacket();
   const identity = {
@@ -153,7 +156,7 @@ export async function createAttachedWorker(store: Harness): Promise<ControllerLe
     workspaceLeaseId: "workspace-lease-1",
     expectedAttemptRevision: 2,
     expectedWorkspaceLeaseRevision: 0,
-    sessionId: "worker-session-1",
+    sessionId,
     packetId: packet.packet_id,
     packetHash: packet.packet_hash,
     executionEnvelopeId: "envelope-1",
