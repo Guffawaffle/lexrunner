@@ -26,6 +26,26 @@ afterEach(async () => {
   for (const store of stores.splice(0)) await store.close();
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
+function verificationPacket(baseSha: string) {
+  const { packet_hash: _, ...template } = taskPacket();
+  return createAgentTaskPacket({
+    ...template,
+    repository: { id: "repo-1", base_sha: baseSha },
+    scope: { ...template.scope, read_globs: ["result.txt"] },
+    verification: [
+      {
+        id: "check-result",
+        argv: [
+          "node",
+          "-e",
+          "const fs=require('node:fs');const text=fs.readFileSync('result.txt','utf8');console.log(text.trim());process.exit(text==='mostly birds\\n'?0:3)",
+        ],
+        expected_exit_codes: [0],
+      },
+    ],
+  });
+}
+
 async function setup(kind: string, result = "mostly birds\n") {
   const root = await mkdtemp(join(tmpdir(), "lexrunner-real-receipt-"));
   roots.push(root);
@@ -49,23 +69,7 @@ async function setup(kind: string, result = "mostly birds\n") {
   await git(["commit", "-m", "fixture base"]);
   const baseSha = (await git(["rev-parse", "HEAD"])).stdout.trim();
   await git(["worktree", "add", "-b", "agent/work-1", worktreePath, baseSha]);
-  const { packet_hash: _, ...template } = taskPacket();
-  const packet = createAgentTaskPacket({
-    ...template,
-    repository: { id: "repo-1", base_sha: baseSha },
-    scope: { ...template.scope, read_globs: ["result.txt"] },
-    verification: [
-      {
-        id: "check-result",
-        argv: [
-          process.execPath,
-          "-e",
-          "const fs=require('node:fs');const text=fs.readFileSync('result.txt','utf8');console.log(text.trim());process.exit(text==='mostly birds\\n'?0:3)",
-        ],
-        expected_exit_codes: [0],
-      },
-    ],
-  });
+  const packet = verificationPacket(baseSha);
   const store =
     kind === "sqlite"
       ? new SqliteWorkerObservationStore(join(root, "store.db"))
@@ -82,6 +86,7 @@ async function setup(kind: string, result = "mostly birds\n") {
   });
   const controller = await createAttachedWorker(store, "worker-session-1", {
     packet,
+    exposedEnvironmentKeys: ["PATH"],
     workspace: {
       repositoryRoot,
       allocationRoot,
@@ -300,3 +305,8 @@ it.skipIf(process.platform !== "win32")(
     });
   }
 );
+
+it("validates the portable verification packet on every host", () => {
+  const packet = verificationPacket("a".repeat(40));
+  expect(packet.verification[0].argv[0]).toBe("node");
+});

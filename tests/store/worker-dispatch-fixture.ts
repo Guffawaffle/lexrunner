@@ -54,6 +54,7 @@ export async function createAttachedWorker(
     externalRuntime?: boolean;
     bindAdapter?: boolean;
     packet?: ReturnType<typeof taskPacket>;
+    exposedEnvironmentKeys?: string[];
     workspace?: {
       repositoryRoot: string;
       allocationRoot: string;
@@ -148,7 +149,7 @@ export async function createAttachedWorker(
           },
         }),
     ],
-    exposed_environment_keys: [],
+    exposed_environment_keys: options.exposedEnvironmentKeys ?? [],
     created_at: T2,
   };
   const envelopeHash = computeCanonicalHash(envelope);
