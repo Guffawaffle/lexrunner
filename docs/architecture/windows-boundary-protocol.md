@@ -28,7 +28,11 @@ match reports `verification: not_performed`. Matching claimed digests or PIDs is
 not binary authentication, process ownership, release-signer trust, a self-probe
 or proof that a nonce is fresh. No lease or filesystem capability is issued.
 
-Next integration must bind these frames to owned inherited private pipes, verify
+The [owned handshake probe](owned-windows-boundary-handshake.md) now exercises a
+one-shot development child with private pipes, a deadline and explicit cleanup.
+It remains non-authorizing and does not supply a production helper.
+
+Production integration must bind these frames to owned inherited private pipes, verify
 the actual helper artifact against independently trusted release metadata and
 signer policy before launch, correlate replies with the actual child, enforce a
 handshake deadline and one accepted handshake, and retain explicit cleanup
