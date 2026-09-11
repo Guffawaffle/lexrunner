@@ -1,6 +1,12 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { isAbsolute, normalize } from "node:path";
-import { StringDecoder } from "node:string_decoder";
+import { randomUUID } from "node:crypto";
+import { TextDecoder } from "node:util";
+import {
+  TerminalTurnNotification,
+  type WorkerTurnEvidenceStore,
+  type WorkerTurnCaptureResult,
+} from "../store/worker-turn-evidence.js";
 import { z } from "zod";
 import type { AttachedCodexTransport, CodexTurnStartParams } from "./codex-worker-dispatch.js";
 
@@ -53,7 +59,17 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
   readonly adapterVersion: string;
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly pending = new Map<number, Pending>();
-  private readonly decoder = new StringDecoder("utf8");
+  private readonly decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  private readonly captureId = randomUUID();
+  private captureSequence = 0;
+  private captureBytes = 0;
+  private captureBusy = false;
+  private outputFinalized = false;
+  private readonly capturedTurns: Array<{
+    observationId: string;
+    observedAt: string;
+    notificationJson: string;
+  }> = [];
   private readonly exited: Promise<void>;
   private closing?: Promise<CodexConnectionCloseResult>;
   private sequence = 0;
@@ -100,6 +116,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
     this.exited = new Promise((resolve) =>
       this.child.once("close", (code, signal) => {
         this.processExited = true;
+        this.finalizeOutput();
         this.exitCode = code;
         this.signal = signal;
         this.rejectPending("connection_closed");
@@ -111,6 +128,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
     this.child.stdout.on("error", () => this.fail("stdout_error"));
     this.child.stderr.on("error", () => this.fail("stderr_error"));
     this.child.stdout.on("data", (chunk: Buffer) => this.receive(chunk));
+    this.child.stdout.on("end", () => this.finalizeOutput());
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderrBytes += chunk.length;
       if (this.stderrBytes > MAX_TOTAL) this.fail("stderr_limit");
@@ -176,7 +194,34 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
       stderrBytes: this.stderrBytes,
       methods: [...this.methods],
       notifications: { ...this.notifications },
+      pendingTurnCaptures: this.capturedTurns.length,
+      pendingTurnCaptureBytes: this.captureBytes,
     };
+  }
+
+  /** Store transaction precedes queue removal. May run after child exit; grants no execution. */
+  async persistNextTurnCapture(
+    store: WorkerTurnEvidenceStore,
+    binding: { sessionId: string; claimId: string; requestHash: string },
+    recordedAt: string
+  ): Promise<WorkerTurnCaptureResult | null> {
+    if (this.captureBusy) throw new Error("capture_in_progress");
+    const next = this.capturedTurns[0];
+    if (!next) return null;
+    this.captureBusy = true;
+    try {
+      const result = await store.recordWorkerTurnEvidence(
+        { ...binding, ...next, observerId: this.captureId, workerId: this.session.threadId },
+        recordedAt
+      );
+      if (result.recorded) {
+        this.capturedTurns.shift();
+        this.captureBytes -= Buffer.byteLength(next.notificationJson, "utf8");
+      }
+      return result;
+    } finally {
+      this.captureBusy = false;
+    }
   }
 
   async request(
@@ -288,7 +333,12 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
       this.fail("stdout_limit");
       return;
     }
-    this.buffer += this.decoder.write(chunk);
+    try {
+      this.buffer += this.decoder.decode(chunk, { stream: true });
+    } catch {
+      this.fail("invalid_utf8");
+      return;
+    }
     let newline: number;
     while ((newline = this.buffer.indexOf("\n")) >= 0) {
       const line = this.buffer.slice(0, newline);
@@ -306,7 +356,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
         return;
       }
       if (typeof message.method === "string") {
-        // Count bounded method names only. Never retain notification bodies or stderr content.
+        // General diagnostics retain method counts only; terminal evidence is queued below.
         if (
           message.method.length > 128 ||
           (!this.notifications[message.method] && Object.keys(this.notifications).length >= 64)
@@ -319,7 +369,10 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
           this.fail("server_request_unsupported");
           return;
         }
-        if (!this.turnAttempted && /^(turn\/started|item\/started)/u.test(message.method)) {
+        if (
+          !this.turnAttempted &&
+          /^(turn\/started|turn\/completed|item\/started)/u.test(message.method)
+        ) {
           this.fail("unexpected_execution");
           return;
         }
@@ -336,6 +389,28 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
           }
           this.startedNotificationId = id;
         }
+        if (message.method === "turn/completed") {
+          const event = TerminalTurnNotification.safeParse(message);
+          if (!event.success) {
+            this.fail("invalid_terminal_turn");
+            return;
+          }
+          if (event.data.params.threadId !== this.settings?.threadId) {
+            this.fail("thread_mismatch");
+            return;
+          }
+          const bytes = Buffer.byteLength(line, "utf8");
+          if (this.capturedTurns.length >= 128 || this.captureBytes + bytes > 2 * MAX_FRAME) {
+            this.fail("turn_capture_limit");
+            return;
+          }
+          this.capturedTurns.push({
+            observationId: `${this.captureId}:${++this.captureSequence}`,
+            observedAt: new Date().toISOString(),
+            notificationJson: line,
+          });
+          this.captureBytes += bytes;
+        }
       } else {
         const pending = typeof message.id === "number" ? this.pending.get(message.id) : undefined;
         if (!pending || "result" in message === "error" in message) {
@@ -350,5 +425,17 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
       if (this.failure) return;
     }
     if (Buffer.byteLength(this.buffer, "utf8") > MAX_FRAME) this.fail("frame_limit");
+  }
+  private finalizeOutput() {
+    if (this.outputFinalized) return;
+    this.outputFinalized = true;
+    if (this.failure) return;
+    try {
+      this.buffer += this.decoder.decode();
+    } catch {
+      this.fail("invalid_utf8");
+      return;
+    }
+    if (this.buffer.length) this.fail("incomplete_frame");
   }
 }

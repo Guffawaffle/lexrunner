@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
 import { OwnedCodexConnection } from "../../src/runs/owned-codex-connection.js";
+import { InMemoryWorkerObservationStore } from "../../src/store/inmemory/worker-observation-store.js";
+import { createAttachedWorker, taskPacket } from "../store/worker-dispatch-fixture.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 const options = {
@@ -22,6 +24,7 @@ let child: EventEmitter & {
 };
 let sent: Array<{ id?: number; method: string; params: unknown }>;
 let mode: string;
+let providerThreadId: string;
 let connection: OwnedCodexConnection | undefined;
 function reply(value: unknown) {
   child.stdout.write(JSON.stringify(value) + "\n");
@@ -29,6 +32,7 @@ function reply(value: unknown) {
 beforeEach(() => {
   sent = [];
   mode = "normal";
+  providerThreadId = "owned-thread";
   child = Object.assign(new EventEmitter(), {
     pid: 123,
     stdout: new PassThrough(),
@@ -44,7 +48,7 @@ beforeEach(() => {
               id: message.id,
               result: {
                 thread: {
-                  id: "owned-thread",
+                  id: providerThreadId,
                   ephemeral: true,
                   status: { type: "idle" },
                   turns: [],
@@ -85,6 +89,191 @@ const requestOptions = () => ({
 const params = { threadId: "owned-thread", input: [{ type: "text" as const, text: "task" }] };
 
 describe("owned Codex connection", () => {
+  it("retains terminal evidence before acknowledgment and retries only persistence after loss", async () => {
+    const store = new InMemoryWorkerObservationStore();
+    try {
+      const controller = await createAttachedWorker(store);
+      providerThreadId = "native-session-1";
+      connection = await OwnedCodexConnection.open(options);
+      const binding = {
+        sessionId: "worker-session-1",
+        claimId: "capture-claim",
+        requestHash: "sha256:" + "b".repeat(64),
+      };
+      await store.claimWorkerDispatch({
+        ...binding,
+        controller,
+        runId: "run-1",
+        expectedRunRevision: 0,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 3,
+        workspaceLeaseId: "workspace-lease-1",
+        expectedWorkspaceLeaseRevision: 0,
+        expectedSessionRevision: 0,
+        packetHash: taskPacket().packet_hash,
+        now: "2026-08-12T12:00:04.000Z",
+      });
+      const realPersist = store.recordWorkerTurnEvidence.bind(store);
+      let lost = true;
+      const port = {
+        getWorkerTurnEvidence: store.getWorkerTurnEvidence.bind(store),
+        recordWorkerTurnEvidence: vi.fn(async (input, now) => {
+          const result = await realPersist(input, now);
+          if (lost) {
+            lost = false;
+            throw new Error("lost persistence response");
+          }
+          return result;
+        }),
+      };
+      mode = "lost";
+      const abort = new AbortController();
+      const send = connection.request(
+        "turn/start",
+        { ...params, threadId: providerThreadId },
+        {
+          ...requestOptions(),
+          signal: abort.signal,
+        }
+      );
+      const sendFailure = expect(send).rejects.toThrow("request_aborted");
+      reply({
+        method: "turn/completed",
+        params: {
+          threadId: providerThreadId,
+          turn: { id: "turn-early", status: "completed", items: [{ text: "birds" }] },
+        },
+      });
+      expect(connection.snapshot().pendingTurnCaptures).toBe(1);
+      abort.abort();
+      await sendFailure;
+      await connection.close();
+      await expect(
+        connection.persistNextTurnCapture(port, binding, new Date().toISOString())
+      ).rejects.toThrow("lost persistence response");
+      expect(connection.snapshot().pendingTurnCaptures).toBe(1);
+      expect(
+        await connection.persistNextTurnCapture(port, binding, new Date().toISOString())
+      ).toMatchObject({ recorded: true, replay: true });
+      expect(connection.snapshot().pendingTurnCaptures).toBe(0);
+      expect(await store.listWorkerObservations(binding.sessionId)).toHaveLength(1);
+      const records = await store.listWorkerObservations(binding.sessionId);
+      expect(
+        await store.getWorkerTurnEvidence(binding.sessionId, records[0].observationId)
+      ).toContain('"text":"birds"');
+      expect(sent.filter((x) => x.method === "turn/start")).toHaveLength(1);
+    } finally {
+      await store.close();
+    }
+  });
+  it("rejects terminal events from another thread and premature completion", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    reply({
+      method: "turn/completed",
+      params: { threadId: "other", turn: { id: "turn", status: "completed" } },
+    });
+    expect(connection.snapshot().failure).toBe("unexpected_execution");
+    expect(connection.snapshot().pendingTurnCaptures).toBe(0);
+  });
+  it("rejects a different thread after dispatch without enqueuing its evidence", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request("turn/start", params, requestOptions());
+    reply({
+      method: "turn/completed",
+      params: { threadId: "other", turn: { id: "turn", status: "completed" } },
+    });
+    expect(connection.snapshot().failure).toBe("thread_mismatch");
+    expect(connection.snapshot().pendingTurnCaptures).toBe(0);
+  });
+  it("serializes capture persistence and retains an event when storage rejects it", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request("turn/start", params, requestOptions());
+    reply({
+      method: "turn/completed",
+      params: { threadId: "owned-thread", turn: { id: "turn", status: "failed" } },
+    });
+    let finish!: (value: { recorded: false; reason: "evidence_limit" }) => void;
+    const port = {
+      getWorkerTurnEvidence: async () => null,
+      recordWorkerTurnEvidence: vi.fn(
+        () =>
+          new Promise<{ recorded: false; reason: "evidence_limit" }>((resolve) => {
+            finish = resolve;
+          })
+      ),
+    };
+    const binding = {
+      sessionId: "session",
+      claimId: "claim",
+      requestHash: "sha256:" + "b".repeat(64),
+    };
+    const pending = connection.persistNextTurnCapture(port, binding, new Date().toISOString());
+    await expect(
+      connection.persistNextTurnCapture(port, binding, new Date().toISOString())
+    ).rejects.toThrow("capture_in_progress");
+    finish({ recorded: false, reason: "evidence_limit" });
+    expect(await pending).toEqual({ recorded: false, reason: "evidence_limit" });
+    expect(connection.snapshot().pendingTurnCaptures).toBe(1);
+    expect(port.recordWorkerTurnEvidence).toHaveBeenCalledOnce();
+  });
+  it("bounds queued bytes independently of event count", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request("turn/start", params, requestOptions());
+    for (let i = 0; i < 3; i++)
+      reply({
+        method: "turn/completed",
+        params: {
+          threadId: "owned-thread",
+          turn: { id: String(i), status: "completed", items: [{ text: "x".repeat(900000) }] },
+        },
+      });
+    expect(connection.snapshot().failure).toBe("turn_capture_limit");
+    expect(connection.snapshot().pendingTurnCaptures).toBe(2);
+  });
+  it("fails explicitly on capture overflow while preserving previously queued evidence", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request("turn/start", params, requestOptions());
+    for (let i = 0; i < 129; i++)
+      reply({
+        method: "turn/completed",
+        params: { threadId: "owned-thread", turn: { id: String(i), status: "completed" } },
+      });
+    expect(connection.snapshot().failure).toBe("turn_capture_limit");
+    expect(connection.snapshot().pendingTurnCaptures).toBe(128);
+  });
+  it("rejects invalid UTF-8 rather than changing retained evidence bytes", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    child.stdout.write(Buffer.from([0xff]));
+    expect(connection.snapshot().failure).toBe("invalid_utf8");
+  });
+  it.each([
+    [Buffer.from([0xf0, 0x9f]), "invalid_utf8", "end"],
+    [Buffer.from('{"method":"turn/completed","params":'), "incomplete_frame", "end"],
+    [Buffer.from([0xf0, 0x9f]), "invalid_utf8", "close"],
+    [Buffer.from('{"method":"turn/completed","params":'), "incomplete_frame", "close"],
+  ])(
+    "reports truncated stdout %j as %s on %s without discarding earlier evidence",
+    async (tail, reason, boundary) => {
+      connection = await OwnedCodexConnection.open(options);
+      await connection.request("turn/start", params, requestOptions());
+      reply({
+        method: "turn/completed",
+        params: { threadId: "owned-thread", turn: { id: "valid-turn", status: "completed" } },
+      });
+      child.stdout.write(tail);
+      if (boundary === "end") {
+        child.stdout.end();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } else child.emit("close", 0, null);
+      expect(connection.snapshot().failure).toBe(reason);
+      expect(connection.snapshot().pendingTurnCaptures).toBe(1);
+      expect(await connection.close()).toMatchObject({
+        processExited: true,
+        execution: "may_have_started",
+      });
+      expect(connection.snapshot().failure).toBe(reason);
+    }
+  );
   it("launches fixed argv, binds an idle session, and closes only its child", async () => {
     connection = await OwnedCodexConnection.open(options);
     expect(spawn).toHaveBeenCalledWith(

@@ -2,6 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import Database from "better-sqlite3-multiple-ciphers";
+import {
+  turnEvidenceHash,
+  type WorkerTurnCaptureInput,
+} from "../../src/store/worker-turn-evidence.js";
 import { InMemoryWorkerObservationStore } from "../../src/store/inmemory/worker-observation-store.js";
 import { SqliteWorkerObservationStore } from "../../src/store/sqlite/worker-observation-store.js";
 import type { ClaimWorkerDispatchInput } from "../../src/store/worker-dispatch-store.js";
@@ -58,8 +63,85 @@ async function setup(kind: string, sessionId = "worker/session α") {
   return { store, claim, observation, path };
 }
 const recordedAt = "2026-08-12T12:05:01.000Z";
+function capture(observation: WorkerObservationInput, extra = ""): WorkerTurnCaptureInput {
+  return {
+    sessionId: observation.sessionId,
+    claimId: observation.claimId,
+    requestHash: observation.requestHash,
+    workerId: observation.workerId,
+    observationId: observation.observationId,
+    observerId: observation.observerId,
+    observedAt: observation.observedAt,
+    notificationJson: JSON.stringify({
+      method: "turn/completed",
+      params: {
+        threadId: observation.workerId,
+        turn: { id: observation.turnId, status: "completed", items: [{ text: extra }] },
+      },
+    }),
+  };
+}
 for (const kind of ["memory", "sqlite"])
   describe(`${kind} observation journal`, () => {
+    it("retains exact notification bytes and digest with the late observation", async () => {
+      const { store, claim, observation } = await setup(kind);
+      await store.claimWorkerDispatch(claim);
+      const input = capture(observation, "Mostly birds 🐦");
+      input.notificationJson = " " + input.notificationJson + " ";
+      const result = await store.recordWorkerTurnEvidence(input, recordedAt);
+      expect(result).toMatchObject({
+        recorded: true,
+        replay: false,
+        record: { evidenceHash: turnEvidenceHash(input.notificationJson), kind: "completed" },
+      });
+      expect(await store.getWorkerTurnEvidence(claim.sessionId, observation.observationId)).toBe(
+        input.notificationJson
+      );
+      expect(await store.recordWorkerTurnEvidence(input, recordedAt)).toMatchObject({
+        recorded: true,
+        replay: true,
+      });
+      expect(
+        await store.recordWorkerTurnEvidence(capture(observation, "changed"), recordedAt)
+      ).toMatchObject({ recorded: false, reason: "observation_conflict" });
+      expect((await store.getWorkerDispatch(claim.sessionId))?.acknowledgement).toBeUndefined();
+    });
+    it("rejects wrong-thread and oversized evidence without creating a journal record", async () => {
+      const { store, claim, observation } = await setup(kind);
+      await store.claimWorkerDispatch(claim);
+      const input = capture(observation);
+      await expect(
+        store.recordWorkerTurnEvidence(
+          {
+            ...input,
+            notificationJson: input.notificationJson.replace("native-session-1", "other"),
+          },
+          recordedAt
+        )
+      ).rejects.toThrow("thread_mismatch");
+      await expect(
+        store.recordWorkerTurnEvidence(capture(observation, "🐦".repeat(300000)), recordedAt)
+      ).rejects.toThrow();
+      expect(await store.listWorkerObservations(claim.sessionId)).toEqual([]);
+    });
+    it("enforces a per-session artifact byte budget without partial journal writes", async () => {
+      const { store, claim, observation } = await setup(kind);
+      await store.claimWorkerDispatch(claim);
+      const input = capture(observation, "x".repeat(1024 * 1024 - 300));
+      for (let i = 0; i < 8; i++)
+        expect(
+          await store.recordWorkerTurnEvidence({ ...input, observationId: String(i) }, recordedAt)
+        ).toMatchObject({ recorded: true });
+      expect(await store.recordWorkerTurnEvidence(input, recordedAt)).toEqual({
+        recorded: false,
+        reason: "evidence_limit",
+      });
+      expect(await store.listWorkerObservations(claim.sessionId)).toHaveLength(8);
+      expect(await store.getWorkerTurnEvidence(claim.sessionId, input.observationId)).toBeNull();
+      expect(
+        await store.recordWorkerTurnEvidence({ ...input, observationId: "0" }, recordedAt)
+      ).toMatchObject({ recorded: true, replay: true });
+    });
     it("requires an exact durable dispatch binding", async () => {
       const { store, claim, observation } = await setup(kind);
       expect(await store.recordWorkerObservation(observation, recordedAt)).toEqual({
@@ -193,6 +275,43 @@ for (const kind of ["memory", "sqlite"])
       ).toMatchObject({ recorded: true });
     });
   });
+it("rolls back the journal when SQLite artifact insertion fails, then survives read-only reopen", async () => {
+  const { store, claim, observation, path } = await setup("sqlite");
+  await store.claimWorkerDispatch(claim);
+  const db = new Database(path!);
+  try {
+    db.exec(
+      "CREATE TRIGGER fail_capture BEFORE INSERT ON worker_turn_evidence BEGIN SELECT RAISE(ABORT,'injected capture failure'); END;"
+    );
+    await expect(store.recordWorkerTurnEvidence(capture(observation), recordedAt)).rejects.toThrow(
+      "injected capture failure"
+    );
+    expect(await store.listWorkerObservations(claim.sessionId)).toEqual([]);
+    expect(
+      await store.getWorkerTurnEvidence(claim.sessionId, observation.observationId)
+    ).toBeNull();
+    db.exec("DROP TRIGGER fail_capture");
+    await store.recordWorkerTurnEvidence(capture(observation), recordedAt);
+  } finally {
+    db.close();
+  }
+  await store.close();
+  stores.splice(stores.indexOf(store), 1);
+  const reader = new SqliteWorkerObservationStore(path!, { readOnly: true });
+  stores.push(reader);
+  expect(await reader.getWorkerTurnEvidence(claim.sessionId, observation.observationId)).toBe(
+    capture(observation).notificationJson
+  );
+  const writer = new Database(path!);
+  try {
+    writer.prepare("UPDATE worker_turn_evidence SET notificationJson=?").run("{}");
+  } finally {
+    writer.close();
+  }
+  await expect(
+    reader.getWorkerTurnEvidence(claim.sessionId, observation.observationId)
+  ).rejects.toThrow("evidence_hash_mismatch");
+});
 it("serializes independent SQLite writers and survives reopen read-only", async () => {
   const { store, claim, observation, path } = await setup("sqlite");
   await store.claimWorkerDispatch(claim);
