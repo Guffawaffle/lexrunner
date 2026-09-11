@@ -8,7 +8,9 @@ and `verification: not_performed`.
 The input includes a dispatch record, retained observations, available terminal
 artifacts and the caller's capture disposition (`unknown`, `incomplete`, `drained`).
 The caller must construct a consistent snapshot and include every relevant report
-and capture failure. This function cannot detect omitted records, authenticate a
+and capture failure. The [store snapshot collector](worker-evidence-snapshot.md)
+provides one consistent database view; capture disposition remains a separate host
+input. This function cannot detect omitted records, authenticate a
 caller, establish artifact custody or prove that a capture declared drained was
 complete. Drained means the caller has accounted for this capture queue; it does
 not mean a complete task transcript exists. No result is merge eligibility or
@@ -43,6 +45,6 @@ reuse it as an execution grant.
 
 Tests cover late reports, unavailable artifacts, contradictory trails, identical
 evidence with multiple observers, malformed bindings/hashes, ordering, chronology
-and bounds. Store snapshot collection, durable reconciliation decisions, qualified
-late-acknowledgment resolution and verified task-receipt conversion remain separate
+and bounds. Durable reconciliation decisions, qualified late-acknowledgment
+resolution and verified task-receipt conversion remain separate
 work. No live task, native qualification, public command, release or runtime change.
