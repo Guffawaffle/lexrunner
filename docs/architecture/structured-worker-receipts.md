@@ -107,5 +107,16 @@ Portable tests use real memory/SQLite stores with explicit store-contract adapte
 in place of the applications' path checks. They exercise raw capture, provenance,
 conflicts, unchanged verification failures and lost responses, including SQLite
 close/reopen after committed end/submission. Connection tests use a fake stdio
-child. Qualified native preparation, real receipt path validation and a live model
-trial remain required before claiming end-to-end native worker execution.
+child.
+
+The Git-backed lane (`npm run test:git`) also exercises real application path
+validation and the existing local verifier on Linux. Disposable repositories and
+linked worktrees bind actual base commits and directory identities. For memory
+and SQLite, the fixture executes a packet-declared Node check, tests a false
+success claim against a failing command, checks verification replay without
+re-execution, and replaces the worktree directory before delivery or verification
+to require rejection. Worker claims are controlled input; no provider is called.
+On Windows the suite instead asserts that native boundary qualification reports
+unavailable. The Linux cases are explicitly skipped there, not counted as passes.
+Qualified native preparation and a live model trial remain required before
+claiming end-to-end native worker execution.

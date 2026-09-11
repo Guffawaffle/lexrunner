@@ -1,7 +1,11 @@
 import { AgentWorkWorkerAdapterNegotiator } from "../../src/runs/agent-work-worker-runtime.js";
-// Synthetic lifecycle fixture only; no Git, provider, or qualified host execution.
+// Synthetic lifecycle defaults; callers may supply a real disposable test workspace.
+// This helper does not execute Git, a provider, or qualified host preparation.
 import { createAgentTaskPacket } from "../../src/schemas/agent-work.js";
-import { createNativeExecutionPathMapping } from "../../src/schemas/agent-work-projection.js";
+import {
+  createNativeExecutionPathMapping,
+  type AgentExecutionPathMapping_v1,
+} from "../../src/schemas/agent-work-projection.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
 import type { ControllerLeaseCredential } from "../../src/store/coordination-store.js";
 import type { InMemoryWorkerDispatchStore } from "../../src/store/inmemory/worker-dispatch-store.js";
@@ -37,7 +41,7 @@ async function createLiveAttempt(
     workItemRevision: 1,
     packetId: "packet-1",
     packetHash: packet.packet_hash,
-    baseSha: "a".repeat(40),
+    baseSha: packet.repository.base_sha,
   });
   if (!created.updated) throw new Error(`attempt setup failed: ${created.reason}`);
   return controller;
@@ -46,17 +50,31 @@ async function createLiveAttempt(
 export async function createAttachedWorker(
   store: Harness,
   sessionId = "worker-session-1",
-  options: { externalRuntime?: boolean; bindAdapter?: boolean } = {}
+  options: {
+    externalRuntime?: boolean;
+    bindAdapter?: boolean;
+    packet?: ReturnType<typeof taskPacket>;
+    exposedEnvironmentKeys?: string[];
+    workspace?: {
+      repositoryRoot: string;
+      allocationRoot: string;
+      worktreePath: string;
+      pathMapping: AgentExecutionPathMapping_v1;
+      gitRuntime: string;
+    };
+  } = {}
 ): Promise<ControllerLeaseCredential> {
-  const packet = taskPacket(options.externalRuntime ?? false);
+  const packet = options.packet ?? taskPacket(options.externalRuntime ?? false);
+  const workspace = options.workspace;
+  const gitRuntime = workspace?.gitRuntime ?? "wsl-git";
   const controller = await createLiveAttempt(store, packet);
   const identity = {
     repositoryId: "repo-1",
     hostId: "host-1",
-    gitRuntime: "wsl-git",
-    projectRoot: "/srv/repo",
+    gitRuntime,
+    projectRoot: workspace?.repositoryRoot ?? "/srv/repo",
     branch: "agent/work-1",
-    worktreePath: "/srv/worktrees/work-1",
+    worktreePath: workspace?.worktreePath ?? "/srv/worktrees/work-1",
     attemptId: "attempt-1",
   };
   const acquired = await store.acquireWorkspace({
@@ -67,7 +85,7 @@ export async function createAttachedWorker(
     now: T1,
     workspaceLeaseId: "workspace-lease-1",
     workItemId: "work-1",
-    baseSha: "a".repeat(40),
+    baseSha: packet.repository.base_sha,
     expectedAttemptRevision: 0,
     ttlMs: 60_000,
     ...identity,
@@ -75,7 +93,7 @@ export async function createAttachedWorker(
       ...identity,
       exists: true,
       registered: true,
-      headSha: "a".repeat(40),
+      headSha: packet.repository.base_sha,
       cleanliness: "clean",
     },
   });
@@ -100,37 +118,38 @@ export async function createAttachedWorker(
     packet_hash: packet.packet_hash,
     workspace_lease_id: "workspace-lease-1",
     workspace_lease_revision: 0,
-    expected_head_sha: "a".repeat(40),
+    expected_head_sha: packet.repository.base_sha,
     branch: "agent/work-1",
     runtime: {
       host_id: "host-1",
       os: "linux" as const,
       architecture: "x64",
-      git_runtime: "wsl-git",
+      git_runtime: gitRuntime,
       worker_runtime: "codex-native",
     },
     paths: {
-      project_root: "/srv/worktrees/work-1",
-      execution_root: "/srv/worktrees/work-1",
-      allocation_root: "/srv/worktrees",
-      worktree_root: "/srv/worktrees/work-1",
+      project_root: identity.worktreePath,
+      execution_root: identity.worktreePath,
+      allocation_root: workspace?.allocationRoot ?? "/srv/worktrees",
+      worktree_root: identity.worktreePath,
     },
     path_mappings: [
-      createNativeExecutionPathMapping({
-        schema_version: "1.0.0",
-        mapping_kind: "native_linux",
-        repository_id: "repo-1",
-        base_sha: "a".repeat(40),
-        native_host_id: "host-1",
-        git_runtime: "wsl-git",
-        roots: {
-          native_repository: verifiedRoot("/srv/repo", "11"),
-          native_allocation_root: verifiedRoot("/srv/worktrees", "12"),
-          native_worktree: verifiedRoot("/srv/worktrees/work-1", "13"),
-        },
-      }),
+      workspace?.pathMapping ??
+        createNativeExecutionPathMapping({
+          schema_version: "1.0.0",
+          mapping_kind: "native_linux",
+          repository_id: "repo-1",
+          base_sha: packet.repository.base_sha,
+          native_host_id: "host-1",
+          git_runtime: "wsl-git",
+          roots: {
+            native_repository: verifiedRoot("/srv/repo", "11"),
+            native_allocation_root: verifiedRoot("/srv/worktrees", "12"),
+            native_worktree: verifiedRoot("/srv/worktrees/work-1", "13"),
+          },
+        }),
     ],
-    exposed_environment_keys: [],
+    exposed_environment_keys: options.exposedEnvironmentKeys ?? [],
     created_at: T2,
   };
   const envelopeHash = computeCanonicalHash(envelope);
@@ -187,7 +206,7 @@ export async function createAttachedWorker(
     executionEnvelopeHash: envelopeHash,
     hostId: "host-1",
     workerRuntime: "codex-native",
-    gitRuntime: "wsl-git",
+    gitRuntime,
     backend: "host-subagent",
     workerId: "native-session-1",
     startedAt: T3,
