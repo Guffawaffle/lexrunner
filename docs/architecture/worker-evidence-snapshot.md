@@ -34,7 +34,8 @@ journal reads. A read-only WAL reader retains the old whole view, while its next
 snapshot sees the committed acknowledgment, observation and artifact together.
 This is controlled local evidence, not qualified custody or a live worker trial.
 
-Collection and pure reconciliation can now be composed directly. Task-specific
-verification and receipt conversion, authoritative late-turn resolution, live
+Collection and pure reconciliation can now be composed directly. The existing
+[receipt and verification route](worker-receipt-boundary.md) defines the next
+boundary; provider receipt delivery, authoritative late-turn resolution, live
 terminal conformance and qualified native workspace preparation remain separate
 work. No public command, default store, release, runtime upgrade or execution grant.
