@@ -1,7 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { reconcileWorkerTurn } from "../../src/runs/worker-turn-reconciliation.js";
 import Database from "better-sqlite3-multiple-ciphers";
 import {
   turnEvidenceHash,
@@ -83,6 +84,51 @@ function capture(observation: WorkerObservationInput, extra = ""): WorkerTurnCap
 }
 for (const kind of ["memory", "sqlite"])
   describe(`${kind} observation journal`, () => {
+    it("collects a detached whole-session snapshot without inferring capture disposition", async () => {
+      const { store, claim, observation } = await setup(kind);
+      expect(await store.getWorkerEvidenceSnapshot(claim.sessionId)).toBeNull();
+      await store.claimWorkerDispatch(claim);
+      await store.acknowledgeWorkerDispatch({ ...claim, turnId: observation.turnId });
+      await store.recordWorkerTurnEvidence(capture(observation, "birds"), recordedAt);
+      const snapshot = (await store.getWorkerEvidenceSnapshot(claim.sessionId))!;
+      expect(snapshot.observations).toHaveLength(1);
+      expect(snapshot.artifacts).toHaveLength(1);
+      expect(snapshot).not.toHaveProperty("captureDisposition");
+      expect(reconcileWorkerTurn({ ...snapshot, captureDisposition: "unknown" })).toMatchObject({
+        state: "unresolved",
+        blockers: ["capture_unsettled"],
+      });
+      expect(reconcileWorkerTurn({ ...snapshot, captureDisposition: "drained" })).toMatchObject({
+        state: "reported_terminal",
+        verification: "not_performed",
+      });
+      snapshot.dispatch.claimId = "mutated";
+      snapshot.observations[0].summary = "mutated";
+      snapshot.artifacts[0].notificationJson = "mutated";
+      const fresh = (await store.getWorkerEvidenceSnapshot(claim.sessionId))!;
+      expect(fresh.dispatch.claimId).toBe(claim.claimId);
+      expect(fresh.observations[0].summary).not.toBe("mutated");
+      expect(fresh.artifacts[0].notificationJson).toContain("birds");
+    });
+    it("includes all conflicting reports and leaves missing artifacts visible", async () => {
+      const { store, claim, observation } = await setup(kind);
+      await store.claimWorkerDispatch(claim);
+      await store.acknowledgeWorkerDispatch({ ...claim, turnId: observation.turnId });
+      await store.recordWorkerTurnEvidence(capture(observation), recordedAt);
+      await store.recordWorkerObservation(
+        { ...observation, observationId: "other", turnId: "other-turn", kind: "failed" },
+        recordedAt
+      );
+      const snapshot = (await store.getWorkerEvidenceSnapshot(claim.sessionId))!;
+      expect(snapshot.observations).toHaveLength(2);
+      expect(snapshot.artifacts).toHaveLength(1);
+      expect(reconcileWorkerTurn({ ...snapshot, captureDisposition: "drained" }).blockers).toEqual([
+        "artifact_missing",
+        "evidence_conflict",
+        "outcome_conflict",
+        "turn_conflict",
+      ]);
+    });
     it("retains exact notification bytes and digest with the late observation", async () => {
       const { store, claim, observation } = await setup(kind);
       await store.claimWorkerDispatch(claim);
@@ -275,6 +321,73 @@ for (const kind of ["memory", "sqlite"])
       ).toMatchObject({ recorded: true });
     });
   });
+it("collects memory state before a pending journal append without yielding mid-snapshot", async () => {
+  const { store, claim, observation } = await setup("memory");
+  await store.claimWorkerDispatch(claim);
+  const write = store.recordWorkerTurnEvidence(capture(observation), recordedAt);
+  const reading = store.getWorkerEvidenceSnapshot(claim.sessionId);
+  await write;
+  expect(await reading).toMatchObject({ observations: [], artifacts: [] });
+  const after = (await store.getWorkerEvidenceSnapshot(claim.sessionId))!;
+  expect(after.observations).toHaveLength(1);
+  expect(after.artifacts).toHaveLength(1);
+});
+it("pins a SQLite snapshot across an independent writer commit, including on a read-only reader", async () => {
+  const { store, claim, observation, path } = await setup("sqlite");
+  await store.claimWorkerDispatch(claim);
+  const configure = new Database(path!);
+  try {
+    expect(configure.pragma("journal_mode=WAL", { simple: true })).toBe("wal");
+  } finally {
+    configure.close();
+  }
+  class InspectableReader extends SqliteWorkerObservationStore {
+    get connection() {
+      return this.db;
+    }
+  }
+  const reader = new InspectableReader(path!, { readOnly: true });
+  stores.push(reader);
+  const prepare = reader.connection.prepare.bind(reader.connection);
+  let interleaved = false;
+  const writes: Array<Promise<unknown>> = [];
+  const spy = vi.spyOn(reader.connection, "prepare").mockImplementation((sql: string) => {
+    const statement = prepare(sql);
+    if (sql === "SELECT recordJson FROM worker_dispatches WHERE sessionId=?") {
+      const get = statement.get.bind(statement);
+      vi.spyOn(statement, "get").mockImplementation((...args: unknown[]) => {
+        const value = get(...args);
+        if (!interleaved) {
+          interleaved = true;
+          writes.push(store.acknowledgeWorkerDispatch({ ...claim, turnId: observation.turnId }));
+          writes.push(store.recordWorkerTurnEvidence(capture(observation), recordedAt));
+        }
+        return value;
+      });
+    }
+    return statement;
+  });
+  try {
+    const snapshot = (await reader.getWorkerEvidenceSnapshot(claim.sessionId))!;
+    expect(await Promise.all(writes)).toEqual([
+      expect.objectContaining({ recorded: true }),
+      expect.objectContaining({ recorded: true }),
+    ]);
+    expect(interleaved).toBe(true);
+    expect(snapshot.dispatch.acknowledgement).toBeUndefined();
+    expect(snapshot.observations).toEqual([]);
+    expect(snapshot.artifacts).toEqual([]);
+  } finally {
+    spy.mockRestore();
+  }
+  const next = (await reader.getWorkerEvidenceSnapshot(claim.sessionId))!;
+  expect(next.dispatch.acknowledgement?.turnId).toBe(observation.turnId);
+  expect(next.observations).toHaveLength(1);
+  expect(next.artifacts).toHaveLength(1);
+  expect(reconcileWorkerTurn({ ...next, captureDisposition: "drained" }).state).toBe(
+    "reported_terminal"
+  );
+});
 it("rolls back the journal when SQLite artifact insertion fails, then survives read-only reopen", async () => {
   const { store, claim, observation, path } = await setup("sqlite");
   await store.claimWorkerDispatch(claim);

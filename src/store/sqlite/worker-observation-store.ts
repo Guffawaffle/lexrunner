@@ -1,4 +1,8 @@
 import { SqliteWorkerDispatchStore } from "./worker-dispatch-store.js";
+import type {
+  WorkerEvidenceSnapshot,
+  WorkerEvidenceSnapshotStore,
+} from "../worker-evidence-snapshot.js";
 import {
   parseTurnEvidence,
   turnEvidenceHash,
@@ -23,7 +27,7 @@ import {
 /** Opt-in journal on the existing lifecycle database; never changes lifecycle records. */
 export class SqliteWorkerObservationStore
   extends SqliteWorkerDispatchStore
-  implements WorkerObservationStore, WorkerTurnEvidenceStore
+  implements WorkerObservationStore, WorkerTurnEvidenceStore, WorkerEvidenceSnapshotStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -58,6 +62,25 @@ export class SqliteWorkerObservationStore
       .prepare("SELECT recordJson FROM worker_observations WHERE sessionId = ? ORDER BY rowid")
       .all(sessionId) as { recordJson: string }[];
     return rows.map((row) => WorkerObservationRecord_v1.parse(JSON.parse(row.recordJson)));
+  }
+  async getWorkerEvidenceSnapshot(sessionId: string): Promise<WorkerEvidenceSnapshot | null> {
+    // A deferred read transaction works on read-only connections and pins one SQLite view.
+    return this.db
+      .transaction(() => {
+        const row = this.db
+          .prepare("SELECT recordJson FROM worker_dispatches WHERE sessionId=?")
+          .get(sessionId) as { recordJson: string } | undefined;
+        if (!row) return null;
+        const dispatch = WorkerDispatchRecord_v1.parse(JSON.parse(row.recordJson));
+        const observations = this.observations(sessionId);
+        const artifacts = this.db
+          .prepare(
+            "SELECT observationId,notificationJson FROM worker_turn_evidence WHERE sessionId=? ORDER BY rowid"
+          )
+          .all(sessionId) as Array<{ observationId: string; notificationJson: string }>;
+        return { dispatch, observations, artifacts };
+      })
+      .deferred();
   }
   async getWorkerTurnEvidence(sessionId: string, observationId: string): Promise<string | null> {
     const row = this.db

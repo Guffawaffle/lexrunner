@@ -1,4 +1,8 @@
 import { InMemoryWorkerDispatchStore } from "./worker-dispatch-store.js";
+import type {
+  WorkerEvidenceSnapshot,
+  WorkerEvidenceSnapshotStore,
+} from "../worker-evidence-snapshot.js";
 import {
   parseTurnEvidence,
   turnEvidenceHash,
@@ -18,10 +22,22 @@ import {
 
 export class InMemoryWorkerObservationStore
   extends InMemoryWorkerDispatchStore
-  implements WorkerObservationStore, WorkerTurnEvidenceStore
+  implements WorkerObservationStore, WorkerTurnEvidenceStore, WorkerEvidenceSnapshotStore
 {
   private readonly observations = new Map<string, WorkerObservationRecord[]>();
   private readonly evidence = new Map<string, Map<string, string>>();
+  async getWorkerEvidenceSnapshot(sessionId: string): Promise<WorkerEvidenceSnapshot | null> {
+    // No await or public async getter between these reads.
+    const dispatch = this.readWorkerDispatch(sessionId);
+    if (!dispatch) return null;
+    return structuredClone({
+      dispatch,
+      observations: this.observations.get(sessionId) ?? [],
+      artifacts: [...(this.evidence.get(sessionId) ?? [])].map(
+        ([observationId, notificationJson]) => ({ observationId, notificationJson })
+      ),
+    });
+  }
   async getWorkerTurnEvidence(sessionId: string, observationId: string): Promise<string | null> {
     const json = this.evidence.get(sessionId)?.get(observationId) ?? null;
     if (

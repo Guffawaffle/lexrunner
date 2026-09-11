@@ -16,6 +16,10 @@ export class InMemoryWorkerDispatchStore
   private readonly dispatches = new Map<string, WorkerDispatchRecord>();
 
   async getWorkerDispatch(sessionId: string): Promise<WorkerDispatchRecord | null> {
+    return this.readWorkerDispatch(sessionId);
+  }
+  /** Synchronous detached read for subclasses collecting a consistent in-memory view. */
+  protected readWorkerDispatch(sessionId: string): WorkerDispatchRecord | null {
     return structuredClone(this.dispatches.get(sessionId) ?? null);
   }
   async claimWorkerDispatch(input: ClaimWorkerDispatchInput): Promise<WorkerDispatchResult> {
