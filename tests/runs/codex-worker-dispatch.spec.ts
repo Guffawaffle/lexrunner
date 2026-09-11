@@ -68,7 +68,9 @@ for (const kind of ["memory", "sqlite"])
         const payload = JSON.parse(params.input[0]!.text);
         expect(payload.task_packet.packet_id).toBe("packet-1");
         expect(payload.execution_envelope.envelope_id).toBe("envelope-1");
-        expect(Object.keys(params)).toEqual(["threadId", "input"]);
+        expect(Object.keys(params)).toEqual(["threadId", "input", "outputSchema"]);
+        expect(payload.receipt_contract.worker_session_id).toBe(input.sessionId);
+        expect(params.outputSchema).toMatchObject({ type: "object", additionalProperties: false });
         expect(await store.getWorkerDispatch(input.sessionId)).toMatchObject({
           claimId: input.claimId,
         });

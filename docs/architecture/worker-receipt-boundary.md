@@ -36,8 +36,9 @@ than introduce another verification vocabulary or an alternative acceptance path
 
 ## Next implementation boundary: receipt delivery
 
-Delivery from an owned provider turn into the receipt application service is
-still unimplemented. Before enabling it, define and test:
+The source-only [structured delivery bridge](structured-worker-receipts.md) now
+implements capture, provenance and recovery using this route. Live provider and
+qualified-host conformance remain unproven. Its contract addresses:
 
 - A bounded, explicit structured-result channel. Do not scrape arbitrary prose,
   infer omitted fields, or assume that terminal notification items contain a

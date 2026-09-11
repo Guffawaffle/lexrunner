@@ -1,4 +1,11 @@
 import { SqliteWorkerDispatchStore } from "./worker-dispatch-store.js";
+import {
+  reduceWorkerReceiptEvidence,
+  type WorkerReceiptCapture,
+  type WorkerReceiptEvidence,
+  type WorkerReceiptEvidenceStore,
+  type WorkerReceiptSnapshot,
+} from "../worker-receipt-evidence.js";
 import type {
   WorkerEvidenceSnapshot,
   WorkerEvidenceSnapshotStore,
@@ -27,7 +34,11 @@ import {
 /** Opt-in journal on the existing lifecycle database; never changes lifecycle records. */
 export class SqliteWorkerObservationStore
   extends SqliteWorkerDispatchStore
-  implements WorkerObservationStore, WorkerTurnEvidenceStore, WorkerEvidenceSnapshotStore
+  implements
+    WorkerObservationStore,
+    WorkerTurnEvidenceStore,
+    WorkerEvidenceSnapshotStore,
+    WorkerReceiptEvidenceStore
 {
   constructor(dbPath: string, options: SqliteCoordinationStoreOptions = {}) {
     super(dbPath, options);
@@ -51,11 +62,53 @@ export class SqliteWorkerObservationStore
         );
         INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
           VALUES(19,'worker-turn-evidence',datetime('now'));
+        CREATE TABLE IF NOT EXISTS worker_receipt_evidence (
+          sessionId TEXT NOT NULL, observationId TEXT NOT NULL, recordJson TEXT NOT NULL,
+          PRIMARY KEY(sessionId,observationId),
+          FOREIGN KEY(sessionId) REFERENCES worker_dispatches(sessionId) ON DELETE RESTRICT
+        );
+        INSERT OR IGNORE INTO coordination_schema_migrations(version,name,appliedAt)
+          VALUES(20,'worker-receipt-evidence',datetime('now'));
       `);
     } catch (error) {
       this.db.close();
       throw error;
     }
+  }
+  private receiptEvidence(sessionId: string): WorkerReceiptEvidence[] {
+    return (
+      this.db
+        .prepare("SELECT recordJson FROM worker_receipt_evidence WHERE sessionId=? ORDER BY rowid")
+        .all(sessionId) as { recordJson: string }[]
+    ).map((row) => JSON.parse(row.recordJson) as WorkerReceiptEvidence);
+  }
+  async recordWorkerReceiptEvidence(input: WorkerReceiptCapture, recordedAt: string) {
+    return this.immediateTransaction(() => {
+      const row = this.db
+        .prepare("SELECT recordJson FROM worker_dispatches WHERE sessionId=?")
+        .get(input.sessionId) as { recordJson: string } | undefined;
+      const result = reduceWorkerReceiptEvidence(
+        input,
+        recordedAt,
+        row ? WorkerDispatchRecord_v1.parse(JSON.parse(row.recordJson)) : null,
+        this.receiptEvidence(input.sessionId)
+      );
+      if (result.recorded && !result.replay)
+        this.db
+          .prepare(
+            "INSERT INTO worker_receipt_evidence(sessionId,observationId,recordJson) VALUES(?,?,?)"
+          )
+          .run(input.sessionId, input.observationId, canonicalJSONStringify(result.record));
+      return result;
+    });
+  }
+  async getWorkerReceiptSnapshot(sessionId: string): Promise<WorkerReceiptSnapshot | null> {
+    return this.db
+      .transaction(() => {
+        const turn = this.readWorkerEvidenceSnapshot(sessionId);
+        return turn ? { turn, receipts: this.receiptEvidence(sessionId) } : null;
+      })
+      .deferred();
   }
   private observations(sessionId: string): WorkerObservationRecord[] {
     const rows = this.db
@@ -64,6 +117,9 @@ export class SqliteWorkerObservationStore
     return rows.map((row) => WorkerObservationRecord_v1.parse(JSON.parse(row.recordJson)));
   }
   async getWorkerEvidenceSnapshot(sessionId: string): Promise<WorkerEvidenceSnapshot | null> {
+    return this.readWorkerEvidenceSnapshot(sessionId);
+  }
+  private readWorkerEvidenceSnapshot(sessionId: string): WorkerEvidenceSnapshot | null {
     // A deferred read transaction works on read-only connections and pins one SQLite view.
     return this.db
       .transaction(() => {
