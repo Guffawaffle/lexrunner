@@ -2,6 +2,7 @@ import type { CoordinationStore } from "../store/coordination-store.js";
 import { AgentTaskPacket_v1 } from "../schemas/agent-work.js";
 import { computeCanonicalHash } from "../schemas/task-contract.js";
 import { canonicalJSONStringify } from "../util/canonicalJson.js";
+import { codexReceiptRequest } from "./codex-receipt-contract.js";
 import { validatePersistedCanonicalEnvelope } from "../store/workspace-lifecycle-evidence.js";
 import type {
   WorkerDispatchStore,
@@ -35,6 +36,7 @@ export type DispatchAttachedCodexWorkerInput = Omit<
 export interface CodexTurnStartParams {
   threadId: string;
   input: Array<{ type: "text"; text: string }>;
+  outputSchema?: ReturnType<typeof codexReceiptRequest>["params"]["outputSchema"];
 }
 /** Trusted, explicitly supplied connection to the already-created worker. No automatic launcher. */
 export interface AttachedCodexTransport {
@@ -141,16 +143,8 @@ export class CodexWorkerDispatcher {
     ) {
       return { status: "blocked", reason: "adapter_negotiation_failed" };
     }
-    const params: CodexTurnStartParams = {
-      threadId: session.workerId,
-      input: [
-        {
-          type: "text",
-          text: canonicalJSONStringify({ task_packet: packet, execution_envelope: envelope }),
-        },
-      ],
-    };
-    const request = { method: "turn/start" as const, params };
+    const request = codexReceiptRequest(packet, envelope, session.workerId, session.sessionId);
+    const { params } = request;
     if (Buffer.byteLength(canonicalJSONStringify(request), "utf8") > MAX_REQUEST_BYTES) {
       return { status: "blocked", reason: "provider_request_too_large" };
     }

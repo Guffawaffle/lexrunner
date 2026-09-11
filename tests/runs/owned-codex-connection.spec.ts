@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
 import { OwnedCodexConnection } from "../../src/runs/owned-codex-connection.js";
+import { CodexReceiptOutputSchema } from "../../src/runs/codex-receipt-contract.js";
+import type { WorkerReceiptCapture } from "../../src/store/worker-receipt-evidence.js";
 import { InMemoryWorkerObservationStore } from "../../src/store/inmemory/worker-observation-store.js";
 import { createAttachedWorker, taskPacket } from "../store/worker-dispatch-fixture.js";
 
@@ -89,6 +91,98 @@ const requestOptions = () => ({
 const params = { threadId: "owned-thread", input: [{ type: "text" as const, text: "task" }] };
 
 describe("owned Codex connection", () => {
+  it("requests the supported receipt schema and retries only final-message persistence after response loss", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request(
+      "turn/start",
+      { ...params, outputSchema: CodexReceiptOutputSchema },
+      requestOptions()
+    );
+    const event = {
+      method: "item/completed",
+      params: {
+        threadId: "owned-thread",
+        turnId: "turn-1",
+        item: {
+          type: "agentMessage",
+          id: "item-1",
+          phase: "final_answer",
+          text: '{"receipt":"fixture"}',
+        },
+      },
+    };
+    reply({
+      ...event,
+      params: { ...event.params, item: { ...event.params.item, phase: "commentary" } },
+    });
+    reply(event);
+    expect(connection.snapshot().pendingReceiptCaptures).toBe(1);
+    await connection.close();
+    const recordWorkerReceiptEvidence = vi.fn(
+      async (capture: WorkerReceiptCapture, recordedAt: string) => ({
+        recorded: true as const,
+        replay: true,
+        record: {
+          ...capture,
+          recordedAt,
+          sourceHash: "fixture",
+          recordHash: "fixture",
+          attemptId: "fixture",
+          runId: "fixture",
+          packetHash: "fixture",
+          envelopeHash: "fixture",
+        },
+      })
+    );
+    recordWorkerReceiptEvidence.mockRejectedValueOnce(new Error("lost persist response"));
+    const store = {
+      recordWorkerReceiptEvidence,
+      getWorkerReceiptSnapshot: vi.fn(async () => null),
+    };
+    const binding = { sessionId: "s", claimId: "c", requestHash: "h" };
+    await expect(connection.persistNextReceiptCapture(store, binding, "now")).rejects.toThrow(
+      "lost persist response"
+    );
+    expect(connection.snapshot().pendingReceiptCaptures).toBe(1);
+    expect(await connection.persistNextReceiptCapture(store, binding, "later")).toMatchObject({
+      recorded: true,
+    });
+    const [first] = recordWorkerReceiptEvidence.mock.calls[0];
+    const [second] = recordWorkerReceiptEvidence.mock.calls[1];
+    expect(second).toEqual(first);
+    expect(first.notificationJson).toBe(JSON.stringify(event));
+    expect(first.workerId).toBe("owned-thread");
+    expect(connection.snapshot().pendingReceiptCaptures).toBe(0);
+    expect(sent.filter((x) => x.method === "turn/start")).toHaveLength(1);
+  });
+  it("rejects caller-selected schema overrides before dispatch", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await expect(
+      connection.request(
+        "turn/start",
+        { ...params, outputSchema: { type: "string" } },
+        requestOptions()
+      )
+    ).rejects.toThrow();
+    expect(sent.filter((x) => x.method === "turn/start")).toHaveLength(0);
+  });
+  it("retains bounded final messages and fails explicitly on receipt capture overflow", async () => {
+    connection = await OwnedCodexConnection.open(options);
+    await connection.request("turn/start", params, requestOptions());
+    for (let i = 0; i < 129; i++)
+      reply({
+        method: "item/completed",
+        params: {
+          threadId: "owned-thread",
+          turnId: "turn-1",
+          item: { type: "agentMessage", id: `item-${i}`, phase: "final_answer", text: "{}" },
+        },
+      });
+    expect(connection.snapshot()).toMatchObject({
+      pendingReceiptCaptures: 128,
+      failure: "receipt_capture_limit",
+    });
+  });
   it("retains terminal evidence before acknowledgment and retries only persistence after loss", async () => {
     const store = new InMemoryWorkerObservationStore();
     try {

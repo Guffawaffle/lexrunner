@@ -1,6 +1,12 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { isAbsolute, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
+import {
+  FinalAgentMessage,
+  type WorkerReceiptEvidenceStore,
+} from "../store/worker-receipt-evidence.js";
+import { CodexReceiptOutputSchema } from "./codex-receipt-contract.js";
+import { computeCanonicalHash } from "../schemas/task-contract.js";
 import { TextDecoder } from "node:util";
 import {
   TerminalTurnNotification,
@@ -27,6 +33,15 @@ const TurnParams = z
   .object({
     threadId: text,
     input: z.array(z.object({ type: z.literal("text"), text: z.string() }).strict()).length(1),
+    outputSchema: z
+      .unknown()
+      .optional()
+      .refine(
+        (value) =>
+          value === undefined ||
+          computeCanonicalHash(value) === computeCanonicalHash(CodexReceiptOutputSchema),
+        "Unsupported receipt schema"
+      ),
   })
   .strict();
 const Started = z.object({
@@ -70,6 +85,9 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
     observedAt: string;
     notificationJson: string;
   }> = [];
+  private readonly capturedReceipts: typeof this.capturedTurns = [];
+  private receiptCaptureBytes = 0;
+  private receiptCaptureBusy = false;
   private readonly exited: Promise<void>;
   private closing?: Promise<CodexConnectionCloseResult>;
   private sequence = 0;
@@ -196,7 +214,34 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
       notifications: { ...this.notifications },
       pendingTurnCaptures: this.capturedTurns.length,
       pendingTurnCaptureBytes: this.captureBytes,
+      pendingReceiptCaptures: this.capturedReceipts.length,
+      pendingReceiptCaptureBytes: this.receiptCaptureBytes,
     };
+  }
+
+  /** Retain the source event before removing it from the volatile queue. No lifecycle effects. */
+  async persistNextReceiptCapture(
+    store: WorkerReceiptEvidenceStore,
+    binding: { sessionId: string; claimId: string; requestHash: string },
+    recordedAt: string
+  ) {
+    if (this.receiptCaptureBusy) throw new Error("capture_in_progress");
+    const next = this.capturedReceipts[0];
+    if (!next) return null;
+    this.receiptCaptureBusy = true;
+    try {
+      const result = await store.recordWorkerReceiptEvidence(
+        { ...binding, ...next, observerId: this.captureId, workerId: this.session.threadId },
+        recordedAt
+      );
+      if (result.recorded) {
+        this.capturedReceipts.shift();
+        this.receiptCaptureBytes -= Buffer.byteLength(next.notificationJson, "utf8");
+      }
+      return result;
+    } finally {
+      this.receiptCaptureBusy = false;
+    }
   }
 
   /** Store transaction precedes queue removal. May run after child exit; grants no execution. */
@@ -371,7 +416,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
         }
         if (
           !this.turnAttempted &&
-          /^(turn\/started|turn\/completed|item\/started)/u.test(message.method)
+          /^(turn\/started|turn\/completed|item\/started|item\/completed)/u.test(message.method)
         ) {
           this.fail("unexpected_execution");
           return;
@@ -410,6 +455,34 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
             notificationJson: line,
           });
           this.captureBytes += bytes;
+        }
+        if (message.method === "item/completed") {
+          const params = message.params as
+            { item?: { type?: string; phase?: string }; threadId?: string } | undefined;
+          if (params?.threadId !== this.settings?.threadId) {
+            this.fail("thread_mismatch");
+            return;
+          }
+          if (params?.item?.type === "agentMessage" && params.item.phase === "final_answer") {
+            if (!FinalAgentMessage.safeParse(message).success) {
+              this.fail("invalid_receipt_event");
+              return;
+            }
+            const bytes = Buffer.byteLength(line, "utf8");
+            if (
+              this.capturedReceipts.length >= 128 ||
+              this.receiptCaptureBytes + bytes > 2 * MAX_FRAME
+            ) {
+              this.fail("receipt_capture_limit");
+              return;
+            }
+            this.capturedReceipts.push({
+              observationId: `${this.captureId}:${++this.captureSequence}`,
+              observedAt: new Date().toISOString(),
+              notificationJson: line,
+            });
+            this.receiptCaptureBytes += bytes;
+          }
         }
       } else {
         const pending = typeof message.id === "number" ? this.pending.get(message.id) : undefined;

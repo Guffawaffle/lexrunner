@@ -1,4 +1,11 @@
 import { InMemoryWorkerDispatchStore } from "./worker-dispatch-store.js";
+import {
+  reduceWorkerReceiptEvidence,
+  type WorkerReceiptCapture,
+  type WorkerReceiptEvidence,
+  type WorkerReceiptEvidenceStore,
+  type WorkerReceiptSnapshot,
+} from "../worker-receipt-evidence.js";
 import type {
   WorkerEvidenceSnapshot,
   WorkerEvidenceSnapshotStore,
@@ -22,11 +29,37 @@ import {
 
 export class InMemoryWorkerObservationStore
   extends InMemoryWorkerDispatchStore
-  implements WorkerObservationStore, WorkerTurnEvidenceStore, WorkerEvidenceSnapshotStore
+  implements
+    WorkerObservationStore,
+    WorkerTurnEvidenceStore,
+    WorkerEvidenceSnapshotStore,
+    WorkerReceiptEvidenceStore
 {
   private readonly observations = new Map<string, WorkerObservationRecord[]>();
   private readonly evidence = new Map<string, Map<string, string>>();
+  private readonly receiptEvidence = new Map<string, WorkerReceiptEvidence[]>();
+  async recordWorkerReceiptEvidence(input: WorkerReceiptCapture, recordedAt: string) {
+    const prior = this.receiptEvidence.get(input.sessionId) ?? [];
+    const result = reduceWorkerReceiptEvidence(
+      input,
+      recordedAt,
+      this.readWorkerDispatch(input.sessionId),
+      prior
+    );
+    if (result.recorded && !result.replay)
+      this.receiptEvidence.set(input.sessionId, [...prior, structuredClone(result.record)]);
+    return result;
+  }
+  async getWorkerReceiptSnapshot(sessionId: string): Promise<WorkerReceiptSnapshot | null> {
+    const turn = this.readWorkerEvidenceSnapshot(sessionId);
+    return turn
+      ? { turn, receipts: structuredClone(this.receiptEvidence.get(sessionId) ?? []) }
+      : null;
+  }
   async getWorkerEvidenceSnapshot(sessionId: string): Promise<WorkerEvidenceSnapshot | null> {
+    return this.readWorkerEvidenceSnapshot(sessionId);
+  }
+  private readWorkerEvidenceSnapshot(sessionId: string): WorkerEvidenceSnapshot | null {
     // No await or public async getter between these reads.
     const dispatch = this.readWorkerDispatch(sessionId);
     if (!dispatch) return null;
