@@ -64,6 +64,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
   private captureSequence = 0;
   private captureBytes = 0;
   private captureBusy = false;
+  private outputFinalized = false;
   private readonly capturedTurns: Array<{
     observationId: string;
     observedAt: string;
@@ -115,6 +116,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
     this.exited = new Promise((resolve) =>
       this.child.once("close", (code, signal) => {
         this.processExited = true;
+        this.finalizeOutput();
         this.exitCode = code;
         this.signal = signal;
         this.rejectPending("connection_closed");
@@ -126,6 +128,7 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
     this.child.stdout.on("error", () => this.fail("stdout_error"));
     this.child.stderr.on("error", () => this.fail("stderr_error"));
     this.child.stdout.on("data", (chunk: Buffer) => this.receive(chunk));
+    this.child.stdout.on("end", () => this.finalizeOutput());
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderrBytes += chunk.length;
       if (this.stderrBytes > MAX_TOTAL) this.fail("stderr_limit");
@@ -422,5 +425,17 @@ export class OwnedCodexConnection implements AttachedCodexTransport {
       if (this.failure) return;
     }
     if (Buffer.byteLength(this.buffer, "utf8") > MAX_FRAME) this.fail("frame_limit");
+  }
+  private finalizeOutput() {
+    if (this.outputFinalized) return;
+    this.outputFinalized = true;
+    if (this.failure) return;
+    try {
+      this.buffer += this.decoder.decode();
+    } catch {
+      this.fail("invalid_utf8");
+      return;
+    }
+    if (this.buffer.length) this.fail("incomplete_frame");
   }
 }

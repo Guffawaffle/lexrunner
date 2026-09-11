@@ -246,6 +246,34 @@ describe("owned Codex connection", () => {
     child.stdout.write(Buffer.from([0xff]));
     expect(connection.snapshot().failure).toBe("invalid_utf8");
   });
+  it.each([
+    [Buffer.from([0xf0, 0x9f]), "invalid_utf8", "end"],
+    [Buffer.from('{"method":"turn/completed","params":'), "incomplete_frame", "end"],
+    [Buffer.from([0xf0, 0x9f]), "invalid_utf8", "close"],
+    [Buffer.from('{"method":"turn/completed","params":'), "incomplete_frame", "close"],
+  ])(
+    "reports truncated stdout %j as %s on %s without discarding earlier evidence",
+    async (tail, reason, boundary) => {
+      connection = await OwnedCodexConnection.open(options);
+      await connection.request("turn/start", params, requestOptions());
+      reply({
+        method: "turn/completed",
+        params: { threadId: "owned-thread", turn: { id: "valid-turn", status: "completed" } },
+      });
+      child.stdout.write(tail);
+      if (boundary === "end") {
+        child.stdout.end();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } else child.emit("close", 0, null);
+      expect(connection.snapshot().failure).toBe(reason);
+      expect(connection.snapshot().pendingTurnCaptures).toBe(1);
+      expect(await connection.close()).toMatchObject({
+        processExited: true,
+        execution: "may_have_started",
+      });
+      expect(connection.snapshot().failure).toBe(reason);
+    }
+  );
   it("launches fixed argv, binds an idle session, and closes only its child", async () => {
     connection = await OwnedCodexConnection.open(options);
     expect(spawn).toHaveBeenCalledWith(

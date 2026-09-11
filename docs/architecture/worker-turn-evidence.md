@@ -7,7 +7,10 @@ against locally generated Codex 0.145.0 schemas, not verification of the full tu
 body or the provider's conclusions.
 
 The queue retains each original valid UTF-8 JSON frame, excluding its newline
-delimiter. Invalid UTF-8 fails instead of replacing bytes. A connection UUID and
+delimiter. Invalid UTF-8 fails instead of replacing bytes. EOF finalizes the decoder
+and reports incomplete UTF-8 or an unterminated frame, preserving earlier queued
+events. Child close performs the same check if stdout EOF was not observed.
+A connection UUID and
 sequence give each captured event a stable observation ID for persistence retries;
 neither is an authenticated identity. Capture time is the host's observation time.
 The snapshot exposes counts and byte totals, never the notification body.
