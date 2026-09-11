@@ -6,10 +6,17 @@ release resources, qualify a workspace or enable a public worker command.
 
 ## Protocol and evidence
 
-`codexReceiptRequest` adds the input JSON Schema for `AgentTaskReceipt_v2` as
+`codexReceiptRequest` adds the `codex-task-receipt-v1` wire JSON Schema for `AgentTaskReceipt_v2` as
 `turn/start.outputSchema`, and supplies the worker-session binding in the task
 instructions. The full request, including schema and instructions, is covered by
-the existing durable dispatch digest and authority decision. Existing requests
+the existing durable dispatch digest and authority decision. The wire schema uses
+required nullable fields for optional result identities, check details and costs,
+as required by [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+The decoder removes those explicit nulls, preserves real zero values, and then
+validates the canonical receipt. Null is never interpreted as an observed zero.
+Receipt workspace revision is the attachment revision carried by the envelope
+and canonical session; dispatch's current fencing revision may be newer after
+heartbeats. Existing requests
 without this contract cannot be retroactively attributed to it. Schema generation
 does not encode every semantic refinement; local receipt parsing is mandatory.
 
@@ -58,7 +65,7 @@ references and identities before requesting any lifecycle effect.
 The durable source record is the recovery input. Its record digest is recorded in
 the canonical session's exit reason when the existing worker-session application
 service ends that session. The receipt application service then submits the
-unchanged parsed claim with the resulting session revision and current controller
+decoded canonical claim with the resulting session revision and current controller
 credentials. A completed claim stops at `verification_pending`.
 
 | Failure point                               | Recovery                                                                                                     |

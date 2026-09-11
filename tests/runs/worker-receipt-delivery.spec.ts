@@ -6,7 +6,11 @@ import { InMemoryWorkerObservationStore } from "../../src/store/inmemory/worker-
 import { SqliteWorkerObservationStore } from "../../src/store/sqlite/worker-observation-store.js";
 import { AgentTaskReceipt_v2, ExecutionEnvelope_v1 } from "../../src/schemas/agent-work.js";
 import { computeCanonicalHash } from "../../src/schemas/task-contract.js";
-import { codexReceiptRequest } from "../../src/runs/codex-receipt-contract.js";
+import {
+  codexReceiptRequest,
+  CodexReceiptOutputSchema,
+  decodeCodexReceipt,
+} from "../../src/runs/codex-receipt-contract.js";
 import {
   WorkerReceiptDeliveryService,
   assessWorkerReceipt,
@@ -26,7 +30,7 @@ afterEach(async () => {
   for (const store of stores.splice(0)) await store.close();
   for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true });
 });
-async function setup(kind: string) {
+async function setup(kind: string, heartbeatBeforeDispatch = false) {
   const path = kind === "sqlite" ? await mkdtemp(join(tmpdir(), "lexrunner-receipts-")) : undefined;
   if (path) directories.push(path);
   const dbPath = path && join(path, "store.db");
@@ -35,6 +39,36 @@ async function setup(kind: string) {
     : new InMemoryWorkerObservationStore();
   stores.push(store);
   const controller = await createAttachedWorker(store);
+  if (heartbeatBeforeDispatch) {
+    const lease = (await store.getWorkspaceLease("workspace-lease-1"))!;
+    expect(
+      await store.heartbeatWorkspace({
+        controller,
+        runId: "run-1",
+        expectedRunRevision: 0,
+        attemptId: "attempt-1",
+        expectedAttemptRevision: 3,
+        workspaceLeaseId: lease.leaseId,
+        expectedWorkspaceLeaseRevision: 0,
+        mutationId: "heartbeat-before-dispatch",
+        now: "2026-08-12T12:00:03.500Z",
+        ttlMs: 60_000,
+        observation: {
+          repositoryId: lease.repositoryId,
+          hostId: lease.hostId,
+          gitRuntime: lease.gitRuntime,
+          projectRoot: lease.projectRoot,
+          worktreePath: lease.worktreePath,
+          branch: lease.branch,
+          attemptId: lease.attemptId,
+          exists: true,
+          registered: true,
+          headSha: lease.baseSha,
+          cleanliness: "clean",
+        },
+      })
+    ).toMatchObject({ updated: true });
+  }
   const packet = taskPacket();
   const envelope = ExecutionEnvelope_v1.parse(
     JSON.parse((await store.getLaunchEnvelopeBinding("attempt-1"))!.envelopeJson)
@@ -45,9 +79,9 @@ async function setup(kind: string) {
     runId: "run-1",
     expectedRunRevision: 0,
     attemptId: "attempt-1",
-    expectedAttemptRevision: 3,
+    expectedAttemptRevision: heartbeatBeforeDispatch ? 4 : 3,
     workspaceLeaseId: "workspace-lease-1",
-    expectedWorkspaceLeaseRevision: 0,
+    expectedWorkspaceLeaseRevision: heartbeatBeforeDispatch ? 1 : 0,
     sessionId: "worker-session-1",
     expectedSessionRevision: 0,
     claimId: "claim-1",
@@ -106,7 +140,7 @@ async function setup(kind: string) {
           type: "agentMessage",
           id: "item-1",
           phase: "final_answer",
-          text: JSON.stringify(receipt),
+          text: JSON.stringify(wireReceipt(receipt)),
         },
       },
     }),
@@ -130,7 +164,25 @@ async function setup(kind: string) {
   const clock = { now: "2026-08-12T12:00:08.000Z" };
   const services = portableServices(store);
   const service = () => new WorkerReceiptDeliveryService(store, () => clock.now, services);
-  return { store, dbPath, source, receipt, input, clock, services, service };
+  return { store, dbPath, source, receipt, input, clock, services, service, request };
+}
+function wireReceipt(receipt: AgentTaskReceipt_v2) {
+  return {
+    ...receipt,
+    final_head_sha: receipt.final_head_sha ?? null,
+    patch_hash: receipt.patch_hash ?? null,
+    cost: {
+      input_tokens: receipt.cost.input_tokens ?? null,
+      output_tokens: receipt.cost.output_tokens ?? null,
+      tool_calls: receipt.cost.tool_calls ?? null,
+      elapsed_ms: receipt.cost.elapsed_ms ?? null,
+    },
+    claimed_checks: receipt.claimed_checks.map((check) => ({
+      ...check,
+      exit_code: check.exit_code ?? null,
+      output_snippet: check.output_snippet ?? null,
+    })),
+  };
 }
 function portableServices(store: InMemoryWorkerObservationStore | SqliteWorkerObservationStore) {
   // Portable store-contract adapters only. Real application services additionally validate paths.
@@ -162,6 +214,25 @@ function portableServices(store: InMemoryWorkerObservationStore | SqliteWorkerOb
 }
 for (const kind of ["memory", "sqlite"])
   describe(`${kind} structured receipt delivery`, () => {
+    it("keeps the receipt bound to attachment after a workspace heartbeat advances dispatch fencing", async () => {
+      const f = await setup(kind, true);
+      expect((await f.store.getWorkerDispatch(f.input.sessionId))!.workspaceLeaseRevision).toBe(1);
+      expect(
+        JSON.parse(f.request.params.input[0].text).receipt_contract.workspace_lease_revision
+      ).toBe(0);
+      await f.store.recordWorkerReceiptEvidence(f.source, f.source.observedAt);
+      expect(await f.service().deliver(f.input)).toMatchObject({
+        state: "submitted",
+        disposition: "verification_pending",
+      });
+      expect(
+        (await f.store.getAttemptReceiptForAttempt(f.input.attemptId))!.workspaceLeaseRevision
+      ).toBe(0);
+      const stored = JSON.parse(
+        (await f.store.getAttemptReceiptForAttempt(f.input.attemptId))!.receiptJson
+      );
+      expect(stored.workspace_lease_revision).toBe(0);
+    });
     it("does not attribute an unrelated canonical submission to the captured source", async () => {
       const f = await setup(kind);
       await f.store.recordWorkerReceiptEvidence(f.source, f.source.observedAt);
@@ -388,6 +459,33 @@ it("reconstructs receipt provenance from SQLite after a process restart", async 
   expect(assessWorkerReceipt(after!, "drained").provenance.receiptHash).toBe(
     computeCanonicalHash(f.receipt)
   );
+});
+
+it("uses required nullable wire fields and decodes omissions without inventing zero costs", async () => {
+  const f = await setup("memory");
+  const wire = wireReceipt(f.receipt);
+  expect(decodeCodexReceipt(wire)).toEqual(f.receipt);
+  expect(decodeCodexReceipt({ ...wire, cost: { ...wire.cost, input_tokens: 0 } }).cost).toEqual({
+    input_tokens: 0,
+  });
+  expect(() => decodeCodexReceipt(f.receipt)).toThrow();
+  expect(() => decodeCodexReceipt({ ...wire, final_head_sha: null, patch_hash: null })).toThrow();
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const object = node as Record<string, unknown>;
+    if (object.type === "object") {
+      expect(object.additionalProperties).toBe(false);
+      expect([...(object.required as string[])].sort()).toEqual(
+        Object.keys(object.properties as object).sort()
+      );
+    }
+    Object.values(object).forEach(visit);
+  };
+  visit(CodexReceiptOutputSchema);
 });
 
 it.each(["end", "submit"] as const)(

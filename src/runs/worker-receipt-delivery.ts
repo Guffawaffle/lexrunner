@@ -1,6 +1,5 @@
 import {
   AgentTaskPacket_v1,
-  AgentTaskReceipt_v2,
   ExecutionEnvelope_v1,
   validateAgentTaskReceiptV2PacketReferences,
 } from "../schemas/agent-work.js";
@@ -26,7 +25,7 @@ import {
   AgentWorkAttemptVerificationService,
   type RunAttemptVerificationInput,
 } from "./agent-work-attempt-verification-service.js";
-import { codexReceiptRequest } from "./codex-receipt-contract.js";
+import { codexReceiptRequest, decodeCodexReceipt } from "./codex-receipt-contract.js";
 import { reconcileWorkerTurn } from "./worker-turn-reconciliation.js";
 
 type Store = WorkerReceiptEvidenceStore &
@@ -79,9 +78,12 @@ export function assessWorkerReceipt(
   } catch {
     throw new Error("invalid_task_receipt");
   }
-  const parsed = AgentTaskReceipt_v2.safeParse(value);
-  if (!parsed.success) throw new Error("invalid_task_receipt");
-  const receipt = parsed.data;
+  let receipt;
+  try {
+    receipt = decodeCodexReceipt(value);
+  } catch {
+    throw new Error("invalid_task_receipt");
+  }
   const dispatch = snapshot.turn.dispatch;
   if (
     receipt.run_id !== runId ||
@@ -90,7 +92,6 @@ export function assessWorkerReceipt(
     receipt.packet_id !== dispatch.packetId ||
     receipt.worker_session_id !== dispatch.sessionId ||
     receipt.workspace_lease_id !== dispatch.workspaceLeaseId ||
-    receipt.workspace_lease_revision !== dispatch.workspaceLeaseRevision ||
     Date.parse(receipt.worker_completed_at) > Date.parse(source.observedAt)
   )
     throw new Error("receipt_binding_mismatch");
@@ -160,6 +161,7 @@ export class WorkerReceiptDeliveryService {
       receipt.work_item_revision !== packet.work_item.revision ||
       receipt.observed_base_sha !== packet.repository.base_sha ||
       receipt.worker_runtime !== session.workerRuntime ||
+      receipt.workspace_lease_revision !== session.workspaceLeaseRevision ||
       Date.parse(receipt.worker_started_at) < Date.parse(session.startedAt) ||
       !validateAgentTaskReceiptV2PacketReferences(packet, receipt).valid
     )
