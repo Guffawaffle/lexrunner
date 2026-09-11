@@ -1,0 +1,243 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { probeOwnedWindowsBoundaryHandshake } from "../../src/workspaces/owned-windows-boundary-handshake.js";
+
+const fixture = fileURLToPath(
+  new URL("../fixtures/windows-boundary-handshake-child.mjs", import.meta.url)
+);
+const state = vi.hoisted(() => ({
+  mode: "valid",
+  calls: [] as unknown[][],
+  child: undefined as any,
+  write: undefined as any,
+}));
+vi.mock("node:child_process", async (original) => {
+  const actual = await original<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    spawn: (...args: Parameters<typeof actual.spawn>) => {
+      state.calls.push(args);
+      if (state.mode === "spawn-throws") throw new Error("private spawn diagnostic");
+      if (state.mode === "fake") return state.child;
+      if (state.mode === "async-spawn-error") {
+        return actual.spawn(process.execPath + ".missing-boundary", [], args[2]);
+      }
+      // The production fixed argv is captured above; only this test replaces the executable peer.
+      state.child = actual.spawn(
+        process.execPath,
+        [fixture, state.mode, `sha256:${"c".repeat(64)}`],
+        args[2]
+      );
+      state.write = vi.spyOn(state.child.stdin, "write");
+      return state.child;
+    },
+  };
+});
+const options = () => ({
+  executable: process.execPath,
+  cwd: process.cwd(),
+  expectedArtifactSha256: `sha256:${"c".repeat(64)}`,
+  architecture: process.arch as "x64" | "arm64",
+  handshakeTimeoutMs: 2_000,
+  closeTimeoutMs: 100,
+  killTimeoutMs: 1_000,
+});
+afterEach(() => {
+  state.calls.length = 0;
+  state.mode = "valid";
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+describe("owned Windows boundary development handshake", () => {
+  it("checks the elapsed deadline even before the timer callback runs", async () => {
+    const now = performance.now();
+    const clock = vi.spyOn(performance, "now").mockReturnValue(now);
+    const pending = probeOwnedWindowsBoundaryHandshake(options());
+    clock.mockReturnValue(now + 3_000);
+    const report = await pending;
+    expect(report).toMatchObject({
+      reason: "handshake_timeout",
+      cleanup: { disposition: "closed" },
+    });
+    expect(state.write).not.toHaveBeenCalled();
+  });
+  it("generates a distinct cryptographic client nonce and request identity per launch", async () => {
+    await probeOwnedWindowsBoundaryHandshake(options());
+    const first = JSON.parse(state.write.mock.calls[0][0].subarray(4).toString("utf8"));
+    await probeOwnedWindowsBoundaryHandshake(options());
+    const second = JSON.parse(state.write.mock.calls[0][0].subarray(4).toString("utf8"));
+    expect(first.client_nonce).toMatch(/^[a-f0-9]{64}$/u);
+    expect(second.client_nonce).toMatch(/^[a-f0-9]{64}$/u);
+    expect(second.client_nonce).not.toBe(first.client_nonce);
+    expect(second.request_id).not.toBe(first.request_id);
+    expect(state.calls).toHaveLength(2);
+  });
+  it("handles asynchronous executable-not-found without claiming an exited process", async () => {
+    state.mode = "async-spawn-error";
+    expect(await probeOwnedWindowsBoundaryHandshake(options())).toMatchObject({
+      reason: "spawn_error",
+      cleanup: { disposition: "not_started", processExited: false },
+    });
+  });
+  it("finalizes truncated bytes when close arrives without a stdout end event", async () => {
+    state.mode = "fake";
+    const child = Object.assign(new EventEmitter(), {
+      pid: 42,
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+      unref: vi.fn(),
+    });
+    state.child = child;
+    const pending = probeOwnedWindowsBoundaryHandshake(options());
+    child.emit("spawn");
+    child.stdout.write(Buffer.from([0, 0]));
+    child.emit("exit", 0, null);
+    child.emit("close", 0, null);
+    expect(await pending).toMatchObject({
+      reason: "protocol_error",
+      cleanup: { disposition: "closed", processExited: true },
+    });
+    expect(child.kill).not.toHaveBeenCalled();
+  });
+  it.each(["valid", "fragmented"])(
+    "matches %s real peer and observes process/pipe closure",
+    async (mode) => {
+      state.mode = mode;
+      const report = await probeOwnedWindowsBoundaryHandshake(options());
+      expect(report).toMatchObject({
+        outcome: "matched",
+        verification: "not_performed",
+        helloMatched: true,
+        cleanup: {
+          disposition: "closed",
+          processExited: true,
+          terminationRequested: false,
+          exitCode: 0,
+          descendants: "not_assessed",
+        },
+      });
+      expect(report.sessionNonceSha256).toMatch(/^sha256:[a-f0-9]{64}$/u);
+      expect(state.calls).toHaveLength(1);
+    }
+  );
+  it("uses fixed argv, fresh pipes and a restricted child environment", async () => {
+    vi.stubEnv("NODE_OPTIONS", "--require=do-not-load-this");
+    vi.stubEnv("LD_PRELOAD", "/do-not-load-this");
+    vi.stubEnv("PRIVATE_TEST_SECRET", "must-not-be-forwarded");
+    expect((await probeOwnedWindowsBoundaryHandshake(options())).outcome).toBe("matched");
+    expect(state.calls[0][1]).toEqual(["--boundary-protocol", "1.0.0"]);
+    const launch = state.calls[0][2] as any;
+    expect(launch).toMatchObject({
+      shell: false,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    expect(
+      Object.keys(launch.env).every((key) =>
+        ["SYSTEMROOT", "WINDIR", "TEMP", "TMP"].includes(key.toUpperCase())
+      )
+    ).toBe(true);
+  });
+  it.each([
+    ["wrong-pid", "metadata_mismatch"],
+    ["wrong-nonce", "metadata_mismatch"],
+    ["wrong-digest", "metadata_mismatch"],
+    ["duplicate", "protocol_error"],
+    ["trailing-partial", "protocol_error"],
+    ["partial", "protocol_error"],
+    ["garbage", "protocol_error"],
+    ["early-exit", "child_exit"],
+    ["nonzero-exit", "child_exit"],
+    ["stderr-overflow", "output_limit"],
+  ])("rejects %s and waits for cleanup", async (mode, reason) => {
+    state.mode = mode;
+    const report = await probeOwnedWindowsBoundaryHandshake(options());
+    expect(report).toMatchObject({
+      outcome: "failed",
+      reason,
+      verification: "not_performed",
+      cleanup: { disposition: "closed", processExited: true },
+    });
+  });
+  it("retains a matched hello as evidence but fails if graceful shutdown needs termination", async () => {
+    state.mode = "ignore-eof";
+    expect(await probeOwnedWindowsBoundaryHandshake(options())).toMatchObject({
+      outcome: "failed",
+      reason: "cleanup_forced",
+      helloMatched: true,
+      cleanup: { disposition: "closed", terminationRequested: true, processExited: true },
+    });
+  });
+  it("times out and closes a silent real child without resending", async () => {
+    state.mode = "silent";
+    expect(
+      await probeOwnedWindowsBoundaryHandshake({ ...options(), handshakeTimeoutMs: 100 })
+    ).toMatchObject({
+      outcome: "failed",
+      reason: "handshake_timeout",
+      cleanup: { disposition: "closed" },
+    });
+    expect(state.calls).toHaveLength(1);
+  });
+  it("does not spawn for invalid options or prior cancellation", async () => {
+    expect(
+      await probeOwnedWindowsBoundaryHandshake({ ...options(), executable: "relative" })
+    ).toMatchObject({ reason: "invalid_options", cleanup: { disposition: "not_started" } });
+    expect(await probeOwnedWindowsBoundaryHandshake(options(), AbortSignal.abort())).toMatchObject({
+      reason: "cancelled",
+      cleanup: { disposition: "not_started" },
+    });
+    expect(state.calls).toHaveLength(0);
+  });
+  it("cancels a waiting child and retains explicit closure", async () => {
+    state.mode = "silent";
+    const controller = new AbortController();
+    const pending = probeOwnedWindowsBoundaryHandshake(options(), controller.signal);
+    controller.abort();
+    expect(await pending).toMatchObject({
+      reason: "cancelled",
+      cleanup: { disposition: "closed" },
+    });
+  });
+  it("reports synchronous spawn failure without private diagnostics", async () => {
+    state.mode = "spawn-throws";
+    const report = await probeOwnedWindowsBoundaryHandshake(options());
+    expect(report).toMatchObject({
+      reason: "spawn_error",
+      cleanup: { disposition: "not_started" },
+    });
+    expect(JSON.stringify(report)).not.toContain("private");
+  });
+  it("bounds cleanup when the owned handle cannot confirm exit or pipe closure", async () => {
+    state.mode = "fake";
+    const child = Object.assign(new EventEmitter(), {
+      pid: 42,
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(() => false),
+      unref: vi.fn(),
+    });
+    state.child = child;
+    const pending = probeOwnedWindowsBoundaryHandshake({
+      ...options(),
+      handshakeTimeoutMs: 10,
+      closeTimeoutMs: 10,
+      killTimeoutMs: 10,
+    });
+    child.emit("spawn");
+    const report = await pending;
+    expect(report).toMatchObject({
+      reason: "handshake_timeout",
+      cleanup: { disposition: "unknown", processExited: false, terminationRequested: true },
+    });
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.unref).toHaveBeenCalledTimes(1);
+    expect(child.stdout.destroyed).toBe(true);
+  });
+});
