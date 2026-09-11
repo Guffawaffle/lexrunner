@@ -16,7 +16,10 @@ public unauthenticated endpoint or an executor qualification mechanism.
 The report contains a provider turn ID, reported kind (`acknowledged`, `completed`,
 `failed` or `interrupted`), evidence digest and summary. The digest identifies
 caller-selected evidence; this slice neither retains the underlying artifact nor
-verifies its existence, authenticity or conclusions. `observationHash` hashes the
+verifies its existence, authenticity or conclusions. The separate
+[terminal capture API](worker-turn-evidence.md) atomically retains a notification
+artifact and its derived observation; generic report insertion retains its original
+caller-supplied semantics. `observationHash` hashes the
 canonical input report for replay comparison. It is not a signature or independent
 integrity root. Copied dispatch bindings and the original recorded time remain in
 the immutable journal record.
@@ -50,7 +53,8 @@ await. Neither adapter promotes a report into authority.
 
 Tests cover late reports, conflicting turns, replay after response loss, independent
 SQLite connections, read-only reopen, input/time/capacity rejection, detached reads
-and opaque identities. These are controlled store tests. Native event ingestion,
-durable artifact capture, verified result receipts, late-turn reconciliation and
-qualified native workspace preparation remain follow-up work before live dogfood.
+and opaque identities. These are controlled store tests. Terminal notification
+capture is implemented separately as described above. Live conformance, verified
+result receipts, late-turn reconciliation and qualified native workspace preparation
+remain follow-up work before live dogfood.
 No CLI/MCP command, default store or installed runtime changes in this slice.

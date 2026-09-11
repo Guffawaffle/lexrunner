@@ -26,9 +26,10 @@ an explicit error.
 Protocol output is bounded to 1 MiB per frame and 8 MiB per stream over the entire
 connection. Unexpected responses, server requests, premature execution and changed
 thread identity terminate the connection. Notifications retain only bounded method
-counts, and stderr retains only byte counts. Thus this slice does not collect task
-receipts or establish task completion. Long-running sessions that exceed the bounds
-fail explicitly; they need a separately designed event/receipt consumer.
+counts, and stderr retains only byte counts. Terminal turn notifications additionally
+enter an explicit bounded evidence queue; see [terminal event capture](worker-turn-evidence.md).
+The caller must persist that queue explicitly. It does not establish task completion
+or a verified task receipt. Long-running sessions that exceed the bounds fail explicitly.
 
 Run the idle native probe with `npx tsx scripts/probe-owned-codex-connection.ts`
 followed by an absolute Codex executable path and a **new** absolute output directory.
